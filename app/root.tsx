@@ -22,6 +22,7 @@ export const loader = async ({ request }) => {
   const env = {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_KEY: process.env.SUPABASE_KEY,
+    BASE_URL: process.env.BASE_URL
   };
   const response = new Response();
   const { supabaseClient: supabase, headers } =
@@ -66,7 +67,7 @@ export default function App() {
         <Links />
       </head>
       <body>
-        <Outlet context={supabase} />
+        <Outlet context={{supabase, env}} />
         <ScrollRestoration />
         <Scripts />
         <LiveReload />

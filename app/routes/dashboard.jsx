@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, redirect, json, useFetcher } from '@remix-run/react';
+import { Outlet, useLoaderData, redirect, json, useFetcher, useOutletContext } from '@remix-run/react';
 import { createSupabaseServerClient } from '../supabase.server';
 import { useEffect, useState, useRef } from 'react';
 import { Device } from '@twilio/voice-sdk';
@@ -10,6 +10,7 @@ export const loader = async ({ request }) => {
 };
 
 const Dashboard = () => {
+    const { env } = useOutletContext();
     const { token } = useLoaderData();
     const [to, setTo] = useState('');
     const [call, setCall] = useState(null);
@@ -48,15 +49,15 @@ const Dashboard = () => {
         }
     }
     const makeRoboCall = async () => {
-        await fetch('https://39b8-104-158-1-82.ngrok-free.app/api/call/robocall', {
-            method:'POST',
-            body:JSON.stringify({to})
+        await fetch(`${env.BASE_URL}/api/call/robocall`, {
+            method: 'POST',
+            body: JSON.stringify({ to })
         })
     }
     const makeVoiceDrop = async () => {
-        await fetch('https://39b8-104-158-1-82.ngrok-free.app/api/call/audiodrop', {
-            method:'POST',
-            body:JSON.stringify({to})
+        await fetch(`${env.BASE_URL}/api/call/audiodrop`, {
+            method: 'POST',
+            body: JSON.stringify({ to })
         })
     }
     const hangUp = () => {
