@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "euphoric-axon-421918",
+  "private_key_id": "2d04e5174a7f27dbb4edbece9aa997fc53fab8e9",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEugIBADANBgkqhkiG9w0BAQEFAASCBKQwggSgAgEAAoIBAQC4aMPrAf3s7+JJ\nOgPMWaMhu5fHoNRFfQqjtTI6WgOC+vlmfkXL2NZh8TAQTo09A4kZtCURWDbcN8oB\npIdnMH4yVj6n/ZK1K43TLzAN8RSLELdpbyEqgzYUtXjnb7n+mkgCfc8NfMhh139S\ns5hb29mWgQsP9bMxmg+L71fwRit8rhbLQOTXk3FKn+YwK7+CVoEKuMN4jik6IFCL\n+LN1rUZMYuk24Xmf4iif0F5H2qGswOByFN/vU74YQFGSmZ7BMokys9vHH8kFEfXj\nnnXLxdkYUM88xsfbVC7Pij0w/5b0YZKj1W03mEQmwFpRjfJnbM9MbtowT/bkjsHT\n32GHr/XhAgMBAAECgf8+TsWKIIs8BO0snIJZ5ccAx+EUfYv3OU56L8XXPS+PXSs/\n+e+tbf+fg+a4+abq5y7qHbwIjIEBDtq3FHDctd/2Z2hBBk8vVYVUcN/dVhCrag5B\n4ywwBdvgjyF7WdIYc/iOlmoC8fTm8878kf3E/wY7vjBcA5f9F8wKBRug3KXAnwlx\ntrE3vbJHSMpt2cvBhVfFhb50PBtorgUKIuwamieJap7nB7JU4ebdpHhpxs/9XFon\nXf8DaXxk+kt45MOzEavYXJiBK/ZZd62Y2bsx7Lzvl8UcmC2fog1Ry6oc4zk3z83o\n3B7/aI0wpPyk5Kel9S95iH/axJa4yxzLftE89wECgYEA4fiVArjP1WNhQBhqkWEr\n/fvrr+mQ/HOQ+fo8b/vt+M+Y+macDkTNJoH+0fCdrDRH4RZZ8Y+QhMGJMFWyxR47\nWjeBM6zfYm7wXeN3PMwcXak7kZP5quCyIhEJfluT2ehYR1Rl1GGNkZ2RzfaYP5C0\nMtMA+p5hm25Qx/GUR+HnROECgYEA0OpF0R7bV7my915GINKCBwXzcylwSHwwfAGr\ntDW1b/AdV0ALHilw8OHMbz1edlHJh3UTh0urIUwee5k9IzDicRrhDDmMD68O0skv\nrbgaGJteAVNMw4uoV+X9b3kIHTFrndUhm1d/wiicm/bJYaW+0bAoV+07pC5uj2D4\n4Rst0QECgYARcYH3MtMAUuqX6wqW7Fxb/81ix/HkOvuPAG0X6+ej1Eqn0bHsPA1m\nEpTcGenh+CswSexphD6QsOvpKkRhiQLl5PD5TzfzPkMZzExRCiSKalzp0PVt5mh5\nzrzf3yvbn17pKq+tpFYsTnCJ6KY6Ce6PGdCyh/Va7ToZJSHgJqUWoQKBgG6+0bXS\naqntSb6x3fEGRmFcuToiDGCQXM9Pv2qvUff9zD/1Ni+N/k3jFJEfchS8tF03JdwB\ns7zZ8grJJ8yg3Fjiy8vEMcgan3wDpF+tiT/kFIgVVUsPnHTD+X3/Jdr72LV5RvBn\nCNWu254dy5EU4LudazV5D7Wv23HsEOKbmsUBAoGAcZHnI+LzeVO7QIsswlo9E2xu\nHBFJH8Y8fob25H/MCgG0vD/wYEkNy+WpFfMUEuZoTW56civ3DJRgSTU6AC5JdjeW\n9WfA3IEKKCZEiLuXF9M3PaJs68j/OfbnkMeIyjCwlZwkQfMv5k2PISqs+TyT/BX0\nXHyIadwdpX+boSAE1xA=\n-----END PRIVATE KEY-----\n",
+  "client_email": "transcriptor@euphoric-axon-421918.iam.gserviceaccount.com",
+  "client_id": "107282179475553072139",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/transcriptor%40euphoric-axon-421918.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
