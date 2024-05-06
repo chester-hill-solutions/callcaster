@@ -13,6 +13,7 @@ const Dashboard = () => {
     const { env } = useOutletContext();
     const { token } = useLoaderData();
     const [to, setTo] = useState('');
+    const [messageBody, setMessage] = useState('');
     const [call, setCall] = useState(null);
     const [device, setDevice] = useState(null);
     const [error, setError] = useState(null);
@@ -69,7 +70,13 @@ const Dashboard = () => {
         }
         device.disconnectAll();
     };
-
+    const sendMessage = async () => {
+        console.log('Sending')
+        await fetch(`${env.BASE_URL}/api/message`, {
+            method:"POST",
+            body: JSON.stringify({to, messageBody})
+        })
+    }
     return (
         <div>
             <div>
@@ -89,6 +96,13 @@ const Dashboard = () => {
                 <button onClick={makeVoiceDrop}>Voice Drop</button>
                 <button onClick={hangUp}>
                     Hang Up
+                </button>
+            </div>
+            <div>
+                <textarea name='messageBody' placeholder='Text Message' onChange={(e) => setMessage(e.target.value)}>
+                </textarea>
+                <button onClick={sendMessage}>
+                    SMS
                 </button>
             </div>
             <div>
