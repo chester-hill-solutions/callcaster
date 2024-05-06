@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Device } from '@twilio/voice-sdk';
 
 export const loader = async ({ request }) => {
+    const baseUrl = process.env.BASE_URL;
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
     const { token } = await fetch(`${baseUrl}/api/token`).then((res) => res.json());
     return json({ token }, { headers });
