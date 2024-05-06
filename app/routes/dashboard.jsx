@@ -5,7 +5,7 @@ import { Device } from '@twilio/voice-sdk';
 
 export const loader = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { token } = await fetch('http://localhost:3000/api/token').then((res) => res.json());
+    const { token } = await fetch(`${baseUrl}/api/token`).then((res) => res.json());
     return json({ token }, { headers });
 };
 
