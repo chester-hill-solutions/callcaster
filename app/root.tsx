@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect } from "react";
 import { cssBundleHref } from "@remix-run/css-bundle";
 import type { LinksFunction } from "@remix-run/node";
@@ -12,17 +13,20 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
-import { createSupabaseServerClient } from "./supabase.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { createBrowserClient } from "@supabase/ssr";
+
+import stylesheet from "~/tailwind.css";
+
 export const links: LinksFunction = () => [
-  ...(cssBundleHref ? [{ rel: "stylesheet", href: cssBundleHref }] : []),
+  { rel: "stylesheet", href: stylesheet },
 ];
 
 export const loader = async ({ request }) => {
   const env = {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_KEY: process.env.SUPABASE_KEY,
-    BASE_URL: process.env.BASE_URL
+    BASE_URL: process.env.BASE_URL,
   };
   const response = new Response();
   const { supabaseClient: supabase, headers } =
@@ -37,7 +41,7 @@ export const loader = async ({ request }) => {
     },
     {
       headers: response.headers,
-    }
+    },
   );
 };
 export default function App() {
@@ -66,8 +70,8 @@ export default function App() {
         <Meta />
         <Links />
       </head>
-      <body>
-        <Outlet context={{supabase, env}} />
+      <body className="flex min-h-screen bg-foreground">
+        <Outlet context={{ supabase, env }} />
         <ScrollRestoration />
         <Scripts />
         <LiveReload />
