@@ -8,25 +8,26 @@ import {
 } from "@remix-run/react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { useEffect, useState, useRef } from "react";
-import { Device } from "@twilio/voice-sdk";
+import { Call, Device } from "@twilio/voice-sdk";
+import { ContextType } from "~/lib/types";
 
 export const loader = async ({ request }) => {
   const baseUrl = process.env.BASE_URL;
   const { supabaseClient: supabase, headers } =
     createSupabaseServerClient(request);
   const { token } = await fetch(`${baseUrl}/api/token`).then((res) =>
-    res.json()
+    res.json(),
   );
   return json({ token }, { headers });
 };
 
 const Dashboard = () => {
-  const { env } = useOutletContext();
+  const { env } = useOutletContext() as ContextType;
   const { token } = useLoaderData();
   const [to, setTo] = useState("");
   const [messageBody, setMessage] = useState("");
-  const [call, setCall] = useState(null);
-  const [device, setDevice] = useState(null);
+  const [call, setCall] = useState<Call>(null);
+  const [device, setDevice] = useState<Device | null>(null);
   const [error, setError] = useState(null);
   const [transcript, setTranscript] = useState("");
   const audioContext = useRef(null);
@@ -36,20 +37,23 @@ const Dashboard = () => {
   useEffect(() => {
     const device = new Device(token);
     setDevice(device);
-    audioContext.current = new (window.AudioContext ||
-      window.webkitAudioContext)();
+
+    if (audioContext.current != null) {
+      audioContext.current = new (window.AudioContext ||
+        window.webkitAudioContext)();
+    }
   }, []);
 
   const makeCall = async () => {
-    if (device) {
-      device.audio.setAudioConstraints({
+    if (device != null) {
+      device.audio?.setAudioConstraints({
         echoCancellation: true,
         autoGainControl: true,
-        noiseSupression: true,
+        noiseSuppression: true,
       });
       try {
         console.log(`Attempting call to ${to}.`);
-        let call = await device.connect({
+        const call = await device.connect({
           params: {
             To: to,
           },
@@ -89,10 +93,9 @@ const Dashboard = () => {
     });
   };
   return (
-    <div>
-      <div>
-        <h1>Welcome to the dashboard</h1>
-      </div>
+    <main className="mx-auto flex h-full w-full flex-col items-center gap-8 text-white">
+      <h1>Welcome to the dashboard</h1>
+
       <div>
         <input
           type="text"
@@ -120,7 +123,9 @@ const Dashboard = () => {
       </div>
 
       {error && <div>Error: {JSON.stringify(error)}</div>}
-    </div>
+    </main>
   );
 };
+
+Dashboard.displayName = "Dashboard";
 export default Dashboard;

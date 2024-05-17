@@ -1,10 +1,11 @@
 import { createServerClient, parse, serialize } from "@supabase/ssr";
+import { Database } from "./database.types";
 
 export const createSupabaseServerClient = (request: Request) => {
   const cookies = parse(request.headers.get("Cookie") ?? "");
   const headers = new Headers();
 
-  const supabaseClient = createServerClient(
+  const supabaseClient = createServerClient<Database>(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_KEY!,
     {
@@ -19,7 +20,7 @@ export const createSupabaseServerClient = (request: Request) => {
           headers.append("Set-Cookie", serialize(key, "", options));
         },
       },
-    }
+    },
   );
   return { supabaseClient, headers };
 };
