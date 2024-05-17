@@ -17,7 +17,7 @@ export const loader = async ({ request }: { request: Request }) => {
     await getSupabaseServerClientWithSession(request);
 
   if (serverSession && serverSession.user) {
-    redirect("/workspaces", { headers });
+    return redirect("/workspaces", { headers });
   }
 
   return json({ headers });

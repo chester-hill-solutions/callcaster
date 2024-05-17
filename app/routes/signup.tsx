@@ -1,10 +1,9 @@
-import { json, useActionData, redirect, Link, Form } from "@remix-run/react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { Form, json, useActionData } from "@remix-run/react";
 
-import { Button } from "~/components/ui/button";
+import { ReactNode, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { ReactNode, useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
@@ -52,14 +51,14 @@ function FormFirstPage() {
     <>
       <Button
         variant={"outline"}
-        className="font-Zilla-Slab flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent text-xl font-semibold"
+        className="flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent font-Zilla-Slab text-xl font-semibold"
       >
         <FcGoogle size={"2rem"} />
         Sign in with Google
       </Button>
       <Button
         variant={"outline"}
-        className="font-Zilla-Slab flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent text-xl font-semibold"
+        className="flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent font-Zilla-Slab text-xl font-semibold"
       >
         <FaGithub size={"2rem"} />
         Sign in with Github
@@ -67,7 +66,7 @@ function FormFirstPage() {
 
       <div className="flex w-full items-center justify-center gap-2">
         <div className="w-full border border-brand-secondary" />
-        <p className="font-Zilla-Slab font-regular text-xl text-brand-secondary">
+        <p className="font-regular font-Zilla-Slab text-xl text-brand-secondary">
           OR
         </p>
         <div className="w-full border border-brand-secondary" />
@@ -76,7 +75,7 @@ function FormFirstPage() {
       <Form method="POST" className="flex w-full flex-col gap-4">
         <label
           htmlFor="email"
-          className="font-Zilla-Slab flex w-full flex-col text-2xl font-semibold tracking-[1px]"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
         >
           Email
           <input
@@ -101,7 +100,7 @@ function FormSecondPage() {
       >
         <label
           htmlFor="email"
-          className="font-Zilla-Slab flex w-full flex-col text-2xl font-semibold tracking-[1px]"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
         >
           Email*
           <input
@@ -114,7 +113,7 @@ function FormSecondPage() {
         </label>
         <label
           htmlFor="confirmEmail"
-          className="font-Zilla-Slab flex w-full flex-col text-2xl font-semibold tracking-[1px]"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
         >
           Confirm Email*
           <input
@@ -128,7 +127,7 @@ function FormSecondPage() {
         <div className="my-2"></div>
         <label
           htmlFor="password"
-          className="font-Zilla-Slab flex w-full flex-col text-2xl font-semibold tracking-[1px]"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
         >
           Password*
           <input
@@ -141,7 +140,7 @@ function FormSecondPage() {
         </label>
         <label
           htmlFor="confirmPassword"
-          className="font-Zilla-Slab flex w-full flex-col text-2xl font-semibold tracking-[1px]"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
         >
           Confirm Password*
           <input
@@ -180,7 +179,7 @@ export default function SignUp() {
         id="login-hero"
         className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-[#191716] px-28 py-8 shadow-sm"
       >
-        <h1 className="font-Zilla-Slab mb-4 text-6xl font-bold text-brand-secondary">
+        <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-secondary">
           Create a New Account
         </h1>
 
@@ -191,7 +190,7 @@ export default function SignUp() {
         {formPage}
         {isFirstPage ? (
           <Button
-            className="font-Zilla-Slab min-h-[48px] rounded-md bg-brand-primary px-16 py-2 text-3xl font-bold tracking-[1px] text-white
+            className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
             type="button"
             onClick={() => {
@@ -205,7 +204,7 @@ export default function SignUp() {
           <div className="flex gap-4">
             {/* SUBMISSION BUTTON */}
             <Button
-              className="font-Zilla-Slab min-h-[48px] rounded-md bg-brand-primary px-8 py-2 text-3xl font-bold tracking-[1px] text-white
+              className="min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
               type="submit"
               form="signup-form"
@@ -213,7 +212,7 @@ export default function SignUp() {
               Sign-Up!
             </Button>
             <Button
-              className="font-Zilla-Slab min-h-[48px] rounded-md bg-zinc-700 px-8 py-2 text-3xl font-bold tracking-[1px] text-white
+              className="min-h-[48px] rounded-md bg-zinc-700 px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
               type="button"
               onClick={() => {

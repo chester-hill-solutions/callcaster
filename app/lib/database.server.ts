@@ -30,9 +30,33 @@ export async function createNewWorkspace({
   userId: string;
   name: string;
 }) {
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("workspace")
-    .insert({ owner: userId, name, users: [userId] });
+    .insert({ owner: userId, name, users: [userId] })
+    .select("id")
+    .single();
 
-  return { error };
+  return { data, error };
+}
+
+export async function getWorkspaceInfo({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string | undefined;
+}) {
+  if (workspaceId == null) return { error: "No workspace id" };
+
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select("name")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    console.log("Error on function getWorkspaceInfo");
+  }
+
+  return { data, error };
 }

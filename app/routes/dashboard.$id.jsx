@@ -1,14 +1,18 @@
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { useEffect, useState, useRef } from "react";
-import * as wavefile from 'wavefile';
+import * as wavefile from "wavefile";
 
 export const loader = async ({ request, params }) => {
   const { id } = params;
   try {
-    return json({ success: true, message: 'Call initiated', id });
+    return json({ success: true, message: "Call initiated", id });
   } catch (error) {
-    return json({ success: false, message: 'Failed to initiate call', error: error.message });
+    return json({
+      success: false,
+      message: "Failed to initiate call",
+      error: error.message,
+    });
   }
 };
 
@@ -23,12 +27,15 @@ export default function Call() {
   const audioBuffer = useRef([]);
 
   useEffect(() => {
-    audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
-    const ws = new WebSocket(`wss://socketserver-production-2306.up.railway.app/${id}`);
-    
-    ws.onopen = () => console.log('WebSocket connection established');
-    ws.onerror = (event) => console.error('WebSocket error:', event);
-    ws.onclose = () => console.log('WebSocket connection closed');
+    audioContext.current = new (window.AudioContext ||
+      window.webkitAudioContext)();
+    const ws = new WebSocket(
+      `wss://socketserver-production-2306.up.railway.app/${id}`,
+    );
+
+    ws.onopen = () => console.log("WebSocket connection established");
+    ws.onerror = (event) => console.error("WebSocket error:", event);
+    ws.onclose = () => console.log("WebSocket connection closed");
 
     ws.onmessage = async (e) => {
       if (e.data) {
@@ -52,14 +59,14 @@ export default function Call() {
     const wav = new wavefile.WaveFile();
     let allSamples = [];
 
-    wavFiles.forEach(file => {
+    wavFiles.forEach((file) => {
       const wav = new wavefile.WaveFile();
-      wav.fromScratch(1, sampleRate, '8', Buffer.from(file, "base64"));
+      wav.fromScratch(1, sampleRate, "8", Buffer.from(file, "base64"));
       wav.fromMuLaw();
       allSamples.push(...wav.getSamples(true, Float32Array));
     });
 
-    wav.fromScratch(1, sampleRate, '8', allSamples);
+    wav.fromScratch(1, sampleRate, "8", allSamples);
     return wav.toBuffer();
   }
 
@@ -70,7 +77,9 @@ export default function Call() {
       try {
         const sampleRate = audioContext.current.sampleRate;
         const wavFileBuffer = createWavFileFromBuffers(wavBuffer, sampleRate);
-        const audioBufferDecoded = await audioContext.current.decodeAudioData(wavFileBuffer.buffer);
+        const audioBufferDecoded = await audioContext.current.decodeAudioData(
+          wavFileBuffer.buffer,
+        );
 
         const source = audioContext.current.createBufferSource();
         source.buffer = audioBufferDecoded;
@@ -81,7 +90,7 @@ export default function Call() {
           audioBuffer.current = [];
         };
       } catch (error) {
-        console.error('Error decoding audio data:', error);
+        console.error("Error decoding audio data:", error);
       }
     }
   };
@@ -91,14 +100,18 @@ export default function Call() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStream.current = stream;
       const source = audioContext.current.createMediaStreamSource(stream);
-      processorNode.current = audioContext.current.createScriptProcessor(4096, 1, 1);
+      processorNode.current = audioContext.current.createScriptProcessor(
+        4096,
+        1,
+        1,
+      );
       source.connect(processorNode.current);
       processorNode.current.connect(audioContext.current.destination);
 
       processorNode.current.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         const wav = new wavefile.WaveFile();
-        wav.fromScratch(1, audioContext.current.sampleRate, '32f', inputData);
+        wav.fromScratch(1, audioContext.current.sampleRate, "32f", inputData);
         wav.toMuLaw();
         const buffer = Buffer.from(wav.toBuffer());
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -108,22 +121,26 @@ export default function Call() {
 
       setIsRecording(true);
     } catch (error) {
-      console.error('Error accessing media devices.', error);
+      console.error("Error accessing media devices.", error);
     }
   };
 
   const stopRecording = () => {
     if (audioStream.current && processorNode.current) {
       processorNode.current.disconnect();
-      audioStream.current.getTracks().forEach(track => track.stop());
+      audioStream.current.getTracks().forEach((track) => track.stop());
       setIsRecording(false);
     }
   };
 
   return (
     <div>
-      <button onClick={startRecording} disabled={isRecording}>Start Streaming</button>
-      <button onClick={stopRecording} disabled={!isRecording}>Stop Streaming</button>
+      <button onClick={startRecording} disabled={isRecording}>
+        Start Streaming
+      </button>
+      <button onClick={stopRecording} disabled={!isRecording}>
+        Stop Streaming
+      </button>
     </div>
   );
 }

@@ -35,7 +35,7 @@ export const action = async ({ request }: { request: Request }) => {
 
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
-    getSupabaseServerClientWithSession(request);
+    await getSupabaseServerClientWithSession(request);
   console.log(serverSession);
   return json({ serverSession }, { headers });
 };
