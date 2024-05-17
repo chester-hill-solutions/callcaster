@@ -7,12 +7,13 @@ export const action = async ({ request }) => {
   let twiml = new Twilio.twiml.VoiceResponse();
 
   if (isAValidPhoneNumber(toNumber)) {
-
     let dial = twiml.dial({
       callerId: process.env.TWILIO_PHONE_NUMBER,
       record: 'record-from-answer',
-      recordingStatusCallback: `${baseUrl}/api/recording`, // todo: set up recording.
+      recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: 'completed',
+      transcribe: true,
+      transcribeCallback: `${baseUrl}/api/transcribe`
     });
     dial.number(toNumber);
   } else {

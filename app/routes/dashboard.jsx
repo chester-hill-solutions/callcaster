@@ -1,118 +1,55 @@
-import { Outlet, useLoaderData, redirect, json, useFetcher, useOutletContext } from '@remix-run/react';
-import { createSupabaseServerClient } from '../supabase.server';
-import { useEffect, useState, useRef } from 'react';
-import { Device } from '@twilio/voice-sdk';
+import {
+  Link,
+  json,
+  redirect,
+  useLoaderData,
+  useOutletContext,
+} from "@remix-run/react";
+import { getSupabaseServerClientWithUser } from "~/lib/supabase.server";
 
 export const loader = async ({ request }) => {
-    const baseUrl = process.env.BASE_URL;
-    const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { token } = await fetch(`${baseUrl}/api/token`).then((res) => res.json());
-    return json({ token }, { headers });
+  const { supabaseClient, headers, user, workspace } = await getSupabaseServerClientWithUser(request);
+  console.log(workspace)
+  if (!workspace) {
+    return redirect('/select-workspace');
+  }
+  const { data: campaigns = [], error } = await supabaseClient
+    .from('campaign')
+    .select()
+    .eq('workspace', workspace);
+    console.log(campaigns)
+  return json({ campaigns, headers });
 };
 
 const Dashboard = () => {
-    const { env } = useOutletContext();
-    const { token } = useLoaderData();
-    const [to, setTo] = useState('');
-    const [messageBody, setMessage] = useState('');
-    const [call, setCall] = useState(null);
-    const [device, setDevice] = useState(null);
-    const [error, setError] = useState(null);
-    const [transcript, setTranscript] = useState('');
-    const audioContext = useRef(null);
-    const mediaStreamSource = useRef(null);
-    const processor = useRef(null);
+  const { env, twilioDevice } = useOutletContext();
+  const { campaigns } = useLoaderData();
+  return (
+    <main className="flex h-screen w-full flex-col items-center py-8 text-white">
+      <div className="flex flex-col gap-4 rounded-md bg-gray-50 p-6 text-lg text-black shadow-md">
+        <h1 className="text-5xl font-bold">Campaign Time</h1>
+        {campaigns && campaigns.length > 0 ? (
+          <div className="mt-8">
+            <h3 className="text-2xl font-semibold">Campaigns</h3>
+            <ul className="mt-4 flex flex-col gap-4">
+              {campaigns.map(campaign => (
+                <li key={campaign.id}>
+                  <Link
+                    to={`/campaign/${campaign.id}`}
+                    className="block rounded-md bg-gray-200 px-4 py-2 text-xl font-semibold text-gray-800 transition duration-150 ease-in-out hover:bg-gray-800 hover:text-gray-200"
+                  >
+                    {campaign.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="mt-8 text-xl">No campaigns available.</p>
+        )}
+      </div>
+    </main>
+  );
+};
 
-    useEffect(() => {
-        const device = new Device(token);
-        setDevice(device);
-        audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
-    }, [])
-
-
-    const makeCall = async () => {
-        if (device) {
-            device.audio.setAudioConstraints({
-                echoCancellation: true,
-                autoGainControl: true,
-                noiseSupression: true
-            })
-            try {
-                console.log(`Attempting call to ${to}.`)
-                let call = await device.connect({
-                    params: {
-                        To: to,
-                    },
-                })
-                setCall(call);
-            } catch (err) {
-                setError(error)
-            }
-        }
-    }
-    const makeRoboCall = async () => {
-        await fetch(`${env.BASE_URL}/api/call/robocall`, {
-            method: 'POST',
-            body: JSON.stringify({ to })
-        })
-    }
-    const makeVoiceDrop = async () => {
-        await fetch(`${env.BASE_URL}/api/call/audiodrop`, {
-            method: 'POST',
-            body: JSON.stringify({ to })
-        })
-    }
-    const hangUp = () => {
-        if (mediaStreamSource.current && processor.current) {
-            processor.current.disconnect();
-            mediaStreamSource.current.disconnect();
-            processor.current = null;
-            mediaStreamSource.current = null;
-        }
-        device.disconnectAll();
-    };
-    const sendMessage = async () => {
-        console.log('Sending')
-        await fetch(`${env.BASE_URL}/api/message`, {
-            method:"POST",
-            body: JSON.stringify({to, messageBody})
-        })
-    }
-    return (
-        <div>
-            <div>
-                <h1>Welcome to the dashboard</h1>
-            </div>
-            <div>
-                <input
-                    type='text'
-                    name='to'
-                    value={to}
-                    onChange={(e) => setTo(e.target.value)}
-                    placeholder='Phone Number'
-                    required
-                />
-                <button onClick={makeCall}>Call</button>
-                <button onClick={makeRoboCall}>Robo Call</button>
-                <button onClick={makeVoiceDrop}>Voice Drop</button>
-                <button onClick={hangUp}>
-                    Hang Up
-                </button>
-            </div>
-            <div>
-                <textarea name='messageBody' placeholder='Text Message' onChange={(e) => setMessage(e.target.value)}>
-                </textarea>
-                <button onClick={sendMessage}>
-                    SMS
-                </button>
-            </div>
-            <div>
-                <Outlet />
-            </div>
-
-            {error && <div>Error: {JSON.stringify(error)}</div>}
-
-        </div>
-    )
-}
 export default Dashboard;
