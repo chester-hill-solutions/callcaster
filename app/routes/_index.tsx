@@ -1,9 +1,9 @@
 import type { MetaFunction } from "@remix-run/node";
 import { Form, json, Link, redirect } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { FcGoogle } from "react-icons/fc";
+import { Button } from "~/components/ui/button";
+import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const meta: MetaFunction = () => {
   return [
@@ -12,30 +12,16 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-// export const action = async ({ request }: { request: Request }) => {
-//   const { supabaseClient, headers } = createSupabaseServerClient(request);
+export const loader = async ({ request }: { request: Request }) => {
+  const { headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
 
-//   const formData = await request.formData();
+  if (serverSession && serverSession.user) {
+    redirect("/workspaces", { headers });
+  }
 
-//   const email = formData.get("email") as string;
-//   const password = formData.get("password") as string;
-
-//   console.log(email, password);
-
-//   const { user, error } = await supabaseClient.auth.signInWithPassword({
-//     email: email,
-//     password: password,
-//   });
-
-//   // console.log(user);
-
-//   if (!error) {
-//     return redirect("/workspaces", { headers });
-//   } else {
-//     console.log(error);
-//     return json({ error: error.message });
-//   }
-// };
+  return json({ headers });
+};
 
 export default function Index() {
   return (

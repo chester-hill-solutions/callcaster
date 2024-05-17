@@ -1,7 +1,7 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Form, useFetcher, useLoaderData } from "@remix-run/react";
-import { useEffect, useRef, useState } from "react";
-import { FaSpinner } from "react-icons/fa";
+import { Form, useLoaderData } from "@remix-run/react";
+import { useRef } from "react";
+import { FaPlus } from "react-icons/fa";
 import { FaUserPlus } from "react-icons/fa6";
 import { Button } from "~/components/ui/button";
 import { createNewWorkspace, getUserWorkspaces } from "~/lib/database.server";
@@ -68,12 +68,12 @@ export default function Workspace() {
       <h1 className="text-center font-Tabac-Slab text-4xl font-black text-white">
         Your Workspaces
       </h1>
-      <div className="grid auto-rows-auto grid-cols-5 gap-4 px-16">
+      <div className="grid w-full auto-rows-auto grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6 px-16">
         {workspaces != null &&
           workspaces.map((workspace) => (
             <div
               key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md bg-zinc-800 p-4"
+              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center"
             >
               <h5 className="font-Zilla-Slab text-2xl text-white">
                 {workspace.name}
@@ -82,10 +82,18 @@ export default function Workspace() {
             </div>
           ))}
         <Button
-          className="px-4 py-2"
+          variant="outline"
+          className="h-full min-h-fit border border-white px-4 py-8"
           onClick={() => dialogRef.current?.showModal()}
         >
-          Create New Workspace
+          <FaPlus
+            size="72px"
+            style={{
+              border: "1px solid white",
+              borderRadius: "50%",
+              padding: "0.75rem",
+            }}
+          />
         </Button>
       </div>
       <dialog ref={dialogRef} className="rounded-md bg-indigo-400 p-8">
