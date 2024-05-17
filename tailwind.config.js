@@ -17,6 +17,11 @@ module.exports = {
       },
     },
     extend: {
+      fontFamily: {
+        "Tabac-Slab": ["Tabac Slab", "serif"],
+        "Tabac-Big-Slab": ["Tabac Big Slab", "serif"],
+        "Zilla-Slab": ["Zilla Slab", "serif"],
+      },
       colors: {
         brand: {
           primary: "hsl(var(--brand-primary))",
