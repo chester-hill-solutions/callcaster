@@ -6,9 +6,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { WorkspaceTableNames } from "~/lib/types";
 
-export function WorkspaceDropdown() {
-  const [buttonText, setButtonText] = useState<string>("Campaigns");
+export function WorkspaceDropdown({ selectTable }) {
+  const [buttonText, setButtonText] = useState<string>(
+    WorkspaceTableNames.Campaign + "s",
+  );
+  const handleDropdownSelection = (tableName: WorkspaceTableNames) => {
+    setButtonText(tableName.valueOf() + "s");
+    selectTable(tableName);
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className="w-fit text-2xl">
@@ -17,13 +25,19 @@ export function WorkspaceDropdown() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
-        <DropdownMenuItem onClick={() => setButtonText("Campaigns")}>
+        <DropdownMenuItem
+          onClick={() => handleDropdownSelection(WorkspaceTableNames.Campaign)}
+        >
           Campaigns
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setButtonText("Audiences")}>
+        <DropdownMenuItem
+          onClick={() => handleDropdownSelection(WorkspaceTableNames.Audience)}
+        >
           Audiences
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setButtonText("Contacts")}>
+        <DropdownMenuItem
+          onClick={() => handleDropdownSelection(WorkspaceTableNames.Contact)}
+        >
           Contacts
         </DropdownMenuItem>
       </DropdownMenuContent>

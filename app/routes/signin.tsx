@@ -2,7 +2,7 @@ import { json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData } from "@remix-run/react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { Button, buttonVariants } from "~/components/ui/button";
+import { Button } from "~/components/ui/button";
 import {
   createSupabaseServerClient,
   getSupabaseServerClientWithSession,
@@ -15,8 +15,6 @@ export const action = async ({ request }: { request: Request }) => {
 
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
-
-  console.log(email, password);
 
   const { user, error } = await supabaseClient.auth.signInWithPassword({
     email: email,
@@ -36,7 +34,7 @@ export const action = async ({ request }: { request: Request }) => {
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  console.log(serverSession);
+  console.log("Sign in Loader: ", serverSession);
   return json({ serverSession }, { headers });
 };
 
