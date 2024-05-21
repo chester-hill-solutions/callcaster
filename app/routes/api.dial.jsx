@@ -14,6 +14,7 @@ export const action = async ({ request }) => {
             url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(toNumber)}`,
         });
 
+
         const callData = {
             sid: call.sid,
             date_updated: call.dateUpdated,
