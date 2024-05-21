@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 
 export async function getUserWorkspaces({
@@ -30,9 +30,105 @@ export async function createNewWorkspace({
   userId: string;
   name: string;
 }) {
-  const { error } = await supabaseClient
+  const { data, error } = await supabaseClient
     .from("workspace")
-    .insert({ owner: userId, name, users: [userId] });
+    .insert({ owner: userId, name, users: [userId] })
+    .select("id")
+    .single();
 
-  return { error };
+  return { data, error };
+}
+
+export async function getWorkspaceInfo({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string | undefined;
+}) {
+  if (workspaceId == null) return { error: "No workspace id" };
+
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select("name")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    console.log("Error on function getWorkspaceInfo");
+  }
+
+  return { data, error };
+}
+
+// type getTableDataByIdProps = {
+//   supabaseClient: SupabaseClient<Database>;
+//   tableName: string;
+//   rowId?: string;
+//   columnNames?: string[];
+// };
+
+// Too Generic
+// export async function getTableDataById({
+//   supabaseClient,
+//   tableName,
+//   rowId = "",
+//   columnNames,
+// }: getTableDataByIdProps) {
+//   const joinedColumnNames = columnNames?.join(",");
+//   const tableDataQuery = supabaseClient
+//     .from(tableName)
+//     .select(joinedColumnNames || "*");
+//   // .eq("id", rowId);
+
+//   const { data, error } = await tableDataQuery;
+//   // console.log("getTableDataById: ", data);
+
+//   if (error) {
+//     console.log("Error on function getTableDataById: ", error);
+//   }
+
+//   return { data, error };
+// }
+
+export async function getWorkspaceAudiences({
+  supabaseClient,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  const { data, error } = await supabaseClient.from("audience").select();
+
+  if (error) {
+    console.log("Error on function getWorkspaceAudiences");
+  }
+
+  return { data, error };
+}
+
+export async function getWorkspaceCampaigns({
+  supabaseClient,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  const { data, error } = await supabaseClient.from("campaign").select();
+
+  if (error) {
+    console.log("Error on function getWorkspaceAudiences");
+  }
+
+  return { data, error };
+}
+
+export async function getWorkspaceContacts({
+  supabaseClient,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  const { data, error } = await supabaseClient.from("contact").select();
+
+  if (error) {
+    console.log("Error on function getWorkspaceAudiences");
+  }
+
+  return { data, error };
 }

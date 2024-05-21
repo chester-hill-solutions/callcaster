@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Form, useLoaderData } from "@remix-run/react";
+import { Form, Link, useLoaderData } from "@remix-run/react";
 import { useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { FaUserPlus } from "react-icons/fa6";
@@ -44,7 +44,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // console.log(Object.fromEntries(formData));
 
-  const { error } = await createNewWorkspace({ supabaseClient, userId, name });
+  const { data, error } = await createNewWorkspace({
+    supabaseClient,
+    userId,
+    name,
+  });
 
   if (error) {
     console.log("Error: ", error);
@@ -54,11 +58,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
+  if (data && data.id) {
+    return redirect(`/workspaces/${data.id}`, { headers });
+  }
+
   return json({ ok: true, error: null }, { headers });
 };
 
 //************COMPONENT************/
-export default function Workspace() {
+export default function Workspaces() {
   const { workspaces, userId } = useLoaderData<typeof loader>();
   // console.log(workspaces);
 
@@ -71,7 +79,8 @@ export default function Workspace() {
       <div className="grid w-full auto-rows-auto grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6 px-16">
         {workspaces != null &&
           workspaces.map((workspace) => (
-            <div
+            <Link
+              to={`/workspaces/${workspace.id}`}
               key={workspace.id}
               className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center"
             >
@@ -79,7 +88,7 @@ export default function Workspace() {
                 {workspace.name}
               </h5>
               <p className="">Workspace Description</p>
-            </div>
+            </Link>
           ))}
         <Button
           variant="outline"

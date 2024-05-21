@@ -9,7 +9,7 @@ export default function Navbar({
   handleSignOut,
 }: {
   className?: string;
-  handleSignOut: () => Promise<
+  handleSignOut?: () => Promise<
     TypedResponse<{
       error: AuthError | null;
     }>
@@ -17,7 +17,7 @@ export default function Navbar({
 }) {
   return (
     <header className={`w-full ${className}`}>
-      <nav className="flex w-full justify-between px-8 py-4">
+      <nav className="flex w-full justify-between px-8 py-4" id="global-nav">
         <Link
           to="/"
           className="font-Tabac-Slab text-4xl font-black text-brand-secondary"

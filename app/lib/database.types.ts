@@ -14,26 +14,26 @@ export type Database = {
           created_at: string
           id: number
           name: string | null
-          organization: number | null
+          workspace: string | null
         }
         Insert: {
           created_at?: string
           id?: number
           name?: string | null
-          organization?: number | null
+          workspace?: string | null
         }
         Update: {
           created_at?: string
           id?: number
           name?: string | null
-          organization?: number | null
+          workspace?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "audience_organization_fkey"
-            columns: ["organization"]
+            foreignKeyName: "audience_workspace_fkey"
+            columns: ["workspace"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
         ]
@@ -42,6 +42,7 @@ export type Database = {
         Row: {
           account_sid: string | null
           answered_by: Database["public"]["Enums"]["answered_by"] | null
+          answers: Json | null
           api_version: string | null
           call_duration: number | null
           caller_name: string | null
@@ -56,7 +57,6 @@ export type Database = {
           from: string | null
           from_formatted: string | null
           group_sid: string | null
-          organization: number | null
           parent_call_sid: string | null
           phone_number_sid: string | null
           price: string | null
@@ -73,11 +73,12 @@ export type Database = {
           to_formatted: string | null
           trunk_sid: string | null
           uri: string | null
-          workspace: number | null
+          workspace: string | null
         }
         Insert: {
           account_sid?: string | null
           answered_by?: Database["public"]["Enums"]["answered_by"] | null
+          answers?: Json | null
           api_version?: string | null
           call_duration?: number | null
           caller_name?: string | null
@@ -92,7 +93,6 @@ export type Database = {
           from?: string | null
           from_formatted?: string | null
           group_sid?: string | null
-          organization?: number | null
           parent_call_sid?: string | null
           phone_number_sid?: string | null
           price?: string | null
@@ -109,11 +109,12 @@ export type Database = {
           to_formatted?: string | null
           trunk_sid?: string | null
           uri?: string | null
-          workspace?: number | null
+          workspace?: string | null
         }
         Update: {
           account_sid?: string | null
           answered_by?: Database["public"]["Enums"]["answered_by"] | null
+          answers?: Json | null
           api_version?: string | null
           call_duration?: number | null
           caller_name?: string | null
@@ -128,7 +129,6 @@ export type Database = {
           from?: string | null
           from_formatted?: string | null
           group_sid?: string | null
-          organization?: number | null
           parent_call_sid?: string | null
           phone_number_sid?: string | null
           price?: string | null
@@ -145,7 +145,7 @@ export type Database = {
           to_formatted?: string | null
           trunk_sid?: string | null
           uri?: string | null
-          workspace?: number | null
+          workspace?: string | null
         }
         Relationships: [
           {
@@ -153,13 +153,6 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contact"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "call_organization_fkey"
-            columns: ["organization"]
-            isOneToOne: false
-            referencedRelation: "organization"
             referencedColumns: ["id"]
           },
           {
@@ -173,7 +166,7 @@ export type Database = {
             foreignKeyName: "call_workspace_fkey"
             columns: ["workspace"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
           {
@@ -187,41 +180,47 @@ export type Database = {
       }
       campaign: {
         Row: {
+          call_questions: Json | null
           created_at: string
           end_date: string | null
           id: number
-          organization: number | null
           start_date: string | null
           status: Database["public"]["Enums"]["campaign_status"] | null
           title: string | null
           type: Database["public"]["Enums"]["campaign_type"] | null
+          voicemail_file: string | null
+          workspace: string | null
         }
         Insert: {
+          call_questions?: Json | null
           created_at?: string
           end_date?: string | null
           id?: number
-          organization?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"] | null
           title?: string | null
           type?: Database["public"]["Enums"]["campaign_type"] | null
+          voicemail_file?: string | null
+          workspace?: string | null
         }
         Update: {
+          call_questions?: Json | null
           created_at?: string
           end_date?: string | null
           id?: number
-          organization?: number | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["campaign_status"] | null
           title?: string | null
           type?: Database["public"]["Enums"]["campaign_type"] | null
+          voicemail_file?: string | null
+          workspace?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "campaign_organization_fkey"
-            columns: ["organization"]
+            foreignKeyName: "campaign_workspace_fkey"
+            columns: ["workspace"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
         ]
@@ -269,9 +268,9 @@ export type Database = {
           firstname: string | null
           id: number
           opt_out: boolean | null
-          organization: number | null
           phone: string | null
           surname: string | null
+          workspace: string | null
         }
         Insert: {
           address?: string | null
@@ -282,9 +281,9 @@ export type Database = {
           firstname?: string | null
           id?: number
           opt_out?: boolean | null
-          organization?: number | null
           phone?: string | null
           surname?: string | null
+          workspace?: string | null
         }
         Update: {
           address?: string | null
@@ -295,16 +294,16 @@ export type Database = {
           firstname?: string | null
           id?: number
           opt_out?: boolean | null
-          organization?: number | null
           phone?: string | null
           surname?: string | null
+          workspace?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "contact_organization_fkey"
-            columns: ["organization"]
+            foreignKeyName: "contact_workspace_fkey"
+            columns: ["workspace"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
         ]
@@ -342,6 +341,35 @@ export type Database = {
           },
         ]
       }
+      live_campaign: {
+        Row: {
+          campaign_id: number | null
+          id: number
+          questions: Json | null
+          voicemail: string | null
+        }
+        Insert: {
+          campaign_id?: number | null
+          id?: number
+          questions?: Json | null
+          voicemail?: string | null
+        }
+        Update: {
+          campaign_id?: number | null
+          id?: number
+          questions?: Json | null
+          voicemail?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_campaign_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaign"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message: {
         Row: {
           account_sid: string | null
@@ -358,7 +386,6 @@ export type Database = {
           messaging_service_sid: string | null
           num_media: string | null
           num_segments: string | null
-          organization: number | null
           price: string
           price_unit: string | null
           sid: number
@@ -366,6 +393,7 @@ export type Database = {
           subresource_uris: Json | null
           to: string | null
           uri: string | null
+          workspace: string | null
         }
         Insert: {
           account_sid?: string | null
@@ -382,7 +410,6 @@ export type Database = {
           messaging_service_sid?: string | null
           num_media?: string | null
           num_segments?: string | null
-          organization?: number | null
           price: string
           price_unit?: string | null
           sid?: number
@@ -390,6 +417,7 @@ export type Database = {
           subresource_uris?: Json | null
           to?: string | null
           uri?: string | null
+          workspace?: string | null
         }
         Update: {
           account_sid?: string | null
@@ -406,7 +434,6 @@ export type Database = {
           messaging_service_sid?: string | null
           num_media?: string | null
           num_segments?: string | null
-          organization?: number | null
           price?: string
           price_unit?: string | null
           sid?: number
@@ -414,13 +441,14 @@ export type Database = {
           subresource_uris?: Json | null
           to?: string | null
           uri?: string | null
+          workspace?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "message_organization_fkey"
-            columns: ["organization"]
+            foreignKeyName: "message_workspace_fkey"
+            columns: ["workspace"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
           {
@@ -464,24 +492,6 @@ export type Database = {
           },
         ]
       }
-      organization: {
-        Row: {
-          created_at: string
-          id: number
-          name: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          name?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          name?: string | null
-        }
-        Relationships: []
-      }
       robo_campaign: {
         Row: {
           campaign_id: number | null
@@ -515,20 +525,29 @@ export type Database = {
         Row: {
           access_level: string | null
           created_at: string
+          first_name: string | null
           id: string
+          last_name: string | null
           organization: number | null
+          username: string
         }
         Insert: {
           access_level?: string | null
           created_at?: string
+          first_name?: string | null
           id: string
+          last_name?: string | null
           organization?: number | null
+          username?: string
         }
         Update: {
           access_level?: string | null
           created_at?: string
+          first_name?: string | null
           id?: string
+          last_name?: string | null
           organization?: number | null
+          username?: string
         }
         Relationships: [
           {
@@ -538,11 +557,36 @@ export type Database = {
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
+        ]
+      }
+      workspace: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner: string | null
+          users: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner?: string | null
+          users?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner?: string | null
+          users?: string[] | null
+        }
+        Relationships: [
           {
-            foreignKeyName: "user_organization_fkey"
-            columns: ["organization"]
+            foreignKeyName: "workspace_owner_fkey"
+            columns: ["owner"]
             isOneToOne: false
-            referencedRelation: "organization"
+            referencedRelation: "user"
             referencedColumns: ["id"]
           },
         ]
@@ -560,7 +604,7 @@ export type Database = {
           created_at: string
           id: number
           name: string | null
-          organization: number | null
+          workspace: string | null
         }[]
       }
       get_calls_by_campaign: {
@@ -570,6 +614,7 @@ export type Database = {
         Returns: {
           account_sid: string | null
           answered_by: Database["public"]["Enums"]["answered_by"] | null
+          answers: Json | null
           api_version: string | null
           call_duration: number | null
           caller_name: string | null
@@ -584,7 +629,6 @@ export type Database = {
           from: string | null
           from_formatted: string | null
           group_sid: string | null
-          organization: number | null
           parent_call_sid: string | null
           phone_number_sid: string | null
           price: string | null
@@ -601,7 +645,7 @@ export type Database = {
           to_formatted: string | null
           trunk_sid: string | null
           uri: string | null
-          workspace: number | null
+          workspace: string | null
         }[]
       }
       get_contacts_by_campaign: {
@@ -617,9 +661,9 @@ export type Database = {
           firstname: string | null
           id: number
           opt_out: boolean | null
-          organization: number | null
           phone: string | null
           surname: string | null
+          workspace: string | null
         }[]
       }
     }

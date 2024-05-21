@@ -1,7 +1,8 @@
-import type { MetaFunction } from "@remix-run/node";
-import { Form, json, Link, redirect } from "@remix-run/react";
+import { TypedResponse, type MetaFunction } from "@remix-run/node";
+import { Form, json, Link, Outlet, redirect } from "@remix-run/react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
+import Navbar from "~/components/Navbar";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -17,7 +18,7 @@ export const loader = async ({ request }: { request: Request }) => {
     await getSupabaseServerClientWithSession(request);
 
   if (serverSession && serverSession.user) {
-    redirect("/workspaces", { headers });
+    return redirect("/workspaces", { headers });
   }
 
   return json({ headers });
@@ -125,8 +126,8 @@ export default function Index() {
           {/* <Link
               to={"/signup"}
               className="rounded-md bg-gray-300 px-3 py-2 font-bold text-black
-            transition-colors duration-150 ease-in-out hover:bg-gray-700 hover:text-white"
-            >
+              transition-colors duration-150 ease-in-out hover:bg-gray-700 hover:text-white"
+              >
               Sign Up
             </Link> */}
         </div>
