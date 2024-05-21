@@ -7,7 +7,7 @@ export const createSupabaseServerClient = (request: Request) => {
 
   const supabaseClient = createServerClient<Database>(
     process.env.SUPABASE_URL!,
-    process.env.SUPABASE_KEY!,
+    process.env.SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(key) {
