@@ -48,21 +48,32 @@ export default function Workspace() {
     data: campaigns,
   });
 
+  const [firstColumn, setFirstColumn] = useState<(string | null)[]>(
+    campaigns != null ? campaigns.map((campaign) => campaign.title) : [],
+  );
+
   const handleSelectTable = (tableName: string) => {
     switch (tableName) {
       case WorkspaceTableNames.Campaign:
+        setFirstColumn(
+          campaigns != null ? campaigns.map((campaign) => campaign.title) : [],
+        );
         setSelectedTable({
           columns: campaignColumns,
           data: campaigns,
         });
         break;
       case WorkspaceTableNames.Audience:
+        setFirstColumn(
+          audiences != null ? audiences.map((audience) => audience.name) : [],
+        );
         setSelectedTable({
           columns: audienceColumns,
           data: audiences,
         });
         break;
       case WorkspaceTableNames.Contact:
+        setFirstColumn([]);
         setSelectedTable({
           columns: contactColumns,
           data: contacts,
@@ -76,23 +87,29 @@ export default function Workspace() {
   };
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col rounded-sm text-white">
-      {/* <h1 className="text-center font-Tabac-Slab text-4xl font-black text-white">
-        Workspace: {workspace?.name}
-      </h1> */}
-      <div id="table-selector" className="col-span-full flex items-center">
-        <div className="py-4">
-          <WorkspaceDropdown selectTable={handleSelectTable} />
-        </div>
-        <div
-          className="flex gap-4 px-4 font-Zilla-Slab text-2xl font-bold"
-          id="filter-controls"
-        >
-          <p>Filter Controls</p>
-          <input type="text" name="filter-input" id="filter-input" />
-        </div>
+    <main
+      className="mx-auto mt-8 grid h-full w-[80%] auto-rows-auto items-center rounded-sm text-white"
+      style={{
+        gridTemplateColumns: "200px auto",
+      }}
+    >
+      <div className="py-4">
+        <WorkspaceDropdown selectTable={handleSelectTable} />
       </div>
-
+      <div
+        className="flex gap-4 px-4 font-Zilla-Slab text-2xl font-bold"
+        id="filter-controls"
+      >
+        <p>Filter Controls</p>
+        <input type="text" name="filter-input" id="filter-input" />
+      </div>
+      <div className="self-start" id="name-column">
+        <ul className="flex flex-col gap-4">
+          {firstColumn.map((row) => (
+            <li key={crypto.randomUUID()}>{row}</li>
+          ))}
+        </ul>
+      </div>
       {campaigns != null && (
         <DataTable
           classname="border-white border-2 rounded-md"

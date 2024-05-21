@@ -133,7 +133,7 @@ export default function App() {
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar className="bg-brand-primary" handleSignOut={signOut} />
+          <Navbar className="bg-brand-secondary" handleSignOut={signOut} />
           <Outlet context={{ supabase, env }} />
         </ThemeProvider>
         <ScrollRestoration />

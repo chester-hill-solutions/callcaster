@@ -1,8 +1,7 @@
-import { TypedResponse, type MetaFunction } from "@remix-run/node";
-import { Form, json, Link, Outlet, redirect } from "@remix-run/react";
+import { type MetaFunction } from "@remix-run/node";
+import { Form, json, Link, redirect } from "@remix-run/react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import Navbar from "~/components/Navbar";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -44,7 +43,7 @@ export default function Index() {
 
         <div
           id="login-card"
-          className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-card px-28 py-8 shadow-sm"
+          className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-foreground px-28 py-8 shadow-sm"
         >
           <h2 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-secondary">
             Login

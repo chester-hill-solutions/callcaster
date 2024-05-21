@@ -20,7 +20,7 @@ export default function Navbar({
       <nav className="flex w-full justify-between px-8 py-4" id="global-nav">
         <Link
           to="/"
-          className="font-Tabac-Slab text-4xl font-black text-brand-secondary"
+          className="font-Tabac-Slab text-4xl font-black text-brand-primary"
         >
           CallCaster
         </Link>

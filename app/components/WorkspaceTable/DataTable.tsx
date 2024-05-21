@@ -17,7 +17,7 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  classname: string;
+  classname?: string;
 }
 
 export function DataTable<TData, TValue>({
