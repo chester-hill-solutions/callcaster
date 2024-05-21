@@ -14,7 +14,8 @@ export default {
       os: true, // Provide an empty polyfill
       buffer: true, // Provide a JSPM polyfill
       fs: "empty", // Provide an empty polyfill
-      events: true
+      events: true,
+      window: true
     },
     globals: {
       Buffer: true,
