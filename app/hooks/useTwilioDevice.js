@@ -28,7 +28,7 @@ export function useTwilioDevice(token) {
                 setStatus('Disconnected');
                 activeCall?.disconnect();
                 setActiveCall(null);
-                setStatus('Idle')
+                setStatus('Registered')
                 console.log('Call disconnected');
             });
 
@@ -58,7 +58,7 @@ export function useTwilioDevice(token) {
                 });
                 call.on('disconnect', () => {
                     setActiveCall(null);
-                    setStatus('disconnected');
+                    setStatus('Registered');
                     console.log('Call disconnected');
                 });
                 call.on('reject', () => {
@@ -105,8 +105,10 @@ export function useTwilioDevice(token) {
 
     const hangUp = useCallback(() => {
         if (activeCall) {
-            console.log('Hanging up call');
             activeCall.disconnect();
+            deviceRef.current.disconnectAll();
+            setStatus('Registered')
+            setActiveCall(null)
         } else {
             console.error('No active call to hang up');
         }

@@ -3,10 +3,8 @@ import { createSupabaseServerClient } from '../lib/supabase.server';
 
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to: toNumber, user_id, campaign_id, contact_id, organization } = await request.json();
-
+    const { to: toNumber, user_id, campaign_id, contact_id } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-    
     const twiml = new Twilio.twiml.VoiceResponse();
 
     try {
@@ -16,7 +14,7 @@ export const action = async ({ request }) => {
             url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(toNumber)}`,
         });
 
-        const callData = {
+      const callData = {
             sid: call.sid,
             date_updated: call.dateUpdated,
             parent_call_sid: call.parentCallSid,
@@ -37,13 +35,13 @@ export const action = async ({ request }) => {
             group_sid: call.groupSid,
             caller_name: call.callerName,
             uri: call.uri,
-            organization: parseInt(organization, 10),  
-            campaign_id: parseInt(campaign_id, 10),  
-            contact_id: parseInt(contact_id, 10),  
+            campaign_id: parseInt(campaign_id, 10),
+            contact_id: parseInt(contact_id, 10),
+            workspace: 'd915f70e-4f32-4f2f-984f-72e2064e8e3c' //TODO
         };
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
-        const {error} = await supabase.from('call').upsert({...callData});
+        const { error } = await supabase.from('call').upsert({ ...callData });
         if (error) console.error('Error saving the call to the database:', error);
     } catch (error) {
         console.error('Error placing call:', error);

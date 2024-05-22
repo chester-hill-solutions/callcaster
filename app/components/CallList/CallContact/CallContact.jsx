@@ -4,7 +4,7 @@ import Note from "./Note";
 import Result from "./Result";
 import { ContactInfo } from "./ContactInfo";
 
-const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall, isPlaying, showUpdate, handleShowUpdate, questions }) => {
+const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall, isPlaying, showUpdate, handleShowUpdate, questions, household = null, firstInHouse = false, grouped=false }) => {
     const [recentCall, setRecentCall] = useState(callsList?.find(call => call.contact_id === contact.id) || null);
     const [update, setUpdate] = useState({
         result: '',
@@ -21,13 +21,17 @@ const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall
 
     return (
         <>
-            <tr style={{ fontSize: "small" }}>
+            <tr style={{ fontSize: "small", border: grouped && '2px solid #C91D25'}}>
                 <td style={{ padding: "8px 16px" }}>{contact.firstname} {contact.surname}</td>
-                <td style={{ padding: "8px 16px" }}>{contact.phone}</td>
-                <td style={{ padding: "8px 16px" }}>{contact.address}</td>
-                <td style={{ padding: "8px 16px", textTransform: "capitalize" }}>
-                    {recentCall?.status || 'Pending'}
-                </td>
+                <td style={{ padding: "8px 16px", opacity: !household ? '1' : firstInHouse ? '1' : '.6' }}>{contact.phone}</td>
+                {firstInHouse || !household ? (
+                    <td style={{ padding: "8px 16px", verticalAlign: 'middle', background: !household ? 'unset' : firstInHouse ? "#BDEBFF" : 'unset'  }} rowSpan={household?.length} >{contact.address}</td>
+                ) : null}
+                {firstInHouse || !household ? (
+                    <td style={{ padding: "8px 16px", textTransform: "capitalize", verticalAlign: 'middle' }} rowSpan={household?.length} >
+                        {recentCall?.status || 'Pending'}
+                    </td>
+                ) : null}
                 <td style={{ padding: "8px 16px" }}>
                     {recentCall?.status === 'completed' ? (
                         <button>
@@ -52,7 +56,7 @@ const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall
             {showUpdate === contact.id && (
                 <tr style={{ borderBottom: '2px solid #333', padding: "2px", minHeight: "1px" }}>
                     <td colSpan={6} style={{ padding: "8px 16px" }}>
-                        <div style={{ padding: "8px 16px", borderBottom: "2px solid #eee" }} className="column flex gap2">
+                        <div style={{ padding: "8px 16px", borderBottom: "2px solid #eee", display: "flex", flexDirection: "column" }}>
                             {Object.keys(questions).sort((a, b) => questions[a].order - questions[b].order).map((key) => (
                                 <Result action={intentAction} questions={questions[key]} />
                             ))}
