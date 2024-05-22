@@ -124,8 +124,6 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
         } else {
             currentContactIndex.current = 0;
         }
-
-        // Reset to start if we reach the end without finding a contact
         currentContactIndex.current = 0;
     };
 
