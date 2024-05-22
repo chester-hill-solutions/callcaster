@@ -1,4 +1,5 @@
 import { json, redirect, useLoaderData } from "@remix-run/react";
+import { PostgrestError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
@@ -20,15 +21,18 @@ export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
-  if (!serverSession) {
-    return redirect("/signin", { headers });
-  }
-
   const workspaceId = request.url.split("/").at(-1);
-  const { data: workspace } = await getWorkspaceInfo({
+  const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
   });
+
+  if (error) {
+    console.log(error);
+    if (error.code === "PGRST116") {
+      return redirect("/workspaces", { headers });
+    }
+  }
 
   const { data: audiences } = await getWorkspaceAudiences({ supabaseClient });
   const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient });

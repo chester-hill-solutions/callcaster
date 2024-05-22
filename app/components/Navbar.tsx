@@ -24,7 +24,7 @@ export default function Navbar({
         >
           CallCaster
         </Link>
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4">
           <NavLink
             to="/workspaces"
             className="rounded-sm bg-secondary px-4 py-2 font-bold text-brand-primary 
