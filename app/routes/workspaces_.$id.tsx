@@ -109,7 +109,7 @@ export default function Workspace() {
       <div className="self-start" id="name-column">
         <ul className="flex flex-col gap-4">
           {firstColumn.map((row, i) => (
-            <li key={`${selectedTable}-row-${i}>{row}</li>
+            <li key={`${selectedTable}-row-${i}`}>{row}</li>
           ))}
         </ul>
       </div>
