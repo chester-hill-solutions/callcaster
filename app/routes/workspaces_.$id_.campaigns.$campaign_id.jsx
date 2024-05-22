@@ -41,7 +41,7 @@ export const loader = async ({ request, params }) => {
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id })
     const { data: calls, error: callError } = await supabase.rpc('get_calls_by_campaign', { selected_campaign_id: id }).order('date_created', { ascending: false });
 
-    return json({ contacts, campaign, calls, token, user: data.user, audiences, campaignDetails })
+    return json({ contacts, campaign, calls, user: data.user, audiences, campaignDetails })
 }
 
 export const action = async ({ request, params }) => {
