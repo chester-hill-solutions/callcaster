@@ -1,4 +1,5 @@
 import { json, redirect, useLoaderData } from "@remix-run/react";
+
 import { PostgrestError } from "@supabase/supabase-js";
 import { useState } from "react";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
@@ -17,23 +18,21 @@ import {
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { WorkspaceTable, WorkspaceTableNames } from "~/lib/types";
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request, params }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
-  const workspaceId = request.url.split("/").at(-1);
+  const workspaceId = params.id
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
   });
-
   if (error) {
     console.log(error);
     if (error.code === "PGRST116") {
       return redirect("/workspaces", { headers });
     }
   }
-
   const { data: audiences } = await getWorkspaceAudiences({ supabaseClient });
   const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient });
   const { data: contacts } = await getWorkspaceContacts({ supabaseClient });
@@ -109,11 +108,12 @@ export default function Workspace() {
       </div>
       <div className="self-start" id="name-column">
         <ul className="flex flex-col gap-4">
-          {firstColumn.map((row) => (
-            <li key={crypto.randomUUID()}>{row}</li>
+          {firstColumn.map((row, i) => (
+            <li key={`${selectedTable}-row-${i}>{row}</li>
           ))}
         </ul>
       </div>
+
       {campaigns != null && (
         <DataTable
           classname="border-white border-2 rounded-md"

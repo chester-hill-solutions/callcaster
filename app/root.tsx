@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type {
   LinksFunction,
   LoaderFunctionArgs,
   TypedResponse,
 } from "@remix-run/node";
+import { Device } from "twilio-client";
 import {
   Links,
   LiveReload,
@@ -18,7 +19,7 @@ import {
 } from "@remix-run/react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { createBrowserClient } from "@supabase/ssr";
-
+import {useTwilioDevice} from "./hooks/useTwilioDevice"
 // Remix-Themes Imports
 // import clsx from "clsx";
 // import {
@@ -53,7 +54,7 @@ export const links: LinksFunction = () => [
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const env: ENV = {
     SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_KEY: process.env.SUPABASE_KEY,
+    SUPABASE_KEY: process.env.SUPABASE_ANON_KEY,
     BASE_URL: process.env.BASE_URL,
   };
   const response = new Response();
@@ -62,36 +63,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-
+  let token;
+  if (session?.user) {
+    const { token: newToken } = await fetch(
+      `${process.env.PUBLIC_URL}/api/token?id=${session.user.id}`,
+    ).then((res) => res.json());
+    token = newToken;
+  }
   // const { getTheme } = await themeSessionResolver(request);
 
-  return json({
-    supabaseData: {
+  return json(
+    {
       env,
       session,
+      token,
     },
-    headers: response.headers,
+    {
+      headers: response.headers,
+    },
     // theme: getTheme(),
-  });
+  );
+
+  // Wrapper for Implementing Remix-Themes
+  // export default function AppWithProviders() {
+  //   const { revalidate } = useRevalidator();
+  //   const data = useLoaderData<typeof loader>();
+  //   // console.log(data.theme);
+  //   return (
+  //     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
+  //       <App />
+  //     </ThemeProvider>
+  //   );
+  // }
 };
 
-// Wrapper for Implementing Remix-Themes
-// export default function AppWithProviders() {
-//   const { revalidate } = useRevalidator();
-//   const data = useLoaderData<typeof loader>();
-//   // console.log(data.theme);
-//   return (
-//     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
-//       <App />
-//     </ThemeProvider>
-//   );
-// }
-
 export default function App() {
-  const data = useLoaderData<typeof loader>();
-  // const [theme, setTheme] = useTheme();
-
-  const { env, session } = data.supabaseData;
+  const { env, session, token } = useLoaderData<typeof loader>();
+  const device = useTwilioDevice(token)
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
@@ -134,7 +142,7 @@ export default function App() {
           disableTransitionOnChange
         >
           <Navbar className="bg-brand-secondary" handleSignOut={signOut} />
-          <Outlet context={{ supabase, env }} />
+          <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>
         <ScrollRestoration />
         <Scripts />
