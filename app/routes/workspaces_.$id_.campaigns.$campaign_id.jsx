@@ -125,11 +125,6 @@ export default function Campaign() {
                 <h3>{campaign.title}</h3>
 
             </div>
-            {(incomingCall || activeCall) && (
-                <div >
-                    <button onClick={hangUp} style={{ color: "white", background: "#d60000", padding: "8px 16px", margin: "0 10px" }}>Hang Up</button>
-                </div>
-            )}
             <CallList {...{ contacts, calls, placeCall: handlePlaceCall, hangUp, activeCall, incomingCall, contactOpen, newContact, handleContact, audiences, openContact, campaign, device, status }} />
             <div className="row justify-end" style={{ padding: "8px 16px" }}>
                 <button onClick={openContact}><AddIcon fill={'#fff'} width="20px" /></button>
