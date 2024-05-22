@@ -59,7 +59,6 @@ const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall
                         <div style={{ padding: "8px 16px", display: "flex", flexDirection: "column" }}>
                             {Object.keys(questions).sort((a, b) => questions[a].order - questions[b].order).map((key) => (
                                 <Result action={intentAction} questions={questions[key]} key={`questions-${key}`}/>
-
                             ))}
                             <ContactInfo action={handleSave} handleChange={handleChange} contact={contact} />
                             <Note action={() => null} initialVal={''} />
