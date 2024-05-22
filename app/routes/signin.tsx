@@ -5,7 +5,6 @@ import { FcGoogle } from "react-icons/fc";
 import { Button } from "~/components/ui/button";
 import {
   createSupabaseServerClient,
-  getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
@@ -16,13 +15,10 @@ export const action = async ({ request }: { request: Request }) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const { user, error } = await supabaseClient.auth.signInWithPassword({
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: email,
     password: password,
   });
-
-  console.log(user);
-
   if (!error) {
     return redirect("/workspaces", { headers });
   } else {
@@ -32,10 +28,8 @@ export const action = async ({ request }: { request: Request }) => {
 };
 
 export const loader = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  console.log("Sign in Loader: ", serverSession);
-  return json({ serverSession }, { headers });
+  const { headers } = createSupabaseServerClient(request);
+  return json({ success: true }, { headers });
 };
 
 export default function SignIn() {
