@@ -66,7 +66,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let token;
   if (session?.user) {
     const { token: newToken } = await fetch(
-      `${process.env.PUBLIC_URL}/api/token?id=${session.user.id}`,
+      `${process.env.BASE_URL}/api/token?id=${session.user.id}`,
     ).then((res) => res.json());
     token = newToken;
   }
