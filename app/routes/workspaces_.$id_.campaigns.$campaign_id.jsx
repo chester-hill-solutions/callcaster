@@ -40,7 +40,6 @@ export const loader = async ({ request, params }) => {
     const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id })
     const { data: calls, error: callError } = await supabase.rpc('get_calls_by_campaign', { selected_campaign_id: id }).order('date_created', { ascending: false });
-    const { token } = await fetch(`${process.env.PUBLIC_URL}/api/token?id=${data.user.id}`).then((res) => res.json());
 
     return json({ contacts, campaign, calls, token, user: data.user, audiences, campaignDetails })
 }
@@ -80,7 +79,7 @@ export const action = async ({ request, params }) => {
 export default function Campaign() {
     const { device: twilioDevice } = useOutletContext();
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
-    const { contacts, campaign, calls, token, user, audiences } = useLoaderData();
+    const { contacts, campaign, calls, user, audiences } = useLoaderData();
     const { submit } = useFetcher();
     const [contactOpen, setContactOpen] = useState(null);
     const [newContact, setNewContact] = useState({
