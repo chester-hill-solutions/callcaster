@@ -3,6 +3,7 @@ import { redirect, json } from "@remix-run/node";
 import twilio from "twilio";
 
 export const loader = async ({ request }) => {
+
   let url = new URL(request.url);
   let identity = url.searchParams.get('id');
   const { supabaseClient: supabase, headers } =

@@ -55,7 +55,7 @@ export async function getWorkspaceInfo({
     .single();
 
   if (error) {
-    console.log("Error on function getWorkspaceInfo");
+    console.log(`Error on function getWorkspaceInfo: ${error.details}`);
   }
 
   return { data, error };

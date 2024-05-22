@@ -30,7 +30,7 @@
     --brand-secondary: 198 100% 87%;
     --brand-tertiary: 354 83% 88%;
 
-    --background: var(--brand-secondary);
+    --background: white;
     --foreground: 240 10% 3.9%;
     /* --card: 0 0% 100%; */
     --card: 220, 5%, 12%;
