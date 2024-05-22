@@ -21,13 +21,67 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
 
     const [callsList, setCallsList] = useSupabaseRealtime('call', supabase, calls);
     const [showUpdate, setShowUpdate] = useState(null);
-    const [autoDial, setAutoDial] = useState(false);
     const [groupByHousehold, setGroupByHousehold] = useState(true);
-    const [timer, setTimer] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
     const fetcher = useFetcher();
     const currentContactIndex = useRef(0);
+    const [nextRecipient, setNextRecipient] = useState(null);
+
+    const nextNumber = (skip = false) => {
+        let foundNext = false;
+        let nextContact = null;
+        let currentIndex = currentContactIndex.current;
+    
+        if (skip) {
+            if (groupByHousehold) {
+                const households = Object.values(householdMap);
+                currentIndex = (currentIndex + 1) % households.length;
+            } else {
+                currentIndex = (currentIndex + 1) % contactList.length;
+            }
+        }
+    
+        if (groupByHousehold) {
+            const households = Object.values(householdMap);
+            for (let i = currentIndex; i < households.length; i++) {
+                const household = households[i];
+    
+                for (let j = 0; j < household.length; j++) {
+                    const contact = household[j];
+                    const recentCall = callsList ? callsList.find((call) => call.contact_id === contact.id) : null;
+                    if (!recentCall && contact.phone && j === 0) {
+                        nextContact = contact;
+                        currentContactIndex.current = i;
+                        foundNext = true;
+                        break;
+                    }
+                }
+                if (foundNext) break;
+            }
+        } else {
+            for (let i = currentIndex; i < contactList.length; i++) {
+                const contact = contactList[i];
+                const recentCall = callsList ? callsList.find((call) => call.contact_id === contact.id) : null;
+                if (!recentCall && contact.phone) {
+                    nextContact = contact;
+                    currentContactIndex.current = i;
+                    foundNext = true;
+                    break;
+                }
+            }
+        }
+    
+        if (!foundNext) {
+            nextContact = null;
+        }
+        setNextRecipient(nextContact);
+        return nextContact;
+    };
+
+    useEffect(() => {
+        nextNumber();
+    }, []);
 
     const handleReplay = (url) => {
         fetcher.load(`/api/recording?url=${encodeURIComponent(url)}`);
@@ -46,6 +100,7 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
         } else {
             placeCall(contact);
             setShowUpdate(contact.id);
+            nextNumber();
         }
     };
 
@@ -58,96 +113,49 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
             return;
         }
 
-        if (groupByHousehold) {
-            const households = Object.values(householdMap);
-            for (let i = currentContactIndex.current; i < households.length; i++) {
-                const household = households[i];
-
-                for (let j = 0; j < household.length; j++) {
-                    const contact = household[j];
-                    const recentCall = callsList ? callsList.find((call) => call.contact_id === contact.id) : null;
-                    if (!recentCall && contact.phone && j === 0) {
-                        handleCall(contact);
-                        currentContactIndex.current = (i + 1) % households.length;
-                        return;
-                    }
-                }
+        const nextContact = nextNumber();
+        if (nextContact) {
+            handleCall(nextContact);
+            if (groupByHousehold) {
+                currentContactIndex.current = (currentContactIndex.current + 1) % Object.values(householdMap).length;
+            } else {
+                currentContactIndex.current = (currentContactIndex.current + 1) % contactList.length;
             }
         } else {
-            for (let i = currentContactIndex.current; i < contactList.length; i++) {
-                const contact = contactList[i];
-                const recentCall = callsList ? callsList.find((call) => call.contact_id === contact.id) : null;
-                if (!recentCall && contact.phone) {
-                    handleCall(contact);
-                    currentContactIndex.current = (i + 1) % contactList.length;
-                    return;
-                }
-            }
-        }
-
-        currentContactIndex.current = 0;
-    };
-
-    const startAutoDial = () => {
-        setAutoDial(true);
-        setTimer(10);
-    };
-
-    const stopAutoDial = () => {
-        setAutoDial(false);
-        setTimer(0);
-    };
-
-    const toggleAutoDial = () => {
-        if (autoDial) {
-            stopAutoDial();
-        } else {
-            startAutoDial();
+            currentContactIndex.current = 0;
         }
     };
-    useEffect(() => {
-        if (autoDial && timer === 0 && !activeCall&& status == 'Registered') {
-            setTimer(10)
-            dialNextContact();
-        }
-        if (timer > 0 && !activeCall && status == 'Registered') {
-            setTimeout(() => {
-                setTimer((prev) => prev - 1)
-            }, 1000)
-        }
-    }, [autoDial, timer, activeCall, status]);
-
-    useEffect(() => {
-        if (fetcher.data && fetcher.data.body && !isPlaying) {
-            const audioUrl = URL.createObjectURL(new Blob([fetcher.data.body], { type: fetcher.data.headers['Content-Type'] }));
-            const audio = new Audio(audioUrl);
-            audioRef.current = audio;
-            audio.play();
-            setIsPlaying(true);
-
-            audio.addEventListener('ended', () => {
-                setIsPlaying(false);
-            });
-        }
-    }, [fetcher.data, isPlaying]);
 
     return (
         <div style={{ display: "flex", flexDirection: "column" }}>
-            <div className="row flex justify-space-between" style={{ padding: '16px 0' }}>
-                <div></div>
-                <div className="flex row gap2">
-                    <button disabled style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white' }}>
-                        Predictive Dial
-                    </button>
-                    <button onClick={toggleAutoDial} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>
-                        {autoDial ? 'Stop AutoDial' : 'Start AutoDial'}
-                    </button>
-                    {autoDial && !activeCall && status === 'Registered' && (
-                        <div style={{ padding: "8px 16px", background: "#f7f7f7", borderRadius: "5px" }}>
-                            Next call in: {timer}s
-                        </div>
-                    )}
+            <div style={{ display: "flex", flexDirection: "column", position: "sticky", top: "0px", background: "hsl(var(--background))" }}>
+                <div style={{ padding: '16px 0', display: 'flex', justifyContent: "space-between" }}>
+                    <div className="flex row gap2" style={{ display: 'flex', gap: "8px" }}>
+                        <button disabled style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', opacity: ".5" }}>
+                            Predictive Dial
+                        </button>
+                        <button onClick={dialNextContact} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>
+                            Dial Next
+                        </button>
+                    </div>
+                    <div className="flex row gap2" style={{ display: 'flex' }}>
+                        {(incomingCall || activeCall) && (
+                            <div >
+                                <button onClick={hangUp} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>Hang Up</button>
+                            </div>
+                        )}
+                    </div>
                 </div>
+                {nextRecipient && (
+                    <div style={{ display: 'flex', alignItems: "center", justifyContent: 'space-between', border: '1px solid #ccc', borderRadius: '5px', padding: "8px", marginBottom: "10px" }}>
+                        <div >
+                            <strong>Next Recipient: </strong> {nextRecipient.firstname} {nextRecipient.surname} ({nextRecipient.phone})
+                        </div>
+                        <div>
+                            <button onClick={() => nextNumber(true)}>SKIP</button>
+                        </div>
+                    </div>
+                )}
             </div>
             <div className="flex column">
                 <table style={{ width: "100%", borderCollapse: "collapse", background: "rgba(240,240,240,1)", color: '#333', border: "2px solid #333" }}>
@@ -156,7 +164,9 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                         {groupByHousehold ?
                             Object.values(householdMap).map((household, index) => (
                                 <HouseholdContact
+                                    currentContactIndex={currentContactIndex}
                                     key={index}
+                                    index={index}
                                     household={household}
                                     callsList={callsList}
                                     handleReplay={handleReplay}

@@ -21,11 +21,11 @@ const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall
 
     return (
         <>
-            <tr style={{ fontSize: "small", border: grouped && '2px solid #C91D25'}}>
+            <tr style={{ fontSize: "small", borderTop: grouped && firstInHouse ? '2px solid #C91D25' : grouped ? '2px solid hsl(var(--muted-foreground))' : 'unset'}}>
                 <td style={{ padding: "8px 16px" }}>{contact.firstname} {contact.surname}</td>
                 <td style={{ padding: "8px 16px", opacity: !household ? '1' : firstInHouse ? '1' : '.6' }}>{contact.phone}</td>
                 {firstInHouse || !household ? (
-                    <td style={{ padding: "8px 16px", verticalAlign: 'middle', background: !household ? 'unset' : firstInHouse ? "#BDEBFF" : 'unset'  }} rowSpan={household?.length} >{contact.address}</td>
+                    <td style={{ padding: "8px 16px", verticalAlign: 'middle', background: !household ? 'unset' : firstInHouse ? "hsl(var(--secondary))" : 'unset'  }} rowSpan={household?.length} >{contact.address}</td>
                 ) : null}
                 {firstInHouse || !household ? (
                     <td style={{ padding: "8px 16px", textTransform: "capitalize", verticalAlign: 'middle' }} rowSpan={household?.length} >
@@ -54,11 +54,12 @@ const CallContact = ({ contact, callsList, handleReplay, handlePause, handleCall
                 </td>
             </tr>
             {showUpdate === contact.id && (
-                <tr style={{ borderBottom: '2px solid #333', padding: "2px", minHeight: "1px" }}>
-                    <td colSpan={6} style={{ padding: "8px 16px" }}>
-                        <div style={{ padding: "8px 16px", borderBottom: "2px solid #eee", display: "flex", flexDirection: "column" }}>
+                <tr style={{ borderBottom: '2px solid #333', padding: "2px", minHeight: "1px", background:"hsl(var(--background))" }}>
+                    <td colSpan={6} style={{ padding: "8px 16px", }}>
+                        <div style={{ padding: "8px 16px", display: "flex", flexDirection: "column" }}>
                             {Object.keys(questions).sort((a, b) => questions[a].order - questions[b].order).map((key) => (
-                                <Result action={intentAction} questions={questions[key]} />
+                                <Result action={intentAction} questions={questions[key]} key={`questions-${key}`}/>
+
                             ))}
                             <ContactInfo action={handleSave} handleChange={handleChange} contact={contact} />
                             <Note action={() => null} initialVal={''} />

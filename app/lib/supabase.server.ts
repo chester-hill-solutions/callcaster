@@ -32,10 +32,8 @@ export async function getSupabaseServerClientWithSession(request: Request) {
   const {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();
-
-  if (serverSession == null) {
-    redirect("http://localhost:3000/signin", { headers });
+  if (!serverSession) {
+    return redirect('/signin')
   }
-
   return { supabaseClient, headers, serverSession };
 }

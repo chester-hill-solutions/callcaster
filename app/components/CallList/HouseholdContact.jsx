@@ -1,9 +1,8 @@
 import React from "react";
 import CallContact from "./CallContact/CallContact";
 
-const HouseholdContact = ({ household, callsList, handleReplay, handlePause, handleCall, isPlaying, showUpdate, handleShowUpdate, questions, grouped }) => {
-    
-    return (
+const HouseholdContact = ({ household, callsList, handleReplay, handlePause, handleCall, isPlaying, showUpdate, handleShowUpdate, questions, currentContactIndex, index }) => {
+    return (        
         <>
             {household.map((contact, index) => (
                 <CallContact
