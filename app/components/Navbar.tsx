@@ -20,11 +20,11 @@ export default function Navbar({
       <nav className="flex w-full justify-between px-8 py-4" id="global-nav">
         <Link
           to="/"
-          className="font-Tabac-Slab text-4xl font-black text-brand-secondary"
+          className="font-Tabac-Slab text-4xl font-black text-brand-primary"
         >
           CallCaster
         </Link>
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4">
           <NavLink
             to="/workspaces"
             className="rounded-sm bg-secondary px-4 py-2 font-bold text-brand-primary 

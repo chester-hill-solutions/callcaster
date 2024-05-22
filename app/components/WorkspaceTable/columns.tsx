@@ -11,18 +11,7 @@ export const audienceColumns: ColumnDef<Audience>[] = [
 export const campaignColumns: ColumnDef<Campaign>[] = [
   {
     accessorKey: "title",
-    header: () => (
-      <div className="flex h-full items-center border-r-2 border-white">
-        Name
-      </div>
-    ),
-    cell: ({ row }) => {
-      return (
-        <div className="flex h-full items-center border-r-2 border-white">
-          {row.getValue("title")}
-        </div>
-      );
-    },
+    header: "Name",
   },
   {
     accessorKey: "start_date",
