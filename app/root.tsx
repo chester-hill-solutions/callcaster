@@ -19,7 +19,7 @@ import {
 } from "@remix-run/react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { createBrowserClient } from "@supabase/ssr";
-import {useTwilioDevice} from "./hooks/useTwilioDevice"
+import { useTwilioDevice } from "./hooks/useTwilioDevice";
 // Remix-Themes Imports
 // import clsx from "clsx";
 // import {
@@ -81,25 +81,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     {
       headers: response.headers,
     },
-    // theme: getTheme(),
   );
-
-  // Wrapper for Implementing Remix-Themes
-  // export default function AppWithProviders() {
-  //   const { revalidate } = useRevalidator();
-  //   const data = useLoaderData<typeof loader>();
-  //   // console.log(data.theme);
-  //   return (
-  //     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
-  //       <App />
-  //     </ThemeProvider>
-  //   );
-  // }
 };
 
 export default function App() {
   const { env, session, token } = useLoaderData<typeof loader>();
-  const device = useTwilioDevice(token)
+  const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
@@ -141,7 +128,7 @@ export default function App() {
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar className="bg-brand-primary" handleSignOut={signOut} />
+          <Navbar className="bg-brand-secondary" handleSignOut={signOut} />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>
         <ScrollRestoration />

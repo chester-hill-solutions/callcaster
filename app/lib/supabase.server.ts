@@ -1,5 +1,6 @@
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { Database } from "./database.types";
+import { redirect } from "@remix-run/node";
 
 export const createSupabaseServerClient = (request: Request) => {
   const cookies = parse(request.headers.get("Cookie") ?? "");
@@ -31,5 +32,6 @@ export async function getSupabaseServerClientWithSession(request: Request) {
   const {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();
+
   return { supabaseClient, headers, serverSession };
 }

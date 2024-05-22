@@ -6,31 +6,31 @@
   @font-face {
     font-family: "Tabac Slab";
     font-weight: 400;
-    src: url("/public/fonts/Tabac\ Slab.otf") format("opentype");
+    src: url("/fonts/Tabac\ Slab.otf") format("opentype");
   }
   @font-face {
     font-family: "Tabac Slab";
     font-weight: 900;
-    src: url("/public/fonts/Tabac\ Slab\ Black.otf") format("opentype");
+    src: url("/fonts/Tabac\ Slab\ Black.otf") format("opentype");
   }
   @font-face {
     font-family: "Tabac Slab";
     font-style: italic;
     font-weight: 900;
-    src: url("/public/fonts/Tabac\ Slab\ Black\ Italic.otf") format("opentype");
+    src: url("/fonts/Tabac\ Slab\ Black\ Italic.otf") format("opentype");
   }
 
   @font-face {
     font-family: "Tabac Big Slab";
     font-weight: 900;
-    src: url("/public/fonts/Tabac\ Big\ Slab\ Black.otf") format("opentype");
+    src: url("/fonts/Tabac\ Big\ Slab\ Black.otf") format("opentype");
   }
   :root {
     --brand-primary: 357 75% 45%;
     --brand-secondary: 198 100% 87%;
     --brand-tertiary: 354 83% 88%;
 
-    --background: var(--brand-secondary);
+    --background: white;
     --foreground: 240 10% 3.9%;
     /* --card: 0 0% 100%; */
     --card: 220, 5%, 12%;

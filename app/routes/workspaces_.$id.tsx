@@ -25,10 +25,15 @@ export const loader = async ({ request }: { request: Request }) => {
   }
 
   const workspaceId = request.url.split("/").at(-1);
-  const { data: workspace } = await getWorkspaceInfo({
+  const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
   });
+
+  // Redirect if user does not have workspace access OR workspace does not exist
+  if (workspace == null) {
+    return redirect("/workspaces", { headers });
+  }
 
   const { data: audiences } = await getWorkspaceAudiences({ supabaseClient });
   const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient });
