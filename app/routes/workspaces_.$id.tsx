@@ -1,4 +1,4 @@
-import { json, redirect, useLoaderData } from "@remix-run/react";
+import { json, redirect, useLoaderData, useNavigate } from "@remix-run/react";
 
 import { PostgrestError } from "@supabase/supabase-js";
 import { useState } from "react";
@@ -41,12 +41,14 @@ export const loader = async ({ request, params }: { request: Request }) => {
 };
 
 export default function Workspace() {
+  const navigate = useNavigate();
   const { workspace, audiences, campaigns, contacts } =
     useLoaderData<typeof loader>();
 
   const [selectedTable, setSelectedTable] = useState<
     JsonifyObject<WorkspaceTable>
   >({
+    name:'campaigns',
     columns: campaignColumns,
     data: campaigns,
   });
@@ -62,6 +64,7 @@ export default function Workspace() {
           campaigns != null ? campaigns.map((campaign) => campaign.title) : [],
         );
         setSelectedTable({
+          name: 'campaigns',
           columns: campaignColumns,
           data: campaigns,
         });
@@ -71,6 +74,7 @@ export default function Workspace() {
           audiences != null ? audiences.map((audience) => audience.name) : [],
         );
         setSelectedTable({
+          name: 'audiences',
           columns: audienceColumns,
           data: audiences,
         });
@@ -78,6 +82,7 @@ export default function Workspace() {
       case WorkspaceTableNames.Contact:
         setFirstColumn([]);
         setSelectedTable({
+          name: 'contacts',
           columns: contactColumns,
           data: contacts,
         });
@@ -109,7 +114,7 @@ export default function Workspace() {
       <div className="self-start" id="name-column">
         <ul className="flex flex-col gap-4">
           {firstColumn.map((row, i) => (
-            <li key={`${selectedTable}-row-${i}`}>{row}</li>
+            <li key={`${selectedTable}-row-${i}`} onClick={() => nav}>{row}</li>
           ))}
         </ul>
       </div>
@@ -119,6 +124,7 @@ export default function Workspace() {
           classname="border-white border-2 rounded-md"
           columns={selectedTable.columns}
           data={selectedTable.data}
+          onRowClick={(item) => navigate(`${selectedTable.name}/${item.id}`)}
         />
       )}
     </main>

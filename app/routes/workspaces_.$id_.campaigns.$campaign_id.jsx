@@ -1,7 +1,6 @@
 import { json, useFetcher, useLoaderData, useOutletContext, redirect } from "@remix-run/react";
 import { createSupabaseServerClient } from "../lib/supabase.server"
 import CallList from "../components/CallList/CallList";
-import { useTwilioDevice } from "../hooks/useTwilioDevice";
 import { AddIcon } from "../components/Icons";
 import { useState } from "react";
 
@@ -126,7 +125,7 @@ export default function Campaign() {
             </div>
             <CallList {...{ contacts, calls, placeCall: handlePlaceCall, hangUp, activeCall, incomingCall, contactOpen, newContact, handleContact, audiences, openContact, campaign, device, status }} />
             <div className="row justify-end" style={{ padding: "8px 16px" }}>
-                <button onClick={openContact}><AddIcon fill={'#fff'} width="20px" /></button>
+                <button onClick={openContact}><AddIcon fill={'hsl(var(--accent-foreground))'} width="20px" /></button>
             </div>
         </div>
     )

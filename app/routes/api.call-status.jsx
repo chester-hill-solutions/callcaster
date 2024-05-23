@@ -25,7 +25,7 @@ export const action = async ({ request }) => {
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
     };
-
+    
     const underCaseData = convertKeysToUnderCase(parsedBody);
     
     const updateData = {
@@ -57,9 +57,6 @@ export const action = async ({ request }) => {
 
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const { data, error } = await supabase.from('call').upsert(updateData, { onConflict: 'sid' }).select();
-
-
-    console.log(data, error)
 
     return json({ success: true, data });
 }

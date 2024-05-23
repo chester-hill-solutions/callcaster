@@ -4,11 +4,10 @@ import { useSupabaseRealtime } from "../../hooks/useSupabaseRealtime";
 import CallContact from "./CallContact/CallContact";
 import { TableHeader } from "./TableHeader";
 import { NewContactForm } from "./NewContactForm";
-import HouseholdContact from "./HouseholdContact";
 
-export default function CallList({ contacts = [], calls = [], placeCall, hangUp, activeCall, incomingCall, contactOpen, newContact, handleContact, audiences = [], openContact, campaign, status }) {
+export default function CallList({ contacts = [], calls = [], placeCall, hangUp, device, activeCall, incomingCall, contactOpen, newContact, handleContact, audiences = [], openContact, campaign, status }) {
     const { supabase } = useOutletContext();
-    const [contactList, setContacts] = useSupabaseRealtime('contact', supabase, contacts);
+    const [contactList] = useSupabaseRealtime('contact', supabase, contacts);
 
     const householdMap = contactList.reduce((acc, curr) => {
         if (!acc[curr.address]) {
@@ -19,20 +18,21 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
         return acc;
     }, {});
 
-    const [callsList, setCallsList] = useSupabaseRealtime('call', supabase, calls);
+    const [callsList] = useSupabaseRealtime('call', supabase, calls);
     const [showUpdate, setShowUpdate] = useState(null);
-    const [groupByHousehold, setGroupByHousehold] = useState(true);
+    const [groupByHousehold] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioRef = useRef(null);
     const fetcher = useFetcher();
     const currentContactIndex = useRef(0);
+    const openRef = useRef(null);
     const [nextRecipient, setNextRecipient] = useState(null);
 
     const nextNumber = (skip = false) => {
         let foundNext = false;
         let nextContact = null;
         let currentIndex = currentContactIndex.current;
-    
+
         if (skip) {
             if (groupByHousehold) {
                 const households = Object.values(householdMap);
@@ -41,12 +41,12 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                 currentIndex = (currentIndex + 1) % contactList.length;
             }
         }
-    
+
         if (groupByHousehold) {
             const households = Object.values(householdMap);
             for (let i = currentIndex; i < households.length; i++) {
                 const household = households[i];
-    
+
                 for (let j = 0; j < household.length; j++) {
                     const contact = household[j];
                     const recentCall = callsList ? callsList.find((call) => call.contact_id === contact.id) : null;
@@ -71,7 +71,7 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                 }
             }
         }
-    
+
         if (!foundNext) {
             nextContact = null;
         }
@@ -100,7 +100,7 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
         } else {
             placeCall(contact);
             setShowUpdate(contact.id);
-            nextNumber();
+
         }
     };
 
@@ -129,7 +129,7 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
 
     return (
         <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", flexDirection: "column", position: "sticky", top: "0px", background: "hsl(var(--background))" }}>
+            <div style={{ display: "flex", flexDirection: "column", position: "sticky", top: "0px", background: "hsl(var(--background))", padding: "8px", boxShadow: "0px 2px 0 0 #333", zIndex: 99 }}>
                 <div style={{ padding: '16px 0', display: 'flex', justifyContent: "space-between" }}>
                     <div className="flex row gap2" style={{ display: 'flex', gap: "8px" }}>
                         <button disabled style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', opacity: ".5" }}>
@@ -141,9 +141,9 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                     </div>
                     <div className="flex row gap2" style={{ display: 'flex' }}>
                         {(incomingCall || activeCall) && (
-                            <div >
-                                <button onClick={hangUp} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>Hang Up</button>
-                            </div>
+                            <><div>
+                                <button onClick={() => hangUp()} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>Hang Up</button>
+                            </div></>
                         )}
                     </div>
                 </div>
@@ -158,29 +158,33 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                     </div>
                 )}
             </div>
-            <div className="flex column">
-                <table style={{ width: "100%", borderCollapse: "collapse", background: "rgba(240,240,240,1)", color: '#333', border: "2px solid #333" }}>
+            <div className="flex column" style={{ display: "flex", flexDirection: "column" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", background: "hsl(var(--background))", border: "2px solid #333" }}>
                     <TableHeader keys={["Name", "Number", "Address", "Status", "", "Updates"]} />
                     <tbody>
                         {groupByHousehold ?
                             Object.values(householdMap).map((household, index) => (
-                                <HouseholdContact
-                                    currentContactIndex={currentContactIndex}
-                                    key={index}
-                                    index={index}
-                                    household={household}
-                                    callsList={callsList}
-                                    handleReplay={handleReplay}
-                                    handlePause={handlePause}
-                                    handleCall={handleCall}
-                                    isPlaying={isPlaying}
-                                    showUpdate={showUpdate}
-                                    handleShowUpdate={handleShowUpdate}
-                                    questions={campaign.call_questions}
-                                />
+                                household.map((contact, index) => (
+                                    <CallContact
+                                        key={contact.id}
+                                        contact={contact}
+                                        callsList={callsList}
+                                        handleReplay={handleReplay}
+                                        handlePause={handlePause}
+                                        handleCall={handleCall}
+                                        isPlaying={isPlaying}
+                                        showUpdate={showUpdate}
+                                        handleShowUpdate={handleShowUpdate}
+                                        questions={campaign.call_questions}
+                                        household={household}
+                                        firstInHouse={index === 0}
+                                        grouped={true}
+                                    />
+                                ))
                             )) :
                             contactList.map((contact) => (
                                 <CallContact
+                                    openRef={openRef}
                                     key={contact.id}
                                     contact={contact}
                                     callsList={callsList}
