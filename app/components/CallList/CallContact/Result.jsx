@@ -16,21 +16,20 @@ const iconMapping = {
     NoAnswerIcon
 };
 
-const Result = ({ action, initResult = null, questions }) => {
+const Result = ({ action, initResult = null, questions, questionId }) => {
     const [result, setResult] = useState(initResult);
 
     const handleChange = (value) => {
         setResult(value);
-        action({ column: 'result', value });
+        action({ column: questionId, value });
     };
-
     return (
-        <div className="row justify-space-between flex align-center" style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', gap:"16px" }}>
-            <div className="flex-half" style={{ flexBasis: "1 1 50%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', gap: "16px" }}>
+            <div style={{ flexBasis: "1 1 50%" }}>
                 <p>{questions.title}</p>
                 <p className="caption xx-small" style={{ fontSize: "xx-small" }}>{questions.text}</p>
             </div>
-            <div className="row xx-small justify-end gap1" style={{ alignItems: "unset", flexWrap: "wrap", justifyContent: "end", gap: "8px", display:"flex" }}>
+            <div style={{ alignItems: "unset", flexWrap: "wrap", justifyContent: "end", gap: "8px", display: "flex" }}>
                 {questions.options.map(({ Icon, value, label }) => {
 
                     if (Icon === 'SupportButton') {
@@ -54,13 +53,13 @@ const Result = ({ action, initResult = null, questions }) => {
                             <button
                                 key={value}
                                 className="result-button column align-center justify-start"
-                                style={{display:"flex", flexDirection:"column", alignContent:"center"}}
+                                style={{ display: "flex", flexDirection: "column", alignContent: "center", alignItems:'center' }}
                                 value={value}
                                 onClick={() => handleChange(value)}
                                 type="button"
                             >
-                                <IconComponent width="20px" fill={result === value ? 'var(--yellow)' : '#ccc'} />
-                                <div className="caption" style={{ fontSize: "10px", textAlign: 'center', color: result === value ? 'var(--yellow)' : '#ccc' }}>
+                                <IconComponent width="20px" fill={result === value ? 'hsl(var(--brand-primary))' : 'hsl(var(--muted-foreground))'} />
+                                <div className="caption" style={{ fontSize: "10px", textAlign: 'center', color: result === value ? 'hsl(var(--input))' : '#ccc' }}>
                                     {label}
                                 </div>
                             </button>

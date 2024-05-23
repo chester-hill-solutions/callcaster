@@ -23,12 +23,8 @@ export const loader = async ({ request }: { request: Request }) => {
 
 //************ACTION************/
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
+  const { supabaseClient, headers } =
     await getSupabaseServerClientWithSession(request);
-
-  if (!serverSession) {
-    return redirect("/signin", { headers });
-  }
 
   const formData = await request.formData();
 
