@@ -38,7 +38,7 @@ export const action = async ({ request }) => {
             uri: call.uri,
             campaign_id: parseInt(campaign_id, 10),
             contact_id: parseInt(contact_id, 10),
-            workspace: 'd915f70e-4f32-4f2f-984f-72e2064e8e3c' //TODO
+            workspace: 'f0cb3600-4d60-41e8-9470-f66ebbc9a64b' //TODO
         };
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
