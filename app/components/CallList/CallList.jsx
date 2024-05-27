@@ -145,6 +145,7 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                                 <button onClick={() => hangUp()} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>Hang Up</button>
                             </div></>
                          )} 
+
                     </div>
                 </div>
                 {nextRecipient && (
