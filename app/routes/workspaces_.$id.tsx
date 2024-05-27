@@ -96,7 +96,7 @@ export default function Workspace() {
 
   return (
     <main
-      className="mx-auto mt-8 grid h-full w-[80%] auto-rows-auto items-center rounded-sm text-white"
+      className="mx-auto mt-8 grid h-full w-[80%] auto-rows-auto items-center rounded-sm"
       style={{
         gridTemplateColumns: "200px auto",
       }}
