@@ -93,10 +93,11 @@ export async function getWorkspaceInfo({
 
 export async function getWorkspaceAudiences({
   supabaseClient,
+  workspaceId
 }: {
   supabaseClient: SupabaseClient<Database>;
 }) {
-  const { data, error } = await supabaseClient.from("audience").select();
+  const { data, error } = await supabaseClient.from("audience").select().eq('workspace', workspaceId);
 
   if (error) {
     console.log("Error on function getWorkspaceAudiences");
@@ -107,10 +108,11 @@ export async function getWorkspaceAudiences({
 
 export async function getWorkspaceCampaigns({
   supabaseClient,
+  workspaceId
 }: {
   supabaseClient: SupabaseClient<Database>;
 }) {
-  const { data, error } = await supabaseClient.from("campaign").select();
+  const { data, error } = await supabaseClient.from("campaign").select().eq('workspace', workspaceId);
 
   if (error) {
     console.log("Error on function getWorkspaceAudiences");
@@ -121,10 +123,11 @@ export async function getWorkspaceCampaigns({
 
 export async function getWorkspaceContacts({
   supabaseClient,
+  workspaceId
 }: {
   supabaseClient: SupabaseClient<Database>;
 }) {
-  const { data, error } = await supabaseClient.from("contact").select();
+  const { data, error } = await supabaseClient.from("contact").select().eq('workspace', workspaceId);
 
   if (error) {
     console.log("Error on function getWorkspaceAudiences");

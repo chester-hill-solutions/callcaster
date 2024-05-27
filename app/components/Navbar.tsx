@@ -25,21 +25,21 @@ export default function Navbar({
           CallCaster
         </Link>
          <div className="flex items-center gap-4">
-           <NavLink
+          <NavLink
             to="/workspaces"
             className="rounded-sm bg-secondary px-4 py-2 font-bold text-brand-primary 
-                      transition-colors duration-150 ease-in-out"
+                      transition-colors duration-150 ease-in-out hover:bg-accent dark:hover:bg-accent-foreground"
           >
-            Log in
+            Workspaces
           </NavLink>
-          {/* <Button
+          <Button
             variant="destructive"
             className="px-4 py-2 text-center"
             type="button"
             onClick={() => handleSignOut()}
           >
             Log Out
-          </Button> */}
+          </Button>
           <ModeToggle />
         </div> 
       </nav>

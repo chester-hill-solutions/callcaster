@@ -68,27 +68,27 @@ export default function Workspaces() {
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   return (
-    <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16 text-white">
-      <h1 className="text-center font-Tabac-Slab text-4xl font-black text-white">
+    <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
+      <h1 className="text-center font-Tabac-Slab text-4xl ">
         Your Workspaces
       </h1>
-      <div className="grid w-full auto-rows-auto grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6 px-16">
+      <div className="flex flex-row flex-wrap gap-4">
         {workspaces != null &&
           workspaces.map((workspace) => (
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center"
+              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60"
             >
               <h5 className="font-Zilla-Slab text-2xl text-white">
                 {workspace.name}
               </h5>
-              <p className="">Workspace Description</p>
+              <p className="text-white">Workspace Description</p>
             </Link>
           ))}
         <Button
           variant="outline"
-          className="h-full min-h-fit border border-white px-4 py-8"
+          className="h-full min-h-fit border border-white px-4 py-8 min-w-60"
           onClick={() => dialogRef.current?.showModal()}
         >
           <FaPlus
