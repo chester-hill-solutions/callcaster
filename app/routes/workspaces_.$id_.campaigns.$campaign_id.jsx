@@ -6,7 +6,7 @@ import { useState } from "react";
 
 const limit = 30
 export const loader = async ({ request, params }) => {
-    const { campaign_id: id } = params;
+    const { campaign_id: id, id: workspaceId } = params;
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
     const { data, error } = await supabase.auth.getUser();
 
@@ -40,7 +40,7 @@ export const loader = async ({ request, params }) => {
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id })
     const { data: calls, error: callError } = await supabase.rpc('get_calls_by_campaign', { selected_campaign_id: id }).order('date_created', { ascending: false });
 
-    return json({ contacts, campaign, calls, user: data.user, audiences, campaignDetails })
+    return json({ contacts, campaign, calls, user: data.user, audiences, campaignDetails, workspaceId })
 }
 
 export const action = async ({ request, params }) => {
@@ -78,7 +78,7 @@ export const action = async ({ request, params }) => {
 export default function Campaign() {
     const { device: twilioDevice } = useOutletContext();
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
-    const { contacts, campaign, calls, user, audiences } = useLoaderData();
+    const { contacts, campaign, calls, user, audiences, workspaceId } = useLoaderData();
     const { submit } = useFetcher();
     const [contactOpen, setContactOpen] = useState(null);
     const [newContact, setNewContact] = useState({
@@ -96,6 +96,7 @@ export default function Campaign() {
                 campaign_id: campaign.id,
                 user_id: user.id,
                 contact_id: contact.id,
+                workspaceId
             }, {
                 action: "/api/dial",
                 method: "POST",

@@ -33,9 +33,9 @@ export const loader = async ({ request, params }: { request: Request }) => {
       return redirect("/workspaces", { headers });
     }
   }
-  const { data: audiences } = await getWorkspaceAudiences({ supabaseClient });
-  const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient });
-  const { data: contacts } = await getWorkspaceContacts({ supabaseClient });
+  const { data: audiences } = await getWorkspaceAudiences({ supabaseClient, workspaceId });
+  const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient, workspaceId });
+  const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
 
   return json({ workspace, audiences, campaigns, contacts }, { headers });
 };
@@ -96,10 +96,7 @@ export default function Workspace() {
 
   return (
     <main
-      className="mx-auto mt-8 grid h-full w-[80%] auto-rows-auto items-center rounded-sm"
-      style={{
-        gridTemplateColumns: "200px auto",
-      }}
+      className="mx-auto mt-8 h-full w-[80%] items-center rounded-sm"
     >
       <div className="py-4">
         <WorkspaceDropdown selectTable={handleSelectTable} />

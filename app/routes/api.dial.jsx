@@ -3,7 +3,7 @@ import { createSupabaseServerClient } from '../lib/supabase.server';
 
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to: toNumber, user_id, campaign_id, contact_id } = await request.json();
+    const { to: toNumber, user_id, campaign_id, contact_id, workspaceId } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const twiml = new Twilio.twiml.VoiceResponse();
 
@@ -38,7 +38,7 @@ export const action = async ({ request }) => {
             uri: call.uri,
             campaign_id: parseInt(campaign_id, 10),
             contact_id: parseInt(contact_id, 10),
-            workspace: 'f0cb3600-4d60-41e8-9470-f66ebbc9a64b' //TODO
+            workspace: workspaceId
         };
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
