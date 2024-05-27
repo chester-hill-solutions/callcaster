@@ -140,11 +140,12 @@ export default function CallList({ contacts = [], calls = [], placeCall, hangUp,
                         </button>
                     </div>
                     <div className="flex row gap2" style={{ display: 'flex' }}>
-                        {(incomingCall || activeCall) && (
+                         {(incomingCall || activeCall) && ( 
                             <><div>
                                 <button onClick={() => hangUp()} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>Hang Up</button>
                             </div></>
-                        )}
+                         )} 
+
                     </div>
                 </div>
                 {nextRecipient && (

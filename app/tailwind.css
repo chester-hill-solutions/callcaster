@@ -49,7 +49,7 @@
     --input: 240 5.9% 90%;
     --ring: 346.8 77.2% 49.8%;
     --radius: 0.5rem;
-    color: #333,
+    --contrast-text: #333,
   }
 
   .dark,
@@ -73,7 +73,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 346.8 77.2% 49.8%;
-    color: #f1f1f1,
+    --contrast-text: #f1f1f1,
   }
 }
 
