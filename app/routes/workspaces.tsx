@@ -42,8 +42,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  // console.log(Object.fromEntries(formData));
-
   const { data, error } = await createNewWorkspace({
     supabaseClient,
     userId,
@@ -71,9 +69,10 @@ export default function Workspaces() {
   // console.log(workspaces);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16 text-white">
-      <h1 className="text-center font-Tabac-Slab text-4xl font-black text-white">
+      <h1 className="text-center font-Tabac-Slab text-4xl font-black text-zinc-800 dark:text-white">
         Your Workspaces
       </h1>
       <div className="grid w-full auto-rows-auto grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6 px-16">
@@ -82,27 +81,41 @@ export default function Workspaces() {
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center"
+              className="flex flex-col items-center gap-4 rounded-md border-2 border-zinc-700 bg-brand-secondary px-4 py-8 text-center font-semibold text-black shadow-md
+              transition-colors duration-150 ease-in-out hover:bg-black hover:text-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
             >
-              <h5 className="font-Zilla-Slab text-2xl text-white">
-                {workspace.name}
-              </h5>
+              <h5 className="font-Zilla-Slab text-2xl">{workspace.name}</h5>
               <p className="">Workspace Description</p>
             </Link>
           ))}
         <Button
           variant="outline"
-          className="h-full min-h-fit border border-white px-4 py-8"
+          className="h-full min-h-fit border-2 border-zinc-700 px-4 py-8
+                  hover:bg-brand-primary dark:border-white"
           onClick={() => dialogRef.current?.showModal()}
         >
-          <FaPlus
-            size="72px"
-            style={{
-              border: "1px solid white",
-              borderRadius: "50%",
-              padding: "0.75rem",
-            }}
-          />
+          <div className="hidden dark:block">
+            <FaPlus
+              size="72px"
+              color="white"
+              style={{
+                border: "2px solid white",
+                borderRadius: "50%",
+                padding: "0.75rem",
+              }}
+            />
+          </div>
+          <div className="block dark:hidden">
+            <FaPlus
+              size="72px"
+              color="black"
+              style={{
+                border: "2px solid black",
+                borderRadius: "50%",
+                padding: "0.75rem",
+              }}
+            />
+          </div>
         </Button>
       </div>
       <dialog ref={dialogRef} className="rounded-md bg-indigo-400 p-8">

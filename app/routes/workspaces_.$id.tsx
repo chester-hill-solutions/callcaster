@@ -1,22 +1,12 @@
-import { json, redirect, useLoaderData } from "@remix-run/react";
-import { useState } from "react";
-import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
+import { LoaderFunctionArgs } from "@remix-run/node";
+import { json, redirect, useLoaderData, useNavigate } from "@remix-run/react";
+import { CSVLink } from "react-csv";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
-import {
-  audienceColumns,
-  campaignColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
-import {
-  getWorkspaceAudiences,
-  getWorkspaceCampaigns,
-  getWorkspaceContacts,
-  getWorkspaceInfo,
-} from "~/lib/database.server";
+import { campaignColumns } from "~/components/WorkspaceTable/columns";
+import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { WorkspaceTable, WorkspaceTableNames } from "~/lib/types";
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
@@ -24,85 +14,83 @@ export const loader = async ({ request }: { request: Request }) => {
     return redirect("/signin", { headers });
   }
 
-  const workspaceId = request.url.split("/").at(-1);
-  const { data: workspace, error } = await getWorkspaceInfo({
+  const workspaceId = params.id;
+  if (workspaceId == null) {
+    return json({ error: "Workspace does not exist" });
+  }
+
+  const { data: workspace, error: workspaceError } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
   });
 
-  // Redirect if user does not have workspace access OR workspace does not exist
-  if (workspace == null) {
-    return redirect("/workspaces", { headers });
+  const { data: campaigns, error: campaignsError } =
+    await getWorkspaceCampaigns({
+      supabaseClient,
+      workspaceId,
+    });
+
+  if (campaigns == null) {
+    return json({ error: "No campaigns found in workspace" });
   }
 
-  const { data: audiences } = await getWorkspaceAudiences({ supabaseClient });
-  const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient });
-  const { data: contacts } = await getWorkspaceContacts({ supabaseClient });
+  for (const campaign of campaigns) {
+    // console.log(`//////////////////// CAMPAIGN ${campaign.id} ////////////////////`,);
+    const { data: contacts, error: contactError } = await supabaseClient.rpc(
+      "get_contacts_by_campaign",
+      { selected_campaign_id: campaign.id },
+    );
+    const { data: calls, error: callsError } = await supabaseClient.rpc(
+      "get_calls_by_campaign",
+      { selected_campaign_id: campaign.id },
+    );
 
-  return json({ workspace, audiences, campaigns, contacts }, { headers });
+    let completedCalls = 0;
+    let totalCalls = 0;
+
+    for (const contact of contacts) {
+      const calledContact = calls?.find(
+        (call) => call.contact_id === contact.id,
+      );
+
+      // console.log(campaign.id,"     ",calledContact?.contact_id,calledContact?.status,);
+      if (calledContact) {
+        totalCalls += 1;
+        if (calledContact.status === "completed") {
+          completedCalls += 1;
+        }
+      }
+    }
+    const progress = completedCalls / totalCalls;
+    campaign["progress"] = progress;
+  }
+
+  return json({ workspace, campaigns }, { headers });
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, contacts } =
-    useLoaderData<typeof loader>();
-
-  const [selectedTable, setSelectedTable] = useState<
-    JsonifyObject<WorkspaceTable>
-  >({
-    columns: campaignColumns,
-    data: campaigns,
-  });
-
-  const handleSelectTable = (tableName: string) => {
-    switch (tableName) {
-      case WorkspaceTableNames.Campaign:
-        setSelectedTable({
-          columns: campaignColumns,
-          data: campaigns,
-        });
-        break;
-      case WorkspaceTableNames.Audience:
-        setSelectedTable({
-          columns: audienceColumns,
-          data: audiences,
-        });
-        break;
-      case WorkspaceTableNames.Contact:
-        setSelectedTable({
-          columns: contactColumns,
-          data: contacts,
-        });
-        break;
-      default:
-        console.log(
-          `tableName: ${tableName} does not correspond to any workspace tables`,
-        );
-    }
-  };
+  const { workspace, campaigns } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col rounded-sm text-white">
-      {/* <h1 className="text-center font-Tabac-Slab text-4xl font-black text-white">
-        Workspace: {workspace?.name}
-      </h1> */}
-      <div id="table-selector" className="col-span-full flex items-center">
-        <div className="py-4">
-          <WorkspaceDropdown selectTable={handleSelectTable} />
-        </div>
-        <div
-          className="flex gap-4 px-4 font-Zilla-Slab text-2xl font-bold"
-          id="filter-controls"
+    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
+      <div className="flex items-center gap-4">
+        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+          {workspace.name}
+        </h1>
+        <CSVLink
+          data={campaigns as object[]}
+          className="rounded-md bg-brand-primary px-4 py-2 font-Zilla-Slab text-xl font-bold text-white hover:bg-brand-secondary"
         >
-          <p>Filter Controls</p>
-          <input type="text" name="filter-input" id="filter-input" />
-        </div>
+          Download
+        </CSVLink>
       </div>
-
       {campaigns != null && (
         <DataTable
-          classname="border-white border-2 rounded-md"
-          columns={selectedTable.columns}
-          data={selectedTable.data}
+          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
+          columns={campaignColumns}
+          data={campaigns}
+          onRowClick={(item) => navigate(`campaigns/${item.id}`)}
         />
       )}
     </main>

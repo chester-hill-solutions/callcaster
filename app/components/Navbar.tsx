@@ -1,12 +1,15 @@
+import { TypedResponse } from "@remix-run/node";
+import { Link, NavLink } from "@remix-run/react";
 import { AuthError } from "@supabase/supabase-js";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
-import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink } from "@remix-run/react";
+import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
+import { WorkspaceData } from "~/lib/types";
 
 export default function Navbar({
   className,
   handleSignOut,
+  workspaces,
 }: {
   className?: string;
   handleSignOut: () => Promise<
@@ -14,7 +17,9 @@ export default function Navbar({
       error: AuthError | null;
     }>
   >;
+  workspaces: WorkspaceData;
 }) {
+  console.log(workspaces);
   return (
     <header className={`w-full ${className}`}>
       <nav className="flex w-full justify-between px-8 py-4" id="global-nav">
@@ -24,6 +29,9 @@ export default function Navbar({
         >
           CallCaster
         </Link>
+        {workspaces != null && (
+          <WorkspaceSelectorCombobox workspaces={workspaces} />
+        )}
         <div className="flex items-center gap-4">
           <NavLink
             to="/workspaces"

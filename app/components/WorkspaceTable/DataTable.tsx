@@ -17,13 +17,15 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  classname: string;
+  className?: string;
+  onRowClick?: (item: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
-  classname,
+  className,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -31,8 +33,14 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
   });
 
+  const handleRowClick = (item: TData) => {
+    if (onRowClick) {
+      onRowClick(item);
+    }
+  };
+
   return (
-    <Table className={classname}>
+    <Table className={className}>
       <TableHeader className="">
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
@@ -57,6 +65,8 @@ export function DataTable<TData, TValue>({
             <TableRow
               key={row.id}
               data-state={row.getIsSelected() && "selected"}
+              onClick={() => handleRowClick(row.original)}
+              style={{ cursor: onRowClick ? "pointer" : "default" }}
             >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>

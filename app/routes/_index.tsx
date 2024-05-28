@@ -1,8 +1,7 @@
-import { TypedResponse, type MetaFunction } from "@remix-run/node";
-import { Form, json, Link, Outlet, redirect } from "@remix-run/react";
+import { type MetaFunction } from "@remix-run/node";
+import { Form, json, Link, redirect } from "@remix-run/react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import Navbar from "~/components/Navbar";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 

@@ -23,3 +23,13 @@ export enum WorkspaceTableNames {
   Campaign = "Campaign",
   Contact = "Contact",
 }
+
+export type WorkspaceData =
+  | {
+      created_at: string;
+      id: string;
+      name: string;
+      owner: string | null;
+      users: string[] | null;
+    }[]
+  | null;

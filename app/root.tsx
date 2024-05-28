@@ -1,40 +1,27 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react";
-import type {
-  LinksFunction,
-  LoaderFunctionArgs,
-  TypedResponse,
-} from "@remix-run/node";
-import { Device } from "twilio-client";
+import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Links,
   LiveReload,
-  json,
-  useRevalidator,
-  useLoaderData,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
+  json,
+  useLoaderData,
+  useRevalidator,
 } from "@remix-run/react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { createBrowserClient } from "@supabase/ssr";
+import { useEffect } from "react";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { useTwilioDevice } from "./hooks/useTwilioDevice";
-// Remix-Themes Imports
-// import clsx from "clsx";
-// import {
-//   PreventFlashOnWrongTheme,
-//   Theme,
-//   ThemeProvider,
-//   useTheme,
-// } from "remix-themes";
-// import { themeSessionResolver } from "./sessions.server";
 
 import { ThemeProvider } from "./components/theme-provider";
 
-import stylesheet from "~/tailwind.css";
-import type { ENV } from "~/lib/types";
 import Navbar from "~/components/Navbar";
+import type { ENV } from "~/lib/types";
+import stylesheet from "~/tailwind.css";
+import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
 
 export const links: LinksFunction = () => [
@@ -51,7 +38,7 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const env: ENV = {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_KEY: process.env.SUPABASE_ANON_KEY,
@@ -70,13 +57,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ).then((res) => res.json());
     token = newToken;
   }
-  // const { getTheme } = await themeSessionResolver(request);
+
+  const { data: workspaces, error: workspaceQueryError } =
+    await getUserWorkspaces({ supabaseClient: supabase });
 
   return json(
     {
       env,
       session,
       token,
+      workspaces,
     },
     {
       headers: response.headers,
@@ -85,7 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { env, session, token } = useLoaderData<typeof loader>();
+  const { env, session, token, workspaces } = useLoaderData<typeof loader>();
   const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
@@ -128,7 +118,11 @@ export default function App() {
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar className="bg-brand-secondary" handleSignOut={signOut} />
+          <Navbar
+            className="bg-brand-secondary"
+            handleSignOut={signOut}
+            workspaces={workspaces}
+          />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>
         <ScrollRestoration />

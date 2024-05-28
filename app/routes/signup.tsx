@@ -1,4 +1,4 @@
-import { Form, json, useActionData } from "@remix-run/react";
+import { Form, json, redirect, useActionData } from "@remix-run/react";
 
 import { ReactNode, useState } from "react";
 import { FaGithub } from "react-icons/fa";
@@ -24,26 +24,23 @@ export const action = async ({ request }: { request: Request }) => {
     return json({ error: "Passwords do not match" });
   }
 
-  // const { supabaseClient: supabase, headers } =
-  //   createSupabaseServerClient(request);
-  // const { data, error } = await supabase.auth.signUp({
-  //   email: email as string,
-  //   password: password as string,
-  // });
+  const { supabaseClient: supabase, headers } =
+    createSupabaseServerClient(request);
+  const { data, error } = await supabase.auth.signUp({
+    email: email as string,
+    password: password as string,
+  });
 
-  // if (error) {
-  //   return json({ error: error.message }, { headers });
-  // }
+  if (error) {
+    return json({ error: error.message }, { headers });
+  }
 
-  // if (data.user) {
-  //   console.log(data);
-  //   // return redirect("/signin");
-  //   // return json({ data: data });
+  if (data.user) {
+    // console.log(data);
+    return redirect("/signin", { headers });
+  }
 
-  //   return null;
-  // }
-
-  return null;
+  return json({ data }, { headers });
 };
 
 function FormFirstPage() {
