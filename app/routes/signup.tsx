@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
-/* 
+
   const { email, password, confirmEmail, confirmPassword } =
     Object.fromEntries(formData);
 
