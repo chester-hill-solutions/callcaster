@@ -23,12 +23,8 @@ export const loader = async ({ request }: { request: Request }) => {
 
 //************ACTION************/
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
+  const { supabaseClient, headers } =
     await getSupabaseServerClientWithSession(request);
-
-  if (!serverSession) {
-    return redirect("/signin", { headers });
-  }
 
   const formData = await request.formData();
 
@@ -75,7 +71,7 @@ export default function Workspaces() {
       <h1 className="text-center font-Tabac-Slab text-4xl font-black text-zinc-800 dark:text-white">
         Your Workspaces
       </h1>
-      <div className="grid w-full auto-rows-auto grid-cols-[repeat(auto-fit,_minmax(200px,_1fr))] gap-6 px-16">
+      <div className="flex flex-row flex-wrap gap-4">
         {workspaces != null &&
           workspaces.map((workspace) => (
             <Link
@@ -86,6 +82,7 @@ export default function Workspaces() {
             >
               <h5 className="font-Zilla-Slab text-2xl">{workspace.name}</h5>
               <p className="">Workspace Description</p>
+
             </Link>
           ))}
         <Button

@@ -18,13 +18,15 @@ export const action = async ({ request }) => {
 
     const call = twilio.calls(parsedBody.CallSid);
     const answeredBy = formData.get('AnsweredBy');
-
-    if (answeredBy && answeredBy.includes('machine')) {
-        call.update({ twiml: `<Response><Play>${campaign.voicemail_file}</Play></Response>` })
+    if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other')) {
+        try { call.update({ twiml: `<Response><Pause length="5"/><Play>${campaign.voicemail_file}</Play></Response>` }) }
+        catch (error){
+            console.log(error)
+        }
     }
 
 
-    const { data, error } = await supabase.from('call').upsert({ sid: call, answered_by: answeredBy }, { onConflict: 'sid' }).select();
+    const { data, error } = await supabase.from('call').upsert({ sid: call.sid, answered_by: answeredBy }, { onConflict: 'sid' }).select();
     return json({ success: true, data });
 
 };

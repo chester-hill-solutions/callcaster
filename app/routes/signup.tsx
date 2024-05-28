@@ -1,5 +1,5 @@
-import { Form, json, redirect, useActionData } from "@remix-run/react";
-
+import { Form, json, useActionData, redirect } from "@remix-run/react";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { ReactNode, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -7,6 +7,7 @@ import { Button } from "~/components/ui/button";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
+/* 
   const { email, password, confirmEmail, confirmPassword } =
     Object.fromEntries(formData);
 
@@ -26,6 +27,7 @@ export const action = async ({ request }: { request: Request }) => {
 
   const { supabaseClient: supabase, headers } =
     createSupabaseServerClient(request);
+
   const { data, error } = await supabase.auth.signUp({
     email: email as string,
     password: password as string,
@@ -155,7 +157,6 @@ function FormSecondPage() {
 
 export default function SignUp() {
   const actionData = useActionData<typeof action>();
-
   const firstPage = FormFirstPage();
   const secondPage = FormSecondPage();
   const [formPage, setFormPage] = useState<ReactNode>(secondPage);
@@ -164,11 +165,6 @@ export default function SignUp() {
   const paginationHandler = (page: ReactNode) => {
     setFormPage(page);
   };
-
-  // useEffect(() => {
-  //   setFormPage(firstPage);
-  //   setIsFirstPage(true);
-  // }, []);
 
   return (
     <main className="flex h-screen w-full flex-col items-center justify-center py-8 text-white">

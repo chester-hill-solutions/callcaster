@@ -64,7 +64,7 @@ export async function getWorkspaceInfo({
     .single();
 
   if (error) {
-    console.log("Error on function getWorkspaceInfo");
+    console.log(`Error on function getWorkspaceInfo: ${error.details}`);
   }
 
   return { data, error };
@@ -88,36 +88,3 @@ export async function getWorkspaceCampaigns({
 
   return { data, error };
 }
-
-// export async function getWorkspaceAudiencesByCampaign({
-//   supabaseClient,
-//   campaignId,
-// }: {
-//   supabaseClient: SupabaseClient<Database>;
-//   campaignId: number;
-// }) {
-//   const { data: audiences, error: error } = await supabaseClient.rpc(
-//     "get_audiences_by_campaign",
-//     { selected_campaign_id: campaignId },
-//   );
-
-//   if (error) {
-//     console.log("Error on function getWorkspaceAudiencesByCampaign", error);
-//   }
-
-//   return { audiences, error };
-// }
-
-// export async function getWorkspaceContactsByAudience({
-//   supabaseClient,
-// }: {
-//   supabaseClient: SupabaseClient<Database>;
-// }) {
-//   const { data, error } = await supabaseClient.from("contact").select();
-
-//   if (error) {
-//     console.log("Error on function getWorkspaceAudiences");
-//   }
-
-//   return { data, error };
-// }

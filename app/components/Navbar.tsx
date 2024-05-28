@@ -35,6 +35,7 @@ export default function Navbar({
           <WorkspaceSelectorCombobox workspaces={workspaces} />
         )}
         <div className="flex items-center gap-4">
+
           <NavLink
             to="/workspaces"
             className="rounded-sm bg-secondary px-4 py-2 font-bold text-brand-primary 
@@ -61,7 +62,7 @@ export default function Navbar({
             </Link>
           )}
           <ModeToggle />
-        </div>
+        </div> 
       </nav>
     </header>
   );

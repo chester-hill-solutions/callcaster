@@ -24,8 +24,8 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
   columns,
   data,
-  className,
-  onRowClick,
+  classname,
+  onRowClick, 
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
