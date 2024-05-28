@@ -1,6 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { json, redirect, useLoaderData, useNavigate } from "@remix-run/react";
-import { CSVLink } from "react-csv";
+/* import { CSVLink } from "react-csv"; */
 
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { campaignColumns } from "~/components/WorkspaceTable/columns";
@@ -79,12 +79,12 @@ export default function Workspace() {
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace.name}
         </h1>
-        <CSVLink
+{/*         <CSVLink
           data={campaigns as object[]}
           className="rounded-md bg-brand-primary px-4 py-2 font-Zilla-Slab text-xl font-bold text-white hover:bg-brand-secondary"
         >
           Download
-        </CSVLink>
+        </CSVLink> */}
       </div>
       {campaigns != null && (
         <DataTable
