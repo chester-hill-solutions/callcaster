@@ -10,6 +10,7 @@ export default function Navbar({
   className,
   handleSignOut,
   workspaces,
+  isSignedIn,
 }: {
   className?: string;
   handleSignOut: () => Promise<
@@ -18,6 +19,7 @@ export default function Navbar({
     }>
   >;
   workspaces: WorkspaceData;
+  isSignedIn: boolean;
 }) {
   console.log(workspaces);
   return (
@@ -40,14 +42,24 @@ export default function Navbar({
           >
             Workspaces
           </NavLink>
-          <Button
-            variant="destructive"
-            className="px-4 py-2 text-center"
-            type="button"
-            onClick={() => handleSignOut()}
-          >
-            Log Out
-          </Button>
+          {isSignedIn ? (
+            <Button
+              variant="destructive"
+              className="px-4 py-2 text-center font-Zilla-Slab text-xl font-bold"
+              type="button"
+              onClick={() => handleSignOut()}
+            >
+              Log Out
+            </Button>
+          ) : (
+            <Link
+              to="/signin"
+              className="rounded-md bg-brand-primary px-4 py-1 text-center font-Zilla-Slab text-2xl font-bold text-white shadow-md transition-colors 
+          ease-in-out hover:bg-white hover:text-brand-primary"
+            >
+              Sign In
+            </Link>
+          )}
           <ModeToggle />
         </div>
       </nav>

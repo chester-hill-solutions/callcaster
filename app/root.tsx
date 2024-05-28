@@ -122,6 +122,7 @@ export default function App() {
             className="bg-brand-secondary"
             handleSignOut={signOut}
             workspaces={workspaces}
+            isSignedIn={serverAccessToken != null}
           />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>
