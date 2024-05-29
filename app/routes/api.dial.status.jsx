@@ -13,8 +13,8 @@ export const action = async ({ request }) => {
         parsedBody[pair[0]] = pair[1];
     };
 
-    const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id').eq('sid', parsedBody.CallSid).single();
-    const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
+    const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id').eq('sid', parsedBody.CallSid);
+    const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall[0].campaign_id).single();
 
     const call = twilio.calls(parsedBody.CallSid);
     const answeredBy = formData.get('AnsweredBy');
