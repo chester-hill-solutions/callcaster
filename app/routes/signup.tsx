@@ -45,19 +45,24 @@ export const action = async ({ request }: { request: Request }) => {
   return json({ data }, { headers });
 };
 
+const fieldLabelStyles =
+  "flex w-full flex-col font-Zilla-Slab text-2xl font-bold tracking-[1px] text-black dark:text-white";
+const fieldInputStyles =
+  "w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white";
+
 function FormFirstPage() {
   return (
     <>
       <Button
         variant={"outline"}
-        className="flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent font-Zilla-Slab text-xl font-semibold"
+        className="flex min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
       >
         <FcGoogle size={"2rem"} />
         Sign in with Google
       </Button>
       <Button
         variant={"outline"}
-        className="flex min-h-[56px] w-full gap-2 border-2 border-white bg-transparent font-Zilla-Slab text-xl font-semibold"
+        className="flex min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
       >
         <FaGithub size={"2rem"} />
         Sign in with Github
@@ -72,16 +77,13 @@ function FormFirstPage() {
       </div>
 
       <Form method="POST" className="flex w-full flex-col gap-4">
-        <label
-          htmlFor="email"
-          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
-        >
+        <label htmlFor="email" className={fieldLabelStyles}>
           Email
           <input
             type="text"
             name="email"
             id="email"
-            className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+            className={fieldInputStyles}
           />
         </label>
       </Form>
@@ -97,56 +99,44 @@ function FormSecondPage() {
         className="flex w-full flex-col gap-4"
         id="signup-form"
       >
-        <label
-          htmlFor="email"
-          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
-        >
+        <label htmlFor="email" className={fieldLabelStyles}>
           Email*
           <input
             type="text"
             name="email"
             id="email"
-            className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+            className={fieldInputStyles}
             required
           />
         </label>
-        <label
-          htmlFor="confirmEmail"
-          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
-        >
+        <label htmlFor="confirmEmail" className={fieldLabelStyles}>
           Confirm Email*
           <input
             type="text"
             name="confirmEmail"
             id="confirmEmail"
-            className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+            className={fieldInputStyles}
             required
           />
         </label>
         <div className="my-2"></div>
-        <label
-          htmlFor="password"
-          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
-        >
+        <label htmlFor="password" className={fieldLabelStyles}>
           Password*
           <input
             type="password"
             name="password"
             id="password"
-            className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+            className={fieldInputStyles}
             required
           />
         </label>
-        <label
-          htmlFor="confirmPassword"
-          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px]"
-        >
+        <label htmlFor="confirmPassword" className={fieldLabelStyles}>
           Confirm Password*
           <input
             type="password"
             name="confirmPassword"
             id="confirmPassword"
-            className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+            className={fieldInputStyles}
             required
           />
         </label>
@@ -167,12 +157,12 @@ export default function SignUp() {
   };
 
   return (
-    <main className="flex h-screen w-full flex-col items-center justify-center py-8 text-white">
+    <main className="flex h-full w-full flex-col items-center justify-center py-16 text-white">
       <div
         id="login-hero"
-        className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-[#191716] px-28 py-8 shadow-sm"
+        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-16 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
-        <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-secondary">
+        <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
           Create a New Account
         </h1>
 
@@ -184,7 +174,7 @@ export default function SignUp() {
         {isFirstPage ? (
           <Button
             className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
+          transition-colors duration-150 ease-in-out hover:bg-white hover:text-black"
             type="button"
             onClick={() => {
               paginationHandler(secondPage);
@@ -198,7 +188,7 @@ export default function SignUp() {
             {/* SUBMISSION BUTTON */}
             <Button
               className="min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
+          transition-colors duration-150 ease-in-out hover:bg-white hover:text-black"
               type="submit"
               form="signup-form"
             >
@@ -206,7 +196,7 @@ export default function SignUp() {
             </Button>
             <Button
               className="min-h-[48px] rounded-md bg-zinc-700 px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
+          transition-colors duration-150 ease-in-out hover:bg-zinc-400 "
               type="button"
               onClick={() => {
                 paginationHandler(firstPage);

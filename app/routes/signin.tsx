@@ -5,6 +5,7 @@ import { FcGoogle } from "react-icons/fc";
 import { Button } from "~/components/ui/button";
 import {
   createSupabaseServerClient,
+  getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
@@ -36,10 +37,10 @@ export const loader = async ({ request }: { request: Request }) => {
 export default function SignIn() {
   const actionData = useActionData<typeof action>();
   return (
-    <main className="flex h-screen w-full flex-col items-center justify-center py-4 text-slate-800">
+    <main className="flex h-full w-full flex-col items-center justify-center py-16 text-slate-800">
       <div
         id="login-hero"
-        className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-10 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
         <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
           Login
@@ -86,7 +87,6 @@ export default function SignIn() {
               name="email"
               id="email"
               className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
-
             />
           </label>
 

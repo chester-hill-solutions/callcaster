@@ -35,7 +35,6 @@ export default function Navbar({
           <WorkspaceSelectorCombobox workspaces={workspaces} />
         )}
         <div className="flex items-center gap-4">
-
           <NavLink
             to="/workspaces"
             className="rounded-sm bg-secondary px-4 py-2 font-bold text-brand-primary 
@@ -53,16 +52,25 @@ export default function Navbar({
               Log Out
             </Button>
           ) : (
-            <Link
-              to="/signin"
-              className="rounded-md bg-brand-primary px-4 py-1 text-center font-Zilla-Slab text-2xl font-bold text-white shadow-md transition-colors 
-          ease-in-out hover:bg-white hover:text-brand-primary"
-            >
-              Sign In
-            </Link>
+            <div className="flex items-center gap-4">
+              <Button
+                asChild
+                className="rounded-md bg-brand-primary px-4 py-1 text-center font-Zilla-Slab text-xl font-bold text-white transition-colors 
+              ease-in-out hover:bg-white hover:text-brand-primary"
+              >
+                <Link to="/signin">Sign In</Link>
+              </Button>
+              <Button
+                asChild
+                className="rounded-md bg-brand-primary bg-zinc-700 px-4 py-1 text-center font-Zilla-Slab text-xl font-bold text-white 
+              transition-colors ease-in-out hover:bg-zinc-400"
+              >
+                <Link to="/signup">Sign Up</Link>
+              </Button>
+            </div>
           )}
           <ModeToggle />
-        </div> 
+        </div>
       </nav>
     </header>
   );
