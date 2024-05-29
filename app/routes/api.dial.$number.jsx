@@ -11,7 +11,7 @@ export const action = async ({ request, params }) => {
     dial.number({
         machineDetection: 'Enable',
         amdStatusCallback: `${process.env.BASE_URL}/api/dial/status`,
-        statusCallback: '/api/call-status/',
+        statusCallback: `${process.env.BASE_URL}/api/call-status/`,
         statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
     }, number);
     return new Response(twiml.toString(), {
