@@ -1,10 +1,8 @@
-import { TypedResponse } from "@remix-run/node";
 import { Link, NavLink } from "@remix-run/react";
-import { AuthError } from "@supabase/supabase-js";
+import { WorkspaceData } from "~/lib/types";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
-import { WorkspaceData } from "~/lib/types";
 
 export default function Navbar({
   className,
@@ -13,15 +11,11 @@ export default function Navbar({
   isSignedIn,
 }: {
   className?: string;
-  handleSignOut: () => Promise<
-    TypedResponse<{
-      error: AuthError | null;
-    }>
-  >;
+  handleSignOut: () => void;
   workspaces: WorkspaceData;
   isSignedIn: boolean;
 }) {
-  console.log(workspaces);
+  // console.log(workspaces);
   return (
     <header className={`w-full ${className}`}>
       <nav className="flex w-full justify-between px-8 py-4" id="global-nav">

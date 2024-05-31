@@ -8,7 +8,9 @@ import {
   Scripts,
   ScrollRestoration,
   json,
+  redirect,
   useLoaderData,
+  useNavigate,
   useRevalidator,
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -83,11 +85,12 @@ export default function App() {
     env.SUPABASE_KEY!,
   );
   const serverAccessToken = session?.access_token;
+  const navigate = useNavigate();
 
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     revalidate();
-    return json({ error: error });
+    return await navigate("/");
   }
 
   useEffect(() => {

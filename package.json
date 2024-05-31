@@ -30,6 +30,7 @@
     "cmdk": "^1.0.0",
     "dotenv": "^16.4.4",
     "isbot": "^4.1.0",
+    "jwt-decode": "^4.0.0",
     "lucide-react": "^0.378.0",
     "next-themes": "^0.3.0",
     "openai": "^4.39.0",

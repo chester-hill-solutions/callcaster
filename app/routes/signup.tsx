@@ -194,7 +194,7 @@ export default function SignUp() {
             >
               Sign-Up!
             </Button>
-            <Button
+            {/* <Button
               className="min-h-[48px] rounded-md bg-zinc-700 px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-zinc-400 "
               type="button"
@@ -204,7 +204,7 @@ export default function SignUp() {
               }}
             >
               Back
-            </Button>
+            </Button> */}
           </div>
         )}
       </div>

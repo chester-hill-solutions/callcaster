@@ -1,9 +1,17 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { json, redirect, useLoaderData, useNavigate } from "@remix-run/react";
-/* import { CSVLink } from "react-csv"; */
+import {
+  json,
+  redirect,
+  useLoaderData,
+  useNavigate,
+  Form,
+  Link,
+} from "@remix-run/react";
+import { useRef } from "react";
 
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { campaignColumns } from "~/components/WorkspaceTable/columns";
+import { Button } from "~/components/ui/button";
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -66,25 +74,25 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaign["progress"] = progress;
   }
 
-  return json({ workspace, campaigns }, { headers });
+  return json({ workspace, workspaceId, campaigns }, { headers });
 };
 
 export default function Workspace() {
-  const { workspace, campaigns } = useLoaderData<typeof loader>();
+  const { workspace, workspaceId, campaigns } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const teamsDialog = useRef<HTMLDialogElement>(null);
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace.name}
         </h1>
-{/*         <CSVLink
-          data={campaigns as object[]}
-          className="rounded-md bg-brand-primary px-4 py-2 font-Zilla-Slab text-xl font-bold text-white hover:bg-brand-secondary"
-        >
-          Download
-        </CSVLink> */}
+        <Button asChild>
+          <Link to={`/workspaces/${workspaceId}/settings`} className="text-xl">
+            Settings
+          </Link>
+        </Button>
       </div>
       {campaigns != null && (
         <DataTable
@@ -96,4 +104,104 @@ export default function Workspace() {
       )}
     </main>
   );
+}
+
+{
+  /* <dialog
+        id="teams-dialog"
+        className="rounded-md border-2 border-brand-primary bg-white bg-opacity-100 text-black shadow-none"
+        ref={teamsDialog}
+      >
+        <div
+          id="teams-dialog-container"
+          className="flex flex-col items-center px-16 pb-10 pt-8"
+        >
+          <h3 className="mb-4 font-Zilla-Slab text-4xl font-bold">
+            Manage Team Members
+          </h3>
+
+          <p className="self-start text-lg font-bold text-black">Owner</p>
+          <div
+            id="team-owner"
+            className="mb-4 flex w-full gap-2 rounded-md border-2 border-black p-2 text-xl"
+          >
+            <div className="aspect-square w-8 rounded-full bg-brand-primary" />
+            <p className="font-semibold">Some Owner</p>
+          </div>
+
+          <p className="self-start text-lg font-bold">Members</p>
+          <ul className="mb-4 flex w-full flex-col items-center gap-2">
+            <li className="w-full">
+              <TeamMember
+                memberName="Some Admin"
+                memberRole={MemberRole.Admin}
+              />
+            </li>
+
+            <li className="w-full">
+              <TeamMember
+                memberName="Some Member"
+                memberRole={MemberRole.Member}
+              />
+            </li>
+
+            <li className="w-full">
+              <TeamMember
+                memberName="Some Caller"
+                memberRole={MemberRole.Caller}
+              />
+            </li>
+          </ul>
+          <p className="font-bold text-black">Add New Member</p>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button className="h-fit w-full border-2 border-black bg-transparent">
+                <IoPersonAdd size="32px" className="" color="black" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent
+              className="z-[100] bg-white dark:bg-inherit"
+              onInteractOutside={(event) => event.preventDefault()}
+            >
+              <SheetHeader>
+                <SheetTitle>Invite a Team Member</SheetTitle>
+                <SheetDescription>
+                  Enter a username or use the search function to add a new
+                  member to your workspace team.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 flex w-full flex-col gap-4">
+                <label
+                  htmlFor="username"
+                  className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+                >
+                  User Name
+                  <input
+                    type="text"
+                    name="username"
+                    id="username"
+                    className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                  />
+                </label>
+
+                <label
+                  htmlFor="username"
+                  className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+                >
+                  <div className="flex items-center gap-2">
+                    <FaSearch size="16px" />
+                    Search
+                  </div>
+                  <input
+                    type="text"
+                    name="username"
+                    id="username"
+                    className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                  />
+                </label>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </dialog> */
 }
