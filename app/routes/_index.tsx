@@ -36,7 +36,8 @@ export default function Index() {
           <a className="font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200 text-center" href="mailto:info@callcaster.com">info@callcaster.com</a>
           <a className="font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200 text-center" href="tel:+13656459045">365 645 9045</a>
           </div>
-          <img src="/Hero-1.png" width={'100%'} style={{opacity:".1", position:"absolute", left:"0", top:"10px", zIndex:'-1'}}/>
+          <div className="bg-[url('/Hero-1.png')] bg-cover h-full w-full" style={{display:'block', position:'absolute', top:"0px", left:"0px", right:"0px", zIndex:"-1", opacity:'.1'}}>
+          </div>
         </div>
       </section>
  {/*      <section
