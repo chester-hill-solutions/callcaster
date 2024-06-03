@@ -88,3 +88,50 @@ export async function getWorkspaceCampaigns({
 
   return { data, error };
 }
+
+export async function getWorkspaceUsers({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const { data, error } = await supabaseClient.rpc("get_workspace_users", {
+    selected_workspace_id: workspaceId,
+  });
+  // console.log("INSIDE FUNC:", data);
+  if (error) {
+    console.log("Error on function getWorkspaceUsers", error);
+  }
+
+  return { data, error };
+}
+
+export async function addUserToWorkspace({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  return;
+}
+
+export async function testAuthorize({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const { data, error } = await supabaseClient.rpc("authorize", {
+    selected_workspace_id: workspaceId,
+    requested_permission: "workspace.inviteUser",
+  });
+  console.log("\nXXXXXXXXXXXXXXXXXXXXXXXXX");
+  console.log("Data: ", data);
+  console.log("Error: ", error);
+  console.log("XXXXXXXXXXXXXXXXXXXXXXXXX");
+
+  return { data, error };
+}

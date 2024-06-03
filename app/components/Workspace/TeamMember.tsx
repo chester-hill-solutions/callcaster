@@ -4,9 +4,9 @@ import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 
 export enum MemberRole {
-  Admin = "Admin",
-  Member = "Member",
-  Caller = "Caller",
+  Owner = "owner",
+  Member = "member",
+  Caller = "caller",
 }
 
 type TeamMemberProps = {
@@ -20,13 +20,13 @@ export default function TeamMember({
 }: TeamMemberProps) {
   const iconStyles = clsx(
     "aspect-square w-8 rounded-full",
-    memberRole === MemberRole.Admin && "bg-green-500",
+    memberRole === MemberRole.Owner && "bg-green-500",
     memberRole === MemberRole.Member && "bg-cyan-500",
     memberRole === MemberRole.Caller && "bg-rose-500",
   );
   const roleTextStyles = clsx(
     "font-Zilla-Slab font-semibold italic",
-    memberRole === MemberRole.Admin && "text-green-500",
+    memberRole === MemberRole.Owner && "text-green-500",
     memberRole === MemberRole.Member && "text-cyan-500",
     memberRole === MemberRole.Caller && "text-rose-500",
   );
