@@ -1,5 +1,5 @@
-import { json, useFetcher, useLoaderData, useOutletContext, redirect } from "@remix-run/react";
-import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "../lib/supabase.server"
+import { json, useFetcher, useLoaderData, useOutletContext, redirect, useSubmit } from "@remix-run/react";
+import { getSupabaseServerClientWithSession } from "../lib/supabase.server"
 import { QueueList } from "../components/CallScreen.QueueList";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
@@ -12,16 +12,25 @@ const limit = 30
 export const loader = async ({ request, params }) => {
     const { campaign_id: id, id: workspaceId } = params;
     const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-
     const { data: campaign, error: campaignError } = await supabase.from('campaign').select().eq('id', id).single();
-    const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', campaign.id).single();
+    const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', id).single();
     const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
     const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
     const { data: queue, error: queueError } = await supabase.from('campaign_queue').select().eq('status', serverSession.user.id);
-
-    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue, contacts }, { headers });
+    let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
+    if (errors.length) {
+        console.log(errors);
+        throw (errors)
+    }
+    const initialQueue = queue?.map(q => contacts?.find(contact => contact.id === q.contact_id));
+    const nextRecipient = initialQueue[0] || null;
+    const initalCallsList = attempts.flatMap(attempt => attempt.call);
+    const initialRecentCall = initalCallsList.find((call) => call.contact_id === nextRecipient?.id)
+    const initialRecentAttempt = attempts.find((call) => call.contact_id === nextRecipient?.id)
+    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue.slice(1), contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt }, { headers });
 }
+
 
 export const action = async ({ request, params }) => {
     const { id: workspaceId, campaign_id } = params
@@ -55,21 +64,18 @@ export const action = async ({ request, params }) => {
 export default function Campaign() {
     const { device: twilioDevice, supabase } = useOutletContext();
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
-    const { campaign, attempts, user, audiences, workspaceId, campaignDetails, contacts, queue: queueIds } = useLoaderData();
-    const initialQueue = [];
-    for (let i = 0; i < queueIds.length; i++) {
-        let contact_id = queueIds[i].contact_id;
-        initialQueue.push(contacts.find((contact) => contact.id === contact_id));
-    }
-    const [callStarted, setCallStarted] = useState(null);
+    const { campaign, attempts, user, audiences, workspaceId, campaignDetails, contacts, queue: initialQueue, nextRecipient: initialNextRecipient, initalCallsList, initialRecentCall = {}, originalQueue, initialRecentAttempt } = useLoaderData();
     const fetcher = useFetcher();
-    const { submit } = useFetcher();
+    const submit = useSubmit();
     const [queue, setQueue] = useState(initialQueue);
     const [groupByHousehold] = useState(true);
-    const [callsList] = useSupabaseRealtime('call', supabase, attempts.flatMap(attempt => attempt.call));
-    const [nextRecipient, setNextRecipient] = useState(queue[0]);
-    const [recentCall, setRecentCall] = useState(callsList.map((call) => call.contact_id === nextRecipient.id ?? {}));
-    const [update, setUpdate] = useState(recentCall);
+    const [callsList] = useSupabaseRealtime('call', supabase, initalCallsList);
+    const [attemptList] = useSupabaseRealtime('attempt', supabase, attempts);
+    const [nextRecipient, setNextRecipient] = useState(initialNextRecipient);
+    const [recentCall, setRecentCall] = useState(initialRecentCall);
+    const [recentAttempt, setRecentAttempt] = useState(initialRecentAttempt);
+    const [update, setUpdate] = useState(recentAttempt?.result || {});
+    const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
     const householdMap = queue.reduce((acc, curr) => {
         if (!acc[curr.address]) {
             acc[curr.address] = [];
@@ -80,7 +86,6 @@ export default function Campaign() {
     }, {});
 
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
-
 
     const handleNextNumber = useCallback((skipHousehold = false) => {
         const getNextContact = () => {
@@ -117,31 +122,35 @@ export default function Campaign() {
 
         const nextContact = getNextContact();
         setNextRecipient(nextContact);
-
-        // Update 'update' state with the results of the new nextRecipient's call
-        const recentCall = callsList.find(call => call.contact_id === nextContact?.id)?.results ?? {};
-        setUpdate(recentCall);
+        const recentAttemptUpdate = attemptList.find(call => call.contact_id === nextContact?.id)?.result ?? {};
+        setUpdate(recentAttemptUpdate);
 
         return nextContact;
-    }, [groupByHousehold, householdMap, nextRecipient, queue, attempts]);
-
+    }, [attemptList, groupByHousehold, householdMap, queue, nextRecipient]);
 
     const handleDialNext = () => {
         if (activeCall || incomingCall || status !== 'Registered') {
             return;
         }
         if (nextRecipient) {
-            handleCall(nextRecipient);
+            handlePlaceCall(nextRecipient);
         }
     };
 
-    const handleCall = (contact) => {
+    const handleCall = (contact) => { /* FOR INDIVIDUAL DIALING */
         if (activeCall || incomingCall || status !== 'Registered') {
             return;
         } else {
             handlePlaceCall(contact);
         }
     };
+    console.log(householdMap)
+    const handleDequeue = (contact) => {
+        if (groupByHousehold){
+            //const contacts = householdMap.map((household) => household)
+        }
+
+    }
 
     const handlePlaceCall = (contact) => {
         if (contact.phone) {
@@ -151,16 +160,16 @@ export default function Campaign() {
                 user_id: user.id,
                 contact_id: contact.id,
                 workspaceId,
-                queue_id: queueIds.find((id) => id === contact.id)
+                queue_id: originalQueue.find((queue) => queue.contact_id === contact.id).id
             }, {
                 action: "/api/dial",
                 method: "POST",
                 encType: "application/json",
-                navigate: false
+                navigate: false,
+                fetcherKey:'place-call'
             });
         }
     };
-
 
     const handleQueueButton = () => {
         fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - (householdMap?.length || 0)}`);
@@ -168,38 +177,44 @@ export default function Campaign() {
 
     const handleUserJoin = async (presences, queue, householdMap, supabase, currentUser) => {
         try {
-            const userIds = presences.map(presence => presence.user_id);
-            const usersDetails = userIds.map(userId => {
-                return queue.find(contact => contact.user_id === userId) || householdMap[userId];
-            });
+
+            /*   const usersDetails = userIds.map(userId => {
+                  return queue.find(contact => contact.user_id === userId) || householdMap[userId];
+              }); */
         } catch (error) {
             console.error('Error handling user join:', error);
         }
     };
 
     const handleUserLeave = async (state) => {
-        console.log('leave', state);
+        //console.log('leave', state);
     }
-
-    useEffect(() => {
-        fetcher.data && setQueue(fetcher.data);
-    }, [fetcher])
-
-    useEffect(() => {
-        if (!callStarted && activeCall){
-            setCallStarted(Date.now())
+    /* Update queue on fetch */ useEffect(() => {
+        if (fetcher.data) {
+            let newQueue = [...queue, fetcher.data];
+            const callNext = newQueue.shift();
+            const nextRecent = callsList.find((call) => call.contact_id === callNext?.id) || {};
+            setQueue(newQueue);
+            setNextRecipient(callNext);
+            setRecentCall(nextRecent);
         }
-    },[callStarted, activeCall])
+    }, [fetcher.data, callsList, nextRecipient?.id, queue, submit]);
 
-    useEffect(() => {
-        if (nextRecipient) {
-            const recentCall = callsList.find((call) => call.contact_id === nextRecipient.id) ?? {};
-            setRecentCall(recentCall);
-            setUpdate(recentCall);
-        }
-    }, [nextRecipient, callsList]);
+    /* Postgres updater */ useEffect(() => {
+        const newRecentCall = callsList.sort((a, b) => a.date_created < b.date_created).find((call) => call.contact_id === nextRecipient?.id)
+        console.log(callsList)
+        setRecentCall(newRecentCall || {})
 
-    useEffect(() => {
+    }, [callsList, nextRecipient?.id, supabase])
+    /* Postgres updater */ useEffect(() => {
+        const newRecentAttempt = attemptList.find((call) => call.contact_id === nextRecipient?.id)
+        setRecentAttempt(newRecentAttempt || {})
+        setDisposition(newRecentAttempt?.disposition);
+        setUpdate(newRecentAttempt?.result || {})
+
+    }, [attemptList, callsList, nextRecipient?.id])
+
+    /* Supabase Realtime */ useEffect(() => {
         const channel = supabase.channel(`${workspaceId}-${campaign.id}`, {
             config: {
                 presence: {
@@ -216,7 +231,7 @@ export default function Campaign() {
         channel.on('presence', { event: 'sync' }, () => {
             const newState = channel.presenceState();
             syncHandler(newState);
-            console.log('sync', newState)
+            //console.log('sync', newState)
         })
             .on('presence', { event: 'join' }, ({ newPresences }) => handleUserJoin(newPresences, queue, householdMap, supabase, user))
             .on('presence', { event: 'leave' }, ({ leftPresences }) => handleUserLeave(leftPresences))
@@ -231,18 +246,17 @@ export default function Campaign() {
         return () => {
             channel.unsubscribe();
         };
-    }, [campaign.id, supabase, user.id, workspaceId, queue]);
+    }, [campaign.id, supabase, user.id, workspaceId, queue, user, householdMap]);
 
-    useEffect(() => {
-        const handleQuestionsSave = () => submit({ update, callId: activeCall?.sid }, {
+    /* Debounced save handler */ useEffect(() => {
+        const handleQuestionsSave = () => submit({ update, callId: recentCall?.id }, {
             method: "PATCH",
             navigate: false,
             action: `/api/questions`,
             encType: 'application/json'
         });
-
-        const recentCall = callsList.find(call => call.contact_id === nextRecipient?.id) ?? {};
         const handler = setTimeout(() => {
+            console.log(update, recentCall)
             if (JSON.stringify(update) !== JSON.stringify(recentCall)) {
                 handleQuestionsSave();
             }
@@ -250,19 +264,39 @@ export default function Campaign() {
         return () => {
             clearTimeout(handler);
         };
-    }, [callsList, nextRecipient, update, activeCall, submit]);
+    }, [callsList, nextRecipient, update, submit, recentCall]);
 
+    useEffect(() => {
+        const callDispositionSave = () => submit({
+            update: { disposition }
+        }, {
+            method: "PATCH",
+            navigate: false,
+            action: `/api/outreach-attempt/${recentCall.id}`,
+            encType: 'application/json'
+        })
+        const handler = setTimeout(() => {
+            if (disposition) {
+                console.log(disposition)
+                callDispositionSave();
+            }
+        }, 3000);
+        return () => {
+            clearTimeout(handler);
+        };
 
+    }, [disposition, recentCall, submit, update])
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
             <TopBar {...{ handleQueueButton, state: fetcher.state, handleNextNumber, handleDialNext }} />
-            <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly' }}>
-                <CallArea {...{ nextRecipient, activeCall, callStarted, recentCall }} />
+            <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
+                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleNextNumber, disposition, setDisposition, recentAttempt }} />
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
                 <QueueList
                     {...{
                         groupByHousehold,
                         queue,
+
                     }}
                 />
             </div>

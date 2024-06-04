@@ -8,6 +8,7 @@ export function useSupabaseRealtime(table, supabase, init = []) {
             .channel(`*`)
             .on('postgres_changes', { event: '*', schema: 'public', table: table }, (payload) => {
                 const updatedData = payload.new;
+                console.log(updatedData)
                 setData((currentData) => {
                     const index = table === 'call'
                         ? currentData.findIndex(item => item.sid === updatedData.sid)

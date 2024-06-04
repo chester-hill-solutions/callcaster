@@ -57,6 +57,6 @@ export const action = async ({ request }) => {
 
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const { data, error } = await supabase.from('call').upsert(updateData, { onConflict: 'sid' }).select();
-
+    
     return json({ success: true, data });
 }

@@ -18,17 +18,22 @@ const iconMapping = {
 
 const Result = ({ action, initResult = null, questions, questionId }) => {
     const [result, setResult] = useState(initResult);
+    const [multiResult, setMultiResult] = useState(initResult || []);
 
     const handleChange = (value) => {
         setResult(value);
         action({ column: questionId, value });
     };
-    const handleMultiChange = (value) => {
-
-        setResult([...result, value]);
-        action({ column: questionId, ...[...result, value] });
-    };
-    return (
+    const handleMultiChange = (value, isChecked) => {
+        let newArr = [];
+        if (isChecked) {
+            newArr = [...multiResult, value];
+        } else {
+            newArr = multiResult.filter(item => item !== value);
+        }
+        setMultiResult(newArr);
+        action({ column: questionId, value: newArr });
+    };    return (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', gap: "16px" }}>
             <div style={{ flexBasis: "1 1 50%" }}>
                 <p>{questions.title}</p>
@@ -72,10 +77,14 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                     }
                 })}
                 {questions.type === 'boolean' && (
-                    <input type="checkbox" name={questions.title} onChange={handleChange}></input>
+                    <input type="checkbox" name={questions.title} onChange={(e => handleChange(e.target.checked))}></input>
                 )}
                 {questions.type === 'dropdown' && (
-                    <select name={questions.title} onChange={handleChange} className="px-2 py-1">
+                    <select name={questions.title} onChange={(e) => handleChange(e.currentTarget.value)} className="px-2 py-1">
+                        <option value={null} key={`question-${questionId}-select-DEFAULT`}>
+                            ---
+                        </option>
+
                         {questions.options.map(({ value, label }) => {
                             return (
                                 <option value={value} key={`question-${questionId}-select-${value}`}>
@@ -88,18 +97,25 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                 {questions.type === 'multi' && (
                     <div>
                         {questions.options.map(({ value, label }) => {
+                            const inputId = `${questionId}-select-${value}`;
                             return (
-                                <div key={`multiselect-${questionId}-${value}`} className="flex">
-                                    <input type="checkbox" onChange={handleMultiChange} value={value} key={`question-${questionId}-select-${value}`} />
-                                    <p>{label}</p>
+                                <div key={inputId} className="flex items-center">
+                                    <input
+                                        id={inputId}
+                                        name={inputId}
+                                        type="checkbox"
+                                        onChange={(e) => handleMultiChange(value, e.target.checked)}
+                                        checked={multiResult.includes(value)}
+                                        />
+                                    <label htmlFor={inputId} className="ml-2">{label}</label>
                                 </div>
-                            )
+                            );
                         })}
                     </div>
                 )}
                 {questions.type === 'textarea' && (
                     <div>
-                        <textarea type="textarea" rows={2} placeholder="Notes/Key Issues" onChange={handleMultiChange} value={result} key={`question-${questionId}-notes`} />
+                        <textarea type="textarea" rows={2} placeholder="Notes/Key Issues" onChange={handleChange} value={result} key={`question-${questionId}-notes`} />
                     </div>
                 )}
             </div>

@@ -94,7 +94,7 @@ export function useTwilioDevice(token) {
                 console.log('Call disconnected');
             });
 
-            connection.on('error', (err) => {
+        connection.on('error', (err) => {
                 setError(err);
                 setStatus('error');
                 console.error('Call error:', err);
@@ -106,13 +106,13 @@ export function useTwilioDevice(token) {
 
     const hangUp = useCallback(() => {
         if (activeCall) {
+            activeCall.disconnect();
+            deviceRef.current.disconnectAll();
             fetch(`/api/hangup`, {
                 method: "POST",
                 body: JSON.stringify(activeCall),
                 headers: { "Cotnent-Type": 'application/json' }
             }).then(() => null).catch((e) => console.log(e))
-            activeCall.disconnect();
-            deviceRef.current.disconnectAll();
             setStatus('Registered')
             setActiveCall(null)
         } else {

@@ -12,7 +12,7 @@ export const action = async ({ request }) => {
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
     };
-
+try{
     const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id').eq('sid', parsedBody.CallSid).single();
     const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
 
@@ -28,5 +28,9 @@ export const action = async ({ request }) => {
 
     const { data, error } = await supabase.from('call').upsert({ sid: call.sid, answered_by: answeredBy }, { onConflict: 'sid' }).select();
     return json({ success: true, data });
+} catch (error) {
+    console.log(error)
+    return json({success:false, error})
+}
 
 };

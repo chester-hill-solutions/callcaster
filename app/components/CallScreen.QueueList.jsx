@@ -15,6 +15,21 @@ function QueueList({
 
     return (
         <div style={{ flex: '1 0 20%', border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem" }}>
+            <div style={{
+                display: 'flex',
+                alignItems: "center",
+                justifyContent: 'space-between',
+                borderTopLeftRadius: '18px',
+                borderTopRightRadius: '18px',
+                padding: "16px ",
+            }}
+                className="bg-brand-secondary text-slate-800 font-Tabac-Slab text-xl "
+            >
+                <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
+                    Upcoming
+                </div>
+            </div>
+
             <div className="flex column" style={{ display: "flex", flexDirection: "column" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <TableHeader keys={["Name", "Number", "Address"]} />

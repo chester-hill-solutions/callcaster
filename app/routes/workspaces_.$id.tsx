@@ -117,7 +117,7 @@ export default function Workspace() {
       </div>
       <div className="flex">
         <div className="flex w-60 min-w-60 flex-col border-2 border-solid border-slate-800 bg-cyan-50 h-[800px] overflow-scroll">
-          {selectedTable.data.map((row) => (
+          {selectedTable.data?.map((row) => (
             <Link
               to={`${selectedTable.name}/${row.id}`}
               key={row.id}
