@@ -11,11 +11,11 @@ export const action = async ({ request }: { request: Request }) => {
   const { email, password, confirmEmail, confirmPassword } =
     Object.fromEntries(formData);
 
-  const passwordPattern = new RegExp(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/);
+  // const passwordPattern = new RegExp(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/);
 
-  if (!passwordPattern.test(password.toString())) {
-    return json({ error: "Password not strong enough!" });
-  }
+  // if (!passwordPattern.test(password.toString())) {
+  //   return json({ error: "Password not strong enough!" });
+  // }
 
   if ((email as string) !== (confirmEmail as string)) {
     return json({ error: "Emails do not match" });
@@ -204,7 +204,7 @@ export default function SignUp() {
             >
               Sign-Up!
             </Button>
-            <Button
+            {/* <Button
               className="min-h-[48px] rounded-md bg-zinc-700 px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:text-black"
               type="button"
@@ -214,7 +214,7 @@ export default function SignUp() {
               }}
             >
               Back
-            </Button>
+            </Button> */}
           </div>
         )}
       </div>

@@ -37,6 +37,11 @@ export default function OtherServices() {
       <p className="font-Zilla-Slab text-2xl font-semibold">
         Take your campaign to the next level with Chester Hill Solutions!
       </p>
+      <img
+        alt="background"
+        src="/Hero-1.png"
+        className="absolute left-0 top-[10px] z-[-1] hidden max-h-full w-full overflow-hidden object-cover opacity-10 sm:block"
+      />
     </main>
   );
 }
