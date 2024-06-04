@@ -1,5 +1,4 @@
 import { json } from '@remix-run/react';
-import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 
 function toUnderCase(str) {
@@ -24,10 +23,10 @@ export const action = async ({ request }) => {
 
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
-    };
-    
+    }
+
     const underCaseData = convertKeysToUnderCase(parsedBody);
-    
+
     const updateData = {
         sid: underCaseData.call_sid,
         date_created: underCaseData.timestamp,
@@ -57,6 +56,6 @@ export const action = async ({ request }) => {
 
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const { data, error } = await supabase.from('call').upsert(updateData, { onConflict: 'sid' }).select();
-    
+
     return json({ success: true, data });
 }

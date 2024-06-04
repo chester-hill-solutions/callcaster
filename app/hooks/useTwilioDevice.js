@@ -30,7 +30,6 @@ export function useTwilioDevice(token) {
                 activeCall?.disconnect();
                 setActiveCall(null);
                 setStatus('Registered')
-                console.log('Call disconnected');
             });
 
             device.on('cancel', () => {

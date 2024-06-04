@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, handleDialNext, handleNextNumber, disposition, setDisposition, recentAttempt }) => {
+const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }) => {
     const [time, setTime] = useState(Date.now());
 
     useEffect(() => {
@@ -37,34 +37,40 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                 className={`font-Tabac-Slab text-xl text-white ${activeCall ? 'bg-green-300' : 'bg-slate-700'}`}
             >
                 <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-                    {activeCall ? `Connected ${formatTime(time - (new Date(recentCall?.date_created)).getTime())}` : recentCall?.sid ? '' : 'Pending'}
+                    {activeCall ?
+                     
+                    `Connected ${formatTime(time - (new Date(recentCall?.date_created)).getTime())}` : 
+                    recentCall?.sid ? `Complete` 
+                    : 
+                    'Pending'}
                 </div>
             </div>
             {nextRecipient &&
                 <div className="p-4   w-3/4">
                     <div className="font-bold text-lg font-Zilla-Slab">
-                        {nextRecipient.firstname} {nextRecipient.surname}
+                        {nextRecipient.contact?.firstname} {nextRecipient.contact?.surname}
                     </div>
                     <div className="text-lg">
-                        {nextRecipient.phone}
+                        {nextRecipient.contact?.phone}
                     </div>
                     <div >
-                        {nextRecipient.email}
+                        {nextRecipient.contact?.email}
                     </div>
                     <div >
-                        {nextRecipient.address.split(',').map((t) => t.trim()).join(', ')}
+                        {nextRecipient.contact?.address?.split(',').map((t) => t.trim()).join(', ')}
                     </div>
                 </div>
+
             }
             <div>
                 <div className="flex row gap-2 px-4 py-2 flex-1">
                     <button onClick={() => hangUp()} disabled={!activeCall} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', width: "100px" }}>
                         End Call
                     </button>
-                    {!recentAttempt?.disposition ? <button onClick={() => handleDialNext()} disabled={activeCall} style={{ padding: "8px 16px", background: "#4CA83D", borderRadius: "5px", width: "100px", color: "white" }}>
+                    {!recentAttempt?.call?.length ? <button onClick={() => handleDialNext()} disabled={activeCall} style={{ padding: "8px 16px", background: "#4CA83D", borderRadius: "5px", width: "100px", color: "white" }}>
                         Dial
                     </button> :
-                        <button disabled={!disposition} onClick={() => handleNextNumber()} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: "5px", width: "100px", color: "#333" }}>
+                        <button disabled={!recentAttempt?.call?.length} onClick={() => handleDequeueNext()} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: "5px", width: "100px", color: "#333" }}>
                             Next
                         </button>}
                 </div>

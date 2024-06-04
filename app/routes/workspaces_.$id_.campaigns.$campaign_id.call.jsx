@@ -23,14 +23,13 @@ export const loader = async ({ request, params }) => {
         console.log(errors);
         throw (errors)
     }
-    const initialQueue = queue?.map(q => contacts?.find(contact => contact.id === q.contact_id));
+    const initialQueue = queue?.map(q => ({ ...q, contact: contacts?.find(contact => contact.id === q.contact_id) }));
     const nextRecipient = initialQueue[0] || null;
     const initalCallsList = attempts.flatMap(attempt => attempt.call);
-    const initialRecentCall = initalCallsList.find((call) => call.contact_id === nextRecipient?.id)
-    const initialRecentAttempt = attempts.find((call) => call.contact_id === nextRecipient?.id)
+    const initialRecentCall = initalCallsList.find((call) => call.contact_id === nextRecipient?.contact.id)
+    const initialRecentAttempt = attempts.sort((a, b) => b.created_at - a.created_at).find((call) => call.contact_id === nextRecipient?.contact.id)
     return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue.slice(1), contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt }, { headers });
 }
-
 
 export const action = async ({ request, params }) => {
     const { id: workspaceId, campaign_id } = params
@@ -64,70 +63,107 @@ export const action = async ({ request, params }) => {
 export default function Campaign() {
     const { device: twilioDevice, supabase } = useOutletContext();
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
-    const { campaign, attempts, user, audiences, workspaceId, campaignDetails, contacts, queue: initialQueue, nextRecipient: initialNextRecipient, initalCallsList, initialRecentCall = {}, originalQueue, initialRecentAttempt } = useLoaderData();
+    const {
+        campaign,
+        attempts: initialAttempts,
+        user,
+        audiences,
+        workspaceId,
+        campaignDetails,
+        contacts,
+        queue:
+        initialQueue,
+        nextRecipient: initialNextRecipient,
+        initalCallsList,
+        initialRecentCall = {},
+        initialRecentAttempt
+    } = useLoaderData();
+    const [nextRecipient, setNextRecipient] = useState(initialNextRecipient);
+    const { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
+        user,
+        supabase,
+        init: {
+            queue: [...initialQueue],
+            callsList: [...initalCallsList],
+            attempts: [...initialAttempts],
+            recentCall: {...initialRecentCall},
+            recentAttempt: {...initialRecentAttempt}
+
+        },
+        nextRecipient
+    })
     const fetcher = useFetcher();
     const submit = useSubmit();
-    const [queue, setQueue] = useState(initialQueue);
     const [groupByHousehold] = useState(true);
-    const [callsList] = useSupabaseRealtime('call', supabase, initalCallsList);
-    const [attemptList] = useSupabaseRealtime('attempt', supabase, attempts);
-    const [nextRecipient, setNextRecipient] = useState(initialNextRecipient);
-    const [recentCall, setRecentCall] = useState(initialRecentCall);
-    const [recentAttempt, setRecentAttempt] = useState(initialRecentAttempt);
     const [update, setUpdate] = useState(recentAttempt?.result || {});
     const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
     const householdMap = queue.reduce((acc, curr) => {
-        if (!acc[curr.address]) {
-            acc[curr.address] = [];
+        if (!acc[curr?.contact.address]) {
+            acc[curr?.contact.address] = [];
         }
-        acc[curr.address].push(curr);
-        acc[curr.address].sort((a, b) => a?.phone?.localeCompare(b?.phone));
+        acc[curr?.contact.address].push(curr);
         return acc;
     }, {});
 
+    for (const address in householdMap) {
+        householdMap[address].sort((a, b) => {
+            if (a.contact.phone && b.contact.phone) {
+                return a.contact.phone.localeCompare(b.contact.phone);
+            }
+            return 0;
+        });
+    }
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleNextNumber = useCallback((skipHousehold = false) => {
         const getNextContact = () => {
+            let currIndex;
+    
             if (groupByHousehold && skipHousehold) {
-                for (let currentIndex = Object.keys(householdMap).findIndex(house => house === nextRecipient.address); currentIndex < queue.length; currentIndex++) {
-                    for (let i = 0; i < householdMap[Object.keys(householdMap)[currentIndex]].length; i++) {
-                        let contact = householdMap[Object.keys(householdMap)[currentIndex]][i];
-                        if (contact.phone && contact.address !== nextRecipient.address) {
-                            return contact;
-                        }
+                currIndex = Object.keys(householdMap).findIndex((curr) => curr === nextRecipient.contact.address);
+                for (let i = currIndex + 1; i < Object.keys(householdMap).length; i++) {
+                    let household = householdMap[Object.keys(householdMap)[i]];
+                    for (let j = 0; j < household.length; j++) {
+                        if (household[j].contact.phone) return household[j];
                     }
                 }
-                for (let currentIndex = 0; currentIndex < Object.keys(householdMap).findIndex(house => house === nextRecipient.address); currentIndex++) {
-                    for (let i = 0; i < householdMap[Object.keys(householdMap)[currentIndex]].length; i++) {
-                        let contact = householdMap[Object.keys(householdMap)[currentIndex]][i];
-                        if (contact.phone && contact.address !== nextRecipient.address) {
-                            return contact;
-                        }
+                for (let i = 0; i <= currIndex; i++) {
+                    let household = householdMap[Object.keys(householdMap)[i]];
+                    for (let j = 0; j < household.length; j++) {
+                        if (household[j].contact.phone) return household[j];
                     }
                 }
             } else {
-                for (let currentIndex = queue.findIndex(con => con.id === nextRecipient.id) + 1; currentIndex < queue.length; currentIndex++) {
-                    if (queue[currentIndex].phone) {
-                        return queue[currentIndex];
-                    }
+                currIndex = queue.findIndex((curr) => curr.id === nextRecipient.id);
+                for (let i = currIndex + 1; i < queue.length; i++) {
+                    if (queue[i].contact.phone) return queue[i];
+                }
+                for (let i = 0; i <= currIndex; i++) {
+                    if (queue[i].contact.phone) return queue[i];
                 }
             }
-            for (let currentIndex = 0; currentIndex < queue.length; currentIndex++) {
-                if (queue[currentIndex].phone) {
-                    return queue[currentIndex];
-                }
-            }
+    
+            return null;
         };
-
+    
         const nextContact = getNextContact();
-        setNextRecipient(nextContact);
-        const recentAttemptUpdate = attemptList.find(call => call.contact_id === nextContact?.id)?.result ?? {};
-        setUpdate(recentAttemptUpdate);
-
-        return nextContact;
-    }, [attemptList, groupByHousehold, householdMap, queue, nextRecipient]);
-
+        if (nextContact) {
+/*             setQueue((current) => {
+                let filtered = current.filter((contact) => contact.contact.id !== nextContact.contact.id);
+                return [...filtered, nextRecipient].sort((a, b) => a.order > b.order)
+            })
+ */         setNextRecipient(nextContact);
+            const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
+            const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
+            setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
+            setUpdate(newRecentAttempt.update);
+    
+            return nextContact;
+        }
+    
+        return null;
+    }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
+    
     const handleDialNext = () => {
         if (activeCall || incomingCall || status !== 'Registered') {
             return;
@@ -144,35 +180,52 @@ export default function Campaign() {
             handlePlaceCall(contact);
         }
     };
-    console.log(householdMap)
-    const handleDequeue = (contact) => {
-        if (groupByHousehold){
-            //const contacts = householdMap.map((household) => household)
-        }
 
+    const handleDequeue = (contact) => {
+        submit({
+            contact_id: contact.contact.id,
+            household: groupByHousehold
+        }, {
+            action: "/api/queues",
+            method: "POST",
+            encType: "application/json",
+            navigate: false,
+            fetcherKey: 'dequeue'
+        })
     }
 
     const handlePlaceCall = (contact) => {
-        if (contact.phone) {
+        console.log(contact)
+        if (contact.contact.phone) {
             submit({
-                to: contact.phone,
+                to: contact.contact.phone,
                 campaign_id: campaign.id,
                 user_id: user.id,
-                contact_id: contact.id,
+                contact_id: contact.contact.id,
                 workspaceId,
-                queue_id: originalQueue.find((queue) => queue.contact_id === contact.id).id
+                outreachId: recentAttempt?.id,
+                queue_id: nextRecipient.id
             }, {
                 action: "/api/dial",
                 method: "POST",
                 encType: "application/json",
                 navigate: false,
-                fetcherKey:'place-call'
+                fetcherKey: 'place-call'
             });
         }
     };
 
     const handleQueueButton = () => {
-        fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - (householdMap?.length || 0)}`);
+        submit(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
+            method: "GET",
+            navigate: false
+        });
+    }
+
+    const handleDequeueNext = () => {
+        handleDequeue(nextRecipient);
+        handleQueueButton();
+        handleNextNumber(true);
     }
 
     const handleUserJoin = async (presences, queue, householdMap, supabase, currentUser) => {
@@ -189,30 +242,6 @@ export default function Campaign() {
     const handleUserLeave = async (state) => {
         //console.log('leave', state);
     }
-    /* Update queue on fetch */ useEffect(() => {
-        if (fetcher.data) {
-            let newQueue = [...queue, fetcher.data];
-            const callNext = newQueue.shift();
-            const nextRecent = callsList.find((call) => call.contact_id === callNext?.id) || {};
-            setQueue(newQueue);
-            setNextRecipient(callNext);
-            setRecentCall(nextRecent);
-        }
-    }, [fetcher.data, callsList, nextRecipient?.id, queue, submit]);
-
-    /* Postgres updater */ useEffect(() => {
-        const newRecentCall = callsList.sort((a, b) => a.date_created < b.date_created).find((call) => call.contact_id === nextRecipient?.id)
-        console.log(callsList)
-        setRecentCall(newRecentCall || {})
-
-    }, [callsList, nextRecipient?.id, supabase])
-    /* Postgres updater */ useEffect(() => {
-        const newRecentAttempt = attemptList.find((call) => call.contact_id === nextRecipient?.id)
-        setRecentAttempt(newRecentAttempt || {})
-        setDisposition(newRecentAttempt?.disposition);
-        setUpdate(newRecentAttempt?.result || {})
-
-    }, [attemptList, callsList, nextRecipient?.id])
 
     /* Supabase Realtime */ useEffect(() => {
         const channel = supabase.channel(`${workspaceId}-${campaign.id}`, {
@@ -249,22 +278,22 @@ export default function Campaign() {
     }, [campaign.id, supabase, user.id, workspaceId, queue, user, householdMap]);
 
     /* Debounced save handler */ useEffect(() => {
-        const handleQuestionsSave = () => submit({ update, callId: recentCall?.id }, {
+        const handleQuestionsSave = () => submit({ update, callId: recentAttempt?.id, selected_workspace_id: workspaceId, contact_id: nextRecipient.contact.id, campaign_id: campaign.id }, {
             method: "PATCH",
             navigate: false,
             action: `/api/questions`,
             encType: 'application/json'
         });
         const handler = setTimeout(() => {
-            console.log(update, recentCall)
-            if (JSON.stringify(update) !== JSON.stringify(recentCall)) {
+            console.log(update, recentAttempt.result)
+            if (JSON.stringify(update) !== JSON.stringify(recentAttempt?.result || {})) {
                 handleQuestionsSave();
             }
         }, 3000);
         return () => {
             clearTimeout(handler);
         };
-    }, [callsList, nextRecipient, update, submit, recentCall]);
+    }, [callsList, nextRecipient, update, submit, recentCall, workspaceId, recentAttempt, campaign.id]);
 
     useEffect(() => {
         const callDispositionSave = () => submit({
@@ -277,7 +306,6 @@ export default function Campaign() {
         })
         const handler = setTimeout(() => {
             if (disposition) {
-                console.log(disposition)
                 callDispositionSave();
             }
         }, 3000);
@@ -286,14 +314,16 @@ export default function Campaign() {
         };
 
     }, [disposition, recentCall, submit, update])
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
             <TopBar {...{ handleQueueButton, state: fetcher.state, handleNextNumber, handleDialNext }} />
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleNextNumber, disposition, setDisposition, recentAttempt }} />
+                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
                 <QueueList
                     {...{
+                        householdMap,
                         groupByHousehold,
                         queue,
 

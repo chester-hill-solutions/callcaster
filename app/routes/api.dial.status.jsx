@@ -18,7 +18,8 @@ try{
 
     const call = twilio.calls(parsedBody.CallSid);
     const answeredBy = formData.get('AnsweredBy');
-    if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other')) {
+    const callStatus = formData.get('CallStatus')
+    if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
         try { call.update({ twiml: `<Response><Pause length="5"/><Play>${campaign.voicemail_file}</Play></Response>` }) }
         catch (error){
             console.log(error)

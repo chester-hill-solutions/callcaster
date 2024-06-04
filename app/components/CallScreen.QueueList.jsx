@@ -3,15 +3,9 @@ import QueueContact from "./CallList/CallContact/CallContact";
 
 function QueueList({
     groupByHousehold = false,
-    queue = []
+    queue = [],
+    householdMap
 }) {
-    const householdMap = queue.reduce((acc, curr) => {
-        if (!acc[curr.address]) {
-            acc[curr.address] = [];
-        }
-        acc[curr.address].push(curr);
-        return acc;
-    }, {});
 
     return (
         <div style={{ flex: '1 0 20%', border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem" }}>
@@ -38,8 +32,8 @@ function QueueList({
                             Object.values(householdMap).map((household) => (
                                 household.map((contact, index) => (
                                     <QueueContact
-                                        key={`household-${contact.id}`}
-                                        contact={contact}
+                                        key={`household-${contact.contact.id}`}
+                                        contact={contact.contact}
                                         household={household}
                                         firstInHouse={index === 0}
                                         grouped={true}
@@ -48,8 +42,8 @@ function QueueList({
                             )) :
                             queue.map((contact) => (
                                 <QueueContact
-                                    key={contact.id}
-                                    contact={contact}
+                                    key={contact.contact.id}
+                                    contact={contact.contact}
                                 />
                             ))}
                     </tbody>
