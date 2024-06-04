@@ -120,13 +120,15 @@ export async function addUserToWorkspace({
 export async function testAuthorize({
   supabaseClient,
   workspaceId,
+  permission,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  permission: string;
 }) {
   const { data, error } = await supabaseClient.rpc("authorize", {
     selected_workspace_id: workspaceId,
-    requested_permission: "workspace.inviteUser",
+    requested_permission: permission,
   });
   console.log("\nXXXXXXXXXXXXXXXXXXXXXXXXX");
   console.log("Data: ", data);

@@ -1,23 +1,22 @@
 import { FaSearch } from "react-icons/fa";
 import { IoPersonAdd } from "react-icons/io5";
 
-import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "~/components/ui/sheet";
+import TeamMember from "~/components/Workspace/TeamMember";
 
+import { ActionFunctionArgs } from "@remix-run/node";
 import { Form, json, useActionData, useLoaderData } from "@remix-run/react";
 import { jwtDecode } from "jwt-decode";
 import { useTheme } from "next-themes";
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { getWorkspaceUsers, testAuthorize } from "~/lib/database.server";
+import { getWorkspaceUsers } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { ActionFunctionArgs } from "@remix-run/node";
+import { capitalize } from "~/lib/utils";
+import {
+  handleAddUser,
+  handleDeleteUser,
+  handleUpdateUser,
+} from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -36,7 +35,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       (workspaceRoleObj) => workspaceRoleObj.workspace_id === workspaceId,
     )?.role;
     // const userRole = null;
-    console.log("\nJWT: ", jwt);
+    // console.log("\nJWT: ", jwt);
     console.log("USER ROLE: ", userRole);
 
     // const { data: authorizeData, error: authorizeError } = await testAuthorize({
@@ -44,7 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     //   workspaceId,
     // });
 
-    const hasAccess = userRole === "member";
+    const hasAccess = userRole === "owner";
 
     return json({ hasAccess: hasAccess, userRole, users: users }, { headers });
   }
@@ -56,59 +55,44 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const workspaceId = params.id;
   const { supabaseClient, headers, session } =
     await getSupabaseServerClientWithSession(request);
+
+  if (workspaceId == null) {
+    return json({ error: "No workspace_id found!" }, { headers });
+  }
+
   const formData = await request.formData();
+  const formName = formData.get("formName");
 
-  const userName = formData.get("username") as string;
-  if (!userName) {
-    console.log("HERE no username");
-    return json({ error: "No username provided" }, { status: 400, headers });
-  }
-
-  const { data: user, error: getUserError } = await supabaseClient
-    .from("user")
-    .select()
-    .eq("username", userName)
-    .single();
-
-  if (user == null) {
-    // console.log(`User ${userName} not found - `, getUserError);
-    return json({ error: `User ${userName} not found` }, { headers });
-  }
-  // console.log("Selected user: ", user);
-
-  const { data: newUser, error: errorAddingUser } = await supabaseClient
-    .from("workspace_users")
-    .insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      role: "member",
-    })
-    .select()
-    .single();
-
-  if (newUser == null) {
-    if (errorAddingUser != null && errorAddingUser.code === "23505") {
-      return json(
-        { error: `User ${userName} is already in this workspace!` },
-        { headers },
-      );
+  switch (formName) {
+    case "addUser": {
+      return handleAddUser(formData, workspaceId, supabaseClient, headers);
     }
-    console.log("Insert error on workspace_users: ", errorAddingUser);
-    return json(
-      { error: `Could not add ${userName} to workspace!` },
-      { headers },
-    );
+    case "updateUser": {
+      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
+    }
+    case "deleteUser": {
+      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
+    }
+    default: {
+      break;
+    }
   }
 
-  return json({ newUser, error: errorAddingUser }, { headers });
+  return json({ data: null, error: "Unrecognized action called" }, { headers });
 };
 
 export default function WorkspaceSettings() {
   const { hasAccess, userRole, users } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const { theme } = useTheme();
-  console.log("Theme", theme);
+  // console.log("Theme", theme);
   // console.log("Users: ", users);
+
+  const workspaceOwner = users?.find(
+    (user) => user.user_workspace_role === "owner",
+  );
+
+  const [showForm, setShowForm] = useState<boolean>(false);
 
   const settings = (
     <main className="mx-auto mt-8 flex h-full w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
@@ -119,27 +103,23 @@ export default function WorkspaceSettings() {
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Owner
         </p>
-        <div
-          id="team-owner"
-          className=" flex w-full gap-2 rounded-md border-2 border-black p-2 text-xl dark:border-white"
-        >
-          <div className="aspect-square w-8 rounded-full bg-brand-primary" />
-          <p className="font-semibold">Some Owner</p>
-        </div>
+        <TeamMember member={workspaceOwner} />
       </div>
       <div className="flex flex-col">
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Members
         </p>
         <ul className=" flex w-full flex-col items-center gap-2">
-          {users?.map((user) => (
-            <li key={Math.floor(Math.random() * 1000)} className="w-full">
-              <TeamMember
-                memberName={user.first_name + " " + user.last_name}
-                memberRole={user.user_workspace_role}
-              />
-            </li>
-          ))}
+          {users?.map((user) => {
+            if (user.user_workspace_role === "owner") {
+              return <></>;
+            }
+            return (
+              <li key={Math.floor(Math.random() * 1000)} className="w-full">
+                <TeamMember member={user} />
+              </li>
+            );
+          })}
           {/* <li className="w-full">
             <TeamMember memberName="Some Admin" memberRole={MemberRole.Admin} />
           </li>
@@ -164,62 +144,57 @@ export default function WorkspaceSettings() {
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Add New Member
         </p>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button className="h-fit w-full border-2 border-black bg-transparent dark:border-white">
-              {theme === "dark" ? (
-                <IoPersonAdd size="32px" className="" color="white" />
-              ) : (
-                <IoPersonAdd size="32px" className="" color="black" />
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="z-[100] bg-white dark:bg-inherit">
-            <SheetHeader>
-              <SheetTitle>Invite a Team Member</SheetTitle>
-              <SheetDescription>
-                Enter a username or use the search function to add a new member
-                to your workspace team.
-              </SheetDescription>
-            </SheetHeader>
-            <Form method="POST" className="mt-4 flex w-full flex-col gap-4">
-              {actionData?.error && (
-                <p className="text-center text-2xl font-bold text-brand-primary">
-                  {actionData.error}
-                </p>
-              )}
-              <label
-                htmlFor="username"
-                className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
-              >
-                User Name
-                <input
-                  type="text"
-                  name="username"
-                  id="username"
-                  className="rounded-md border border-white bg-transparent px-4 py-2"
-                />
-              </label>
+        {!showForm && (
+          <Button
+            onClick={() => setShowForm(true)}
+            className="h-fit w-full border-2 border-black bg-transparent dark:border-white"
+          >
+            {theme === "dark" ? (
+              <IoPersonAdd size="32px" className="" color="white" />
+            ) : (
+              <IoPersonAdd size="32px" className="" color="black" />
+            )}
+          </Button>
+        )}
+        {showForm && (
+          <Form method="POST" className="flex w-full flex-col gap-4">
+            {actionData?.error && (
+              <p className="text-center text-2xl font-bold text-brand-primary">
+                {actionData.error}
+              </p>
+            )}
+            <input type="hidden" name="formName" value="addUser" />
+            <label
+              htmlFor="username"
+              className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+            >
+              User Name
+              <input
+                type="text"
+                name="username"
+                id="username"
+                className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+              />
+            </label>
 
-              <label
-                htmlFor="username"
-                className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
-              >
-                <div className="flex items-center gap-2">
-                  <FaSearch size="16px" />
-                  Search
-                </div>
-                <input
-                  type="text"
-                  name="username"
-                  id="username"
-                  className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
-                />
-              </label>
-              <Button className="">Invite New User</Button>
-            </Form>
-          </SheetContent>
-        </Sheet>
+            <label
+              htmlFor="username_search"
+              className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+            >
+              <div className="flex items-center gap-2">
+                <FaSearch size="16px" />
+                Search
+              </div>
+              <input
+                type="search"
+                name="username_search"
+                id="username_search"
+                className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+              />
+            </label>
+            <Button className="">Invite New User</Button>
+          </Form>
+        )}
       </div>
     </main>
   );

@@ -82,7 +82,6 @@ export default function Workspaces() {
             >
               <h5 className="font-Zilla-Slab text-2xl">{workspace.name}</h5>
               <p className="">Workspace Description</p>
-
             </Link>
           ))}
         <Button
