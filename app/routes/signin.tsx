@@ -5,6 +5,7 @@ import { FcGoogle } from "react-icons/fc";
 import { Button } from "~/components/ui/button";
 import {
   createSupabaseServerClient,
+  getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
@@ -36,10 +37,10 @@ export const loader = async ({ request }: { request: Request }) => {
 export default function SignIn() {
   const actionData = useActionData<typeof action>();
   return (
-    <main className="flex h-screen w-full flex-col items-center justify-center py-4 text-slate-800">
+    <main className="mt-8 flex flex-col items-center justify-center text-slate-800 sm:w-full">
       <div
         id="login-hero"
-        className="flex aspect-square flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
         <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
           Login
@@ -50,14 +51,14 @@ export default function SignIn() {
         )}
         <Button
           variant={"outline"}
-          className="flex min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
+          className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
         >
           <FcGoogle size={"2rem"} />
           Sign in with Google
         </Button>
         <Button
           variant={"outline"}
-          className="flex min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
+          className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
         >
           <FaGithub size={"2rem"} />
           Sign in with Github
@@ -86,7 +87,6 @@ export default function SignIn() {
               name="email"
               id="email"
               className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
-
             />
           </label>
 
