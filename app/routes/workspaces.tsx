@@ -67,8 +67,8 @@ export default function Workspaces() {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   return (
-    <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16 text-white">
-      <h1 className="text-center font-Tabac-Slab text-4xl font-black text-zinc-800 dark:text-white">
+    <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
+      <h1 className="text-center font-Tabac-Slab text-4xl ">
         Your Workspaces
       </h1>
       <div className="flex flex-row flex-wrap gap-4">
@@ -77,18 +77,17 @@ export default function Workspaces() {
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border-2 border-zinc-700 bg-brand-secondary px-4 py-8 text-center font-semibold text-black shadow-md
-              transition-colors duration-150 ease-in-out hover:bg-black hover:text-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60"
             >
-              <h5 className="font-Zilla-Slab text-2xl">{workspace.name}</h5>
-              <p className="">Workspace Description</p>
-
+              <h5 className="font-Zilla-Slab text-2xl text-white">
+                {workspace.name}
+              </h5>
+              <p className="text-white">Workspace Description</p>
             </Link>
           ))}
         <Button
           variant="outline"
-          className="h-full min-h-fit border-2 border-zinc-700 px-4 py-8
-                  hover:bg-brand-primary dark:border-white"
+          className="h-full min-h-fit border border-white px-4 py-8 min-w-60"
           onClick={() => dialogRef.current?.showModal()}
         >
           <div className="hidden dark:block">

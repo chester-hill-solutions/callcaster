@@ -70,17 +70,74 @@ export async function getWorkspaceInfo({
   return { data, error };
 }
 
+// type getTableDataByIdProps = {
+//   supabaseClient: SupabaseClient<Database>;
+//   tableName: string;
+//   rowId?: string;
+//   columnNames?: string[];
+// };
+
+// Too Generic
+// export async function getTableDataById({
+//   supabaseClient,
+//   tableName,
+//   rowId = "",
+//   columnNames,
+// }: getTableDataByIdProps) {
+//   const joinedColumnNames = columnNames?.join(",");
+//   const tableDataQuery = supabaseClient
+//     .from(tableName)
+//     .select(joinedColumnNames || "*");
+//   // .eq("id", rowId);
+
+//   const { data, error } = await tableDataQuery;
+//   // console.log("getTableDataById: ", data);
+
+//   if (error) {
+//     console.log("Error on function getTableDataById: ", error);
+//   }
+
+//   return { data, error };
+// }
+
+export async function getWorkspaceAudiences({
+  supabaseClient,
+  workspaceId
+}: {
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  const { data, error } = await supabaseClient.from("audience").select().eq('workspace', workspaceId);
+
+  if (error) {
+    console.log("Error on function getWorkspaceAudiences");
+  }
+
+  return { data, error };
+}
+
 export async function getWorkspaceCampaigns({
   supabaseClient,
-  workspaceId,
+  workspaceId
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient.rpc(
-    "get_campaigns_by_workspace",
-    { workspace_id: workspaceId },
-  );
+  const { data, error } = await supabaseClient.from("campaign").select().eq('workspace', workspaceId);
+
+  if (error) {
+    console.log("Error on function getWorkspaceAudiences");
+  }
+
+  return { data, error };
+}
+
+export async function getWorkspaceContacts({
+  supabaseClient,
+  workspaceId
+}: {
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  const { data, error } = await supabaseClient.from("contact").select().eq('workspace', workspaceId);
 
   if (error) {
     console.log("Error on function getWorkspaceAudiences");

@@ -7,49 +7,26 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Callcaster Pre-Alpha" },
-    { name: "description", content: "Early dev build of callcaster" },
+    { title: "Callcaster Outreach Platform" },
+    { name: "description", content: "Real-Time Connections, Real Results" },
   ];
 };
 
 export const loader = async ({ request }: { request: Request }) => {
   const { headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-
-  if (serverSession && serverSession.user) {
-    return redirect("/workspaces", { headers });
-  }
-
-  return json({ headers });
+    return json({ headers });
 };
 
 export default function Index() {
   return (
-    <main className="mx-auto flex h-full w-full justify-center items-center text-white">
-      <section>
-        <div className="mx-auto py-40 w-400">
-          <h1 className="font-Tabac-Slab text-6xl font-black text-brand-primary text-center">CallCaster</h1>
-          <p className="font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200 text-center">Real-Time Connections, Real Results.</p>
-          <div style={{height:"20px"}}></div>
-          <div className="flex flex-col">
-          <a className="font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200 text-center" href="mailto:info@callcaster.com">info@callcaster.com</a>
-          <a className="font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200 text-center" href="tel:+13656459045">365 645 9045</a>
-          </div>
-          <img src="/Hero-1.png" width={'100%'} style={{opacity:".1", position:"absolute", left:"0", top:"10px", zIndex:'-1'}}/>
-        </div>
-      </section>
- {/*      <section
-        id="index_hero"
-        className="flex h-full w-full items-center justify-center gap-64 px-20 py-16"
-      >
-        <div className="flex flex-col items-center gap-4 text-center">
-          <h3 className="font-Tabac-Slab text-[14rem] font-black italic leading-none text-brand-primary">
-            CC
-          </h3>
-          <p className="font-Zilla-Slab text-4xl font-bold tracking-[0.5px] text-brand-primary">
-            Affordable Outreach
-            <br />
-            Made Simple
+    <main className="mx-auto flex h-full w-full items-center justify-center text-white bg-[url('/Hero')]">
+        <div className="w-400 mx-auto py-40">
+          <h1 className="text-center font-Tabac-Slab text-6xl font-black text-brand-primary">
+            CallCaster
+          </h1>
+          <p className="text-center font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200">
+            Real-Time Connections, Real Results.
           </p>
         </div>
 
@@ -144,7 +121,6 @@ export default function Index() {
               Sign Up
             </Link> 
         </div>
-      </section> */}
     </main>
   );
 }

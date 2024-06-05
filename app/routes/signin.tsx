@@ -4,7 +4,7 @@ import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { Button } from "~/components/ui/button";
 import {
-  createSupabaseServerClient,
+  getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
