@@ -50,7 +50,7 @@ export async function handleAddUser(
     );
   }
 
-  return json({ newUser, error: errorAddingUser }, { headers });
+  return json({ data: newUser, error: errorAddingUser }, { headers });
 }
 
 export async function handleUpdateUser(
@@ -83,7 +83,7 @@ export async function handleUpdateUser(
     .select()
     .single();
 
-  return { data: updatedUser, error: errorUpdatingUser };
+  return json({ data: updatedUser, error: errorUpdatingUser }, { headers });
 }
 
 export async function handleDeleteUser(
@@ -92,7 +92,6 @@ export async function handleDeleteUser(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  console.log("\nHERE");
   const userName = formData.get("username");
 
   const { data: user, error: getUserError } = await supabaseClient
@@ -116,4 +115,48 @@ export async function handleDeleteUser(
     .single();
 
   return { data: deletedUser, error: errorDeletingUser };
+}
+
+export async function handleInviteCaller(
+  formData: FormData,
+  workspaceId: string,
+  supabaseClient: SupabaseClient<Database>,
+  headers: Headers,
+) {
+  const callerEmail = formData.get("callerEmail") as string;
+
+  const session = await supabaseClient.auth.getSession();
+  if (session == null) {
+    return json({ error: "No user session" }, { headers });
+  }
+
+  const { data: callerSignUpData, error: callerSignUpError } =
+    await supabaseClient.auth.signUp({
+      email: callerEmail,
+      password: "password1234",
+    });
+
+  if (callerSignUpData?.user != null) {
+    const { data: addCallerToWorkspaceData, error: addCallerToWorkspaceError } =
+      await supabaseClient
+        .from("workspace_users")
+        .insert({
+          workspace_id: workspaceId,
+          user_id: callerSignUpData.user.id,
+          role: "caller",
+        })
+        .select()
+        .single();
+
+    if (addCallerToWorkspaceData != null) {
+      return json({ data: addCallerToWorkspaceData }, { headers });
+    } else if (addCallerToWorkspaceError) {
+      return json({ error: addCallerToWorkspaceError }, { headers });
+    }
+  }
+
+  return json(
+    { data: callerSignUpData, error: callerSignUpError },
+    { headers },
+  );
 }

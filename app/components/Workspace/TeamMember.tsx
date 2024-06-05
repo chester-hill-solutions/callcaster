@@ -18,6 +18,7 @@ export enum MemberRole {
   Owner = "owner",
   Member = "member",
   Caller = "caller",
+  Admin = "admin",
 }
 
 type TeamMemberProps = {
@@ -38,12 +39,14 @@ export default function TeamMember({ member }) {
     memberRole === MemberRole.Owner && "bg-green-500",
     memberRole === MemberRole.Member && "bg-cyan-500",
     memberRole === MemberRole.Caller && "bg-rose-500",
+    memberRole === MemberRole.Admin && "bg-purple-500",
   );
   const roleTextStyles = clsx(
     "font-Zilla-Slab font-semibold italic",
     memberRole === MemberRole.Owner && "text-green-500",
     memberRole === MemberRole.Member && "text-cyan-500",
     memberRole === MemberRole.Caller && "text-rose-500",
+    memberRole === MemberRole.Admin && "text-purple-500",
   );
 
   const { theme } = useTheme();
@@ -98,21 +101,24 @@ export default function TeamMember({ member }) {
                     className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
                     name="updated_workspace_role"
                     id="updated_workspace_role"
+                    defaultValue={memberRole}
                     required
                   >
-                    <option
-                      value="member"
-                      selected={memberRole === MemberRole.Member}
-                      className=""
-                    >
-                      Member
-                    </option>
-                    <option
-                      value="caller"
-                      selected={memberRole === MemberRole.Caller}
-                    >
-                      Caller
-                    </option>
+                    {Object.values(MemberRole).map((role) => {
+                      // console.log(role.valueOf());
+                      if (role.valueOf() === "owner") {
+                        return <></>;
+                      }
+                      return (
+                        <option
+                          key={role.valueOf()}
+                          value={role.valueOf()}
+                          className=""
+                        >
+                          {capitalize(role.valueOf())}
+                        </option>
+                      );
+                    })}
                   </select>
                   {/* <Select name="workspace_role">
                   <SelectTrigger className="w-[180px]">

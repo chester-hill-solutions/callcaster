@@ -7,7 +7,7 @@ import { ActionFunctionArgs } from "@remix-run/node";
 import { Form, json, useActionData, useLoaderData } from "@remix-run/react";
 import { jwtDecode } from "jwt-decode";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { getWorkspaceUsers } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -16,7 +16,11 @@ import {
   handleAddUser,
   handleDeleteUser,
   handleUpdateUser,
+  handleInviteCaller,
 } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { toast, Toaster } from "sonner";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -73,6 +77,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     case "deleteUser": {
       return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
     }
+    case "inviteCaller": {
+      return handleInviteCaller(formData, workspaceId, supabaseClient, headers);
+    }
     default: {
       break;
     }
@@ -93,6 +100,15 @@ export default function WorkspaceSettings() {
   );
 
   const [showForm, setShowForm] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (actionData?.error) {
+      toast.error(actionData.error);
+    }
+    if (actionData?.data) {
+      toast.success("Action completed succesfully!");
+    }
+  }, [actionData]);
 
   const settings = (
     <main className="mx-auto mt-8 flex h-full w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
@@ -115,7 +131,7 @@ export default function WorkspaceSettings() {
               return <></>;
             }
             return (
-              <li key={Math.floor(Math.random() * 1000)} className="w-full">
+              <li key={user.username} className="w-full">
                 <TeamMember member={user} />
               </li>
             );
@@ -144,7 +160,70 @@ export default function WorkspaceSettings() {
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Add New Member
         </p>
-        {!showForm && (
+        <Tabs defaultValue="addUser" className="w-full">
+          <TabsList className="flex w-full gap-2 bg-brand-secondary font-bold dark:bg-inherit">
+            <TabsTrigger
+              className="w-full bg-zinc-300 font-bold data-[state=active]:bg-white dark:data-[state=active]:border-2 dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
+              value="addUser"
+            >
+              Add User
+            </TabsTrigger>
+            <TabsTrigger
+              className="w-full bg-zinc-300 font-bold data-[state=active]:bg-white dark:data-[state=active]:border-2 dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
+              value="inviteCaller"
+            >
+              Invite Caller
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="addUser">
+            <Form method="POST" className="flex w-full flex-col gap-4">
+              {actionData?.error && (
+                <p className="text-center text-2xl font-bold text-brand-primary">
+                  {actionData.error}
+                </p>
+              )}
+              <input type="hidden" name="formName" value="addUser" />
+              <label
+                htmlFor="username"
+                className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+              >
+                User Name
+                <input
+                  type="text"
+                  name="username"
+                  id="username"
+                  className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                />
+              </label>
+              <Button className="">Add New User</Button>
+            </Form>
+          </TabsContent>
+          <TabsContent value="inviteCaller" className="">
+            <Form method="POST" className="flex w-full flex-col gap-4">
+              {actionData?.error && (
+                <p className="text-center text-2xl font-bold text-brand-primary">
+                  {actionData.error}
+                </p>
+              )}
+              <input type="hidden" name="formName" value="inviteCaller" />
+              <label
+                htmlFor="callerEmail"
+                className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+              >
+                Email
+                <input
+                  type="email"
+                  name="callerEmail"
+                  id="callerEmail"
+                  className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                />
+              </label>
+              <Button className="">Invite Caller</Button>
+            </Form>
+          </TabsContent>
+        </Tabs>
+
+        {/* {!showForm && (
           <Button
             onClick={() => setShowForm(true)}
             className="h-fit w-full border-2 border-black bg-transparent dark:border-white"
@@ -194,8 +273,9 @@ export default function WorkspaceSettings() {
             </label>
             <Button className="">Invite New User</Button>
           </Form>
-        )}
+        )} */}
       </div>
+      <Toaster richColors />
     </main>
   );
 
