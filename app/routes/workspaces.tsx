@@ -38,8 +38,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  // console.log(Object.fromEntries(formData));
-
   const { data, error } = await createNewWorkspace({
     supabaseClient,
     userId,
@@ -67,6 +65,7 @@ export default function Workspaces() {
   // console.log(workspaces);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Tabac-Slab text-4xl ">
@@ -91,14 +90,28 @@ export default function Workspaces() {
           className="h-full min-h-fit border border-white px-4 py-8 min-w-60"
           onClick={() => dialogRef.current?.showModal()}
         >
-          <FaPlus
-            size="72px"
-            style={{
-              border: "1px solid white",
-              borderRadius: "50%",
-              padding: "0.75rem",
-            }}
-          />
+          <div className="hidden dark:block">
+            <FaPlus
+              size="72px"
+              color="white"
+              style={{
+                border: "2px solid white",
+                borderRadius: "50%",
+                padding: "0.75rem",
+              }}
+            />
+          </div>
+          <div className="block dark:hidden">
+            <FaPlus
+              size="72px"
+              color="black"
+              style={{
+                border: "2px solid black",
+                borderRadius: "50%",
+                padding: "0.75rem",
+              }}
+            />
+          </div>
         </Button>
       </div>
       <dialog ref={dialogRef} className="rounded-md bg-indigo-400 p-8">

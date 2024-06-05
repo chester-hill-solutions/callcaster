@@ -17,8 +17,8 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
-  classname?: string;
-  onRowClick?: (item: TData) => void; 
+  className?: string;
+  onRowClick?: (item: TData) => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -40,7 +40,7 @@ export function DataTable<TData, TValue>({
   };
 
   return (
-    <Table className={classname}>
+    <Table className={className}>
       <TableHeader className="">
         {table.getHeaderGroups().map((headerGroup) => (
           <TableRow key={headerGroup.id}>
@@ -65,7 +65,7 @@ export function DataTable<TData, TValue>({
             <TableRow
               key={row.id}
               data-state={row.getIsSelected() && "selected"}
-              onClick={() => handleRowClick(row.original)} 
+              onClick={() => handleRowClick(row.original)}
               style={{ cursor: onRowClick ? "pointer" : "default" }}
             >
               {row.getVisibleCells().map((cell) => (

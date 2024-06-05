@@ -1,18 +1,27 @@
-import { SupabaseClient } from "@supabase/supabase-js";
+import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { Audience, WorkspaceData } from "./types";
 
 export async function getUserWorkspaces({
   supabaseClient,
 }: {
   supabaseClient: SupabaseClient<Database>;
 }) {
+  const {
+    data: { session },
+  } = await supabaseClient.auth.getSession();
+  // console.log("Session? ", session);
+  if (session == null) {
+    return { data: null, error: "No user session found" };
+  }
+
   const workspacesQuery = supabaseClient
     .from("workspace")
     .select("*")
     .order("created_at", { ascending: false });
 
-  const { data, error } = await workspacesQuery;
-  //   console.log(data);
+  const { data, error }: { data: WorkspaceData; error: PostgrestError | null } =
+    await workspacesQuery;
 
   if (error) {
     console.log("Error on function getUserWorkspaces: ", error);
@@ -111,6 +120,7 @@ export async function getWorkspaceCampaigns({
   workspaceId
 }: {
   supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
 }) {
   const { data, error } = await supabaseClient.from("campaign").select().eq('workspace', workspaceId);
 

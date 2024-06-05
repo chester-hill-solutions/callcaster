@@ -7,7 +7,7 @@ import { Button } from "~/components/ui/button";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
-/* 
+
   const { email, password, confirmEmail, confirmPassword } =
     Object.fromEntries(formData);
 
@@ -27,26 +27,22 @@ export const action = async ({ request }: { request: Request }) => {
 
   const { supabaseClient: supabase, headers } =
     createSupabaseServerClient(request);
-    console.log(email, password)
+
   const { data, error } = await supabase.auth.signUp({
     email: email as string,
     password: password as string,
   });
 
   if (error) {
-    console.log(error)
     return json({ error: error.message }, { headers });
   }
 
   if (data.user) {
-    console.log(data);
-    return redirect("/signin");
-    return json({ data: data });
+    // console.log(data);
+    return redirect("/signin", { headers });
+  }
 
-    return null;
-  } */
-
-  return null;
+  return json({ data }, { headers });
 };
 
 function FormFirstPage() {
@@ -169,11 +165,6 @@ export default function SignUp() {
   const paginationHandler = (page: ReactNode) => {
     setFormPage(page);
   };
-
-  // useEffect(() => {
-  //   setFormPage(firstPage);
-  //   setIsFirstPage(true);
-  // }, []);
 
   return (
     <main className="flex h-screen w-full flex-col items-center justify-center py-8 text-white">

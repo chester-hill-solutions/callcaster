@@ -3,10 +3,9 @@ import { createSupabaseServerClient } from '../lib/supabase.server';
 
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to, /*:  toNumber, */ user_id, campaign_id, contact_id, workspaceId, queue_id, outreachId } = await request.json();
+    const { to: toNumber, user_id, campaign_id, contact_id, workspaceId, queue_id, outreachId } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const twiml = new Twilio.twiml.VoiceResponse();
-    const toNumber = "+19058088017" /// CHANGE THIS BACK
     try {
         const call = await twilio.calls.create({
             to: `client:${user_id}`,

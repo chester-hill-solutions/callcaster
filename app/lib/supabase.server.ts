@@ -28,7 +28,6 @@ export const createSupabaseServerClient = (request: Request) => {
 
 export async function getSupabaseServerClientWithSession(request: Request) {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
-
   const {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();

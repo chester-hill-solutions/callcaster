@@ -18,7 +18,6 @@ import {
   getWorkspaceInfo,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { WorkspaceTable, WorkspaceTableNames } from "~/lib/types";
 
 export const loader = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
@@ -40,6 +39,7 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Workspace() {
+  const { workspace, campaigns } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { workspace, audiences, campaigns, contacts, selected } = useLoaderData();
   const tables = [
