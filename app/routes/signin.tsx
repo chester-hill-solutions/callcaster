@@ -1,7 +1,9 @@
 import { json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData } from "@remix-run/react";
+import { useEffect, useLayoutEffect } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
+import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
 import {
   createSupabaseServerClient,
@@ -36,8 +38,15 @@ export const loader = async ({ request }: { request: Request }) => {
 
 export default function SignIn() {
   const actionData = useActionData<typeof action>();
+
+  useEffect(() => {
+    if (actionData?.error != null) {
+      toast.error(actionData.error, { duration: 4000 });
+    }
+  }, [actionData]);
+
   return (
-    <main className="mt-8 flex flex-col items-center justify-center text-slate-800 sm:w-full">
+    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
       <div
         id="login-hero"
         className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
@@ -47,7 +56,9 @@ export default function SignIn() {
         </h1>
 
         {actionData?.error && (
-          <p style={{ color: "red" }}>{actionData.error}</p>
+          <p className="block sm:hidden" style={{ color: "red" }}>
+            {actionData.error}
+          </p>
         )}
         <Button
           variant={"outline"}
@@ -127,6 +138,7 @@ export default function SignIn() {
           I forgot my password
         </Link>
       </div>
+      <Toaster richColors visibleToasts={1} />
     </main>
   );
 }

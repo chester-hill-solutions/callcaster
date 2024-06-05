@@ -1,5 +1,5 @@
 import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink } from "@remix-run/react";
+import { Link, NavLink, useNavigate } from "@remix-run/react";
 import { AuthError } from "@supabase/supabase-js";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
@@ -21,7 +21,8 @@ export default function Navbar({
   workspaces: WorkspaceData;
   isSignedIn: boolean;
 }) {
-  console.log(workspaces);
+  // console.log(workspaces);
+  const navigate = useNavigate();
   return (
     <header className={`w-full ${className}`}>
       <nav
@@ -63,7 +64,10 @@ export default function Navbar({
               variant="destructive"
               className="px-4 py-2 text-center font-Zilla-Slab text-base font-bold sm:text-xl"
               type="button"
-              onClick={() => handleSignOut()}
+              onClick={() => {
+                handleSignOut();
+                navigate("/");
+              }}
             >
               Log Out
             </Button>

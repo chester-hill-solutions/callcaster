@@ -4,11 +4,14 @@ import {
   Links,
   LiveReload,
   Meta,
+  NavigateFunction,
   Outlet,
   Scripts,
   ScrollRestoration,
   json,
+  redirect,
   useLoaderData,
+  useNavigate,
   useRevalidator,
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
@@ -23,6 +26,8 @@ import type { ENV } from "~/lib/types";
 import stylesheet from "~/tailwind.css";
 import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
+
+import { Toaster } from "sonner";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -87,7 +92,11 @@ export default function App() {
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     revalidate();
-    return json({ error: error });
+    if (error) {
+      return json({ error: error });
+    }
+
+    return redirect("/");
   }
 
   useEffect(() => {
