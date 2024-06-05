@@ -46,8 +46,8 @@ export default function SignIn() {
   }, [actionData]);
 
   return (
+    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
 
-    <main className="mt-8 flex flex-col items-center justify-center text-slate-800 sm:w-full">
       <div
         id="login-hero"
         className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
