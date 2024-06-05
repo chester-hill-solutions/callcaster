@@ -1,7 +1,4 @@
-import { FaSearch } from "react-icons/fa";
-import { IoPersonAdd } from "react-icons/io5";
-
-import TeamMember from "~/components/Workspace/TeamMember";
+import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
 
 import { ActionFunctionArgs } from "@remix-run/node";
 import { Form, json, useActionData, useLoaderData } from "@remix-run/react";
@@ -11,16 +8,17 @@ import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { getWorkspaceUsers } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { capitalize } from "~/lib/utils";
 import {
   handleAddUser,
   handleDeleteUser,
-  handleUpdateUser,
   handleInviteCaller,
+  handleTransferWorkspace,
+  handleUpdateUser,
 } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { toast, Toaster } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { capitalize } from "~/lib/utils";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -33,7 +31,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
 
   if (serverSession) {
-    // console.log("here", users);
     const jwt = jwtDecode(serverSession.access_token);
     const userRole = jwt["user_workspace_roles"]?.find(
       (workspaceRoleObj) => workspaceRoleObj.workspace_id === workspaceId,
@@ -47,7 +44,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     //   workspaceId,
     // });
 
-    const hasAccess = userRole === "owner";
+    const hasAccess = userRole === "owner" || userRole === "admin";
 
     return json({ hasAccess: hasAccess, userRole, users: users }, { headers });
   }
@@ -80,12 +77,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     case "inviteCaller": {
       return handleInviteCaller(formData, workspaceId, supabaseClient, headers);
     }
+    case "transferWorkspaceOwnership": {
+      return handleTransferWorkspace(
+        formData,
+        workspaceId,
+        supabaseClient,
+        headers,
+      );
+    }
     default: {
       break;
     }
   }
 
-  return json({ data: null, error: "Unrecognized action called" }, { headers });
+  return json(
+    { data: null, error: "Error: Unrecognized action called" },
+    { headers },
+  );
 };
 
 export default function WorkspaceSettings() {
@@ -98,8 +106,10 @@ export default function WorkspaceSettings() {
   const workspaceOwner = users?.find(
     (user) => user.user_workspace_role === "owner",
   );
+  // console.log(workspaceOwner);
 
   const [showForm, setShowForm] = useState<boolean>(false);
+  const userIsOwner = userRole === "owner";
 
   useEffect(() => {
     if (actionData?.error) {
@@ -119,40 +129,31 @@ export default function WorkspaceSettings() {
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Owner
         </p>
-        <TeamMember member={workspaceOwner} />
+        <TeamMember
+          member={workspaceOwner}
+          userIsOwner={userIsOwner}
+          workspaceOwner={workspaceOwner}
+        />
       </div>
       <div className="flex flex-col">
         <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Members
         </p>
         <ul className=" flex w-full flex-col items-center gap-2">
-          {users?.map((user) => {
-            if (user.user_workspace_role === "owner") {
+          {users?.map((member) => {
+            if (member.user_workspace_role === "owner") {
               return <></>;
             }
             return (
-              <li key={user.username} className="w-full">
-                <TeamMember member={user} />
+              <li key={member.username} className="w-full">
+                <TeamMember
+                  member={member}
+                  userIsOwner={userIsOwner}
+                  workspaceOwner={workspaceOwner}
+                />
               </li>
             );
           })}
-          {/* <li className="w-full">
-            <TeamMember memberName="Some Admin" memberRole={MemberRole.Admin} />
-          </li>
-
-          <li className="w-full">
-            <TeamMember
-              memberName="Some Member"
-              memberRole={MemberRole.Member}
-            />
-          </li>
-
-          <li className="w-full">
-            <TeamMember
-              memberName="Some Caller"
-              memberRole={MemberRole.Caller}
-            />
-          </li> */}
         </ul>
       </div>
 
@@ -195,6 +196,42 @@ export default function WorkspaceSettings() {
                   className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
                 />
               </label>
+              <label
+                htmlFor="newUserWorkspaceRole"
+                className="flex w-full flex-col gap-2 font-Zilla-Slab text-lg font-semibold dark:text-white"
+              >
+                Workspace Role
+                <select
+                  className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
+                  name="newUserWorkspaceRole"
+                  id="newUserWorkspaceRole"
+                  defaultValue={MemberRole.Member}
+                  required
+                >
+                  {Object.values(MemberRole).map((role) => {
+                    // console.log(role.valueOf());
+                    if (role.valueOf() === "owner") {
+                      return <></>;
+                    }
+                    if (
+                      role.valueOf() === "admin" &&
+                      userRole === MemberRole.Member
+                    ) {
+                      return <></>;
+                    }
+
+                    return (
+                      <option
+                        key={role.valueOf()}
+                        value={role.valueOf()}
+                        className=""
+                      >
+                        {capitalize(role.valueOf())}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
               <Button className="">Add New User</Button>
             </Form>
           </TabsContent>
@@ -222,58 +259,6 @@ export default function WorkspaceSettings() {
             </Form>
           </TabsContent>
         </Tabs>
-
-        {/* {!showForm && (
-          <Button
-            onClick={() => setShowForm(true)}
-            className="h-fit w-full border-2 border-black bg-transparent dark:border-white"
-          >
-            {theme === "dark" ? (
-              <IoPersonAdd size="32px" className="" color="white" />
-            ) : (
-              <IoPersonAdd size="32px" className="" color="black" />
-            )}
-          </Button>
-        )}
-        {showForm && (
-          <Form method="POST" className="flex w-full flex-col gap-4">
-            {actionData?.error && (
-              <p className="text-center text-2xl font-bold text-brand-primary">
-                {actionData.error}
-              </p>
-            )}
-            <input type="hidden" name="formName" value="addUser" />
-            <label
-              htmlFor="username"
-              className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
-            >
-              User Name
-              <input
-                type="text"
-                name="username"
-                id="username"
-                className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
-              />
-            </label>
-
-            <label
-              htmlFor="username_search"
-              className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
-            >
-              <div className="flex items-center gap-2">
-                <FaSearch size="16px" />
-                Search
-              </div>
-              <input
-                type="search"
-                name="username_search"
-                id="username_search"
-                className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
-              />
-            </label>
-            <Button className="">Invite New User</Button>
-          </Form>
-        )} */}
       </div>
       <Toaster richColors />
     </main>

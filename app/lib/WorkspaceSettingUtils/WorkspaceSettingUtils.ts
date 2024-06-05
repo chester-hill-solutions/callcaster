@@ -14,6 +14,8 @@ export async function handleAddUser(
     return json({ error: "No username provided" }, { headers });
   }
 
+  const newUserRole = formData.get("newUserWorkspaceRole") as string;
+
   const { data: user, error: getUserError } = await supabaseClient
     .from("user")
     .select()
@@ -31,7 +33,7 @@ export async function handleAddUser(
     .insert({
       workspace_id: workspaceId,
       user_id: user.id,
-      role: "member",
+      role: newUserRole,
     })
     .select()
     .single();
@@ -131,32 +133,106 @@ export async function handleInviteCaller(
   }
 
   const { data: callerSignUpData, error: callerSignUpError } =
-    await supabaseClient.auth.signUp({
+    await supabaseClient.auth.admin.generateLink({
+      type: "signup",
       email: callerEmail,
       password: "password1234",
+      options: {
+        data: {
+          user_workspace_role: "caller",
+          add_to_workspace: workspaceId,
+          first_name: "New",
+          last_name: "Caller",
+        },
+        redirectTo: "http://localhost:3000/signin",
+      },
     });
 
-  if (callerSignUpData?.user != null) {
-    const { data: addCallerToWorkspaceData, error: addCallerToWorkspaceError } =
-      await supabaseClient
-        .from("workspace_users")
-        .insert({
-          workspace_id: workspaceId,
-          user_id: callerSignUpData.user.id,
-          role: "caller",
-        })
-        .select()
-        .single();
+  console.log(callerSignUpData);
+  // if (callerSignUpData?.user != null) {
+  //   const { data: addCallerToWorkspaceData, error: addCallerToWorkspaceError } =
+  //     await supabaseClient
+  //       .from("workspace_users")
+  //       .insert({
+  //         workspace_id: workspaceId,
+  //         user_id: callerSignUpData.user.id,
+  //         role: "caller",
+  //       })
+  //       .select()
+  //       .single();
 
-    if (addCallerToWorkspaceData != null) {
-      return json({ data: addCallerToWorkspaceData }, { headers });
-    } else if (addCallerToWorkspaceError) {
-      return json({ error: addCallerToWorkspaceError }, { headers });
-    }
-  }
+  //   if (addCallerToWorkspaceData != null) {
+  //     return json({ data: addCallerToWorkspaceData }, { headers });
+  //   } else if (addCallerToWorkspaceError) {
+  //     return json({ error: addCallerToWorkspaceError }, { headers });
+  //   }
+  // }
 
   return json(
     { data: callerSignUpData, error: callerSignUpError },
+    { headers },
+  );
+}
+
+export async function handleTransferWorkspace(
+  formData: FormData,
+  workspaceId: string,
+  supabaseClient: SupabaseClient<Database>,
+  headers: Headers,
+) {
+  const currentOwnerUserName = formData.get("workspaceOwnerUserName") as string;
+  const newOwnerUserName = formData.get("username") as string;
+
+  const { data: currentOwnerData, error: errorGettingCurrentOwner } =
+    await supabaseClient
+      .from("user")
+      .select()
+      .eq("username", currentOwnerUserName)
+      .single();
+
+  const { data: newOwnerData, error: errorGettingNewOwner } =
+    await supabaseClient
+      .from("user")
+      .select()
+      .eq("username", newOwnerUserName)
+      .single();
+
+  if (currentOwnerData == null) {
+    console.log("ERROR GETTING CURRENT OWNER");
+    return json({ error: errorGettingCurrentOwner.message }, { headers });
+  } else if (newOwnerData == null) {
+    console.log("ERROR GETTING NEW OWNER");
+    return json({ error: errorGettingNewOwner.message }, { headers });
+  }
+
+  const { data: updatedNewOwner, error: errorUpdatingNewOwner } =
+    await supabaseClient
+      .from("workspace_users")
+      .update({ role: "owner" })
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", newOwnerData.id)
+      .select()
+      .single();
+
+  if (errorUpdatingNewOwner) {
+    return json({ error: errorUpdatingNewOwner.message }, { headers });
+  }
+
+  const { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner } =
+    await supabaseClient
+      .from("workspace_users")
+      .update({ role: "admin" })
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", currentOwnerData.id)
+      .select()
+      .single();
+
+  if (errorUpdatingCurrentOwner) {
+    return json({ error: errorUpdatingCurrentOwner.message }, { headers });
+  }
+
+  return json(
+    { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner },
     { headers },
   );
 }
