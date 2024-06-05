@@ -4,7 +4,7 @@ import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { Button } from "~/components/ui/button";
 import {
-  getSupabaseServerClientWithSession,
+  createSupabaseServerClient,
 } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
@@ -29,7 +29,7 @@ export const action = async ({ request }: { request: Request }) => {
 
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+    await createSupabaseServerClient(request);
   return json({ serverSession }, { headers });
 };
 
