@@ -39,7 +39,6 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Workspace() {
-  const { workspace, campaigns } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { workspace, audiences, campaigns, contacts, selected } = useLoaderData();
   const tables = [
