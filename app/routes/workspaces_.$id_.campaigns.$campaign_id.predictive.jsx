@@ -79,8 +79,9 @@ export default function Campaign() {
         initialRecentCall = {},
         initialRecentAttempt
     } = useLoaderData();
-    const [nextRecipient, setNextRecipient] = useState(initialNextRecipient);
+    const [nextRecipient, setNextRecipient] = useState({});
     const { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
+        setNextRecipient,
         user,
         supabase,
         init: {
@@ -230,67 +231,11 @@ export default function Campaign() {
             });
         }
      */
-    const handleQueueButton = () => {
-        fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
-            navigate: false,
-            relative: ''
-        });
-    }
 
     const handleDequeueNext = () => {
         handleDequeue(nextRecipient);
-        handleQueueButton();
         handleNextNumber(true);
     }
-
-    const handleUserJoin = async (presences, queue, householdMap, supabase, currentUser) => {
-        try {
-
-            /*   const usersDetails = userIds.map(userId => {
-                  return queue.find(contact => contact.user_id === userId) || householdMap[userId];
-              }); */
-        } catch (error) {
-            console.error('Error handling user join:', error);
-        }
-    };
-
-    const handleUserLeave = async (state) => {
-        //console.log('leave', state);
-    }
-
-    /* Supabase Realtime */ useEffect(() => {
-        const channel = supabase.channel(`${workspaceId}-${campaign.id}`, {
-            config: {
-                presence: {
-                    key: user.id,
-                }
-            }
-        });
-
-        const syncHandler = async (state) => {
-            const presences = Object.values(state).flat();
-            handleUserJoin(state, queue, householdMap, supabase, user);
-        };
-
-        channel.on('presence', { event: 'sync' }, () => {
-            const newState = channel.presenceState();
-            syncHandler(newState);
-            //console.log('sync', newState)
-        })
-            .on('presence', { event: 'join' }, ({ newPresences }) => handleUserJoin(newPresences, queue, householdMap, supabase, user))
-            .on('presence', { event: 'leave' }, ({ leftPresences }) => handleUserLeave(leftPresences))
-            .subscribe((e) => {
-                if (e !== 'SUBSCRIBED') return;
-                channel.track({
-                    user_id: user.id,
-                    online_at: Date.now(),
-                    queue
-                });
-            });
-        return () => {
-            channel.unsubscribe();
-        };
-    }, [campaign.id, supabase, user.id, workspaceId, queue, user, householdMap]);
 
     /* Debounced save handler */ useEffect(() => {
         const handleQuestionsSave = () =>
@@ -339,11 +284,11 @@ export default function Campaign() {
 
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
-            <TopBar {...{ handleQueueButton, state: fetcher.state, handleNextNumber, handleDialNext, handlePowerDial }} />
+            <TopBar {...{ state: fetcher.state, handleNextNumber, handleDialNext, handlePowerDial }} />
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
                 <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
-                <QueueList
+                {/* <QueueList
                     {...{
                         householdMap,
                         groupByHousehold,
@@ -351,7 +296,7 @@ export default function Campaign() {
                         handleNextNumber,
                         nextRecipient
                     }}
-                />
+                /> */}
             </div>
         </div>
     );

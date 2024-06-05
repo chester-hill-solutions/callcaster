@@ -10,7 +10,9 @@ export const loader = async ({ request, params }) => {
     if (parseInt(limit) === 0) {
         return json([]);
     }
+    console.log(limit)
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_households', { selected_campaign_id: campaign_id, households_limit: limit }).order('attempts').order('queue_order');
+
     if (contactsError) {
         console.error(contactsError);
         return json({ error: contactsError.message });

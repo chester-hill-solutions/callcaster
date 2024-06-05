@@ -1,10 +1,10 @@
-const TopBar = ({ handleQueueButton, state, handleNextNumber, handleDialNext }) => (
+const TopBar = ({ handleQueueButton, state, handleNextNumber, handleDialNext, handlePowerDial }) => (
     <div className="flex p-4 gap-2" style={{ border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem" }}>
         <button onClick={handleQueueButton} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white' }}>
             {state === 'idle' ? 'Load' : 'Loading'}
         </button>
         <div className="flex row gap2" style={{ display: 'flex', gap: "8px" }}>
-            <button disabled style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', opacity: ".5" }}>
+            <button onClick={handlePowerDial} style={{ padding: "8px 16px", background: "#d60000", borderRadius: "5px", color: 'white', opacity: ".5" }}>
                 Predictive Dial
             </button>
             <button onClick={handleDialNext} style={{ padding: "8px 16px", border: "1px solid #d60000", borderRadius: "5px" }}>

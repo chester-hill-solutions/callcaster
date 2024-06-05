@@ -105,8 +105,8 @@ export function useTwilioDevice(token) {
 
     const hangUp = useCallback(() => {
         if (activeCall) {
-            activeCall.disconnect();
-            deviceRef.current.disconnectAll();
+            /* activeCall.disconnect();
+            deviceRef.current.disconnectAll(); */
             fetch(`/api/hangup`, {
                 method: "POST",
                 body: JSON.stringify(activeCall),

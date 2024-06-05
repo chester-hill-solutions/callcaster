@@ -11,27 +11,27 @@ export const action = async ({ request }) => {
 
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
-    };
-try{
-    const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id').eq('sid', parsedBody.CallSid).single();
-    const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
-
-    const call = twilio.calls(parsedBody.CallSid);
-    const answeredBy = formData.get('AnsweredBy');
-    const callStatus = formData.get('CallStatus')
-    if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
-        try { call.update({ twiml: `<Response><Pause length="5"/><Play>${campaign.voicemail_file}</Play></Response>` }) }
-        catch (error){
-            console.log(error)
-        }
     }
+    try {
+        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id').eq('sid', parsedBody.CallSid).single();
+        const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
+
+        const call = twilio.calls(parsedBody.CallSid);
+        const answeredBy = formData.get('AnsweredBy');
+        const callStatus = formData.get('CallStatus')
+        if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
+            try { call.update({ twiml: `<Response><Pause length="5"/><Play>${campaign.voicemail_file}</Play></Response>` }) }
+            catch (error) {
+                console.log(error)
+            }
+        }
 
 
-    const { data, error } = await supabase.from('call').upsert({ sid: call.sid, answered_by: answeredBy }, { onConflict: 'sid' }).select();
-    return json({ success: true, data });
-} catch (error) {
-    console.log(error)
-    return json({success:false, error})
-}
+        const { data, error } = await supabase.from('call').upsert({ sid: call.sid, answered_by: answeredBy }, { onConflict: 'sid' }).select();
+        return json({ success: true, data });
+    } catch (error) {
+        console.log(error)
+        return json({ success: false, error })
+    }
 
 };
