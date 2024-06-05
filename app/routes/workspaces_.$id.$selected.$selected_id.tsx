@@ -66,7 +66,7 @@ export const loader = async ({ request, params }) => {
       console.error("No valid table detected");
       return redirect(`/workspaces/${workspace_id}`);
   }
-
+  if (selected === 'campaigns') return redirect(`call`)
   const { data, error } = await mtmQuery;
   if (error) {
     console.error(error);

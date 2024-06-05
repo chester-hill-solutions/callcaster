@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/mouse-events-have-key-events */
 import { useEffect, useState } from "react";
-const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }) => {
+const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt, predictive = false }) => {
     const [time, setTime] = useState(Date.now());
     const [tooltip, setTooltip] = useState(null);
     useEffect(() => {
@@ -40,9 +40,9 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                 className={`font-Tabac-Slab text-xl text-white ${activeCall ? 'bg-green-300' : 'bg-slate-700'}`}
             >
                 <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-                    {activeCall ?
-
+                    {activeCall && nextRecipient.contact ?
                         `Connected ${formatTime(time - (new Date(recentCall?.date_created)).getTime())}` :
+                        activeCall ? 'Searching for a call...' :
                         recentCall?.sid ? `Complete`
                             :
                             'Pending'}
@@ -72,11 +72,11 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                     <button onClick={() => hangUp()} disabled={!activeCall} style={{ padding: "8px 16px", background: activeCall ? "#d60000" : '#cc8888', borderRadius: "5px", color: 'white', width: "100px" }}>
                         End Call
                     </button>
-                    {nextRecipient?.contact && !nextRecipient?.contact?.phone &&
+                    {nextRecipient?.contact && !nextRecipient?.contact?.phone && predictive &&
                         (<button onClick={() => handleDequeueNext()} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: "5px", width: "100px", color: "#333" }}>
                             Next
                         </button>)
-                        }
+                    }
                     {!recentAttempt?.call?.length ? <button onClick={() => handleDialNext()} disabled={activeCall} style={{ padding: "8px 16px", background: "#4CA83D", borderRadius: "5px", width: "100px", color: "white" }}>
                         Dial
                     </button> :

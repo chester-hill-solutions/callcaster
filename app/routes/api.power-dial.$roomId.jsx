@@ -30,7 +30,7 @@ export const action = async ({ request, params }) => {
         beep: false,
         statusCallback: `${process.env.BASE_URL}/api/power-dial/status`,
         statusCallbackEvent: ['start', 'end', 'join', 'leave', 'modify'],
-        endConferenceOnExit: false,
+        endConferenceOnExit: true,
         maxParticipants: 10,
         waitUrl: '',
     }, conferenceName);

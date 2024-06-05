@@ -25,9 +25,12 @@ export const action = async ({ request }) => {
         })
     }
     if (parsedBody.StatusCallbackEvent === 'participant-join') {
+
         const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id').eq('sid', parsedBody.CallSid).single();
-        const {data: outreachStatus, error: outreachError} = await supabase.from('outreach_attempt').select('contact_id').eq('id', dbCall.outreach_attempt_id).single();
-        const {data: queueStatus, error: queueError} = await supabase.from('campaign_queue').update({status: parsedBody.FriendlyName}).eq('contact_id', outreachStatus.contact_id).select();
+        if (dbCall) {
+            const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').select('contact_id').eq('id', dbCall.outreach_attempt_id).single();
+            const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: parsedBody.FriendlyName }).eq('contact_id', outreachStatus.contact_id).select();
+        }
         /* await fetch(`${process.env.BASE_URL}/api/power-dial/dialer`, {
             method: 'POST',
             headers: { "Content-Type": 'application/json' },

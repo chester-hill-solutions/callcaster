@@ -89,7 +89,7 @@ export default function Campaign() {
             callsList: [...initalCallsList],
             attempts: [...initialAttempts],
             recentCall: { ...initialRecentCall },
-            recentAttempt: { ...initialRecentAttempt }
+            recentAttempt: {}
 
         },
         contacts,
@@ -162,7 +162,7 @@ export default function Campaign() {
             return;
         }
         if (nextRecipient) {
-            handlePlaceCall(nextRecipient);
+            handlePowerDial();
         }
     };
 
@@ -234,7 +234,7 @@ export default function Campaign() {
 
     const handleDequeueNext = () => {
         handleDequeue(nextRecipient);
-        handleNextNumber(true);
+        handlePowerDial();
     }
 
     /* Debounced save handler */ useEffect(() => {
@@ -286,7 +286,7 @@ export default function Campaign() {
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
             <TopBar {...{ state: fetcher.state, handleNextNumber, handleDialNext, handlePowerDial }} />
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
+                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt, predictive:true }} />
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
                 {/* <QueueList
                     {...{
