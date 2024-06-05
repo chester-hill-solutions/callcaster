@@ -8,7 +8,7 @@ export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-
+  if (selected === 'campaigns') return redirect(`call`)
   if (selected_id === "new") {
     let query = supabaseClient;
     switch (selected) {
@@ -66,7 +66,7 @@ export const loader = async ({ request, params }) => {
       console.error("No valid table detected");
       return redirect(`/workspaces/${workspace_id}`);
   }
-  if (selected === 'campaigns') return redirect(`call`)
+  
   const { data, error } = await mtmQuery;
   if (error) {
     console.error(error);
