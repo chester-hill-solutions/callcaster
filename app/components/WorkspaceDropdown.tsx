@@ -1,46 +1,35 @@
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { WorkspaceTableNames } from "~/lib/types";
-import {CheveronDownIcon} from '../components/Icons';
-export function WorkspaceDropdown({ selectTable }) {
-  const [buttonText, setButtonText] = useState<string>(
-    WorkspaceTableNames.Campaign + "s",
-  );
-  const handleDropdownSelection = (tableName: WorkspaceTableNames) => {
-    setButtonText(tableName.valueOf() + "s");
-    selectTable(tableName);
-  };
+import type { ColumnDef } from "@tanstack/react-table";
+import type { Audience, Campaign, Contact } from "~/lib/types";
+
+export function WorkspaceDropdown({
+  selectTable,
+  selectedTable,
+  tables,
+}: {
+  selectTable: (tableName: string) => void;
+  selectedTable: string;
+  tables: Array<{name: string,columns:ColumnDef<Campaign>[], data:Array<Campaign | Contact | Audience>}>;
+}) {
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild className="w-full text-2xl">
-        <Button variant="default" className="p-4 flex justify-between">
-          {buttonText} <span style={{position:'relative'}}><CheveronDownIcon fill="#fff" width="25px"/></span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem
-          onClick={() => handleDropdownSelection(WorkspaceTableNames.Campaign)}
-        >
-          Campaigns
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => handleDropdownSelection(WorkspaceTableNames.Audience)}
-        >
-          Audiences
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => handleDropdownSelection(WorkspaceTableNames.Contact)}
-        >
-          Contacts
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <select
+      title="Workspace Table Selector"
+      className="w-full bg-brand-primary text-white font-Zilla-Slab px-0.5 py-1 text-xl"
+      value={selectedTable}
+      name="Workspace-Table"
+      onChange={(e) => {selectTable(e.currentTarget.value)}}
+    >
+      {tables.map((table) => {
+        return (
+          <option
+            key={`select-${table.name}`}
+            value={table.name}
+            className="capitalize"
+          >
+            {table.name[0].toUpperCase() + table.name.substring(1)}
+          </option>
+        );
+      })}
+    </select>
   );
 }

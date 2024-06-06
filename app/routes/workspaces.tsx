@@ -71,13 +71,13 @@ export default function Workspaces() {
       <h1 className="text-center font-Tabac-Slab text-4xl ">
         Your Workspaces
       </h1>
-      <div className="flex flex-row flex-wrap gap-4">
+      <div className="flex flex-row flex-wrap justify-start">
         {workspaces != null &&
           workspaces.map((workspace) => (
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60"
+              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60 m-4"
             >
               <h5 className="font-Zilla-Slab text-2xl text-white">
                 {workspace.name}
@@ -87,7 +87,7 @@ export default function Workspaces() {
           ))}
         <Button
           variant="outline"
-          className="h-full min-h-fit border border-white px-4 py-8 min-w-60"
+          className="h-full min-h-fit border border-slate-800 px-4 py-8 min-w-60 m-4"
           onClick={() => dialogRef.current?.showModal()}
         >
           <div className="hidden dark:block">
