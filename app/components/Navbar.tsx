@@ -21,7 +21,6 @@ export default function Navbar({
   workspaces: WorkspaceData;
   isSignedIn: boolean;
 }) {
-  console.log(workspaces);
   return (
     <header className={`w-full ${className}`}>
       <nav className="flex w-full justify-between px-8 py-4" id="global-nav">
