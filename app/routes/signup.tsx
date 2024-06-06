@@ -1,16 +1,10 @@
-import {
-  Form,
-  json,
-  useActionData,
-  redirect,
-  useNavigate,
-} from "@remix-run/react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { ReactNode, useState } from "react";
+import { Form, json, useActionData, useNavigate } from "@remix-run/react";
+import { ReactNode, useEffect, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { Button } from "~/components/ui/button";
 import { toast, Toaster } from "sonner";
+import { Button } from "~/components/ui/button";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, headers } =
@@ -18,8 +12,14 @@ export const action = async ({ request }: { request: Request }) => {
 
   const formData = await request.formData();
 
-  const { email, password, confirmEmail, confirmPassword } =
-    Object.fromEntries(formData);
+  const {
+    email,
+    password,
+    confirmEmail,
+    confirmPassword,
+    firstName,
+    lastName,
+  } = Object.fromEntries(formData);
 
   // const passwordPattern = new RegExp(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/);
 
@@ -45,9 +45,21 @@ export const action = async ({ request }: { request: Request }) => {
     );
   }
 
+  let userName = email as string;
+  userName = userName.split("@")[0];
+  const alphaNumericRegex = new RegExp(/([^a-zA-Z\d])/g);
+  userName = userName.replace(alphaNumericRegex, "");
+
   const { data, error } = await supabase.auth.signUp({
     email: email as string,
     password: password as string,
+    options: {
+      data: {
+        username: userName,
+        first_name: firstName as string,
+        last_name: lastName as string,
+      },
+    },
   });
 
   if (error) {
@@ -62,7 +74,6 @@ export const action = async ({ request }: { request: Request }) => {
   }
 
   // if (data.user) {
-  //   // console.log(data);
   //   return redirect("/signin", { headers });
   // }
 
@@ -138,18 +149,20 @@ export default function SignUp() {
   const emailError = actionData?.emailError;
   const passwordError = actionData?.passwordError;
 
-  if (actionData?.data != null && actionData.data.user != null) {
-    toast.success(
-      "You have successfully signed-up! Redirecting to your dashboard...",
-    );
-    setTimeout(() => navigate("/signin"), 3000);
-  }
+  useEffect(() => {
+    if (actionData?.data != null && actionData.data.user != null) {
+      toast.success(
+        "You have successfully signed-up! Redirecting to your dashboard...",
+      );
+      setTimeout(() => navigate("/workspaces"), 2000);
+    }
+  }, [actionData]);
 
   return (
     <main className="flex h-full w-full flex-col items-center justify-center py-16 text-white">
       <div
         id="login-hero"
-        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-16 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-24 py-16 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
         <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
           Create a New Account
@@ -166,6 +179,36 @@ export default function SignUp() {
           className="flex w-full flex-col gap-4"
           id="signup-form"
         >
+          <div className="flex w-full gap-4">
+            <label htmlFor="firstName" className={fieldLabelStyles}>
+              {emailError && (
+                <p className="font-Zilla-Slab font-bold text-brand-primary">
+                  {emailError}
+                </p>
+              )}
+              First Name
+              <input
+                type="text"
+                name="firstName"
+                id="firstName"
+                className={fieldInputStyles}
+              />
+            </label>
+            <label htmlFor="lastName" className={fieldLabelStyles}>
+              {emailError && (
+                <p className="font-Zilla-Slab font-bold text-brand-primary">
+                  {emailError}
+                </p>
+              )}
+              Last Name
+              <input
+                type="text"
+                name="lastName"
+                id="lastName"
+                className={fieldInputStyles}
+              />
+            </label>
+          </div>
           <label htmlFor="email" className={fieldLabelStyles}>
             {emailError && (
               <p className="font-Zilla-Slab font-bold text-brand-primary">
@@ -191,7 +234,6 @@ export default function SignUp() {
               required
             />
           </label>
-          <div className="my-2"></div>
           <label htmlFor="password" className={fieldLabelStyles}>
             {passwordError && (
               <p className="font-Zilla-Slab font-bold text-brand-primary">

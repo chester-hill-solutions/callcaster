@@ -1,46 +1,58 @@
 import {
   json,
+  Link,
+  Outlet,
   redirect,
   useLoaderData,
   useNavigate,
-  Outlet,
-  Link,
-  useOutletContext,
 } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
-import { audienceColumns, campaignColumns, contactColumns } from "~/components/WorkspaceTable/columns";
 import {
-  getWorkspaceAudiences,
-  getWorkspaceCampaigns,
-  getWorkspaceContacts,
-  getWorkspaceInfo,
-} from "~/lib/database.server";
+  audienceColumns,
+  campaignColumns,
+  contactColumns,
+} from "~/components/WorkspaceTable/columns";
+import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
-  const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
   const selected = params.selected || "campaigns";
-  const { data: workspace, error } = await getWorkspaceInfo({ supabaseClient, workspaceId });
+  const { data: workspace, error } = await getWorkspaceInfo({
+    supabaseClient,
+    workspaceId,
+  });
   if (error) {
     console.log(error);
     if (error.code === "PGRST116") {
       return redirect("/workspaces", { headers });
     }
   }
-  const { data: audiences } = await getWorkspaceAudiences({ supabaseClient, workspaceId });
-  const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient, workspaceId });
-  const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
+  // const { data: audiences } = await getWorkspaceAudiences({
+  //   supabaseClient,
+  //   workspaceId,
+  // });
+  const { data: campaigns } = await getWorkspaceCampaigns({
+    supabaseClient,
+    workspaceId,
+  });
+  // const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
 
-  return json({ workspace, audiences, campaigns, contacts, selected }, { headers });
+  return json(
+    { workspace, audiences, campaigns, contacts, selected },
+    { headers },
+  );
 };
 
 export default function Workspace() {
   const navigate = useNavigate();
-  const { workspace, audiences, campaigns, contacts, selected } = useLoaderData();
+  const { workspace, audiences, campaigns, contacts, selected } =
+    useLoaderData();
   const tables = [
     {
       name: "campaigns",
@@ -59,9 +71,8 @@ export default function Workspace() {
     },
   ];
 
-
   const [selectedTable, setSelectedTable] = useState(() =>
-    tables.find((table) => table.name === selected)
+    tables.find((table) => table.name === selected),
   );
 
   useEffect(() => {
@@ -93,7 +104,9 @@ export default function Workspace() {
         };
         break;
       default:
-        console.log(`tableName: ${tableName} does not correspond to any workspace tables`);
+        console.log(
+          `tableName: ${tableName} does not correspond to any workspace tables`,
+        );
         return;
     }
     setSelectedTable(newTable);
@@ -115,7 +128,7 @@ export default function Workspace() {
         </div>
       </div>
       <div className="flex">
-        <div className="flex w-60 min-w-60 flex-col border-2 border-solid border-slate-800 bg-cyan-50 h-[800px] overflow-scroll">
+        <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
           {selectedTable.data?.map((row) => (
             <Link
               to={`${selectedTable.name}/${row.id}`}
@@ -126,14 +139,17 @@ export default function Workspace() {
                 {selectedTable.name === "campaigns"
                   ? row.title
                   : selectedTable.name === "audiences"
-                  ? row.name || `${selectedTable.name} ${row.id}`
-                  : selectedTable.name === "contacts"
-                  ? `${row.firstname} ${row.surname}`
-                  : ""}
+                    ? row.name || `${selectedTable.name} ${row.id}`
+                    : selectedTable.name === "contacts"
+                      ? `${row.firstname} ${row.surname}`
+                      : ""}
               </h3>
             </Link>
           ))}
-          <Link to={`${selectedTable.name}/new`} className="flex justify-center p-4">
+          <Link
+            to={`${selectedTable.name}/new`}
+            className="flex justify-center p-4"
+          >
             <PlusIcon fill="#333" width="25px" />
           </Link>
         </div>
