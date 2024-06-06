@@ -91,7 +91,6 @@ export default function Workspace() {
   const getTableByName = useCallback(
     (name: string) => {
       const foundTable = tables.find((table) => table.name === name);
-      console.log(name, tables, foundTable);
       return foundTable;
     },
     [tables],
@@ -121,6 +120,9 @@ export default function Workspace() {
       <div className="flex items-center">
         <div className="w-60">
           <WorkspaceDropdown selectTable={handleSelectTable} selectedTable={selected} tables={tables}/>
+        </div>
+        <div className="justify-center flex flex-1">
+          <h3 className="text-2xl font-Tabac-Slab">{workspace.name}</h3>
         </div>
 {/*         <div
           className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"

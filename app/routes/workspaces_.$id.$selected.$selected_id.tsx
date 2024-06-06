@@ -3,12 +3,13 @@ import { useLoaderData, useOutletContext } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { AudienceTable } from "../components/AudienceTable";
+import {CampaignSettings} from "../components/CampaignSettings";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  if (selected === 'campaigns') return redirect(`call`)
+  //if (selected === 'campaigns') return redirect(`call`)
   if (selected_id === "new") {
     let query = supabaseClient;
     switch (selected) {
@@ -53,7 +54,11 @@ export const loader = async ({ request, params }) => {
     case "campaigns":
       mtmQuery = supabaseClient
         .from("campaign_audience")
-        .select()
+        .select(
+          `*,
+        campaign(*)
+        `,
+        )
         .eq("campaign_id", selected_id);
       break;
     case "contact":
@@ -66,19 +71,26 @@ export const loader = async ({ request, params }) => {
       console.error("No valid table detected");
       return redirect(`/workspaces/${workspace_id}`);
   }
-  
-  const { data, error } = await mtmQuery;
+  let data = []
+  const { data: mtmData, error } = await mtmQuery;
   if (error) {
     console.error(error);
   }
-
+  data = [...mtmData];
+  if (selected === 'campaigns' && data[0].campaign.type === 'live_call'){
+    const {data: campaignDetails, error: detailsError} = await supabaseClient.from('live_campaign').select().eq('campaign_id', selected_id).single()
+    if (detailsError) console.error(detailsError);
+    data = data.map((item) => ({
+      ...item,
+      campaignDetails
+    }));
+  }
   return json({ workspace_id, selected_id, data });
 };
 
 export default function Audience() {
   const { selectedTable, audiences, contacts = [] } = useOutletContext();
   const { workspace_id, selected_id, data = [] } = useLoaderData();
-
   const ids = useMemo(() => data.map((row) => row.contact_id), [data]);
   const audienceContacts = useMemo(
     () => contacts.filter((contact) => ids.includes(contact.id)),
@@ -88,7 +100,6 @@ export default function Audience() {
     () => audiences.find((audience) => audience.id === parseInt(selected_id)),
     [audiences, selected_id],
   );
-
   return (
     <div className="flex flex-col">
       {selectedTable.name === "audiences" && (
@@ -102,6 +113,9 @@ export default function Audience() {
           }}
         />
       )}
+      {selectedTable.name === "campaigns" && 
+        <CampaignSettings data={data} audiences={audiences}/>
+      }
     </div>
   );
 }

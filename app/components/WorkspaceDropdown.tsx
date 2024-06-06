@@ -1,16 +1,19 @@
-import { useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
+import type { Audience, Campaign, Contact } from "~/lib/types";
+
 export function WorkspaceDropdown({
   selectTable,
   selectedTable,
   tables,
 }: {
-  selectTable: (tableName: string) => object;
+  selectTable: (tableName: string) => void;
   selectedTable: string;
-  tables: Array<T>;
+  tables: Array<{name: string,columns:ColumnDef<Campaign>[], data:Array<Campaign | Contact | Audience>}>;
 }) {
 
   return (
     <select
+      title="Workspace Table Selector"
       className="w-full bg-brand-primary text-white font-Zilla-Slab px-0.5 py-1 text-xl"
       value={selectedTable}
       name="Workspace-Table"
