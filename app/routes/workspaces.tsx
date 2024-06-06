@@ -87,7 +87,7 @@ export default function Workspaces() {
           ))}
         <Button
           variant="outline"
-          className="h-full min-h-fit border border-white px-4 py-8 min-w-60"
+          className="h-full min-h-fit border border-slate-800 px-4 py-8 min-w-60 m-4"
           onClick={() => dialogRef.current?.showModal()}
         >
           <div className="hidden dark:block">
