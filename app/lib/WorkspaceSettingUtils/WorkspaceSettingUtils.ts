@@ -52,7 +52,7 @@ export async function handleAddUser(
     );
   }
 
-  return json({ data: newUser, error: errorAddingUser }, { headers });
+  return json({ data: newUser, error: errorAddingUser?.message }, { headers });
 }
 
 export async function handleUpdateUser(
@@ -85,7 +85,10 @@ export async function handleUpdateUser(
     .select()
     .single();
 
-  return json({ data: updatedUser, error: errorUpdatingUser }, { headers });
+  return json(
+    { data: updatedUser, error: errorUpdatingUser?.message },
+    { headers },
+  );
 }
 
 export async function handleDeleteUser(
@@ -116,7 +119,10 @@ export async function handleDeleteUser(
     .select()
     .single();
 
-  return { data: deletedUser, error: errorDeletingUser };
+  return json(
+    { data: deletedUser, error: errorDeletingUser?.message },
+    { headers },
+  );
 }
 
 export async function handleInviteCaller(
@@ -169,7 +175,7 @@ export async function handleInviteCaller(
   // }
 
   return json(
-    { data: callerSignUpData, error: callerSignUpError },
+    { data: callerSignUpData, error: callerSignUpError?.message },
     { headers },
   );
 }
