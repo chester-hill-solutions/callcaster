@@ -6,19 +6,22 @@ import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
 import { TopBar } from "../components/CallScreen.TopBar";
 import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import { startConferenceAndDial } from "../lib/startConferenceAndDial";
+import { useStartConferenceAndDial } from "../hooks/useStartConferenceAndDial";
+import { getNextContact } from "../lib/getNextContact";
+import useDebouncedSave from "../hooks/useDebouncedSave";
 
 const limit = 30
 
 export const loader = async ({ request, params }) => {
     const { campaign_id: id, id: workspaceId } = params;
-    const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-    const { data: campaign, error: campaignError } = await supabase.from('campaign').select().eq('id', id).single();
-    const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', id).single();
-    const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
-    const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
-    const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
-    const { data: queue, error: queueError } = await supabase.from('campaign_queue').select().eq('status', serverSession.user.id);
+    const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
+    if (!serverSession) return redirect('/signin');
+    const { data: campaign, error: campaignError } = await supabaseClient.from('campaign').select().eq('id', id).single();
+    const { data: campaignDetails, error: detailsError } = await supabaseClient.from('live_campaign').select().eq('campaign_id', id).single();
+    const { data: audiences, error: audiencesError } = await supabaseClient.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
+    const { data: contacts, error: contactsError } = await supabaseClient.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
+    const { data: attempts, error: attemptError } = await supabaseClient.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
+    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', serverSession.user.id).eq('campaign_id', id);
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
         console.log(errors);
@@ -68,16 +71,12 @@ export default function Campaign() {
         campaign,
         attempts: initialAttempts,
         user,
-        audiences,
         workspaceId,
         campaignDetails,
         contacts,
-        queue:
-        initialQueue,
-        nextRecipient: initialNextRecipient,
+        queue: initialQueue,
         initalCallsList,
         initialRecentCall = {},
-        initialRecentAttempt
     } = useLoaderData();
     const [nextRecipient, setNextRecipient] = useState({});
     const { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
@@ -110,52 +109,8 @@ export default function Campaign() {
             }
             return acc;
         }, {}), [queue]);
-
+    const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id);
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
-
-    const handleNextNumber = useCallback((skipHousehold = false) => {
-        const getNextContact = () => {
-            let currIndex;
-
-            if (groupByHousehold && skipHousehold) {
-                currIndex = Object.keys(householdMap).findIndex((curr) => curr === nextRecipient.contact.address);
-                for (let i = currIndex + 1; i < Object.keys(householdMap).length; i++) {
-                    let household = householdMap[Object.keys(householdMap)[i]];
-                    for (let j = 0; j < household.length; j++) {
-                        if (household[j].contact.phone) return household[j];
-                    }
-                }
-                for (let i = 0; i <= currIndex; i++) {
-                    let household = householdMap[Object.keys(householdMap)[i]];
-                    for (let j = 0; j < household.length; j++) {
-                        if (household[j].contact.phone) return household[j];
-                    }
-                }
-            } else {
-                currIndex = queue.findIndex((curr) => curr.id === nextRecipient.id);
-                for (let i = currIndex + 1; i < queue.length; i++) {
-                    if (queue[i].contact.phone) return queue[i];
-                }
-                for (let i = 0; i <= currIndex; i++) {
-                    if (queue[i].contact.phone) return queue[i];
-                }
-            }
-
-            return null;
-        };
-
-        const nextContact = getNextContact();
-        if (nextContact) {
-            setNextRecipient(nextContact);
-            const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
-            const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
-            setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-            setUpdate(newRecentAttempt.update || {});
-            return nextContact;
-        }
-
-        return null;
-    }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
 
     const handleDialNext = () => {
         if (activeCall || incomingCall || status !== 'Registered') {
@@ -170,133 +125,30 @@ export default function Campaign() {
         if (activeCall || incomingCall || status !== 'Registered') {
             return;
         }
-        startConferenceAndDial(user.id, campaign.id, workspaceId)
+        begin();
     }
 
-    const handleCall = (contact) => { /* FOR INDIVIDUAL DIALING */
-        if (activeCall || incomingCall || status !== 'Registered') {
-            return;
-        } else {
-            handlePlaceCall(contact);
-        }
-    };
 
-    const handleDequeue = (contact) => {
-        submit({
-            contact_id: contact.contact.id,
-            household: groupByHousehold
-        }, {
-            action: "/api/queues",
-            method: "POST",
-            encType: "application/json",
-            navigate: false,
-            fetcherKey: 'dequeue'
-        })
+    const handleEndConference = () => {
+        console.log("Ending")
+        submit({},{method:"post", action:'/api/auto-dial/end', navigate:false})
     }
-
-    const handlePlaceCall = (contact) => {
-        if (contact.contact.phone) {
-            submit({
-                to: contact.contact.phone,
-                campaign_id: campaign.id,
-                user_id: user.id,
-                contact_id: contact.contact.id,
-                workspaceId,
-                outreachId: recentAttempt?.id,
-                queue_id: nextRecipient.id
-            }, {
-                action: "/api/dial",
-                method: "POST",
-                encType: "application/json",
-                navigate: false,
-                fetcherKey: 'place-call'
-            });
-        }
-    };
-
-
-    /*     const handlePowerDial = () => {
-            submit({
-                campaign_id: campaign.id,
-                user_id: user.id,
-                workspaceId,
-                outreachId: recentAttempt?.id,
-                queue_id: nextRecipient.id
-            }, {
-                action: "/api/power-dial",
-                method: "POST",
-                encType: "application/json",
-                navigate: false,
-                fetcherKey: 'power-call'
-            });
-        }
-     */
-
-    const handleDequeueNext = () => {
-        handleDequeue(nextRecipient);
-        handlePowerDial();
-    }
-
-    /* Debounced save handler */ useEffect(() => {
-        const handleQuestionsSave = () =>
-            submit({
-                update,
-                callId: recentAttempt?.id,
-                selected_workspace_id: workspaceId,
-                contact_id: nextRecipient.contact.id,
-                campaign_id: campaign.id
-            }, {
-                method: "PATCH",
-                navigate: false,
-                action: `/api/questions`,
-                encType: 'application/json'
-            });
-        const handler = setTimeout(() => {
-            if (JSON.stringify(update) !== JSON.stringify({ ...recentAttempt?.result })) {
-                console.log(`Saving updated object: `, { new: { ...update } }, { old: { ...recentAttempt.result } });
-                handleQuestionsSave();
-            }
-        }, 3000);
-        return () => {
-            clearTimeout(handler);
-        };
-    }, [callsList, nextRecipient, update, submit, recentCall, workspaceId, recentAttempt, campaign.id]);
-
-    useEffect(() => {
-        const callDispositionSave = () => submit({
-            update: { disposition }
-        }, {
-            method: "PATCH",
-            navigate: false,
-            action: `/api/outreach-attempt/${recentCall.id}`,
-            encType: 'application/json'
-        })
-        const handler = setTimeout(() => {
-            if (disposition) {
-                callDispositionSave();
-            }
-        }, 3000);
-        return () => {
-            clearTimeout(handler);
-        };
-
-    }, [disposition, recentCall, submit, update])
-
+    useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
-            <TopBar {...{ state: fetcher.state, handleNextNumber, handleDialNext, handlePowerDial }} />
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt, predictive:true }} />
+                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp: handleEndConference, handleDialNext, handleDequeueNext:() => null, disposition, setDisposition, recentAttempt, predictive: true }} />
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
-                {/* <QueueList
+                <QueueList
                     {...{
                         householdMap,
                         groupByHousehold,
                         queue,
-                        handleNextNumber,
-                        nextRecipient
+                        handleNextNumber:() => null,
+                        nextRecipient,
+                        predictive:true
                     }}
-                /> */}
+                />
             </div>
         </div>
     );

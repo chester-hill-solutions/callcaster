@@ -74,7 +74,7 @@ export function useTwilioDevice(token) {
             device.register();
 
             return () => {
-                device.unregister();
+                device.state === 'registered' && device.unregister();
                 deviceRef.current = null;
             };
         }
