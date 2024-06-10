@@ -88,7 +88,7 @@ export default function Workspaces() {
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
         Your Workspaces
       </h1>
-      <div className="flex flex-row flex-wrap gap-4">
+      <div className="flex flex-row flex-wrap justify-start">
         {workspaces != null &&
           workspaces.map((workspace) => (
             <Link
@@ -102,7 +102,6 @@ export default function Workspaces() {
               <p className="text-white">Workspace Description</p>
             </Link>
           ))}
-
         <Dialog>
           <DialogTrigger>
             <Button
