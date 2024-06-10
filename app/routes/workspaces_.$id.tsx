@@ -3,6 +3,8 @@ import {
   redirect,
   useLoaderData,
   useNavigate,
+  Link,
+  Outlet
 } from "@remix-run/react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
