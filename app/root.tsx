@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import type {
+  LinksFunction,
+  LoaderFunctionArgs,
+  TypedResponse,
+} from "@remix-run/node";
 import {
   Links,
   LiveReload,
@@ -98,14 +102,16 @@ export default function App() {
   const serverAccessToken = session?.access_token;
   const navigate = useNavigate();
 
-  async function signOut() {
-    const { error } = await supabase.auth.signOut();
+  async function signOut(): Promise<
+    TypedResponse<{ success: string | null; error: string | null }>
+  > {
+    const { error: signOutError } = await supabase.auth.signOut();
     revalidate();
-    if (error) {
-      return json({ error: error });
+    if (signOutError) {
+      return json({ success: null, error: signOutError.message });
     }
-
-    return redirect("/");
+    navigate("/");
+    return json({ success: "Sign off successful", error: null });
   }
 
   useEffect(() => {
