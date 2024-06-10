@@ -37,23 +37,31 @@ export const loader = async ({ request, params }) => {
      supabaseClient,
      workspaceId,
    }); */
-  const { data: audiences } = await supabaseClient
-    .from("audience")
-    .select()
-    .eq("workspace", selected);
-  const { data: campaigns } = await getWorkspaceCampaigns({
-    supabaseClient,
-    workspaceId,
-  });
-  const { data: contacts } = await supabaseClient
-    .from("contacts")
-    .select()
-    .eq("workspace", selected);
-
-  return json(
-    { workspace, audiences, campaigns, contacts, selected },
-    { headers },
-  );
+  try {
+    const { data: audiences, error: audiencesError } = await supabaseClient
+      .from("audience")
+      .select()
+      .eq("workspace", workspaceId);
+    if (audiencesError) throw {audiencesError};
+    const { data: campaigns, error: campaignsError } =
+      await getWorkspaceCampaigns({
+        supabaseClient,
+        workspaceId,
+      });
+    if (campaignsError) throw {campaignsError};
+    const { data: contacts, error: contactsError } = await supabaseClient
+      .from("contact")
+      .select()
+      .eq("workspace", workspaceId);
+    if (contactsError) throw {contactsError};
+    return json(
+      { workspace, audiences, campaigns, contacts, selected },
+      { headers },
+    );
+  } catch (error) {
+    console.log(error);
+    return json(error, 500);
+  }
 };
 
 export default function Workspace() {
@@ -124,7 +132,7 @@ export default function Workspace() {
           />
         </div>
         <div className="flex flex-1 justify-center">
-          <h3 className="font-Tabac-Slab text-2xl">{workspace.name}</h3>
+          <h3 className="font-Tabac-Slab text-2xl">{workspace?.name}</h3>
         </div>
         {/*         <div
           className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"
@@ -136,7 +144,7 @@ export default function Workspace() {
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
-          {selectedTable.data?.map((row) => (
+          {selectedTable?.data?.map((row) => (
             <Link
               to={`${selectedTable.name}/${row.id}`}
               key={row.id}
@@ -154,7 +162,7 @@ export default function Workspace() {
             </Link>
           ))}
           <Link
-            to={`${selectedTable.name}/new`}
+            to={`${selectedTable?.name}/new`}
             className="flex justify-center p-4"
           >
             <PlusIcon fill="#333" width="25px" />

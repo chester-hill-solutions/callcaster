@@ -91,18 +91,18 @@ export const loader = async ({ request, params }) => {
 export default function Audience() {
   const { selectedTable, audiences, contacts = [] } = useOutletContext();
   const { workspace_id, selected_id, data = [] } = useLoaderData();
-  const ids = useMemo(() => data.map((row) => row.contact_id), [data]);
+  const ids = useMemo(() => data.map((row) => row[`${selectedTable?.name.substring(0, selectedTable.name.length - 1)}_id`]), [data, selectedTable]);
   const audienceContacts = useMemo(
-    () => contacts.filter((contact) => ids.includes(contact.id)),
+    () => contacts?.filter((contact) => ids.includes(contact.id)),
     [contacts, ids],
   );
   const audience = useMemo(
-    () => audiences.find((audience) => audience.id === parseInt(selected_id)),
+    () => audiences?.find((audience) => audience.id === parseInt(selected_id)),
     [audiences, selected_id],
   );
   return (
     <div className="flex flex-col">
-      {selectedTable.name === "audiences" && (
+      {selectedTable?.name.toLowerCase() === "audiences" && (
         <AudienceTable
           {...{
             data,
@@ -113,7 +113,7 @@ export default function Audience() {
           }}
         />
       )}
-      {selectedTable.name === "campaigns" && 
+      {selectedTable?.name.toLowerCase() === "campaigns" && 
         <CampaignSettings data={data} audiences={audiences}/>
       }
     </div>
