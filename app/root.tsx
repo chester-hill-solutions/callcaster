@@ -4,6 +4,7 @@ import {
   Links,
   LiveReload,
   Meta,
+  NavigateFunction,
   Outlet,
   Scripts,
   ScrollRestoration,
@@ -25,6 +26,8 @@ import type { ENV } from "~/lib/types";
 import stylesheet from "~/tailwind.css";
 import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
+
+import { Toaster } from "sonner";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -60,6 +63,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     token = newToken;
   }
 
+  const { data: userData, error: userError } = await supabase
+    .from("user")
+    .select()
+    .eq("id", session?.user.id ?? "")
+    .single();
+
   const { data: workspaces, error: workspaceQueryError } =
     await getUserWorkspaces({ supabaseClient: supabase });
 
@@ -69,6 +78,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       session,
       token,
       workspaces,
+      user: userData,
     },
     {
       headers: response.headers,
@@ -77,7 +87,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { env, session, token, workspaces } = useLoaderData<typeof loader>();
+  const { env, session, token, workspaces, user } =
+    useLoaderData<typeof loader>();
   const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
@@ -90,7 +101,11 @@ export default function App() {
   async function signOut() {
     const { error } = await supabase.auth.signOut();
     revalidate();
-    return await navigate("/");
+    if (error) {
+      return json({ error: error });
+    }
+
+    return redirect("/");
   }
 
   useEffect(() => {
@@ -126,6 +141,7 @@ export default function App() {
             handleSignOut={signOut}
             workspaces={workspaces}
             isSignedIn={serverAccessToken != null}
+            user={user}
           />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>

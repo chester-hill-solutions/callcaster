@@ -30,7 +30,8 @@ export async function getUserWorkspaces({
   return { data, error };
 }
 
-export async function createNewWorkspace({
+// THIS FUNCTION IS NOW DEPRECATED
+export async function createNewWorkspaceDeprecated({
   supabaseClient,
   userId,
   name,
@@ -41,11 +42,34 @@ export async function createNewWorkspace({
 }) {
   const { data, error } = await supabaseClient
     .from("workspace")
-    .insert({ owner: userId, name, users: [userId] })
+    .insert({ owner: userId, name })
     .select("id")
     .single();
 
   return { data, error };
+}
+
+export async function createNewWorkspace({
+  supabaseClient,
+  workspaceName,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceName: string;
+}) {
+  const { data: insertWorkspaceData, error: insertWorkspaceError } =
+    await supabaseClient.rpc("create_new_workspace", {
+      new_workspace_name: workspaceName,
+    });
+  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
+
+  if (insertWorkspaceError) {
+    return { data: null, error: insertWorkspaceError };
+  }
+
+  // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
+  //   await supabaseClient.from("workspace_users").insert({ workspace });
+
+  return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
 export async function getWorkspaceInfo({
@@ -83,7 +107,7 @@ export async function getWorkspaceCampaigns({
   );
 
   if (error) {
-    console.log("Error on function getWorkspaceAudiences");
+    console.log("Error on function getWorkspaceCampaigns");
   }
 
   return { data, error };
