@@ -1,16 +1,28 @@
 import { TypedResponse } from "@remix-run/node";
 import { Link, NavLink, useNavigate } from "@remix-run/react";
-import { AuthError } from "@supabase/supabase-js";
+import { AuthError, User } from "@supabase/supabase-js";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
 import { WorkspaceData } from "~/lib/types";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+
+import { FaUserAlt } from "react-icons/fa";
 
 export default function Navbar({
   className,
   handleSignOut,
   workspaces,
   isSignedIn,
+  user,
 }: {
   className?: string;
   handleSignOut: () => Promise<
@@ -20,6 +32,15 @@ export default function Navbar({
   >;
   workspaces: WorkspaceData;
   isSignedIn: boolean;
+  user: JsonifyObject<{
+    access_level: string | null;
+    created_at: string;
+    first_name: string | null;
+    id: string;
+    last_name: string | null;
+    organization: number | null;
+    username: string;
+  }> | null;
 }) {
   // console.log(workspaces);
   const navigate = useNavigate();
@@ -80,6 +101,19 @@ export default function Navbar({
               <p className="block sm:hidden">Login</p>
               <p className="hidden sm:block">Sign In</p>
             </Link>
+          )}
+          {user != null && (
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button>
+                  <FaUserAlt />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>My Username:</DropdownMenuLabel>
+                <DropdownMenuLabel>{user.username}</DropdownMenuLabel>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <ModeToggle />
         </div>

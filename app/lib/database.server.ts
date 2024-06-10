@@ -30,7 +30,8 @@ export async function getUserWorkspaces({
   return { data, error };
 }
 
-export async function createNewWorkspace({
+// THIS FUNCTION IS NOW DEPRECATED
+export async function createNewWorkspaceDeprecated({
   supabaseClient,
   userId,
   name,
@@ -41,11 +42,34 @@ export async function createNewWorkspace({
 }) {
   const { data, error } = await supabaseClient
     .from("workspace")
-    .insert({ owner: userId, name, users: [userId] })
+    .insert({ owner: userId, name })
     .select("id")
     .single();
 
   return { data, error };
+}
+
+export async function createNewWorkspace({
+  supabaseClient,
+  workspaceName,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceName: string;
+}) {
+  const { data: insertWorkspaceData, error: insertWorkspaceError } =
+    await supabaseClient.rpc("create_new_workspace", {
+      new_workspace_name: workspaceName,
+    });
+  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
+
+  if (insertWorkspaceError) {
+    return { data: null, error: insertWorkspaceError };
+  }
+
+  // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
+  //   await supabaseClient.from("workspace_users").insert({ workspace });
+
+  return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
 export async function getWorkspaceInfo({
@@ -70,78 +94,70 @@ export async function getWorkspaceInfo({
   return { data, error };
 }
 
-// type getTableDataByIdProps = {
-//   supabaseClient: SupabaseClient<Database>;
-//   tableName: string;
-//   rowId?: string;
-//   columnNames?: string[];
-// };
-
-// Too Generic
-// export async function getTableDataById({
-//   supabaseClient,
-//   tableName,
-//   rowId = "",
-//   columnNames,
-// }: getTableDataByIdProps) {
-//   const joinedColumnNames = columnNames?.join(",");
-//   const tableDataQuery = supabaseClient
-//     .from(tableName)
-//     .select(joinedColumnNames || "*");
-//   // .eq("id", rowId);
-
-//   const { data, error } = await tableDataQuery;
-//   // console.log("getTableDataById: ", data);
-
-//   if (error) {
-//     console.log("Error on function getTableDataById: ", error);
-//   }
-
-//   return { data, error };
-// }
-
-export async function getWorkspaceAudiences({
-  supabaseClient,
-  workspaceId
-}: {
-  supabaseClient: SupabaseClient<Database>;
-}) {
-  const { data, error } = await supabaseClient.from("audience").select().eq('workspace', workspaceId);
-
-  if (error) {
-    console.log("Error on function getWorkspaceAudiences");
-  }
-
-  return { data, error };
-}
-
 export async function getWorkspaceCampaigns({
   supabaseClient,
-  workspaceId
+  workspaceId,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient.from("campaign").select().eq('workspace', workspaceId);
+  const { data, error } = await supabaseClient.rpc(
+    "get_campaigns_by_workspace",
+    { workspace_id: workspaceId },
+  );
 
   if (error) {
-    console.log("Error on function getWorkspaceAudiences");
+    console.log("Error on function getWorkspaceCampaigns");
   }
 
   return { data, error };
 }
 
-export async function getWorkspaceContacts({
+export async function getWorkspaceUsers({
   supabaseClient,
-  workspaceId
+  workspaceId,
 }: {
   supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient.from("contact").select().eq('workspace', workspaceId);
-
+  const { data, error } = await supabaseClient.rpc("get_workspace_users", {
+    selected_workspace_id: workspaceId,
+  });
+  // console.log("INSIDE FUNC:", data);
   if (error) {
-    console.log("Error on function getWorkspaceAudiences");
+    console.log("Error on function getWorkspaceUsers", error);
   }
+
+  return { data, error };
+}
+
+export async function addUserToWorkspace({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  return;
+}
+
+export async function testAuthorize({
+  supabaseClient,
+  workspaceId,
+  permission,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  permission: string;
+}) {
+  const { data, error } = await supabaseClient.rpc("authorize", {
+    selected_workspace_id: workspaceId,
+    requested_permission: permission,
+  });
+  console.log("\nXXXXXXXXXXXXXXXXXXXXXXXXX");
+  console.log("Data: ", data);
+  console.log("Error: ", error);
+  console.log("XXXXXXXXXXXXXXXXXXXXXXXXX");
 
   return { data, error };
 }

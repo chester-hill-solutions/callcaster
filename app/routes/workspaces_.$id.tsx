@@ -1,12 +1,12 @@
 import {
   json,
+  Link,
+  Outlet,
   redirect,
   useLoaderData,
   useNavigate,
-  Outlet,
-  Link,
 } from "@remix-run/react";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
 import {
@@ -14,12 +14,7 @@ import {
   campaignColumns,
   contactColumns,
 } from "~/components/WorkspaceTable/columns";
-import {
-  getWorkspaceAudiences,
-  getWorkspaceCampaigns,
-  getWorkspaceContacts,
-  getWorkspaceInfo,
-} from "~/lib/database.server";
+import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
@@ -28,7 +23,6 @@ export const loader = async ({ request, params }) => {
 
   const workspaceId = params.id;
   const selected = params.selected || "campaigns";
-  if (!selected) return redirect("campaigns", { headers });
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -40,17 +34,14 @@ export const loader = async ({ request, params }) => {
     }
   }
   const { data: audiences } = await getWorkspaceAudiences({
-    supabaseClient,
-    workspaceId,
-  });
+     supabaseClient,
+     workspaceId,
+   });
   const { data: campaigns } = await getWorkspaceCampaigns({
     supabaseClient,
     workspaceId,
   });
-  const { data: contacts } = await getWorkspaceContacts({
-    supabaseClient,
-    workspaceId,
-  });
+   const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
 
   return json(
     { workspace, audiences, campaigns, contacts, selected },
@@ -60,55 +51,63 @@ export const loader = async ({ request, params }) => {
 
 export default function Workspace() {
   const navigate = useNavigate();
-  const {
-    workspace,
-    audiences,
-    campaigns,
-    contacts,
-    selected = "campaigns",
-  } = useLoaderData();
-  const tables = useMemo(
-    () => [
-      {
-        name: "campaigns",
-        columns: campaignColumns,
-        data: campaigns,
-      },
-      {
-        name: "audiences",
-        columns: audienceColumns,
-        data: audiences,
-      },
-      {
-        name: "contacts",
-        columns: contactColumns,
-        data: contacts,
-      },
-    ],
-    [audiences, campaigns, contacts],
-  );
-
-  const getTableByName = useCallback(
-    (name: string) => {
-      const foundTable = tables.find((table) => table.name === name);
-      return foundTable;
+  const { workspace, audiences, campaigns, contacts, selected } =
+    useLoaderData();
+  const tables = [
+    {
+      name: "campaigns",
+      columns: campaignColumns,
+      data: campaigns,
     },
-    [tables],
+    {
+      name: "audiences",
+      columns: audienceColumns,
+      data: audiences,
+    },
+    {
+      name: "contacts",
+      columns: contactColumns,
+      data: contacts,
+    },
+  ];
+
+  const [selectedTable, setSelectedTable] = useState(() =>
+    tables.find((table) => table.name === selected),
   );
 
   const selectedTable = useMemo(() => {
     return getTableByName(selected);
   }, [getTableByName, selected]);
 
-  const handleSelectTable = (tableName: string) => {
-    const table = getTableByName(tableName);
-    if (table) {
-      setSelectedTable(table);
-      navigate(`${tableName}`);
-    } else {
-      console.error(
-        `tableName: ${tableName} does not correspond to any workspace tables`,
-      );
+  const handleSelectTable = (tableName) => {
+    let newTable;
+    switch (tableName) {
+      case WorkspaceTableNames.Campaign:
+        newTable = {
+          name: "campaigns",
+          columns: campaignColumns,
+          data: campaigns,
+        };
+        break;
+      case WorkspaceTableNames.Audience:
+        newTable = {
+          name: "audiences",
+          columns: audienceColumns,
+          data: audiences,
+        };
+        break;
+      case WorkspaceTableNames.Contact:
+        newTable = {
+          name: "contacts",
+          columns: contactColumns,
+          data: contacts,
+        };
+        break;
+      default:
+        console.log(
+          `tableName: ${tableName} does not correspond to any workspace tables`,
+        );
+        return;
     }
   };
 
@@ -134,7 +133,7 @@ export default function Workspace() {
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
-          {selectedTable?.data?.map((row) => (
+          {selectedTable.data?.map((row) => (
             <Link
               to={`${selectedTable.name}/${row.id}`}
               key={row.id}
@@ -144,7 +143,7 @@ export default function Workspace() {
                 {selectedTable.name === "campaigns"
                   ? row.title
                   : selectedTable.name === "audiences"
-                    ? row.name || `${selectedTable?.name} ${row.id}`
+                    ? row.name || `${selectedTable.name} ${row.id}`
                     : selectedTable.name === "contacts"
                       ? `${row.firstname} ${row.surname}`
                       : ""}
@@ -152,7 +151,7 @@ export default function Workspace() {
             </Link>
           ))}
           <Link
-            to={`${selectedTable?.name}/new`}
+            to={`${selectedTable.name}/new`}
             className="flex justify-center p-4"
           >
             <PlusIcon fill="#333" width="25px" />
