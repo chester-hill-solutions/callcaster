@@ -94,7 +94,7 @@ export default function Workspaces() {
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex min-w-60 flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center"
+              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60 m-4"
             >
               <h5 className="font-Zilla-Slab text-2xl text-white">
                 {workspace.name}

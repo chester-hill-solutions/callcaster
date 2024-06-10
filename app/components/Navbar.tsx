@@ -42,8 +42,6 @@ export default function Navbar({
     username: string;
   }> | null;
 }) {
-  // console.log(workspaces);
-  const navigate = useNavigate();
   return (
     <header className={`w-full ${className}`}>
       <nav

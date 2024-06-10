@@ -10,7 +10,7 @@ export function formatDateToLocale(dateFromSupabase: string) {
   return formattedDateTime;
 }
 
-function capitalize(text: string): string {
+export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 

@@ -5,10 +5,17 @@ import {
   redirect,
   useLoaderData,
   useNavigate,
+  Outlet,
+  Link,
 } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
+import {
+  audienceColumns,
+  campaignColumns,
+  contactColumns,
+} from "~/components/WorkspaceTable/columns";
 import {
   audienceColumns,
   campaignColumns,
@@ -23,6 +30,7 @@ export const loader = async ({ request, params }) => {
 
   const workspaceId = params.id;
   const selected = params.selected || "campaigns";
+  if (!selected) return redirect("campaigns", { headers });
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -154,7 +162,7 @@ export default function Workspace() {
                 {selectedTable.name === "campaigns"
                   ? row.title
                   : selectedTable.name === "audiences"
-                    ? row.name || `${selectedTable.name} ${row.id}`
+                    ? row.name || `${selectedTable?.name} ${row.id}`
                     : selectedTable.name === "contacts"
                       ? `${row.firstname} ${row.surname}`
                       : ""}
