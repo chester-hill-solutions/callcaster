@@ -74,11 +74,6 @@ export default function Workspace() {
   const [selectedTable, setSelectedTable] = useState(() =>
     tables.find((table) => table.name === selected),
   );
-
-  const selectedTable = useMemo(() => {
-    return getTableByName(selected);
-  }, [getTableByName, selected]);
-
   const handleSelectTable = (tableName) => {
     let newTable;
     switch (tableName) {
@@ -109,10 +104,6 @@ export default function Workspace() {
         );
         return;
     }
-  };
-
-  const setSelectedTable = (newTable: object) => {
-    navigate(`${newTable.name}`);
   };
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
