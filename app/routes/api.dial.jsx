@@ -3,22 +3,22 @@ import { createSupabaseServerClient } from '../lib/supabase.server';
 
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to: toNumber, user_id, campaign_id, contact_id, workspaceId, queue_id, outreachId } = await request.json();
+    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await twilio.calls.create({
             to: `client:${user_id}`,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(toNumber)}`,
+            from: caller_id,
+            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to_number)}`,
         });
         let outreach_attempt_id;
-        if (!outreachId) {
+        if (!outreach_id) {
             const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id });
             if (outreachError) throw outreachError;
             outreach_attempt_id = outreachAttempt;
         } else {
-            outreach_attempt_id = outreachId
+            outreach_attempt_id = outreach_id
         }
 
         const callData = {
@@ -26,7 +26,7 @@ export const action = async ({ request }) => {
             date_updated: call.dateUpdated,
             parent_call_sid: call.parentCallSid,
             account_sid: call.accountSid,
-            to: toNumber,
+            to: +19058088017, //to_number,
             from: call.from,
             phone_number_sid: call.phoneNumberSid,
             status: call.status,
@@ -44,7 +44,7 @@ export const action = async ({ request }) => {
             uri: call.uri,
             campaign_id: parseInt(campaign_id, 10),
             contact_id: parseInt(contact_id, 10),
-            workspace: workspaceId,
+            workspace: workspace_id,
             outreach_attempt_id
         };
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);

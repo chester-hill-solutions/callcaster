@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt, predictive = false }) => {
     const [time, setTime] = useState(Date.now());
     const [tooltip, setTooltip] = useState(null);
+
     useEffect(() => {
         if (activeCall) {
             const tick = () => {
@@ -15,6 +16,10 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
         }
     }, [activeCall]);
 
+    useEffect(() => {
+        if (recentCall.started_time) setTime(recentCall.started_time)
+    }, [nextRecipient, recentCall])
+
     const formatTime = (milliseconds) => {
         const totalSeconds = Math.floor(milliseconds / 1000);
         const hours = Math.floor(totalSeconds / 3600);
@@ -26,7 +31,19 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
 
     const nextDisabled = (recentAttempt && !Object.keys({ ...recentAttempt?.result }).length > 0)
     return (
-        <div style={{ flex: '0 0 20%', border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem", background: '#F1F1F1' }}>
+        <div style={{
+            flex: '0 0 20%',
+            border: '3px solid #BCEBFF',
+            borderRadius: "20px",
+            marginBottom: "2rem",
+            background: '#F1F1F1',
+            minHeight:"300px",
+            alignItems:"stretch",
+            flexDirection:"column",
+            justifyContent:"space-between",
+            display:"flex",
+            boxShadow:"3px 5px 0  rgba(50,50,50,.6)"
+        }}>
             <div style={{
                 display: 'flex',
                 alignItems: "center",
@@ -40,12 +57,11 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                 className={`font-Tabac-Slab text-xl text-white ${activeCall ? 'bg-green-300' : 'bg-slate-700'}`}
             >
                 <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-                    {activeCall && nextRecipient.contact ?
-                        `Connected ${formatTime(time - (new Date(recentCall?.date_created)).getTime())}` :
-                        activeCall ? 'Searching for a call...' :
-                        recentCall?.sid ? `Complete`
-                            :
-                            'Pending'}
+
+                    {recentCall.start_time && activeCall && <div>Connected {`${formatTime(time - (new Date(recentCall?.start_time)).getTime())}`}</div>}
+                    {activeCall && !nextRecipient.id && <div>Searching for a call...</div>}
+                    {activeCall && nextRecipient.id && <div>Dialing...</div>}
+                    {!activeCall &&  <div>Pending</div>}
                 </div>
             </div>
             {nextRecipient &&
@@ -64,21 +80,19 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
 
                     </div>
                 </div>
-
-
             }
             <div>
                 <div className="flex row gap-2 px-4 py-2 flex-1" style={{ position: 'relative' }}>
-                    <button onClick={() => hangUp()} disabled={!activeCall} style={{ padding: "8px 16px", background: activeCall ? "#d60000" : '#cc8888', borderRadius: "5px", color: 'white', width: "100px" }}>
-                        End Call
+                    <button onClick={() => hangUp()} disabled={!activeCall} style={{ flex: "1", padding: "4px 8px", background: activeCall ? "#d60000" : '#cc8888', borderRadius: "5px", color: 'white' }}>
+                        Hang Up
                     </button>
                     {nextRecipient?.contact && !nextRecipient?.contact?.phone && predictive &&
-                        (<button onClick={() => handleDequeueNext()} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: "5px", width: "100px", color: "#333" }}>
+                        (<button onClick={() => handleDequeueNext()} style={{ flex: "1", padding: "4px 8px", border: "1px solid #333", borderRadius: "5px", color: "#333" }}>
                             Next
                         </button>)
                     }
-                    {!recentAttempt?.call?.length ? <button onClick={() => handleDialNext()} disabled={activeCall} style={{ padding: "8px 16px", background: "#4CA83D", borderRadius: "5px", width: "100px", color: "white" }}>
-                        Dial
+                    {!recentAttempt?.call?.length ? <button onClick={() => handleDialNext()} disabled={activeCall} style={{ flex: "1", padding: "4px 8px", background: "#4CA83D", borderRadius: "5px", color: "white" }}>
+                        {!predictive ? 'Dial' : 'Start'}
                     </button> :
                         <>{tooltip && nextDisabled && !activeCall &&
                             <span style={{
@@ -88,13 +102,13 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                                 background: "#333",
                                 color: "white",
                                 borderRadius: "5px",
-                                padding: "8px 16px",
+                                padding: "4px 8px",
                                 bottom: "30px",
                                 opacity: ".7"
                             }}
                                 onMouseLeave={() => setTooltip(null)}
                             >{tooltip}</span>}
-                            <button disabled={nextDisabled} onMouseOver={() => (nextDisabled && setTooltip('You must select a result first'))} onClick={() => handleDequeueNext()} style={{ padding: "8px 16px", border: "1px solid #333", borderRadius: "5px", width: "100px", color: "#333" }} onMouseLeave={() => setTooltip(null)}>
+                            <button disabled={nextDisabled} onMouseOver={() => (nextDisabled && setTooltip('You must select a result first'))} onClick={() => handleDequeueNext()} style={{ padding: "4px 8px", border: "1px solid #333", borderRadius: "5px", color: "#333", flex: "1" }} onMouseLeave={() => setTooltip(null)}>
                                 Next
                             </button></>}
                 </div>

@@ -41,7 +41,10 @@ export const loader = async ({ request, params }) => {
     supabaseClient,
     workspaceId,
   });
-   const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
+  const { data: contacts } = await getWorkspaceContacts({
+    supabaseClient,
+    workspaceId,
+  });
 
   return json(
     { workspace, audiences, campaigns, contacts, selected },
@@ -51,6 +54,7 @@ export const loader = async ({ request, params }) => {
 
 export default function Workspace() {
   const navigate = useNavigate();
+
   const { workspace, audiences, campaigns, contacts, selected } =
     useLoaderData();
   const tables = [

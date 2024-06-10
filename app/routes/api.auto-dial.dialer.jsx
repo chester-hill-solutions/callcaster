@@ -3,38 +3,31 @@ import { createClient } from "@supabase/supabase-js";
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-    const { user_id, campaign_id, workspaceId } = await request.json();
+    const { user_id, campaign_id, workspace_id, conference_id } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     try {
-        const { data: contactRecord, error: contactError } = await supabase
-            .from('campaign_queue')
-            .select(
-                `
-          queue_id:id,
-            ...contact!inner(contact_id:id,*)
-          `,
-            )
-            .eq('status', 'queued')
-            .eq('campaign_id', campaign_id)
-            .limit(1);
-        if (contactError) throw contactError;
+        const { data: record, error: contactError } = await supabase
+            .rpc('auto_dial_queue',
+                {
+                    campaign_id_variable: campaign_id, user_id_variable: user_id
 
+                })
+        if (contactError) throw contactError;
+        const contactRecord = record[0];
         const toNumber = +19058088017//contactRecord.phone;
 
-
         let outreach_attempt_id;
-        const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contactRecord[0].contact_id, cam_id: campaign_id, queue_id: contactRecord[0].queue_id });
+        const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contactRecord.contact_id, cam_id: campaign_id, queue_id: contactRecord.queue_id });
         if (outreachError) throw outreachError;
         outreach_attempt_id = outreachAttempt;
 
         const call = await twilio.calls.create({
             to: toNumber,
-            from: process.env.TWILIO_PHONE_NUMBER,
-            url: `${process.env.BASE_URL}/api/power-dial/${user_id}`,
+            from: contactRecord.caller_id,
+            url: `${process.env.BASE_URL}/api/auto-dial/${user_id}`,
             machineDetection: 'Enable',
             statusCallbackEvent: ['answered', 'completed']
         });
-
         const callData = {
             sid: call.sid,
             date_updated: call.dateUpdated,
@@ -56,15 +49,15 @@ export const action = async ({ request }) => {
             group_sid: call.groupSid,
             caller_name: call.callerName,
             uri: call.uri,
-            campaign_id: parseInt(campaign_id, 10),
-            contact_id: parseInt(contactRecord[0].id, 10),
-            workspace: workspaceId,
-            outreach_attempt_id
+            campaign_id: campaign_id,
+            contact_id: contactRecord.contact_id,
+            workspace: workspace_id,
+            outreach_attempt_id,
+            conference_id
         };
 
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
-
-        const { error } = await supabase.from('call').upsert({ ...callData });
+        const { error } = await supabase.from('call').upsert({ ...callData }).select();
         if (error) console.error('Error saving the call to the database:', error);
         return new Response(JSON.stringify({ success: true }), {
             headers: {

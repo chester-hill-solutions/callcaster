@@ -12,22 +12,34 @@ export const action = async ({ request }) => {
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
     }
-    if (parsedBody.StatusCallbackEvent === 'participant-leave' && parsedBody.ReasonParticipantLeft === 'participant_updated_via_api') {
-        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, workspace').eq('sid', parsedBody.CallSid).single();
-        await fetch(`${process.env.BASE_URL}/api/power-dial/dialer`, {
+    let update;
+    const { data: dbCall, error: callError } = await supabase.from('call').select().eq('sid', parsedBody.CallSid).single();
+    if (parsedBody.StatusCallbackEvent === 'participant-leave'
+        && (parsedBody.ReasonParticipantLeft === 'participant_updated_via_api'
+            || parsedBody.ReasonParticipantLeft === 'participant_hung_up')) {
+        const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp) }).eq('sid', parsedBody.CallSid).select();
+        if (updateError) console.error(updateError)
+        update = callUpdate;
+        await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
             method: 'POST',
             headers: { "Content-Type": 'application/json' },
             body: JSON.stringify({
                 user_id: parsedBody.FriendlyName,
                 campaign_id: dbCall.campaign_id,
-                workspaceId: dbCall.workspace
+                workspace_id: dbCall.workspace,
+                conference_id: parsedBody.ConferenceSid
             })
         })
     }
     if (parsedBody.StatusCallbackEvent === 'participant-join') {
 
-        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id').eq('sid', parsedBody.CallSid).single();
         if (dbCall) {
+            if (!dbCall.conference_id) {
+
+                const { data: callUpdate, error: updateError } = await supabase.from('call').update({ conference_id: parsedBody.ConferenceSid, start_time: new Date(parsedBody.Timestamp) }).eq('sid', parsedBody.CallSid).select();
+                if (updateError) console.error(updateError)
+                update = callUpdate
+            }
             const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').select('contact_id').eq('id', dbCall.outreach_attempt_id).single();
             const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: parsedBody.FriendlyName }).eq('contact_id', outreachStatus.contact_id).select();
         }
@@ -41,5 +53,5 @@ export const action = async ({ request }) => {
             })
         }) */
     }
-    return json(parsedBody)
+    return json(update)
 }
