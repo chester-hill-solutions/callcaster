@@ -185,7 +185,6 @@ export default function Campaign() {
         handleNextNumber(true);
     }
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
-
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 

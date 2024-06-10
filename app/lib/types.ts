@@ -19,9 +19,9 @@ export type Contact = Database["public"]["Tables"]["contact"]["Row"] | null;
 export type WorkspaceTable = Audience | Campaign | Contact | null;
 
 export enum WorkspaceTableNames {
-  Audience = "Audience",
-  Campaign = "Campaign",
-  Contact = "Contact",
+  Audience = "audiences",
+  Campaign = "campaigns",
+  Contact = "contacts",
 }
 
 export type WorkspaceData =

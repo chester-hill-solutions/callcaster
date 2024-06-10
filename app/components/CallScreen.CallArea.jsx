@@ -17,7 +17,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
     }, [activeCall]);
 
     useEffect(() => {
-        if (recentCall.started_time) setTime(recentCall.started_time)
+        if (recentCall.date_created) setTime(recentCall.date_created)
     }, [nextRecipient, recentCall])
 
     const formatTime = (milliseconds) => {
@@ -60,7 +60,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
 
                     {recentCall.start_time && activeCall && <div>Connected {`${formatTime(time - (new Date(recentCall?.start_time)).getTime())}`}</div>}
                     {activeCall && !nextRecipient.id && <div>Searching for a call...</div>}
-                    {activeCall && nextRecipient.id && <div>Dialing...</div>}
+                    {activeCall && nextRecipient.id  && !recentCall.start_time && <div>Dialing...</div>}
                     {!activeCall &&  <div>Pending</div>}
                 </div>
             </div>

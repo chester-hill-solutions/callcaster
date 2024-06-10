@@ -6,7 +6,6 @@ export const action = async ({ request }) => {
     const { user_id, caller_id } = await request.json();
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const conferenceName = user_id;
-
     try {
         const call = await twilio.calls.create({
             to: `client:${user_id}`,

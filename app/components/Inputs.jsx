@@ -15,10 +15,11 @@ const TextInput = ({ name, value, onChange, className, label = name }) => (
         />
     </div>
 );
-const Dropdown = ({ name, value, onChange, options = [], className, label = name }) => (
+
+const Dropdown = ({ name, value, onChange, options = [], className, label = name, disabled = false }) => (
     <div className={className}>
         <label htmlFor={name}>{label}</label>
-        <select value={value} onChange={onChange} name={name} id={name} className="px-1 py-2 border-2 border-solid border-[var(--border)]">
+        <select value={value} onChange={onChange} name={name} disabled={disabled} id={name} className="px-1 py-2 border-2 border-solid border-[var(--border)]">
             <option value={null}>Select a status</option>
             {options.map((opt) => (
                 <option key={`${name}-${opt}`} value={opt}>{(opt[0].toUpperCase() + opt.substring(1)).replace('_', " ")}</option>
@@ -100,7 +101,7 @@ const DateTime = ({ name, value = new Date(), onChange, label = name, className 
                 className="w-full p-2 mt-2 border rounded cursor-pointer z-0 relative"
             />
             {showCalendar && (
-                <div style={{ zIndex: 10 }} className="datetime-picker mt-2 absolute bg-white p-2 border-2 border-solid border-[var(--border)]" ref={calendarRef}>
+                <div style={{ zIndex: 10, minWidth: '364px' }} className="datetime-picker mt-2 absolute bg-white p-2 border-2 border-solid border-[var(--border)] " ref={calendarRef}>
                     <div className="calendar-header flex justify-between items-center mb-4">
                         <button onClick={handlePrevMonth} className="px-2 py-1 bg-gray-200 rounded">Prev</button>
                         <div className="text-lg font-semibold">
@@ -246,4 +247,23 @@ const DragOver = ({
     );
 };
 
-export { TextInput, Dropdown, DateTime, DragOver };
+const Toggle = ({ name, isChecked, onChange, label = name, leftLabel = '', rightLabel = '', className }) => {
+    return (
+        <div className={className}>
+            <label htmlFor={name}>
+                <div>{label}</div>
+                <div className="flex gap-2" style={{alignItems:"baseline"}}>
+                    <div className=" text-xl font-Zilla-Slab">{leftLabel}</div>
+                    <div style={{ position: 'relative', zIndex: '5', height: "20px", width: "60px", borderRadius: '30px', backgroundColor: `${isChecked ? 'hsl(var(--secondary)' : '#333'}`, marginTop: "8px", transition: "background .3s ease",  }}>
+                        <div style={{ position: "absolute", zIndex: "6", height: '24px', width: "24px", background: "hsl(var(--primary))", top: '-2px', transform: `translateX(${isChecked ? '40px' : '0px'})`, left: "-2px", transition: "transform .3s ease", borderRadius: "5px" }}>
+                        </div>
+                    </div>
+                    <div className=" text-xl font-Zilla-Slab">{rightLabel}</div>
+                </div>
+            </label>
+            <input type="checkbox" checked={isChecked} onChange={(e) => onChange(e.target.checked)} id={name} className="hidden" />
+        </div>
+    )
+}
+
+export { TextInput, Dropdown, DateTime, DragOver, Toggle };

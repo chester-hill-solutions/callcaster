@@ -1,7 +1,5 @@
 import {
   json,
-  Link,
-  Outlet,
   redirect,
   useLoaderData,
   useNavigate,
@@ -11,11 +9,7 @@ import {
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
-import {
-  audienceColumns,
-  campaignColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
+import { WorkspaceTableNames } from "~/lib/types";
 import {
   audienceColumns,
   campaignColumns,
@@ -29,8 +23,7 @@ export const loader = async ({ request, params }) => {
     await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
-  const selected = params.selected || "campaigns";
-  if (!selected) return redirect("campaigns", { headers });
+  const selected = params.selected;
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -50,18 +43,20 @@ export const loader = async ({ request, params }) => {
       .from("audience")
       .select()
       .eq("workspace", workspaceId);
-    if (audiencesError) throw {audiencesError};
+    if (audiencesError) throw { audiencesError };
     const { data: campaigns, error: campaignsError } =
       await getWorkspaceCampaigns({
         supabaseClient,
         workspaceId,
       });
-    if (campaignsError) throw {campaignsError};
+    if (campaignsError) throw { campaignsError };
     const { data: contacts, error: contactsError } = await supabaseClient
       .from("contact")
       .select()
       .eq("workspace", workspaceId);
-    if (contactsError) throw {contactsError};
+    if (contactsError) throw { contactsError };
+    if (!selected) return redirect("campaigns", { headers });
+
     return json(
       { workspace, audiences, campaigns, contacts, selected },
       { headers },
@@ -75,8 +70,7 @@ export const loader = async ({ request, params }) => {
 export default function Workspace() {
   const navigate = useNavigate();
 
-  const { workspace, audiences, campaigns, contacts, selected } =
-    useLoaderData();
+  const { workspace, audiences, campaigns, contacts, selected:initSelected } = useLoaderData();
   const tables = [
     {
       name: "campaigns",
@@ -95,9 +89,12 @@ export default function Workspace() {
     },
   ];
 
+  const [selected, setSelected] = useState(initSelected)
   const [selectedTable, setSelectedTable] = useState(() =>
     tables.find((table) => table.name === selected),
   );
+
+
   const handleSelectTable = (tableName) => {
     let newTable;
     switch (tableName) {
@@ -107,6 +104,8 @@ export default function Workspace() {
           columns: campaignColumns,
           data: campaigns,
         };
+        setSelectedTable(newTable);
+        setSelected(tableName)
         break;
       case WorkspaceTableNames.Audience:
         newTable = {
@@ -114,6 +113,8 @@ export default function Workspace() {
           columns: audienceColumns,
           data: audiences,
         };
+        setSelectedTable(newTable);
+        setSelected(tableName)
         break;
       case WorkspaceTableNames.Contact:
         newTable = {
@@ -121,14 +122,20 @@ export default function Workspace() {
           columns: contactColumns,
           data: contacts,
         };
+        setSelectedTable(newTable);
+        setSelected(tableName)
         break;
       default:
         console.log(
           `tableName: ${tableName} does not correspond to any workspace tables`,
         );
-        return;
+        break;
+        
     }
+    navigate(tableName);
+
   };
+  
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="flex items-center">
@@ -152,7 +159,7 @@ export default function Workspace() {
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
-          {selectedTable?.data?.map((row) => (
+          {selectedTable?.data?.map((row, i) => (
             <Link
               to={`${selectedTable.name}/${row.id}`}
               key={row.id}
@@ -160,7 +167,7 @@ export default function Workspace() {
             >
               <h3 className="capitalize">
                 {selectedTable.name === "campaigns"
-                  ? row.title
+                  ? row.title || `Unnamed campaign ${i + 1}`
                   : selectedTable.name === "audiences"
                     ? row.name || `${selectedTable?.name} ${row.id}`
                     : selectedTable.name === "contacts"

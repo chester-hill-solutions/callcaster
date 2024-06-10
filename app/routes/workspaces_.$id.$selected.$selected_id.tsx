@@ -3,7 +3,7 @@ import { useLoaderData, useOutletContext } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { AudienceTable } from "../components/AudienceTable";
-import {CampaignSettings} from "../components/CampaignSettings";
+import { CampaignSettings } from "../components/CampaignSettings";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -40,6 +40,11 @@ export const loader = async ({ request, params }) => {
       console.log(error);
       return redirect(`/workspaces/${workspace_id}`);
     }
+    if (selected === "campaigns") {
+      const { error: detailsError } = await supabaseClient
+        .from("live_campaign")
+        .insert({ campaign_id: data[0].id, workspace: workspace_id });
+    }
     return redirect(`/workspaces/${workspace_id}/${selected}/${data[0].id}`);
   }
 
@@ -71,27 +76,45 @@ export const loader = async ({ request, params }) => {
       console.error("No valid table detected");
       return redirect(`/workspaces/${workspace_id}`);
   }
-  let data = []
+  let data = [];
   const { data: mtmData, error } = await mtmQuery;
   if (error) {
     console.error(error);
   }
   data = [...mtmData];
-  if (selected === 'campaigns' && data[0].campaign.type === 'live_call'){
-    const {data: campaignDetails, error: detailsError} = await supabaseClient.from('live_campaign').select().eq('campaign_id', selected_id).single()
+  if (
+    selected === "campaigns" &&
+    data.length > 0 &&
+    data[0].campaign.type === "live_call"
+  ) {
+    const { data: campaignDetails, error: detailsError } = await supabaseClient
+      .from("live_campaign")
+      .select()
+      .eq("campaign_id", selected_id)
+      .single();
     if (detailsError) console.error(detailsError);
     data = data.map((item) => ({
       ...item,
-      campaignDetails
+      campaignDetails,
     }));
   }
-  return json({ workspace_id, selected_id, data });
+  return json({ workspace_id, selected_id, data, selected });
 };
 
 export default function Audience() {
   const { selectedTable, audiences, contacts = [] } = useOutletContext();
   const { workspace_id, selected_id, data = [] } = useLoaderData();
-  const ids = useMemo(() => data.map((row) => row[`${selectedTable?.name.substring(0, selectedTable.name.length - 1)}_id`]), [data, selectedTable]);
+
+  const ids = useMemo(
+    () =>
+      data.map(
+        (row) =>
+          row[
+            `${selectedTable?.name.substring(0, selectedTable.name.length - 1)}_id`
+          ],
+      ),
+    [data, selectedTable],
+  );
   const audienceContacts = useMemo(
     () => contacts?.filter((contact) => ids.includes(contact.id)),
     [contacts, ids],
@@ -100,12 +123,14 @@ export default function Audience() {
     () => audiences?.find((audience) => audience.id === parseInt(selected_id)),
     [audiences, selected_id],
   );
+  const pageData = useMemo(() => data, [data]);
+  console.log(pageData)
   return (
     <div className="flex flex-col">
       {selectedTable?.name.toLowerCase() === "audiences" && (
         <AudienceTable
           {...{
-            data,
+            data: pageData,
             contacts: audienceContacts,
             workspace_id,
             selected_id,
@@ -113,9 +138,9 @@ export default function Audience() {
           }}
         />
       )}
-      {selectedTable?.name.toLowerCase() === "campaigns" && 
-        <CampaignSettings data={data} audiences={audiences}/>
-      }
+      {selectedTable?.name.toLowerCase() === "campaigns" && (
+        <CampaignSettings data={pageData} audiences={audiences} />
+      )}
     </div>
   );
 }
