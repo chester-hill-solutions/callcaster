@@ -145,7 +145,7 @@ export default function WorkspaceSettings() {
               return <></>;
             }
             return (
-              <li key={member.username} className="w-full">
+              <li key={member.id} className="w-full">
                 <TeamMember
                   member={member}
                   userIsOwner={userIsOwner}

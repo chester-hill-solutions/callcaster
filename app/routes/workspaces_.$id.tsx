@@ -5,8 +5,6 @@ import {
   redirect,
   useLoaderData,
   useNavigate,
-  Outlet,
-  Link,
 } from "@remix-run/react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
@@ -16,11 +14,8 @@ import {
   campaignColumns,
   contactColumns,
 } from "~/components/WorkspaceTable/columns";
-import {
-  audienceColumns,
-  campaignColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
+import { Button } from "~/components/ui/button";
+
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -50,18 +45,18 @@ export const loader = async ({ request, params }) => {
       .from("audience")
       .select()
       .eq("workspace", workspaceId);
-    if (audiencesError) throw {audiencesError};
+    if (audiencesError) throw { audiencesError };
     const { data: campaigns, error: campaignsError } =
       await getWorkspaceCampaigns({
         supabaseClient,
         workspaceId,
       });
-    if (campaignsError) throw {campaignsError};
+    if (campaignsError) throw { campaignsError };
     const { data: contacts, error: contactsError } = await supabaseClient
       .from("contact")
       .select()
       .eq("workspace", workspaceId);
-    if (contactsError) throw {contactsError};
+    if (contactsError) throw { contactsError };
     return json(
       { workspace, audiences, campaigns, contacts, selected },
       { headers },
@@ -140,7 +135,20 @@ export default function Workspace() {
           />
         </div>
         <div className="flex flex-1 justify-center">
-          <h3 className="font-Tabac-Slab text-2xl">{workspace?.name}</h3>
+          <h3 className="ml-auto font-Tabac-Slab text-2xl">
+            {workspace?.name}
+          </h3>
+          <div className="ml-auto flex gap-4">
+            <Button asChild>
+              <Link
+                to={`./settings`}
+                relative="path"
+                className="font-Zilla-Slab text-xl font-semibold"
+              >
+                Settings
+              </Link>
+            </Button>
+          </div>
         </div>
         {/*         <div
           className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"
