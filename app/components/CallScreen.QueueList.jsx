@@ -7,7 +7,8 @@ function QueueList({
     householdMap,
     handleNextNumber,
     nextRecipient,
-    predictive = false
+    predictive = false,
+    handleQueueButton
 }) {
 
     return (
@@ -64,7 +65,7 @@ function QueueList({
                         !predictive ? (
                         <tr>
                             <td colSpan={3} style={{ padding: "36px", textAlign: "center" }}>
-                                <button style={{ flex: "1 1 auto", padding: "4px 8px", border: "1px solid #d60000", borderRadius: "5px", fontSize: 'small' }}>Load Queue</button>
+                                <button onClick={handleQueueButton} style={{ flex: "1 1 auto", padding: "4px 8px", border: "1px solid #d60000", borderRadius: "5px", fontSize: 'small' }}>Load Queue</button>
                             </td>
                         </tr>)
                         : <tr>

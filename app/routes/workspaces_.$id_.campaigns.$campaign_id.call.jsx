@@ -175,8 +175,7 @@ export default function Campaign() {
 
     const handleQueueButton = () => {
         fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
-            navigate: false,
-            relative: ''
+            navigate: false
         });
     }
 
@@ -199,7 +198,8 @@ export default function Campaign() {
                         groupByHousehold,
                         queue,
                         handleNextNumber,
-                        nextRecipient
+                        nextRecipient,
+                        handleQueueButton
                     }}
                 />
             </div>

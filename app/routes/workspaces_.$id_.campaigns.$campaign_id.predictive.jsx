@@ -21,7 +21,7 @@ export const loader = async ({ request, params }) => {
     const { data: audiences, error: audiencesError } = await supabaseClient.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabaseClient.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
     const { data: attempts, error: attemptError } = await supabaseClient.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
-    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', serverSession.user.id).eq('campaign_id', id);
+    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', 'queued').eq('campaign_id', id);
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
         console.log(errors);
@@ -74,17 +74,17 @@ export default function Campaign() {
         workspaceId,
         campaignDetails,
         contacts,
-        queue: initialQueue,
+        queue,
         initalCallsList,
         initialRecentCall = {},
     } = useLoaderData();
     const [nextRecipient, setNextRecipient] = useState({});
-    const { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
+    const { callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
         setNextRecipient,
         user,
         supabase,
         init: {
-            queue: [...initialQueue],
+            queue: [],
             callsList: [...initalCallsList],
             attempts: [...initialAttempts],
             recentCall: { ...initialRecentCall },
@@ -130,7 +130,6 @@ export default function Campaign() {
 
 
     const handleEndConference = () => {
-        console.log("Ending")
         submit({},{method:"post", action:'/api/auto-dial/end', navigate:false})
     }
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);

@@ -58,10 +58,10 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
             >
                 <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
 
-                    {recentCall.start_time && <div>Connected {`${formatTime(time - (new Date(recentCall?.start_time)).getTime())}`}</div>}
+                    {recentCall.start_time && activeCall && <div>Connected {`${formatTime(time - (new Date(recentCall?.start_time)).getTime())}`}</div>}
                     {activeCall && !nextRecipient.id && <div>Searching for a call...</div>}
                     {activeCall && nextRecipient.id && <div>Dialing...</div>}
-                    {!activeCall && !recentCall.start_time && <div>Pending</div>}
+                    {!activeCall &&  <div>Pending</div>}
                 </div>
             </div>
             {nextRecipient &&
