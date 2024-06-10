@@ -37,12 +37,12 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
             borderRadius: "20px",
             marginBottom: "2rem",
             background: '#F1F1F1',
-            minHeight:"300px",
-            alignItems:"stretch",
-            flexDirection:"column",
-            justifyContent:"space-between",
-            display:"flex",
-            boxShadow:"3px 5px 0  rgba(50,50,50,.6)"
+            minHeight: "300px",
+            alignItems: "stretch",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            display: "flex",
+            boxShadow: "3px 5px 0  rgba(50,50,50,.6)"
         }}>
             <div style={{
                 display: 'flex',
@@ -60,8 +60,8 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
 
                     {recentCall.start_time && activeCall && <div>Connected {`${formatTime(time - (new Date(recentCall?.start_time)).getTime())}`}</div>}
                     {activeCall && !nextRecipient.id && <div>Searching for a call...</div>}
-                    {activeCall && nextRecipient.id  && !recentCall.start_time && <div>Dialing...</div>}
-                    {!activeCall &&  <div>Pending</div>}
+                    {activeCall && nextRecipient.id && !recentCall.start_time && <div>Dialing...</div>}
+                    {!activeCall && <div>Pending</div>}
                 </div>
             </div>
             {nextRecipient &&

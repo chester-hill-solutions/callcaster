@@ -113,7 +113,9 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                 .sort((a, b) => new Date(b.date_created) - new Date(a.date_created))
                 .find(call => call.contact_id === nextRecipient.contact.id)
             : null;
-        setRecentCall(newRecentCall || {});
+            let created = new Date(recentCall.date_created) 
+            let now = new Date();
+            if ((now - created)/3600000 < 24) {setRecentCall(newRecentCall);} else {setRecentCall({})}
     }, [callsList, nextRecipient]);
 
     return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue };

@@ -10,7 +10,7 @@ export const action = async ({ request }) => {
         const call = await twilio.calls.create({
             to: `client:${user_id}`,
             from: caller_id,
-            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to_number)}`,
+            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(+19058088017)}`,
         });
         let outreach_attempt_id;
         if (!outreach_id) {
