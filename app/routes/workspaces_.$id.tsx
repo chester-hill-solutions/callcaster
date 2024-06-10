@@ -139,6 +139,15 @@ export default function Workspace() {
             {workspace?.name}
           </h3>
           <div className="ml-auto flex gap-4">
+            <Button asChild variant="outline">
+              <Link
+                to={`./media`}
+                relative="path"
+                className="font-Zilla-Slab text-xl font-semibold"
+              >
+                Media
+              </Link>
+            </Button>
             <Button asChild>
               <Link
                 to={`./settings`}
