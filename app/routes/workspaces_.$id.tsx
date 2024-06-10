@@ -3,8 +3,6 @@ import {
   redirect,
   useLoaderData,
   useNavigate,
-  Outlet,
-  Link,
 } from "@remix-run/react";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
@@ -15,6 +13,7 @@ import {
   campaignColumns,
   contactColumns,
 } from "~/components/WorkspaceTable/columns";
+import { Button } from "~/components/ui/button";
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -56,7 +55,6 @@ export const loader = async ({ request, params }) => {
       .eq("workspace", workspaceId);
     if (contactsError) throw { contactsError };
     if (!selected) return redirect("campaigns", { headers });
-
     return json(
       { workspace, audiences, campaigns, contacts, selected },
       { headers },
@@ -147,7 +145,20 @@ export default function Workspace() {
           />
         </div>
         <div className="flex flex-1 justify-center">
-          <h3 className="font-Tabac-Slab text-2xl">{workspace?.name}</h3>
+          <h3 className="ml-auto font-Tabac-Slab text-2xl">
+            {workspace?.name}
+          </h3>
+          <div className="ml-auto flex gap-4">
+            <Button asChild>
+              <Link
+                to={`./settings`}
+                relative="path"
+                className="font-Zilla-Slab text-xl font-semibold"
+              >
+                Settings
+              </Link>
+            </Button>
+          </div>
         </div>
         {/*         <div
           className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"

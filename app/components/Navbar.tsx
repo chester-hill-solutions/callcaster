@@ -1,5 +1,5 @@
 import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink, useNavigate } from "@remix-run/react";
+import { Link, NavLink } from "@remix-run/react";
 import { AuthError, User } from "@supabase/supabase-js";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
@@ -26,9 +26,7 @@ export default function Navbar({
 }: {
   className?: string;
   handleSignOut: () => Promise<
-    TypedResponse<{
-      error: AuthError | null;
-    }>
+    TypedResponse<{ success: string | null; error: string | null }>
   >;
   workspaces: WorkspaceData;
   isSignedIn: boolean;
@@ -85,7 +83,6 @@ export default function Navbar({
               type="button"
               onClick={() => {
                 handleSignOut();
-                navigate("/");
               }}
             >
               Log Out
