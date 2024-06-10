@@ -1,23 +1,32 @@
-import { useReducer } from "react";
-import { TextInput, Dropdown, DateTime, DragOver } from "./Inputs";
-import { ImportIcon } from "lucide-react";
-import { useNavigate, useSubmit } from "@remix-run/react";
+import { useReducer, useEffect, useState } from "react";
+import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
+import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
+import { deepEqual } from "~/lib/utils";
 
 const initialState = (data) => ({
-    title: data[0].campaign.title,
-    status: data[0].campaign.status,
-    type: data[0].campaign.type,
-    start_date: data[0].campaign.start_date,
-    end_date: data[0].campaign.end_date,
-    voicemail: data[0].campaignDetails.voicemail,
-    questions: data[0].campaignDetails.questions,
+    campaign_id: data[0]?.campaign.id,
+    workspace: data[0]?.campaignDetails.workspace,
+    title: data[0]?.campaign.title,
+    status: data[0]?.campaign.status,
+    type: data[0]?.campaign.type || 'live_call',
+    dial_type: data[0]?.campaign.dial_type || 'call', 
+    group_household_queue: data[0]?.campaign.group_household_queue,
+    caller_id: data[0]?.campaign.caller_id,
+    start_date: data[0]?.campaign.start_date,
+    end_date: data[0]?.campaign.end_date,
+    voicemail: data[0]?.campaignDetails.voicemail,
+    questions: data[0]?.campaignDetails.questions,
 });
 
 const actionTypes = {
+    SET_INITIAL_STATE: 'SET_INITIAL_STATE',
     SET_TITLE: 'SET_TITLE',
     SET_STATUS: 'SET_STATUS',
     SET_TYPE: 'SET_TYPE',
+    SET_DIAL_TYPE: 'SET_DIAL_TYPE',
+    SET_GROUP_HOUSEHOLD: 'SET_GROUP_HOUSEHOLD',
+    SET_CALL_ID: 'SET_CALL_ID',
     SET_START_DATE: 'SET_START_DATE',
     SET_END_DATE: 'SET_END_DATE',
     SET_VOICEMAIL: 'SET_VOICEMAIL',
@@ -26,6 +35,8 @@ const actionTypes = {
 
 const reducer = (state, action) => {
     switch (action.type) {
+        case actionTypes.SET_INITIAL_STATE:
+            return { ...action.payload };
         case actionTypes.SET_TITLE:
             return { ...state, title: action.payload };
         case actionTypes.SET_STATUS:
@@ -38,6 +49,12 @@ const reducer = (state, action) => {
             return { ...state, end_date: action.payload };
         case actionTypes.SET_VOICEMAIL:
             return { ...state, voicemail: action.payload };
+        case actionTypes.SET_DIAL_TYPE:
+            return { ...state, dial_type: action.payload };
+        case actionTypes.SET_GROUP_HOUSEHOLD:
+            return { ...state, group_household_queue: action.payload };
+        case actionTypes.SET_CALL_ID:
+            return { ...state, caller_id: action.payload };
         case actionTypes.SET_QUESTION:
             return {
                 ...state,
@@ -55,35 +72,48 @@ const reducer = (state, action) => {
 };
 
 const CampaignSettings = ({ data, audiences }) => {
-    const submit = useSubmit();
     const navigate = useNavigate();
-    const [campaignDetails, dispatch] = useReducer(reducer, initialState(data));
-
-    const selectedAudiences = data.map((i) => {
-        return audiences.find((audience) => audience.id === i.audience_id);
-    });
+    const nav = useNavigation();
+    const busy = (nav.state !== 'idle');
+    const submit = useSubmit();
+    const [initial, setInitial] = useState(initialState(data));
+    const [campaignDetails, dispatch] = useReducer(reducer, initial);
+    const selectedAudiences = data.map((i) => audiences?.find((audience) => audience.id === i.audience_id));
+    const [isChanged, setChanged] = useState(false);
 
     const handleInputChange = (type, value) => {
         dispatch({ type, payload: value });
+        setChanged(!deepEqual(campaignDetails, initial));
     };
 
-    const uploadVoicemail = (file) => {
-        if (file) {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('campaign_name', campaignDetails.title);
-            formData.append('live_campaign_id', data[0].campaignDetails.id);
-            submit(formData, { method: 'post', encType: 'multipart/form-data', action: "/api/media", navigate: false });
+    const handleSave = () => {
+        if (!deepEqual(campaignDetails, initial)) {
+            submit(campaignDetails, {
+                method: "patch",
+                encType: "application/json",
+                navigate: false,
+                action: "/api/campaigns"
+            });
+            setInitial(campaignDetails);
+            setChanged(false);
         }
-    }
+    };
+
+    useEffect(() => {
+        setChanged(!deepEqual(campaignDetails, initial));
+    }, [campaignDetails, initial]);
+
+    useEffect(() => {
+        const newInitialState = initialState(data);
+        setInitial(newInitialState);
+        dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
+    }, [data]);
 
     return (
         <div className="p-4 flex-col">
-            <div className="flex justify-between px-4">
+            <div className="flex justify-between px-4" style={{ height: "40px" }}>
                 <h3 className="font-Zilla-Slab text-2xl">{campaignDetails.title}</h3>
-                <Button onClick={() => navigate('call')}>
-                    Start Calling
-                </Button>
+                {isChanged && <Button disabled={busy} onClick={handleSave}>SAVE</Button>}
             </div>
             <div className="gap-2 flex-col flex">
                 <div className="flex justify-start gap-2">
@@ -99,16 +129,16 @@ const CampaignSettings = ({ data, audiences }) => {
                         label={"Campaign Status"}
                         value={campaignDetails.status}
                         onChange={(e) => handleInputChange(actionTypes.SET_STATUS, e.currentTarget.value)}
-                        options={new Array("pending", "running", 'complete', "paused")}
+                        options={["pending", "running", 'complete', "paused"]}
                         className={"flex flex-col"}
                     />
-
                     <Dropdown
                         name="type"
+                        disabled
                         label={"Campaign Type"}
                         value={campaignDetails.type}
                         onChange={(e) => handleInputChange(actionTypes.SET_TYPE, e.currentTarget.value)}
-                        options={new Array("message", "robocall", 'simple_ivr', "complex_ivr", "live_call")}
+                        options={["message", "robocall", 'simple_ivr', "complex_ivr", "live_call"]}
                         className={"flex flex-col"}
                     />
                 </div>
@@ -127,52 +157,39 @@ const CampaignSettings = ({ data, audiences }) => {
                         onChange={(e) => handleInputChange(actionTypes.SET_END_DATE, e)}
                         className={"flex flex-col relative"}
                     />
-                    <DragOver
-                        handleDropContent={uploadVoicemail}
-                        Icon={ImportIcon}
-                        name="voicemail"
-                        label={"Voicemail File"}
-                        title={"IMPORT"}
-                        value={campaignDetails.voicemail}
+                </div>
+                <div className="flex justify-start gap-2">
+                    <Toggle
+                        name={"group_household_queue"}
+                        label={"Group by household"}
+                        isChecked={campaignDetails.group_household_queue}
+                        onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
+                        rightLabel="Yes"
                     />
                 </div>
-                {/*  <div>
-                Questions:
-                {Object.keys(campaignDetails.questions)
-                    .sort((a, b) => campaignDetails.questions[a].order - campaignDetails.questions[b].order)
-                    .map((question) => {
-                        const thisQuestions = campaignDetails.questions[question];
-                        return (
-                            <div key={`campaign-question-${question}`}>
-                                {thisQuestions.order} {question}
-                                {Object.keys(thisQuestions).map((key) => {
-                                    return (
-                                        <div key={`campaign-questions-${question}-${key}`}>
-                                            <div>- {key}</div>
-                                            <input
-                                                type="text"
-                                                value={thisQuestions[key]}
-                                                onChange={(e) =>
-                                                    dispatch({
-                                                        type: actionTypes.SET_QUESTION,
-                                                        payload: { question, key, value: e.target.value },
-                                                    })
-                                                }
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })}
-            </div> */}
+                <div className="justify-start flex gap-2">
+                    <Toggle
+                        name={"dial_type"}
+                        label={"Dial Type"}
+                        isChecked={campaignDetails.dial_type === 'predictive'}
+                        onChange={(e) => handleInputChange(actionTypes.SET_DIAL_TYPE, e === true ? 'predictive' : 'call')}
+                        leftLabel="Power Dialer"
+                        rightLabel="Predictive Dialer"
+                    />
+                </div>
                 <div>
                     Audiences:
-                    {selectedAudiences.filter(Boolean).map((audience) => (
-                        <div key={audience.id}>
-                            {audience.name || `Unnamed Audience ${audience.id}`}
+                    {audiences.filter(Boolean).map((audience) => (
+                        <div key={audience.id} className="flex gap-2">
+                            <input type="checkbox" id={`${audience.id}-audience-select`} checked={selectedAudiences.includes(audience)} onChange={(event) => handleAudience({event, audience})} />
+                            <label htmlFor={`${audience.id}-audience-select`}>{audience.name || `Unnamed Audience ${audience.id}`}</label>
                         </div>
                     ))}
+                </div>
+                <div className="flex justify-end">
+                    <Button onClick={() => navigate(`${campaignDetails.dial_type}`)}>
+                        Start Calling
+                    </Button>
                 </div>
             </div>
         </div>

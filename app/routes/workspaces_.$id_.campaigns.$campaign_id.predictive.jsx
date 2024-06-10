@@ -21,7 +21,8 @@ export const loader = async ({ request, params }) => {
     const { data: audiences, error: audiencesError } = await supabaseClient.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabaseClient.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
     const { data: attempts, error: attemptError } = await supabaseClient.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
-    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', 'queued').eq('campaign_id', id);
+    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', 'queued').eq('campaign_id', id).order('attempts', {ascending:true}).order('queue_order', {ascending: true});
+    
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
         console.log(errors);
@@ -109,6 +110,7 @@ export default function Campaign() {
             }
             return acc;
         }, {}), [queue]);
+
     const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id);
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
@@ -133,6 +135,7 @@ export default function Campaign() {
         submit({},{method:"post", action:'/api/auto-dial/end', navigate:false})
     }
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>

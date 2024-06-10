@@ -14,6 +14,7 @@ export const action = async ({ request }) => {
     }
     let update;
     const { data: dbCall, error: callError } = await supabase.from('call').select().eq('sid', parsedBody.CallSid).single();
+    console.log(new Date(parsedBody.Timestamp) - new Date(dbCall.date_created))
     if (parsedBody.StatusCallbackEvent === 'participant-leave'
         && (parsedBody.ReasonParticipantLeft === 'participant_updated_via_api'
             || parsedBody.ReasonParticipantLeft === 'participant_hung_up')) {

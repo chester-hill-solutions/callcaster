@@ -10,7 +10,6 @@ function QueueList({
     predictive = false,
     handleQueueButton
 }) {
-
     return (
         <div style={{ flex: '1 0 20%', border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem", minHeight: '300px',boxShadow:"3px 5px 0  rgba(50,50,50,.6)" }}>
             <div style={{
@@ -40,6 +39,28 @@ function QueueList({
             <div className="flex column" style={{ display: "flex", flexDirection: "column" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <TableHeader keys={["Name", "Number", "Address"]} />
+                    {queue.length > 0 && predictive && <tbody>
+                        {groupByHousehold && householdMap ?
+                            Object.values(householdMap).map((household) => (
+                                household.map((contact, index) => (
+                                    <QueueContact
+                                        key={`household-${contact.contact?.id}`}
+                                        contact={contact.contact}
+                                        household={household}
+                                        firstInHouse={index === 0}
+                                        grouped={true}
+                                        selected={nextRecipient?.contact?.id === contact.contact.id}
+                                    />
+                                ))
+                            )) :
+                            queue.map((contact) => (
+                                <QueueContact
+                                    key={contact?.contact?.id}
+                                    contact={contact?.contact}
+                                    selected={nextRecipient?.contact?.id === contact.contact.id}
+                                />
+                            ))}
+                    </tbody>}
                     {queue.length > 0 && !predictive ? <tbody>
                         {groupByHousehold && householdMap ?
                             Object.values(householdMap).map((household) => (
@@ -62,18 +83,18 @@ function QueueList({
                                 />
                             ))}
                     </tbody> : (
-                        !predictive ? (
+                        !(queue.length > 0 || householdMap.length > 0) && !predictive ? (
                         <tr>
                             <td colSpan={3} style={{ padding: "36px", textAlign: "center" }}>
                                 <button onClick={handleQueueButton} style={{ flex: "1 1 auto", padding: "4px 8px", border: "1px solid #d60000", borderRadius: "5px", fontSize: 'small' }}>Load Queue</button>
                             </td>
                         </tr>)
-                        : <tr>
+                        : !queue.length > 0 ? <tr>
                             <td colSpan={3} style={{ padding: "36px", textAlign: "center", opacity:'.5' }}>
                                 Check with your administration to ensure your queue is set up.
                             </td>
                         </tr>
-                        )}
+                        : null) }
                 </table>
 
             </div>
