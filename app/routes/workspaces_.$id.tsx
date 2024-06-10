@@ -33,18 +33,22 @@ export const loader = async ({ request, params }) => {
       return redirect("/workspaces", { headers });
     }
   }
-  const { data: audiences } = await getWorkspaceAudiences({
+  /* const { data: audiences } = await getWorkspaceAudiences({
      supabaseClient,
      workspaceId,
-   });
+   }); */
+  const { data: audiences } = await supabaseClient
+    .from("audience")
+    .select()
+    .eq("workspace", selected);
   const { data: campaigns } = await getWorkspaceCampaigns({
     supabaseClient,
     workspaceId,
   });
-  const { data: contacts } = await getWorkspaceContacts({
-    supabaseClient,
-    workspaceId,
-  });
+  const { data: contacts } = await supabaseClient
+    .from("contacts")
+    .select()
+    .eq("workspace", selected);
 
   return json(
     { workspace, audiences, campaigns, contacts, selected },
@@ -113,12 +117,16 @@ export default function Workspace() {
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="flex items-center">
         <div className="w-60">
-          <WorkspaceDropdown selectTable={handleSelectTable} selectedTable={selected} tables={tables}/>
+          <WorkspaceDropdown
+            selectTable={handleSelectTable}
+            selectedTable={selected}
+            tables={tables}
+          />
         </div>
-        <div className="justify-center flex flex-1">
-          <h3 className="text-2xl font-Tabac-Slab">{workspace.name}</h3>
+        <div className="flex flex-1 justify-center">
+          <h3 className="font-Tabac-Slab text-2xl">{workspace.name}</h3>
         </div>
-{/*         <div
+        {/*         <div
           className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"
           id="filter-controls"
         >
