@@ -10,7 +10,7 @@ const initialState = (data) => ({
     title: data[0]?.campaign.title,
     status: data[0]?.campaign.status,
     type: data[0]?.campaign.type || 'live_call',
-    dial_type: data[0]?.campaign.dial_type || 'call', 
+    dial_type: data[0]?.campaign.dial_type || 'call',
     group_household_queue: data[0]?.campaign.group_household_queue,
     caller_id: data[0]?.campaign.caller_id,
     start_date: data[0]?.campaign.start_date,
@@ -71,7 +71,7 @@ const reducer = (state, action) => {
     }
 };
 
-const CampaignSettings = ({ data, audiences }) => {
+const CampaignSettings = ({ data, audiences, mediaData, addAudience, removeAudience }) => {
     const navigate = useNavigate();
     const nav = useNavigation();
     const busy = (nav.state !== 'idle');
@@ -98,6 +98,13 @@ const CampaignSettings = ({ data, audiences }) => {
             setChanged(false);
         }
     };
+    const handleAudience = ({event, audience}) => {
+        if (event.target.checked){
+            addAudience(audience)
+        } else {
+            removeAudience(audience)
+        }
+    }
 
     useEffect(() => {
         setChanged(!deepEqual(campaignDetails, initial));
@@ -129,7 +136,12 @@ const CampaignSettings = ({ data, audiences }) => {
                         label={"Campaign Status"}
                         value={campaignDetails.status}
                         onChange={(e) => handleInputChange(actionTypes.SET_STATUS, e.currentTarget.value)}
-                        options={["pending", "running", 'complete', "paused"]}
+                        options={[
+                            { value: "pending", label: "Pending" },
+                            { value: "running", label: "Running" },
+                            { value: "complete", label: "Complete" },
+                            { value: "paused", label: "Paused" }
+                        ]}
                         className={"flex flex-col"}
                     />
                     <Dropdown
@@ -138,7 +150,20 @@ const CampaignSettings = ({ data, audiences }) => {
                         label={"Campaign Type"}
                         value={campaignDetails.type}
                         onChange={(e) => handleInputChange(actionTypes.SET_TYPE, e.currentTarget.value)}
-                        options={["message", "robocall", 'simple_ivr', "complex_ivr", "live_call"]}
+                        options={[
+                            { value: "message", label: "Message" },
+                            { value: "robocall", label: "Robocall" },
+                            { value: 'simple_ivr', label: "Simple IVR" },
+                            { value: "complex_ivr", label: "Complex IVR" },
+                            { value: "live_call", lable: "Live Call" }]}
+                        className={"flex flex-col"}
+                    />
+                    <Dropdown
+                        name="voicemail"
+                        label={"Voicemail File"}
+                        value={campaignDetails.type}
+                        onChange={(e) => handleInputChange(actionTypes.SET_TYPE, e.currentTarget.value)}
+                        options={mediaData.map((media) => ({ value: media.id, label: media.name }))}
                         className={"flex flex-col"}
                     />
                 </div>
@@ -181,7 +206,7 @@ const CampaignSettings = ({ data, audiences }) => {
                     Audiences:
                     {audiences.filter(Boolean).map((audience) => (
                         <div key={audience.id} className="flex gap-2">
-                            <input type="checkbox" id={`${audience.id}-audience-select`} checked={selectedAudiences.includes(audience)} onChange={(event) => handleAudience({event, audience})} />
+                            <input type="checkbox" id={`${audience.id}-audience-select`} checked={selectedAudiences.includes(audience)} onChange={(event) => handleAudience({ event, audience })} />
                             <label htmlFor={`${audience.id}-audience-select`}>{audience.name || `Unnamed Audience ${audience.id}`}</label>
                         </div>
                     ))}

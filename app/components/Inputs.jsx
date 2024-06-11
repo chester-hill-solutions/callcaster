@@ -20,9 +20,9 @@ const Dropdown = ({ name, value, onChange, options = [], className, label = name
     <div className={className}>
         <label htmlFor={name}>{label}</label>
         <select value={value} onChange={onChange} name={name} disabled={disabled} id={name} className="px-1 py-2 border-2 border-solid border-[var(--border)]">
-            <option value={null}>Select a status</option>
+            <option value={null}>Select an option</option>
             {options.map((opt) => (
-                <option key={`${name}-${opt}`} value={opt}>{(opt[0].toUpperCase() + opt.substring(1)).replace('_', " ")}</option>
+                <option key={`${name}-${opt}`} value={opt.value}>{opt.label}</option>
             ))}
         </select>
     </div>
