@@ -4,9 +4,9 @@ import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
 
-const initialState = (data) => ({
+const initialState = (data, workspace) => ({
     campaign_id: data[0]?.campaign.id,
-    workspace: data[0]?.campaignDetails.workspace,
+    workspace: workspace,
     title: data[0]?.campaign.title,
     status: data[0]?.campaign.status,
     type: data[0]?.campaign.type || 'live_call',
@@ -71,12 +71,12 @@ const reducer = (state, action) => {
     }
 };
 
-const CampaignSettings = ({ data, audiences, mediaData, addAudience, removeAudience }) => {
+const CampaignSettings = ({ data, audiences, mediaData, addAudience, removeAudience, workspace }) => {
     const navigate = useNavigate();
     const nav = useNavigation();
     const busy = (nav.state !== 'idle');
     const submit = useSubmit();
-    const [initial, setInitial] = useState(initialState(data));
+    const [initial, setInitial] = useState(initialState(data, workspace));
     const [campaignDetails, dispatch] = useReducer(reducer, initial);
     const selectedAudiences = data.map((i) => audiences?.find((audience) => audience.id === i.audience_id));
     const [isChanged, setChanged] = useState(false);
@@ -111,7 +111,7 @@ const CampaignSettings = ({ data, audiences, mediaData, addAudience, removeAudie
     }, [campaignDetails, initial]);
 
     useEffect(() => {
-        const newInitialState = initialState(data);
+        const newInitialState = initialState(data, workspace);
         setInitial(newInitialState);
         dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
     }, [data]);

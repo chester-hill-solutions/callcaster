@@ -91,12 +91,11 @@ export default function Campaign() {
             attempts: [...initialAttempts],
             recentCall: { ...initialRecentCall },
             recentAttempt: { ...initialRecentAttempt }
-
         },
         contacts,
         nextRecipient,
         setNextRecipient
-    })
+    });
     const fetcher = useFetcher();
     const submit = useSubmit();
     const [groupByHousehold] = useState(true);
@@ -128,6 +127,16 @@ export default function Campaign() {
 
         return null;
     }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
+
+    const switchToContact = (contact) => {
+        setNextRecipient(contact);
+        const newRecentAttempt = attemptList.find(call => call.contact_id === contact.contact.id) || {};
+        const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
+        setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
+        setUpdate(newRecentAttempt.update || {});
+        setDisposition(newRecentAttempt.disposition || null);
+    };
+
 
     const handleDialNext = () => {
         if (activeCall || incomingCall || status !== 'Registered') {
@@ -184,13 +193,62 @@ export default function Campaign() {
         handleQueueButton();
         handleNextNumber(true);
     }
+    useEffect(() => {
+        if (recentAttempt) {
+            setUpdate(recentAttempt.result || {});
+            setDisposition(recentAttempt.disposition || null);
+        }
+    }, [recentAttempt]);
+
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
+    const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
-                <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
+                <div className="flex flex-col min-w-44">
+                    <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
+                    <div style={{
+                        flex: '0 0 20%',
+                        border: '3px solid #BCEBFF',
+                        borderRadius: "20px",
+                        marginBottom: "2rem",
+                        background: '#F1F1F1',
+                        minHeight: "300px",
+                        alignItems: "stretch",
+                        flexDirection: "column",
+                        display: "flex",
+                        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+                        maxWidth: "300px",
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: "center",
+                            justifyContent: 'space-between',
+                            borderTopLeftRadius: '18px',
+                            borderTopRightRadius: '18px',
+                            padding: "16px",
+                            background: "hsl(var(--brand-secondary))",
+                            width: '100%',
+                            textAlign: "center"
+                        }}
+                            className="font-Tabac-Slab text-xl"
+                        >
+                            <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
+                                Household Members
+                            </div>
+                        </div>
+                        {house?.map((contact) => {
+                            return (
+                                <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
+                                    <div>{contact.contact.firstname} {contact.contact.surname}</div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+                <CallQuestionnaire {...{ handleResponse, campaignDetails, update, nextRecipient }} />
                 <QueueList
                     {...{
                         householdMap,

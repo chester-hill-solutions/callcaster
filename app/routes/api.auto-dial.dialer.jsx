@@ -12,9 +12,11 @@ export const action = async ({ request }) => {
                     campaign_id_variable: campaign_id, user_id_variable: user_id
 
                 })
+
+                const calls = twilio.calls.list();
         if (contactError) throw contactError;
         const contactRecord = record[0];
-        const toNumber = +19058088017//contactRecord.phone;
+        const toNumber = contactRecord.phone;
 
         let outreach_attempt_id;
         const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contactRecord.contact_id, cam_id: campaign_id, queue_id: contactRecord.queue_id });

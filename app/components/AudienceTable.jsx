@@ -83,7 +83,6 @@ const AudienceTable = ({ data: initialData, contacts: initialContacts, workspace
         }
         reader.readAsText(file);
     };
-
     return (
         <div className="max-h-[800px] overflow-y-scroll">
             <div id="audience-settings" className="flex justify-between">

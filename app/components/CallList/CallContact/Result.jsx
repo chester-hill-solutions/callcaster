@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BusyIcon, ClearIcon, FollowUpIcon, SetIcon, ThumbsDownIcon, ThumbsUpIcon, MidIcon, SignIcon, SquareCheckIcon, NoAnswerIcon } from "../../Icons";
 import SupportButton from "./SupportButton";
 
+// Mapping of icon names to actual icon components
 const iconMapping = {
     BusyIcon,
     ClearIcon,
@@ -17,11 +18,16 @@ const iconMapping = {
 };
 
 const Result = ({ action, initResult = null, questions, questionId }) => {
-    const [result, setResult] = useState(initResult);
+    const [result, setResult] = useState(initResult || "");
     const [multiResult, setMultiResult] = useState(initResult || []);
     
+    useEffect(() => {
+        setResult(initResult || "");
+        setMultiResult(initResult || []);
+    }, [initResult]);
+    
     const handleChange = (value) => {
-        console.log(value)
+        setResult(value);
         action({ column: questionId, value });
     };
     
@@ -36,10 +42,6 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
         action({ column: questionId, value: newArr });
     }; 
 
-    useEffect(() => {
-        setResult(initResult)
-    }, [initResult])
-    
     return (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', gap: "16px" }}>
             <div style={{ flexBasis: "1 1 50%" }}>
@@ -88,11 +90,11 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                         <label htmlFor={questions.title}>
                             {questions.title}
                         </label>
-                    <input id={questions.title} type="checkbox" name={questions.title} onChange={(e => handleChange(e.target.checked))}></input>
+                    <input id={questions.title} type="checkbox" name={questions.title} onChange={(e) => handleChange(e.target.checked)} checked={result}></input>
                     </div>
                 )}
                 {questions.type === 'dropdown' && (
-                    <select name={questions.title} onChange={(e) => handleChange(e.currentTarget.value)} className="px-2 py-1">
+                    <select name={questions.title} value={result} onChange={(e) => handleChange(e.currentTarget.value)} className="px-2 py-1">
                         <option value={null} key={`question-${questionId}-select-DEFAULT`}>
                             ---
                         </option>
@@ -120,7 +122,6 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                                         onChange={(e) => handleMultiChange(value, e.target.checked)}
                                         checked={multiResult.includes(value)}
                                     />
-
                                 </div>
                             );
                         })}
@@ -128,7 +129,14 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                 )}
                 {questions.type === 'textarea' && (
                     <div>
-                        <textarea type="textarea" rows={2} placeholder="Notes/Key Issues" onChange={handleChange} value={result} key={`question-${questionId}-notes`} />
+                        <textarea 
+                            type="textarea" 
+                            rows={2} 
+                            placeholder="Notes/Key Issues" 
+                            onChange={(e) => handleChange(e.target.value)} 
+                            value={result} 
+                            key={`question-${questionId}-notes`} 
+                        />
                     </div>
                 )}
             </div>

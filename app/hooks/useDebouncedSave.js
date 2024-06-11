@@ -10,7 +10,8 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
                 callId: recentAttempt?.id,
                 selected_workspace_id: workspaceId,
                 contact_id: nextRecipient.contact.id,
-                campaign_id: campaign.id
+                campaign_id: campaign.id,
+                workspace: workspaceId
             }, {
                 method: "PATCH",
                 navigate: false,
@@ -20,7 +21,9 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
         };
 
         handlerRef.current = setTimeout(() => {
-            if (JSON.stringify(update) !== JSON.stringify({ ...recentAttempt?.result })) {
+            const att = {...recentAttempt.result}
+            const upd = {...update}
+            if (JSON.stringify(att) !== JSON.stringify(upd)) {
                 console.log(`Saving updated object: `, { new: { ...update } }, { old: { ...recentAttempt.result } });
                 handleQuestionsSave();
             }

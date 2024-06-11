@@ -44,6 +44,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
             display: "flex",
             boxShadow: "3px 5px 0  rgba(50,50,50,.6)"
         }}>
+            <div className="flex flex-col">
             <div style={{
                 display: 'flex',
                 alignItems: "center",
@@ -65,7 +66,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                 </div>
             </div>
             {nextRecipient &&
-                <div className="p-4   w-3/4">
+                <div className="p-4">
                     <div className="font-bold text-lg font-Zilla-Slab">
                         {nextRecipient.contact?.firstname} {nextRecipient.contact?.surname}
                     </div>
@@ -79,8 +80,11 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                         {nextRecipient.contact?.address?.split(',')?.map((t) => t.trim()).join(', ')}
 
                     </div>
+                    <div >   
+                    </div>
                 </div>
             }
+            </div>
             <div>
                 <div className="flex row gap-2 px-4 py-2 flex-1" style={{ position: 'relative' }}>
                     <button onClick={() => hangUp()} disabled={!activeCall} style={{ flex: "1", padding: "4px 8px", background: activeCall ? "#d60000" : '#cc8888', borderRadius: "5px", color: 'white' }}>
