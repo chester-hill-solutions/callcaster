@@ -31,41 +31,41 @@ export async function handleNewAudience({
     );
   }
 
-  const {
-    data: createCampaignAudienceData,
-    error: createCampaignAudienceError,
-  } = await supabaseClient
-    .from("campaign_audience")
-    .insert({
-      campaign_id: campaignId,
-      audience_id: createAudienceData.id,
-    })
-    .select()
-    .single();
+  // const {
+  //   data: createCampaignAudienceData,
+  //   error: createCampaignAudienceError,
+  // } = await supabaseClient
+  //   .from("campaign_audience")
+  //   .insert({
+  //     campaign_id: campaignId,
+  //     audience_id: createAudienceData.id,
+  //   })
+  //   .select()
+  //   .single();
 
-  if (createCampaignAudienceError) {
-    console.log("Failed to create row on campaign_audience");
-    const { data: deleteNewAudience, error: deleteNewAudienceError } =
-      await supabaseClient
-        .from("audience")
-        .delete()
-        .eq("id", createAudienceData.id);
+  // if (createCampaignAudienceError) {
+  //   console.log("Failed to create row on campaign_audience");
+  //   const { data: deleteNewAudience, error: deleteNewAudienceError } =
+  //     await supabaseClient
+  //       .from("audience")
+  //       .delete()
+  //       .eq("id", createAudienceData.id);
 
-    if (deleteNewAudienceError != null) {
-      console.log(
-        `Deleted New Audience, ${createAudienceData.id}: ${createAudienceData.name}`,
-      );
-    }
+  //   if (deleteNewAudienceError != null) {
+  //     console.log(
+  //       `Deleted New Audience, ${createAudienceData.id}: ${createAudienceData.name}`,
+  //     );
+  //   }
 
-    return json(
-      {
-        audienceData: null,
-        campaignAudienceData: null,
-        error: createCampaignAudienceError,
-      },
-      { headers },
-    );
-  }
+  //   return json(
+  //     {
+  //       audienceData: null,
+  //       campaignAudienceData: null,
+  //       error: createCampaignAudienceError,
+  //     },
+  //     { headers },
+  //   );
+  // }
 
   return redirect("../");
 }
