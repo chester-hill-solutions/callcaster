@@ -1,12 +1,13 @@
 import {
+  Link,
+  Outlet,
   json,
   redirect,
   useLoaderData,
   useNavigate,
-  Link,
-  Outlet
 } from "@remix-run/react";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Toaster } from "sonner";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
 import { WorkspaceTableNames } from "~/lib/types";
@@ -70,7 +71,8 @@ export const loader = async ({ request, params }) => {
 export default function Workspace() {
   const navigate = useNavigate();
 
-  const { workspace, audiences, campaigns, contacts, selected:initSelected } = useLoaderData();
+  const { workspace, audiences, campaigns, contacts, selected } =
+    useLoaderData();
   const tables = [
     {
       name: "campaigns",
@@ -89,13 +91,10 @@ export default function Workspace() {
     },
   ];
 
-  const [selected, setSelected] = useState(initSelected)
   const [selectedTable, setSelectedTable] = useState(() =>
     tables.find((table) => table.name === selected),
   );
-
-
-  const handleSelectTable = (tableName) => {
+  const handleSelectTable = (tableName: string) => {
     let newTable;
     switch (tableName) {
       case WorkspaceTableNames.Campaign:
@@ -104,8 +103,6 @@ export default function Workspace() {
           columns: campaignColumns,
           data: campaigns,
         };
-        setSelectedTable(newTable);
-        setSelected(tableName)
         break;
       case WorkspaceTableNames.Audience:
         newTable = {
@@ -113,8 +110,6 @@ export default function Workspace() {
           columns: audienceColumns,
           data: audiences,
         };
-        setSelectedTable(newTable);
-        setSelected(tableName)
         break;
       case WorkspaceTableNames.Contact:
         newTable = {
@@ -122,20 +117,14 @@ export default function Workspace() {
           columns: contactColumns,
           data: contacts,
         };
-        setSelectedTable(newTable);
-        setSelected(tableName)
         break;
       default:
         console.log(
           `tableName: ${tableName} does not correspond to any workspace tables`,
         );
-        break;
-        
+        return;
     }
-    navigate(tableName);
-
   };
-  
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="flex items-center">
