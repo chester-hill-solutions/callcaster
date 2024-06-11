@@ -12,9 +12,9 @@ export const action = async ({ request, params }) => {
     const answeredBy = formData.get('AnsweredBy');
     const callStatus = formData.get('CallStatus')
     const dial = twiml.dial();
-    
+
+    const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id').eq('sid', formData.get('CallSid')).single();
     if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
-        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id').eq('sid', formData.get('CallSid')).single();
         const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file, group_household_queue').eq('id', dbCall.campaign_id).single();
         if (campaign.group_household_queue) {
             const { data: contacts, error: householdContactsError } = await supabase.rpc('dequeue_household', { contact_id: dbCall.contact_id })
@@ -26,18 +26,18 @@ export const action = async ({ request, params }) => {
         catch (error) {
             console.log(error)
         }
+    } else {
+        const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({answered_at: new Date() }).eq('id', dbCall.outreach_attempt_id).select();
+        dial.conference({
+            //record: 'record-from-start',
+            beep: false,
+            statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`,
+            statusCallbackEvent: ['join', 'leave', 'modify'],
+            endConferenceOnExit: false,
+            maxParticipants: 10,
+            waitUrl: '',
+        }, conferenceName);
     }
-    
-    dial.conference({
-        //record: 'record-from-start',
-        beep: false,
-        statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`,
-        statusCallbackEvent: ['join', 'leave', 'modify'],
-        endConferenceOnExit: false,
-        maxParticipants: 10,
-        waitUrl: '',
-    }, conferenceName);
-
     return new Response(twiml.toString(), {
         headers: {
             'Content-Type': 'text/xml'

@@ -1,5 +1,3 @@
-import { useRouteError } from "@remix-run/react";
-import { useEffect } from "react";
 import Result from "../components/CallList/CallContact/Result";
 
 const CallQuestionnaire = ({ handleResponse: intentAction, campaignDetails, update, nextRecipient: contact }) => {

@@ -7,6 +7,13 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     const [recentCall, setRecentCall] = useState(init.recentCall);
     const [recentAttempt, setRecentAttempt] = useState(init.recentAttempt);
     const [pendingCalls, setPendingCalls] = useState([]);
+
+    const isRecent = (date) => {
+        const created = new Date(date);
+        const now = new Date();
+        return (now - created) / 3600000 < 24;
+    };
+
     const processPendingCalls = useCallback((attemptId) => {
         setPendingCalls((currentPendingCalls) => {
             const callsToProcess = currentPendingCalls.filter(call => call.outreach_attempt_id === attemptId);
@@ -35,13 +42,12 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
             return newAttempts;
         });
         processPendingCalls(payload.new.id);
-        setRecentAttempt(payload.new);
+        setRecentAttempt(isRecent(payload.new.date_created) ? payload.new : {});
     }, [callsList, processPendingCalls]);
 
     const updateCalls = useCallback((payload) => {
         const attemptId = payload.new.outreach_attempt_id;
         if (attemptId) {
-
             setAttempts((currentAttempts) => {
                 return currentAttempts.map(item => item.id === attemptId
                     ? { ...item, call: [...(item.call || []), payload.new] }
@@ -64,11 +70,9 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                 setNextRecipient({ ...payload.new, contact });
                 setQueue((currentQueue) => {
                     const index = currentQueue.findIndex(item => item.id === payload.new.id);
-                    if (index > -1) {
-                        return currentQueue.map(item => item.id === payload.new.id ? { ...payload.new, contact } : item);
-                    } else {
-                        return [...currentQueue, { ...payload.new, contact }];
-                    }
+                    return index > -1
+                        ? currentQueue.map(item => item.id === payload.new.id ? { ...payload.new, contact } : item)
+                        : [...currentQueue, { ...payload.new, contact }];
                 });
             }
         }
@@ -113,9 +117,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                 .sort((a, b) => new Date(b.date_created) - new Date(a.date_created))
                 .find(call => call.contact_id === nextRecipient.contact.id)
             : null;
-            let created = new Date(recentCall.date_created) 
-            let now = new Date();
-            if ((now - created)/3600000 < 24) {setRecentCall(newRecentCall);} else {setRecentCall({})}
+        setRecentCall(isRecent(newRecentCall?.date_created) ? newRecentCall : {});
     }, [callsList, nextRecipient]);
 
     return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue };
