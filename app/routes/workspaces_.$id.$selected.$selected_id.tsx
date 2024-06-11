@@ -1,5 +1,5 @@
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext } from "@remix-run/react";
+import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { AudienceTable } from "../components/AudienceTable";
@@ -7,9 +7,13 @@ import { CampaignSettings } from "../components/CampaignSettings";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
+
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  //if (selected === 'campaigns') return redirect(`call`)
+
+  const { data: mediaData, error: mediaError } = await supabaseClient.storage
+    .from("workspaceAudio")
+    .list(workspace_id);
   if (selected_id === "new") {
     let query = supabaseClient;
     switch (selected) {
@@ -98,13 +102,39 @@ export const loader = async ({ request, params }) => {
       campaignDetails,
     }));
   }
-  return json({ workspace_id, selected_id, data, selected });
+  return json({ workspace_id, selected_id, data, selected, mediaData });
 };
 
 export default function Audience() {
   const { selectedTable, audiences, contacts = [] } = useOutletContext();
-  const { workspace_id, selected_id, data = [] } = useLoaderData();
-
+  const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
+  const submit = useSubmit();
+  const addAudience = (audience) => {
+    submit(
+      {
+        audience_id: audience.id,
+        campaign_id: selected_id,
+      },
+      {
+        method: "POST",
+        encType: "application/json",
+        action: "/api/campaign_audience",
+      },
+    );
+  };
+  const removeAudience = (audience) => {
+    submit(
+      {
+        audience_id: audience.id,
+        campaign_id: selected_id,
+      },
+      {
+        method: "DELETE",
+        encType: "application/json",
+        action: "/api/campaign_audience",
+      },
+    );
+  };
   const ids = useMemo(
     () =>
       data.map(
@@ -124,7 +154,7 @@ export default function Audience() {
     [audiences, selected_id],
   );
   const pageData = useMemo(() => data, [data]);
-  console.log(pageData)
+
   return (
     <div className="flex flex-col">
       {selectedTable?.name.toLowerCase() === "audiences" && (
@@ -139,7 +169,13 @@ export default function Audience() {
         />
       )}
       {selectedTable?.name.toLowerCase() === "campaigns" && (
-        <CampaignSettings data={pageData} audiences={audiences} />
+        <CampaignSettings
+          data={pageData}
+          audiences={audiences}
+          mediaData={mediaData}
+          addAudience={addAudience}
+          removeAudience={removeAudience}
+        />
       )}
     </div>
   );
