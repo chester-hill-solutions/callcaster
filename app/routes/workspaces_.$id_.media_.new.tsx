@@ -49,8 +49,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     );
   }
 
-  // console.log("XXXXXXXXXXXXXXXXXXXX");
-  // console.log("HERE");
+  console.log("XXXXXXXXXXXXXXXXXXXX");
+  console.log("HERE");
   // const formData = await unstable_parseMultipartFormData(
   //   request,
   //   uploadHandler,
