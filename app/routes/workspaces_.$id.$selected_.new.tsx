@@ -42,7 +42,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const formData = await request.formData();
-
   const formAction = formData.get("formAction") as string;
 
   switch (formAction) {
@@ -124,7 +123,7 @@ export default function SelectedNew() {
             className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
           />
         </label>
-        <div className="flex items-center gap-4 font-Zilla-Slab text-xl font-bold">
+        {/* <div className="flex items-center gap-4 font-Zilla-Slab text-xl font-bold">
           <p className="w-full">Add to Campaign:</p>
           <Select name="campaign-select">
             <SelectTrigger className="w-full border-2 border-black bg-white font-Zilla-Slab text-xl font-semibold dark:border-white dark:bg-transparent">
@@ -142,7 +141,7 @@ export default function SelectedNew() {
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div> */}
 
         <div className="flex items-center gap-4">
           <Button
