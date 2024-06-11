@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from "@remix-run/react";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { Toaster } from "sonner";
 import { PlusIcon } from "~/components/Icons";
 import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
 import {
@@ -18,6 +19,7 @@ import { Button } from "~/components/ui/button";
 
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { WorkspaceTableNames } from "~/lib/types";
 
 export const loader = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
@@ -93,7 +95,7 @@ export default function Workspace() {
   const [selectedTable, setSelectedTable] = useState(() =>
     tables.find((table) => table.name === selected),
   );
-  const handleSelectTable = (tableName) => {
+  const handleSelectTable = (tableName: string) => {
     let newTable;
     switch (tableName) {
       case WorkspaceTableNames.Campaign:
