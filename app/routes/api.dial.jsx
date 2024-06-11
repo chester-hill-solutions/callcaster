@@ -10,7 +10,7 @@ export const action = async ({ request }) => {
         const call = await twilio.calls.create({
             to: `client:${user_id}`,
             from: caller_id,
-            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(+19058088017)}`,
+            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to_number)}`,
         });
         let outreach_attempt_id;
         if (!outreach_id) {
@@ -26,7 +26,7 @@ export const action = async ({ request }) => {
             date_updated: call.dateUpdated,
             parent_call_sid: call.parentCallSid,
             account_sid: call.accountSid,
-            to: +19058088017, //to_number,
+            to: to_number,
             from: call.from,
             phone_number_sid: call.phoneNumberSid,
             status: call.status,

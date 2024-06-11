@@ -108,6 +108,7 @@ export const loader = async ({ request, params }) => {
 export default function Audience() {
   const { selectedTable, audiences, contacts = [] } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
+
   const submit = useSubmit();
   const addAudience = (audience) => {
     submit(
@@ -135,22 +136,14 @@ export default function Audience() {
       },
     );
   };
-  const ids = useMemo(
-    () =>
-      data.map(
-        (row) =>
-          row[
-            `${selectedTable?.name.substring(0, selectedTable.name.length - 1)}_id`
-          ],
-      ),
-    [data, selectedTable],
-  );
+  const ids = useMemo(() => data.map((row) => row[`contact_id`]), [data]);
+
   const audienceContacts = useMemo(
-    () => contacts?.filter((contact) => ids.includes(contact.id)),
+    () => contacts.filter((contact) => ids.includes(contact.id)),
     [contacts, ids],
   );
   const audience = useMemo(
-    () => audiences?.find((audience) => audience.id === parseInt(selected_id)),
+    () => audiences.find((audience) => audience.id === parseInt(selected_id)),
     [audiences, selected_id],
   );
   const pageData = useMemo(() => data, [data]);
@@ -170,6 +163,7 @@ export default function Audience() {
       )}
       {selectedTable?.name.toLowerCase() === "campaigns" && (
         <CampaignSettings
+          workspace={workspace_id}
           data={pageData}
           audiences={audiences}
           mediaData={mediaData}
