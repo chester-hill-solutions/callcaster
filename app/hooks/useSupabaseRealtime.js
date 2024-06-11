@@ -35,9 +35,15 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         setAttempts((currentAttempts) => {
             const index = currentAttempts.findIndex(item => item.id === payload.new.id);
             const calls = callsList.filter(call => call.outreach_attempt_id === payload.new.id);
+            const updatedAttempt = { ...payload.new, call: calls };
+
+            if (payload.new.disposition) {
+                updatedAttempt.result = { ...(updatedAttempt.result || {}), status: payload.new.disposition };
+            }
+
             const newAttempts = index > -1
-                ? currentAttempts.map(item => item.id === payload.new.id ? { ...payload.new, call: calls } : item)
-                : [...currentAttempts, { ...payload.new, call: calls }];
+                ? currentAttempts.map(item => item.id === payload.new.id ? updatedAttempt : item)
+                : [...currentAttempts, updatedAttempt];
 
             return newAttempts;
         });

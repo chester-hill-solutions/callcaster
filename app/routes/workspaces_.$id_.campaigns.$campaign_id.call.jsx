@@ -8,6 +8,7 @@ import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
 import { getNextContact } from "../lib/getNextContact";
 import useDebouncedSave from "../hooks/useDebouncedSave";
+import useSupabaseRoom from "../hooks/useSupabaseRoom";
 
 const limit = 30
 
@@ -96,6 +97,7 @@ export default function Campaign() {
         nextRecipient,
         setNextRecipient
     });
+    const {status: liveStatus, users:onlineUsers} = useSupabaseRoom({supabase, workspace:workspaceId, campaign, userId:user.id});
     const fetcher = useFetcher();
     const submit = useSubmit();
     const [groupByHousehold] = useState(true);

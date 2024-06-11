@@ -161,7 +161,7 @@ const CampaignSettings = ({ data, audiences, mediaData, addAudience, removeAudie
                     <Dropdown
                         name="voicemail"
                         label={"Voicemail File"}
-                        value={campaignDetails.type}
+                        value={campaignDetails.id}
                         onChange={(e) => handleInputChange(actionTypes.SET_TYPE, e.currentTarget.value)}
                         options={mediaData.map((media) => ({ value: media.id, label: media.name }))}
                         className={"flex flex-col"}

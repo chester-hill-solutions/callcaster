@@ -120,6 +120,7 @@ export default function Audience() {
         method: "POST",
         encType: "application/json",
         action: "/api/campaign_audience",
+        navigate:false
       },
     );
   };
@@ -133,6 +134,7 @@ export default function Audience() {
         method: "DELETE",
         encType: "application/json",
         action: "/api/campaign_audience",
+        navigate:false
       },
     );
   };
