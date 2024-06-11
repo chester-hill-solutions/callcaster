@@ -1,7 +1,13 @@
 import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
 
 import { ActionFunctionArgs } from "@remix-run/node";
-import { Form, json, useActionData, useLoaderData } from "@remix-run/react";
+import {
+  Form,
+  json,
+  Link,
+  useActionData,
+  useLoaderData,
+} from "@remix-run/react";
 import { jwtDecode } from "jwt-decode";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -158,23 +164,23 @@ export default function WorkspaceSettings() {
       </div>
 
       <div className="flex flex-col">
-        <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+        {/* <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Add New Member
-        </p>
+        </p> */}
         <Tabs defaultValue="addUser" className="w-full">
           <TabsList className="flex w-full gap-2 bg-brand-secondary font-bold dark:bg-inherit">
             <TabsTrigger
-              className="w-full bg-zinc-300 font-bold data-[state=active]:bg-white dark:data-[state=active]:border-2 dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
+              className="w-full bg-zinc-300 text-xl font-bold uppercase data-[state=active]:bg-white dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
               value="addUser"
             >
-              Add User
+              Add User To Workspace
             </TabsTrigger>
-            <TabsTrigger
+            {/* <TabsTrigger
               className="w-full bg-zinc-300 font-bold data-[state=active]:bg-white dark:data-[state=active]:border-2 dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
               value="inviteCaller"
             >
               Invite Caller
-            </TabsTrigger>
+            </TabsTrigger> */}
           </TabsList>
           <TabsContent value="addUser">
             <Form method="POST" className="flex w-full flex-col gap-4">
@@ -188,7 +194,7 @@ export default function WorkspaceSettings() {
                 htmlFor="username"
                 className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
               >
-                User Name
+                Email
                 <input
                   type="text"
                   name="username"
@@ -205,7 +211,7 @@ export default function WorkspaceSettings() {
                   className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
                   name="newUserWorkspaceRole"
                   id="newUserWorkspaceRole"
-                  defaultValue={MemberRole.Member}
+                  defaultValue={MemberRole.Caller}
                   required
                 >
                   {Object.values(MemberRole).map((role) => {
@@ -232,10 +238,23 @@ export default function WorkspaceSettings() {
                   })}
                 </select>
               </label>
-              <Button className="">Add New User</Button>
+              <div className="flex w-full gap-2">
+                <Button className="h-full w-2/3 font-Zilla-Slab text-2xl font-semibold">
+                  Add New User
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-full w-1/3 border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+                >
+                  <Link to=".." relative="path">
+                    Back
+                  </Link>
+                </Button>
+              </div>
             </Form>
           </TabsContent>
-          <TabsContent value="inviteCaller" className="">
+          {/* <TabsContent value="inviteCaller" className="">
             <Form method="POST" className="flex w-full flex-col gap-4">
               {actionData?.error && (
                 <p className="text-center text-2xl font-bold text-brand-primary">
@@ -257,7 +276,7 @@ export default function WorkspaceSettings() {
               </label>
               <Button className="">Invite Caller</Button>
             </Form>
-          </TabsContent>
+          </TabsContent> */}
         </Tabs>
       </div>
       <Toaster richColors />

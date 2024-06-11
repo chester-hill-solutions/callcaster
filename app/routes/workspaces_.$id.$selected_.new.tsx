@@ -123,7 +123,7 @@ export default function SelectedNew() {
             className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
           />
         </label>
-        {/* <div className="flex items-center gap-4 font-Zilla-Slab text-xl font-bold">
+        <div className="flex items-center gap-4 font-Zilla-Slab text-xl font-bold">
           <p className="w-full">Add to Campaign:</p>
           <Select name="campaign-select">
             <SelectTrigger className="w-full border-2 border-black bg-white font-Zilla-Slab text-xl font-semibold dark:border-white dark:bg-transparent">
@@ -141,7 +141,7 @@ export default function SelectedNew() {
               ))}
             </SelectContent>
           </Select>
-        </div> */}
+        </div>
 
         <div className="flex items-center gap-4">
           <Button
@@ -217,13 +217,12 @@ export default function SelectedNew() {
   return (
     <div className="flex h-full w-full items-start justify-center p-16">
       {url === "audiences" && audiencesNew}
-      {/* {url === "campaigns" && campaignsNew} */}
-      {url === "contacts" ||
-        (url === "campaigns" && (
-          <p className="w-full text-center font-Zilla-Slab text-3xl opacity-85">
-            Adding New {capitalize(url)} coming soon...
-          </p>
-        ))}
+      {url === "campaigns" && campaignsNew}
+      {url === "contacts" && (
+        <p className="w-full text-center font-Zilla-Slab text-3xl opacity-85">
+          Adding New {capitalize(url)} coming soon...
+        </p>
+      )}
     </div>
   );
 }
