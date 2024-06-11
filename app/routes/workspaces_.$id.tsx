@@ -19,6 +19,7 @@ import {
 import { Button } from "~/components/ui/button";
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { WorkspaceTableNames } from "~/lib/types";
 
 export const loader = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
