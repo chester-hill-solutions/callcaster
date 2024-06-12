@@ -16,7 +16,7 @@ const initialState = (data, workspace, campaign_id) => ({
     start_date: data[0]?.start_date,
     end_date: data[0]?.end_date,
     voicemail_file: data[0]?.voicemail_file,
-    questions: data[0]?.campaignDetails.questions,
+    questions: data[0]?.campaignDetails?.questions,
 });
 
 const actionTypes = {
