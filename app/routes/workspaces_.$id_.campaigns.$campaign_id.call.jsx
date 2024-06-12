@@ -97,23 +97,24 @@ export default function Campaign() {
         nextRecipient,
         setNextRecipient
     });
-    const {status: liveStatus, users:onlineUsers} = useSupabaseRoom({supabase, workspace:workspaceId, campaign, userId:user.id});
+    const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({ supabase, workspace: workspaceId, campaign: campaign.id, userId: user.id });
     const fetcher = useFetcher();
     const submit = useSubmit();
     const [groupByHousehold] = useState(true);
     const [update, setUpdate] = useState(recentAttempt?.result || {});
     const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
     const householdMap = useMemo(() =>
-        queue.reduce((acc, curr) => {
+        queue.reduce((acc, curr, index) => {
             if (curr?.contact?.address) {
                 if (!acc[curr.contact.address]) {
                     acc[curr.contact.address] = [];
                 }
                 acc[curr.contact.address].push(curr);
+            } else {
+                acc[`NO_ADDRESS_${index}`] = [curr];
             }
             return acc;
         }, {}), [queue]);
-
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleNextNumber = useCallback((skipHousehold = false) => {
@@ -204,15 +205,13 @@ export default function Campaign() {
 
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
-
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <div className="flex flex-col min-w-44">
+                <div className="flex flex-col" style={{flex:"0 0 20%"}}>
                     <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                     <div style={{
-                        flex: '0 0 20%',
                         border: '3px solid #BCEBFF',
                         borderRadius: "20px",
                         marginBottom: "2rem",
@@ -222,7 +221,6 @@ export default function Campaign() {
                         flexDirection: "column",
                         display: "flex",
                         boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-                        maxWidth: "300px",
                     }}>
                         <div style={{
                             display: 'flex',
@@ -263,10 +261,10 @@ export default function Campaign() {
                 />
             </div>
             <div>
-                
+
             </div>
-            
+
         </div>
-        
+
     );
 }

@@ -1,7 +1,7 @@
+import { useEffect } from "react";
 import Result from "../components/CallList/CallContact/Result";
 
 const CallQuestionnaire = ({ handleResponse: intentAction, campaignDetails, update, nextRecipient: contact }) => {
-
     return (
         <div style={{ position: "relative", flex: "1 0 40%", border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem", background: "#f1f1f1", boxShadow: "3px 5px 0  rgba(50,50,50,.6)" }} className="flex-col flex">
             <div style={{
@@ -21,7 +21,7 @@ const CallQuestionnaire = ({ handleResponse: intentAction, campaignDetails, upda
             </div>
             <div>
                 <div style={{ padding: "8px 16px", width: "100%" }}>
-                    
+
                     <div style={{ padding: "8px 16px", display: "flex", flexDirection: "column", gap: '16px' }}>
                         {Object.keys(campaignDetails?.questions).sort((a, b) => campaignDetails.questions[a].order - campaignDetails.questions[b].order).map((key) => {
                             return (

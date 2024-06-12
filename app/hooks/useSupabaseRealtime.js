@@ -32,40 +32,51 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     }, []);
 
     const updateAttempts = useCallback((payload) => {
+        const calls = callsList.filter(call => (call.outreach_attempt_id === payload.new.id) && (call.direction !== 'outbound-api'));
+        let updatedAttempt = { ...payload.new, call: calls };
+        if (calls.length && calls[0].status && !updatedAttempt.result.status) {
+            updatedAttempt.result = { ...(updatedAttempt.result && updatedAttempt.result), status: calls[0].status };
+        }
+
         setAttempts((currentAttempts) => {
             const index = currentAttempts.findIndex(item => item.id === payload.new.id);
-            const calls = callsList.filter(call => call.outreach_attempt_id === payload.new.id);
-            const updatedAttempt = { ...payload.new, call: calls };
-
-            if (payload.new.disposition) {
-                updatedAttempt.result = { ...(updatedAttempt.result || {}), status: payload.new.disposition };
-            }
-
             const newAttempts = index > -1
                 ? currentAttempts.map(item => item.id === payload.new.id ? updatedAttempt : item)
                 : [...currentAttempts, updatedAttempt];
-
             return newAttempts;
         });
         processPendingCalls(payload.new.id);
-        setRecentAttempt(isRecent(payload.new.date_created) ? payload.new : {});
+        setRecentAttempt(isRecent(updatedAttempt?.created_at) ? updatedAttempt : {});
     }, [callsList, processPendingCalls]);
 
     const updateCalls = useCallback((payload) => {
         const attemptId = payload.new.outreach_attempt_id;
+        let updatedCall = payload.new;
+
         if (attemptId) {
             setAttempts((currentAttempts) => {
-                return currentAttempts.map(item => item.id === attemptId
-                    ? { ...item, call: [...(item.call || []), payload.new] }
-                    : item
-                );
+                const updatedAttempts = currentAttempts.map(item => {
+                    if (item.id === attemptId) {
+                        const updatedItem = {
+                            ...item,
+                            call: [...(item.call || []), updatedCall],
+                            result: {
+                                ...(item.result || {}),
+                                ...(updatedCall.status && updatedCall.direction !== 'outbound-api' && { status: updatedCall.status })
+                            }
+                        };
+                        return updatedItem;
+                    }
+                    return item;
+                });
+                return updatedAttempts;
             });
-            setCalls((currentCalls) => [...currentCalls, payload.new]);
-            setRecentCall(payload.new.contact_id === recentAttempt?.contact?.id ? payload.new : recentCall);
+            setCalls((currentCalls) => [...currentCalls, updatedCall]);
+            setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
         } else {
-            setPendingCalls((currentPendingCalls) => [...currentPendingCalls, payload.new]);
+            setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
         }
-    }, [recentAttempt]);
+    }, [recentAttempt?.contact?.id, recentCall]);
 
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
