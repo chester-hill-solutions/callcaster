@@ -21,8 +21,8 @@ export const loader = async ({ request, params }) => {
     const { data: audiences, error: audiencesError } = await supabaseClient.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabaseClient.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
     const { data: attempts, error: attemptError } = await supabaseClient.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
-    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', 'queued').eq('campaign_id', id).order('attempts', {ascending:true}).order('queue_order', {ascending: true});
-    
+    const { data: queue, error: queueError } = await supabaseClient.from('campaign_queue').select().eq('status', 'queued').eq('campaign_id', id).order('attempts', { ascending: true }).order('queue_order', { ascending: true });
+
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
         console.log(errors);
@@ -101,15 +101,18 @@ export default function Campaign() {
     const [update, setUpdate] = useState(recentAttempt?.result || {});
     const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
     const householdMap = useMemo(() =>
-        queue.reduce((acc, curr) => {
+        queue.reduce((acc, curr, index) => {
             if (curr?.contact?.address) {
                 if (!acc[curr.contact.address]) {
                     acc[curr.contact.address] = [];
                 }
                 acc[curr.contact.address].push(curr);
+            } else {
+                acc[`NO_ADDRESS_${index}`] = [curr];
             }
             return acc;
         }, {}), [queue]);
+    const house = nextRecipient.contact ? householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)] : []
 
     const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id);
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
@@ -132,23 +135,61 @@ export default function Campaign() {
 
 
     const handleEndConference = () => {
-        submit({},{method:"post", action:'/api/auto-dial/end', navigate:false})
+        submit({}, { method: "post", action: '/api/auto-dial/end', navigate: false })
     }
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
 
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp: handleEndConference, handleDialNext, handleDequeueNext:() => null, disposition, setDisposition, recentAttempt, predictive: true }} />
+                <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
+                    <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp: handleEndConference, handleDialNext, handleDequeueNext: () => null, disposition, setDisposition, recentAttempt, predictive: true, conference }} />
+                    <div style={{
+                        border: '3px solid #BCEBFF',
+                        borderRadius: "20px",
+                        marginBottom: "2rem",
+                        background: '#F1F1F1',
+                        minHeight: "300px",
+                        alignItems: "stretch",
+                        flexDirection: "column",
+                        display: "flex",
+                        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+                    }}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: "center",
+                            justifyContent: 'space-between',
+                            borderTopLeftRadius: '18px',
+                            borderTopRightRadius: '18px',
+                            padding: "16px",
+                            background: "hsl(var(--brand-secondary))",
+                            width: '100%',
+                            textAlign: "center"
+                        }}
+                            className="font-Tabac-Slab text-xl"
+                        >
+                            <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
+                                Household Members
+                            </div>
+                        </div>
+                        {house?.map((contact) => {
+                            return (
+                                <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
+                                    <div>{contact.contact.firstname} {contact.contact.surname}</div>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
                 <CallQuestionnaire {...{ handleResponse, campaignDetails, update }} />
                 <QueueList
                     {...{
                         householdMap,
                         groupByHousehold,
                         queue,
-                        handleNextNumber:() => null,
+                        handleNextNumber: () => null,
                         nextRecipient,
-                        predictive:true
+                        predictive: true
                     }}
                 />
             </div>
