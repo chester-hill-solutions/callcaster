@@ -6,15 +6,7 @@ import {
   Link,
   Outlet
 } from "@remix-run/react";
-import { useState, useEffect, useMemo, useCallback } from "react";
 import { PlusIcon } from "~/components/Icons";
-import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
-import { WorkspaceTableNames } from "~/lib/types";
-import {
-  audienceColumns,
-  campaignColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
 import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -24,7 +16,6 @@ export const loader = async ({ request, params }) => {
     await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
-  const selected = params.selected;
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -58,7 +49,6 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Workspace() {
-  const navigate = useNavigate();
 
   const { workspace, audiences, campaigns } = useLoaderData();
 
