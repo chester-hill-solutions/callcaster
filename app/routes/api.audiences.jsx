@@ -15,9 +15,10 @@ export const action = async ({ request }) => {
         for (let pair of formData.entries()){
             data[pair[0]] = pair[1];
         }
+        console.log(data)
         const { data: update, error } = await supabaseClient
             .from('audience')
-            .update(data)
+            .upsert(data)
             .eq('id', data.id)
             .select();
         response = update;

@@ -24,29 +24,32 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const audience_id = params.audience_id;
   const { data: contacts, error: contactError } = await supabaseClient
     .from("contact_audience")
-    .select("...contact(*), audience(*)")
+    .select("...contact(*)")
     .eq("audience_id", audience_id);
+  const { data: audience, error: audienceError } = await supabaseClient
+    .from("audience")
+    .select()
+    .eq("id", audience_id);
   console.log(contacts);
   if (contactError) {
     return json({ contacts: null, error: contactError.message }, { headers });
   }
 
   return json(
-    { contacts, workspace_id, audience: contacts[0]?.audience, error: null },
+    { contacts, workspace_id, audience, audience_id, error: null },
     { headers },
   );
 }
 
 export default function AudienceView() {
-  const { contacts, audience, error, workspace_id } =
+  const { contacts, audience, error, workspace_id, audience_id } =
     useLoaderData<typeof loader>();
-  const navigate = useNavigate();
   //   const actionData = useActionData<typeof action>();
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {audience?.name || `Unnamed Audience ${audience.id}`}
+          {audience?.name || `Unnamed Audience ${audience_id}`}
         </h1>
         <div>
           <Button
@@ -60,11 +63,9 @@ export default function AudienceView() {
           </Button>
         </div>
       </div>
-      {contacts.length && (
         <AudienceTable
-          {...{ contacts, workspace_id, selected_id: audience.id, audience }}
+          {...{ contacts, workspace_id, selected_id: audience_id, audience }}
         />
-      )}
     </main>
   );
 }

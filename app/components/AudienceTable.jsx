@@ -11,7 +11,6 @@ const AudienceTable = ({ contacts: initialContacts, workspace_id, selected_id: a
     const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", address: "" });
     const [isDragging, setIsDragging] = useState(false);
     const submit = useSubmit();
-
     useEffect(() => {
         setContacts(initialContacts);
         setAudienceInfo(initialAudience);
@@ -87,9 +86,10 @@ const AudienceTable = ({ contacts: initialContacts, workspace_id, selected_id: a
                 <div className="p-4">
                     <AudienceForm
                         audienceInfo={audienceInfo}
-                        handleAudienceChange={handleAudienceChange}
                         handleSaveAudience={handleSaveAudience}
+                        handleAudienceChange={handleAudienceChange}
                         audience_id={audience_id}
+                        workspace_id={workspace_id}
                     />
                 </div>
                 <div

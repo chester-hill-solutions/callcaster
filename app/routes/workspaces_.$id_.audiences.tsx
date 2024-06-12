@@ -48,12 +48,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export default function WorkspaceMedia() {
+export default function AudienceChart() {
   const { audienceData, workspace, error } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   //   const actionData = useActionData<typeof action>();
 
-  const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
+  const isWorkspaceAudioEmpty = error === "No contacts on the Audience";
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
@@ -69,7 +69,6 @@ export default function WorkspaceMedia() {
            
             variant="outline"
             className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
-            onClick={() => navigate('..', {relative:'path'})}
           >
               Back
           </Button>

@@ -2,7 +2,6 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { AudienceTable } from "../components/AudienceTable";
 import { CampaignSettings } from "../components/CampaignSettings";
 
 export const loader = async ({ request, params }) => {
@@ -58,16 +57,11 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Audience() {
-  const { selectedTable, audiences, contacts = [] } = useOutletContext();
+  const { audiences} = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
-
-  const submit = useSubmit();
-  const ids = useMemo(() => data.map((row) => row[`contact_id`]), [data]);
   const pageData = useMemo(() => data, [data]);
-
   return (
     <div className="flex flex-col">
-      {selectedTable?.name.toLowerCase() === "campaigns" && (
         <CampaignSettings
           workspace={workspace_id}
           data={pageData}
@@ -75,7 +69,6 @@ export default function Audience() {
           mediaData={mediaData}
           campaign_id={selected_id}
         />
-      )}
     </div>
   );
 }

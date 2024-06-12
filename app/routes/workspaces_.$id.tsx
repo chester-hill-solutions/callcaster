@@ -35,10 +35,6 @@ export const loader = async ({ request, params }) => {
       return redirect("/workspaces", { headers });
     }
   }
-  /* const { data: audiences } = await getWorkspaceAudiences({
-     supabaseClient,
-     workspaceId,
-   }); */
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
       .from("audience")
@@ -51,14 +47,8 @@ export const loader = async ({ request, params }) => {
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-    const { data: contacts, error: contactsError } = await supabaseClient
-      .from("contact")
-      .select()
-      .eq("workspace", workspaceId);
-    if (contactsError) throw { contactsError };
-    if (!selected) return redirect("campaigns", { headers });
     return json(
-      { workspace, audiences, campaigns, contacts, selected },
+      { workspace, audiences, campaigns },
       { headers },
     );
   } catch (error) {
@@ -70,71 +60,8 @@ export const loader = async ({ request, params }) => {
 export default function Workspace() {
   const navigate = useNavigate();
 
-  const { workspace, audiences, campaigns, contacts, selected:initSelected } = useLoaderData();
-  const tables = [
-    {
-      name: "campaigns",
-      columns: campaignColumns,
-      data: campaigns,
-    },
-    {
-      name: "audiences",
-      columns: audienceColumns,
-      data: audiences,
-    },
-    {
-      name: "contacts",
-      columns: contactColumns,
-      data: contacts,
-    },
-  ];
+  const { workspace, audiences, campaigns } = useLoaderData();
 
-  const [selected, setSelected] = useState(initSelected)
-  const [selectedTable, setSelectedTable] = useState(() =>
-    tables.find((table) => table.name === selected),
-  );
-
-
-  const handleSelectTable = (tableName) => {
-    let newTable;
-    switch (tableName) {
-      case WorkspaceTableNames.Campaign:
-        newTable = {
-          name: "campaigns",
-          columns: campaignColumns,
-          data: campaigns,
-        };
-        setSelectedTable(newTable);
-        setSelected(tableName)
-        break;
-      case WorkspaceTableNames.Audience:
-        newTable = {
-          name: "audiences",
-          columns: audienceColumns,
-          data: audiences,
-        };
-        setSelectedTable(newTable);
-        setSelected(tableName)
-        break;
-      case WorkspaceTableNames.Contact:
-        newTable = {
-          name: "contacts",
-          columns: contactColumns,
-          data: contacts,
-        };
-        setSelectedTable(newTable);
-        setSelected(tableName)
-        break;
-      default:
-        console.log(
-          `tableName: ${tableName} does not correspond to any workspace tables`,
-        );
-        break;
-        
-    }
-    navigate(tableName);
-
-  };
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="flex items-center">
@@ -150,7 +77,7 @@ export default function Workspace() {
                 className="font-Zilla-Slab text-xl font-semibold"
               >
                 Media
-              </Link>
+            </Link>
             </Button>
             <Button asChild variant="outline">
               <Link
@@ -176,25 +103,19 @@ export default function Workspace() {
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
-          {selectedTable?.data?.map((row, i) => (
+          {campaigns?.map((row, i) => (
             <Link
-              to={`${selectedTable.name}/${row.id}`}
+              to={`campaigns/${row.id}`}
               key={row.id}
               className="border-b-2 border-solid border-slate-500 p-2 text-brand-primary hover:bg-slate-300 hover:text-slate-800"
             >
               <h3 className="capitalize">
-                {selectedTable.name === "campaigns"
-                  ? row.title || `Unnamed campaign ${i + 1}`
-                  : selectedTable.name === "audiences"
-                    ? row.name || `${selectedTable?.name} ${row.id}`
-                    : selectedTable.name === "contacts"
-                      ? `${row.firstname} ${row.surname}`
-                      : ""}
+                  {row.title || `Unnamed campaign ${i + 1}`}
               </h3>
             </Link>
           ))}
           <Link
-            to={`${selectedTable?.name}/new`}
+            to={`campaign/new`}
             className="flex justify-center p-4"
           >
             <PlusIcon fill="#333" width="25px" />
@@ -204,10 +125,8 @@ export default function Workspace() {
           <div className="flex flex-auto flex-col">
             <Outlet
               context={{
-                selectedTable,
                 audiences,
                 campaigns,
-                contacts,
               }}
             />
           </div>
