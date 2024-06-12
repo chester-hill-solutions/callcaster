@@ -16,6 +16,7 @@ import { getWorkspaceUsers } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import {
   handleAddUser,
+  handleDeleteSelf,
   handleDeleteUser,
   handleInviteCaller,
   handleTransferWorkspace,
@@ -50,12 +51,28 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     //   workspaceId,
     // });
 
-    const hasAccess = userRole === "owner" || userRole === "admin";
+    const hasAccess = userRole !== MemberRole.Caller;
 
-    return json({ hasAccess: hasAccess, userRole, users: users }, { headers });
+    return json(
+      {
+        hasAccess: hasAccess,
+        userRole,
+        users: users,
+        activeUserId: serverSession.user.id,
+      },
+      { headers },
+    );
   }
 
-  return json({ hasAccess: false, userRole: null, users: null }, { headers });
+  return json(
+    {
+      hasAccess: false,
+      userRole: null,
+      users: null,
+      activeUserId: serverSession.user.id,
+    },
+    { headers },
+  );
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -80,6 +97,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     case "deleteUser": {
       return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
     }
+    case "deleteSelf": {
+      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
+    }
     case "inviteCaller": {
       return handleInviteCaller(formData, workspaceId, supabaseClient, headers);
     }
@@ -103,7 +123,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function WorkspaceSettings() {
-  const { hasAccess, userRole, users } = useLoaderData<typeof loader>();
+  const { hasAccess, userRole, users, activeUserId } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const { theme } = useTheme();
   // console.log("Theme", theme);
@@ -115,7 +136,6 @@ export default function WorkspaceSettings() {
   // console.log(workspaceOwner);
 
   const [showForm, setShowForm] = useState<boolean>(false);
-  const userIsOwner = userRole === "owner";
 
   useEffect(() => {
     if (actionData?.error) {
@@ -137,7 +157,8 @@ export default function WorkspaceSettings() {
         </p>
         <TeamMember
           member={workspaceOwner}
-          userIsOwner={userIsOwner}
+          userRole={userRole}
+          memberIsUser={workspaceOwner.id === activeUserId}
           workspaceOwner={workspaceOwner}
         />
       </div>
@@ -154,7 +175,8 @@ export default function WorkspaceSettings() {
               <li key={member.id} className="w-full">
                 <TeamMember
                   member={member}
-                  userIsOwner={userIsOwner}
+                  userRole={userRole}
+                  memberIsUser={member.id === activeUserId}
                   workspaceOwner={workspaceOwner}
                 />
               </li>
@@ -203,14 +225,14 @@ export default function WorkspaceSettings() {
                 />
               </label>
               <label
-                htmlFor="newUserWorkspaceRole"
+                htmlFor="new_user_workspace_role"
                 className="flex w-full flex-col gap-2 text-xl font-semibold dark:text-white"
               >
                 Workspace Role
                 <select
                   className="rounded-md border-2 border-black px-2 py-1 dark:border-white dark:font-normal"
-                  name="newUserWorkspaceRole"
-                  id="newUserWorkspaceRole"
+                  name="new_user_workspace_role"
+                  id="new_user_workspace_role"
                   defaultValue={MemberRole.Caller}
                   required
                 >
@@ -289,12 +311,28 @@ export default function WorkspaceSettings() {
         settings
       ) : (
         <main className="mx-auto mt-32 flex h-full w-fit flex-col items-center justify-center gap-4 rounded-sm px-8 pb-10 pt-6 text-4xl font-bold text-white dark:bg-transparent dark:text-white">
-          You do not have access to this page
-          <p className="text-brand-primary">
-            You have {`'${userRole.toUpperCase()}'`} permission but require{" "}
-            {"'OWNER' "}
-            permission
-          </p>
+          Manage Your Settings for this Workspace
+          <Form method="POST" className="w-full">
+            <input type="hidden" name="formName" value="deleteSelf" />
+            <input type="hidden" name="user_id" value={activeUserId} />
+            <div className="flex w-full gap-2">
+              <Button
+                className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
+                variant="destructive"
+              >
+                Quit This Workspace
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="h-full w-1/3 border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+              >
+                <Link to=".." relative="path">
+                  Back
+                </Link>
+              </Button>
+            </div>
+          </Form>
         </main>
       )}
     </>

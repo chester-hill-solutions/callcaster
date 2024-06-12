@@ -26,7 +26,12 @@ type TeamMemberProps = {
   memberRole: MemberRole;
 };
 
-export default function TeamMember({ member, userIsOwner, workspaceOwner }) {
+export default function TeamMember({
+  member,
+  userRole,
+  memberIsUser,
+  workspaceOwner,
+}) {
   const memberRole = member.user_workspace_role;
   const firstName =
     member.first_name === null ? "No" : capitalize(member.first_name);
@@ -89,15 +94,13 @@ export default function TeamMember({ member, userIsOwner, workspaceOwner }) {
               <h4 className="text-center text-2xl font-bold text-black dark:text-white">
                 {memberName}
               </h4>
-              {userIsOwner || memberRole !== MemberRole.Admin ? (
+              {userRole === MemberRole.Owner ||
+              (userRole === MemberRole.Admin &&
+                memberRole !== MemberRole.Admin) ? (
                 <>
                   <Form method="POST" className="flex w-full flex-col gap-4">
                     <input type="hidden" name="formName" value="updateUser" />
-                    <input
-                      type="hidden"
-                      name="username"
-                      value={member.username}
-                    />
+                    <input type="hidden" name="user_id" value={member.id} />
                     <label
                       htmlFor="updated_workspace_role"
                       className="flex w-full flex-col gap-2 font-Zilla-Slab text-lg font-semibold dark:text-white"
@@ -135,7 +138,7 @@ export default function TeamMember({ member, userIsOwner, workspaceOwner }) {
                     </Button>
                   </Form>
 
-                  {userIsOwner && (
+                  {userRole && (
                     <Form
                       method="POST"
                       name="transferWorkspaceOwnership"
@@ -148,14 +151,10 @@ export default function TeamMember({ member, userIsOwner, workspaceOwner }) {
                       />
                       <input
                         type="hidden"
-                        name="workspaceOwnerUserName"
-                        value={workspaceOwner.username}
+                        name="workspace_owner_id"
+                        value={workspaceOwner.id}
                       />
-                      <input
-                        type="hidden"
-                        name="username"
-                        value={member.username}
-                      />
+                      <input type="hidden" name="user_id" value={member.id} />
                       <Button className="w-full bg-orange-400 hover:bg-orange-700">
                         Transfer Workspace Ownership
                       </Button>
@@ -164,18 +163,27 @@ export default function TeamMember({ member, userIsOwner, workspaceOwner }) {
 
                   <Form method="POST" className="w-full">
                     <input type="hidden" name="formName" value="deleteUser" />
-                    <input
-                      type="hidden"
-                      name="username"
-                      value={member.username}
-                    />
+                    <input type="hidden" name="user_id" value={member.id} />
                     <Button className="w-full" variant="destructive">
                       Remove Team Member
                     </Button>
                   </Form>
                 </>
+              ) : memberIsUser ? (
+                <></>
               ) : (
-                <p>You do not have permission to edit this user</p>
+                <p className="text-center">
+                  You do not have permission to edit this user
+                </p>
+              )}
+              {memberIsUser && (
+                <Form method="POST" className="w-full">
+                  <input type="hidden" name="formName" value="deleteSelf" />
+                  <input type="hidden" name="user_id" value={member.id} />
+                  <Button className="w-full" variant="destructive">
+                    Quit This Workspace
+                  </Button>
+                </Form>
               )}
             </SheetContent>
           </Sheet>
