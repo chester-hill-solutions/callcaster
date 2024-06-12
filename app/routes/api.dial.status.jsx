@@ -13,9 +13,9 @@ export const action = async ({ request }) => {
         parsedBody[pair[0]] = pair[1];
     }
     try {
-        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id').eq('sid', parsedBody.CallSid).single();
+        const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, workspace').eq('sid', parsedBody.CallSid).single();
         const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
-
+        const {data:{signedUrl}, error: voicemailError} = await supabase.storage.from(`workspaceAudio`).createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`,3600)
         const call = twilio.calls(parsedBody.CallSid);
         const answeredBy = formData.get('AnsweredBy');
         const callStatus = formData.get('CallStatus')
@@ -24,7 +24,7 @@ export const action = async ({ request }) => {
                 const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'voicemail' }).eq('id', dbCall.outreach_attempt_id).select();
 
                 call.update({
-                    twiml: `<Response><Pause length="5"/><Play>${campaign.voicemail_file}</Play></Response>`
+                    twiml: `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`
                 })
                 return json({ success: true });
             }

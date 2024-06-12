@@ -7,6 +7,9 @@ export const audienceColumns: ColumnDef<Audience>[] = [
   {
     accessorKey: "name",
     header: "Name",
+    cell: ({row}) => {
+      return <div>{row.original.name || `Unnamed audience`}</div>
+    }
   },
 ];
 

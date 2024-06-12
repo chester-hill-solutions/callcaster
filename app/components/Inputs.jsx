@@ -16,18 +16,34 @@ const TextInput = ({ name, value, onChange, className, label = name }) => (
     </div>
 );
 
-const Dropdown = ({ name, value, onChange, options = [], className, label = name, disabled = false }) => (
-    <div className={className}>
-        <label htmlFor={name}>{label}</label>
-        <select value={value} onChange={onChange} name={name} disabled={disabled} id={name} className="px-1 py-2 border-2 border-solid border-[var(--border)]">
-            <option value={null}>Select an option</option>
-            {options.map((opt) => (
-                <option key={`${opt.name}-${opt.value}`} value={opt.value}>{opt.label}</option>
-            ))}
-        </select>
-    </div>
-)
-
+const Dropdown = ({ 
+    name, 
+    value = '',
+    onChange, 
+    options = [], 
+    className = '',
+    label = name, 
+    disabled = false 
+}) => {
+    return (
+        <div className={className}>
+            <label htmlFor={name}>{label}</label>
+            <select 
+                value={value || ''}
+                onChange={onChange} 
+                name={name} 
+                readOnly={disabled} 
+                id={name} 
+                className="px-1 py-2 border-2 border-solid border-[var(--border)]"
+            >
+                <option value="">Select an option</option>
+                {options.map((opt) => (
+                    <option key={`${opt.name}-${opt.value}`} value={opt.value}>{opt.label}</option>
+                ))}
+            </select>
+        </div>
+    );
+};
 const DateTime = ({ name, value = new Date(), onChange, label = name, className }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const initialSelectedDate = value ? new Date(value) : new Date();
@@ -72,7 +88,6 @@ const DateTime = ({ name, value = new Date(), onChange, label = name, className 
         const newTime = { ...selectedTime, [name]: value.padStart(2, '0') };
         setSelectedTime(newTime);
         const newDate = new Date(selectedDate.setHours(newTime.hour, newTime.minute));
-        console.log(newDate)
         onChange && onChange(newDate);
     };
 

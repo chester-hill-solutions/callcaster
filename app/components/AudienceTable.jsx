@@ -5,19 +5,16 @@ import { ContactTable } from "./ContactTable";
 import { ImportIcon } from "lucide-react";
 import { useSubmit } from "@remix-run/react";
 
-const AudienceTable = ({ data: initialData, contacts: initialContacts, workspace_id, selected_id: audience_id, audience: initialAudience }) => {
-    const [data, setData] = useState(initialData);
+const AudienceTable = ({ contacts: initialContacts, workspace_id, selected_id: audience_id, audience: initialAudience }) => {
     const [contacts, setContacts] = useState(initialContacts);
     const [audienceInfo, setAudienceInfo] = useState(initialAudience);
     const [newContact, setNewContact] = useState({ name: "", phone: "", email: "", address: "" });
     const [isDragging, setIsDragging] = useState(false);
     const submit = useSubmit();
-
     useEffect(() => {
-        setData(initialData);
         setContacts(initialContacts);
         setAudienceInfo(initialAudience);
-    }, [initialData, initialContacts, initialAudience]);
+    }, [initialContacts, initialAudience]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -89,9 +86,10 @@ const AudienceTable = ({ data: initialData, contacts: initialContacts, workspace
                 <div className="p-4">
                     <AudienceForm
                         audienceInfo={audienceInfo}
-                        handleAudienceChange={handleAudienceChange}
                         handleSaveAudience={handleSaveAudience}
+                        handleAudienceChange={handleAudienceChange}
                         audience_id={audience_id}
+                        workspace_id={workspace_id}
                     />
                 </div>
                 <div
