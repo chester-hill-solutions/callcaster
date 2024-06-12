@@ -63,7 +63,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                         {!activeCall && <div>Pending</div>}
                     </div>
                 </div>
-                {!conference && 
+                {!conference && predictive &&
                     <div className="h-full flex justify-center align-middle flex-1">
                         <button onClick={() => handleDialNext()} className="px-4 py-2 bg-primary text-xl font-Zilla-Slab text-white self-center">
                             Start Dialing
@@ -113,7 +113,6 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                         </div>
                     )}
                 </div>
-
             </div>
         </div>
     )

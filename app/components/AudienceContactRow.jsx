@@ -1,6 +1,6 @@
 
 export const AudienceContactRow = ({ contact }) => (
-    <tr id={contact.id}>
+    <tr id={contact.id} style={{color:"#333"}}>
         <td className="whitespace-nowrap px-2 py-1 text-sm">
             {contact.firstname} {contact.surname}
         </td>

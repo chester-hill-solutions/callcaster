@@ -135,17 +135,9 @@ export default function Workspace() {
     navigate(tableName);
 
   };
-  
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="flex items-center">
-        <div className="w-60">
-          <WorkspaceDropdown
-            selectTable={handleSelectTable}
-            selectedTable={selected}
-            tables={tables}
-          />
-        </div>
         <div className="flex flex-1 justify-center">
           <h3 className="ml-auto font-Tabac-Slab text-2xl">
             {workspace?.name}
@@ -160,24 +152,27 @@ export default function Workspace() {
                 Media
               </Link>
             </Button>
+            <Button asChild variant="outline">
+              <Link
+                to={`./audiences`}
+                relative="path"
+                className="font-Zilla-Slab text-xl font-semibold"
+              >
+                Audiences
+              </Link>
+            </Button>
             <Button asChild>
               <Link
                 to={`./settings`}
                 relative="path"
                 className="font-Zilla-Slab text-xl font-semibold"
               >
-                Settings
+                Users
               </Link>
             </Button>
           </div>
         </div>
-        {/*         <div
-          className="flex gap-4 px-4 font-Zilla-Slab text-xl font-bold"
-          id="filter-controls"
-        >
-          <p>Filter Controls</p>
-          <input type="text" name="filter-input" id="filter-input" />
-        </div> */}
+  
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
