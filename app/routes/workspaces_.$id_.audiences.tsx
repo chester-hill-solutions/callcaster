@@ -66,11 +66,13 @@ export default function AudienceChart() {
             <Link to={`./new`}>Add Audience</Link>
           </Button>
           <Button
-           
+            asChild
             variant="outline"
             className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
           >
+            <Link to=".." relative="path">
               Back
+            </Link>
           </Button>
         </div>
       </div>
