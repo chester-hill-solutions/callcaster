@@ -29,7 +29,7 @@ const Dropdown = ({
         <div className={className}>
             <label htmlFor={name}>{label}</label>
             <select 
-                value={value || ''} // Ensure value is a valid string
+                value={value || ''}
                 onChange={onChange} 
                 name={name} 
                 readOnly={disabled} 

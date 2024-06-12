@@ -173,7 +173,7 @@ export default function WorkspaceSettings() {
               className="w-full bg-zinc-300 text-xl font-bold uppercase data-[state=active]:bg-white dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
               value="addUser"
             >
-              Add User To Workspace
+              Add Existing User To Workspace
             </TabsTrigger>
             {/* <TabsTrigger
               className="w-full bg-zinc-300 font-bold data-[state=active]:bg-white dark:data-[state=active]:border-2 dark:data-[state=active]:border-white dark:data-[state=active]:bg-inherit"
@@ -192,7 +192,7 @@ export default function WorkspaceSettings() {
               <input type="hidden" name="formName" value="addUser" />
               <label
                 htmlFor="username"
-                className="flex w-full flex-col font-Zilla-Slab text-lg font-semibold dark:text-white"
+                className="flex w-full flex-col text-xl font-semibold dark:text-white"
               >
                 Email
                 <input
@@ -204,7 +204,7 @@ export default function WorkspaceSettings() {
               </label>
               <label
                 htmlFor="newUserWorkspaceRole"
-                className="flex w-full flex-col gap-2 font-Zilla-Slab text-lg font-semibold dark:text-white"
+                className="flex w-full flex-col gap-2 text-xl font-semibold dark:text-white"
               >
                 Workspace Role
                 <select
