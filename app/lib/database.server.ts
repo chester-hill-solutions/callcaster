@@ -1,6 +1,7 @@
 import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
+import { jwtDecode } from "jwt-decode";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -160,4 +161,22 @@ export async function testAuthorize({
   console.log("XXXXXXXXXXXXXXXXXXXXXXXXX");
 
   return { data, error };
+}
+
+export async function getUserRole({ serverSession, workspaceId }) {
+  if (serverSession == null || serverSession.access_token == null) {
+    return null;
+  }
+
+  const jwt = jwtDecode(serverSession.access_token);
+  const userRole = jwt["user_workspace_roles"]?.find(
+    (workspaceRoleObj) => workspaceRoleObj.workspace_id === workspaceId,
+  )?.role;
+
+  // console.log("USER ROLE: ", userRole);
+  if (userRole == null) {
+    console.log("No User Role found on this workspace");
+  }
+
+  return userRole;
 }

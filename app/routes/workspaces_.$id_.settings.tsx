@@ -12,7 +12,7 @@ import { jwtDecode } from "jwt-decode";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { getWorkspaceUsers } from "~/lib/database.server";
+import { getUserRole, getWorkspaceUsers } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import {
   handleAddUser,
@@ -38,19 +38,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
 
   if (serverSession) {
-    const jwt = jwtDecode(serverSession.access_token);
-    const userRole = jwt["user_workspace_roles"]?.find(
-      (workspaceRoleObj) => workspaceRoleObj.workspace_id === workspaceId,
-    )?.role;
-    // const userRole = null;
-    // console.log("\nJWT: ", jwt);
-    console.log("USER ROLE: ", userRole);
-
-    // const { data: authorizeData, error: authorizeError } = await testAuthorize({
-    //   supabaseClient,
-    //   workspaceId,
-    // });
-
+    const userRole = getUserRole({ serverSession, workspaceId });
     const hasAccess = userRole !== MemberRole.Caller;
 
     return json(

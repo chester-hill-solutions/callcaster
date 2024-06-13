@@ -135,7 +135,7 @@ export default function App() {
         {/* <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} /> */}
         <Links />
       </head>
-      <body className={`min-h-screen bg-background`}>
+      <body className={`min-h-screen bg-background sm:overflow-hidden`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
