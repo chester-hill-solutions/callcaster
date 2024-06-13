@@ -128,7 +128,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                     </div>
                 )}
                 {questions.type === 'textarea' && (
-                    <div>
+                    <div className="flex items-center justify-between gap-2">
                         <textarea 
                             type="textarea" 
                             rows={2} 
