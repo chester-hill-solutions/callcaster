@@ -72,7 +72,7 @@ const reducer = (state, action) => {
     }
 };
 
-const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }) => {
+const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace, isChanged, setChanged }) => {
     const navigate = useNavigate();
     const nav = useNavigation();
     const busy = (nav.state !== 'idle');
@@ -84,7 +84,6 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }
     }
     );
     const [selectedAudiences, setSelectedAudience] = useState([...initSelectedAudiences]);
-    const [isChanged, setChanged] = useState(false);
 
     const handleInputChange = (type, value) => {
         dispatch({ type, payload: value });
@@ -135,12 +134,10 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }
         dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
     }, [campaign_id, data, workspace]);
 
-    console.log(campaignDetails)
     return (
         <div className="p-4 flex-col">
             <div className="flex justify-between px-4" style={{ height: "40px" }}>
                 <h3 className="font-Zilla-Slab text-2xl">{campaignDetails.title}</h3>
-                {isChanged && <Button disabled={busy} onClick={handleSave}>SAVE</Button>}
                 <Button onClick={() => navigate(`${campaignDetails.dial_type}`)}>
                     Start Calling
                 </Button>
@@ -243,7 +240,7 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }
                         </div>
                     )
                 })}
-                <CampaignSettingsScript {...{questions: campaignDetails.questions}}/>
+                <CampaignSettingsScript {...{questions: campaignDetails.questions, setChanged}}/>
             </div>
         </div>
     );
