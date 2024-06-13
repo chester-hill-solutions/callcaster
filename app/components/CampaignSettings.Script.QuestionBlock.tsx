@@ -1,42 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Result from "./CallList/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
-import { GrAddCircle } from "react-icons/gr";
-import { Icon } from "lucide-react";
-type questionOptions = {
-  label: string;
-  value: string;
-  Icon: string;
-};
-
-type question = {
-  id: string;
-  title: string;
-  text: string;
-  type:
-    | "textarea"
-    | "textblock"
-    | "titleblock"
-    | "radio"
-    | "dropdown"
-    | "boolean"
-    | "multi";
-  order: bigint;
-  options?: Array<questionOptions>;
-};
+import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
+import { deepEqual } from "~/lib/utils";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 export default function CampaignSettingsScriptQuestionBlock({
   question: initQuestion,
-}: {
-  question: question;
+  removeQuestion,
+  setChanged,
+  index,
+  moveUp,
+  moveDown,
+  dispatchState
 }) {
   const [question, setQuestion] = useState(initQuestion);
+
   const handleTextChange = (e) => {
     setQuestion((curr) => ({
       ...curr,
       [e.target.name]: e.target.value,
     }));
   };
+
   const handleTypeChange = (e) => {
     const val = e.currentTarget.value;
     setQuestion((curr) => ({
@@ -47,6 +33,7 @@ export default function CampaignSettingsScriptQuestionBlock({
       }),
     }));
   };
+
   const handleAddOption = () => {
     setQuestion((curr) => ({
       ...curr,
@@ -60,6 +47,7 @@ export default function CampaignSettingsScriptQuestionBlock({
       ],
     }));
   };
+
   const handleRemoveOption = (option) => {
     setQuestion((curr) => ({
       ...curr,
@@ -67,15 +55,13 @@ export default function CampaignSettingsScriptQuestionBlock({
     }));
   };
 
-  const handleIconChange = ({index, iconName}) => {
-    console.log(iconName)
+  const handleIconChange = ({ index, iconName }) => {
     setQuestion((curr) => {
       const updatedOptions = [...curr.options];
       updatedOptions[index] = {
         ...updatedOptions[index],
         Icon: iconName,
       };
-      console.log({...curr, options: updatedOptions})
       return {
         ...curr,
         options: updatedOptions,
@@ -85,123 +71,157 @@ export default function CampaignSettingsScriptQuestionBlock({
 
   const handleOptionChange = (index, e) => {
     const newLabel = e.target.value;
-    const newValue = newLabel?.toLowerCase().replace(/ /g, '-');
-    
+    const newValue = newLabel?.toLowerCase().replace(/ /g, "-");
+
     setQuestion((curr) => {
-        const updatedOptions = [...curr.options];
-        updatedOptions[index] = {
-            ...updatedOptions[index],
-            label: newLabel,
-            value: newValue,
-        };
-        return {
-            ...curr,
-            options: updatedOptions
-        };
+      const updatedOptions = [...curr.options];
+      updatedOptions[index] = {
+        ...updatedOptions[index],
+        label: newLabel,
+        value: newValue,
+      };
+      return {
+        ...curr,
+        options: updatedOptions,
+      };
     });
-};
+  };
+
+  useEffect(() => {
+
+    dispatchState(index, question)
+    setChanged((prev) => !deepEqual(question, initQuestion));
+  }, [dispatchState, index, initQuestion, question, setChanged]);
 
   return (
     <div
       key={question.id}
-      className="flex gap-2 py-2"
+      className="relative flex flex-col gap-2 py-2"
       style={{
-        justifyContent: "space-between",
         background: "#f1f1f1",
         padding: "24px 16px",
       }}
     >
-      <div className="w-[50%]">
-        <div className="flex flex-col">
-          <label htmlFor={`${question.id}-id`}>Identifier</label>
-          <input
-            type="text"
-            name={`id`}
-            id={`${question.id}-id`}
-            value={question.id}
-            onChange={handleTextChange}
-            required
-          />
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor={`${question.id}-title`}>Title</label>
-          <input
-            type="text"
-            name={`title`}
-            id={`${question.id}-title`}
-            value={question.title}
-            onChange={handleTextChange}
-          />
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor={`${question.id}-text`}>Descriptive Text</label>
-          <input
-            type="text"
-            name={`text`}
-            id={`${question.id}-text`}
-            value={question.text}
-            onChange={handleTextChange}
-          />
-        </div>
-        <div className="flex flex-col">
-          <label htmlFor={`${question.id}-type`}>Question Type</label>
-          <select
-            name={`${question.id}-type`}
-            id={`${question.id}-type`}
-            value={question.type}
-            onChange={handleTypeChange}
-          >
-            <option value={"textarea"}>Text Area</option>
-            <option value={"textblock"}>Text Block</option>
-            <option value={"titleblock"}>Title Block</option>
-            <option value={"radio"}>Radio Select</option>
-            <option value={"dropdown"}>Dropdown Menu</option>
-            <option value={"boolean"}>Boolean/Toggle</option>
-            <option value={"multi"}>Multi-Select</option>
-          </select>
-        </div>
-        {question.options && (
-          <div>
-            <div className="flex gap-2" style={{ alignItems: "center" }}>
-              <h4>Options</h4>
-              <button onClick={handleAddOption}>
-                <GrAddCircle />
-              </button>
-            </div>
-            <div>
-              {question.options.map((option, i) => (
-                <QuestionBlockOption
-                  {...{
-                    index: i,
-                    question,
-                    option,
-                    handleRemoveOption,
-                    handleChange: handleOptionChange,
-                    handleIconChange
-                  }}
-                  key={`${question.id}-option-${i}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
       <div
-        className="relative flex flex-col p-2"
-        style={{ background: "#fff", width: "50%", justifyContent: "center" }}
+        style={{
+          justifyContent: "space-between",
+          alignItems: "center",
+          display: "flex",
+        }}
       >
-        <div style={{ scale: ".7" }}>
-          <Result
-            action={() => null}
-            initResult={null}
-            questions={question}
-            questionId={question.id}
-          />
+        <button onClick={() => removeQuestion(question.id)}>
+          <GrSubtractCircle />
+        </button>
+        {/* <div style={{ display: "flex", flexDirection: "column" }}>
+          <button onClick={() => moveUp(index)}>
+            <ArrowUp />
+          </button>
+          <button onClick={() => moveDown(question.id)}>
+            <ArrowDown />
+          </button>
+        </div> */}
+      </div>
+      <div style={{display:"flex", justifyContent:"space-between", gap:"16px"}}>
+        <div className="w-[50%]">
+          <div className="flex flex-col">
+            <label htmlFor={`${question.id}-id`}>Identifier</label>
+            <input
+              type="text"
+              name={`id`}
+              id={`${question.id}-id`}
+              value={question.id}
+              onChange={handleTextChange}
+              required
+            />
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor={`${question.id}-title`}>Title</label>
+            <input
+              type="text"
+              name={`title`}
+              id={`${question.id}-title`}
+              value={question.title}
+              onChange={handleTextChange}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor={`${question.id}-text`}>Descriptive Text</label>
+            <input
+              type="text"
+              name={`text`}
+              id={`${question.id}-text`}
+              value={question.text}
+              onChange={handleTextChange}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor={`${question.id}-type`}>Question Type</label>
+            <select
+              name={`${question.id}-type`}
+              id={`${question.id}-type`}
+              value={question.type}
+              onChange={handleTypeChange}
+            >
+              <option value={"textarea"}>Text Area</option>
+              <option value={"textblock"}>Text Block</option>
+              <option value={"titleblock"}>Title Block</option>
+              <option value={"radio"}>Radio Select</option>
+              <option value={"dropdown"}>Dropdown Menu</option>
+              <option value={"boolean"}>Boolean/Toggle</option>
+              <option value={"multi"}>Multi-Select</option>
+            </select>
+          </div>
+          {question.options && (
+            <div>
+              <div className="flex gap-2" style={{ alignItems: "center" }}>
+                <h4>Options</h4>
+                <button onClick={handleAddOption}>
+                  <GrAddCircle />
+                </button>
+              </div>
+              <div>
+                {question.options.map((option, i) => (
+                  <QuestionBlockOption
+                    {...{
+                      index: i,
+                      question,
+                      option,
+                      handleRemoveOption,
+                      handleChange: handleOptionChange,
+                      handleIconChange,
+                    }}
+                    key={`${question.id}-option-${i}`}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div
-          style={{ position: "absolute", bottom: "10px", fontSize: "x-small" }}
+          className="relative flex flex-col p-2"
+          style={{
+            background: "#fff",
+            width: "50%",
+            justifyContent: "center",
+          }}
         >
-          Preview
+          <div style={{ scale: ".7" }}>
+            <Result
+              action={() => null}
+              initResult={null}
+              questions={question}
+              questionId={question.id}
+            />
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              bottom: "10px",
+              fontSize: "x-small",
+            }}
+          >
+            Preview
+          </div>
         </div>
       </div>
     </div>

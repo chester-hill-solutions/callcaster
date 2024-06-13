@@ -105,7 +105,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                             {!predictive ? 'Dial' : 'Start'}
                         </button>}
                     </div>
-                    {recentAttempt?.result?.status && (
+                    {(recentAttempt.disposition || recentAttempt.status) && (
                         <div className="flex px-4" style={{ paddingBottom: ".5rem" }}>
                             <button onClick={() => handleDequeueNext()} style={{ flex: "1", padding: "4px 8px", border: "1px solid #333", borderRadius: "5px", color: "#333" }}>
                                 Next

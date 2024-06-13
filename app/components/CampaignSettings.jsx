@@ -1,138 +1,21 @@
-import { useReducer, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
-import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
+import { useNavigate } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
-import Result from "./CallList/CallContact/Result";
 import CampaignSettingsScript from "./CampaignSettings.Script";
-const initialState = (data, workspace, campaign_id) => ({
-    campaign_id,
-    workspace,
-    title: data[0]?.title,
-    status: data[0]?.status,
-    type: data[0]?.type || 'live_call',
-    dial_type: data[0]?.dial_type || 'call',
-    group_household_queue: data[0]?.group_household_queue,
-    caller_id: data[0]?.caller_id,
-    start_date: data[0]?.start_date,
-    end_date: data[0]?.end_date,
-    voicemail_file: data[0]?.voicemail_file,
-    questions: data[0]?.campaignDetails?.questions,
-});
 
-const actionTypes = {
-    SET_INITIAL_STATE: 'SET_INITIAL_STATE',
-    SET_TITLE: 'SET_TITLE',
-    SET_STATUS: 'SET_STATUS',
-    SET_TYPE: 'SET_TYPE',
-    SET_DIAL_TYPE: 'SET_DIAL_TYPE',
-    SET_GROUP_HOUSEHOLD: 'SET_GROUP_HOUSEHOLD',
-    SET_CALL_ID: 'SET_CALL_ID',
-    SET_START_DATE: 'SET_START_DATE',
-    SET_END_DATE: 'SET_END_DATE',
-    SET_VOICEMAIL: 'SET_VOICEMAIL',
-    SET_QUESTION: 'SET_QUESTION',
-};
-
-const reducer = (state, action) => {
-    switch (action.type) {
-        case actionTypes.SET_INITIAL_STATE:
-            return { ...action.payload };
-        case actionTypes.SET_TITLE:
-            return { ...state, title: action.payload };
-        case actionTypes.SET_STATUS:
-            return { ...state, status: action.payload };
-        case actionTypes.SET_TYPE:
-            return { ...state, type: action.payload };
-        case actionTypes.SET_START_DATE:
-            return { ...state, start_date: action.payload };
-        case actionTypes.SET_END_DATE:
-            return { ...state, end_date: action.payload };
-        case actionTypes.SET_VOICEMAIL:
-            return { ...state, voicemail_file: action.payload };
-        case actionTypes.SET_DIAL_TYPE:
-            return { ...state, dial_type: action.payload };
-        case actionTypes.SET_GROUP_HOUSEHOLD:
-            return { ...state, group_household_queue: action.payload };
-        case actionTypes.SET_CALL_ID:
-            return { ...state, caller_id: action.payload };
-        case actionTypes.SET_QUESTION:
-            return {
-                ...state,
-                questions: {
-                    ...state.questions,
-                    [action.payload.question]: {
-                        ...state.questions[action.payload.question],
-                        [action.payload.key]: action.payload.value,
-                    },
-                },
-            };
-        default:
-            return state;
-    }
-};
-
-const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace, isChanged, setChanged }) => {
+const CampaignSettings = ({
+    audiences,
+    mediaData,
+    setChanged,
+    handleInputChange,
+    campaignDetails,
+    actionTypes,
+    selectedAudiences,
+    handleAudience
+}) => {
     const navigate = useNavigate();
-    const nav = useNavigation();
-    const busy = (nav.state !== 'idle');
-    const submit = useSubmit();
-    const [initial, setInitial] = useState(initialState(data, workspace, campaign_id));
-    const [campaignDetails, dispatch] = useReducer(reducer, initial);
-    const initSelectedAudiences = audiences.filter((audience) => {
-        return data.map((row) => row.campaign_audience[0]?.audience_id).includes(audience.id)
-    }
-    );
-    const [selectedAudiences, setSelectedAudience] = useState([...initSelectedAudiences]);
-
-    const handleInputChange = (type, value) => {
-        dispatch({ type, payload: value });
-        setChanged(!deepEqual(campaignDetails, initial));
-    };
-
-    const saveCampaign = () => {
-        if (!deepEqual(campaignDetails, initial)) {
-            submit(campaignDetails, {
-                method: "patch",
-                encType: "application/json",
-                navigate: false,
-                action: "/api/campaigns"
-            });
-            setInitial(campaignDetails);
-        }
-    }
-
-    const saveAudience = () => {
-        if (!deepEqual(selectedAudiences, initSelectedAudiences)) {
-            submit({ campaign_id: campaign_id, updated: selectedAudiences }, {
-                method: "put",
-                encType: "application/json",
-                navigate: false,
-                action: "/api/campaign_audience"
-            });
-        }
-    }
-    const handleSave = () => {
-        saveCampaign();
-        saveAudience();
-    };
-    const handleAudience = ({ event, audience }) => {
-        if (event.target.checked) {
-            setSelectedAudience((curr) => ([...curr, audience]))
-        } else {
-            setSelectedAudience((curr) => curr.filter((aud) => aud.id !== audience.id))
-        }
-    }
-
-    useEffect(() => {
-        setChanged((!deepEqual(campaignDetails, initial) || !deepEqual(selectedAudiences, initSelectedAudiences)));
-    }, [campaignDetails, initSelectedAudiences, initial, selectedAudiences]);
-
-    useEffect(() => {
-        const newInitialState = initialState(data, workspace, campaign_id);
-        setInitial(newInitialState);
-        dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
-    }, [campaign_id, data, workspace]);
 
     return (
         <div className="p-4 flex-col">
@@ -141,7 +24,6 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace, 
                 <Button onClick={() => navigate(`${campaignDetails.dial_type}`)}>
                     Start Calling
                 </Button>
-
             </div>
             <div className="gap-2 flex-col flex">
                 <div className="flex justify-start gap-2">
@@ -185,7 +67,7 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace, 
                         label={"Voicemail File"}
                         value={campaignDetails.voicemail_file}
                         onChange={(e) => handleInputChange(actionTypes.SET_VOICEMAIL, e.currentTarget.value)}
-                        options={mediaData.map((media) => ({ value: media.name, label: media.name }))}
+                        options={mediaData?.map((media) => ({ value: media.name, label: media.name }))}
                         className={"flex flex-col"}
                     />
                 </div>
