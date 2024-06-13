@@ -1,8 +1,9 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
+import { Button } from "~/components/ui/button";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -57,18 +58,34 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Audience() {
-  const { audiences} = useOutletContext();
+  const { audiences } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
+  const [isChanged, setChanged] = useState(true);
+
   return (
-    <div className="flex flex-col">
-        <CampaignSettings
-          workspace={workspace_id}
-          data={pageData}
-          audiences={audiences}
-          mediaData={mediaData}
-          campaign_id={selected_id}
-        />
+    <div>
+      <div className="flex h-[80vh] w-full flex-auto overflow-scroll border-2 border-l-0 border-solid border-slate-800">
+        <div className="flex flex-auto flex-col">
+          <CampaignSettings
+            isChanged={isChanged}
+            setChanged={setChanged}
+            workspace={workspace_id}
+            data={pageData}
+            audiences={audiences}
+            mediaData={mediaData}
+            campaign_id={selected_id}
+          />
+        </div>
+      </div>
+      {true && (
+        <div className="flex" style={{ justifyContent: "space-between" }}>
+          <div>You have active changes.</div>
+          <div>
+            <Button onClick={() => null}>SAVE</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
