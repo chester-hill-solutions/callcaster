@@ -86,32 +86,31 @@ export default function Workspace() {
           </div>
         </div>
       </div>
-      <div className="flex">
-        <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
+      <div className="flex flex-auto">
+        <div className="flex h-[80vh] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
+          <h3 className="border-b-2 border-solid border-slate-500 bg-primary p-2 text-center font-Zilla-Slab text-xl text-white">
+            Campaigns
+          </h3>
           {campaigns?.map((row, i) => (
             <Link
               to={`campaigns/${row.id}`}
               key={row.id}
               className="border-b-2 border-solid border-slate-500 p-2 text-brand-primary hover:bg-slate-300 hover:text-slate-800"
             >
-              <h3 className="capitalize">
-                {row.title || `Unnamed campaign ${i + 1}`}
-              </h3>
+              <h3>{row.title || `Unnamed campaign ${i + 1}`}</h3>
             </Link>
           ))}
           <Link to={`campaigns/new`} className="flex justify-center p-4">
             <PlusIcon fill="#333" width="25px" />
           </Link>
         </div>
-        <div className="min-h-3/4 flex w-full flex-auto border-2 border-l-0 border-solid border-slate-800">
-          <div className="flex flex-auto flex-col">
-            <Outlet
-              context={{
-                audiences,
-                campaigns,
-              }}
-            />
-          </div>
+        <div className="flex-auto">
+          <Outlet
+            context={{
+              audiences,
+              campaigns,
+            }}
+          />
         </div>
       </div>
     </main>
