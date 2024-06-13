@@ -15,12 +15,17 @@ export const meta: MetaFunction = () => {
 export const loader = async ({ request }: { request: Request }) => {
   const { headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  return json({ headers });
+
+  if (serverSession && serverSession.user) {
+    return redirect("/workspaces", { headers });
+  }
+
+  return json({});
 };
 
 export default function Index() {
   return (
-    <main className="flex h-full w-full items-center justify-center gap-16 px-16 py-32 text-white">
+    <main className="flex h-full w-full items-center justify-center gap-16 px-16 py-32 text-white sm:overflow-hidden">
       <div className="">
         <h1 className="text-center font-Tabac-Slab text-6xl font-black text-brand-primary">
           CallCaster

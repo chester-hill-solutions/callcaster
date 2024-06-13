@@ -56,8 +56,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-  console.log("Media Data: ", mediaData);
-  //
+  // console.log("Media Data: ", mediaData);
 
   const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
   const { data: signedUrls, error: signedUrlsError } =

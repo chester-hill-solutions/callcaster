@@ -86,6 +86,7 @@ export default function Media() {
   useEffect(() => {
     if (actionData?.success) {
       toast.success("Media successfully uploaded to your workspace!");
+      setTimeout(() => navigate("../", { relative: "path" }), 750);
     }
   }, [actionData]);
 

@@ -22,17 +22,21 @@ export const action = async ({ request }: { request: Request }) => {
     email: email,
     password: password,
   });
+
   if (!error) {
     return redirect("/workspaces", { headers });
-  } else {
-    console.log(error);
-    return json({ error: error.message });
   }
+  console.log(error);
+  return json({ error: error.message });
 };
 
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
-    await createSupabaseServerClient(request);
+    await getSupabaseServerClientWithSession(request);
+
+  if (serverSession && serverSession.user) {
+    return redirect("/workspaces", { headers });
+  }
   return json({ serverSession }, { headers });
 };
 
@@ -47,7 +51,6 @@ export default function SignIn() {
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-
       <div
         id="login-hero"
         className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"

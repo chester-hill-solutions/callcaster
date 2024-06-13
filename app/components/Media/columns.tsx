@@ -29,12 +29,12 @@ export const mediaColumns: ColumnDef<Media>[] = [
       );
     },
   },
-  {
-    accessorKey: "metadata.size",
-    header: "Size",
-  },
-  {
-    accessorKey: "metadata.contentLength",
-    header: "Length",
-  },
+  // {
+  //   accessorKey: "metadata.size",
+  //   header: "Size",
+  // },
+  // {
+  //   accessorKey: "metadata.contentLength",
+  //   header: "Length",
+  // },
 ];
