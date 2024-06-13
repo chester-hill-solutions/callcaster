@@ -2,6 +2,7 @@ import { useState } from "react";
 import Result from "./CallList/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle } from "react-icons/gr";
+import { Icon } from "lucide-react";
 type questionOptions = {
   label: string;
   value: string;
@@ -49,7 +50,14 @@ export default function CampaignSettingsScriptQuestionBlock({
   const handleAddOption = () => {
     setQuestion((curr) => ({
       ...curr,
-      options: [...curr.options, { value: `option-${curr.options.length + 1}`, label: "", ...(question.type === 'radio' && {Icon: 'SupportButton'}) }],
+      options: [
+        ...curr.options,
+        {
+          value: `option-${curr.options.length + 1}`,
+          label: "",
+          ...(question.type === "radio" && { Icon: "SupportButton" }),
+        },
+      ],
     }));
   };
   const handleRemoveOption = (option) => {
@@ -58,15 +66,33 @@ export default function CampaignSettingsScriptQuestionBlock({
       options: [...curr.options.filter((opt) => opt.value !== option.value)],
     }));
   };
+
+  const handleIconChange = ({index, iconName}) => {
+    console.log(iconName)
+    setQuestion((curr) => {
+      const updatedOptions = [...curr.options];
+      updatedOptions[index] = {
+        ...updatedOptions[index],
+        Icon: iconName,
+      };
+      console.log({...curr, options: updatedOptions})
+      return {
+        ...curr,
+        options: updatedOptions,
+      };
+    });
+  };
+
   const handleOptionChange = (index, e) => {
     const newLabel = e.target.value;
-    const newValue = newLabel.toLowerCase().replace(/ /g, '-');
+    const newValue = newLabel?.toLowerCase().replace(/ /g, '-');
+    
     setQuestion((curr) => {
         const updatedOptions = [...curr.options];
         updatedOptions[index] = {
             ...updatedOptions[index],
+            label: newLabel,
             value: newValue,
-            label: newLabel
         };
         return {
             ...curr,
@@ -144,7 +170,17 @@ export default function CampaignSettingsScriptQuestionBlock({
             </div>
             <div>
               {question.options.map((option, i) => (
-                <QuestionBlockOption {...{question, option, handleRemoveOption, index: i, handleChange: handleOptionChange}} key={`${question.id}-option-${i}`}/>
+                <QuestionBlockOption
+                  {...{
+                    index: i,
+                    question,
+                    option,
+                    handleRemoveOption,
+                    handleChange: handleOptionChange,
+                    handleIconChange
+                  }}
+                  key={`${question.id}-option-${i}`}
+                />
               ))}
             </div>
           </div>
