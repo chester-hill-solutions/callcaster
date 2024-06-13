@@ -1,4 +1,4 @@
-import { json } from "@remix-run/react";
+import { json, redirect } from "@remix-run/react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../database.types";
 
@@ -8,25 +8,25 @@ export async function handleAddUser(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const userName = formData.get("username") as string;
-  if (!userName) {
-    // console.log("HERE no username");
-    return json({ error: "No username provided" }, { headers });
-  }
+  const username = formData.get("username") as string;
+  // if (!userId) {
+  //   // console.log("HERE no username");
+  //   return json({ error: "No username provided" }, { headers });
+  // }
 
-  const newUserRole = formData.get("newUserWorkspaceRole") as string;
+  const newUserRole = formData.get("new_user_workspace_role") as string;
 
   const { data: user, error: getUserError } = await supabaseClient
     .from("user")
     .select()
-    .eq("username", userName)
+    .eq("username", username)
     .single();
 
   if (user == null) {
     // console.log(`User ${userName} not found - `, getUserError);
-    return json({ error: `User ${userName} not found` }, { headers });
+    return json({ error: `User ${username} not found` }, { headers });
   }
-  // console.log("Selected user: ", user);
+  console.log("Selected user: ", user);
 
   const { data: newUser, error: errorAddingUser } = await supabaseClient
     .from("workspace_users")
@@ -41,13 +41,13 @@ export async function handleAddUser(
   if (newUser == null) {
     if (errorAddingUser != null && errorAddingUser.code === "23505") {
       return json(
-        { error: `User ${userName} is already in this workspace!` },
+        { error: `User ${username} is already in this workspace!` },
         { headers },
       );
     }
     // console.log("Insert error on workspace_users: ", errorAddingUser);
     return json(
-      { error: `Could not add ${userName} to workspace!` },
+      { error: `Could not add ${username} to workspace!` },
       { headers },
     );
   }
@@ -62,18 +62,18 @@ export async function handleUpdateUser(
   headers: Headers,
 ) {
   //   console.log("\nHERE");
-  const userName = formData.get("username");
+  const userId = formData.get("user_id") as string;
 
-  const { data: user, error: getUserError } = await supabaseClient
-    .from("user")
-    .select()
-    .eq("username", userName)
-    .single();
+  // const { data: user, error: getUserError } = await supabaseClient
+  //   .from("user")
+  //   .select()
+  //   .eq("username", userName)
+  //   .single();
 
-  if (user == null) {
-    // console.log(`User ${userName} not found - `, getUserError);
-    return json({ error: `User ${userName} not found` }, { headers });
-  }
+  // if (user == null) {
+  //   // console.log(`User ${userName} not found - `, getUserError);
+  //   return json({ error: `User ${userName} not found` }, { headers });
+  // }
   //   console.log("Selected user: ", user);
 
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
@@ -81,7 +81,7 @@ export async function handleUpdateUser(
     .from("workspace_users")
     .update({ role: updatedWorkspaceRole })
     .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -97,25 +97,25 @@ export async function handleDeleteUser(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const userName = formData.get("username");
+  const userId = formData.get("user_id") as string;
 
-  const { data: user, error: getUserError } = await supabaseClient
-    .from("user")
-    .select()
-    .eq("username", userName)
-    .single();
+  // const { data: user, error: getUserError } = await supabaseClient
+  //   .from("user")
+  //   .select()
+  //   .eq("username", userName)
+  //   .single();
 
-  if (user == null) {
-    // console.log(`User ${userName} not found - `, getUserError);
-    return json({ error: `User ${userName} not found` }, { headers });
-  }
-  console.log("Selected user: ", user);
+  // if (user == null) {
+  //   // console.log(`User ${userName} not found - `, getUserError);
+  //   return json({ error: `User ${userName} not found` }, { headers });
+  // }
+  // console.log("Selected user: ", user);
 
   const { data: deletedUser, error: errorDeletingUser } = await supabaseClient
     .from("workspace_users")
     .delete()
     .eq("workspace_id", workspaceId)
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -123,6 +123,41 @@ export async function handleDeleteUser(
     { data: deletedUser, error: errorDeletingUser?.message },
     { headers },
   );
+}
+
+export async function handleDeleteSelf(
+  formData: FormData,
+  workspaceId: string,
+  supabaseClient: SupabaseClient<Database>,
+  headers: Headers,
+) {
+  const userId = formData.get("user_id") as string;
+
+  // const { data: user, error: getUserError } = await supabaseClient
+  //   .from("user")
+  //   .select()
+  //   .eq("username", userName)
+  //   .single();
+
+  if (userId == null) {
+    // console.log(`User ${userName} not found - `, getUserError);
+    return json({ error: `User ${userId} not found` }, { headers });
+  }
+
+  const { data: deletedSelf, error: errorDeletingSelf } = await supabaseClient
+    .from("workspace_users")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+  if (errorDeletingSelf) {
+    console.log(errorDeletingSelf);
+    return json({ data: null, error: errorDeletingSelf.message });
+  }
+
+  return redirect("/workspaces", { headers });
 }
 
 export async function handleInviteCaller(
@@ -186,37 +221,37 @@ export async function handleTransferWorkspace(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const currentOwnerUserName = formData.get("workspaceOwnerUserName") as string;
-  const newOwnerUserName = formData.get("username") as string;
+  const currentOwnerUserId = formData.get("workspace_owner_id") as string;
+  const newOwnerUserId = formData.get("user_id") as string;
 
-  const { data: currentOwnerData, error: errorGettingCurrentOwner } =
-    await supabaseClient
-      .from("user")
-      .select()
-      .eq("username", currentOwnerUserName)
-      .single();
+  // const { data: currentOwnerData, error: errorGettingCurrentOwner } =
+  //   await supabaseClient
+  //     .from("user")
+  //     .select()
+  //     .eq("username", currentOwnerUserName)
+  //     .single();
 
-  const { data: newOwnerData, error: errorGettingNewOwner } =
-    await supabaseClient
-      .from("user")
-      .select()
-      .eq("username", newOwnerUserName)
-      .single();
+  // const { data: newOwnerData, error: errorGettingNewOwner } =
+  //   await supabaseClient
+  //     .from("user")
+  //     .select()
+  //     .eq("username", newOwnerUserName)
+  //     .single();
 
-  if (currentOwnerData == null) {
-    console.log("ERROR GETTING CURRENT OWNER");
-    return json({ error: errorGettingCurrentOwner.message }, { headers });
-  } else if (newOwnerData == null) {
-    console.log("ERROR GETTING NEW OWNER");
-    return json({ error: errorGettingNewOwner.message }, { headers });
-  }
+  // if (currentOwnerData == null) {
+  //   console.log("ERROR GETTING CURRENT OWNER");
+  //   return json({ error: errorGettingCurrentOwner.message }, { headers });
+  // } else if (newOwnerData == null) {
+  //   console.log("ERROR GETTING NEW OWNER");
+  //   return json({ error: errorGettingNewOwner.message }, { headers });
+  // }
 
   const { data: updatedNewOwner, error: errorUpdatingNewOwner } =
     await supabaseClient
       .from("workspace_users")
       .update({ role: "owner" })
       .eq("workspace_id", workspaceId)
-      .eq("user_id", newOwnerData.id)
+      .eq("user_id", newOwnerUserId)
       .select()
       .single();
 
@@ -229,7 +264,7 @@ export async function handleTransferWorkspace(
       .from("workspace_users")
       .update({ role: "admin" })
       .eq("workspace_id", workspaceId)
-      .eq("user_id", currentOwnerData.id)
+      .eq("user_id", currentOwnerUserId)
       .select()
       .single();
 
