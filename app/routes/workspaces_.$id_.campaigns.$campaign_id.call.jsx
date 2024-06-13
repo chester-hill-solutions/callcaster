@@ -208,8 +208,8 @@ export default function Campaign() {
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
-            <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <div className="flex flex-col" style={{flex:"0 0 20%"}}>
+            <div className="flex justify-evenly gap-4 " style={{ justifyContent: 'space-evenly', alignItems: "stretch", flexWrap:"wrap" }}>
+                <div className="flex flex-col" style={{minWidth:"10%", flex:"1 1 auto"}}>
                     <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                     <div style={{
                         border: '3px solid #BCEBFF',
