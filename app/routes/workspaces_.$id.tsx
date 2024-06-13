@@ -4,7 +4,7 @@ import {
   useLoaderData,
   useNavigate,
   Link,
-  Outlet
+  Outlet,
 } from "@remix-run/react";
 import { PlusIcon } from "~/components/Icons";
 import { Button } from "~/components/ui/button";
@@ -38,10 +38,7 @@ export const loader = async ({ request, params }) => {
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-    return json(
-      { workspace, audiences, campaigns },
-      { headers },
-    );
+    return json({ workspace, audiences, campaigns }, { headers });
   } catch (error) {
     console.log(error);
     return json(error, 500);
@@ -49,7 +46,6 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Workspace() {
-
   const { workspace, audiences, campaigns } = useLoaderData();
 
   return (
@@ -67,7 +63,7 @@ export default function Workspace() {
                 className="font-Zilla-Slab text-xl font-semibold"
               >
                 Media
-            </Link>
+              </Link>
             </Button>
             <Button asChild variant="outline">
               <Link
@@ -89,7 +85,6 @@ export default function Workspace() {
             </Button>
           </div>
         </div>
-  
       </div>
       <div className="flex">
         <div className="flex h-[800px] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
@@ -100,14 +95,11 @@ export default function Workspace() {
               className="border-b-2 border-solid border-slate-500 p-2 text-brand-primary hover:bg-slate-300 hover:text-slate-800"
             >
               <h3 className="capitalize">
-                  {row.title || `Unnamed campaign ${i + 1}`}
+                {row.title || `Unnamed campaign ${i + 1}`}
               </h3>
             </Link>
           ))}
-          <Link
-            to={`campaign/new`}
-            className="flex justify-center p-4"
-          >
+          <Link to={`campaigns/new`} className="flex justify-center p-4">
             <PlusIcon fill="#333" width="25px" />
           </Link>
         </div>

@@ -31,43 +31,7 @@ export async function handleNewAudience({
     );
   }
 
-  // const {
-  //   data: createCampaignAudienceData,
-  //   error: createCampaignAudienceError,
-  // } = await supabaseClient
-  //   .from("campaign_audience")
-  //   .insert({
-  //     campaign_id: campaignId,
-  //     audience_id: createAudienceData.id,
-  //   })
-  //   .select()
-  //   .single();
-
-  // if (createCampaignAudienceError) {
-  //   console.log("Failed to create row on campaign_audience");
-  //   const { data: deleteNewAudience, error: deleteNewAudienceError } =
-  //     await supabaseClient
-  //       .from("audience")
-  //       .delete()
-  //       .eq("id", createAudienceData.id);
-
-  //   if (deleteNewAudienceError != null) {
-  //     console.log(
-  //       `Deleted New Audience, ${createAudienceData.id}: ${createAudienceData.name}`,
-  //     );
-  //   }
-
-  //   return json(
-  //     {
-  //       audienceData: null,
-  //       campaignAudienceData: null,
-  //       error: createCampaignAudienceError,
-  //     },
-  //     { headers },
-  //   );
-  // }
-
-  return redirect("../");
+  return redirect(`/workspaces/${workspaceId}/audiences`);
 }
 
 export async function handleNewCampaign({
@@ -87,7 +51,10 @@ export async function handleNewCampaign({
     .single();
 
   if (campaignError) {
-    return json({ campaignData: null, error: campaignError.message });
+    return json(
+      { campaignData: null, error: campaignError.message },
+      { headers },
+    );
   }
 
   //ADD CAMPAIGN DETAILS
@@ -96,8 +63,11 @@ export async function handleNewCampaign({
     .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
-    return json({ campaignData: campaignData, error: detailsError.error });
+    return json(
+      { campaignData: campaignData, error: detailsError.error },
+      { headers },
+    );
   }
 
-  return redirect("../");
+  return redirect(`/workspaces/${workspaceId}/campaigns`);
 }
