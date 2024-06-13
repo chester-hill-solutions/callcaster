@@ -3,7 +3,8 @@ import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
-
+import Result from "./CallList/CallContact/Result";
+import CampaignSettingsScript from "./CampaignSettings.Script";
 const initialState = (data, workspace, campaign_id) => ({
     campaign_id,
     workspace,
@@ -134,12 +135,16 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }
         dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
     }, [campaign_id, data, workspace]);
 
-
+    console.log(campaignDetails)
     return (
         <div className="p-4 flex-col">
             <div className="flex justify-between px-4" style={{ height: "40px" }}>
                 <h3 className="font-Zilla-Slab text-2xl">{campaignDetails.title}</h3>
                 {isChanged && <Button disabled={busy} onClick={handleSave}>SAVE</Button>}
+                <Button onClick={() => navigate(`${campaignDetails.dial_type}`)}>
+                    Start Calling
+                </Button>
+
             </div>
             <div className="gap-2 flex-col flex">
                 <div className="flex justify-start gap-2">
@@ -238,11 +243,7 @@ const CampaignSettings = ({ campaign_id, data, audiences, mediaData, workspace }
                         </div>
                     )
                 })}
-                <div className="flex justify-end">
-                    <Button onClick={() => navigate(`${campaignDetails.dial_type}`)}>
-                        Start Calling
-                    </Button>
-                </div>
+                <CampaignSettingsScript {...{questions: campaignDetails.questions}}/>
             </div>
         </div>
     );
