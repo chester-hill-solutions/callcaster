@@ -58,11 +58,11 @@ export default function Workspace() {
           <div className="ml-auto flex gap-4">
             <Button asChild variant="outline">
               <Link
-                to={`./media`}
+                to={`./audios`}
                 relative="path"
                 className="font-Zilla-Slab text-xl font-semibold"
               >
-                Media
+                Audio
               </Link>
             </Button>
             <Button asChild variant="outline">
@@ -80,7 +80,7 @@ export default function Workspace() {
                 relative="path"
                 className="font-Zilla-Slab text-xl font-semibold"
               >
-                Users
+                Workspace Settings
               </Link>
             </Button>
           </div>

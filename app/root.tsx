@@ -15,6 +15,7 @@ import {
   json,
   redirect,
   useLoaderData,
+  useLocation,
   useNavigate,
   useRevalidator,
 } from "@remix-run/react";
@@ -83,6 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       token,
       workspaces,
       user: userData,
+      params,
     },
     {
       headers: response.headers,
@@ -91,7 +93,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { env, session, token, workspaces, user } =
+  const { env, session, token, workspaces, user, params } =
     useLoaderData<typeof loader>();
   const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
@@ -135,7 +137,7 @@ export default function App() {
         {/* <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} /> */}
         <Links />
       </head>
-      <body className={`min-h-screen bg-background sm:overflow-hidden`}>
+      <body className={`min-h-screen bg-background`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -148,6 +150,7 @@ export default function App() {
             workspaces={workspaces}
             isSignedIn={serverAccessToken != null}
             user={user}
+            params={params}
           />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>

@@ -94,7 +94,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 //   return json({}, { headers });
 // }
 
-export default function WorkspaceMedia() {
+export default function WorkspaceAudio() {
   const { audioMedia, workspace, error } = useLoaderData<typeof loader>();
   //   const actionData = useActionData<typeof action>();
 
@@ -104,11 +104,13 @@ export default function WorkspaceMedia() {
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null ? `${workspace?.name} Media` : "No Workspace"}
+          {workspace != null
+            ? `${workspace?.name} Audio Library`
+            : "No Workspace"}
         </h1>
         <div className="flex items-center gap-4">
           <Button asChild className="font-Zilla-Slab text-xl font-semibold">
-            <Link to={`./new`}>Add Media</Link>
+            <Link to={`./new`}>Add Audio</Link>
           </Button>
           <Button
             asChild
@@ -128,7 +130,7 @@ export default function WorkspaceMedia() {
       )}
       {isWorkspaceAudioEmpty && (
         <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Media to this Workspace!
+          Add Your Own Audio to this Workspace!
         </h4>
       )}
 
