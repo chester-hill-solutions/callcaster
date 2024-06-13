@@ -97,7 +97,7 @@ export default function Media() {
         className="flex w-fit flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-16 pb-10 pt-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
         <h1 className="flex items-center gap-2 text-center font-Zilla-Slab text-4xl font-bold">
-          Add Media to{" "}
+          Add Audio to{" "}
           <span className="rounded-md bg-gray-400 bg-opacity-30 px-4 py-2 font-Zilla-Slab text-xl">
             {workspace.name}
           </span>
@@ -116,7 +116,7 @@ export default function Media() {
             htmlFor="media-name"
             className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
           >
-            Media Name
+            Audio Name
             <input
               type="text"
               name="media-name"
@@ -141,7 +141,7 @@ export default function Media() {
             transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
               type="submit"
             >
-              Upload Media
+              Upload Audio
             </Button>
             <Button
               asChild

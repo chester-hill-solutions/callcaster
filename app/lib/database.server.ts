@@ -163,7 +163,7 @@ export async function testAuthorize({
   return { data, error };
 }
 
-export async function getUserRole({ serverSession, workspaceId }) {
+export function getUserRole({ serverSession, workspaceId }) {
   if (serverSession == null || serverSession.access_token == null) {
     return null;
   }

@@ -135,12 +135,12 @@ export default function SignIn() {
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
         </Link>
-        <Link
+        {/* <Link
           to={"/remember"}
           className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-gray-500 hover:text-brand-primary hover:underline dark:text-brand-tertiary"
         >
           I forgot my password
-        </Link>
+        </Link> */}
       </div>
       <Toaster richColors visibleToasts={1} />
     </main>
