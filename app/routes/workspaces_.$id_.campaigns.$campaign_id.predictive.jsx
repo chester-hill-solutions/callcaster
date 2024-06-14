@@ -28,12 +28,13 @@ export const loader = async ({ request, params }) => {
         console.log(errors);
         throw (errors)
     }
+
     const initialQueue = queue?.map(q => ({ ...q, contact: contacts?.find(contact => contact.id === q.contact_id) }));
     const nextRecipient = initialQueue[0] || null;
     const initalCallsList = attempts.flatMap(attempt => attempt.call);
     const initialRecentCall = initalCallsList.find((call) => call.contact_id === nextRecipient?.contact.id)
     const initialRecentAttempt = attempts.sort((a, b) => b.created_at - a.created_at).find((call) => call.contact_id === nextRecipient?.contact.id)
-    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue, contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt }, { headers });
+    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue, contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt, initialConference: null }, { headers });
 }
 
 export const action = async ({ request, params }) => {
@@ -68,6 +69,7 @@ export const action = async ({ request, params }) => {
 export default function Campaign() {
     const { device: twilioDevice, supabase } = useOutletContext();
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
+    
     const {
         campaign,
         attempts: initialAttempts,
@@ -78,6 +80,7 @@ export default function Campaign() {
         queue,
         initalCallsList,
         initialRecentCall = {},
+        initialConference
     } = useLoaderData();
     const [nextRecipient, setNextRecipient] = useState({});
     const { callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
@@ -86,6 +89,7 @@ export default function Campaign() {
         supabase,
         init: {
             queue: [],
+            predictiveQueue: [...queue],
             callsList: [...initalCallsList],
             attempts: [...initialAttempts],
             recentCall: { ...initialRecentCall },
@@ -93,7 +97,8 @@ export default function Campaign() {
 
         },
         contacts,
-        nextRecipient
+        nextRecipient,
+        campaign_id: campaign.id
     })
     const fetcher = useFetcher();
     const submit = useSubmit();
@@ -112,12 +117,13 @@ export default function Campaign() {
             }
             return acc;
         }, {}), [queue]);
-    const house = nextRecipient.contact ? householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)] : []
+    const house = nextRecipient?.contact ? householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)] : []
 
-    const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id);
+    const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id, { ...initialConference });
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleDialNext = () => {
+
         if (activeCall || incomingCall || status !== 'Registered') {
             return;
         }
@@ -172,12 +178,14 @@ export default function Campaign() {
                                 Household Members
                             </div>
                         </div>
-                        {house?.map((contact) => {
-                            return (
-                                <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
-                                    <div>{contact.contact.firstname} {contact.contact.surname}</div>
-                                </div>
-                            )
+                        {house && house.length > 0 && house?.map((contact) => {
+                            if (contact) {
+                                return (
+                                    <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
+                                        <div>{contact?.contact.firstname} {contact?.contact.surname}</div>
+                                    </div>
+                                )
+                            }
                         })}
                     </div>
                 </div>

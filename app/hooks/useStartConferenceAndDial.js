@@ -1,14 +1,14 @@
 import { useState, useCallback } from "react";
 
-const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId) => {
-    const [conference, setConference] = useState(null);
+const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId, initialConference) => {
+    const [conference, setConference] = useState(initialConference);
 
     const begin = useCallback(async () => {
         try {
             const startConferenceResponse = await fetch('/api/auto-dial', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: userId, caller_id: callerId })
+                body: JSON.stringify({ user_id: userId, caller_id: callerId, workspace_id: workspaceId, campaign_id: campaignId })
             });
 
             const startConferenceData = await startConferenceResponse.json();
