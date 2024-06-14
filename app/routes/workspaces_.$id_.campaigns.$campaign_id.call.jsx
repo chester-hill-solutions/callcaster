@@ -224,7 +224,6 @@ export default function Campaign() {
             setDisposition(recentAttempt.disposition || null);
         }
     }, [recentAttempt]);
-
     
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
