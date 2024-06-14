@@ -217,7 +217,7 @@ export default function Campaign() {
     }, [recentAttempt]);
 
     useEffect(() => {
-        if (fetcher.state === "idle" && fetcher.data) {
+        if (fetcher.state === "idle" && fetcher.data && !nextRecipient) {
             console.log(queue, queue[0])
           setNextRecipient(queue[0])
         }
