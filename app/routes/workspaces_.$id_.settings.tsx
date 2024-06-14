@@ -121,6 +121,11 @@ export default function WorkspaceSettings() {
     (user) => user.user_workspace_role === "owner",
   );
   // console.log(workspaceOwner);
+  users?.sort((a, b) => {
+    if (a.user_workspace_role < b.user_workspace_role) return 1;
+    if (a.user_workspace_role > b.user_workspace_role) return -1;
+    return 0;
+  });
 
   const [showForm, setShowForm] = useState<boolean>(false);
 

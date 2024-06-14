@@ -43,7 +43,7 @@ export default function Index() {
           Login
         </h2>
 
-        <Button
+        {/* <Button
           variant={"outline"}
           className="flex min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black"
         >
@@ -64,7 +64,7 @@ export default function Index() {
             OR
           </p>
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
-        </div>
+        </div> */}
 
         <Form
           id="homepage-signin-form"

@@ -16,9 +16,9 @@ import { Form } from "@remix-run/react";
 
 export enum MemberRole {
   Owner = "owner",
+  Admin = "admin",
   Member = "member",
   Caller = "caller",
-  Admin = "admin",
 }
 
 type TeamMemberProps = {
