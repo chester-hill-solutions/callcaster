@@ -103,8 +103,20 @@ export default function Campaign() {
     const [groupByHousehold] = useState(true);
     const [update, setUpdate] = useState(recentAttempt?.result || {});
     const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
-    const householdMap = useMemo(() =>
-        queue.reduce((acc, curr, index) => {
+    const sortQueue = (queue) => {
+        return [...queue].sort((a, b) => {
+            if (a.attempts !== b.attempts) {
+                return b.attempts - a.attempts;
+            }
+            if (a.id !== b.id) {
+                return a.id - b.id;
+            }
+            return a.queue_order - b.queue_order;
+        });
+    };
+    const householdMap = useMemo(() => {
+        const sortedQueue = sortQueue(queue);
+        return sortedQueue.reduce((acc, curr, index) => {
             if (curr?.contact?.address) {
                 if (!acc[curr.contact.address]) {
                     acc[curr.contact.address] = [];
@@ -114,23 +126,24 @@ export default function Campaign() {
                 acc[`NO_ADDRESS_${index}`] = [curr];
             }
             return acc;
-        }, {}), [queue]);
+        }, {});
+    }, [queue]);
+
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleNextNumber = useCallback((skipHousehold = false) => {
         const nextContact = getNextContact(queue, householdMap, nextRecipient, groupByHousehold, skipHousehold);
         if (nextContact) {
-            setNextRecipient(nextContact);
-            const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
-            const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
-            setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-            setUpdate(newRecentAttempt.update || {});
-            return nextContact;
+          setNextRecipient(nextContact);
+          const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
+          const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
+          setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
+          setUpdate(newRecentAttempt.update || {});
+          return nextContact;
         }
-
         return null;
-    }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
-
+      }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
+    
     const switchToContact = (contact) => {
         setNextRecipient(contact);
         const newRecentAttempt = attemptList.find(call => call.contact_id === contact.contact.id) || {};
@@ -187,8 +200,8 @@ export default function Campaign() {
 
     const handleQueueButton = () => {
         fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
-            navigate: false
-        });
+            navigate: false,
+        })
     }
 
     const handleDequeueNext = () => {
@@ -203,13 +216,21 @@ export default function Campaign() {
         }
     }, [recentAttempt]);
 
+    useEffect(() => {
+        if (fetcher.state === "idle" && fetcher.data) {
+            console.log(queue, queue[0])
+          setNextRecipient(queue[0])
+        }
+      }, [fetcher.data]);
+    
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
-                <div className="flex flex-col" style={{flex:"0 0 20%"}}>
+                <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
                     <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                     <div style={{
                         border: '3px solid #BCEBFF',

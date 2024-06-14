@@ -7,6 +7,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     const [recentCall, setRecentCall] = useState(init.recentCall);
     const [recentAttempt, setRecentAttempt] = useState(init.recentAttempt);
     const [pendingCalls, setPendingCalls] = useState([]);
+    const [isNextRecipientSet, setIsNextRecipientSet] = useState(false);
 
     const isRecent = (date) => {
         const created = new Date(date);
@@ -80,21 +81,37 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
 
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
-            setQueue((currentQueue) => currentQueue.filter(item => item.id !== payload.new.id));
+            setQueue((currentQueue) => {
+                const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
+                if (nextRecipient && nextRecipient.id === payload.new.contact_idid) {
+                    setIsNextRecipientSet(false);
+                    if (filteredQueue.length > 0) {
+                        setNextRecipient(filteredQueue[0]);
+                    } else {
+                        setNextRecipient(null);
+                    }
+                }
+                return filteredQueue;
+            });
         } else if (payload.new.status === user.id) {
             const contact = contacts.find(contact => contact.id === payload.new.contact_id);
             if (contact?.phone) {
-                setNextRecipient({ ...payload.new, contact });
                 setQueue((currentQueue) => {
                     const index = currentQueue.findIndex(item => item.id === payload.new.id);
-                    return index > -1
+                    const updatedQueue = index > -1
                         ? currentQueue.map(item => item.id === payload.new.id ? { ...payload.new, contact } : item)
                         : [...currentQueue, { ...payload.new, contact }];
+                    return updatedQueue;
                 });
+    
+                if (!isNextRecipientSet || (nextRecipient && nextRecipient.id === payload.new.id)) {
+                    setNextRecipient({ ...payload.new, contact });
+                    setIsNextRecipientSet(true);
+                }
             }
         }
-    }, [user.id, contacts, setNextRecipient]);
-
+    }, [user.id, contacts, nextRecipient, isNextRecipientSet, setNextRecipient]);
+        
     useEffect(() => {
         const handleChange = (payload) => {
             switch (payload.table) {
