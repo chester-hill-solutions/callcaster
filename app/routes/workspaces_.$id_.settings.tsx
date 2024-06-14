@@ -109,6 +109,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   );
 };
 
+function compareMembersByRole(a, b) {
+  const memberRoleArray = Object.values(MemberRole);
+
+  if (
+    memberRoleArray.indexOf(a.user_workspace_role) <
+    memberRoleArray.indexOf(b.user_workspace_role)
+  )
+    return -1;
+  if (
+    memberRoleArray.indexOf(a.user_workspace_role) >
+    memberRoleArray.indexOf(b.user_workspace_role)
+  )
+    return 1;
+  return 0;
+}
+
 export default function WorkspaceSettings() {
   const { hasAccess, userRole, users, activeUserId } =
     useLoaderData<typeof loader>();
@@ -121,11 +137,7 @@ export default function WorkspaceSettings() {
     (user) => user.user_workspace_role === "owner",
   );
   // console.log(workspaceOwner);
-  users?.sort((a, b) => {
-    if (a.user_workspace_role < b.user_workspace_role) return 1;
-    if (a.user_workspace_role > b.user_workspace_role) return -1;
-    return 0;
-  });
+  users?.sort((a, b) => compareMembersByRole(a, b));
 
   const [showForm, setShowForm] = useState<boolean>(false);
 
