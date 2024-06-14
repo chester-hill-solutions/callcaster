@@ -57,18 +57,18 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function Audience() {
-  const { audiences} = useOutletContext();
+  const { audiences } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
   return (
-    <div className="flex flex-col">
-        <CampaignSettings
-          workspace={workspace_id}
-          data={pageData}
-          audiences={audiences}
-          mediaData={mediaData}
-          campaign_id={selected_id}
-        />
+    <div className="flex h-full flex-col">
+      <CampaignSettings
+        workspace={workspace_id}
+        data={pageData}
+        audiences={audiences}
+        mediaData={mediaData}
+        campaign_id={selected_id}
+      />
     </div>
   );
 }

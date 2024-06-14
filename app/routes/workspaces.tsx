@@ -29,8 +29,20 @@ export const loader = async ({ request }: { request: Request }) => {
   }
 
   const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
+  const { data: workspaceAccessData, error: workspaceAccessError } =
+    await supabaseClient
+      .from("workspace_users")
+      .select("workspace_id, last_accessed")
+      .eq("user_id", serverSession.user.id)
+      .order("last_accessed", { ascending: false });
 
-  return json({ workspaces, userId: serverSession.user }, { headers });
+  // console.log("Data: ", workspaceAccessData);
+  // console.log("Error: ", workspaceAccessError);
+
+  return json(
+    { workspaces, userId: serverSession.user, workspaceAccessData },
+    { headers },
+  );
 };
 
 //************ACTION************/
@@ -72,7 +84,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 //************COMPONENT************/
 export default function Workspaces() {
-  const { workspaces, userId } = useLoaderData<typeof loader>();
+  const { workspaces, userId, workspaceAccessData } =
+    useLoaderData<typeof loader>();
   // console.log(workspaces);
 
   const actionData = useActionData<typeof action>();
@@ -83,7 +96,22 @@ export default function Workspaces() {
   }, [actionData]);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+  console.log("Unsorted: ", workspaces);
+  if (workspaces != null) {
+    for (let i = 0; i < workspaceAccessData.length; i++) {
+      if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
+        continue;
+      }
 
+      const temp = workspaces[i];
+      const oldIndex = workspaces.findIndex(
+        (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
+      );
+      workspaces[i] = workspaces[oldIndex];
+      workspaces[oldIndex] = temp;
+    }
+  }
+  console.log("Sorted? ", workspaces);
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
@@ -97,7 +125,7 @@ export default function Workspaces() {
           <DialogTrigger>
             <Button
               variant="outline"
-              className="h-full min-h-fit min-w-60 border-2 border-black px-4 py-8 dark:border-white"
+              className="h-full min-h-fit w-full min-w-60 border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
                 <FaPlus
@@ -185,7 +213,8 @@ export default function Workspaces() {
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black dark:border-white dark:bg-transparent dark:text-white"
+              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
+              transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
             >
               <h5 className="font-Zilla-Slab text-2xl font-semibold">
                 {formatTableText(workspace.name)}

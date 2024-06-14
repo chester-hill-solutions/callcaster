@@ -56,7 +56,7 @@ export default function TeamMember({
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;
-  console.log("User role :", userRole);
+  // console.log("User role :", userRole);
   return (
     <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
       <div className="flex items-center gap-2">
