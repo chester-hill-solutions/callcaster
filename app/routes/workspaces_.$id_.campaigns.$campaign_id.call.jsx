@@ -20,7 +20,7 @@ export const loader = async ({ request, params }) => {
     const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', id).single();
     const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
-    const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
+    const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`).eq('campaign_id', id).eq('user_id', serverSession.user.id);
     const { data: queue, error: queueError } = await supabase.from('campaign_queue').select().eq('status', serverSession.user.id).eq('campaign_id', id);
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
