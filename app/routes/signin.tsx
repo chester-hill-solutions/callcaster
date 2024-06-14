@@ -1,6 +1,6 @@
 import { json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData } from "@remix-run/react";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
@@ -64,7 +64,7 @@ export default function SignIn() {
             {actionData.error}
           </p>
         )}
-        <Button
+        {/* <Button
           variant={"outline"}
           className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
         >
@@ -77,7 +77,7 @@ export default function SignIn() {
         >
           <FaGithub size={"2rem"} />
           Sign in with Github
-        </Button>
+        </Button> */}
 
         <div className="flex w-full items-center justify-center gap-2">
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
