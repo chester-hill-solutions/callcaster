@@ -1,41 +1,38 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { useEffect, useState } from "react";
 import type {
   LinksFunction,
   LoaderFunctionArgs,
   TypedResponse,
 } from "@remix-run/node";
-import { Device } from "twilio-client";
 import {
   Links,
   LiveReload,
-  json,
-  useRevalidator,
-  useLoaderData,
   Meta,
+  NavigateFunction,
   Outlet,
   Scripts,
   ScrollRestoration,
+  json,
+  redirect,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useRevalidator,
 } from "@remix-run/react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { createBrowserClient } from "@supabase/ssr";
-import {useTwilioDevice} from "./hooks/useTwilioDevice"
-// Remix-Themes Imports
-// import clsx from "clsx";
-// import {
-//   PreventFlashOnWrongTheme,
-//   Theme,
-//   ThemeProvider,
-//   useTheme,
-// } from "remix-themes";
-// import { themeSessionResolver } from "./sessions.server";
+import { useEffect } from "react";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { useTwilioDevice } from "./hooks/useTwilioDevice";
 
 import { ThemeProvider } from "./components/theme-provider";
 
-import stylesheet from "~/tailwind.css";
-import type { ENV } from "~/lib/types";
 import Navbar from "~/components/Navbar";
+import type { ENV } from "~/lib/types";
+import stylesheet from "~/tailwind.css";
+import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
+
+import { Toaster } from "sonner";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -51,7 +48,7 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const env: ENV = {
     SUPABASE_URL: process.env.SUPABASE_URL,
     SUPABASE_KEY: process.env.SUPABASE_ANON_KEY,
@@ -70,47 +67,53 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ).then((res) => res.json());
     token = newToken;
   }
-  // const { getTheme } = await themeSessionResolver(request);
+
+  const { data: userData, error: userError } = await supabase
+    .from("user")
+    .select()
+    .eq("id", session?.user.id ?? "")
+    .single();
+
+  const { data: workspaces, error: workspaceQueryError } =
+    await getUserWorkspaces({ supabaseClient: supabase });
 
   return json(
     {
       env,
       session,
       token,
+      workspaces,
+      user: userData,
+      params,
     },
     {
       headers: response.headers,
     },
-    // theme: getTheme(),
   );
-
-  // Wrapper for Implementing Remix-Themes
-  // export default function AppWithProviders() {
-  //   const { revalidate } = useRevalidator();
-  //   const data = useLoaderData<typeof loader>();
-  //   // console.log(data.theme);
-  //   return (
-  //     <ThemeProvider specifiedTheme={data.theme} themeAction="/action/set-theme">
-  //       <App />
-  //     </ThemeProvider>
-  //   );
-  // }
 };
 
 export default function App() {
-  const { env, session, token } = useLoaderData<typeof loader>();
-  const device = useTwilioDevice(token)
+  const { env, session, token, workspaces, user, params } =
+    useLoaderData<typeof loader>();
+  const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
     env.SUPABASE_KEY!,
   );
   const serverAccessToken = session?.access_token;
+  const navigate = useNavigate();
 
-  async function signOut() {
-    const { error } = await supabase.auth.signOut();
+  async function signOut(): Promise<
+    TypedResponse<{ success: string | null; error: string | null }>
+  > {
+    const { error: signOutError } = await supabase.auth.signOut();
     revalidate();
-    return json({ error: error });
+    if (signOutError) {
+      return json({ success: null, error: signOutError.message });
+    }
+    navigate("/");
+    return json({ success: "Sign off successful", error: null });
   }
 
   useEffect(() => {
@@ -141,7 +144,14 @@ export default function App() {
           enableSystem
           disableTransitionOnChange
         >
-          <Navbar className="bg-brand-secondary" handleSignOut={signOut} />
+          <Navbar
+            className="bg-brand-secondary"
+            handleSignOut={signOut}
+            workspaces={workspaces}
+            isSignedIn={serverAccessToken != null}
+            user={user}
+            params={params}
+          />
           <Outlet context={{ supabase, env, device }} />
         </ThemeProvider>
         <ScrollRestoration />

@@ -1,28 +1,26 @@
-import { json, redirect, useLoaderData, useNavigate } from "@remix-run/react";
-
-import { PostgrestError } from "@supabase/supabase-js";
-import { useState } from "react";
-import { WorkspaceDropdown } from "~/components/WorkspaceDropdown";
-import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import {
-  audienceColumns,
-  campaignColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
+  json,
+  redirect,
+  useLoaderData,
+  useNavigate,
+  Link,
+  Outlet,
+} from "@remix-run/react";
+import { FaPlus } from "react-icons/fa6";
+import { PlusIcon } from "~/components/Icons";
+import { Button } from "~/components/ui/button";
 import {
-  getWorkspaceAudiences,
   getWorkspaceCampaigns,
-  getWorkspaceContacts,
   getWorkspaceInfo,
+  updateUserWorkspaceAccess,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { WorkspaceTable, WorkspaceTableNames } from "~/lib/types";
 
-export const loader = async ({ request, params }: { request: Request }) => {
+export const loader = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
-  const workspaceId = params.id
+  const workspaceId = params.id;
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -33,97 +31,114 @@ export const loader = async ({ request, params }: { request: Request }) => {
       return redirect("/workspaces", { headers });
     }
   }
-  const { data: audiences } = await getWorkspaceAudiences({ supabaseClient, workspaceId });
-  const { data: campaigns } = await getWorkspaceCampaigns({ supabaseClient, workspaceId });
-  const { data: contacts } = await getWorkspaceContacts({ supabaseClient, workspaceId });
 
-  return json({ workspace, audiences, campaigns, contacts }, { headers });
+  updateUserWorkspaceAccess({ workspaceId, supabaseClient });
+
+  try {
+    const { data: audiences, error: audiencesError } = await supabaseClient
+      .from("audience")
+      .select()
+      .eq("workspace", workspaceId);
+    if (audiencesError) throw { audiencesError };
+    const { data: campaigns, error: campaignsError } =
+      await getWorkspaceCampaigns({
+        supabaseClient,
+        workspaceId,
+      });
+    if (campaignsError) throw { campaignsError };
+    return json({ workspace, audiences, campaigns }, { headers });
+  } catch (error) {
+    console.log(error);
+    return json(error, 500);
+  }
 };
 
 export default function Workspace() {
-  const navigate = useNavigate();
-  const { workspace, audiences, campaigns, contacts } =
-    useLoaderData<typeof loader>();
+  const { workspace, audiences, campaigns } = useLoaderData();
 
-  const [selectedTable, setSelectedTable] = useState<
-    JsonifyObject<WorkspaceTable>
-  >({
-    name:'campaigns',
-    columns: campaignColumns,
-    data: campaigns,
+  campaigns.sort((campaign1, campaign2) => {
+    if (campaign1.created_at < campaign2.created_at) {
+      return 1;
+    } else if (campaign1.created_at > campaign2.created_at) {
+      return -1;
+    }
+
+    return 0;
   });
 
-  const [firstColumn, setFirstColumn] = useState<(string | null)[]>(
-    campaigns != null ? campaigns.map((campaign) => campaign.title) : [],
-  );
-
-  const handleSelectTable = (tableName: string) => {
-    switch (tableName) {
-      case WorkspaceTableNames.Campaign:
-        setFirstColumn(
-          campaigns != null ? campaigns.map((campaign) => campaign.title) : [],
-        );
-        setSelectedTable({
-          name: 'campaigns',
-          columns: campaignColumns,
-          data: campaigns,
-        });
-        break;
-      case WorkspaceTableNames.Audience:
-        setFirstColumn(
-          audiences != null ? audiences.map((audience) => audience.name) : [],
-        );
-        setSelectedTable({
-          name: 'audiences',
-          columns: audienceColumns,
-          data: audiences,
-        });
-        break;
-      case WorkspaceTableNames.Contact:
-        setFirstColumn([]);
-        setSelectedTable({
-          name: 'contacts',
-          columns: contactColumns,
-          data: contacts,
-        });
-        break;
-      default:
-        console.log(
-          `tableName: ${tableName} does not correspond to any workspace tables`,
-        );
-    }
-  };
-
   return (
-    <main
-      className="mx-auto mt-8 h-full w-[80%] items-center rounded-sm"
-    >
-      <div className="py-4">
-        <WorkspaceDropdown selectTable={handleSelectTable} />
+    <main className="mx-auto mt-8 h-full w-[80%] items-center">
+      <div className="mb-2 flex items-center">
+        <div className="flex flex-1 justify-between">
+          <div className="flex gap-4">
+            <Button asChild variant="outline">
+              <Link
+                to={`./audios`}
+                relative="path"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold "
+              >
+                Audio
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link
+                to={`./audiences`}
+                relative="path"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
+              >
+                Audiences
+              </Link>
+            </Button>
+          </div>
+          <h3 className="absolute left-1/2 translate-x-[-50%] font-Tabac-Slab text-2xl">
+            {workspace?.name}
+          </h3>
+          <Button asChild variant="outline">
+            <Link
+              to={`./settings`}
+              relative="path"
+              className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
+            >
+              Workspace Settings
+            </Link>
+          </Button>
+        </div>
       </div>
-      <div
-        className="flex gap-4 px-4 font-Zilla-Slab text-2xl font-bold"
-        id="filter-controls"
-      >
-        <p>Filter Controls</p>
-        <input type="text" name="filter-input" id="filter-input" />
+      <div id="campaigns-container" className="flex border-2 border-zinc-600">
+        <div
+          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-cyan-50  dark:bg-transparent"
+          style={{ scrollbarWidth: "none" }}
+        >
+          <Link
+            to={`campaigns/new`}
+            className="flex items-center justify-center gap-2 border-b-2 border-zinc-600 px-2 py-1 font-Zilla-Slab text-xl font-bold dark:bg-brand-primary dark:text-white"
+          >
+            <span>Add Campaign</span>
+            <FaPlus size="20px" />
+          </Link>
+          {campaigns?.map((row, i) => (
+            <Link
+              to={`campaigns/${row.id}`}
+              key={row.id}
+              className="border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white"
+            >
+              <h3 className="capitalize">
+                {row.title || `Unnamed campaign ${i + 1}`}
+              </h3>
+            </Link>
+          ))}
+        </div>
+        <div className="min-h-3/4 flex w-full flex-auto dark:bg-zinc-700">
+          <div className="flex flex-auto flex-col">
+            <Outlet
+              context={{
+                audiences,
+                campaigns,
+              }}
+            />
+          </div>
+        </div>
       </div>
-      <div className="self-start" id="name-column">
-        <ul className="flex flex-col gap-4">
-          {/* {firstColumn.map((row, i) => (
-            <li key={`${selectedTable}-row-${i}`} onClick={() => nav}>{row}</li>
-          ))} */}
-        </ul>
-      </div>
-
-      {campaigns != null && (
-        <DataTable
-          classname="border-white border-2 rounded-md"
-          columns={selectedTable.columns}
-          data={selectedTable.data}
-          onRowClick={(item) => navigate(`${selectedTable.name}/${item.id}`)}
-        />
-      )}
     </main>
   );
 }
