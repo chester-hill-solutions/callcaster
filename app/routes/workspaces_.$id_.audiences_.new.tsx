@@ -44,7 +44,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function AudiencesNew() {
   const actionData = useActionData<typeof action>();
   return (
-    <main className="mx-auto mt-8 flex h-full w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:bg-transparent dark:text-white">
+    <main className="mx-auto mt-8 flex h-full w-fit flex-col gap-4 rounded-sm px-8 pb-10 pt-6 dark:text-white">
       <section
         id="form"
         className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-16 pb-10 pt-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"

@@ -17,6 +17,7 @@ import {
   DialogClose,
 } from "~/components/ui/dialog";
 import { toast, Toaster } from "sonner";
+import { formatTableText } from "~/lib/utils";
 
 //************LOADER************/
 export const loader = async ({ request }: { request: Request }) => {
@@ -88,25 +89,15 @@ export default function Workspaces() {
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
         Your Workspaces
       </h1>
-      <div className="flex flex-row flex-wrap justify-start">
-        {workspaces != null &&
-          workspaces.map((workspace) => (
-            <Link
-              to={`/workspaces/${workspace.id}`}
-              key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60 m-4"
-            >
-              <h5 className="font-Zilla-Slab text-2xl text-white">
-                {workspace.name}
-              </h5>
-              <p className="text-white">Workspace Description</p>
-            </Link>
-          ))}
+      <div
+        id="workspaces-grid"
+        className="grid auto-rows-auto grid-cols-5 items-start gap-4"
+      >
         <Dialog>
           <DialogTrigger>
             <Button
               variant="outline"
-              className="h-full min-h-fit min-w-60 border border-white px-4 py-8"
+              className="h-full min-h-fit min-w-60 border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
                 <FaPlus
@@ -189,46 +180,19 @@ export default function Workspaces() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
-      {/* <dialog ref={dialogRef} className="rounded-md bg-indigo-400 p-8">
-        <div className="flex flex-col gap-4">
-          <h3 className="font-Tabac-Slab text-4xl font-black">
-            Add a New Workspace
-          </h3>
-          <Form
-            className="flex w-full flex-col gap-4"
-            method="POST"
-            onSubmit={() => dialogRef.current?.close()}
-            name="newWorkspace"
-          >
-            <label htmlFor="newWorkspaceName" className="flex flex-col">
-              Workspace Name
-              <input
-                type="text"
-                name="newWorkspaceName"
-                id="newWorkspaceName"
-                className="rounded-sm border-2 border-white bg-transparent px-4 py-2 text-xl"
-                required
-              />
-            </label>
-
-            <input type="hidden" name="userId" value={userId.id} />
-            <p className="flex items-center gap-4 font-bold">
-              Invite Workspace Members:{" "}
-              <Button className="" type="button">
-                <FaUserPlus size="24px" />
-              </Button>
-            </p>
-            <Button
-              variant="default"
-              className="max-w-[66%] self-center"
-              type="submit"
+        {workspaces != null &&
+          workspaces.map((workspace) => (
+            <Link
+              to={`/workspaces/${workspace.id}`}
+              key={workspace.id}
+              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black dark:border-white dark:bg-transparent dark:text-white"
             >
-              Create New Workspace
-            </Button>
-          </Form>
-        </div>
-      </dialog> */}
+              <h5 className="font-Zilla-Slab text-2xl font-semibold">
+                {formatTableText(workspace.name)}
+              </h5>
+            </Link>
+          ))}
+      </div>
       <Toaster richColors />
     </main>
   );

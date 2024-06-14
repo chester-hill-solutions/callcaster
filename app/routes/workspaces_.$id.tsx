@@ -50,17 +50,14 @@ export default function Workspace() {
 
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
-      <div className="flex items-center">
-        <div className="flex flex-1 justify-center">
-          <h3 className="ml-auto font-Tabac-Slab text-2xl">
-            {workspace?.name}
-          </h3>
-          <div className="ml-auto flex gap-4">
+      <div className="mb-2 flex items-center">
+        <div className="flex flex-1 justify-between">
+          <div className="flex gap-4">
             <Button asChild variant="outline">
               <Link
                 to={`./audios`}
                 relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold "
               >
                 Audio
               </Link>
@@ -69,21 +66,22 @@ export default function Workspace() {
               <Link
                 to={`./audiences`}
                 relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
               >
                 Audiences
               </Link>
             </Button>
-            <Button asChild>
-              <Link
-                to={`./settings`}
-                relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
-              >
-                Workspace Settings
-              </Link>
-            </Button>
           </div>
+          <h3 className="font-Tabac-Slab text-2xl">{workspace?.name}</h3>
+          <Button asChild>
+            <Link
+              to={`./settings`}
+              relative="path"
+              className="font-Zilla-Slab text-xl font-semibold"
+            >
+              Workspace Settings
+            </Link>
+          </Button>
         </div>
       </div>
       <div className="flex">
