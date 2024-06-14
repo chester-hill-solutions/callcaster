@@ -16,9 +16,9 @@ import { Form } from "@remix-run/react";
 
 export enum MemberRole {
   Owner = "owner",
+  Admin = "admin",
   Member = "member",
   Caller = "caller",
-  Admin = "admin",
 }
 
 type TeamMemberProps = {
@@ -34,9 +34,9 @@ export default function TeamMember({
 }) {
   const memberRole = member.user_workspace_role;
   const firstName =
-    member.first_name === null ? "No" : capitalize(member.first_name);
+    member.first_name === null ? "Unnamed" : capitalize(member.first_name);
   const lastName =
-    member.last_name === null ? "Name" : capitalize(member.last_name);
+    member.last_name === null ? "" : capitalize(member.last_name);
   const memberName = `${firstName} ${lastName}`;
 
   const iconStyles = clsx(

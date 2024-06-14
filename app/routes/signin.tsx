@@ -79,13 +79,13 @@ export default function SignIn() {
           Sign in with Github
         </Button> */}
 
-        <div className="flex w-full items-center justify-center gap-2">
+        {/* <div className="flex w-full items-center justify-center gap-2">
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
           <p className="font-Zilla-Slab text-xl font-semibold text-brand-primary dark:text-brand-secondary">
             OR
           </p>
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
-        </div>
+        </div> */}
 
         <Form
           method="POST"
