@@ -225,7 +225,7 @@ export default function Campaign() {
     
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
-
+      console.log(callsList)
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
