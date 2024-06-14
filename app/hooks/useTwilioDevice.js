@@ -3,13 +3,15 @@ import { Device } from '@twilio/voice-sdk';
 
 export function useTwilioDevice(token) {
     const deviceRef = useRef(null);
+    const initializedRef = useRef(false);
     const [status, setStatus] = useState('disconnected');
     const [error, setError] = useState(null);
     const [activeCall, setActiveCall] = useState(null);
     const [incomingCall, setIncomingCall] = useState(null);
 
     useEffect(() => {
-        if (token && !deviceRef.current) {
+        if (token && !initializedRef.current) {
+            initializedRef.current = true;
             const device = new Device(token);
             deviceRef.current = device;
 
@@ -20,8 +22,6 @@ export function useTwilioDevice(token) {
 
             device.on('connect', (call) => {
                 setStatus('Connected');
-                setActiveCall(call);
-                console.log('Call connected:', call);
             });
 
             device.on('disconnect', () => {
@@ -29,7 +29,7 @@ export function useTwilioDevice(token) {
                 device.disconnectAll();
                 activeCall?.disconnect();
                 setActiveCall(null);
-                setStatus('Registered')
+                setStatus('Registered');
             });
 
             device.on('cancel', () => {
@@ -44,7 +44,7 @@ export function useTwilioDevice(token) {
             });
 
             device.on('incoming', (call) => {
-                setIncomingCall(call)
+                setIncomingCall(call);
                 if (call.parameters.To.includes('client')) {
                     call.accept();
                     setStatus('connected');
@@ -53,7 +53,7 @@ export function useTwilioDevice(token) {
                 call.on('accept', () => {
                     setActiveCall(call);
                     setStatus('connected');
-                    setIncomingCall(null); // Clear incoming call when accepted
+                    setIncomingCall(null);
                     console.log('Call accepted');
                 });
                 call.on('disconnect', () => {
@@ -74,12 +74,14 @@ export function useTwilioDevice(token) {
             device.register();
 
             return () => {
-                device.state === 'registered' && device.unregister();
+                if (device.state === 'registered') {
+                    device.unregister();
+                }
                 deviceRef.current = null;
+                initializedRef.current = false;
             };
         }
     }, [token]);
-
 
     const makeCall = useCallback((params) => {
         if (deviceRef.current) {
@@ -93,7 +95,7 @@ export function useTwilioDevice(token) {
                 console.log('Call disconnected');
             });
 
-        connection.on('error', (err) => {
+            connection.on('error', (err) => {
                 setError(err);
                 setStatus('error');
                 console.error('Call error:', err);
@@ -101,19 +103,18 @@ export function useTwilioDevice(token) {
         } else {
             console.error('Device is not ready');
         }
-    }, [deviceRef.current]);
+    }, []);
 
     const hangUp = useCallback(() => {
         if (activeCall) {
-            /* activeCall.disconnect();
-            deviceRef.current.disconnectAll(); */
             fetch(`/api/hangup`, {
                 method: "POST",
-                body: JSON.stringify(activeCall),
-                headers: { "Cotnent-Type": 'application/json' }
-            }).then(() => null).catch((e) => console.log(e))
-            setStatus('Registered')
-            setActiveCall(null)
+                body: JSON.stringify({ callSid: activeCall.parameters.CallSid }),
+                headers: { "Content-Type": 'application/json' }
+            }).then(() => {
+                setStatus('Registered');
+                setActiveCall(null);
+            }).catch((e) => console.log(e));
         } else {
             console.error('No active call to hang up');
         }
@@ -129,7 +130,7 @@ export function useTwilioDevice(token) {
     }, [incomingCall]);
 
     return {
-        device: deviceRef.current,
+        device: deviceRef?.current,
         status,
         error,
         activeCall,

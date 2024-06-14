@@ -12,6 +12,12 @@ import useSupabaseRoom from "../hooks/useSupabaseRoom";
 
 const limit = 30
 
+const isRecent = (date) => {
+    const created = new Date(date);
+    const now = new Date();
+    return (now - created) / 3600000 < 24;
+};
+
 export const loader = async ({ request, params }) => {
     const { campaign_id: id, id: workspaceId } = params;
     const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
@@ -87,6 +93,7 @@ export default function Campaign() {
         user,
         supabase,
         init: {
+            predictiveQueue: [],
             queue: [...initialQueue],
             callsList: [...initalCallsList],
             attempts: [...initialAttempts],
@@ -95,7 +102,8 @@ export default function Campaign() {
         },
         contacts,
         nextRecipient,
-        setNextRecipient
+        setNextRecipient,
+        campaign_id:campaign.id
     });
     const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({ supabase, workspace: workspaceId, campaign: campaign.id, userId: user.id });
     const fetcher = useFetcher();
@@ -136,6 +144,7 @@ export default function Campaign() {
         if (nextContact) {
           setNextRecipient(nextContact);
           const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
+          if (!isRecent(newRecentAttempt.created_at)) return nextContact;
           const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
           setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
           setUpdate(newRecentAttempt.update || {});
@@ -216,16 +225,10 @@ export default function Campaign() {
         }
     }, [recentAttempt]);
 
-    useEffect(() => {
-        if (fetcher.state === "idle" && fetcher.data) {
-            console.log(queue, queue[0])
-          setNextRecipient(queue[0])
-        }
-      }, [fetcher.data]);
     
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
-      console.log(callsList)
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
