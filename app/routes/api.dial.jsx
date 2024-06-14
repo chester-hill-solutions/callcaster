@@ -39,7 +39,7 @@ let to = normalizePhoneNumber(to_number)
         });
         let outreach_attempt_id;
         if (!outreach_id) {
-            const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id });
+            const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id, wks_id: workspace_id, usr_id: user_id });
             if (outreachError) throw outreachError;
             outreach_attempt_id = outreachAttempt;
         } else {
@@ -70,7 +70,7 @@ let to = normalizePhoneNumber(to_number)
             campaign_id: parseInt(campaign_id, 10),
             contact_id: parseInt(contact_id, 10),
             workspace: workspace_id,
-            outreach_attempt_id
+            outreach_attempt_id,
         };
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
