@@ -33,6 +33,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     }, []);
 
     const updateAttempts = useCallback((payload) => {
+        if (payload.new.user_id !== user.id) return;
         const calls = callsList.filter(call => (call.outreach_attempt_id === payload.new.id) && (call.direction !== 'outbound-api'));
         let updatedAttempt = { ...payload.new, call: calls };
         if (calls.length && calls[0].status && !updatedAttempt.result.status) {
@@ -53,11 +54,11 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     const updateCalls = useCallback((payload) => {
         const attemptId = payload.new.outreach_attempt_id;
         let updatedCall = payload.new;
-
+    
         if (attemptId) {
             setAttempts((currentAttempts) => {
                 const updatedAttempts = currentAttempts.map(item => {
-                    if (item.id === attemptId) {
+                    if (item.id === attemptId && item.user_id === user.id) { // Add check for user ID
                         const updatedItem = {
                             ...item,
                             call: [...(item.call || []), updatedCall],
@@ -77,8 +78,8 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         } else {
             setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
         }
-    }, [recentAttempt?.contact?.id, recentCall]);
-
+    }, [user.id, recentAttempt?.contact?.id, recentCall]);
+    
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
             setQueue((currentQueue) => {
