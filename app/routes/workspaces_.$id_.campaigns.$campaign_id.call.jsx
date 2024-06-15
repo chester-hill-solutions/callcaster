@@ -12,6 +12,12 @@ import useSupabaseRoom from "../hooks/useSupabaseRoom";
 
 const limit = 30
 
+const isRecent = (date) => {
+    const created = new Date(date);
+    const now = new Date();
+    return (now - created) / 3600000 < 24;
+};
+
 export const loader = async ({ request, params }) => {
     const { campaign_id: id, id: workspaceId } = params;
     const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
@@ -20,7 +26,7 @@ export const loader = async ({ request, params }) => {
     const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', id).single();
     const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
     const { data: contacts, error: contactsError } = await supabase.rpc('get_contacts_by_campaign', { selected_campaign_id: id });
-    const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`,).eq('campaign_id', id);
+    const { data: attempts, error: attemptError } = await supabase.from('outreach_attempt').select(`*,call(*)`).eq('campaign_id', id).eq('user_id', serverSession.user.id);
     const { data: queue, error: queueError } = await supabase.from('campaign_queue').select().eq('status', serverSession.user.id).eq('campaign_id', id);
     let errors = [campaignError, detailsError, audiencesError, contactsError, attemptError, queueError].filter(Boolean);
     if (errors.length) {
@@ -87,6 +93,7 @@ export default function Campaign() {
         user,
         supabase,
         init: {
+            predictiveQueue: [],
             queue: [...initialQueue],
             callsList: [...initalCallsList],
             attempts: [...initialAttempts],
@@ -95,7 +102,8 @@ export default function Campaign() {
         },
         contacts,
         nextRecipient,
-        setNextRecipient
+        setNextRecipient,
+        campaign_id:campaign.id
     });
     const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({ supabase, workspace: workspaceId, campaign: campaign.id, userId: user.id });
     const fetcher = useFetcher();
@@ -103,8 +111,20 @@ export default function Campaign() {
     const [groupByHousehold] = useState(true);
     const [update, setUpdate] = useState(recentAttempt?.result || {});
     const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
-    const householdMap = useMemo(() =>
-        queue.reduce((acc, curr, index) => {
+    const sortQueue = (queue) => {
+        return [...queue].sort((a, b) => {
+            if (a.attempts !== b.attempts) {
+                return b.attempts - a.attempts;
+            }
+            if (a.id !== b.id) {
+                return a.id - b.id;
+            }
+            return a.queue_order - b.queue_order;
+        });
+    };
+    const householdMap = useMemo(() => {
+        const sortedQueue = sortQueue(queue);
+        return sortedQueue.reduce((acc, curr, index) => {
             if (curr?.contact?.address) {
                 if (!acc[curr.contact.address]) {
                     acc[curr.contact.address] = [];
@@ -114,23 +134,25 @@ export default function Campaign() {
                 acc[`NO_ADDRESS_${index}`] = [curr];
             }
             return acc;
-        }, {}), [queue]);
+        }, {});
+    }, [queue]);
+
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleNextNumber = useCallback((skipHousehold = false) => {
         const nextContact = getNextContact(queue, householdMap, nextRecipient, groupByHousehold, skipHousehold);
         if (nextContact) {
-            setNextRecipient(nextContact);
-            const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
-            const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
-            setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-            setUpdate(newRecentAttempt.update || {});
-            return nextContact;
+          setNextRecipient(nextContact);
+          const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
+          if (!isRecent(newRecentAttempt.created_at)) return nextContact;
+          const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
+          setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
+          setUpdate(newRecentAttempt.update || {});
+          return nextContact;
         }
-
         return null;
-    }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
-
+      }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
+    
     const switchToContact = (contact) => {
         setNextRecipient(contact);
         const newRecentAttempt = attemptList.find(call => call.contact_id === contact.contact.id) || {};
@@ -187,8 +209,8 @@ export default function Campaign() {
 
     const handleQueueButton = () => {
         fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
-            navigate: false
-        });
+            navigate: false,
+        })
     }
 
     const handleDequeueNext = () => {
@@ -202,14 +224,15 @@ export default function Campaign() {
             setDisposition(recentAttempt.disposition || null);
         }
     }, [recentAttempt]);
-
+    
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
+
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
 
-            <div className="flex justify-evenly gap-4 " style={{ justifyContent: 'space-evenly', alignItems: "stretch", flexWrap:"wrap" }}>
-                <div className="flex flex-col" style={{minWidth:"10%", flex:"1 1 auto"}}>
+            <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
+                <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
                     <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
                     <div style={{
                         border: '3px solid #BCEBFF',

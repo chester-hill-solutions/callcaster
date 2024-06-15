@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 
-export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient }) {
+export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id }) {
     const [queue, setQueue] = useState(init.queue);
+    const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue)
     const [callsList, setCalls] = useState(init.callsList);
     const [attemptList, setAttempts] = useState(init.attempts);
     const [recentCall, setRecentCall] = useState(init.recentCall);
     const [recentAttempt, setRecentAttempt] = useState(init.recentAttempt);
     const [pendingCalls, setPendingCalls] = useState([]);
+    const [isNextRecipientSet, setIsNextRecipientSet] = useState(false);
 
     const isRecent = (date) => {
         const created = new Date(date);
@@ -32,10 +34,12 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     }, []);
 
     const updateAttempts = useCallback((payload) => {
+        if (payload.new.user_id !== user.id) return;
+        if (payload.new.campaign_id !== campaign_id) return;
         const calls = callsList.filter(call => (call.outreach_attempt_id === payload.new.id) && (call.direction !== 'outbound-api'));
         let updatedAttempt = { ...payload.new, call: calls };
         if (calls.length && calls[0].status && !updatedAttempt.result.status) {
-            updatedAttempt.result = { ...(updatedAttempt.result && updatedAttempt.result), status: calls[0].status };
+            updatedAttempt.result = { ...(updatedAttempt.result && {...updatedAttempt.result, status: calls[0].status }), status: calls[0].status };
         }
 
         setAttempts((currentAttempts) => {
@@ -52,11 +56,11 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     const updateCalls = useCallback((payload) => {
         const attemptId = payload.new.outreach_attempt_id;
         let updatedCall = payload.new;
-
+    
         if (attemptId) {
             setAttempts((currentAttempts) => {
                 const updatedAttempts = currentAttempts.map(item => {
-                    if (item.id === attemptId) {
+                    if (item.id === attemptId && item.user_id === user.id) {
                         const updatedItem = {
                             ...item,
                             call: [...(item.call || []), updatedCall],
@@ -70,31 +74,60 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                     return item;
                 });
                 return updatedAttempts;
-            });
-            setCalls((currentCalls) => [...currentCalls, updatedCall]);
-            setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
+                });
+                setCalls((currentCalls) => [...currentCalls, updatedCall]);
+                setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
+                setNextRecipient(queue.find((contact) => updatedCall.contact_id === contact.contact.id));
         } else {
             setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
         }
-    }, [recentAttempt?.contact?.id, recentCall]);
-
+    }, [recentAttempt?.contact?.id, recentCall, queue, setNextRecipient, user.id]);
+    
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
-            setQueue((currentQueue) => currentQueue.filter(item => item.id !== payload.new.id));
+            setQueue((currentQueue) => {
+                const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
+                if (nextRecipient && nextRecipient.id === payload.new.contact_idid) {
+                    setIsNextRecipientSet(false);
+                    if (filteredQueue.length > 0) {
+                        setNextRecipient(filteredQueue[0]);
+                    } else {
+                        setNextRecipient(null);
+                    }
+                }
+                return filteredQueue;
+            });
+            setPredictiveQueue((currentQueue) => {
+                const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
+                if (nextRecipient && nextRecipient.id === payload.new.contact_id) {
+                    setIsNextRecipientSet(false);
+                    if (filteredQueue.length > 0) {
+                        setNextRecipient(filteredQueue[0]);
+                    } else {
+                        setNextRecipient(null);
+                    }
+                }
+                return filteredQueue;
+            });
         } else if (payload.new.status === user.id) {
             const contact = contacts.find(contact => contact.id === payload.new.contact_id);
             if (contact?.phone) {
-                setNextRecipient({ ...payload.new, contact });
                 setQueue((currentQueue) => {
                     const index = currentQueue.findIndex(item => item.id === payload.new.id);
-                    return index > -1
+                    const updatedQueue = index > -1
                         ? currentQueue.map(item => item.id === payload.new.id ? { ...payload.new, contact } : item)
                         : [...currentQueue, { ...payload.new, contact }];
+                    return updatedQueue;
                 });
+    
+                if (!isNextRecipientSet || (nextRecipient && nextRecipient.id === payload.new.id)) {
+                    setNextRecipient({ ...payload.new, contact });
+                    setIsNextRecipientSet(true);
+                }
             }
         }
-    }, [user.id, contacts, setNextRecipient]);
-
+    }, [user.id, contacts, nextRecipient, isNextRecipientSet, setNextRecipient]);
+        
     useEffect(() => {
         const handleChange = (payload) => {
             switch (payload.table) {

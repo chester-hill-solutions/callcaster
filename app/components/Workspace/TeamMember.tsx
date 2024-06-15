@@ -16,9 +16,9 @@ import { Form } from "@remix-run/react";
 
 export enum MemberRole {
   Owner = "owner",
+  Admin = "admin",
   Member = "member",
   Caller = "caller",
-  Admin = "admin",
 }
 
 type TeamMemberProps = {
@@ -34,9 +34,9 @@ export default function TeamMember({
 }) {
   const memberRole = member.user_workspace_role;
   const firstName =
-    member.first_name === null ? "No" : capitalize(member.first_name);
+    member.first_name === null ? "Unnamed" : capitalize(member.first_name);
   const lastName =
-    member.last_name === null ? "Name" : capitalize(member.last_name);
+    member.last_name === null ? "" : capitalize(member.last_name);
   const memberName = `${firstName} ${lastName}`;
 
   const iconStyles = clsx(
@@ -56,6 +56,7 @@ export default function TeamMember({
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;
+  // console.log("User role :", userRole);
   return (
     <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
       <div className="flex items-center gap-2">
@@ -66,23 +67,25 @@ export default function TeamMember({
         <p className={roleTextStyles}>{capitalize(memberRole)}</p>
         {!memberIsOwner && (
           <Sheet>
-            <SheetTrigger asChild>
-              <Button className="h-fit rounded-full bg-transparent p-2">
-                {theme === "dark" ? (
-                  <GrUserSettings
-                    size="16px"
-                    className="mx-auto aspect-square w-fit"
-                    color="white"
-                  />
-                ) : (
-                  <GrUserSettings
-                    size="16px"
-                    className="mx-auto aspect-square w-fit"
-                    color="black"
-                  />
-                )}
-              </Button>
-            </SheetTrigger>
+            {userRole !== MemberRole.Caller && (
+              <SheetTrigger asChild>
+                <Button className="h-fit rounded-full bg-transparent p-2">
+                  {theme === "dark" ? (
+                    <GrUserSettings
+                      size="16px"
+                      className="mx-auto aspect-square w-fit"
+                      color="white"
+                    />
+                  ) : (
+                    <GrUserSettings
+                      size="16px"
+                      className="mx-auto aspect-square w-fit"
+                      color="black"
+                    />
+                  )}
+                </Button>
+              </SheetTrigger>
+            )}
             <SheetContent className="z-[100] flex flex-col gap-4 bg-white dark:bg-inherit">
               <SheetHeader>
                 <SheetTitle>Manage Team Member</SheetTitle>
@@ -138,7 +141,7 @@ export default function TeamMember({
                     </Button>
                   </Form>
 
-                  {userRole && (
+                  {userRole === MemberRole.Owner && (
                     <Form
                       method="POST"
                       name="transferWorkspaceOwnership"

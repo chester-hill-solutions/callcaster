@@ -1,6 +1,6 @@
 import { json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData } from "@remix-run/react";
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
@@ -64,7 +64,7 @@ export default function SignIn() {
             {actionData.error}
           </p>
         )}
-        <Button
+        {/* <Button
           variant={"outline"}
           className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
         >
@@ -77,15 +77,15 @@ export default function SignIn() {
         >
           <FaGithub size={"2rem"} />
           Sign in with Github
-        </Button>
+        </Button> */}
 
-        <div className="flex w-full items-center justify-center gap-2">
+        {/* <div className="flex w-full items-center justify-center gap-2">
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
           <p className="font-Zilla-Slab text-xl font-semibold text-brand-primary dark:text-brand-secondary">
             OR
           </p>
           <div className="w-full border border-brand-primary dark:border-brand-secondary" />
-        </div>
+        </div> */}
 
         <Form
           method="POST"
@@ -135,12 +135,12 @@ export default function SignIn() {
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
         </Link>
-        <Link
+        {/* <Link
           to={"/remember"}
           className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-gray-500 hover:text-brand-primary hover:underline dark:text-brand-tertiary"
         >
           I forgot my password
-        </Link>
+        </Link> */}
       </div>
       <Toaster richColors visibleToasts={1} />
     </main>

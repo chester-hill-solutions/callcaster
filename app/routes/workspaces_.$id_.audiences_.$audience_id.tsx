@@ -29,8 +29,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { data: audience, error: audienceError } = await supabaseClient
     .from("audience")
     .select()
-    .eq("id", audience_id);
-  console.log(contacts);
+    .eq("id", audience_id)
+    .single();
+  console.log("Contacts: ", contacts);
   if (contactError) {
     return json({ contacts: null, error: contactError.message }, { headers });
   }
@@ -63,9 +64,9 @@ export default function AudienceView() {
           </Button>
         </div>
       </div>
-        <AudienceTable
-          {...{ contacts, workspace_id, selected_id: audience_id, audience }}
-        />
+      <AudienceTable
+        {...{ contacts, workspace_id, selected_id: audience_id, audience }}
+      />
     </main>
   );
 }

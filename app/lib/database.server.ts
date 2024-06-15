@@ -1,4 +1,4 @@
-import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
+import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
 import { jwtDecode } from "jwt-decode";
@@ -163,7 +163,7 @@ export async function testAuthorize({
   return { data, error };
 }
 
-export async function getUserRole({ serverSession, workspaceId }) {
+export function getUserRole({ serverSession, workspaceId }) {
   if (serverSession == null || serverSession.access_token == null) {
     return null;
   }
@@ -179,4 +179,23 @@ export async function getUserRole({ serverSession, workspaceId }) {
   }
 
   return userRole;
+}
+
+export async function updateUserWorkspaceAccess({
+  workspaceId,
+  supabaseClient,
+}: {
+  workspaceId: string;
+  supabaseClient: SupabaseClient<Database>;
+}): Promise<void> {
+  const { data: updatedTime, error: updatedTimeError } =
+    await supabaseClient.rpc("update_user_workspace_last_access_time", {
+      selected_workspace_id: workspaceId,
+    });
+
+  if (updatedTimeError) {
+    console.log("Error updating user access time: ", updatedTimeError);
+  }
+
+  return;
 }

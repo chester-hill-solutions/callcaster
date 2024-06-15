@@ -6,9 +6,14 @@ import {
   Link,
   Outlet,
 } from "@remix-run/react";
+import { FaPlus } from "react-icons/fa6";
 import { PlusIcon } from "~/components/Icons";
 import { Button } from "~/components/ui/button";
-import { getWorkspaceCampaigns, getWorkspaceInfo } from "~/lib/database.server";
+import {
+  getWorkspaceCampaigns,
+  getWorkspaceInfo,
+  updateUserWorkspaceAccess,
+} from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
@@ -26,6 +31,9 @@ export const loader = async ({ request, params }) => {
       return redirect("/workspaces", { headers });
     }
   }
+
+  updateUserWorkspaceAccess({ workspaceId, supabaseClient });
+
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
       .from("audience")
@@ -48,69 +56,87 @@ export const loader = async ({ request, params }) => {
 export default function Workspace() {
   const { workspace, audiences, campaigns } = useLoaderData();
 
+  campaigns.sort((campaign1, campaign2) => {
+    if (campaign1.created_at < campaign2.created_at) {
+      return 1;
+    } else if (campaign1.created_at > campaign2.created_at) {
+      return -1;
+    }
+
+    return 0;
+  });
+
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
-      <div className="flex items-center">
-        <div className="flex flex-1 justify-center">
-          <h3 className="ml-auto font-Tabac-Slab text-2xl">
-            {workspace?.name}
-          </h3>
-          <div className="ml-auto flex gap-4">
+      <div className="mb-2 flex items-center">
+        <div className="flex flex-1 justify-between">
+          <div className="flex gap-4">
             <Button asChild variant="outline">
               <Link
-                to={`./media`}
+                to={`./audios`}
                 relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold "
               >
-                Media
+                Audio
               </Link>
             </Button>
             <Button asChild variant="outline">
               <Link
                 to={`./audiences`}
                 relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
+                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
               >
                 Audiences
               </Link>
             </Button>
-            <Button asChild>
-              <Link
-                to={`./settings`}
-                relative="path"
-                className="font-Zilla-Slab text-xl font-semibold"
-              >
-                Users
-              </Link>
-            </Button>
           </div>
+          <h3 className="absolute left-1/2 translate-x-[-50%] font-Tabac-Slab text-2xl">
+            {workspace?.name}
+          </h3>
+          <Button asChild variant="outline">
+            <Link
+              to={`./settings`}
+              relative="path"
+              className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
+            >
+              Workspace Settings
+            </Link>
+          </Button>
         </div>
       </div>
-      <div className="flex flex-auto">
-        <div className="flex h-[80vh] w-60 min-w-60 flex-col overflow-scroll border-2 border-solid border-slate-800 bg-cyan-50">
-          <h3 className="border-b-2 border-solid border-slate-500 bg-primary p-2 text-center font-Zilla-Slab text-xl text-white">
-            Campaigns
-          </h3>
+      <div id="campaigns-container" className="flex border-2 border-zinc-600">
+        <div
+          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-cyan-50  dark:bg-transparent"
+          style={{ scrollbarWidth: "none" }}
+        >
+          <Link
+            to={`campaigns/new`}
+            className="flex items-center justify-center gap-2 border-b-2 border-zinc-600 px-2 py-1 font-Zilla-Slab text-xl font-bold dark:bg-brand-primary dark:text-white"
+          >
+            <span>Add Campaign</span>
+            <FaPlus size="20px" />
+          </Link>
           {campaigns?.map((row, i) => (
             <Link
               to={`campaigns/${row.id}`}
               key={row.id}
-              className="border-b-2 border-solid border-slate-500 p-2 text-brand-primary hover:bg-slate-300 hover:text-slate-800"
+              className="border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white"
             >
-              <h3>{row.title || `Unnamed campaign ${i + 1}`}</h3>
+              <h3 className="capitalize">
+                {row.title || `Unnamed campaign ${i + 1}`}
+              </h3>
             </Link>
           ))}
-          <Link to={`campaigns/new`} className="flex justify-center p-4">
-            <PlusIcon fill="#333" width="25px" />
-          </Link>
         </div>
-        <div className="flex-auto">
-          <Outlet
-            context={{
-              audiences,
-              campaigns,
-            }}
-          />
+        <div className="min-h-3/4 flex w-full flex-auto dark:bg-zinc-700">
+          <div className="flex flex-auto flex-col">
+            <Outlet
+              context={{
+                audiences,
+                campaigns,
+              }}
+            />
+          </div>
         </div>
       </div>
     </main>

@@ -27,7 +27,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
                 console.log(`Saving updated object: `, { new: { ...update } }, { old: { ...recentAttempt.result } });
                 handleQuestionsSave();
             }
-        }, 3000);
+        }, 1000);
 
         return () => {
             clearTimeout(handlerRef.current);

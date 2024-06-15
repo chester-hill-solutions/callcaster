@@ -26,12 +26,12 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
         setMultiResult(initResult || []);
     }, [initResult]);
     
-    const handleChange = (value) => {
+    const handleChange = (id, value) => {
         setResult(value);
-        action({ column: questionId, value });
+        action({ column: id, value });
     };
     
-    const handleMultiChange = (value, isChecked) => {
+    const handleMultiChange = (id, value, isChecked) => {
         let newArr = [];
         if (isChecked) {
             newArr = [...multiResult, value];
@@ -39,7 +39,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
             newArr = multiResult.filter(item => item !== value);
         }
         setMultiResult(newArr);
-        action({ column: questionId, value: newArr });
+        action({ column: id, value: newArr });
     }; 
 
     return (
@@ -56,7 +56,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                             <SupportButton
                                 key={value}
                                 option={{ Icon, value, label }}
-                                handleChange={handleChange}
+                                handleChange={() => handleChange(questions.id, value)}
                                 current={result}
                             />
                         );
@@ -74,7 +74,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                                 className="result-button column align-center justify-start"
                                 style={{ display: "flex", flexDirection: "column", alignContent: "center", alignItems: 'center', width: "20%" }}
                                 value={value}
-                                onClick={() => handleChange(value)}
+                                onClick={() => handleChange(questions.id, value)}
                                 type="button"
                             >
                                 <IconComponent width="20px" fill={result === value ? 'hsl(var(--brand-primary))' : 'hsl(var(--muted-foreground))'} />
@@ -90,11 +90,11 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                         <label htmlFor={questions.title}>
                             {questions.title}
                         </label>
-                    <input id={questions.title} type="checkbox" name={questions.title} onChange={(e) => handleChange(e.target.checked)} checked={result}></input>
+                    <input id={questions.title} type="checkbox" name={questions.title} onChange={(e) => handleChange(questions.id, e.target.checked)} checked={result}></input>
                     </div>
                 )}
                 {questions.type === 'dropdown' && (
-                    <select name={questions.title} value={result} onChange={(e) => handleChange(e.currentTarget.value)} className="px-2 py-1">
+                    <select name={questions.title} value={result} onChange={(e) => handleChange(questions.id, e.currentTarget.value)} className="px-2 py-1">
                         <option value={null} key={`question-${questionId}-select-DEFAULT`}>
                             ---
                         </option>
@@ -119,7 +119,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                                         id={inputId}
                                         name={inputId}
                                         type="checkbox"
-                                        onChange={(e) => handleMultiChange(value, e.target.checked)}
+                                        onChange={(e) => handleMultiChange(questions.id, value, e.target.checked)}
                                         checked={multiResult.includes(value)}
                                     />
                                 </div>
@@ -133,7 +133,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                             type="textarea" 
                             rows={2} 
                             placeholder="Notes/Key Issues" 
-                            onChange={(e) => handleChange(e.target.value)} 
+                            onChange={(e) => handleChange(questions.id, e.target.value)} 
                             value={result} 
                             key={`question-${questionId}-notes`} 
                         />

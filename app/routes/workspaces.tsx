@@ -17,6 +17,7 @@ import {
   DialogClose,
 } from "~/components/ui/dialog";
 import { toast, Toaster } from "sonner";
+import { formatTableText } from "~/lib/utils";
 
 //************LOADER************/
 export const loader = async ({ request }: { request: Request }) => {
@@ -28,8 +29,20 @@ export const loader = async ({ request }: { request: Request }) => {
   }
 
   const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
+  const { data: workspaceAccessData, error: workspaceAccessError } =
+    await supabaseClient
+      .from("workspace_users")
+      .select("workspace_id, last_accessed")
+      .eq("user_id", serverSession.user.id)
+      .order("last_accessed", { ascending: false });
 
-  return json({ workspaces, userId: serverSession.user }, { headers });
+  // console.log("Data: ", workspaceAccessData);
+  // console.log("Error: ", workspaceAccessError);
+
+  return json(
+    { workspaces, userId: serverSession.user, workspaceAccessData },
+    { headers },
+  );
 };
 
 //************ACTION************/
@@ -71,7 +84,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 //************COMPONENT************/
 export default function Workspaces() {
-  const { workspaces, userId } = useLoaderData<typeof loader>();
+  const { workspaces, userId, workspaceAccessData } =
+    useLoaderData<typeof loader>();
   // console.log(workspaces);
 
   const actionData = useActionData<typeof action>();
@@ -82,31 +96,36 @@ export default function Workspaces() {
   }, [actionData]);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
+  console.log("Unsorted: ", workspaces);
+  if (workspaces != null) {
+    for (let i = 0; i < workspaceAccessData.length; i++) {
+      if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
+        continue;
+      }
 
+      const temp = workspaces[i];
+      const oldIndex = workspaces.findIndex(
+        (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
+      );
+      workspaces[i] = workspaces[oldIndex];
+      workspaces[oldIndex] = temp;
+    }
+  }
+  console.log("Sorted? ", workspaces);
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
         Your Workspaces
       </h1>
-      <div className="flex flex-row flex-wrap justify-start">
-        {workspaces != null &&
-          workspaces.map((workspace) => (
-            <Link
-              to={`/workspaces/${workspace.id}`}
-              key={workspace.id}
-              className="flex flex-col items-center gap-4 rounded-md border bg-card px-4 py-8 text-center min-w-60 m-4"
-            >
-              <h5 className="font-Zilla-Slab text-2xl text-white">
-                {workspace.name}
-              </h5>
-              <p className="text-white">Workspace Description</p>
-            </Link>
-          ))}
+      <div
+        id="workspaces-grid"
+        className="grid auto-rows-auto grid-cols-5 items-start gap-4"
+      >
         <Dialog>
           <DialogTrigger>
             <Button
               variant="outline"
-              className="h-full min-h-fit min-w-60 border border-white px-4 py-8"
+              className="h-full min-h-fit w-full min-w-60 border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
                 <FaPlus
@@ -189,46 +208,20 @@ export default function Workspaces() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
-      {/* <dialog ref={dialogRef} className="rounded-md bg-indigo-400 p-8">
-        <div className="flex flex-col gap-4">
-          <h3 className="font-Tabac-Slab text-4xl font-black">
-            Add a New Workspace
-          </h3>
-          <Form
-            className="flex w-full flex-col gap-4"
-            method="POST"
-            onSubmit={() => dialogRef.current?.close()}
-            name="newWorkspace"
-          >
-            <label htmlFor="newWorkspaceName" className="flex flex-col">
-              Workspace Name
-              <input
-                type="text"
-                name="newWorkspaceName"
-                id="newWorkspaceName"
-                className="rounded-sm border-2 border-white bg-transparent px-4 py-2 text-xl"
-                required
-              />
-            </label>
-
-            <input type="hidden" name="userId" value={userId.id} />
-            <p className="flex items-center gap-4 font-bold">
-              Invite Workspace Members:{" "}
-              <Button className="" type="button">
-                <FaUserPlus size="24px" />
-              </Button>
-            </p>
-            <Button
-              variant="default"
-              className="max-w-[66%] self-center"
-              type="submit"
+        {workspaces != null &&
+          workspaces.map((workspace) => (
+            <Link
+              to={`/workspaces/${workspace.id}`}
+              key={workspace.id}
+              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
+              transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
             >
-              Create New Workspace
-            </Button>
-          </Form>
-        </div>
-      </dialog> */}
+              <h5 className="font-Zilla-Slab text-2xl font-semibold">
+                {formatTableText(workspace.name)}
+              </h5>
+            </Link>
+          ))}
+      </div>
       <Toaster richColors />
     </main>
   );

@@ -1,5 +1,5 @@
 import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink } from "@remix-run/react";
+import { Link, NavLink, Params } from "@remix-run/react";
 import { AuthError, User } from "@supabase/supabase-js";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
@@ -16,14 +16,10 @@ import {
 } from "~/components/ui/dropdown-menu";
 
 import { FaUserAlt } from "react-icons/fa";
+import { FaGear } from "react-icons/fa6";
+import { capitalize } from "~/lib/utils";
 
-export default function Navbar({
-  className,
-  handleSignOut,
-  workspaces,
-  isSignedIn,
-  user,
-}: {
+type NavbarProps = {
   className?: string;
   handleSignOut: () => Promise<
     TypedResponse<{ success: string | null; error: string | null }>
@@ -39,16 +35,30 @@ export default function Navbar({
     organization: number | null;
     username: string;
   }> | null;
-}) {
+  params: Params<string>;
+};
+
+export default function Navbar({
+  className,
+  handleSignOut,
+  workspaces,
+  isSignedIn,
+  user,
+  params,
+}: NavbarProps) {
   const navLinkStyles =
     "rounded-sm border-2 border-zinc-700/30 bg-secondary px-2 py-[6px] font-bold text-brand-primary transition-colors duration-150 ease-in-out hover:bg-white sm:px-4";
 
   const activeNavLinkStyles =
-    "rounded-sm border-2 border-brand-primary bg-white px-2 py-[6px] font-bold text-brand-primary transition-colors duration-150 ease-in-out hover:bg-white sm:px-4";
+    "rounded-sm bg-brand-primary px-2 py-[6px] font-bold text-white transition-colors duration-150 ease-in-out sm:px-4";
+
+  const workspaceId = params.id;
+  const userInWorkspace = workspaceId != null;
+
   return (
     <header className={`w-full ${className}`}>
       <nav
-        className="flex w-full items-center gap-1 px-4 py-4 sm:h-[80px] sm:justify-between sm:gap-0 sm:px-8"
+        className="relative flex w-full items-center gap-1 px-4 py-4 sm:h-[80px] sm:justify-between sm:gap-0 sm:px-8"
         id="global-nav"
       >
         <Link
@@ -64,7 +74,9 @@ export default function Navbar({
           CC
         </Link>
         {workspaces != null && (
-          <WorkspaceSelectorCombobox workspaces={workspaces} />
+          <div className="absolute left-1/2 translate-x-[-50%]">
+            <WorkspaceSelectorCombobox workspaces={workspaces} />
+          </div>
         )}
         <div className="flex h-full items-center sm:gap-4">
           <NavLink
@@ -74,14 +86,6 @@ export default function Navbar({
             }
           >
             Home
-          </NavLink>
-          <NavLink
-            to="/workspaces"
-            className={({ isActive }) =>
-              isActive ? activeNavLinkStyles : navLinkStyles
-            }
-          >
-            Workspaces
           </NavLink>
           <NavLink
             to="/other-services"
@@ -108,8 +112,8 @@ export default function Navbar({
                 to="/signin"
                 className={({ isActive }) =>
                   isActive
-                    ? "rounded-md border-2 border-brand-primary bg-white px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-brand-primary shadow-md transition-colors ease-in-out hover:bg-white hover:text-brand-primary sm:px-4 sm:text-2xl"
-                    : "rounded-md bg-brand-primary px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-white shadow-md transition-colors ease-in-out hover:bg-white hover:text-brand-primary sm:px-4 sm:text-2xl"
+                    ? "rounded-md bg-brand-primary px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-white shadow-md transition-colors ease-in-out sm:px-4 sm:text-2xl"
+                    : "rounded-md bg-white px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-brand-primary shadow-md transition-colors ease-in-out hover:bg-white hover:text-brand-primary sm:px-4 sm:text-2xl"
                 }
               >
                 <p className="block sm:hidden">Login</p>
@@ -130,13 +134,33 @@ export default function Navbar({
           {user != null && (
             <DropdownMenu>
               <DropdownMenuTrigger>
-                <Button>
-                  <FaUserAlt />
+                <Button variant="outline" className="border-2 border-black">
+                  <FaGear size="20px" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuLabel>My Username:</DropdownMenuLabel>
-                <DropdownMenuLabel>{user.username}</DropdownMenuLabel>
+                <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="font-normal">
+                  {capitalize(user.first_name)}
+                </DropdownMenuLabel>
+                <DropdownMenuLabel className="font-normal">
+                  {user.username}
+                </DropdownMenuLabel>
+                {/* RENDER IF USER IN WORKSPACE */}
+
+                {false && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <Link to={`/workspaces/${workspaceId}/settings`}>
+                        Users
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

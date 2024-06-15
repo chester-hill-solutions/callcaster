@@ -11,7 +11,7 @@ export const loader = async ({ request, params }) => {
         return json([]);
     }
 
-    const { data: contacts, error: contactsError } = limit > 0 ? await supabase.rpc('get_contacts_by_households', { selected_campaign_id: campaign_id, households_limit: limit }).order('attempts').order('queue_order') : { data: [], error: null };
+    const { data: contacts, error: contactsError } = limit > 0 ? await supabase.rpc('get_contacts_by_households', { selected_campaign_id: campaign_id, households_limit: limit }).order('attempts').order('id',{ascending:true}).order('queue_order', {ascending:true}) : { data: [], error: null };
 
     if (contactsError) {
         console.error(contactsError);
