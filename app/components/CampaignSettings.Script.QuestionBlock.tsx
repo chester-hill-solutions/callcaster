@@ -5,6 +5,117 @@ import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
 import { deepEqual } from "~/lib/utils";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
+const QuestionHeader = ({ questionId, removeQuestion, title }) => (
+  <div className="flex items-center justify-between">
+    <div className="item-center flex items-center gap-2">
+      <div className="flex flex-col">
+        <button onClick={() => moveUp(index)}>
+          <ArrowUp />
+        </button>
+        <button onClick={() => moveDown(questionId)}>
+          <ArrowDown />
+        </button>
+      </div>
+
+      <h3>{title}</h3>
+    </div>
+    <button onClick={() => removeQuestion(questionId)}>
+      <GrSubtractCircle />
+    </button>
+  </div>
+);
+
+const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
+  <div className="flex w-1/2 flex-col gap-2">
+    {[
+      { label: "Identifier", name: "id", value: question.id, required: true },
+      { label: "Title", name: "title", value: question.title },
+      { label: "Descriptive Text", name: "text", value: question.text },
+    ].map(({ label, name, value, required }) => (
+      <div key={name} className="flex flex-col">
+        <label htmlFor={`${question.id}-${name}`}>{label}</label>
+        <input
+          type="text"
+          name={name}
+          id={`${question.id}-${name}`}
+          value={value}
+          onChange={handleTextChange}
+          required={required}
+        />
+      </div>
+    ))}
+    <div className="flex flex-col">
+      <label htmlFor={`${question.id}-type`}>Question Type</label>
+      <select
+        name="type"
+        id={`${question.id}-type`}
+        value={question.type}
+        onChange={handleTypeChange}
+      >
+        {[
+          "textarea",
+          "textblock",
+          "titleblock",
+          "radio",
+          "dropdown",
+          "boolean",
+          "multi",
+        ].map((type) => (
+          <option key={type} value={type}>
+            {type.charAt(0).toUpperCase() +
+              type.slice(1).replace(/block/, " Block")}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+);
+
+const OptionsSection = ({
+  question,
+  handleAddOption,
+  handleRemoveOption,
+  handleOptionChange,
+  handleIconChange,
+}) =>
+  question.options && (
+    <div>
+      <div className="flex items-center gap-2">
+        <h4>Options</h4>
+        <button onClick={handleAddOption}>
+          <GrAddCircle />
+        </button>
+      </div>
+      <div>
+        {question.options.map((option, i) => (
+          <QuestionBlockOption
+            key={`${question.id}-option-${i}`}
+            index={i}
+            question={question}
+            option={option}
+            handleRemoveOption={handleRemoveOption}
+            handleChange={handleOptionChange}
+            handleIconChange={handleIconChange}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+const PreviewSection = ({ question }) => (
+  <div className="relative flex w-1/2 flex-col justify-center bg-white p-2">
+    <div style={{ scale: ".7" }}>
+      <Result
+        action={() => null}
+        initResult={null}
+        questions={question}
+        questionId={question.id}
+      />
+    </div>
+    <div className="absolute bottom-2 text-xs">Preview</div>
+  </div>
+);
+
 export default function CampaignSettingsScriptQuestionBlock({
   question: initQuestion,
   removeQuestion,
@@ -12,7 +123,8 @@ export default function CampaignSettingsScriptQuestionBlock({
   index,
   moveUp,
   moveDown,
-  dispatchState
+  dispatchState,
+  openQuestion,
 }) {
   const [question, setQuestion] = useState(initQuestion);
 
@@ -90,133 +202,34 @@ export default function CampaignSettingsScriptQuestionBlock({
   return (
     <div
       key={question.id}
-      className="relative flex flex-col gap-2 py-2"
-      style={{
-        background: "#f1f1f1",
-        padding: "24px 16px",
-      }}
+      className="relative flex flex-col gap-2 bg-gray-100 p-6 py-2"
     >
+      <QuestionHeader
+        questionId={question.id}
+        removeQuestion={removeQuestion}
+        title={question.title}
+      />
       <div
         style={{
-          justifyContent: "space-between",
-          alignItems: "center",
-          display: "flex",
+          height: `${openQuestion === question.id ? "height" : "0px"}`,
+          overflow: "hidden",
         }}
       >
-        <button onClick={() => removeQuestion(question.id)}>
-          <GrSubtractCircle />
-        </button>
-        {/* <div style={{ display: "flex", flexDirection: "column" }}>
-          <button onClick={() => moveUp(index)}>
-            <ArrowUp />
-          </button>
-          <button onClick={() => moveDown(question.id)}>
-            <ArrowDown />
-          </button>
-        </div> */}
-      </div>
-      <div style={{display:"flex", justifyContent:"space-between", gap:"16px"}}>
-        <div className="w-[50%]">
-          <div className="flex flex-col">
-            <label htmlFor={`${question.id}-id`}>Identifier</label>
-            <input
-              type="text"
-              name={`id`}
-              id={`${question.id}-id`}
-              value={question.id}
-              onChange={handleTextChange}
-              required
-            />
-          </div>
-          <div className="flex flex-col">
-            <label htmlFor={`${question.id}-title`}>Title</label>
-            <input
-              type="text"
-              name={`title`}
-              id={`${question.id}-title`}
-              value={question.title}
-              onChange={handleTextChange}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label htmlFor={`${question.id}-text`}>Descriptive Text</label>
-            <input
-              type="text"
-              name={`text`}
-              id={`${question.id}-text`}
-              value={question.text}
-              onChange={handleTextChange}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label htmlFor={`${question.id}-type`}>Question Type</label>
-            <select
-              name={`${question.id}-type`}
-              id={`${question.id}-type`}
-              value={question.type}
-              onChange={handleTypeChange}
-            >
-              <option value={"textarea"}>Text Area</option>
-              <option value={"textblock"}>Text Block</option>
-              <option value={"titleblock"}>Title Block</option>
-              <option value={"radio"}>Radio Select</option>
-              <option value={"dropdown"}>Dropdown Menu</option>
-              <option value={"boolean"}>Boolean/Toggle</option>
-              <option value={"multi"}>Multi-Select</option>
-            </select>
-          </div>
-          {question.options && (
-            <div>
-              <div className="flex gap-2" style={{ alignItems: "center" }}>
-                <h4>Options</h4>
-                <button onClick={handleAddOption}>
-                  <GrAddCircle />
-                </button>
-              </div>
-              <div>
-                {question.options.map((option, i) => (
-                  <QuestionBlockOption
-                    {...{
-                      index: i,
-                      question,
-                      option,
-                      handleRemoveOption,
-                      handleChange: handleOptionChange,
-                      handleIconChange,
-                    }}
-                    key={`${question.id}-option-${i}`}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="flex justify-between gap-4">
+          <QuestionInputs
+            question={question}
+            handleTextChange={handleTextChange}
+            handleTypeChange={handleTypeChange}
+          />
+          <PreviewSection question={question} />
         </div>
-        <div
-          className="relative flex flex-col p-2"
-          style={{
-            background: "#fff",
-            width: "50%",
-            justifyContent: "center",
-          }}
-        >
-          <div style={{ scale: ".7" }}>
-            <Result
-              action={() => null}
-              initResult={null}
-              questions={question}
-              questionId={question.id}
-            />
-          </div>
-          <div
-            style={{
-              position: "absolute",
-              bottom: "10px",
-              fontSize: "x-small",
-            }}
-          >
-            Preview
-          </div>
-        </div>
+        <OptionsSection
+          question={question}
+          handleAddOption={handleAddOption}
+          handleRemoveOption={handleRemoveOption}
+          handleOptionChange={handleOptionChange}
+          handleIconChange={handleIconChange}
+        />
       </div>
     </div>
   );

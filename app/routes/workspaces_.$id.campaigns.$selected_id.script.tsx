@@ -60,11 +60,11 @@ export default function Audience() {
   const { audiences } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
-  console.log(data)
+  
   return (
     <div className="flex h-full flex-col">
       <CampaignSettingsScript
-        {...{ questions: pageData?.campaignDetails?.questions }}
+        {...{ questions: (pageData.length > 0 && pageData[0]?.campaignDetails?.questions) }}
       />
     </div>
   );
