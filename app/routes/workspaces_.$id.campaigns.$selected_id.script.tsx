@@ -2,7 +2,7 @@ import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { CampaignSettingsScript } from "../components/CampaignSettings.";
+import  CampaignSettingsScript  from "../components/CampaignSettings.Script";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
