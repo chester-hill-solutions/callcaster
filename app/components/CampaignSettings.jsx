@@ -1,6 +1,6 @@
-import { useReducer, useEffect, useState } from "react";
+import { useEffect, useState, useReducer } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
-import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
+import { useNavigate, useNavigation, useSubmit,  } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
 
@@ -224,6 +224,7 @@ const CampaignSettings = ({
             }))}
             className={"flex flex-col"}
           />
+
         </div>
         <div className="flex justify-start gap-2">
           <DateTime
@@ -298,5 +299,5 @@ const CampaignSettings = ({
     </div>
   );
 };
-
 export { CampaignSettings };
+
