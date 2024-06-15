@@ -87,12 +87,6 @@ export default function CampaignSettingsScriptQuestionBlock({
     });
   };
 
-  useEffect(() => {
-
-    dispatchState(index, question)
-    setChanged((prev) => !deepEqual(question, initQuestion));
-  }, [dispatchState, index, initQuestion, question, setChanged]);
-
   return (
     <div
       key={question.id}

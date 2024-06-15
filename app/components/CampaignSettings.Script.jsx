@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
 import { deepEqual } from "~/lib/utils";
 
-export default function CampaignSettingsScript({ questions: initQuestions, setChanged }) {
+export default function CampaignSettingsScript({ questions: initQuestions = [] }) {
     const [questions, setQuestions] = useState(() => {
         return initQuestions.map((q, index) => ({ ...q, order: index }));
     });
@@ -50,10 +50,10 @@ export default function CampaignSettingsScript({ questions: initQuestions, setCh
         });
     };
 
-    useEffect(() => {
+/*     useEffect(() => {
         setChanged((prev) => !deepEqual(questions, initQuestions));
         
-    }, [initQuestions, questions, setChanged]);
+    }, [initQuestions, questions, setChanged]); */
 
     return (
         <div>
@@ -61,7 +61,7 @@ export default function CampaignSettingsScript({ questions: initQuestions, setCh
             <div className="flex flex-col gap-2">
                 <button onClick={addQuestion}>Add Question</button>
                 {questions.map((question, index) => (
-                    <CampaignSettingsScriptQuestionBlock {...{ question, removeQuestion, setChanged, index, moveDown, moveUp, dispatchState:updateQuestion }} key={question.id} />
+                    <CampaignSettingsScriptQuestionBlock {...{ question, removeQuestion, setChanged: () => null, index, moveDown, moveUp, dispatchState:updateQuestion }} key={question.id} />
                 ))}
             </div>
         </div>
