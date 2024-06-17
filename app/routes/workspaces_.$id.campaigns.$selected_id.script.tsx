@@ -3,6 +3,7 @@ import {
   NavLink,
   Outlet,
   useLoaderData,
+  useOutlet,
   useOutletContext,
   useSubmit,
 } from "@remix-run/react";
@@ -68,7 +69,7 @@ export default function Audience() {
   const { audiences } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const submit = useSubmit();
-  const outlet = useOutletContext();
+  const outlet = useOutlet();
   const pageData = useMemo(() => data || [], [data]);
   const initQuestions = useMemo(() => {
     return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
@@ -178,17 +179,19 @@ export default function Audience() {
   useEffect(() => {
     setChanged(!deepEqual(questions, initQuestions));
   }, [initQuestions]);
-
+  console.log(outlet);
   return (
     <div className="relative flex h-full flex-col">
-      <div className="my-1 flex gap-2 px-2">
-        {!outlet && (<div className="flex flex-1 justify-end">
-          <Button asChild>
-            <NavLink to={"edit"}>Edit </NavLink>
-          </Button>
-        </div>)}
+      <div className="my-1 flex gap-2 px-2 flex-col">
+        {!outlet && (
+          <div className="flex flex-1 justify-end">
+            <Button asChild>
+              <NavLink to={"edit"}>Edit </NavLink>
+            </Button>
+          </div>
+        )}
         <div className="flex flex-col">
-          {!outlet &&
+          {!outlet && questions.length > 0 ? (
             questions.map((question) => (
               <div
                 key={question.id}
@@ -200,7 +203,12 @@ export default function Audience() {
                 </div>
                 <div className="text-sm">{question.text}</div>
               </div>
-            ))}
+            ))
+          ) : (
+            <div className="flex flex-col items-center">
+              <div>Get started on your campaign Script and survey.</div>
+            </div>
+          )}
         </div>
       </div>
       <Outlet />
