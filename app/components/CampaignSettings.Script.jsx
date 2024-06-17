@@ -1,75 +1,28 @@
-import { useEffect, useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
-import { deepEqual } from "~/lib/utils";
+import { FaPlus } from "react-icons/fa";
 
-export default function CampaignSettingsScript({ questions: initQuestions = [] }) {
-    const [questions, setQuestions] = useState(() => {
-        return initQuestions.map((q, index) => ({ ...q, order: index }));
-    });
-    const [openQuestion, setOpenQuestion] = useState(questions[0].id)
-    const removeQuestion = (id) => {
-        setQuestions((prevQuestions) => prevQuestions.filter((question) => question.id !== id));
-    };
-
-    const addQuestion = () => {
-        setQuestions((prevQuestions) => [
-            ...prevQuestions,
-            { id: `new-question-${questions.length + 1}`, title: '', type: "textarea", order: prevQuestions.length }
-        ]);
-    };
-
-    const moveUp = (index) => {
-        if (index <= 0) return;
-
-        setQuestions((prevQuestions) => {
-
-            const newQuestions = [...prevQuestions];
-            [newQuestions[index], newQuestions[index - 1]] = [newQuestions[index - 1], newQuestions[index]];
-            newQuestions[index].order = index;
-            newQuestions[index - 1].order = index - 1;
-            return newQuestions;
-        });
-    };
-
-    const moveDown = (index) => {
-        if (index >= questions.length - 1) return;
-
-        setQuestions((prevQuestions) => {
-            const newQuestions = [...prevQuestions];
-            [newQuestions[index], newQuestions[index + 1]] = [newQuestions[index + 1], newQuestions[index]];
-            newQuestions[index].order = index;
-            newQuestions[index + 1].order = index + 1;
-            return newQuestions;
-        });
-    };
-    const updateQuestion = (index, updatedQuestion) => {
-        setQuestions((prevQuestions) => {
-            const newQuestions = [...prevQuestions];
-            newQuestions[index] = { ...newQuestions[index], ...updatedQuestion };
-            return newQuestions;
-        });
-    };
-
-    /*     useEffect(() => {
-            setChanged((prev) => !deepEqual(questions, initQuestions));
-            
-        }, [initQuestions, questions, setChanged]); */
-
+export default function CampaignSettingsScript({ questions, addQuestion, removeQuestion, moveUp, moveDown, openQuestion, setOpenQuestion, dispatchState }) {
     return (
         <div>
-            <h3>Questions & Script</h3>
-            <div className="flex gap-2">
-                <div className="flex flex-col" style={{ flex: '1 1 10%' }}>
-                    <button className="bg-primary text-white font-Zilla-Slab text-xl" onClick={addQuestion}>Add Question</button>
+            <div className="flex gap-2 px-2 my-1">
+                <div className="flex flex-col" style={{
+                    flex: '1 1 20%',
+                    border: "3px solid #BCEBFF",
+                    borderRadius: "20px",
+                    boxShadow: "3px 5px 0  rgba(50,50,50,.6)"
+                }}>
+                    <button className="bg-primary text-white font-Zilla-Slab text-xl px-2 py-2 gap-2" onClick={addQuestion} style={{ justifyContent: 'center', display: "flex", alignItems: "center", borderTopLeftRadius: "18px", borderTopRightRadius: "18px" }}>Add Question<FaPlus size="16px" />
+                    </button>
                     {questions.map((question) => {
-                        return (<button onClick={() => setOpenQuestion(question.id)}>
-                            {question.title}
-                        </button>)
+                        return (
+                            <button key={question.id} onClick={() => setOpenQuestion((curr) => curr === question.id ? null : question.id)} style={{ textAlign: 'left', border:"1px solid #f1f1f1" }} className={`px-2 hover:bg-accent ${openQuestion === question.id && 'bg-brand-secondary'}`}>
+                                {question.title || question.id}
+                            </button>)
                     })}
                 </div>
-                <div className="flex flex-col" style={{ flex: '1 1 80%' }}>
+                <div className="flex flex-col" style={{ flex: '1 1 60%' }}>
                     {questions.map((question, index) => (
-                        <CampaignSettingsScriptQuestionBlock {...{ question, removeQuestion, setChanged: () => null, index, moveDown, moveUp, dispatchState: updateQuestion, openQuestion }} key={question.id} />
+                        <CampaignSettingsScriptQuestionBlock {...{ question, removeQuestion, setChanged: () => null, index, moveDown, moveUp, openQuestion, setOpenQuestion, dispatchState }} key={question.id} />
                     ))}
                 </div>
             </div>

@@ -96,7 +96,6 @@ export default function Workspaces() {
   }, [actionData]);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
-  console.log("Unsorted: ", workspaces);
   if (workspaces != null) {
     for (let i = 0; i < workspaceAccessData.length; i++) {
       if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
@@ -111,7 +110,6 @@ export default function Workspaces() {
       workspaces[oldIndex] = temp;
     }
   }
-  console.log("Sorted? ", workspaces);
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">

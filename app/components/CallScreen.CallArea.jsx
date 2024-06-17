@@ -102,7 +102,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                                 Next
                             </button>)
                         }
-                        {<button disabled={isBusy} onClick={() => handleDialNext()} disabled={activeCall} style={{ flex: "1", padding: "4px 8px", background: "#4CA83D", borderRadius: "5px", color: "white" }}>
+                        {<button onClick={() => handleDialNext()} disabled={activeCall} style={{ flex: "1", padding: "4px 8px", background: "#4CA83D", borderRadius: "5px", color: "white" }}>
                             {!predictive ? 'Dial' : 'Start'}
                         </button>}
                     </div>
