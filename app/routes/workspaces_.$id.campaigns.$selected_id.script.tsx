@@ -162,7 +162,6 @@ export default function Audience() {
       return newQuestions;
     });
   };
-
   const dispatchState = (e) => {
     const quesIndex = questions.findIndex(
       (question) => question.id === e.oldState.id,
