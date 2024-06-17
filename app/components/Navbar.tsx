@@ -16,7 +16,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 
 import { FaUserAlt } from "react-icons/fa";
-import { FaGear } from "react-icons/fa6";
+import { MdOutlineLogout } from "react-icons/md";
 import { capitalize } from "~/lib/utils";
 
 type NavbarProps = {
@@ -88,25 +88,14 @@ export default function Navbar({
             Home
           </NavLink>
           <NavLink
-            to="/other-services"
+            to="/services"
             className={({ isActive }) =>
               isActive ? activeNavLinkStyles : navLinkStyles
             }
           >
             Services
           </NavLink>
-          {isSignedIn ? (
-            <Button
-              variant="destructive"
-              className="rounded-md bg-zinc-400 px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-white shadow-md transition-colors ease-in-out hover:bg-zinc-600 sm:px-4 sm:text-2xl"
-              type="button"
-              onClick={() => {
-                handleSignOut();
-              }}
-            >
-              Log Out
-            </Button>
-          ) : (
+          {isSignedIn === false && (
             <>
               <NavLink
                 to="/signin"
@@ -134,8 +123,11 @@ export default function Navbar({
           {user != null && (
             <DropdownMenu>
               <DropdownMenuTrigger>
-                <Button variant="outline" className="border-2 border-black">
-                  <FaGear size="20px" />
+                <Button
+                  variant="outline"
+                  className="border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:[color:black]"
+                >
+                  <FaUserAlt size="20px" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -147,6 +139,19 @@ export default function Navbar({
                 <DropdownMenuLabel className="font-normal">
                   {user.username}
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <Button
+                  id="logoutButton"
+                  variant="ghost"
+                  className="flex w-full gap-2 rounded-md px-2 font-Zilla-Slab text-xl font-bold text-black transition-colors ease-in-out hover:bg-zinc-300 dark:text-white dark:hover:bg-zinc-600"
+                  type="button"
+                  onClick={() => {
+                    handleSignOut();
+                  }}
+                >
+                  <MdOutlineLogout />
+                  <span>Log Out</span>
+                </Button>
                 {/* RENDER IF USER IN WORKSPACE */}
 
                 {false && (
