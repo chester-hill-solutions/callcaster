@@ -2,21 +2,21 @@ import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
-import { FaUserPlus } from "react-icons/fa6";
 import { Button } from "~/components/ui/button";
-import { createNewWorkspace, getUserWorkspaces } from "~/lib/database.server";
+import { createNewWorkspace } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
+import { Toaster, toast } from "sonner";
+import { handleRoleTextStyles } from "~/components/Workspace/TeamMember";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "~/components/ui/dialog";
-import { toast, Toaster } from "sonner";
 import { formatTableText } from "~/lib/utils";
 
 //************LOADER************/
@@ -28,19 +28,66 @@ export const loader = async ({ request }: { request: Request }) => {
     return redirect("/signin", { headers });
   }
 
-  const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
-  const { data: workspaceAccessData, error: workspaceAccessError } =
-    await supabaseClient
-      .from("workspace_users")
-      .select("workspace_id, last_accessed")
-      .eq("user_id", serverSession.user.id)
-      .order("last_accessed", { ascending: false });
+  const userId = serverSession.user.id;
+  const { data: workspaces, error: workspacesError } = await supabaseClient
+    .from("workspace_users")
+    .select("last_accessed, role, workspace(id, name)")
+    .eq("user_id", userId)
+    .order("last_accessed", { ascending: false });
+
+  if (workspacesError) {
+    console.log(workspacesError);
+    return json(
+      { workspaces: null, userId: userId, error: workspacesError },
+      { headers },
+    );
+  }
+
+  // const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
+  // const { data: workspaceAccessData, error: workspaceAccessError } =
+  //   await supabaseClient
+  //     .from("workspace_users")
+  //     .select("workspace_id, last_accessed")
+  //     .eq("user_id", serverSession.user.id)
+  //     .order("last_accessed", { ascending: false });
+
+  // if (workspaceAccessError) {
+  //   return json(
+  //     {
+  //       workspaces: null,
+  //       userId: serverSession.user.id,
+  //       error: workspaceAccessError,
+  //     },
+  //     { headers },
+  //   );
+  // }
+
+  // const workspaces = [];
+  // for (let workspaceUser of workspaceAccessData) {
+  //   const { data: workspace, error: workspaceError } = await supabaseClient
+  //     .from("workspace")
+  //     .select()
+  //     .eq("id", workspaceUser.workspace_id)
+  //     .single();
+
+  //   if (workspaceError) {
+  //     return json(
+  //       {
+  //         workspaces: null,
+  //         userId: serverSession.user.id,
+  //         error: workspaceError,
+  //       },
+  //       { headers },
+  //     );
+  //   }
+  //   workspaces.push(workspace);
+  // }
 
   // console.log("Data: ", workspaceAccessData);
   // console.log("Error: ", workspaceAccessError);
 
   return json(
-    { workspaces, userId: serverSession.user, workspaceAccessData },
+    { workspaces: workspaces, userId: userId, error: null },
     { headers },
   );
 };
@@ -96,20 +143,23 @@ export default function Workspaces() {
   }, [actionData]);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
-  if (workspaces != null) {
-    for (let i = 0; i < workspaceAccessData.length; i++) {
-      if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
-        continue;
-      }
 
-      const temp = workspaces[i];
-      const oldIndex = workspaces.findIndex(
-        (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
-      );
-      workspaces[i] = workspaces[oldIndex];
-      workspaces[oldIndex] = temp;
-    }
-  }
+  // if (workspaces != null) {
+  //   for (let i = 0; i < workspaceAccessData.length; i++) {
+  //     if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
+  //       continue;
+  //     }
+
+  //     const temp = workspaces[i];
+  //     const oldIndex = workspaces.findIndex(
+  //       (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
+  //     );
+  //     workspaces[i] = workspaces[oldIndex];
+  //     workspaces[oldIndex] = temp;
+  //   }
+  // }
+
+
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
@@ -178,7 +228,7 @@ export default function Workspaces() {
                 />
               </label>
 
-              <input type="hidden" name="userId" value={userId.id} />
+              <input type="hidden" name="userId" value={userId} />
               {/* <p className="flex items-center gap-4 font-bold">
                 Invite Workspace Members:{" "}
                 <Button className="" type="button">
@@ -207,18 +257,26 @@ export default function Workspaces() {
           </DialogContent>
         </Dialog>
         {workspaces != null &&
-          workspaces.map((workspace) => (
-            <Link
-              to={`/workspaces/${workspace.id}`}
-              key={workspace.id}
-              className="flex h-full flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
-              transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
-            >
-              <h5 className="max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
-                {formatTableText(workspace.name)}
-              </h5>
-            </Link>
-          ))}
+          workspaces.map((workspaceUser) => {
+            const workspace = workspaceUser.workspace;
+            return (
+              <Link
+                to={`/workspaces/${workspace.id}`}
+                key={workspace.id}
+                className="flex h-full flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
+        transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+              >
+                <h5 className="max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
+                  {formatTableText(workspace.name)}
+                </h5>
+                <p
+                  className={`${handleRoleTextStyles(workspaceUser.role)} text-xl capitalize`}
+                >
+                  {workspaceUser.role}
+                </p>
+              </Link>
+            );
+          })}
       </div>
       <Toaster richColors />
     </main>

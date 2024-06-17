@@ -3,6 +3,7 @@ import {
   NavLink,
   Outlet,
   useLoaderData,
+  useLocation,
   useNavigate,
   useNavigation,
   useOutlet,
@@ -13,6 +14,8 @@ import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 const formatTime = (milliseconds) => {
   const totalSeconds = Math.floor(milliseconds / 1000);
@@ -81,6 +84,10 @@ export const loader = async ({ request, params }) => {
     .from("workspaceAudio")
     .list(workspace_id);
 
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const hasAccess =
+    userRole === MemberRole.Owner || userRole === MemberRole.Admin;
+
   return json({
     workspace_id,
     selected_id,
@@ -89,17 +96,34 @@ export const loader = async ({ request, params }) => {
     mediaData,
     outcomes,
     queue,
+    hasAccess,
   });
 };
 
+function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
+  if (isActive) {
+    return "rounded-md border-2 border-brand-secondary bg-brand-secondary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
+  }
+
+  if (isPending) {
+    return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+  }
+
+  return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+}
+
 export default function CampaignScreen() {
   const { audiences } = useOutletContext();
-  const { data = [], outcomes, queue } = useLoaderData();
-  const navigate = useNavigate();
-  const nav = useNavigation();
-  const outlet = useOutlet();
-
-  const outcomeKeys = outcomes.reduce((acc, outcome) => {
+  const {
+    workspace_id,
+    selected_id,
+    data = [],
+    mediaData,
+    hasAccess,
+    outcomes,
+    queue
+  } = useLoaderData<typeof loader>();
+          const outcomeKeys = outcomes.reduce((acc, outcome) => {
     Object.keys(outcome?.result).forEach((key) => {
       if (!acc.includes(key)) {
         acc.push(key);
@@ -108,59 +132,72 @@ export default function CampaignScreen() {
     return acc;
   }, []);
 
+  const pageData = useMemo(() => data, [data]);
+  const navigate = useNavigate();
+  const nav = useNavigation();
+  const outlet = useOutlet();
+
+  const route = useLocation().pathname.split("/");
+  const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="my-4 mt-2 flex justify-between px-2">
+    <div className="flex h-full w-full flex-col">
+      <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
         <div className="flex gap-2">
-          <Button asChild>
-            <NavLink
-              className="text-xl font-semibold uppercase"
-              style={({ isActive, isPending }) => ({
-                background: isActive ? "black" : "white",
-                color: "blue",
-              })}
-              to="."
-              end
-            >
-              CAMPAIGN
-            </NavLink>
-          </Button>
-          <Button
-            className="text-xl font-semibold uppercase"
-            onClick={() => navigate("script")}
-            disabled={nav.state !== "idle"}
+          
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to="."
+            relative="path"
+          >
+            Campaign
+          </NavLink>
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to="script"
+            relative="path"
           >
             Script
-          </Button>
-          <Button
-            className="text-xl font-semibold uppercase"
-            onClick={() => navigate("settings")}
-            disabled={nav.state !== "idle"}
-          >
-            Settings
-          </Button>
+          </NavLink>
+
+          {hasAccess && (
+            <NavLink
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
+              to="settings"
+              relative="path"
+            >
+              Settings
+            </NavLink>
+          )}
         </div>
-        <Button
-          className="text-xl font-semibold uppercase"
-          onClick={() => navigate(`${(data[0].dial_type || 'call')}`)}
-          disabled={nav.state !== "idle"}
+        <h3 className="font-Zilla-Slab text-3xl font-semibold">
+          {data[0].title}
+        </h3>
+        <NavLink
+          className={({ isActive, isPending }) =>
+            handleNavlinkStyles(isActive, isPending)
+          }
+          to={`${data[0].dial_type}`}
+          relative="path"
         >
           Join Campaign
-        </Button>
+        </NavLink>
       </div>
-      <div className="pb-4">
-        <Outlet context={{ audiences }} />
-        {!outlet && outcomes.length > 0 ? (
-          <div className="p-4">
-            <div>
-              {outcomes.length} of {queue?.length} calls
-            </div>
-            <div>Other statistics</div>
-          </div>
-        ) : !outlet &&(
-          <div className="p-4">Let's make some calls!</div>
-        )}
-      </div>
+      {isCampaignParentRoute && (
+        <div className="flex flex-auto items-center justify-center">
+          <h1 className="font-Zilla-Slab text-4xl text-gray-400">
+            Your Campaign Results Will Show Here
+          </h1>
+        </div>
+      )}
+      <Outlet context={{ audiences }} />
+   
     </div>
   );
 }

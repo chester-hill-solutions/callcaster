@@ -46,7 +46,7 @@ export default function CampaignsNew() {
   return (
     <section
       id="form"
-      className="mx-auto mt-8 flex w-fit flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-16 pb-10 pt-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-16 pb-10 pt-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
     >
       <h1 className="text-center font-Zilla-Slab text-4xl font-bold">
         Add Campaign
@@ -69,6 +69,34 @@ export default function CampaignsNew() {
             id="campaign-name"
             className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
           />
+        </label>
+
+        <label
+          htmlFor="campaign-type"
+          className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
+        >
+          Campaign Type
+          <select
+            className="rounded-sm border-2 border-black bg-transparent px-2 py-1 text-xl font-semibold dark:border-white  "
+            name="campaign-type"
+            id="campaign-type"
+          >
+            <option value="message" className="dark:bg-black">
+              Message
+            </option>
+            <option value="robocall" className="dark:bg-black">
+              Robocall
+            </option>
+            <option value="simple_ivr" className="dark:bg-black">
+              Simple IVR
+            </option>
+            <option value="complex_ivr" className="dark:bg-black">
+              Complex IVR
+            </option>
+            <option value="live_call" className="dark:bg-black">
+              Live Call
+            </option>
+          </select>
         </label>
         <div className="flex items-center gap-4">
           <Button

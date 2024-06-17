@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from "@remix-run/react";
 import { mediaColumns } from "~/components/Media/columns";
+import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { audienceColumns } from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
@@ -57,6 +58,7 @@ export default function AudienceChart() {
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
+      <WorkspaceNav workspace={workspace} isInChildRoute={true} />
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null ? `${workspace?.name} Audiences` : "No Workspace"}
@@ -81,19 +83,18 @@ export default function AudienceChart() {
           {error}
         </h4>
       )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Media to this Workspace!
-        </h4>
-      )}
 
-      {audienceData != null && (
+      {audienceData != null ? (
         <DataTable
           className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
           columns={audienceColumns}
           data={audienceData}
           onRowClick={(item) => navigate(`${item?.id}`)}
         />
+      ) : (
+        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
+          Add An Audience To This Workspace
+        </h4>
       )}
     </main>
   );

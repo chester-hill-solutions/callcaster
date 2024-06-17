@@ -74,8 +74,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .eq("id", session?.user.id ?? "")
     .single();
 
-  const { data: workspaces, error: workspaceQueryError } =
-    await getUserWorkspaces({ supabaseClient: supabase });
+  // const { data: workspaces, error: workspaceQueryError } =
+  //   await getUserWorkspaces({ supabaseClient: supabase });
+
+  const { data: workspaceData, error: workspacesError } = await supabase
+    .from("workspace_users")
+    .select("workspace ( id, name )")
+    .eq("user_id", session?.user.id)
+    .order("last_accessed", { ascending: false });
+
+  const workspaces = workspaceData?.map((data) => data.workspace);
 
   return json(
     {
