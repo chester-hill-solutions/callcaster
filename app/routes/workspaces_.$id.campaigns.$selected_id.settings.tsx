@@ -61,7 +61,6 @@ export default function Audience() {
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
   return (
-    <div className="flex h-full flex-col">
       <CampaignSettings
         workspace={workspace_id}
         data={pageData}
@@ -69,6 +68,5 @@ export default function Audience() {
         mediaData={mediaData}
         campaign_id={selected_id}
       />
-    </div>
   );
 }

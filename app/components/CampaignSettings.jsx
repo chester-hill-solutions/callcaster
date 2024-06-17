@@ -74,7 +74,7 @@ const reducer = (state, action) => {
 const CampaignSettings = ({
   campaign_id,
   data,
-  audiences,
+  audiences = [],
   mediaData,
   workspace,
 }) => {
