@@ -171,7 +171,7 @@ export default function ScriptEditor() {
   useEffect(() => {
     setChanged(!deepEqual(questions, initQuestions));
   }, [initQuestions]);
-  console.log(questions)
+
   return (
     <div className="relative flex h-full flex-col">
       {isChanged && (
