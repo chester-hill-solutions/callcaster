@@ -84,7 +84,7 @@ export default function Audience() {
         </div>
         <Button
           className="text-xl font-semibold uppercase"
-          onClick={() => navigate(`${campaignDetails.dial_type}`)}
+          onClick={() => navigate(`${data[0].dial_type}`)}
           disabled={nav.state !== 'idle'}
         >
           Join Campaign
