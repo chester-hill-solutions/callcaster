@@ -1,34 +1,92 @@
-import { useEffect, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Result from "./CallList/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
-import { deepEqual } from "~/lib/utils";
 import { ArrowDown, ArrowUp } from "lucide-react";
 
-const QuestionHeader = ({ questionId, removeQuestion, title }) => (
-  <div className="flex items-center justify-between">
-    <div className="item-center flex items-center gap-2">
-      <div className="flex flex-col">
+const QuestionHeader = ({
+  questionId,
+  removeQuestion,
+  title,
+  onClick,
+  isOpen,
+  moveUp,
+  moveDown,
+  index,
+}: {
+  questionId: bigint;
+  removeQuestion: (arg0: bigint) => null;
+  title: string;
+  onClick: (arg0: bigint) => null;
+  isOpen: boolean;
+  moveUp: (arg0: bigint) => null;
+  moveDown: (arg0: bigint) => null;
+  index: bigint;
+}) => (
+  <div className="flex items-center">
+    <div className="item-center flex flex-auto items-center gap-2">
+      <div className="flex flex-col justify-center">
         <button onClick={() => moveUp(index)}>
           <ArrowUp />
         </button>
-        <button onClick={() => moveDown(questionId)}>
+        <button onClick={() => moveDown(index)}>
           <ArrowDown />
         </button>
       </div>
-
-      <h3>{title}</h3>
+      <div
+        className="flex min-h-10 flex-auto items-center"
+        onClick={() => onClick(isOpen ? null : questionId)}
+      >
+        <h3 className="font-Zilla-Slab text-xl">{title || questionId}</h3>
+      </div>
     </div>
-    <button onClick={() => removeQuestion(questionId)}>
+    <button
+      onClick={() => removeQuestion(questionId)}
+      className=" text-red-900"
+    >
       <GrSubtractCircle />
     </button>
   </div>
 );
 
+const IDInput = ({ question, handleTextChange }) => {
+  const [id, setId] = useState(question.id);
+  const inputRef = useRef(null);
+
+  const handleIdChange = (e) => {
+    const newId = e.target.value;
+    setId(newId);
+    handleTextChange(e);
+  };
+
+  useEffect(() => {
+    const newInputId = `${question.id}-id`;
+    if (inputRef.current) {
+      inputRef.current.id = newInputId;
+      inputRef.current.focus();
+    }
+  }, [question.id]);
+
+  return (
+    <div className="flex flex-col">
+      <label htmlFor={`${question.id}-id`}>Identifier</label>
+      <input
+        type="text"
+        name="id"
+        ref={inputRef}
+        value={id}
+        onChange={handleIdChange}
+        required
+      />
+    </div>
+  );
+};
+
 const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
   <div className="flex w-1/2 flex-col gap-2">
+    <IDInput question={question} handleTextChange={handleTextChange} />
+
     {[
-      { label: "Identifier", name: "id", value: question.id, required: true },
       { label: "Title", name: "title", value: question.title },
       { label: "Descriptive Text", name: "text", value: question.text },
     ].map(({ label, name, value, required }) => (
@@ -52,20 +110,14 @@ const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
         value={question.type}
         onChange={handleTypeChange}
       >
-        {[
-          "textarea",
-          "textblock",
-          "titleblock",
-          "radio",
-          "dropdown",
-          "boolean",
-          "multi",
-        ].map((type) => (
-          <option key={type} value={type}>
-            {type.charAt(0).toUpperCase() +
-              type.slice(1).replace(/block/, " Block")}
-          </option>
-        ))}
+        {["textarea", "textblock", "radio", "dropdown", "boolean", "multi"].map(
+          (type) => (
+            <option key={type} value={type}>
+              {type.charAt(0).toUpperCase() +
+                type.slice(1).replace(/block/, " Block")}
+            </option>
+          ),
+        )}
       </select>
     </div>
   </div>
@@ -119,45 +171,52 @@ const PreviewSection = ({ question }) => (
 export default function CampaignSettingsScriptQuestionBlock({
   question: initQuestion,
   removeQuestion,
-  setChanged,
   index,
   moveUp,
   moveDown,
   dispatchState,
   openQuestion,
+  setOpenQuestion,
 }) {
   const [question, setQuestion] = useState(initQuestion);
+  const focusedInputRef = useRef(null);
 
   const handleTextChange = (e) => {
-    setQuestion((curr) => ({
-      ...curr,
-      [e.target.name]: e.target.value,
-    }));
+    const oldState = { ...question };
+    const newState = { ...question, [e.target.name]: e.target.value };
+    setQuestion(newState);
+    dispatchState({ oldState, newState });
   };
 
   const handleTypeChange = (e) => {
     const val = e.currentTarget.value;
-    setQuestion((curr) => ({
-      ...curr,
+    const oldState = { ...question };
+    const newState = {
+      ...question,
       type: val,
       ...((val === "radio" || val === "multi" || val === "dropdown") && {
-        options: [],
+        options: question?.options || [],
       }),
-    }));
+    };
+    setQuestion(newState);
+    dispatchState({ oldState, newState });
   };
 
   const handleAddOption = () => {
-    setQuestion((curr) => ({
-      ...curr,
+    const oldState = { ...question };
+    const newState = {
+      ...question,
       options: [
-        ...curr.options,
+        ...question.options,
         {
-          value: `option-${curr.options.length + 1}`,
+          value: `option-${question.options.length + 1}`,
           label: "",
           ...(question.type === "radio" && { Icon: "SupportButton" }),
         },
       ],
-    }));
+    };
+    setQuestion(newState);
+    dispatchState({ oldState, newState });
   };
 
   const handleRemoveOption = (option) => {
@@ -165,53 +224,71 @@ export default function CampaignSettingsScriptQuestionBlock({
       ...curr,
       options: [...curr.options.filter((opt) => opt.value !== option.value)],
     }));
+    removeQuestion(question.id);
   };
 
   const handleIconChange = ({ index, iconName }) => {
-    setQuestion((curr) => {
-      const updatedOptions = [...curr.options];
-      updatedOptions[index] = {
-        ...updatedOptions[index],
-        Icon: iconName,
-      };
-      return {
-        ...curr,
-        options: updatedOptions,
-      };
-    });
+    const oldState = { ...question };
+    const newOptions = [...oldState.options];
+    newOptions[index] = {
+      ...newOptions[index],
+      Icon: iconName,
+    };
+    const newState = { ...oldState, options: newOptions };
+    setQuestion(newState);
+    dispatchState({ oldState, newState });
   };
 
   const handleOptionChange = (index, e) => {
     const newLabel = e.target.value;
     const newValue = newLabel?.toLowerCase().replace(/ /g, "-");
-
-    setQuestion((curr) => {
-      const updatedOptions = [...curr.options];
-      updatedOptions[index] = {
-        ...updatedOptions[index],
-        label: newLabel,
-        value: newValue,
-      };
-      return {
-        ...curr,
-        options: updatedOptions,
-      };
-    });
+    const oldState = { ...question };
+    const newOptions = [...oldState.options];
+    newOptions[index] = {
+      ...newOptions[index],
+      label: newLabel,
+      value: newValue,
+    };
+    const newState = { ...oldState, options: newOptions };
+    setQuestion(newState);
+    dispatchState({ oldState, newState });
   };
+
+  useEffect(() => {
+    if (focusedInputRef.current) {
+      const input = document.getElementById(focusedInputRef.current);
+      if (input) {
+        input.focus();
+      }
+      focusedInputRef.current = null; // Clear the ref after focusing
+    }
+  }, [question.id]);
+
+  const isOpen = openQuestion === question.id;
 
   return (
     <div
       key={question.id}
-      className="relative flex flex-col gap-2 bg-gray-100 p-6 py-2"
+      className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-gray-100 p-2"
+      style={{
+        border: "3px solid #BCEBFF",
+        borderRadius: "20px",
+        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+      }}
     >
       <QuestionHeader
         questionId={question.id}
         removeQuestion={removeQuestion}
         title={question.title}
+        onClick={setOpenQuestion}
+        isOpen={isOpen}
+        moveUp={moveUp}
+        moveDown={moveDown}
+        index={index}
       />
       <div
         style={{
-          height: `${openQuestion === question.id ? "height" : "0px"}`,
+          height: isOpen ? "unset" : "0px",
           overflow: "hidden",
         }}
       >
@@ -223,13 +300,15 @@ export default function CampaignSettingsScriptQuestionBlock({
           />
           <PreviewSection question={question} />
         </div>
-        <OptionsSection
-          question={question}
-          handleAddOption={handleAddOption}
-          handleRemoveOption={handleRemoveOption}
-          handleOptionChange={handleOptionChange}
-          handleIconChange={handleIconChange}
-        />
+        <div className="p-4">
+          <OptionsSection
+            question={question}
+            handleAddOption={handleAddOption}
+            handleRemoveOption={handleRemoveOption}
+            handleOptionChange={handleOptionChange}
+            handleIconChange={handleIconChange}
+          />
+        </div>
       </div>
     </div>
   );

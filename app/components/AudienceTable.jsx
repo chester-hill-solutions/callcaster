@@ -130,6 +130,7 @@ const AudienceTable = ({
           contact.surname = last != null ? last.replace(/\W/g, "") : "";
         }
 
+
         contact.phone = columnData[parsedHeaders.phone].replace(/\W/g, "");
         contact.email = columnData[parsedHeaders.email].replace(/\W/g, "");
         contact.address = columnData[parsedHeaders.address].replace(/\W/g, "");
@@ -151,6 +152,7 @@ const AudienceTable = ({
   };
 
   const inputRef = useRef(null);
+
   return (
     <div className="max-h-[800px] overflow-y-scroll">
       <div id="audience-settings" className="flex justify-between">

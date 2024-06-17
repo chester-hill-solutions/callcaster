@@ -25,17 +25,6 @@ export default function QuestionBlockOption({ question, option, handleRemoveOpti
             setShowIcons(false);
         }
     };
-
-    useEffect(() => {
-        if (showIcons && buttonRef.current && iconContainerRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-            iconContainerRef.current.style.top = `${rect.bottom + scrollTop}px`;
-            iconContainerRef.current.style.left = `${rect.left + scrollLeft}px`;
-        }
-    }, [showIcons]);
-
     const handleIconClick = (iconName) => {
         handleIconChange({ index, iconName });
         setShowIcons(false);
@@ -74,18 +63,18 @@ export default function QuestionBlockOption({ question, option, handleRemoveOpti
                     {showIcons &&
                         <div
                             ref={iconContainerRef}
-                            className="absolute bg-secondary border flex flex-wrap"
+                            className="absolute bg-secondary border flex"
                             style={{
                                 height: "150px",
                                 width: '200px',
+                                flexWrap:"wrap",
                                 padding: '24px',
                                 boxShadow: '5px 5px 0 0 rgba(0,0,0,.7)',
-                                zIndex: 1
+                                zIndex: 1,
                             }}
                         >
                             {Object.keys(IconMapping).map((iconName) => {
                                 const Icon = IconMapping[iconName];
-                                console.log(iconName)
                                 return (
                                     <button
                                         value={`${iconName}`}

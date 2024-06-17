@@ -81,6 +81,18 @@ export default function Workspace() {
     return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
   }
 
+  function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
+    if (isActive) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-primary p-2 text-xl font-semibold text-white hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+    }
+
+    if (isPending) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-tertiary p-2 text-xl font-semibold text-black hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+    }
+
+    return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+  }
+
   return (
     <main className="mx-auto h-full w-[80%] items-center py-8">
       <WorkspaceNav workspace={workspace} isInChildRoute={false} />

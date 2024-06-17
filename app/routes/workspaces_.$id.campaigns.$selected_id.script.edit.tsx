@@ -1,12 +1,5 @@
 import { json, redirect } from "@remix-run/node";
-import {
-  NavLink,
-  Outlet,
-  useLoaderData,
-  useOutlet,
-  useOutletContext,
-  useSubmit,
-} from "@remix-run/react";
+import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo, useState, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
@@ -65,11 +58,9 @@ export const loader = async ({ request, params }) => {
   return json({ workspace_id, selected_id, data, selected, mediaData });
 };
 
-export default function Audience() {
-  const { audiences } = useOutletContext();
+export default function ScriptEditor() {
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const submit = useSubmit();
-  const outlet = useOutlet();
   const pageData = useMemo(() => data || [], [data]);
   const initQuestions = useMemo(() => {
     return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
@@ -163,6 +154,7 @@ export default function Audience() {
       return newQuestions;
     });
   };
+
   const dispatchState = (e) => {
     const quesIndex = questions.findIndex(
       (question) => question.id === e.oldState.id,
@@ -179,39 +171,36 @@ export default function Audience() {
   useEffect(() => {
     setChanged(!deepEqual(questions, initQuestions));
   }, [initQuestions]);
-  console.log(outlet);
+
   return (
     <div className="relative flex h-full flex-col">
-      <div className="my-1 flex gap-2 px-2 flex-col">
-        {!outlet && (
-          <div className="flex flex-1 justify-end">
-            <Button asChild>
-              <NavLink to={"edit"}>Edit </NavLink>
-            </Button>
+      {isChanged && (
+        <div
+          className="absolute flex w-full items-center justify-between bg-accent px-4 py-2"
+          style={{ top: "-65px" }}
+        >
+          <Button onClick={handleReset} color="accent">
+            Reset
+          </Button>
+          <div className="font-Zilla-Slab text-xl">
+            You have unsaved changes
           </div>
-        )}
-        <div className="flex flex-col">
-          {!outlet && questions.length > 0 ? (
-            questions.map((question) => (
-              <div
-                key={question.id}
-                className="flex flex-col"
-                style={{ border: "3px solid #BCEBFF" }}
-              >
-                <div className="font-Zilla-Slab text-lg">
-                  {question.title || question.id}
-                </div>
-                <div className="text-sm">{question.text}</div>
-              </div>
-            ))
-          ) : (
-            <div className="flex flex-col items-center">
-              <div>Get started on your campaign Script and survey.</div>
-            </div>
-          )}
+          <Button onClick={handleSaveUpdate}>Save Changes</Button>
         </div>
-      </div>
-      <Outlet />
+      )}
+      <CampaignSettingsScript
+        {...{
+          questions,
+          addQuestion,
+          removeQuestion,
+          moveUp,
+          moveDown,
+          updateQuestion,
+          openQuestion,
+          setOpenQuestion,
+          dispatchState,
+        }}
+      />
     </div>
   );
 }

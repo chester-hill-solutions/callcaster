@@ -6,6 +6,6 @@ export const loader = ({ request, params }) => {
 };
 
 export default function SelectedType() {
-  const { selectedTable, audiences, campaigns, contacts } = useOutletContext();
-  return <Outlet context={{ selectedTable, audiences, contacts, campaigns }} />;
+  const { selectedTable, audiences, campaigns } = useOutletContext();
+  return <Outlet context={{ selectedTable, audiences, campaigns }} />;
 }

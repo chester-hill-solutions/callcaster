@@ -6,6 +6,7 @@ import {
   useLocation,
   useNavigate,
   useNavigation,
+  useOutlet,
   useOutletContext,
   useSubmit,
 } from "@remix-run/react";
@@ -15,6 +16,14 @@ import { CampaignSettings } from "../components/CampaignSettings";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
+
+const formatTime = (milliseconds) => {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -61,6 +70,16 @@ export const loader = async ({ request, params }) => {
       campaignDetails,
     }));
   }
+  const { data: outcomes, error: outcomeError } = await supabaseClient
+    .from("outreach_attempt")
+    .select(`*, call(*)`)
+    .eq("campaign_id", selected_id);
+
+  const { data: queue, error: queueError } = await supabaseClient
+    .from("campaign_queue")
+    .select(`*, contact(*)`)
+    .eq("campaign_id", selected_id);
+
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspace_id);
@@ -68,12 +87,15 @@ export const loader = async ({ request, params }) => {
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
+
   return json({
     workspace_id,
     selected_id,
     data,
     selected,
     mediaData,
+    outcomes,
+    queue,
     hasAccess,
   });
 };
@@ -90,7 +112,7 @@ function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
   return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
 }
 
-export default function Audience() {
+export default function CampaignScreen() {
   const { audiences } = useOutletContext();
   const {
     workspace_id,
@@ -98,10 +120,22 @@ export default function Audience() {
     data = [],
     mediaData,
     hasAccess,
+    outcomes,
+    queue
   } = useLoaderData<typeof loader>();
+          const outcomeKeys = outcomes.reduce((acc, outcome) => {
+    Object.keys(outcome?.result).forEach((key) => {
+      if (!acc.includes(key)) {
+        acc.push(key);
+      }
+    });
+    return acc;
+  }, []);
+
   const pageData = useMemo(() => data, [data]);
   const navigate = useNavigate();
   const nav = useNavigation();
+  const outlet = useOutlet();
 
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
@@ -110,6 +144,16 @@ export default function Audience() {
     <div className="flex h-full w-full flex-col">
       <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
         <div className="flex gap-2">
+          
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to="."
+            relative="path"
+          >
+            Campaign
+          </NavLink>
           <NavLink
             className={({ isActive, isPending }) =>
               handleNavlinkStyles(isActive, isPending)
@@ -153,6 +197,7 @@ export default function Audience() {
         </div>
       )}
       <Outlet context={{ audiences }} />
+   
     </div>
   );
 }
