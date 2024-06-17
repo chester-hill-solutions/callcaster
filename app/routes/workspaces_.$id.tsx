@@ -1,3 +1,4 @@
+import { LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
   redirect,
@@ -9,6 +10,7 @@ import {
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa6";
 import { PlusIcon } from "~/components/Icons";
+import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
   getWorkspaceCampaigns,
@@ -17,7 +19,7 @@ import {
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
-export const loader = async ({ request, params }) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
@@ -57,15 +59,15 @@ export const loader = async ({ request, params }) => {
 export default function Workspace() {
   const { workspace, audiences, campaigns } = useLoaderData();
 
-  campaigns.sort((campaign1, campaign2) => {
-    if (campaign1.created_at < campaign2.created_at) {
-      return 1;
-    } else if (campaign1.created_at > campaign2.created_at) {
-      return -1;
-    }
+  // campaigns.sort((campaign1, campaign2) => {
+  //   if (campaign1.created_at < campaign2.created_at) {
+  //     return 1;
+  //   } else if (campaign1.created_at > campaign2.created_at) {
+  //     return -1;
+  //   }
 
-    return 0;
-  });
+  //   return 0;
+  // });
 
   function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
     if (isActive) {
@@ -80,43 +82,8 @@ export default function Workspace() {
   }
 
   return (
-    <main className="mx-auto mt-8 h-full w-[80%] items-center">
-      <div className="mb-2 flex items-center">
-        <div className="flex flex-1 justify-between">
-          <div className="flex gap-4">
-            <Button asChild variant="outline">
-              <Link
-                to={`./audios`}
-                relative="path"
-                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold "
-              >
-                Audio
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link
-                to={`./audiences`}
-                relative="path"
-                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
-              >
-                Audiences
-              </Link>
-            </Button>
-          </div>
-          <h3 className="absolute left-1/2 translate-x-[-50%] font-Tabac-Slab text-2xl">
-            {workspace?.name}
-          </h3>
-          <Button asChild variant="outline">
-            <Link
-              to={`./settings`}
-              relative="path"
-              className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
-            >
-              Workspace Settings
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <main className="mx-auto h-full w-[80%] items-center py-8">
+      <WorkspaceNav workspace={workspace} isInChildRoute={false} />
       <div id="campaigns-container" className="flex border-2 border-zinc-600">
         <div
           className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-brand-secondary  dark:bg-transparent"
@@ -143,15 +110,13 @@ export default function Workspace() {
             </NavLink>
           ))}
         </div>
-        <div className="min-h-3/4 flex w-full flex-auto dark:bg-zinc-700">
-          <div className="flex flex-auto flex-col">
-            <Outlet
-              context={{
-                audiences,
-                campaigns,
-              }}
-            />
-          </div>
+        <div className="min-h-3/4 flex w-full flex-auto overflow-hidden dark:bg-zinc-700">
+          <Outlet
+            context={{
+              audiences,
+              campaigns,
+            }}
+          />
         </div>
       </div>
     </main>

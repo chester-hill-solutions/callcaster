@@ -41,6 +41,9 @@ export async function handleNewCampaign({
   headers,
 }) {
   const newCampaignName = formData.get("campaign-name") as string;
+  const newCampaignType = formData.get("campaign-type") as string;
+  console.log("Campaign Type: ", newCampaignType);
+
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
     .insert({

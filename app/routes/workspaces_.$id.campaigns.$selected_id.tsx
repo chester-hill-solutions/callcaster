@@ -1,9 +1,20 @@
 import { json, redirect } from "@remix-run/node";
-import { Outlet, useLoaderData, useNavigate, useNavigation, useOutletContext, useSubmit } from "@remix-run/react";
+import {
+  NavLink,
+  Outlet,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+  useOutletContext,
+  useSubmit,
+} from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -54,46 +65,94 @@ export const loader = async ({ request, params }) => {
     .from("workspaceAudio")
     .list(workspace_id);
 
-  return json({ workspace_id, selected_id, data, selected, mediaData });
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const hasAccess =
+    userRole === MemberRole.Owner || userRole === MemberRole.Admin;
+  return json({
+    workspace_id,
+    selected_id,
+    data,
+    selected,
+    mediaData,
+    hasAccess,
+  });
 };
+
+function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
+  if (isActive) {
+    return "rounded-md border-2 border-brand-secondary bg-brand-secondary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
+  }
+
+  if (isPending) {
+    return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+  }
+
+  return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+}
 
 export default function Audience() {
   const { audiences } = useOutletContext();
-  const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
+  const {
+    workspace_id,
+    selected_id,
+    data = [],
+    mediaData,
+    hasAccess,
+  } = useLoaderData<typeof loader>();
   const pageData = useMemo(() => data, [data]);
   const navigate = useNavigate();
   const nav = useNavigation();
+
+  const route = useLocation().pathname.split("/");
+  const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="mt-2 flex justify-between px-2">
+    <div className="flex h-full w-full flex-col">
+      <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
         <div className="flex gap-2">
-          <Button
-            className="text-xl font-semibold uppercase"
-            onClick={() => navigate("script")}
-            disabled={nav.state !== 'idle'}
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to="script"
+            relative="path"
           >
             Script
-          </Button>
-          <Button
-            className="text-xl font-semibold uppercase"
-            onClick={() => navigate("settings")}
-            disabled={nav.state !== 'idle'}
-          >
-            Settings
-          </Button>
+          </NavLink>
+
+          {hasAccess && (
+            <NavLink
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
+              to="settings"
+              relative="path"
+            >
+              Settings
+            </NavLink>
+          )}
         </div>
-        <Button
-          className="text-xl font-semibold uppercase"
-          onClick={() => navigate(`${campaignDetails.dial_type}`)}
-          disabled={nav.state !== 'idle'}
+        <h3 className="font-Zilla-Slab text-3xl font-semibold">
+          {data[0].title}
+        </h3>
+        <NavLink
+          className={({ isActive, isPending }) =>
+            handleNavlinkStyles(isActive, isPending)
+          }
+          to={`${data[0].dial_type}`}
+          relative="path"
         >
           Join Campaign
-        </Button>
+        </NavLink>
       </div>
-      <div className="flex flex-auto content-center justify-center">
-        <h1 className=" font-Zilla-Slab text-4xl">Campaign results.</h1>
-      </div>
-      <Outlet context={{audiences}}/>
+      {isCampaignParentRoute && (
+        <div className="flex flex-auto items-center justify-center">
+          <h1 className="font-Zilla-Slab text-4xl text-gray-400">
+            Your Campaign Results Will Show Here
+          </h1>
+        </div>
+      )}
+      <Outlet context={{ audiences }} />
     </div>
   );
 }

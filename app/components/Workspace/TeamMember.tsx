@@ -26,6 +26,23 @@ type TeamMemberProps = {
   memberRole: MemberRole;
 };
 
+export const handleIconStyles = (memberRole: MemberRole): string =>
+  clsx(
+    "aspect-square w-8 rounded-full",
+    memberRole === MemberRole.Owner && "bg-green-500",
+    memberRole === MemberRole.Member && "bg-cyan-500",
+    memberRole === MemberRole.Caller && "bg-rose-500",
+    memberRole === MemberRole.Admin && "bg-purple-500",
+  );
+export const handleRoleTextStyles = (memberRole: MemberRole): string =>
+  clsx(
+    "font-Zilla-Slab font-semibold italic",
+    memberRole === MemberRole.Owner && "text-green-500",
+    memberRole === MemberRole.Member && "text-cyan-500",
+    memberRole === MemberRole.Caller && "text-rose-500",
+    memberRole === MemberRole.Admin && "text-purple-500",
+  );
+
 export default function TeamMember({
   member,
   userRole,
@@ -39,20 +56,8 @@ export default function TeamMember({
     member.last_name === null ? "" : capitalize(member.last_name);
   const memberName = `${firstName} ${lastName}`;
 
-  const iconStyles = clsx(
-    "aspect-square w-8 rounded-full",
-    memberRole === MemberRole.Owner && "bg-green-500",
-    memberRole === MemberRole.Member && "bg-cyan-500",
-    memberRole === MemberRole.Caller && "bg-rose-500",
-    memberRole === MemberRole.Admin && "bg-purple-500",
-  );
-  const roleTextStyles = clsx(
-    "font-Zilla-Slab font-semibold italic",
-    memberRole === MemberRole.Owner && "text-green-500",
-    memberRole === MemberRole.Member && "text-cyan-500",
-    memberRole === MemberRole.Caller && "text-rose-500",
-    memberRole === MemberRole.Admin && "text-purple-500",
-  );
+  const iconStyles = handleIconStyles(memberRole);
+  const roleTextStyles = handleRoleTextStyles(memberRole);
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;

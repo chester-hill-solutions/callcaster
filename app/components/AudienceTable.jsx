@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { ContactTable } from "./ContactTable";
 import { ImportIcon } from "lucide-react";
 import { useSubmit } from "@remix-run/react";
+import { parseCSVHeaders } from "~/lib/utils";
 
 const AudienceTable = ({
   contacts: initialContacts,
@@ -72,11 +73,31 @@ const AudienceTable = ({
       readCSVFile(file);
     }
   };
+
+  const handleOnClick = (e) => {
+    e.preventDefault();
+    inputRef.current.click();
+    try {
+      const file = inputRef.current.files[0];
+      if (file.type === "text/csv") {
+        readCSVFile(file);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+
+    // const file = e.dataTransfer.files[0];
+    // if (file && file.type === "text/csv") {
+    //   readCSVFile(file);
+    // }
+  };
+
   const readCSVFile = (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target.result;
       const rows = text.split("\n");
+
       const parsedHeaders = parseCSVHeaders(rows[0].split(","));
       const parsedHeadersLength = Object.keys(parsedHeaders).length;
 
@@ -128,47 +149,8 @@ const AudienceTable = ({
     };
     reader.readAsText(file);
   };
-  const parseCSVHeaders = (unparsedHeaders) => {
-    const trimmedHeaders = unparsedHeaders.map((header) =>
-      header.toLowerCase().replace(/\W/g, ""),
-    );
-    console.log(trimmedHeaders);
-    let parsedHeaders = { name: null, phone: null, address: null, email: null };
-    const regexChecks = {
-      name: /name/,
-      phone: /phone/,
-      address: /address/,
-      email: /email/,
-    };
-    for (let i = 0; i < trimmedHeaders.length; i++) {
-      let header = trimmedHeaders[i];
-      if (regexChecks.name.test(header)) {
-        if (parsedHeaders["name"] != null) {
-          let otherNameIndex = parsedHeaders["name"];
-          console.log("first name index: ", otherNameIndex);
-          if (/first/.test(header)) {
-            parsedHeaders["name"] = [i, otherNameIndex];
-          } else {
-            console.log("HERE");
-            parsedHeaders["name"] = [otherNameIndex, i];
-            console.log(parsedHeaders["name"]);
-          }
-        } else {
-          console.log("HERE???");
-          parsedHeaders["name"] = i;
-        }
-      }
 
-      for (let check of Object.keys(regexChecks)) {
-        if (check === "name") continue;
-        if (regexChecks[check].test(header)) {
-          parsedHeaders[check] = i;
-        }
-      }
-    }
-    console.log(parsedHeaders);
-    return parsedHeaders;
-  };
+  const inputRef = useRef(null);
   return (
     <div className="max-h-[800px] overflow-y-scroll">
       <div id="audience-settings" className="flex justify-between">
@@ -187,7 +169,14 @@ const AudienceTable = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          <Button>
+          <input
+            type="file"
+            name="file"
+            id="file"
+            ref={inputRef}
+            className="hidden"
+          />
+          <Button onClick={handleOnClick} className="">
             IMPORT{" "}
             <span style={{ transform: "rotate(180deg)", marginLeft: "1rem" }}>
               <ImportIcon />
