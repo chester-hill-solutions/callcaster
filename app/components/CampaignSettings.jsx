@@ -86,7 +86,7 @@ const CampaignSettings = ({
     initialState(data, workspace, campaign_id),
   );
   const [campaignDetails, dispatch] = useReducer(reducer, initial);
-  const initSelectedAudiences = audiences?.filter((audience) => {
+  const initSelectedAudiences = audiences.filter((audience) => {
     return data
       .map((row) => row.campaign_audience[0]?.audience_id)
       .includes(audience.id);
