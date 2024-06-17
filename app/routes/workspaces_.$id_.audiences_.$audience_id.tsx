@@ -1,18 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Link,
-  Outlet,
-  json,
-  useLoaderData,
-  useNavigate,
-} from "@remix-run/react";
+import { Link, json, useLoaderData } from "@remix-run/react";
 import { AudienceTable } from "~/components/AudienceTable";
-import { mediaColumns } from "~/components/Media/columns";
-import { DataTable } from "~/components/WorkspaceTable/DataTable";
-import {
-  audienceColumns,
-  contactColumns,
-} from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -31,7 +19,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .select()
     .eq("id", audience_id)
     .single();
-  console.log("Contacts: ", contacts);
+  // console.log("Contacts: ", contacts);
   if (contactError) {
     return json({ contacts: null, error: contactError.message }, { headers });
   }
