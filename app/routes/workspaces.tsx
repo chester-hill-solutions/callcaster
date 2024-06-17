@@ -117,13 +117,13 @@ export default function Workspaces() {
       </h1>
       <div
         id="workspaces-grid"
-        className="grid auto-rows-auto grid-cols-5 items-start gap-4"
+        className="auto-rows-[minmax(fit-content, auto)] grid grid-cols-[repeat(5,_minmax(50px,_200px))] items-start gap-4"
       >
         <Dialog>
-          <DialogTrigger>
+          <DialogTrigger className="h-full">
             <Button
               variant="outline"
-              className="h-full min-h-fit w-full min-w-60 border-2 border-black px-4 py-8 dark:border-white"
+              className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
                 <FaPlus
@@ -211,10 +211,10 @@ export default function Workspaces() {
             <Link
               to={`/workspaces/${workspace.id}`}
               key={workspace.id}
-              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
+              className="flex h-full flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
               transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
             >
-              <h5 className="font-Zilla-Slab text-2xl font-semibold">
+              <h5 className="max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
                 {formatTableText(workspace.name)}
               </h5>
             </Link>

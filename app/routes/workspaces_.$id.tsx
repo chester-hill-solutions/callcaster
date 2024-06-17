@@ -5,6 +5,7 @@ import {
   useNavigate,
   Link,
   Outlet,
+  NavLink,
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa6";
 import { PlusIcon } from "~/components/Icons";
@@ -66,6 +67,18 @@ export default function Workspace() {
     return 0;
   });
 
+  function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
+    if (isActive) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-primary p-2 text-xl font-semibold text-white hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+    }
+
+    if (isPending) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-tertiary p-2 text-xl font-semibold text-black hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+    }
+
+    return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+  }
+
   return (
     <main className="mx-auto mt-8 h-full w-[80%] items-center">
       <div className="mb-2 flex items-center">
@@ -106,7 +119,7 @@ export default function Workspace() {
       </div>
       <div id="campaigns-container" className="flex border-2 border-zinc-600">
         <div
-          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-cyan-50  dark:bg-transparent"
+          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-brand-secondary  dark:bg-transparent"
           style={{ scrollbarWidth: "none" }}
         >
           <Link
@@ -117,15 +130,17 @@ export default function Workspace() {
             <FaPlus size="20px" />
           </Link>
           {campaigns?.map((row, i) => (
-            <Link
+            <NavLink
               to={`campaigns/${row.id}`}
               key={row.id}
-              className="border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white"
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
             >
               <h3 className="capitalize">
                 {row.title || `Unnamed campaign ${i + 1}`}
               </h3>
-            </Link>
+            </NavLink>
           ))}
         </div>
         <div className="min-h-3/4 flex w-full flex-auto dark:bg-zinc-700">
