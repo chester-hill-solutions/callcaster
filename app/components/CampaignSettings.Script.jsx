@@ -9,12 +9,8 @@ export default function CampaignSettingsScript({ questions, addQuestion, removeQ
                     flex: '1 1 20%',
                     border: "3px solid #BCEBFF",
                     borderRadius: "20px",
-<<<<<<< nja-scriptfix
                     boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
                     minHeight:"300px"
-=======
-                    boxShadow: "3px 5px 0  rgba(50,50,50,.6)"
->>>>>>> master
                 }}>
                     <button className="bg-primary text-white font-Zilla-Slab text-xl px-2 py-2 gap-2" onClick={addQuestion} style={{ justifyContent: 'center', display: "flex", alignItems: "center", borderTopLeftRadius: "18px", borderTopRightRadius: "18px" }}>Add Question<FaPlus size="16px" />
                     </button>
