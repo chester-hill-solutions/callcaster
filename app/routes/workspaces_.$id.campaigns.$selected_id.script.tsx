@@ -182,11 +182,11 @@ export default function Audience() {
   return (
     <div className="relative flex h-full flex-col">
       <div className="my-1 flex gap-2 px-2">
-        {!outlet && <div className="flex flex-1 justify-end">
+        {!outlet && (<div className="flex flex-1 justify-end">
           <Button asChild>
             <NavLink to={"edit"}>Edit </NavLink>
           </Button>
-        </div>}
+        </div>)}
         <div className="flex flex-col">
           {!outlet &&
             questions.map((question) => (
