@@ -7,6 +7,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
     const [tooltip, setTooltip] = useState(null);
     const nav = useNavigation();
     const isBusy = (nav.state !== 'idle')
+    const isFailed = activeCall?.parameters?.CallSid && recentAttempt.disposition === 'failed';
     const isDialing = activeCall?.parameters?.CallSid && !(recentAttempt.answered_at)
     const isConnected = recentAttempt.answered_at && activeCall?.parameters?.CallSid
     const isComplete = (recentAttempt.disposition || recentAttempt.result?.status)
@@ -35,6 +36,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
         const seconds = totalSeconds % 60;
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
+
     return (
         <div style={{
             border: '3px solid #BCEBFF',
@@ -57,15 +59,16 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                     borderTopRightRadius: '18px',
                     padding: "16px",
                     marginBottom: "8px",
-                    background: activeCall?.parameters?.CallSid ? "#4CA83D" : "#333333"
+                    background: activeCall?.parameters?.CallSid ? "#4CA83D" : isFailed ? "var(--primary)" : "#333333"
                 }}
                     className={`font-Tabac-Slab text-xl text-white ${activeCall ? 'bg-green-300' : 'bg-slate-700'}`}
                 >
                     <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-                        {isConnected && <div>Connected {`${formatTime(time - (new Date(recentAttempt.answered_at)))}`}</div>}
-                        {isDialing && <div>Dialing...</div>}
-                        {isComplete && <div>Complete</div>}
-                        {isPending && <div>Pending</div>}
+                        {isFailed ? <div>Call Failed</div>:
+                        isConnected ? <div>Connected {`${formatTime(time - (new Date(recentAttempt.answered_at)))}`}</div>:
+                        isDialing ? <div>Dialing...</div>:
+                        isComplete ? <div>Complete</div>:
+                        isPending && <div>Pending</div>}
                     </div>
                 </div>
                 {!conference && predictive &&
@@ -106,11 +109,11 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
                                 Next
                             </button>)
                         }
-                        {<button onClick={() => handleDialNext()} disabled={(isBusy || isConnected || isDialing)} style={{ flex: "1", padding: "4px 8px", background: "#4CA83D", borderRadius: "5px", color: "white", opacity: (isBusy || isConnected || isDialing) ? '.6' : 'unset'  }}>
+                        {<button onClick={() => handleDialNext()} disabled={(isBusy || isConnected || isDialing)} style={{ flex: "1", padding: "4px 8px", background: "#4CA83D", borderRadius: "5px", color: "white", opacity: (isBusy || isConnected || isDialing) ? '.6' : 'unset' }}>
                             {!predictive ? 'Dial' : 'Start'}
                         </button>}
                     </div>
-                    {isComplete && (
+                    {(isComplete || isFailed) && (
                         <div className="flex px-4" style={{ paddingBottom: ".5rem" }}>
                             <button disabled={isBusy} onClick={() => handleDequeueNext()} style={{ flex: "1", padding: "4px 8px", border: "1px solid #333", borderRadius: "5px", color: "#333" }}>
                                 Next

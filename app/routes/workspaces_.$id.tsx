@@ -24,6 +24,9 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
+  if (!serverSession) {
+    return redirect("/signin", { headers });
+  }
 
   const workspaceId = params.id;
   const { data: workspace, error } = await getWorkspaceInfo({
