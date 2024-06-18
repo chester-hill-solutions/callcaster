@@ -183,7 +183,7 @@ export default function CampaignScreen() {
           className={({ isActive, isPending }) =>
             handleNavlinkStyles(isActive, isPending)
           }
-          to={`${data[0].dial_type}`}
+          to={`${data[0].dial_type || 'call'}`}
           relative="path"
         >
           Join Campaign
