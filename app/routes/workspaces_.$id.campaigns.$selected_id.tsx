@@ -155,17 +155,16 @@ export default function CampaignScreen() {
           >
             Dashboard
           </NavLink>
-          {hasAccess && (
-            <NavLink
-              className={({ isActive, isPending }) =>
-                handleNavlinkStyles(isActive, isPending)
-              }
-              to="script"
-              relative="path"
-            >
-              Script
-            </NavLink>
-          )}
+
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to="script"
+            relative="path"
+          >
+            Script
+          </NavLink>
 
           {hasAccess && (
             <NavLink
@@ -183,9 +182,9 @@ export default function CampaignScreen() {
           <h3 className="font-Zilla-Slab text-3xl font-semibold">
             {data[0].title}
           </h3>
-          <p className="flex h-full items-center justify-center rounded-sm bg-zinc-300 px-2 py-1 font-semibold dark:bg-zinc-500 dark:text-white">
+          {/* <p className="flex h-full items-center justify-center rounded-sm bg-zinc-300 px-2 py-1 font-semibold dark:bg-zinc-500 dark:text-white">
             {campaignTypeText(data[0].type)}
-          </p>
+          </p> */}
         </div>
         <NavLink
           className={({ isActive, isPending }) =>
