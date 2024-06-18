@@ -139,7 +139,6 @@ const AudienceTable = ({
             contact.surname = names.at(-1).trim();
           }
         }
-
         contact.phone = row[parsedHeaders.phone]?.trim();
         contact.email = row[parsedHeaders.email]?.trim();
         contact.address = row[parsedHeaders.address]?.trim();
