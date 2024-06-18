@@ -37,6 +37,7 @@ export const loader = async ({ request, params }) => {
       .insert({ campaign_id: data[0].id, workspace: workspace_id });
     return redirect(`/workspaces/${workspace_id}/campaign/${data[0].id}`);
   }
+
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
@@ -45,27 +46,29 @@ export const loader = async ({ request, params }) => {
         `,
     )
     .eq("id", selected_id);
+  const { data: mediaData, error: mediaError } = await supabaseClient.storage
+    .from("workspaceAudio")
+    .list(workspace_id);
+
   let data = [...mtmData];
-  if (data.length > 0 && data[0].type === "live_call") {
+  if (data.length > 0 && (data[0].type === "live_call" || data[0].type === null)) {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("live_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
+    .from("live_campaign")
+    .select()
+    .eq("campaign_id", selected_id)
+    .single();
     if (detailsError) console.error(detailsError);
     data = data.map((item) => ({
       ...item,
       campaignDetails,
     }));
+    return json({ workspace_id, selected_id, data, selected, mediaData });
+  } else {
+    return json({ workspace_id, selected_id, data, selected, mediaData });
   }
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspace_id);
-
-  return json({ workspace_id, selected_id, data, selected, mediaData });
 };
 
-export default function Audience() {
+export default function ScriptPage() {
   const { audiences } = useOutletContext();
   const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
   const submit = useSubmit();
@@ -179,10 +182,9 @@ export default function Audience() {
   useEffect(() => {
     setChanged(!deepEqual(questions, initQuestions));
   }, [initQuestions]);
-  console.log(outlet);
   return (
     <div className="relative flex h-full flex-col">
-      <div className="my-1 flex gap-2 px-2 flex-col">
+      <div className="my-1 flex flex-col gap-2 px-2">
         {!outlet && (
           <div className="flex flex-1 justify-end">
             <Button asChild>
@@ -190,13 +192,13 @@ export default function Audience() {
             </Button>
           </div>
         )}
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-2">
           {!outlet && questions.length > 0 ? (
             questions.map((question) => (
               <div
                 key={question.id}
-                className="flex flex-col"
-                style={{ border: "3px solid #BCEBFF" }}
+                className="flex flex-col px-2"
+                
               >
                 <div className="font-Zilla-Slab text-lg">
                   {question.title || question.id}
