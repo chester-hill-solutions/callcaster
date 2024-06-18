@@ -142,6 +142,7 @@ const AudienceTable = ({
         contact.phone = row[parsedHeaders.phone].trim();
         contact.email = row[parsedHeaders.email].trim();
         contact.address = row[parsedHeaders.address].trim();
+        contact.external_id = row[parsedHeaders.external_id].trim();
         // const [firstname, surname, phone, email, address] = row.split(",");
         return contact;
       });
