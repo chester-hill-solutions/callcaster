@@ -194,10 +194,11 @@ export default function CampaignSettingsScriptQuestionBlock({
     const newState = {
       ...question,
       type: val,
-      ...((val === "radio" || val === "multi" || val === "dropdown") && {
+      ...((val === "radio" || val === "multi" || val === "dropdown") ?{
         options: question?.options || [],
-      }),
+      } : {options: []}),
     };
+    if (!(val === "radio" || val === "multi" || val === "dropdown")) delete newState.options
     setQuestion(newState);
     dispatchState({ oldState, newState });
   };
@@ -259,7 +260,7 @@ export default function CampaignSettingsScriptQuestionBlock({
       if (input) {
         input.focus();
       }
-      focusedInputRef.current = null; // Clear the ref after focusing
+      focusedInputRef.current = null;
     }
   }, [question.id]);
 
