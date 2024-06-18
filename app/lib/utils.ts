@@ -81,3 +81,20 @@ export const parseCSVHeaders = (unparsedHeaders) => {
   console.log(parsedHeaders);
   return parsedHeaders;
 };
+
+export function campaignTypeText(campaignType: string): string {
+  switch (campaignType) {
+    case "message":
+      return "Message";
+    case "robocall":
+      return "Robocall";
+    case "simple_ivr":
+      return "Simple IVR";
+    case "complex_ivr":
+      return "Complex IVR";
+    case "live_call":
+      return "Live Call";
+    default:
+      return "Invalid";
+  }
+}

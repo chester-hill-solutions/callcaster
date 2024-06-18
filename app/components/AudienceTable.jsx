@@ -6,6 +6,8 @@ import { ImportIcon } from "lucide-react";
 import { useSubmit } from "@remix-run/react";
 import { parseCSVHeaders } from "~/lib/utils";
 
+import { parse } from "csv-parse/sync";
+
 const AudienceTable = ({
   contacts: initialContacts,
   workspace_id,
@@ -92,18 +94,26 @@ const AudienceTable = ({
     // }
   };
 
+  const testParser = (text) => {
+    const records = parse(text);
+    return records;
+  };
+
   const readCSVFile = (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target.result;
-      const rows = text.split("\n");
+      // const rows = text.split("\n");
+      const records = testParser(text);
+      // console.log(records);
 
-      const parsedHeaders = parseCSVHeaders(rows[0].split(","));
+      // const parsedHeaders = parseCSVHeaders(rows[0].split(","));
+      // const parsedHeadersLength = Object.keys(parsedHeaders).length;
+      const parsedHeaders = parseCSVHeaders(records[0]);
       const parsedHeadersLength = Object.keys(parsedHeaders).length;
 
-      const contacts = rows.slice(1).flatMap((row) => {
-        let columnData = row.split(",");
-        if (columnData.length < parsedHeadersLength) {
+      const contacts = records.slice(1).flatMap((row) => {
+        if (row.length < parsedHeadersLength) {
           return [];
         }
 
@@ -116,28 +126,26 @@ const AudienceTable = ({
         };
 
         if (parsedHeaders.name.length != null) {
-          contact.firstname = columnData[parsedHeaders.name[0]].replace(
-            /\W/g,
-            "",
-          );
-          contact.surname = columnData[parsedHeaders.name[1]].replace(
-            /\W/g,
-            "",
-          );
+          contact.firstname = row[parsedHeaders.name[0]]?.trim();
+          contact.surname = row[parsedHeaders.name[1]]?.trim();
         } else {
-          let [first, last] = columnData[parsedHeaders.name].split(" ");
-          contact.firstname = first != null ? first.replace(/\W/g, "") : "";
-          contact.surname = last != null ? last.replace(/\W/g, "") : "";
+          let names = row[parsedHeaders.name].split(" ");
+          if (names.length > 0) {
+            contact.firstname = names[0].trim();
+          }
+
+          if (names.length > 1) {
+            contact.surname = names.at(-1).trim();
+          }
         }
 
-
-        contact.phone = columnData[parsedHeaders.phone].replace(/\W/g, "");
-        contact.email = columnData[parsedHeaders.email].replace(/\W/g, "");
-        contact.address = columnData[parsedHeaders.address].replace(/\W/g, "");
+        contact.phone = row[parsedHeaders.phone].trim();
+        contact.email = row[parsedHeaders.email].trim();
+        contact.address = row[parsedHeaders.address].trim();
         // const [firstname, surname, phone, email, address] = row.split(",");
         return contact;
       });
-      //   console.log("Contacts: ", contacts);
+      // console.log("Contacts: ", contacts);
       submit(
         { contacts, audience_id, workspace_id },
         {

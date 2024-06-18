@@ -2,7 +2,7 @@ import { useEffect, useState, useReducer } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
-import { deepEqual } from "~/lib/utils";
+import { campaignTypeText, deepEqual } from "~/lib/utils";
 
 const initialState = (data, workspace, campaign_id) => ({
   campaign_id,
@@ -153,22 +153,6 @@ const CampaignSettings = ({
     dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
   }, [campaign_id, data, workspace]);
 
-  function campaignTypeText(campaignType) {
-    switch (campaignType) {
-      case "message":
-        return "Message";
-      case "robocall":
-        return "Robocall";
-      case "simple_ivr":
-        return "Simple IVR";
-      case "complex_ivr":
-        return "Complex IVR";
-      case "live_call":
-        return "Live Call";
-      default:
-        return "Invalid";
-    }
-  }
   return (
     <div
       id="campaignSettingsContainer"
@@ -233,7 +217,7 @@ const CampaignSettings = ({
             </p>
             <p
               id="campaign-details-value"
-              className="flex h-full items-center justify-center rounded-sm bg-zinc-300 font-semibold dark:bg-zinc-600 dark:text-black"
+              className="flex h-full items-center justify-center rounded-sm bg-zinc-300 font-semibold dark:bg-zinc-600 dark:text-white"
             >
               {campaignTypeText(campaignDetails.type)}
             </p>
