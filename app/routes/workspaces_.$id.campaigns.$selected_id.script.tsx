@@ -12,6 +12,8 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -21,6 +23,9 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) {
     return redirect("/signin");
   }
+
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+
   if (selected_id === "new") {
     const query = supabaseClient
       .from("campaign")
@@ -51,26 +56,49 @@ export const loader = async ({ request, params }) => {
     .list(workspace_id);
 
   let data = [...mtmData];
-  if (data.length > 0 && (data[0].type === "live_call" || data[0].type === null)) {
+  if (
+    data.length > 0 &&
+    (data[0].type === "live_call" || data[0].type === null)
+  ) {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
-    .from("live_campaign")
-    .select()
-    .eq("campaign_id", selected_id)
-    .single();
+      .from("live_campaign")
+      .select()
+      .eq("campaign_id", selected_id)
+      .single();
     if (detailsError) console.error(detailsError);
     data = data.map((item) => ({
       ...item,
       campaignDetails,
     }));
-    return json({ workspace_id, selected_id, data, selected, mediaData });
+    return json({
+      workspace_id,
+      selected_id,
+      data,
+      selected,
+      mediaData,
+      userRole,
+    });
   } else {
-    return json({ workspace_id, selected_id, data, selected, mediaData });
+    return json({
+      workspace_id,
+      selected_id,
+      data,
+      selected,
+      mediaData,
+      userRole,
+    });
   }
 };
 
 export default function ScriptPage() {
   const { audiences } = useOutletContext();
-  const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
+  const {
+    workspace_id,
+    selected_id,
+    data = [],
+    mediaData,
+    userRole,
+  } = useLoaderData();
   const submit = useSubmit();
   const outlet = useOutlet();
   const pageData = useMemo(() => data || [], [data]);
@@ -185,7 +213,7 @@ export default function ScriptPage() {
   return (
     <div className="relative flex h-full flex-col">
       <div className="my-1 flex flex-col gap-2 px-2">
-        {!outlet && (
+        {!outlet && userRole !== MemberRole.Caller && (
           <div className="flex flex-1 justify-end">
             <Button asChild>
               <NavLink to={"edit"}>Edit </NavLink>
@@ -195,11 +223,7 @@ export default function ScriptPage() {
         <div className="flex flex-col gap-2">
           {!outlet && questions.length > 0 ? (
             questions.map((question) => (
-              <div
-                key={question.id}
-                className="flex flex-col px-2"
-                
-              >
+              <div key={question.id} className="flex flex-col px-2">
                 <div className="font-Zilla-Slab text-lg">
                   {question.title || question.id}
                 </div>
