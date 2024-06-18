@@ -31,7 +31,9 @@ export async function handleNewAudience({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/audiences`);
+  return redirect(
+    `/workspaces/${workspaceId}/audiences/${createAudienceData.id}`,
+  );
 }
 
 export async function handleNewCampaign({
@@ -72,5 +74,5 @@ export async function handleNewCampaign({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/campaigns`);
+  return redirect(`/workspaces/${workspaceId}/campaigns/${campaignData.id}`);
 }

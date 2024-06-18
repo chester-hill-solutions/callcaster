@@ -4,6 +4,7 @@ import { mediaColumns } from "~/components/Media/columns";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -13,10 +14,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const workspaceId = params.id;
   if (workspaceId == null) {
     return json(
-      { audioMedia: null, workspace: null, error: "Workspace does not exist" },
+      {
+        audioMedia: null,
+        workspace: null,
+        error: "Workspace does not exist",
+        userRole: null,
+      },
       { headers },
     );
   }
+
+  const userRole = getUserRole({ serverSession, workspaceId });
 
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
@@ -25,7 +33,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
   if (workspaceError) {
     return json(
-      { audioMedia: null, workspace: null, error: workspaceError.message },
+      {
+        audioMedia: null,
+        workspace: null,
+        error: workspaceError.message,
+        userRole,
+      },
       { headers },
     );
   }
@@ -41,7 +54,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (mediaError) {
     console.log("Media Error: ", mediaError);
     return json(
-      { audioMedia: null, workspace: workspaceData, error: mediaError.message },
+      {
+        audioMedia: null,
+        workspace: workspaceData,
+        error: mediaError.message,
+        userRole,
+      },
       { headers },
     );
   }
@@ -53,6 +71,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         audioMedia: null,
         workspace: workspaceData,
         error: "No Audio in Workspace",
+        userRole,
       },
       { headers },
     );
@@ -71,6 +90,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       audioMedia: null,
       workspace: workspaceData,
       error: signedUrlsError.message,
+      userRole,
     });
   }
 
@@ -83,7 +103,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   return json(
-    { audioMedia: mediaData, workspace: workspaceData, error: null },
+    { audioMedia: mediaData, workspace: workspaceData, error: null, userRole },
     { headers },
   );
 }
@@ -96,14 +116,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 // }
 
 export default function WorkspaceAudio() {
-  const { audioMedia, workspace, error } = useLoaderData<typeof loader>();
+  const { audioMedia, workspace, error, userRole } =
+    useLoaderData<typeof loader>();
   //   const actionData = useActionData<typeof action>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
-      <WorkspaceNav workspace={workspace} isInChildRoute={true} />
+      <WorkspaceNav
+        workspace={workspace}
+        isInChildRoute={true}
+        userRole={userRole}
+      />
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null

@@ -155,15 +155,17 @@ export default function CampaignScreen() {
           >
             Dashboard
           </NavLink>
-          <NavLink
-            className={({ isActive, isPending }) =>
-              handleNavlinkStyles(isActive, isPending)
-            }
-            to="script"
-            relative="path"
-          >
-            Script
-          </NavLink>
+          {hasAccess && (
+            <NavLink
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
+              to="script"
+              relative="path"
+            >
+              Script
+            </NavLink>
+          )}
 
           {hasAccess && (
             <NavLink
@@ -189,7 +191,7 @@ export default function CampaignScreen() {
           className={({ isActive, isPending }) =>
             handleNavlinkStyles(isActive, isPending)
           }
-          to={`${data[0].dial_type || 'call'}`}
+          to={`${data[0].dial_type || "call"}`}
           relative="path"
         >
           Join Campaign
