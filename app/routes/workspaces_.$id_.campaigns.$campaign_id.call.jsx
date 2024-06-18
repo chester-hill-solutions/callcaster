@@ -3,12 +3,13 @@ import { getSupabaseServerClientWithSession } from "../lib/supabase.server"
 import { QueueList } from "../components/CallScreen.QueueList";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
-import { TopBar } from "../components/CallScreen.TopBar";
 import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
 import { getNextContact } from "../lib/getNextContact";
-import useDebouncedSave from "../hooks/useDebouncedSave";
+import useDebouncedSave, { handleQuestionsSave } from "../hooks/useDebouncedSave";
 import useSupabaseRoom from "../hooks/useSupabaseRoom";
+import { useTwilioDevice } from "../hooks/useTwilioDevice";
+import { CheckCircleIcon } from "lucide-react";
 
 const limit = 30
 
@@ -19,9 +20,13 @@ const isRecent = (date) => {
 };
 
 export const loader = async ({ request, params }) => {
+
     const { campaign_id: id, id: workspaceId } = params;
     const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
     if (!serverSession) return redirect('/signin');
+    const { token } = await fetch(
+        `${process.env.BASE_URL}/api/token?id=${serverSession.user.id}`,
+    ).then((res) => res.json());
     const { data: campaign, error: campaignError } = await supabase.from('campaign').select().eq('id', id).single();
     const { data: campaignDetails, error: detailsError } = await supabase.from('live_campaign').select().eq('campaign_id', id).single();
     const { data: audiences, error: audiencesError } = await supabase.rpc('get_audiences_by_campaign', { selected_campaign_id: id });
@@ -38,7 +43,7 @@ export const loader = async ({ request, params }) => {
     const initalCallsList = attempts.flatMap(attempt => attempt.call);
     const initialRecentCall = initalCallsList.find((call) => call.contact_id === nextRecipient?.contact.id)
     const initialRecentAttempt = attempts.sort((a, b) => b.created_at - a.created_at).find((call) => call.contact_id === nextRecipient?.contact.id)
-    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue, contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt }, { headers });
+    return json({ campaign, attempts, user: serverSession.user, audiences, campaignDetails, workspaceId, queue: initialQueue, contacts, nextRecipient, initalCallsList, initialRecentCall, originalQueue: queue, initialRecentAttempt, token }, { headers });
 }
 
 export const action = async ({ request, params }) => {
@@ -71,8 +76,7 @@ export const action = async ({ request, params }) => {
 
 
 export default function Campaign() {
-    const { device: twilioDevice, supabase } = useOutletContext();
-    const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = twilioDevice;
+    const { supabase } = useOutletContext();
     const {
         campaign,
         attempts: initialAttempts,
@@ -86,9 +90,12 @@ export default function Campaign() {
         nextRecipient: initialNextRecipient,
         initalCallsList,
         initialRecentCall = {},
-        initialRecentAttempt
+        initialRecentAttempt,
+        token
     } = useLoaderData();
+    const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = useTwilioDevice(token);
     const [nextRecipient, setNextRecipient] = useState(initialNextRecipient);
+    const [questionContact, setQuestionContact] = useState(nextRecipient);
     const { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
         user,
         supabase,
@@ -103,14 +110,19 @@ export default function Campaign() {
         contacts,
         nextRecipient,
         setNextRecipient,
-        campaign_id:campaign.id
+        campaign_id: campaign.id
     });
     const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({ supabase, workspace: workspaceId, campaign: campaign.id, userId: user.id });
     const fetcher = useFetcher();
     const submit = useSubmit();
     const [groupByHousehold] = useState(true);
     const [update, setUpdate] = useState(recentAttempt?.result || {});
-    const [disposition, setDisposition] = useState(recentAttempt?.disposition || null);
+    const [disposition, setDisposition] = useState(recentAttempt?.disposition || recentAttempt?.result?.status || null);
+    const isDialing = activeCall?.parameters?.CallSid && !(recentAttempt.answered_at)
+    const isConnected = recentAttempt.answered_at && activeCall?.parameters?.CallSid
+    const isComplete = (recentAttempt.disposition || recentAttempt.result?.status)
+    const isPending = (!(recentAttempt.disposition || recentAttempt.result?.status)) && !activeCall?.parameters?.CallSid;
+
     const sortQueue = (queue) => {
         return [...queue].sort((a, b) => {
             if (a.attempts !== b.attempts) {
@@ -142,29 +154,37 @@ export default function Campaign() {
     const handleNextNumber = useCallback((skipHousehold = false) => {
         const nextContact = getNextContact(queue, householdMap, nextRecipient, groupByHousehold, skipHousehold);
         if (nextContact) {
-          setNextRecipient(nextContact);
-          const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
-          if (!isRecent(newRecentAttempt.created_at)) return nextContact;
-          const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
-          setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-          setUpdate(newRecentAttempt.update || {});
-          return nextContact;
+            setNextRecipient(nextContact);
+            const newRecentAttempt = attemptList.find(call => call.contact_id === nextContact.contact.id) || {};
+            if (!isRecent(newRecentAttempt.created_at)) {
+                setRecentAttempt({});
+                setUpdate({})
+                return nextContact
+            }
+            const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
+            setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
+            setUpdate(newRecentAttempt.update || {});
+            return nextContact;
         }
         return null;
-      }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
-    
+    }, [attemptList, callsList, setRecentAttempt, groupByHousehold, householdMap, queue, nextRecipient]);
+
     const switchToContact = (contact) => {
-        setNextRecipient(contact);
+        setQuestionContact(contact);
         const newRecentAttempt = attemptList.find(call => call.contact_id === contact.contact.id) || {};
+        if (!isRecent(newRecentAttempt.created_at)) {
+            setRecentAttempt({});
+            setUpdate({})
+            return contact
+        }
         const attemptCalls = newRecentAttempt ? callsList.filter((call) => call.outreach_attempt_id === newRecentAttempt.id) : [];
         setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
         setUpdate(newRecentAttempt.update || {});
-        setDisposition(newRecentAttempt.disposition || null);
     };
 
 
     const handleDialNext = () => {
-        if (activeCall || incomingCall || status !== 'Registered') {
+        if (activeCall?.parameters?.CallSid || incomingCall || status !== 'Registered') {
             return;
         }
         if (nextRecipient) {
@@ -206,7 +226,6 @@ export default function Campaign() {
         }
     };
 
-
     const handleQueueButton = () => {
         fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
             navigate: false,
@@ -217,6 +236,7 @@ export default function Campaign() {
         handleDequeue(nextRecipient);
         handleQueueButton();
         handleNextNumber(true);
+        setRecentAttempt({})
     }
     useEffect(() => {
         if (recentAttempt) {
@@ -224,13 +244,20 @@ export default function Campaign() {
             setDisposition(recentAttempt.disposition || null);
         }
     }, [recentAttempt]);
-    
-    useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);
+
+    useEffect(() => {
+        setQuestionContact(nextRecipient)
+    }, [nextRecipient])
+
+    useDebouncedSave(update, recentAttempt, submit, questionContact, campaign, workspaceId);
+
+    const handleQuickSave = () => {
+        handleQuestionsSave(update, recentAttempt, submit, questionContact, campaign, workspaceId)
+    }
     const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)]
 
     return (
         <div className="" style={{ padding: '24px', margin: "0 auto", width: "100%" }}>
-
             <div className="flex justify-evenly gap-4" style={{ justifyContent: 'space-evenly', alignItems: "start" }}>
                 <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
                     <CallArea {...{ nextRecipient, activeCall, recentCall, hangUp, handleDialNext, handleDequeueNext, disposition, setDisposition, recentAttempt }} />
@@ -265,13 +292,16 @@ export default function Campaign() {
                         {house?.map((contact) => {
                             return (
                                 <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
-                                    <div>{contact.contact.firstname} {contact.contact.surname}</div>
+                                    <div className="flex justify-between items-center flex-auto">
+                                        <div>{contact.contact.firstname} {contact.contact.surname}</div>
+                                        <div>{attemptList.find((attempt) => attempt.contact_id === contact.contact_id)?.result.status && <CheckCircleIcon size={"16px"} />}</div>
+                                    </div>
                                 </div>
                             )
                         })}
                     </div>
                 </div>
-                <CallQuestionnaire {...{ handleResponse, campaignDetails, update, nextRecipient }} />
+                <CallQuestionnaire {...{ handleResponse, campaignDetails, update, nextRecipient: questionContact, handleQuickSave }} />
                 <QueueList
                     {...{
                         householdMap,

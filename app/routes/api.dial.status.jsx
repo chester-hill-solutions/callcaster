@@ -14,21 +14,26 @@ export const action = async ({ request }) => {
     }
     try {
         const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, workspace').eq('sid', parsedBody.CallSid).single();
+        if (callError) throw callError
         const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
-        const { data: { signedUrl }, error: voicemailError } = await supabase.storage.from(`workspaceAudio`).createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600)
+        if (campaignError) throw campaignError
+        const { data, error: voicemailError } = campaign.voicemail_file ? await supabase.storage.from(`workspaceAudio`).createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600) : {data:null, error:null}
+        if (voicemailError) throw voicemailError
         const call = twilio.calls(parsedBody.CallSid);
         const answeredBy = formData.get('AnsweredBy');
         const callStatus = formData.get('CallStatus')
         if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
             try {
-                if (signedUrl) {
+                if (data && data.signedUrl) {
                     const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'voicemail' }).eq('id', dbCall.outreach_attempt_id).select();
+                    if (outreachError) throw outreachError
                     call.update({
-                        twiml: `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`
+                        twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
                     })
                     return json({ success: true });
                 } else {
                     const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'no-answer' }).eq('id', dbCall.outreach_attempt_id).select();
+                    if (outreachError) throw outreachError
                     call.update({
                         twiml: `<Response><Hangup/></Response>`
                     })
