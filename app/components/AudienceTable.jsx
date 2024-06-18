@@ -118,12 +118,12 @@ const AudienceTable = ({
         }
 
         let contact = {
+          external_id: undefined,
           firstname: undefined,
           surname: undefined,
           phone: undefined,
           email: undefined,
           address: undefined,
-          external_id: undefined
         };
 
         if (parsedHeaders.name.length != null) {
