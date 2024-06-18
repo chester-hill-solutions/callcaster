@@ -123,6 +123,7 @@ const AudienceTable = ({
           phone: undefined,
           email: undefined,
           address: undefined,
+          external_id: undefined
         };
 
         if (parsedHeaders.name.length != null) {
