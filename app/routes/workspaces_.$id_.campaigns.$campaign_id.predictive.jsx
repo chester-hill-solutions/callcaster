@@ -39,7 +39,6 @@ export const loader = async ({ request, params }) => {
         console.log(errors);
         throw (errors)
     }
-
     const initialQueue = queue?.map(q => ({ ...q, contact: contacts?.find(contact => contact.id === q.contact_id) }));
     const nextRecipient = initialQueue[0] || null;
     const initalCallsList = attempts.flatMap(attempt => attempt.call);
