@@ -13,9 +13,11 @@ import { PlusIcon } from "~/components/Icons";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
+  forceTokenRefresh,
+  getUserRole,
   getWorkspaceCampaigns,
   getWorkspaceInfo,
-  updateUserWorkspaceAccess,
+  updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -35,7 +37,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  updateUserWorkspaceAccess({ workspaceId, supabaseClient });
+  updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
+  const userRole = getUserRole({ serverSession, workspaceId });
+  if (userRole == null) {
+    console.log("~~~~~~~~~~Refreshing JWT~~~~~~~~~~~");
+    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
+      serverSession,
+      supabaseClient,
+    });
+  }
 
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
@@ -68,18 +78,6 @@ export default function Workspace() {
 
   //   return 0;
   // });
-
-  function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
-    if (isActive) {
-      return "border-b-2 border-solid border-zinc-600 bg-brand-primary p-2 text-xl font-semibold text-white hover:bg-slate-300 hover:text-slate-800 dark:text-white";
-    }
-
-    if (isPending) {
-      return "border-b-2 border-solid border-zinc-600 bg-brand-tertiary p-2 text-xl font-semibold text-black hover:bg-slate-300 hover:text-slate-800 dark:text-white";
-    }
-
-    return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
-  }
 
   function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
     if (isActive) {

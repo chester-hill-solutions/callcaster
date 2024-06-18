@@ -16,6 +16,7 @@ import { CampaignSettings } from "../components/CampaignSettings";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
+import { campaignTypeText } from "~/lib/utils";
 
 const formatTime = (milliseconds) => {
   const totalSeconds = Math.floor(milliseconds / 1000);
@@ -121,9 +122,9 @@ export default function CampaignScreen() {
     mediaData,
     hasAccess,
     outcomes,
-    queue
+    queue,
   } = useLoaderData<typeof loader>();
-          const outcomeKeys = outcomes.reduce((acc, outcome) => {
+  const outcomeKeys = outcomes.reduce((acc, outcome) => {
     Object.keys(outcome?.result).forEach((key) => {
       if (!acc.includes(key)) {
         acc.push(key);
@@ -144,15 +145,15 @@ export default function CampaignScreen() {
     <div className="flex h-full w-full flex-col">
       <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
         <div className="flex gap-2">
-          
           <NavLink
             className={({ isActive, isPending }) =>
               handleNavlinkStyles(isActive, isPending)
             }
             to="."
             relative="path"
+            end
           >
-            Campaign
+            Dashboard
           </NavLink>
           <NavLink
             className={({ isActive, isPending }) =>
@@ -176,9 +177,14 @@ export default function CampaignScreen() {
             </NavLink>
           )}
         </div>
-        <h3 className="font-Zilla-Slab text-3xl font-semibold">
-          {data[0].title}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-Zilla-Slab text-3xl font-semibold">
+            {data[0].title}
+          </h3>
+          <p className="flex h-full items-center justify-center rounded-sm bg-zinc-300 px-2 py-1 font-semibold dark:bg-zinc-500 dark:text-white">
+            {campaignTypeText(data[0].type)}
+          </p>
+        </div>
         <NavLink
           className={({ isActive, isPending }) =>
             handleNavlinkStyles(isActive, isPending)
@@ -197,7 +203,6 @@ export default function CampaignScreen() {
         </div>
       )}
       <Outlet context={{ audiences }} />
-   
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 export default function WorkspaceNav({ workspace, isInChildRoute }) {
   function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
     if (isActive) {
-      return "rounded-md border-2 border-brand-primary bg-brand-primary text-white px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
+      return "rounded-md border-2 border-brand-primary bg-brand-primary text-white px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
     }
 
     if (isPending) {
@@ -15,7 +15,7 @@ export default function WorkspaceNav({ workspace, isInChildRoute }) {
   }
 
   return (
-    <div className="mb-2 flex items-center text-black">
+    <div className="mb-2 flex items-center text-black dark:text-white">
       <div className="flex flex-1 justify-between">
         <div className="flex gap-4">
           <NavLink

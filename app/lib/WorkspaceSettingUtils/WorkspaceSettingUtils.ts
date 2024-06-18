@@ -277,3 +277,34 @@ export async function handleTransferWorkspace(
     { headers },
   );
 }
+
+export async function handleDeleteWorkspace({
+  workspaceId,
+  supabaseClient,
+  headers,
+}: {
+  workspaceId: string;
+  supabaseClient: SupabaseClient<Database>;
+  headers: Headers;
+}) {
+  // const response = await supabaseClient
+  //   .from("workspace")
+  //   .delete()
+  //   .eq("id", workspaceId);
+
+  // console.log("Delete Workspace: ", response);
+
+  const { data: deleteWorkspaceData, error: deleteWorkspaceError } =
+    await supabaseClient
+      .from("workspace")
+      .delete()
+      .eq("id", workspaceId)
+      .select();
+
+  if (deleteWorkspaceError) {
+    console.log("Error deleting workspace: ", deleteWorkspaceError);
+    return json({ data: null, error: deleteWorkspaceError }, { headers });
+  }
+
+  return redirect("/workspaces");
+}

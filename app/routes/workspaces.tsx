@@ -3,7 +3,7 @@ import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "~/components/ui/button";
-import { createNewWorkspace } from "~/lib/database.server";
+import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 import { Toaster, toast } from "sonner";
@@ -18,6 +18,8 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { formatTableText } from "~/lib/utils";
+import { Session } from "@supabase/supabase-js";
+import { jwtDecode } from "jwt-decode";
 
 //************LOADER************/
 export const loader = async ({ request }: { request: Request }) => {
@@ -94,7 +96,7 @@ export const loader = async ({ request }: { request: Request }) => {
 
 //************ACTION************/
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers } =
+  const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   const formData = await request.formData();
@@ -123,6 +125,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (newWorkspaceId) {
+    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
+      supabaseClient,
+      serverSession,
+    });
     return redirect(`/workspaces/${newWorkspaceId}`, { headers });
   }
 
@@ -131,8 +137,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 //************COMPONENT************/
 export default function Workspaces() {
-  const { workspaces, userId, workspaceAccessData } =
-    useLoaderData<typeof loader>();
+  const { workspaces, userId, error } = useLoaderData<typeof loader>();
   // console.log(workspaces);
 
   const actionData = useActionData<typeof action>();
@@ -159,7 +164,6 @@ export default function Workspaces() {
   //   }
   // }
 
-
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
@@ -176,26 +180,10 @@ export default function Workspaces() {
               className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
-                <FaPlus
-                  size="72px"
-                  color="white"
-                  style={{
-                    border: "2px solid white",
-                    borderRadius: "50%",
-                    padding: "0.75rem",
-                  }}
-                />
+                <FaPlus size="72px" color="white" />
               </div>
               <div className="block dark:hidden">
-                <FaPlus
-                  size="72px"
-                  color="black"
-                  style={{
-                    border: "2px solid black",
-                    borderRadius: "50%",
-                    padding: "0.75rem",
-                  }}
-                />
+                <FaPlus size="72px" color="black" />
               </div>
             </Button>
           </DialogTrigger>

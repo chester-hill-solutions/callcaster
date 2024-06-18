@@ -1,3 +1,4 @@
+import { ActionFunctionArgs, json } from "@remix-run/node";
 import {
   Form,
   Link,
@@ -5,19 +6,9 @@ import {
   useLocation,
   useOutletContext,
 } from "@remix-run/react";
-import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import { useEffect } from "react";
 import {
   handleNewAudience,
   handleNewCampaign,

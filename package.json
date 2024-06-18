@@ -30,7 +30,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
-    "csv-parser": "^3.0.0",
+    "csv-parse": "^5.5.6",
     "dotenv": "^16.4.4",
     "isbot": "^4.1.0",
     "jwt-decode": "^4.0.0",
