@@ -151,7 +151,7 @@ export default function Campaign() {
     const handleResponse = ({ column, value }) => setUpdate((curr) => ({ ...curr, [column]: value }));
 
     const handleDialNext = () => {
-        if (activeCall?.parameters.CallSid || incomingCall || status !== 'Registered') {
+        if (activeCall?.parameters?.CallSid || incomingCall || status !== 'Registered') {
             return;
         }
         if (nextRecipient) {
@@ -160,7 +160,7 @@ export default function Campaign() {
     };
 
     const handlePowerDial = () => {
-        if (activeCall?.parameters.CallSid || incomingCall || status !== 'Registered') {
+        if (activeCall?.parameters?.CallSid || incomingCall || status !== 'Registered') {
             return;
         }
         begin();
