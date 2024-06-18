@@ -224,7 +224,6 @@ export default function CampaignSettingsScriptQuestionBlock({
       ...curr,
       options: [...curr.options.filter((opt) => opt.value !== option.value)],
     }));
-    removeQuestion(question.id);
   };
 
   const handleIconChange = ({ index, iconName }) => {
