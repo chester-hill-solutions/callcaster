@@ -40,7 +40,7 @@ const CallArea = ({ nextRecipient, activeCall = null, recentCall = {}, hangUp, h
             border: '3px solid #BCEBFF',
             borderRadius: "20px",
             marginBottom: "2rem",
-            background: '#F1F1F1',
+            backgroundColor: 'hsl(var(--card))',
             minHeight: "300px",
             alignItems: "stretch",
             flexDirection: "column",

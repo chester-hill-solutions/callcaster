@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 const CallQuestionnaire = ({ handleResponse: intentAction, campaignDetails, update, nextRecipient: contact, handleQuickSave }) => {
     
     return (
-        <div style={{ position: "relative", minWidth:"40%", flex:"1 1 auto", border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem", background: "#f1f1f1", boxShadow: "3px 5px 0  rgba(50,50,50,.6)" }} className="flex-col flex">
+        <div style={{ position: "relative", minWidth:"40%", flex:"1 1 auto", border: '3px solid #BCEBFF', borderRadius: "20px", marginBottom: "2rem", backgroundColor: 'hsl(var(--card))', boxShadow: "3px 5px 0  rgba(50,50,50,.6)" }} className="flex-col flex">
             <div style={{
                 display: 'flex',
                 alignItems: "center",
