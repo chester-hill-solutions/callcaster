@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 
-export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id }) {
+export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false }) {
     const [queue, setQueue] = useState(init.queue);
     const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue)
     const [callsList, setCalls] = useState(init.callsList);
@@ -87,7 +87,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         if (payload.new.status === 'dequeued') {
             setQueue((currentQueue) => {
                 const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
-                if (nextRecipient && nextRecipient.id === payload.new.contact_idid) {
+                if (nextRecipient && nextRecipient.id === payload.new.contact_id) {
                     setIsNextRecipientSet(false);
                     if (filteredQueue.length > 0) {
                         setNextRecipient(filteredQueue[0]);

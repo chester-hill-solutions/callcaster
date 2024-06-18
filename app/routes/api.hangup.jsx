@@ -9,6 +9,7 @@ export const action = async ({ request }) => {
 
     twilio.calls(data.callSid).update({ twiml: `<Response><Hangup/></Response>` })
         .catch(e => (console.error(e)));
+    
     return json({ success: true });
 
 };

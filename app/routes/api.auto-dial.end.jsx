@@ -8,7 +8,7 @@ export const action = async ({ request }) => {
 
     try {
         const conferences = await twilio.conferences.list({ friendlyName: serverSession.user.id, status: ['in-progress'] });
-
+        
         await Promise.all(conferences.map(async (conf) => {
             try {
                 await twilio.conferences(conf.sid).update({ status: 'completed' });
