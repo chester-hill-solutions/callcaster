@@ -102,10 +102,9 @@ export async function getWorkspaceCampaigns({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient.rpc(
-    "get_campaigns_by_workspace",
-    { workspace_id: workspaceId },
-  );
+  const { data, error } = await supabaseClient
+    .rpc("get_campaigns_by_workspace", { workspace_id: workspaceId })
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.log("Error on function getWorkspaceCampaigns");
@@ -181,7 +180,7 @@ export function getUserRole({ serverSession, workspaceId }) {
   return userRole;
 }
 
-export async function updateUserWorkspaceAccess({
+export async function updateUserWorkspaceAccessDate({
   workspaceId,
   supabaseClient,
 }: {
@@ -198,4 +197,24 @@ export async function updateUserWorkspaceAccess({
   }
 
   return;
+}
+
+export async function forceTokenRefresh({
+  supabaseClient,
+  serverSession,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  serverSession: Session;
+}) {
+  // const refreshToken = serverSession.refresh_token;
+  const { data: refreshData, error: refreshError } =
+    await supabaseClient.auth.refreshSession();
+
+  if (refreshError) {
+    console.log("Error refreshing access token", refreshError);
+    return { data: null, error: refreshError };
+  }
+
+  console.log("\nREFRESH");
+  return { data: refreshData, error: null };
 }

@@ -1,14 +1,17 @@
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { Outlet, useLoaderData, useOutletContext } from "@remix-run/react";
+import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
-export const loader = ({ request, params }) => {
-  const { selected } = params;
-
-  return json({ selected });
+export const loader = async ({ request, params }) => {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession) {
+    return redirect("/signin", { headers });
+  }
+  return null;
 };
 
 export default function SelectedType() {
-  const { selected } = useLoaderData();
-  const { selectedTable, audiences, campaigns, contacts } = useOutletContext();
-  return <Outlet context={{ selectedTable, audiences, contacts, selected }} />;
+  const { selectedTable, audiences, campaigns } = useOutletContext();
+  return <Outlet context={{ selectedTable, audiences, campaigns }} />;
 }

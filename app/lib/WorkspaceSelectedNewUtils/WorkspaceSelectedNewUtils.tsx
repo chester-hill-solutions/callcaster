@@ -31,7 +31,9 @@ export async function handleNewAudience({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/audiences`);
+  return redirect(
+    `/workspaces/${workspaceId}/audiences/${createAudienceData.id}`,
+  );
 }
 
 export async function handleNewCampaign({
@@ -41,6 +43,9 @@ export async function handleNewCampaign({
   headers,
 }) {
   const newCampaignName = formData.get("campaign-name") as string;
+  const newCampaignType = formData.get("campaign-type") as string;
+  console.log("Campaign Type: ", newCampaignType);
+
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
     .insert({
@@ -69,5 +74,5 @@ export async function handleNewCampaign({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/campaigns`);
+  return redirect(`/workspaces/${workspaceId}/campaigns/${campaignData.id}`);
 }

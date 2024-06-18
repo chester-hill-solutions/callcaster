@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 
-export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient }) {
+export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false }) {
     const [queue, setQueue] = useState(init.queue);
+    const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue)
     const [callsList, setCalls] = useState(init.callsList);
     const [attemptList, setAttempts] = useState(init.attempts);
     const [recentCall, setRecentCall] = useState(init.recentCall);
@@ -34,10 +35,11 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
 
     const updateAttempts = useCallback((payload) => {
         if (payload.new.user_id !== user.id) return;
+        if (payload.new.campaign_id !== campaign_id) return;
         const calls = callsList.filter(call => (call.outreach_attempt_id === payload.new.id) && (call.direction !== 'outbound-api'));
         let updatedAttempt = { ...payload.new, call: calls };
         if (calls.length && calls[0].status && !updatedAttempt.result.status) {
-            updatedAttempt.result = { ...(updatedAttempt.result && updatedAttempt.result), status: calls[0].status };
+            updatedAttempt.result = { ...(updatedAttempt.result && {...updatedAttempt.result, status: calls[0].status }), status: calls[0].status };
         }
 
         setAttempts((currentAttempts) => {
@@ -58,7 +60,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         if (attemptId) {
             setAttempts((currentAttempts) => {
                 const updatedAttempts = currentAttempts.map(item => {
-                    if (item.id === attemptId && item.user_id === user.id) { // Add check for user ID
+                    if (item.id === attemptId && item.user_id === user.id) {
                         const updatedItem = {
                             ...item,
                             call: [...(item.call || []), updatedCall],
@@ -72,19 +74,32 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                     return item;
                 });
                 return updatedAttempts;
-            });
-            setCalls((currentCalls) => [...currentCalls, updatedCall]);
-            setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
+                });
+                setCalls((currentCalls) => [...currentCalls, updatedCall]);
+                setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
+                setNextRecipient(queue.find((contact) => updatedCall.contact_id === contact.contact.id));
         } else {
             setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
         }
-    }, [user.id, recentAttempt?.contact?.id, recentCall]);
+    }, [recentAttempt?.contact?.id, recentCall, queue, setNextRecipient, user.id]);
     
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
             setQueue((currentQueue) => {
                 const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
-                if (nextRecipient && nextRecipient.id === payload.new.contact_idid) {
+                if (nextRecipient && nextRecipient.id === payload.new.contact_id) {
+                    setIsNextRecipientSet(false);
+                    if (filteredQueue.length > 0) {
+                        setNextRecipient(filteredQueue[0]);
+                    } else {
+                        setNextRecipient(null);
+                    }
+                }
+                return filteredQueue;
+            });
+            setPredictiveQueue((currentQueue) => {
+                const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
+                if (nextRecipient && nextRecipient.id === payload.new.contact_id) {
                     setIsNextRecipientSet(false);
                     if (filteredQueue.length > 0) {
                         setNextRecipient(filteredQueue[0]);

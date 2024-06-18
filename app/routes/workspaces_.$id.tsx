@@ -1,3 +1,4 @@
+import { LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
   redirect,
@@ -5,20 +6,27 @@ import {
   useNavigate,
   Link,
   Outlet,
+  NavLink,
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa6";
 import { PlusIcon } from "~/components/Icons";
+import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
+  forceTokenRefresh,
+  getUserRole,
   getWorkspaceCampaigns,
   getWorkspaceInfo,
-  updateUserWorkspaceAccess,
+  updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
-export const loader = async ({ request, params }) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
+  if (!serverSession) {
+    return redirect("/signin", { headers });
+  }
 
   const workspaceId = params.id;
   const { data: workspace, error } = await getWorkspaceInfo({
@@ -32,7 +40,15 @@ export const loader = async ({ request, params }) => {
     }
   }
 
-  updateUserWorkspaceAccess({ workspaceId, supabaseClient });
+  updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
+  const userRole = getUserRole({ serverSession, workspaceId });
+  if (userRole == null) {
+    console.log("~~~~~~~~~~Refreshing JWT~~~~~~~~~~~");
+    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
+      serverSession,
+      supabaseClient,
+    });
+  }
 
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
@@ -46,67 +62,48 @@ export const loader = async ({ request, params }) => {
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-    return json({ workspace, audiences, campaigns }, { headers });
+    return json({ workspace, audiences, campaigns, userRole }, { headers });
   } catch (error) {
     console.log(error);
-    return json(error, 500);
+    return json({ userRole, error }, 500);
   }
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns } = useLoaderData();
+  const { workspace, audiences, campaigns, userRole } = useLoaderData();
 
-  campaigns.sort((campaign1, campaign2) => {
-    if (campaign1.created_at < campaign2.created_at) {
-      return 1;
-    } else if (campaign1.created_at > campaign2.created_at) {
-      return -1;
+  // campaigns.sort((campaign1, campaign2) => {
+  //   if (campaign1.created_at < campaign2.created_at) {
+  //     return 1;
+  //   } else if (campaign1.created_at > campaign2.created_at) {
+  //     return -1;
+  //   }
+
+  //   return 0;
+  // });
+
+  function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
+    if (isActive) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-primary p-2 text-xl font-semibold text-white hover:bg-slate-300 hover:text-slate-800 dark:text-white";
     }
 
-    return 0;
-  });
+    if (isPending) {
+      return "border-b-2 border-solid border-zinc-600 bg-brand-tertiary p-2 text-xl font-semibold text-black hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+    }
+
+    return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
+  }
 
   return (
-    <main className="mx-auto mt-8 h-full w-[80%] items-center">
-      <div className="mb-2 flex items-center">
-        <div className="flex flex-1 justify-between">
-          <div className="flex gap-4">
-            <Button asChild variant="outline">
-              <Link
-                to={`./audios`}
-                relative="path"
-                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold "
-              >
-                Audio
-              </Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link
-                to={`./audiences`}
-                relative="path"
-                className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
-              >
-                Audiences
-              </Link>
-            </Button>
-          </div>
-          <h3 className="absolute left-1/2 translate-x-[-50%] font-Tabac-Slab text-2xl">
-            {workspace?.name}
-          </h3>
-          <Button asChild variant="outline">
-            <Link
-              to={`./settings`}
-              relative="path"
-              className="border-2 border-zinc-300 font-Zilla-Slab text-xl font-semibold"
-            >
-              Workspace Settings
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <main className="mx-auto h-full w-[80%] items-center py-8">
+      <WorkspaceNav
+        workspace={workspace}
+        isInChildRoute={false}
+        userRole={userRole}
+      />
       <div id="campaigns-container" className="flex border-2 border-zinc-600">
         <div
-          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-cyan-50  dark:bg-transparent"
+          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-brand-secondary  dark:bg-transparent"
           style={{ scrollbarWidth: "none" }}
         >
           <Link
@@ -117,26 +114,26 @@ export default function Workspace() {
             <FaPlus size="20px" />
           </Link>
           {campaigns?.map((row, i) => (
-            <Link
+            <NavLink
               to={`campaigns/${row.id}`}
               key={row.id}
-              className="border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white"
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
             >
               <h3 className="capitalize">
                 {row.title || `Unnamed campaign ${i + 1}`}
               </h3>
-            </Link>
+            </NavLink>
           ))}
         </div>
-        <div className="min-h-3/4 flex w-full flex-auto dark:bg-zinc-700">
-          <div className="flex flex-auto flex-col">
-            <Outlet
-              context={{
-                audiences,
-                campaigns,
-              }}
-            />
-          </div>
+        <div className="min-h-3/4 flex w-full flex-auto overflow-hidden dark:bg-zinc-700">
+          <Outlet
+            context={{
+              audiences,
+              campaigns,
+            }}
+          />
         </div>
       </div>
     </main>

@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "../lib/supabase.server";
 export const action = async ({ request }) => {
     const { supabaseClient: supabase } = createSupabaseServerClient(request);
     const { campaign_id, title, status, type, dial_type, group_household_queue, caller_id, start_date, end_date, voicemail_file, questions, workspace } = await request.json();
-    let tableKey = type === 'live_call' ? 'live_campaign' : null;
+    let tableKey = type === 'live_call' ? 'live_campaign' : 'live_campaign';
 
     try {
         const { data: campaign, error: campaignError } = await supabase

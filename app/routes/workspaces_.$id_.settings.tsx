@@ -17,6 +17,7 @@ import {
   handleAddUser,
   handleDeleteSelf,
   handleDeleteUser,
+  handleDeleteWorkspace,
   handleInviteCaller,
   handleTransferWorkspace,
   handleUpdateUser,
@@ -97,6 +98,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         supabaseClient,
         headers,
       );
+    }
+    case "deleteWorkspace": {
+      return handleDeleteWorkspace({ workspaceId, supabaseClient, headers });
     }
     default: {
       break;
@@ -333,6 +337,14 @@ export default function WorkspaceSettings() {
         </p> */}
         {hasAccess ? addUserTabs : callerSelfDeleteForm}
       </div>
+      {/* {userRole === MemberRole.Owner && (
+        <Form method="POST" className="w-full">
+          <input type="hidden" name="formName" value="deleteWorkspace" />
+          <Button variant={"destructive"} className="w-full">
+            Delete This Workspace
+          </Button>
+        </Form>
+      )} */}
       <Toaster richColors />
     </main>
   );

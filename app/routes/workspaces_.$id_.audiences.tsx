@@ -7,9 +7,11 @@ import {
   useNavigate,
 } from "@remix-run/react";
 import { mediaColumns } from "~/components/Media/columns";
+import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { audienceColumns } from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -19,10 +21,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const workspaceId = params.id;
   if (workspaceId == null) {
     return json(
-      { workspace: null, error: "Workspace does not exist" },
+      { workspace: null, error: "Workspace does not exist", userRole: null },
       { headers },
     );
   }
+
+  const userRole = getUserRole({ serverSession, workspaceId });
 
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
@@ -37,19 +41,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (workspaceError) {
     return json(
-      { workspace: null, error: workspaceError.message },
+      { workspace: null, error: workspaceError.message, userRole },
       { headers },
     );
   }
 
   return json(
-    { audienceData, workspace: workspaceData, error: null },
+    { audienceData, workspace: workspaceData, error: null, userRole },
     { headers },
   );
 }
 
 export default function AudienceChart() {
-  const { audienceData, workspace, error } = useLoaderData<typeof loader>();
+  const { audienceData, workspace, error, userRole } =
+    useLoaderData<typeof loader>();
   const navigate = useNavigate();
   //   const actionData = useActionData<typeof action>();
 
@@ -57,6 +62,11 @@ export default function AudienceChart() {
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
+      <WorkspaceNav
+        workspace={workspace}
+        isInChildRoute={true}
+        userRole={userRole}
+      />
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null ? `${workspace?.name} Audiences` : "No Workspace"}
@@ -81,19 +91,18 @@ export default function AudienceChart() {
           {error}
         </h4>
       )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Media to this Workspace!
-        </h4>
-      )}
 
-      {audienceData != null && (
+      {audienceData != null ? (
         <DataTable
           className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
           columns={audienceColumns}
           data={audienceData}
           onRowClick={(item) => navigate(`${item?.id}`)}
         />
+      ) : (
+        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
+          Add An Audience To This Workspace
+        </h4>
       )}
     </main>
   );

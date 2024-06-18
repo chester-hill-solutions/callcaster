@@ -2,22 +2,24 @@ import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
-import { FaUserPlus } from "react-icons/fa6";
 import { Button } from "~/components/ui/button";
-import { createNewWorkspace, getUserWorkspaces } from "~/lib/database.server";
+import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
+import { Toaster, toast } from "sonner";
+import { handleRoleTextStyles } from "~/components/Workspace/TeamMember";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogClose,
 } from "~/components/ui/dialog";
-import { toast, Toaster } from "sonner";
 import { formatTableText } from "~/lib/utils";
+import { Session } from "@supabase/supabase-js";
+import { jwtDecode } from "jwt-decode";
 
 //************LOADER************/
 export const loader = async ({ request }: { request: Request }) => {
@@ -28,26 +30,73 @@ export const loader = async ({ request }: { request: Request }) => {
     return redirect("/signin", { headers });
   }
 
-  const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
-  const { data: workspaceAccessData, error: workspaceAccessError } =
-    await supabaseClient
-      .from("workspace_users")
-      .select("workspace_id, last_accessed")
-      .eq("user_id", serverSession.user.id)
-      .order("last_accessed", { ascending: false });
+  const userId = serverSession.user.id;
+  const { data: workspaces, error: workspacesError } = await supabaseClient
+    .from("workspace_users")
+    .select("last_accessed, role, workspace(id, name)")
+    .eq("user_id", userId)
+    .order("last_accessed", { ascending: false });
+
+  if (workspacesError) {
+    console.log(workspacesError);
+    return json(
+      { workspaces: null, userId: userId, error: workspacesError },
+      { headers },
+    );
+  }
+
+  // const { data: workspaces } = await getUserWorkspaces({ supabaseClient });
+  // const { data: workspaceAccessData, error: workspaceAccessError } =
+  //   await supabaseClient
+  //     .from("workspace_users")
+  //     .select("workspace_id, last_accessed")
+  //     .eq("user_id", serverSession.user.id)
+  //     .order("last_accessed", { ascending: false });
+
+  // if (workspaceAccessError) {
+  //   return json(
+  //     {
+  //       workspaces: null,
+  //       userId: serverSession.user.id,
+  //       error: workspaceAccessError,
+  //     },
+  //     { headers },
+  //   );
+  // }
+
+  // const workspaces = [];
+  // for (let workspaceUser of workspaceAccessData) {
+  //   const { data: workspace, error: workspaceError } = await supabaseClient
+  //     .from("workspace")
+  //     .select()
+  //     .eq("id", workspaceUser.workspace_id)
+  //     .single();
+
+  //   if (workspaceError) {
+  //     return json(
+  //       {
+  //         workspaces: null,
+  //         userId: serverSession.user.id,
+  //         error: workspaceError,
+  //       },
+  //       { headers },
+  //     );
+  //   }
+  //   workspaces.push(workspace);
+  // }
 
   // console.log("Data: ", workspaceAccessData);
   // console.log("Error: ", workspaceAccessError);
 
   return json(
-    { workspaces, userId: serverSession.user, workspaceAccessData },
+    { workspaces: workspaces, userId: userId, error: null },
     { headers },
   );
 };
 
 //************ACTION************/
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers } =
+  const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   const formData = await request.formData();
@@ -76,6 +125,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (newWorkspaceId) {
+    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
+      supabaseClient,
+      serverSession,
+    });
     return redirect(`/workspaces/${newWorkspaceId}`, { headers });
   }
 
@@ -84,8 +137,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 //************COMPONENT************/
 export default function Workspaces() {
-  const { workspaces, userId, workspaceAccessData } =
-    useLoaderData<typeof loader>();
+  const { workspaces, userId, error } = useLoaderData<typeof loader>();
   // console.log(workspaces);
 
   const actionData = useActionData<typeof action>();
@@ -96,22 +148,22 @@ export default function Workspaces() {
   }, [actionData]);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
-  console.log("Unsorted: ", workspaces);
-  if (workspaces != null) {
-    for (let i = 0; i < workspaceAccessData.length; i++) {
-      if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
-        continue;
-      }
 
-      const temp = workspaces[i];
-      const oldIndex = workspaces.findIndex(
-        (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
-      );
-      workspaces[i] = workspaces[oldIndex];
-      workspaces[oldIndex] = temp;
-    }
-  }
-  console.log("Sorted? ", workspaces);
+  // if (workspaces != null) {
+  //   for (let i = 0; i < workspaceAccessData.length; i++) {
+  //     if (workspaceAccessData[i].workspace_id === workspaces[i].id) {
+  //       continue;
+  //     }
+
+  //     const temp = workspaces[i];
+  //     const oldIndex = workspaces.findIndex(
+  //       (workspace) => workspace.id === workspaceAccessData[i].workspace_id,
+  //     );
+  //     workspaces[i] = workspaces[oldIndex];
+  //     workspaces[oldIndex] = temp;
+  //   }
+  // }
+
   return (
     <main className="mx-auto flex h-full w-full flex-col items-center gap-16 py-16">
       <h1 className="text-center font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
@@ -119,35 +171,19 @@ export default function Workspaces() {
       </h1>
       <div
         id="workspaces-grid"
-        className="grid auto-rows-auto grid-cols-5 items-start gap-4"
+        className="auto-rows-[minmax(fit-content, auto)] grid grid-cols-[repeat(5,_minmax(50px,_200px))] items-start gap-4"
       >
         <Dialog>
-          <DialogTrigger>
+          <DialogTrigger className="h-full">
             <Button
               variant="outline"
-              className="h-full min-h-fit w-full min-w-60 border-2 border-black px-4 py-8 dark:border-white"
+              className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
             >
               <div className="hidden dark:block">
-                <FaPlus
-                  size="72px"
-                  color="white"
-                  style={{
-                    border: "2px solid white",
-                    borderRadius: "50%",
-                    padding: "0.75rem",
-                  }}
-                />
+                <FaPlus size="72px" color="white" />
               </div>
               <div className="block dark:hidden">
-                <FaPlus
-                  size="72px"
-                  color="black"
-                  style={{
-                    border: "2px solid black",
-                    borderRadius: "50%",
-                    padding: "0.75rem",
-                  }}
-                />
+                <FaPlus size="72px" color="black" />
               </div>
             </Button>
           </DialogTrigger>
@@ -180,7 +216,7 @@ export default function Workspaces() {
                 />
               </label>
 
-              <input type="hidden" name="userId" value={userId.id} />
+              <input type="hidden" name="userId" value={userId} />
               {/* <p className="flex items-center gap-4 font-bold">
                 Invite Workspace Members:{" "}
                 <Button className="" type="button">
@@ -209,18 +245,26 @@ export default function Workspaces() {
           </DialogContent>
         </Dialog>
         {workspaces != null &&
-          workspaces.map((workspace) => (
-            <Link
-              to={`/workspaces/${workspace.id}`}
-              key={workspace.id}
-              className="flex h-full min-w-60 flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
-              transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
-            >
-              <h5 className="font-Zilla-Slab text-2xl font-semibold">
-                {formatTableText(workspace.name)}
-              </h5>
-            </Link>
-          ))}
+          workspaces.map((workspaceUser) => {
+            const workspace = workspaceUser.workspace;
+            return (
+              <Link
+                to={`/workspaces/${workspace.id}`}
+                key={workspace.id}
+                className="flex h-full flex-col items-center justify-center  rounded-md border-2 border-black bg-brand-secondary px-4 py-8 text-center text-black 
+        transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+              >
+                <h5 className="max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
+                  {formatTableText(workspace.name)}
+                </h5>
+                <p
+                  className={`${handleRoleTextStyles(workspaceUser.role)} text-xl capitalize`}
+                >
+                  {workspaceUser.role}
+                </p>
+              </Link>
+            );
+          })}
       </div>
       <Toaster richColors />
     </main>

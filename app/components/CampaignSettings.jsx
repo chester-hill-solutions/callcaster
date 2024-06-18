@@ -1,8 +1,8 @@
-import { useReducer, useEffect, useState } from "react";
+import { useEffect, useState, useReducer } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
-import { deepEqual } from "~/lib/utils";
+import { campaignTypeText, deepEqual } from "~/lib/utils";
 
 const initialState = (data, workspace, campaign_id) => ({
   campaign_id,
@@ -74,7 +74,7 @@ const reducer = (state, action) => {
 const CampaignSettings = ({
   campaign_id,
   data,
-  audiences,
+  audiences = [],
   mediaData,
   workspace,
 }) => {
@@ -154,8 +154,11 @@ const CampaignSettings = ({
   }, [campaign_id, data, workspace]);
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4">
-      <div className="flex justify-between">
+    <div
+      id="campaignSettingsContainer"
+      className="flex h-full flex-col gap-4 p-4"
+    >
+      {/* <div className="flex justify-between">
         <h3 className="font-Zilla-Slab text-3xl font-bold">
           {campaignDetails.title}
         </h3>
@@ -164,7 +167,7 @@ const CampaignSettings = ({
             SAVE
           </Button>
         )}
-      </div>
+      </div> */}
       <div className="flex flex-col gap-2">
         <div className="flex justify-start gap-2">
           <TextInput
@@ -191,7 +194,7 @@ const CampaignSettings = ({
             ]}
             className={"flex flex-col"}
           />
-          <Dropdown
+          {/* <Dropdown
             name="type"
             disabled
             label={"Campaign Type"}
@@ -207,7 +210,18 @@ const CampaignSettings = ({
               { value: "live_call", label: "Live Call" },
             ]}
             className={"flex flex-col"}
-          />
+          /> */}
+          <div className="flex flex-col">
+            <p id="campaign-details-label" className="">
+              Campaign Type
+            </p>
+            <p
+              id="campaign-details-value"
+              className="flex h-full items-center justify-center rounded-sm bg-zinc-300 font-semibold dark:bg-zinc-600 dark:text-white"
+            >
+              {campaignTypeText(campaignDetails.type)}
+            </p>
+          </div>
           <Dropdown
             name="voicemail"
             label={"Voicemail File"}
@@ -225,7 +239,7 @@ const CampaignSettings = ({
             className={"flex flex-col"}
           />
         </div>
-        <div className="flex justify-start gap-2">
+        {/* <div className="flex justify-start gap-2">
           <DateTime
             name="start_date"
             label={"Start Date"}
@@ -240,7 +254,7 @@ const CampaignSettings = ({
             onChange={(e) => handleInputChange(actionTypes.SET_END_DATE, e)}
             className={"relative flex flex-col"}
           />
-        </div>
+        </div> */}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <div className="flex justify-start gap-8">
           <Toggle
@@ -288,15 +302,15 @@ const CampaignSettings = ({
         })}
         <div className="mt-2 flex justify-end">
           <Button
-            className="text-xl font-semibold uppercase"
-            onClick={() => navigate(`${campaignDetails.dial_type}`)}
+            className="text-xl font-semibold uppercase disabled:bg-zinc-400"
+            disabled={busy || !isChanged}
+            onClick={handleSave}
           >
-            Join Campaign
+            Save Settings
           </Button>
         </div>
       </div>
     </div>
   );
 };
-
 export { CampaignSettings };

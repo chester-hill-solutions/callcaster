@@ -3,13 +3,15 @@ import { Device } from '@twilio/voice-sdk';
 
 export function useTwilioDevice(token) {
     const deviceRef = useRef(null);
+    const initializedRef = useRef(false);
     const [status, setStatus] = useState('disconnected');
     const [error, setError] = useState(null);
-    const [activeCall, setActiveCall] = useState(null);
+    const [activeCall, setActiveCall] = useState({});
     const [incomingCall, setIncomingCall] = useState(null);
 
     useEffect(() => {
-        if (token && !deviceRef.current) {
+        if (token && !initializedRef.current) {
+            initializedRef.current = true;
             const device = new Device(token);
             deviceRef.current = device;
 
@@ -20,21 +22,19 @@ export function useTwilioDevice(token) {
 
             device.on('connect', (call) => {
                 setStatus('Connected');
-                setActiveCall(call);
-                console.log('Call connected:', call);
             });
 
             device.on('disconnect', () => {
                 setStatus('Disconnected');
                 device.disconnectAll();
                 activeCall?.disconnect();
-                setActiveCall(null);
-                setStatus('Registered')
+                setActiveCall({});
+                setStatus('Registered');
             });
 
             device.on('cancel', () => {
                 setStatus('Cancelled');
-                setActiveCall(null);
+                setActiveCall({});
                 console.log('Call cancelled');
             });
 
@@ -44,7 +44,7 @@ export function useTwilioDevice(token) {
             });
 
             device.on('incoming', (call) => {
-                setIncomingCall(call)
+                setIncomingCall(call);
                 if (call.parameters.To.includes('client')) {
                     call.accept();
                     setStatus('connected');
@@ -53,11 +53,11 @@ export function useTwilioDevice(token) {
                 call.on('accept', () => {
                     setActiveCall(call);
                     setStatus('connected');
-                    setIncomingCall(null); // Clear incoming call when accepted
+                    setIncomingCall(null);
                     console.log('Call accepted');
                 });
                 call.on('disconnect', () => {
-                    setActiveCall(null);
+                    setActiveCall({});
                     setStatus('Registered');
                     console.log('Call disconnected');
                 });
@@ -74,12 +74,14 @@ export function useTwilioDevice(token) {
             device.register();
 
             return () => {
-                device.state === 'registered' && device.unregister();
+                if (device.state === 'registered') {
+                    device.unregister();
+                }
                 deviceRef.current = null;
+                initializedRef.current = false;
             };
         }
     }, [token]);
-
 
     const makeCall = useCallback((params) => {
         if (deviceRef.current) {
@@ -88,7 +90,7 @@ export function useTwilioDevice(token) {
             setActiveCall(connection);
 
             connection.on('disconnect', () => {
-                setActiveCall(null);
+                setActiveCall({});
                 setStatus('disconnected');
                 console.log('Call disconnected');
             });
@@ -101,7 +103,7 @@ export function useTwilioDevice(token) {
         } else {
             console.error('Device is not ready');
         }
-    }, [deviceRef.current]);
+    }, []);
 
     const hangUp = useCallback(() => {
         if (activeCall) {
@@ -109,16 +111,31 @@ export function useTwilioDevice(token) {
             deviceRef.current.disconnectAll(); */
             fetch(`/api/hangup`, {
                 method: "POST",
-                body: JSON.stringify(activeCall),
-                headers: { "Cotnent-Type": 'application/json' }
-            }).then(() => null).catch((e) => console.log(e))
-            setStatus('Registered')
-            setActiveCall(null)
+                body: JSON.stringify({ callSid: activeCall.parameters.CallSid }),
+                headers: { "Content-Type": 'application/json' }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(() => {
+                setStatus('Registered');
+                activeCall?.disconnect();
+                setActiveCall({});
+                deviceRef.current.disconnectAll();
+            })
+            .catch((error) => {
+                console.error('Error hanging up call:', error);
+                setError(error);
+            });
         } else {
             console.error('No active call to hang up');
+            setError(new Error('No active call to hang up'));
         }
     }, [activeCall]);
-
+    
     const answer = useCallback(() => {
         if (incomingCall) {
             console.log('Answering incoming call');
@@ -129,7 +146,7 @@ export function useTwilioDevice(token) {
     }, [incomingCall]);
 
     return {
-        device: deviceRef.current,
+        device: deviceRef?.current,
         status,
         error,
         activeCall,
