@@ -261,8 +261,8 @@ export default function Campaign() {
                                 return (
                                     <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
                                         <div className="flex justify-between items-center flex-auto">
-                                            <div>{contact.contact.firstname} {contact.contact.surname}</div>
-                                            <div>{attemptList.find((attempt) => attempt.contact_id === contact.contact_id)?.result.status && <CheckCircleIcon size={"16px"} />}</div>
+                                            <div>{contact.contact?.firstname} {contact.contact?.surname}</div>
+                                            <div>{attemptList.find((attempt) => attempt.contact_id === contact?.contact_id)?.result.status && <CheckCircleIcon size={"16px"} />}</div>
                                         </div>
                                     </div>
                                 )

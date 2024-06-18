@@ -1,7 +1,13 @@
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { Outlet, useLoaderData, useOutletContext } from "@remix-run/react";
+import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
-export const loader = ({ request, params }) => {
+export const loader = async ({ request, params }) => {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession) {
+    return redirect("/signin", { headers });
+  }
   return null;
 };
 

@@ -17,10 +17,10 @@ const iconMapping = {
     NoAnswerIcon
 };
 
-const Result = ({ action, initResult = null, questions, questionId }) => {
+const Result = ({ action, initResult = null, questions, questionId, disabled }) => {
     const [result, setResult] = useState(initResult || "");
     const [multiResult, setMultiResult] = useState(initResult || []);
-
+    
     useEffect(() => {
         setResult(initResult || "");
         setMultiResult(initResult || []);
@@ -79,7 +79,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                                     type="button"
                                 >
                                     <IconComponent width="20px" fill={result === value ? 'hsl(var(--brand-primary))' : 'hsl(var(--muted-foreground))'} />
-                                    <div className="caption" style={{ fontSize: "10px", textAlign: 'center', color: result === value ? 'hsl(var(--input))' : '#333' }}>
+                                    <div className="caption" style={{ fontSize: "10px", textAlign: 'center', color: result === value ? 'hsl(var(--primary))' : '#333' }}>
                                         {label}
                                     </div>
                                 </button>

@@ -34,7 +34,7 @@ export const action = async ({ request }) => {
         })
     }
     if (parsedBody.StatusCallbackEvent === 'participant-join') {
-
+        
         if (dbCall) {
             if (!dbCall.conference_id) {
 

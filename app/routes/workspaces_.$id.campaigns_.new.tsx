@@ -80,6 +80,8 @@ export default function CampaignsNew() {
             className="rounded-sm border-2 border-black bg-transparent px-2 py-1 text-xl font-semibold dark:border-white  "
             name="campaign-type"
             id="campaign-type"
+            value={'live_call'}
+            disabled
           >
             <option value="message" className="dark:bg-black">
               Message
