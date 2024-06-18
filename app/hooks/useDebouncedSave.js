@@ -1,5 +1,21 @@
 import { useEffect, useRef } from 'react';
 
+export const handleQuestionsSave = (update, recentAttempt, submit, nextRecipient, campaign, workspaceId) => {
+    submit({
+        update,
+        callId: recentAttempt?.id,
+        selected_workspace_id: workspaceId,
+        contact_id: nextRecipient.contact.id,
+        campaign_id: campaign.id,
+        workspace: workspaceId
+    }, {
+        method: "PATCH",
+        navigate: false,
+        action: `/api/questions`,
+        encType: 'application/json'
+    });
+};
+
 const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign, workspaceId) => {
     const handlerRef = useRef(null);
 

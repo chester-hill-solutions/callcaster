@@ -43,13 +43,13 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
     };
 
     return (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', gap: "16px" }}>
-            <div style={{ flexBasis: "1 1 50%" }}>
+        <div className="flex flex-col gap-2">
+            <div>
                 <p className="font-Zilla-Slab text-xl">{questions.title}</p>
                 <p className="">{questions.text}</p>
             </div>
             {questions.type !== 'textblock' &&
-                <div style={{ alignItems: "unset", flexWrap: "wrap", justifyContent: "end", gap: "8px", display: "flex", minWidth: "30%" }}>
+                <div className="flex flex-auto wrap gap-2">
                     {questions.type === 'radio' && questions.options.map(({ Icon, value, label }) => {
 
                         if (Icon === 'SupportButton') {
@@ -73,7 +73,7 @@ const Result = ({ action, initResult = null, questions, questionId }) => {
                                 <button
                                     key={value}
                                     className="result-button column align-center justify-start"
-                                    style={{ display: "flex", flexDirection: "column", alignContent: "center", alignItems: 'center', width: "20%" }}
+                                    style={{ display: "flex", flexDirection: "column", alignContent: "center", alignItems: 'center', minWidth: "40px" }}
                                     value={value}
                                     onClick={() => handleChange(questions.id, value)}
                                     type="button"

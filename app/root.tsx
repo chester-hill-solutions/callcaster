@@ -22,7 +22,6 @@ import {
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect } from "react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { useTwilioDevice } from "./hooks/useTwilioDevice";
 
 import { ThemeProvider } from "./components/theme-provider";
 
@@ -60,13 +59,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  let token;
-  if (session?.user) {
-    const { token: newToken } = await fetch(
-      `${process.env.BASE_URL}/api/token?id=${session.user.id}`,
-    ).then((res) => res.json());
-    token = newToken;
-  }
 
   const { data: userData, error: userError } = await supabase
     .from("user")
@@ -89,7 +81,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     {
       env,
       session,
-      token,
       workspaces,
       user: userData,
       params,
@@ -101,9 +92,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function App() {
-  const { env, session, token, workspaces, user, params } =
+  const { env, session, workspaces, user, params } =
     useLoaderData<typeof loader>();
-  const device = useTwilioDevice(token);
   const { revalidate } = useRevalidator();
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
@@ -160,7 +150,7 @@ export default function App() {
             user={user}
             params={params}
           />
-          <Outlet context={{ supabase, env, device }} />
+          <Outlet context={{ supabase, env }} />
         </ThemeProvider>
         <ScrollRestoration />
         <Scripts />

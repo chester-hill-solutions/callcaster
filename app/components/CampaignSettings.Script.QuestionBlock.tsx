@@ -155,7 +155,7 @@ const OptionsSection = ({
   );
 
 const PreviewSection = ({ question }) => (
-  <div className="relative flex w-1/2 flex-col justify-center bg-white p-2">
+  <div className="relative flex w-1/2 flex-col justify-center bg-background p-2">
     <div style={{ scale: ".7" }}>
       <Result
         action={() => null}
@@ -194,10 +194,11 @@ export default function CampaignSettingsScriptQuestionBlock({
     const newState = {
       ...question,
       type: val,
-      ...((val === "radio" || val === "multi" || val === "dropdown") && {
+      ...((val === "radio" || val === "multi" || val === "dropdown") ?{
         options: question?.options || [],
-      }),
+      } : {options: []}),
     };
+    if (!(val === "radio" || val === "multi" || val === "dropdown")) delete newState.options
     setQuestion(newState);
     dispatchState({ oldState, newState });
   };
@@ -224,7 +225,6 @@ export default function CampaignSettingsScriptQuestionBlock({
       ...curr,
       options: [...curr.options.filter((opt) => opt.value !== option.value)],
     }));
-    removeQuestion(question.id);
   };
 
   const handleIconChange = ({ index, iconName }) => {
@@ -260,7 +260,7 @@ export default function CampaignSettingsScriptQuestionBlock({
       if (input) {
         input.focus();
       }
-      focusedInputRef.current = null; // Clear the ref after focusing
+      focusedInputRef.current = null;
     }
   }, [question.id]);
 
@@ -269,7 +269,7 @@ export default function CampaignSettingsScriptQuestionBlock({
   return (
     <div
       key={question.id}
-      className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-gray-100 p-2"
+      className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-card p-2"
       style={{
         border: "3px solid #BCEBFF",
         borderRadius: "20px",
