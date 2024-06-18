@@ -1,4 +1,4 @@
-import { Link, NavLink } from "@remix-run/react";
+import { Link, NavLink, useLocation } from "@remix-run/react";
 import { Button } from "../ui/button";
 import { MemberRole } from "./TeamMember";
 
@@ -16,17 +16,20 @@ export default function WorkspaceNav({ workspace, isInChildRoute, userRole }) {
   }
 
   const userIsCaller = userRole === MemberRole.Caller;
+  const path = useLocation().pathname;
+  const isEnd = !path.includes("audios") && !path.includes("audiences");
 
   return (
     <div className="mb-2 flex items-center text-black dark:text-white">
       <div className="flex flex-1 justify-between">
         <div className="flex gap-4">
           <NavLink
-            to={isInChildRoute ? `../campaigns` : `./campaigns`}
+            to={isInChildRoute ? `..` : `.`}
             relative="path"
             className={({ isActive, isPending }) =>
               handleNavlinkStyles(isActive, isPending)
             }
+            end={!isEnd}
           >
             Campaigns
           </NavLink>
