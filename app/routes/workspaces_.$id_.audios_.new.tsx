@@ -7,7 +7,7 @@ import {
   useLoaderData,
   useNavigate,
 } from "@remix-run/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
@@ -80,6 +80,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function Media() {
   const { workspace } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const [pendingFileName, setPendingFileName] = useState("");
 
   const navigate = useNavigate();
 
@@ -89,6 +90,11 @@ export default function Media() {
       setTimeout(() => navigate("../", { relative: "path" }), 750);
     }
   }, [actionData]);
+
+  const displayFileToUpload = (e) => {
+    const filePath = e.target.value;
+    setPendingFileName(filePath.split("\\").at(-1));
+  };
 
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col items-center gap-4 rounded-sm text-black dark:text-white">
@@ -130,8 +136,18 @@ export default function Media() {
           >
             Upload:
             <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
-              <FaPlus size={"64px"} />
-              <input type="file" name="media" id="media" className="hidden" />
+              {pendingFileName === "" ? (
+                <FaPlus size={"64px"} />
+              ) : (
+                <p>{pendingFileName}</p>
+              )}
+              <input
+                type="file"
+                name="media"
+                id="media"
+                className="hidden"
+                onChange={displayFileToUpload}
+              />
             </div>
           </label>
 

@@ -59,15 +59,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-    return json({ workspace, audiences, campaigns }, { headers });
+    return json({ workspace, audiences, campaigns, userRole }, { headers });
   } catch (error) {
     console.log(error);
-    return json(error, 500);
+    return json({ userRole, error }, 500);
   }
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns } = useLoaderData();
+  const { workspace, audiences, campaigns, userRole } = useLoaderData();
 
   // campaigns.sort((campaign1, campaign2) => {
   //   if (campaign1.created_at < campaign2.created_at) {
@@ -93,7 +93,11 @@ export default function Workspace() {
 
   return (
     <main className="mx-auto h-full w-[80%] items-center py-8">
-      <WorkspaceNav workspace={workspace} isInChildRoute={false} />
+      <WorkspaceNav
+        workspace={workspace}
+        isInChildRoute={false}
+        userRole={userRole}
+      />
       <div id="campaigns-container" className="flex border-2 border-zinc-600">
         <div
           className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-brand-secondary  dark:bg-transparent"
