@@ -12,7 +12,13 @@ export const action = async ({ request }) => {
             if (lookupError) throw lookupError
             const toDelete = existing.filter((row) => !data.updated.some(updatedRow => updatedRow.id === row.id))
             const toAdd = data.updated.filter((updatedRow) => !existing.some(row => row.id === updatedRow.id));
-            const { data: add, error: addError } = await supabaseClient.from('campaign_audience').insert(toAdd.map((row) => ({audience_id: row.id, campaign_id: data.campaign_id}))).select();
+            const { data: add, error: addError } = await supabaseClient
+                .from('campaign_audience')
+                .upsert(
+                    toAdd.map((row) => ({ audience_id: row.id, campaign_id: data.campaign_id })),
+                    { onConflict: ['audience_id', 'campaign_id'] }
+                )
+                .select();
             if (addError) throw addError
             const { data: deleteData, error: deleteError } = await supabaseClient.from('campaign_audience').delete().in('audience_id', toDelete.map((row) => (row.audience_id)))
             if (deleteError) throw deleteError;
