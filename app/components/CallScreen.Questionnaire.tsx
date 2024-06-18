@@ -27,7 +27,7 @@ const CallQuestionnaire = ({ handleResponse: intentAction, campaignDetails, upda
                     <div style={{ padding: "8px 16px", display: "flex", flexDirection: "column", gap: '16px' }}>
                         {campaignDetails?.questions.sort((a, b) => a.order - b.order).map((key, i) => {
                             return (
-                                <Result disabled={!contact.contact} action={intentAction} questions={key} key={`questions-${key.id}`} questionId={key.id} initResult={update[key.id]} type={key.type} />
+                                <Result disabled={!contact?.contact} action={intentAction} questions={key} key={`questions-${key.id}`} questionId={key.id} initResult={update[key.id]} type={key.type} />
                             )
                         })}
                     </div>
