@@ -155,7 +155,7 @@ const OptionsSection = ({
   );
 
 const PreviewSection = ({ question }) => (
-  <div className="relative flex w-1/2 flex-col justify-center bg-white p-2">
+  <div className="relative flex w-1/2 flex-col justify-center bg-background p-2">
     <div style={{ scale: ".7" }}>
       <Result
         action={() => null}
@@ -269,7 +269,7 @@ export default function CampaignSettingsScriptQuestionBlock({
   return (
     <div
       key={question.id}
-      className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-gray-100 p-2"
+      className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-card p-2"
       style={{
         border: "3px solid #BCEBFF",
         borderRadius: "20px",

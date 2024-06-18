@@ -39,7 +39,7 @@ export const loader = async ({ request, params }) => {
     )
     .eq("id", selected_id);
   let data = [...mtmData];
-  if (data.length > 0 && data[0].type === "live_call") {
+  if (data.length > 0 && (data[0].type === "live_call" || data[0].type === null)) {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
       .from("live_campaign")
       .select()
@@ -176,8 +176,8 @@ export default function ScriptEditor() {
     <div className="relative flex h-full flex-col">
       {isChanged && (
         <div
-          className="absolute flex w-full items-center justify-between bg-accent px-4 py-2"
-          style={{ top: "-65px" }}
+          className="absolute flex w-full items-center justify-between bg-accent px-4 py-4"
+          style={{ top: "-105px" }}
         >
           <Button onClick={handleReset} color="accent">
             Reset
