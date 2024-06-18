@@ -6,6 +6,7 @@ import { json, redirect } from "@remix-run/react";
 export const action = async ({ request }) => {
     const formData = await request.formData();
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
     const parsedBody = {};
 
