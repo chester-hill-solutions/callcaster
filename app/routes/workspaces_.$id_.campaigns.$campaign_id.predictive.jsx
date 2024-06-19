@@ -153,9 +153,8 @@ export default function Campaign() {
         if (activeCall?.parameters?.CallSid || incomingCall || status !== 'Registered') {
             return;
         }
-        if (nextRecipient) {
-            handlePowerDial();
-        }
+        handlePowerDial();
+        setNextRecipient(null);
     };
 
     const handlePowerDial = () => {
