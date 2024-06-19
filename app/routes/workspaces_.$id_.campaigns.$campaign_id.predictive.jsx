@@ -95,8 +95,9 @@ export default function Campaign() {
     const { device, status, error, activeCall, incomingCall, makeCall, hangUp, answer } = useTwilioDevice(token);
     const [nextRecipient, setNextRecipient] = useState({});
     const [questionContact, setQuestionContact] = useState(nextRecipient);
-    const { callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue } = useSupabaseRealtime({
+    const { callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, predictiveQueue } = useSupabaseRealtime({
         setNextRecipient,
+        setQuestionContact,
         user,
         supabase,
         init: {
@@ -131,7 +132,7 @@ export default function Campaign() {
     };
 
     const householdMap = useMemo(() => {
-        const sortedQueue = sortQueue(queue);
+        const sortedQueue = sortQueue(predictiveQueue);
         return sortedQueue.reduce((acc, curr, index) => {
             if (curr?.contact?.address) {
                 if (!acc[curr.contact.address]) {
@@ -144,6 +145,7 @@ export default function Campaign() {
             return acc;
         }, {});
     }, [queue]);
+
     const house = nextRecipient?.contact ? householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address)] : []
 
     const { begin, conference, setConference } = useStartConferenceAndDial(user.id, campaign.id, workspaceId, campaign.caller_id, { ...initialConference });
@@ -153,9 +155,9 @@ export default function Campaign() {
         if (activeCall?.parameters?.CallSid || incomingCall || status !== 'Registered') {
             return;
         }
-        if (nextRecipient) {
-            handlePowerDial();
-        }
+        handlePowerDial();
+        setNextRecipient({});
+        setUpdate({})
     };
 
     const handlePowerDial = () => {
@@ -208,7 +210,9 @@ export default function Campaign() {
 
     useEffect(() => {
         setQuestionContact(nextRecipient)
-    }, [nextRecipient])
+        const newRecentAttempt = attemptList.find(call => call.contact_id === nextRecipient?.contact?.id) || {};
+        setUpdate(newRecentAttempt.update || {});
+    }, [attemptList, nextRecipient])
 
 
     return (
