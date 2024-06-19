@@ -35,6 +35,7 @@ export const action = async ({ request }) => {
             uri: call.uri,
             campaign_id: campaign_id,
             workspace: workspace_id,
+            conference_id: user_id
         };
 
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);

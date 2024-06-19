@@ -15,7 +15,52 @@ export const action = async ({ request }) => {
     }
     let update;
     const { data: dbCall, error: callError } = await supabase.from('call').select().eq('sid', parsedBody.CallSid).single();
-    console.log('Call data: ', parsedBody);
+    if (parsedBody.CallStatus === 'failed') {
+        console.log(`Call to ${dbCall.to} failed`)
+        const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp), status: 'failed' }).eq('sid', parsedBody.CallSid).select();
+        if (updateError) console.error(updateError)
+        const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'failed' }).eq('id', dbCall.outreach_attempt_id).select();
+        if (attemptError) console.error(attemptError)
+
+        const conferences = await twilio.conferences.list({ friendlyName: callUpdate.conference_id, status: ['in-progress'] });
+        console.log(`${conferences.length} active conferences.`)
+        if (conferences.length) {
+            console.log(callUpdate.conference_id, dbCall.campaign_id)
+            await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
+                method: 'POST',
+                headers: { "Content-Type": 'application/json' },
+                body: JSON.stringify({
+                    user_id: dbCall.conference_id,
+                    campaign_id: dbCall.campaign_id,
+                    workspace_id: dbCall.workspace,
+                    conference_id: dbCall.conference_id
+                })
+            })
+        }
+
+    }
+    if (parsedBody.CallStatus === 'no-answer') {
+        const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp), status: 'no-answer' }).eq('sid', parsedBody.CallSid).select();
+        if (updateError) console.error(updateError)
+        const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'no-answer' }).eq('id', dbCall.outreach_attempt_id).select();
+        if (attemptError) console.error(attemptError)
+
+        const conferences = await twilio.conferences.list({ friendlyName: callUpdate.conference_id, status: ['in-progress'] });
+        if (conferences.length) {
+            console.log(callUpdate.conference_id, dbCall.campaign_id)
+            await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
+                method: 'POST',
+                headers: { "Content-Type": 'application/json' },
+                body: JSON.stringify({
+                    user_id: dbCall.conference_id,
+                    campaign_id: dbCall.campaign_id,
+                    workspace_id: dbCall.workspace,
+                    conference_id: dbCall.conference_id
+                })
+            })
+        }
+
+    }
     if (parsedBody.StatusCallbackEvent === 'participant-leave'
         && (parsedBody.ReasonParticipantLeft === 'participant_updated_via_api'
             || parsedBody.ReasonParticipantLeft === 'participant_hung_up')) {
@@ -23,6 +68,7 @@ export const action = async ({ request }) => {
         if (updateError) console.error(updateError)
         update = callUpdate;
         const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
+        console.log(`${conferences.length} active conferences.`)
         if (conferences.length) {
             await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
                 method: 'POST',

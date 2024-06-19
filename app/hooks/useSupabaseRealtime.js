@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 
-export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false }) {
+export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false, setQuestionContact }) {
     const [queue, setQueue] = useState(init.queue);
-    const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue)
+    const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue);
     const [callsList, setCalls] = useState(init.callsList);
     const [attemptList, setAttempts] = useState(init.attempts);
     const [recentCall, setRecentCall] = useState(init.recentCall);
@@ -17,10 +17,10 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     };
 
     const processPendingCalls = useCallback((attemptId) => {
+
         setPendingCalls((currentPendingCalls) => {
             const callsToProcess = currentPendingCalls.filter(call => call.outreach_attempt_id === attemptId);
             const remainingCalls = currentPendingCalls.filter(call => call.outreach_attempt_id !== attemptId);
-
             setAttempts((currentData) => {
                 return currentData.map(item => item.id === attemptId
                     ? { ...item, call: [...(item.call || []), ...callsToProcess] }
@@ -39,7 +39,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         const calls = callsList.filter(call => (call.outreach_attempt_id === payload.new.id) && (call.direction !== 'outbound-api'));
         let updatedAttempt = { ...payload.new, call: calls };
         if (calls.length && calls[0].status && !updatedAttempt.result.status) {
-            updatedAttempt.result = { ...(updatedAttempt.result && {...updatedAttempt.result, status: calls[0].status }), status: calls[0].status };
+            updatedAttempt.result = { ...(updatedAttempt.result && { ...updatedAttempt.result, status: calls[0].status }), status: calls[0].status };
         }
 
         setAttempts((currentAttempts) => {
@@ -56,7 +56,6 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
     const updateCalls = useCallback((payload) => {
         const attemptId = payload.new.outreach_attempt_id;
         let updatedCall = payload.new;
-    
         if (attemptId) {
             setAttempts((currentAttempts) => {
                 const updatedAttempts = currentAttempts.map(item => {
@@ -74,22 +73,25 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                     return item;
                 });
                 return updatedAttempts;
-                });
-                setCalls((currentCalls) => [...currentCalls, updatedCall]);
-                setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
-                setNextRecipient(queue.find((contact) => updatedCall.contact_id === contact.contact.id));
+            });
+            setCalls((currentCalls) => [...currentCalls, updatedCall]);
+            setRecentCall(recentAttempt?.contact?.id === updatedCall.contact_id ? updatedCall : recentCall);
+            setNextRecipient(queue.find((contact) => updatedCall.contact_id === contact.contact.id));
+            setQuestionContact(queue.find((contact) => updatedCall.contact_id === contact.contact.id));
         } else {
-            setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
+            if (payload.new.contact_id) {
+                setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
+            }
         }
     }, [recentAttempt?.contact?.id, recentCall, queue, setNextRecipient, user.id]);
-    
+
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
             setQueue((currentQueue) => {
                 const filteredQueue = currentQueue.filter(item => item.id !== payload.new.id);
                 if (nextRecipient && nextRecipient.id === payload.new.contact_id) {
                     setIsNextRecipientSet(false);
-                    if (filteredQueue.length > 0) {
+                    if (filteredQueue.length > 0 && !predictive) {
                         setNextRecipient(filteredQueue[0]);
                     } else {
                         setNextRecipient(null);
@@ -119,7 +121,6 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                         : [...currentQueue, { ...payload.new, contact }];
                     return updatedQueue;
                 });
-    
                 if (!isNextRecipientSet || (nextRecipient && nextRecipient.id === payload.new.id)) {
                     setNextRecipient({ ...payload.new, contact });
                     setIsNextRecipientSet(true);
@@ -127,7 +128,7 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
             }
         }
     }, [user.id, contacts, nextRecipient, isNextRecipientSet, setNextRecipient]);
-        
+
     useEffect(() => {
         const handleChange = (payload) => {
             switch (payload.table) {
@@ -170,5 +171,5 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         setRecentCall(isRecent(newRecentCall?.date_created) ? newRecentCall : {});
     }, [callsList, nextRecipient]);
 
-    return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue };
+    return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue, predictiveQueue };
 }
