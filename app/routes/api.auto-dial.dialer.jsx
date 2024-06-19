@@ -48,7 +48,7 @@ export const action = async ({ request }) => {
                 machineDetection: 'Enable',
                 statusCallbackEvent: ['answered', 'completed']
             });
-
+            console.log('Dialing: ', call)
             const callData = {
                 sid: call.sid,
                 date_updated: call.dateUpdated,
