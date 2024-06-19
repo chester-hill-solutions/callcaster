@@ -22,7 +22,7 @@ export const action = async ({ request }) => {
         const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp) }).eq('sid', parsedBody.CallSid).select();
         if (updateError) console.error(updateError)
         update = callUpdate;
-        const conferences = await twilio.conferences.list({ friendlyName: serverSession.user.id, status: ['in-progress'] });
+        const conferences = await twilio.conferences.list({ status: ['in-progress'] });
         if (conferences.length) {
             await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
                 method: 'POST',
