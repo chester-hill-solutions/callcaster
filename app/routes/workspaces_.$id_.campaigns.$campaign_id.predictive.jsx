@@ -180,6 +180,7 @@ export default function Campaign() {
     };
 
     const handleEndConference = () => {
+
         submit({}, { method: "post", action: '/api/auto-dial/end', navigate: false })
         if (activeCall?.parameters?.CallSid) {
             fetch(`/api/hangup`, {
@@ -201,6 +202,7 @@ export default function Campaign() {
                     console.error('Error hanging up call:', error);
                 })
         }
+        setConference({});
 
     }
     useDebouncedSave(update, recentAttempt, submit, nextRecipient, campaign, workspaceId);

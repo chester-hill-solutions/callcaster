@@ -13,7 +13,7 @@ export const action = async ({ request, params }) => {
     const called = formData.get('Called');
     const dial = twiml.dial();
     const call = twilio.calls(callSid);
-
+    console.log('Room Call: ', call)
     try {
         const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace').eq('sid', callSid).single();
         if (callError) {

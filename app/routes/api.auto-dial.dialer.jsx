@@ -49,7 +49,7 @@ export const action = async ({ request }) => {
                 statusCallbackEvent: ['answered', 'completed', 'ringing'],
                 statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`
             });
-
+            console.log('Dialing: ', call)
             const callData = {
                 sid: call.sid,
                 date_updated: call.dateUpdated,

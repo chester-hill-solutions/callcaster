@@ -68,7 +68,6 @@ export const action = async ({ request }) => {
         if (updateError) console.error(updateError)
         update = callUpdate;
         const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
-        console.log(`${conferences.length} active conferences.`)
         if (conferences.length) {
             await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
                 method: 'POST',
