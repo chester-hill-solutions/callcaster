@@ -46,7 +46,8 @@ export const action = async ({ request }) => {
                 from: contactRecord.caller_id,
                 url: `${process.env.BASE_URL}/api/auto-dial/${user_id}`,
                 machineDetection: 'Enable',
-                statusCallbackEvent: ['answered', 'completed']
+                statusCallbackEvent: ['answered', 'completed', 'ringing'],
+                statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`
             });
             console.log('Dialing: ', call)
             const callData = {
@@ -74,8 +75,8 @@ export const action = async ({ request }) => {
                 contact_id: contactRecord.contact_id,
                 workspace: workspace_id,
                 outreach_attempt_id,
+                conference_id: user_id
             };
-
             Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
             const { error } = await supabase.from('call').upsert({ ...callData }).select();
             if (error) console.error('Error saving the call to the database:', error);
