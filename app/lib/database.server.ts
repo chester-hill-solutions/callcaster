@@ -61,8 +61,15 @@ export async function createNewWorkspace({
     await supabaseClient.rpc("create_new_workspace", {
       new_workspace_name: workspaceName,
     });
-  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
-
+  const registeredAccount = await fetch(`${process.env.BASE_URL}/api/workspace`, {
+    body: JSON.stringify({ workspace_id: insertWorkspaceData }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  })
+    .then((res) => res.json())
+    .catch((e) => console.error(e));
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }
@@ -70,7 +77,7 @@ export async function createNewWorkspace({
   // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
   //   await supabaseClient.from("workspace_users").insert({ workspace });
 
-  return { data: insertWorkspaceData, error: insertWorkspaceError };
+  return { data: registeredAccount.id, error: insertWorkspaceError };
 }
 
 export async function getWorkspaceInfo({
