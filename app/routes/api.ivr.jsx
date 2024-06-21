@@ -31,7 +31,7 @@ const createTwilioCall = async (twilio, to, caller_id, campaign_id, outreach_att
     return await twilio.calls.create({
         to: to,
         from: caller_id,
-        twiml: `<Response><Pause length="5"/><Redirect>${process.env.BASE_URL}/api/ivr/${campaign_id}/</Redirect></Response>`,
+        twiml: `<Response><Redirect>${process.env.BASE_URL}/api/ivr/${campaign_id}/</Redirect></Response>`,
         machineDetection: 'Enable',
         statusCallbackEvent: ['answered', 'completed'],
         statusCallback: `${process.env.BASE_URL}/api/ivr/status`
