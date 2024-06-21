@@ -4,9 +4,8 @@ import { AudienceForm } from "./AudienceForm";
 import { ContactTable } from "./ContactTable";
 import { ImportIcon } from "lucide-react";
 import { useSubmit } from "@remix-run/react";
-import { parseCSVHeaders } from "~/lib/utils";
-
 import { parse } from "csv-parse/sync";
+import { parseCSVHeaders } from "~/lib/fuzzyMatchUtils"; // Update the path accordingly
 
 const AudienceTable = ({
   contacts: initialContacts,
@@ -24,6 +23,8 @@ const AudienceTable = ({
   });
   const [isDragging, setIsDragging] = useState(false);
   const submit = useSubmit();
+  const inputRef = useRef(null);
+
   useEffect(() => {
     setContacts(initialContacts);
     setAudienceInfo(initialAudience);
@@ -58,6 +59,7 @@ const AudienceTable = ({
       console.error("Failed to save audience", result);
     }
   };
+
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -79,19 +81,13 @@ const AudienceTable = ({
   const handleOnClick = (e) => {
     e.preventDefault();
     inputRef.current.click();
-    try {
-      const file = inputRef.current.files[0];
-      if (file.type === "text/csv") {
-        readCSVFile(file);
-      }
-    } catch (error) {
-      console.log(error);
-    }
+  };
 
-    // const file = e.dataTransfer.files[0];
-    // if (file && file.type === "text/csv") {
-    //   readCSVFile(file);
-    // }
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === "text/csv") {
+      readCSVFile(file);
+    }
   };
 
   const testParser = (text) => {
@@ -103,20 +99,20 @@ const AudienceTable = ({
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target.result;
-      // const rows = text.split("\n");
+      console.log('File content:', text); // Ensure file is read correctly
+  
       const records = testParser(text);
-      // console.log(records);
-
-      // const parsedHeaders = parseCSVHeaders(rows[0].split(","));
-      // const parsedHeadersLength = Object.keys(parsedHeaders).length;
+      console.log('Parsed records:', records); // Ensure CSV parsing is correct
+  
       const parsedHeaders = parseCSVHeaders(records[0]);
+      console.log('Parsed headers:', parsedHeaders); // Ensure headers are parsed correctly
+  
       const parsedHeadersLength = Object.keys(parsedHeaders).length;
-
       const contacts = records.slice(1).flatMap((row) => {
         if (row.length < parsedHeadersLength) {
           return [];
         }
-
+  
         let contact = {
           external_id: undefined,
           firstname: undefined,
@@ -124,43 +120,41 @@ const AudienceTable = ({
           phone: undefined,
           email: undefined,
           address: undefined,
+          other_data: [],
         };
-
-        if (parsedHeaders.name.length != null) {
-          contact.firstname = row[parsedHeaders.name[0]]?.trim();
-          contact.surname = row[parsedHeaders.name[1]]?.trim();
-        } else {
-          let names = row[parsedHeaders.name].split(" ");
-          if (names.length > 0) {
-            contact.firstname = names[0].trim();
-          }
-
-          if (names.length > 1) {
-            contact.surname = names.at(-1).trim();
-          }
-        }
+  
+        contact.firstname = row[parsedHeaders.firstname]?.trim();
+        contact.surname = row[parsedHeaders.surname]?.trim();
         contact.phone = row[parsedHeaders.phone]?.trim();
         contact.email = row[parsedHeaders.email]?.trim();
         contact.address = row[parsedHeaders.address]?.trim();
         contact.external_id = row[parsedHeaders.external_id]?.trim();
-        // const [firstname, surname, phone, email, address] = row.split(",");
+  
+        if (parsedHeaders.other_data) {
+          parsedHeaders.other_data.forEach((otherHeader) => {
+            const [key, index] = Object.entries(otherHeader)[0];
+            contact.other_data.push({ [key]: row[index]?.trim() });
+          });
+        }
+  
+        console.log('Parsed contact:', contact);
         return contact;
       });
-      // console.log("Contacts: ", contacts);
-      submit(
+  
+      /* submit(
         { contacts, audience_id, workspace_id },
         {
           action: "/api/contacts",
           method: "POST",
           encType: "application/json",
           navigate: false,
-        },
-      );
+        }
+      ); */
     };
     reader.readAsText(file);
   };
+  
 
-  const inputRef = useRef(null);
 
   return (
     <div className="max-h-[800px] overflow-y-scroll">
@@ -186,6 +180,7 @@ const AudienceTable = ({
             id="file"
             ref={inputRef}
             className="hidden"
+            onChange={handleFileChange}
           />
           <Button onClick={handleOnClick} className="">
             IMPORT{" "}

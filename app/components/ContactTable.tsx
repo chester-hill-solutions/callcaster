@@ -1,28 +1,64 @@
 import { AudienceContactRow } from "./AudienceContactRow";
 import { ContactForm } from "./ContactForm";
 
-const ContactTable = ({ contacts, audience_id, newContact, handleInputChange, handleSaveContact, workspace_id }) => {
-    return (
+const getUniqueKeys = (...arrays) => {
+  const allObjects = arrays.flat();
+
+  const otherDataKeys = allObjects.flatMap((obj) =>
+    obj.other_data
+      ? obj.other_data.flatMap((subObj) => Object.keys(subObj))
+      : [],
+  );
+
+  const allKeys = [...otherDataKeys];
+  return new Set(allKeys);
+};
+const ContactTable = ({
+  contacts,
+  audience_id,
+  newContact,
+  handleInputChange,
+  handleSaveContact,
+  workspace_id,
+}) => {
+  const other_column_keys = getUniqueKeys(contacts);
+  return (
     <table className="divide-y divide-gray-200">
       <thead className="bg-gray-50">
         <tr>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-            Name
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-            Phone
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-            Email
-          </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-            Address
-          </th>
-        </tr>
+          {[
+            "ID",
+            "External ID",
+            "First Name",
+            "Surname",
+            "Phone",
+            "Email",
+            "Address",
+            "City",
+            "Postal",
+          ].map((key) => (
+            <th
+              key={key}
+              className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+            >
+              {key}
+            </th>
+          ))}
+
+          {other_column_keys.size > 0 &&
+            Array.from(other_column_keys).map((key) => (
+              <th
+                key={key}
+                className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+              >
+                {key}
+              </th>
+            ))}
+        </tr>{" "}
       </thead>
       <tbody className="divide-y divide-gray-200 bg-white">
         {contacts.map((contact) => (
-          <AudienceContactRow {...{ contact }} key={contact.id} />
+          <AudienceContactRow {...{ contact, other_column_keys }} key={contact.id} />
         ))}
         <tr>
           <td colSpan={4}>
