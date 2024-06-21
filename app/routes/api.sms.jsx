@@ -30,7 +30,6 @@ const getCampaignData = async ({ supabase, campaign_id }) => {
 };
 
 const sendMessage = async ({ body, to, from, media, supabase, campaign_id, workspace, contact_id }) => {
-    console.log(media);
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const message = await twilio.messages.create({
         body,
