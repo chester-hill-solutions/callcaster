@@ -11,35 +11,41 @@ export const action = async ({ request, params }) => {
     const step = params.step;
 
     try {
-        // Fetch call details
-        const { data: dbCall, error: callError } = await supabase
-            .from('call')
-            .select('campaign_id, outreach_attempt_id, contact_id, workspace')
-            .eq('sid', callSid)
-            .single();
+        const [callResult, campaignResult] = await Promise.all([
+            supabase
+                .from('call')
+                .select('campaign_id, outreach_attempt_id, contact_id, workspace')
+                .eq('sid', callSid)
+                .single(),
+            supabase
+                .from('ivr_campaign')
+                .select()
+                .eq('campaign_id', campaign_id)
+                .single()
+        ]);
 
-        if (callError) throw callError;
-        console.log(dbCall)
-        const { data: campaign, error: campaignError } = await supabase
-            .from('ivr_campaign')
-            .select()
-            .eq('campaign_id', campaign_id)
-            .single();
+        const dbCall = callResult.data;
+        const campaign = campaignResult.data;
 
-        if (campaignError) throw campaignError;
+        if (callResult.error) throw callResult.error;
+        if (campaignResult.error) throw campaignResult.error;
 
         const stepData = campaign.step_data.find((i) => i.step == step);
         const { speechType, say, responseType } = stepData;
 
+        let signedUrlData = null;
+        if (speechType === 'recorded') {
+            const signedUrlResult = await supabase
+                .storage
+                .from('workspaceAudio')
+                .createSignedUrl(`${dbCall.workspace}/${say}`, 3600);
+
+            signedUrlData = signedUrlResult.data;
+            if (signedUrlResult.error) throw signedUrlResult.error;
+        }
+
         if (responseType === 'hangup') {
             if (speechType === 'recorded') {
-                const { data: signedUrlData, error: voicemailError } = await supabase
-                    .storage
-                    .from('workspaceAudio')
-                    .createSignedUrl(`${dbCall.workspace}/${say}`, 3600);
-
-                if (voicemailError) throw voicemailError;
-
                 twiml.play(signedUrlData.signedUrl);
             } else {
                 twiml.say(say);
@@ -52,13 +58,6 @@ export const action = async ({ request, params }) => {
             });
 
             if (speechType === 'recorded') {
-                const { data: signedUrlData, error: voicemailError } = await supabase
-                    .storage
-                    .from('workspaceAudio')
-                    .createSignedUrl(`${dbCall.workspace}/${say}`, 3600);
-
-                if (voicemailError) throw voicemailError;
-
                 gather.play(signedUrlData.signedUrl);
             } else {
                 gather.say(say);

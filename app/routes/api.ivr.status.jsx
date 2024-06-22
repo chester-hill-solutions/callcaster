@@ -21,18 +21,16 @@ const updateResult = async (supabase, outreach_attempt_id, update) => {
 };
 
 const updateCallStatus = async (supabase, callSid, status, timestamp) => {
-    const { data: callUpdate, error: updateError } = await supabase
+    const { error } = await supabase
         .from('call')
-        .update({ end_time: new Date(timestamp), status: status })
-        .eq('sid', callSid)
-        .select();
-    if (updateError) throw updateError;
+        .update({ end_time: new Date(timestamp), status })
+        .eq('sid', callSid);
+    if (error) throw error;
 };
 
 const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail' });
-
     const step = campaign.stepData.find((i) => i.step === 'voicemail');
     if (!step) {
         await call.update({
@@ -47,12 +45,19 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
             const { data, error } = await supabase.storage
                 .from(`workspaceAudio`)
                 .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
-            if (error) throw error;
+            if (error) throw {'Status_Error': error};
             await call.update({
                 twiml: `<Response><Pause length="1"/><Play>${data.signedUrl}</Play></Response>`
             });
         }
     }
+};
+
+const handleCallStatusUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
+    await Promise.all([
+        updateCallStatus(supabase, callSid, status, timestamp),
+        updateResult(supabase, outreach_attempt_id, { disposition })
+    ]);
 };
 
 export const action = async ({ request }) => {
@@ -61,23 +66,25 @@ export const action = async ({ request }) => {
     const formData = await request.formData();
     
     const parsedBody = Object.fromEntries(formData.entries());
+    const callSid = parsedBody.CallSid;
 
     try {
         const { data: dbCall, error: callError } = await supabase
             .from('call')
             .select('campaign_id, outreach_attempt_id, workspace')
-            .eq('sid', parsedBody.CallSid)
+            .eq('sid', callSid)
             .single();
         if (callError) throw callError;
-        if (parsedBody.CallStatus === 'failed') {
-            await updateCallStatus(supabase, parsedBody.CallSid, 'failed', parsedBody.Timestamp);
-            await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'failed' });
-        } else if (parsedBody.CallStatus === 'no-answer') {
-            await updateCallStatus(supabase, parsedBody.CallSid, 'no-answer', parsedBody.Timestamp);
-            await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'no-answer' });
-        } else if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && parsedBody.CallStatus !== 'completed') {
+
+        const callStatus = parsedBody.CallStatus;
+        const timestamp = parsedBody.Timestamp;
+
+        if (callStatus === 'failed' || callStatus === 'no-answer') {
+            const disposition = callStatus === 'failed' ? 'failed' : 'no-answer';
+            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, disposition);
+        } else if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && callStatus !== 'completed') {
             const campaign = await getCampaignData(supabase, dbCall.campaign_id);
-            await handleVoicemail(twilio, parsedBody.CallSid, dbCall, campaign, supabase);
+            await handleVoicemail(twilio, callSid, dbCall, campaign, supabase);
         }
     } catch (error) {
         console.error(error);

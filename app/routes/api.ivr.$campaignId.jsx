@@ -37,8 +37,8 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
         } else {
             const { data, error } = await supabase.storage
                 .from(`workspaceAudio`)
-                .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
-            if (error) throw error;
+                .createSignedUrl(`${dbCall.workspace}/${step.say}`, 3600);
+            if (error) throw {'Campaign':error}
             await call.update({
                 twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
             });
@@ -46,74 +46,64 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
     }
 };
 
-
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const formData = await request.formData();
 
     try {
-
         const parsedBody = Object.fromEntries(formData.entries());
-        const call = twilio.calls(parsedBody.CallSid);
+        const callSid = parsedBody.CallSid;
 
         const { data: dbCall, error: callError } = await supabase
             .from('call')
             .select('campaign_id, outreach_attempt_id, workspace')
-            .eq('sid', parsedBody.CallSid)
+            .eq('sid', callSid)
             .single();
         if (callError) throw callError;
 
+        const campaignPromise = getCampaignData(supabase, dbCall.campaign_id);
+        const call = twilio.calls(callSid);
 
-        if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && parsedBody.CallStatus !== 'completed') {
+        const updateCallAndAttempt = async (answeredBy) => {
+            const firstStepUrl = `${process.env.BASE_URL}/api/ivr/${dbCall.campaign_id}/1`;
+            await call.update({ url: firstStepUrl });
 
-            const campaign = await getCampaignData(supabase, dbCall.campaign_id);
-            await handleVoicemail(twilio, parsedBody.CallSid, dbCall, campaign, supabase);
-
-        } else if (parsedBody.AnsweredBy === 'human') {
-            try {
-                const firstStepUrl = `${process.env.BASE_URL}/api/ivr/${dbCall.campaign_id}/1`;
-                await call.update({ url: firstStepUrl });
-
-                const { data, error } = await supabase
+            const updates = [
+                supabase
                     .from('call')
-                    .upsert({ sid: parsedBody.CallSid, answered_by: parsedBody.AnsweredBy }, { onConflict: 'sid' })
-                    .select();
-                if (error) throw error;
-
-                const { data: attempt, error: attemptError } = await supabase
+                    .upsert({ sid: callSid, answered_by: answeredBy }, { onConflict: 'sid' })
+                    .select(),
+                supabase
                     .from('outreach_attempt')
                     .update({ answered_at: new Date() })
                     .eq('id', dbCall.outreach_attempt_id)
-                    .select();
-                if (attemptError) throw attemptError;
+                    .select()
+            ];
 
-                return json({ success: true, data, attempt });
-            } catch (error) {
-                console.error(error);
-            }
+            const [callUpdate, attemptUpdate] = await Promise.all(updates);
+
+            if (callUpdate.error) throw callUpdate.error;
+            if (attemptUpdate.error) throw attemptUpdate.error;
+
+            return { callUpdate, attemptUpdate };
+        };
+
+        const updateOperations = [];
+
+        if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && parsedBody.CallStatus !== 'completed') {
+            const campaign = await campaignPromise;
+            updateOperations.push(handleVoicemail(twilio, callSid, dbCall, campaign, supabase));
+        } else if (parsedBody.AnsweredBy === 'human' || parsedBody.AnsweredBy === 'unknown') {
+            updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy));
         } else {
-            // Handle other cases
-            const { data, error } = await supabase
-                .from('call')
-                .upsert({ sid: parsedBody.CallSid, answered_by: parsedBody.AnsweredBy }, { onConflict: 'sid' })
-                .select();
-            if (error) throw error;
-
-            const { data: attempt, error: attemptError } = await supabase
-                .from('outreach_attempt')
-                .update({ answered_at: new Date() })
-                .eq('id', dbCall.outreach_attempt_id)
-                .select();
-            if (attemptError) throw attemptError;
-
-            return json({ success: true, data, attempt });
+            updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy));
         }
+
+        await Promise.all(updateOperations);
     } catch (error) {
         console.error(error);
         return json({ success: false, error });
-    
-}
-return json({ success: true });
-
+    }
+    return json({ success: true });
 };
