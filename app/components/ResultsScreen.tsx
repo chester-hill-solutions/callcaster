@@ -56,7 +56,7 @@ const DispositionBar = ({
     </div>
     {(disposition === "completed" || disposition === "voicemail") && (
       <div className="mt-1 text-sm">
-        Avg. Duration: {average_call_duration.split(".").map((t,i) => (i === 1 ? t.slice(0,2) : t)).join('.')}
+        Avg. Duration: {average_call_duration?.split(".").map((t,i) => (i === 1 ? t.slice(0,2) : t)).join('.')}
       </div>
     )}
   </div>
