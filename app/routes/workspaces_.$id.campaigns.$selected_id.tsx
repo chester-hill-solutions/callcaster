@@ -2,28 +2,90 @@ import { json, redirect } from "@remix-run/node";
 import {
   NavLink,
   Outlet,
+  useActionData,
   useLoaderData,
   useLocation,
-  useNavigate,
-  useNavigation,
-  useOutlet,
   useOutletContext,
-  useSubmit,
 } from "@remix-run/react";
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { CampaignSettings } from "../components/CampaignSettings";
-import { Button } from "~/components/ui/button";
+
 import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-import { campaignTypeText } from "~/lib/utils";
+import ResultsScreen from "~/components/ResultsScreen";
 
-const formatTime = (milliseconds) => {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+export const action = async ({ request, params }) => {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession?.user) {
+    return redirect("/signin");
+  }
+  const { data, error } = await supabaseClient.rpc(
+    "get_dynamic_outreach_results",
+    { campaign_id_param: params.selected_id },
+  );
+
+  if (error) {
+    console.error("Error fetching data:", error);
+    return new Response("Error fetching data", { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return new Response("No data found", { status: 404 });
+  }
+
+  const dynamicKeys = new Set();
+  data.forEach((row) => {
+    if (row.dynamic_columns) {
+      Object.keys(row.dynamic_columns).forEach((key) => dynamicKeys.add(key));
+    }
+  });
+  const escapeCSV = (field) => {
+    if (field == null) return "";
+    return `"${String(field).replace(/"/g, '""')}"`;
+  };
+
+  const csvHeaders = [
+    "external_id",
+    "disposition",
+    "call_duration",
+    "firstname",
+    "surname",
+    "phone",
+    "username",
+    "created_at",
+    ...Array.from(dynamicKeys),
+  ];
+  let csvContent = csvHeaders.map(escapeCSV).join(",") + "\n";
+
+  data.forEach((row) => {
+    let callDuration = row.call_duration;
+    if (!callDuration || callDuration.startsWith("-")) {
+      callDuration = "00:00:00";
+    }
+
+    const csvRow = [
+      row.external_id,
+      row.disposition,
+      callDuration,
+      row.firstname,
+      row.surname,
+      row.phone,
+      row.username,
+      row.created_at,
+      ...Array.from(dynamicKeys).map((key) =>
+        row.dynamic_columns ? row.dynamic_columns[key] : "",
+      ),
+    ]
+      .map(escapeCSV)
+      .join(",");
+    csvContent += csvRow + "\n";
+  });
+
+  return json({
+    csvContent,
+    filename: `outreach_results_${params.selected_id}.csv`,
+  });
 };
 
 export const loader = async ({ request, params }) => {
@@ -53,8 +115,9 @@ export const loader = async ({ request, params }) => {
   const { data: results, error: resultsError } = await supabaseClient.rpc(
     "get_basic_results",
     { campaign_id_param: selected_id },
+    { headers },
   );
-  console.log(results, resultsError)
+
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
@@ -79,11 +142,13 @@ export const loader = async ({ request, params }) => {
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
+    const totalCalls = results.reduce((sum, item) => sum + item.count, 0);
 
   return json({
     data,
     hasAccess,
-    results
+    results,
+    totalCalls
   });
 };
 
@@ -101,15 +166,25 @@ function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
 
 export default function CampaignScreen() {
   const { audiences } = useOutletContext();
-  const { data = [], hasAccess, results } = useLoaderData<typeof loader>();
-
-  const pageData = useMemo(() => data, [data]);
-  const navigate = useNavigate();
-  const nav = useNavigation();
-  const outlet = useOutlet();
-
+  const { data = [], hasAccess, results = [], totalCalls = 0 } = useLoaderData<typeof loader>();
+  const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+  
+  useEffect(() => {
+    if (csvData && csvData.csvContent) {
+      console.log();
+      const blob = new Blob([csvData.csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = csvData.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
+  }, [csvData]);
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -150,11 +225,8 @@ export default function CampaignScreen() {
         </div>
         <div className="flex items-center gap-2">
           <h3 className="font-Zilla-Slab text-3xl font-semibold">
-            {data[0].title}
+            {data[0]?.title}
           </h3>
-          {/* <p className="flex h-full items-center justify-center rounded-sm bg-zinc-300 px-2 py-1 font-semibold dark:bg-zinc-500 dark:text-white">
-            {campaignTypeText(data[0].type)}
-          </p> */}
         </div>
         <NavLink
           className={({ isActive, isPending }) =>
@@ -166,12 +238,19 @@ export default function CampaignScreen() {
           Join Campaign
         </NavLink>
       </div>
-      {isCampaignParentRoute && !(results?.length > 0) && (
+      {isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
           <h1 className="font-Zilla-Slab text-4xl text-gray-400">
             Your Campaign Results Will Show Here
           </h1>
         </div>
+      ) : (
+        isCampaignParentRoute && (
+          <div className="container mx-auto px-4 py-8">
+            <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
+            <ResultsScreen {...{totalCalls, results}}/>
+          </div>
+        )
       )}
       <Outlet context={{ audiences }} />
     </div>
