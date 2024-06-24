@@ -50,6 +50,11 @@ export const loader = async ({ request, params }) => {
       .insert({ campaign_id: data[0].id, workspace: workspace_id });
     return redirect(`/workspaces/${workspace_id}/campaign/${data[0].id}`);
   }
+  const { data: results, error: resultsError } = await supabaseClient.rpc(
+    "get_basic_results",
+    { campaign_id_param: selected_id },
+  );
+  console.log(results, resultsError)
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
@@ -71,33 +76,14 @@ export const loader = async ({ request, params }) => {
       campaignDetails,
     }));
   }
-  const { data: outcomes, error: outcomeError } = await supabaseClient
-    .from("outreach_attempt")
-    .select(`*, call(*)`)
-    .eq("campaign_id", selected_id);
-
-  const { data: queue, error: queueError } = await supabaseClient
-    .from("campaign_queue")
-    .select(`*, contact(*)`)
-    .eq("campaign_id", selected_id);
-
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspace_id);
-
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
 
   return json({
-    workspace_id,
-    selected_id,
     data,
-    selected,
-    mediaData,
-    outcomes,
-    queue,
     hasAccess,
+    results
   });
 };
 
@@ -115,23 +101,7 @@ function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
 
 export default function CampaignScreen() {
   const { audiences } = useOutletContext();
-  const {
-    workspace_id,
-    selected_id,
-    data = [],
-    mediaData,
-    hasAccess,
-    outcomes,
-    queue,
-  } = useLoaderData<typeof loader>();
-  const outcomeKeys = outcomes.reduce((acc, outcome) => {
-    Object.keys(outcome?.result).forEach((key) => {
-      if (!acc.includes(key)) {
-        acc.push(key);
-      }
-    });
-    return acc;
-  }, []);
+  const { data = [], hasAccess, results } = useLoaderData<typeof loader>();
 
   const pageData = useMemo(() => data, [data]);
   const navigate = useNavigate();
@@ -196,7 +166,7 @@ export default function CampaignScreen() {
           Join Campaign
         </NavLink>
       </div>
-      {isCampaignParentRoute && (
+      {isCampaignParentRoute && !(results?.length > 0) && (
         <div className="flex flex-auto items-center justify-center">
           <h1 className="font-Zilla-Slab text-4xl text-gray-400">
             Your Campaign Results Will Show Here
