@@ -1,28 +1,29 @@
 import Twilio from 'twilio';
 import { createClient } from "@supabase/supabase-js";
+
+function normalizePhoneNumber(input) {
+    let cleaned = input.replace(/[^0-9+]/g, '');
+    if (cleaned.indexOf('+') > 0) {
+        cleaned = cleaned.replace(/\+/g, '');
+    }
+    if (!cleaned.startsWith('+')) {
+        cleaned = '+' + cleaned;
+    }
+    const validLength = 11;
+    const minLength = 11;
+    if (cleaned.length < minLength + 1) { // +1 for the +
+        cleaned = '+1' + cleaned.replace('+', '');
+    }
+    if (cleaned.length !== validLength + 1) { // +1 for the +
+        throw new Error('Invalid phone number length');
+    }
+    return cleaned;
+}
+
+
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-
-    function normalizePhoneNumber(input) {
-        let cleaned = input.replace(/[^0-9+]/g, '');
-        if (cleaned.indexOf('+') > 0) {
-            cleaned = cleaned.replace(/\+/g, '');
-        }
-        if (!cleaned.startsWith('+')) {
-            cleaned = '+' + cleaned;
-        }
-        const validLength = 11;
-        const minLength = 11;
-        if (cleaned.length < minLength + 1) { // +1 for the +
-            cleaned = '+1' + cleaned.replace('+', '');
-        }
-        if (cleaned.length !== validLength + 1) { // +1 for the +
-            throw new Error('Invalid phone number length');
-        }
-        return cleaned;
-    }
-
     const { user_id, campaign_id, workspace_id, } = await request.json();
     try {
         const { data: record, error: contactError } = await supabase

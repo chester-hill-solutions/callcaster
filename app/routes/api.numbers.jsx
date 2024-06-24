@@ -1,5 +1,5 @@
 import Twilio from 'twilio';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'; // TODO - This needs to be replaced with the server one.
 
 export const loader = async ({ request }) => {
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
