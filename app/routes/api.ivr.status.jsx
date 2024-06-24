@@ -85,6 +85,8 @@ export const action = async ({ request }) => {
         } else if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && callStatus !== 'completed') {
             const campaign = await getCampaignData(supabase, dbCall.campaign_id);
             await handleVoicemail(twilio, callSid, dbCall, campaign, supabase);
+        } else if (callStatus === 'completed'){
+            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed');
         }
     } catch (error) {
         console.error(error);
