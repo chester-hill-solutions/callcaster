@@ -792,3 +792,15 @@ export type Enums<
   : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
     ? PublicSchema["Enums"][PublicEnumNameOrOptions]
     : never
+export interface DispositionResult {
+      disposition: string;
+      count: number;
+      average_call_duration: string;
+    }
+    
+export interface ResultsScreenProps {
+      totalCalls: number;
+      results: DispositionResult[];
+      expectedTotal: number;
+    }
+    

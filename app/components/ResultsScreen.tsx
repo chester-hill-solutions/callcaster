@@ -1,16 +1,6 @@
 import { Button } from "~/components/ui/button";
 import { Form } from "@remix-run/react";
-
-interface DispositionResult {
-  disposition: string;
-  count: number;
-  average_call_duration: string;
-}
-
-interface ResultsScreenProps {
-  totalCalls: number;
-  results: DispositionResult[];
-}
+import { ResultsScreenProps } from "~/lib/database.types";
 
 const dispositionColors: Record<string, string> = {
   voicemail: "bg-blue-500",
@@ -19,8 +9,17 @@ const dispositionColors: Record<string, string> = {
   failed: "bg-red-500",
 };
 
-const TotalCalls = ({ totalCalls }: { totalCalls: number }) => (
-  <h2 className="mb-4 text-2xl font-semibold">Total Calls: {totalCalls}</h2>
+const TotalCalls = ({
+  totalCalls,
+  expectedTotal,
+}: {
+  totalCalls: number;
+  expectedTotal: number;
+}) => (
+  <div className="flex flex-col">
+    <h2 className="mb-0 text-2xl font-semibold">Total Calls: {totalCalls}</h2>
+    <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
+  </div>
 );
 
 const ExportButton = () => (
@@ -42,10 +41,10 @@ const DispositionBar = ({
 }) => (
   <div key={disposition} className="mb-6">
     <div className="mb-1 flex items-center justify-between">
-      <span className="text-sm font-medium capitalize text-gray-700">
+      <span className="text-sm font-medium capitalize">
         {disposition}
       </span>
-      <span className="text-sm font-medium text-gray-700">
+      <span className="text-sm font-medium">
         {count} ({((count / totalCalls) * 100).toFixed(1)}%)
       </span>
     </div>
@@ -56,17 +55,17 @@ const DispositionBar = ({
       ></div>
     </div>
     {(disposition === "completed" || disposition === "voicemail") && (
-      <div className="mt-1 text-xs text-gray-600">
-        Avg. Duration: {average_call_duration}
+      <div className="mt-1 text-sm">
+        Avg. Duration: {average_call_duration.split(".").map((t,i) => (i === 1 ? t.slice(0,2) : t)).join('.')}
       </div>
     )}
   </div>
 );
 
-const DispositionBreakdown = ({ results, totalCalls }:ResultsScreenProps) => (
+const DispositionBreakdown = ({ results, totalCalls }: ResultsScreenProps) => (
   <div className="mb-8">
     <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
-    {results.map((result) => (
+    {results?.map((result) => (
       <DispositionBar
         key={result.disposition}
         {...result}
@@ -76,10 +75,10 @@ const DispositionBreakdown = ({ results, totalCalls }:ResultsScreenProps) => (
   </div>
 );
 
-const KeyMetrics = ({ results, totalCalls }:ResultsScreenProps) => {
-  const getRate = (disposition:string):string => {
+const KeyMetrics = ({ results, totalCalls }: ResultsScreenProps) => {
+  const getRate = (disposition: string): string => {
     const count =
-      results.find((d) => d.disposition === disposition)?.count || 0;
+      results?.find((d) => d.disposition === disposition)?.count || 0;
     return ((count / totalCalls) * 100).toFixed(1);
   };
 
@@ -88,13 +87,13 @@ const KeyMetrics = ({ results, totalCalls }:ResultsScreenProps) => {
       <h3 className="mb-4 text-xl font-semibold">Key Metrics</h3>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg bg-blue-100 p-4">
-          <p className="text-lg font-semibold">Completion Rate</p>
+          <p className="text-lg font-semibold text-blue-500">Completion Rate</p>
           <p className="text-3xl font-bold text-blue-800">
             {getRate("completed")}%
           </p>
         </div>
         <div className="rounded-lg bg-green-100 p-4">
-          <p className="text-lg font-semibold">Voicemail Rate</p>
+          <p className="text-lg font-semibold text-green-500">Voicemail Rate</p>
           <p className="text-3xl font-bold text-green-800">
             {getRate("voicemail")}%
           </p>
@@ -104,15 +103,27 @@ const KeyMetrics = ({ results, totalCalls }:ResultsScreenProps) => {
   );
 };
 
-const ResultsScreen = ({ totalCalls = 0, results = [] }:ResultsScreenProps) => {
+const ResultsScreen = ({
+  totalCalls = 0,
+  results = [],
+  expectedTotal = 0,
+}: ResultsScreenProps) => {
   return (
-    <div className="mb-4 rounded bg-white px-8 pb-8 pt-6">
+    <div className="mb-4 rounded px-8 pb-8 pt-6">
       <div className="flex justify-between">
-        <TotalCalls totalCalls={totalCalls} />
+        <TotalCalls totalCalls={totalCalls} expectedTotal={expectedTotal} />
         <ExportButton />
       </div>
-      <DispositionBreakdown results={results} totalCalls={totalCalls} />
-      <KeyMetrics results={results} totalCalls={totalCalls} />
+      <DispositionBreakdown
+        results={results}
+        totalCalls={totalCalls}
+        expectedTotal={expectedTotal}
+      />
+      <KeyMetrics
+        results={results}
+        totalCalls={totalCalls}
+        expectedTotal={expectedTotal}
+      />
     </div>
   );
 };

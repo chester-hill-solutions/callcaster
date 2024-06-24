@@ -117,7 +117,6 @@ export const loader = async ({ request, params }) => {
     { campaign_id_param: selected_id },
     { headers },
   );
-
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
@@ -142,13 +141,14 @@ export const loader = async ({ request, params }) => {
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
-    const totalCalls = results.reduce((sum, item) => sum + item.count, 0);
-
+  const totalCalls = results?.reduce((sum, item) => sum + item.count, 0);
+  const expectedTotal = results && results[0]?.expected_total || 0;
   return json({
     data,
     hasAccess,
     results,
-    totalCalls
+    totalCalls,
+    expectedTotal,
   });
 };
 
@@ -166,11 +166,17 @@ function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
 
 export default function CampaignScreen() {
   const { audiences } = useOutletContext();
-  const { data = [], hasAccess, results = [], totalCalls = 0 } = useLoaderData<typeof loader>();
+  const {
+    data = [],
+    hasAccess,
+    results = [],
+    totalCalls = 0,
+    expectedTotal = 0,
+  } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
-  
+
   useEffect(() => {
     if (csvData && csvData.csvContent) {
       console.log();
@@ -248,7 +254,7 @@ export default function CampaignScreen() {
         isCampaignParentRoute && (
           <div className="container mx-auto px-4 py-8">
             <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
-            <ResultsScreen {...{totalCalls, results}}/>
+            <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
           </div>
         )
       )}
