@@ -74,7 +74,8 @@ export const action: ActionFunction = async ({ request }) => {
           "fax": false,
           "mms": false,
           "sms": false,
-          "voice": false
+          "voice": false,
+          "verification_status":false
         }
       })
       .select();
