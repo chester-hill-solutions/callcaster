@@ -13,6 +13,7 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 import ResultsScreen from "~/components/ResultsScreen";
+import MessageResultsScreen from "~/components/MessageResultsScreen";
 
 export const action = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
@@ -117,18 +118,34 @@ export const loader = async ({ request, params }) => {
     { campaign_id_param: selected_id },
     { headers },
   );
-  const { data: mtmData, error: mtmError } = await supabaseClient
+
+  const { data: campaign, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
-      `*,
+      `type,
+        dial_type,
+        title,
         campaign_audience(*)
         `,
     )
     .eq("id", selected_id);
-  let data = [...mtmData];
+    
+  let data = [...campaign];
   if (data.length > 0 && data[0].type === "live_call") {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
       .from("live_campaign")
+      .select()
+      .eq("campaign_id", selected_id)
+      .single();
+    if (detailsError) console.error(detailsError);
+    data = data.map((item) => ({
+      ...item,
+      campaignDetails,
+    }));
+  }
+  if (data.length > 0 && data[0].type === "message") {
+    const { data: campaignDetails, error: detailsError } = await supabaseClient
+      .from("message_campaign")
       .select()
       .eq("campaign_id", selected_id)
       .single();
@@ -142,7 +159,7 @@ export const loader = async ({ request, params }) => {
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
   const totalCalls = results?.reduce((sum, item) => sum + item.count, 0);
-  const expectedTotal = results && results[0]?.expected_total || 0;
+  const expectedTotal = (results && results[0]?.expected_total) || 0;
   return json({
     data,
     hasAccess,
@@ -176,6 +193,7 @@ export default function CampaignScreen() {
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+  const campaign = data.length ? data[0] : {};
 
   useEffect(() => {
     if (csvData && csvData.csvContent) {
@@ -251,12 +269,12 @@ export default function CampaignScreen() {
           </h1>
         </div>
       ) : (
-        isCampaignParentRoute && (
-          <div className="container mx-auto px-4 py-8">
-            <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
-            <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
-          </div>
-        )
+        isCampaignParentRoute &&
+        (campaign.type === "message" ? (
+          <MessageResultsScreen {...{ totalCalls, results, expectedTotal }} />
+        ) : (
+          <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
+        ))
       )}
       <Outlet context={{ audiences }} />
     </div>
