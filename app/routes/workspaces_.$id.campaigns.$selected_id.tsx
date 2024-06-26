@@ -14,6 +14,7 @@ import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 import ResultsScreen from "~/components/ResultsScreen";
 import MessageResultsScreen from "~/components/MessageResultsScreen";
+import { Button } from "~/components/ui/button";
 
 export const action = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
@@ -129,7 +130,7 @@ export const loader = async ({ request, params }) => {
         `,
     )
     .eq("id", selected_id);
-    
+
   let data = [...campaign];
   if (data.length > 0 && data[0].type === "live_call") {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
@@ -262,19 +263,57 @@ export default function CampaignScreen() {
           Join Campaign
         </NavLink>
       </div>
-      {isCampaignParentRoute && totalCalls < 0 ? (
+      {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
           <h1 className="font-Zilla-Slab text-4xl text-gray-400">
             Your Campaign Results Will Show Here
           </h1>
         </div>
-      ) : (
-        isCampaignParentRoute &&
-        (campaign.type === "message" ? (
+      ) : isCampaignParentRoute && hasAccess ? (
+        campaign.type === "message" ? (
           <MessageResultsScreen {...{ totalCalls, results, expectedTotal }} />
         ) : (
-          <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
-        ))
+          hasAccess && (
+            <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
+          )
+        )
+      ) : (
+        isCampaignParentRoute &&
+        !hasAccess &&
+        campaign.type === "live_call" && (
+          <div className="flex flex-auto flex-col items-center">
+            <div className="my-4 flex flex-col items-center">
+              <h3 className="my-4 font-Zilla-Slab text-xl">
+                {campaign.instructions?.join ||
+                  "Join the campaign and start dialing!"}
+              </h3>
+              <div>
+                <NavLink
+                  className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                  to={`${data[0].dial_type || "call"}`}
+                  relative="path"
+                >
+                  Join Campaign
+                </NavLink>
+              </div>
+            </div>
+            <div className="my-4 flex flex-col items-center">
+              <h3 className="my-4 font-Zilla-Slab text-xl">
+                {campaign.instructions?.script ||
+                  "Preview the Script and familiarize yourself before dialing."}
+              </h3>
+              <div>
+                <NavLink
+                  className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                  to="script"
+                  relative="path"
+                >
+                  View Script
+                </NavLink>
+              </div>
+            </div>
+          </div>
+        )
       )}
       <Outlet context={{ audiences }} />
     </div>

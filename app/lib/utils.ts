@@ -36,50 +36,94 @@ export function deepEqual(obj1: any, obj2: any) {
 }
 
 export const parseCSVHeaders = (unparsedHeaders) => {
-  const trimmedHeaders = unparsedHeaders.map((header) =>
-    header.toLowerCase().replace(/\W/g, ""),
+  const parsedHeaders = unparsedHeaders.map((header) =>
+    header.toLowerCase().trim(),
   );
-  console.log(trimmedHeaders);
-  let parsedHeaders = {
-    name: undefined,
-    phone: undefined,
-    address: undefined,
-    email: undefined,
-  };
-  const regexChecks = {
-    name: /name/,
-    phone: /phone/,
-    address: /address/,
-    email: /email/,
-  };
-  for (let i = 0; i < trimmedHeaders.length; i++) {
-    const header = trimmedHeaders[i];
-    if (regexChecks.name.test(header)) {
-      if (parsedHeaders["name"] != null) {
-        const otherNameIndex = parsedHeaders["name"];
-        console.log("first name index: ", otherNameIndex);
-        if (/first/.test(header)) {
-          parsedHeaders["name"] = [i, otherNameIndex];
-        } else {
-          // console.log("HERE");
-          parsedHeaders["name"] = [otherNameIndex, i];
-          console.log(parsedHeaders["name"]);
-        }
-      } else {
-        //   console.log("HERE???");
-        parsedHeaders["name"] = i;
-      }
-    }
-
-    for (const check of Object.keys(regexChecks)) {
-      if (check === "name") continue;
-      if (regexChecks[check].test(header)) {
-        parsedHeaders[check] = i;
-      }
-    }
-  }
-  console.log(parsedHeaders);
   return parsedHeaders;
+};
+export const parseCSVData = (data, parsedHeaders) => {
+  return data.slice(1).map((row) => {
+    const contact = {
+      firstname: undefined,
+      surname: undefined,
+      phone: undefined,
+      email: undefined,
+      address: undefined,
+      city: undefined,
+      opt_out: undefined,
+      created_at: undefined,
+      workspace: undefined,
+      external_id: undefined,
+      postal: undefined,
+      other_data: [],
+    };
+    for (let i = 0; i < row.length; i++) {
+      const key = parsedHeaders[i];
+      const value = row[i]?.trim();
+      if (
+        key.match(
+          /^(contact[-_\s]?)?(first[-_\s]?name|given[-_\s]?name|forename)$/i,
+        )
+      ) {
+        contact.firstname = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(last[-_\s]?name|surname|family[-_\s]?name)$/i,
+        )
+      ) {
+        contact.surname = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(phone|phone[-_\s]?number|mobile|mobile[-_\s]?number|cell|cell[-_\s]?phone)$/i,
+        )
+      ) {
+        contact.phone = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(email|email[-_\s]?address|e-mail|e-mail[-_\s]?address)$/i,
+        )
+      ) {
+        contact.email = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(address|street|street[-_\s]?address|mailing[-_\s]?address|property[-_\s]?address|address[-_\s]?line[-_\s]?1)$/i,
+        )
+      ) {
+        contact.address = value;
+      } else if (key.match(/^(contact[-_\s]?)?(city|town)$/i)) {
+        contact.city = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(opt[-_]?out|unsubscribe|do[-_\s]?not[-_\s]?contact)$/i,
+        )
+      ) {
+        contact.opt_out = value?.toLowerCase() === "true";
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(external[-_]?id|vanid|van[-_]?id|id|record[-_\s]?id)$/i,
+        )
+      ) {
+        contact.external_id = value;
+      } else if (
+        key.match(
+          /^(contact[-_\s]?)?(postal|postal[-_]?code|zip|zip[-_]?code)$/i,
+        )
+      ) {
+        contact.postal = value;
+      } else if (key.match(/^(contact[-_\s]?)?(name)$/i)) {
+        const names = value.split(",").map((name) => name.trim());
+        contact.surname = names[0];
+        contact.firstname = names[1];
+      } else if (key.match(/^(contact[-_\s]?)?(province|state)$/i)) {
+        contact.province = value;
+      } else if (key.match(/^(contact[-_\s]?)?(country)$/i)) {
+        contact.country = value;
+      } else {
+        contact.other_data.push({ [key]: value });
+      }
+    }
+    return contact;
+  });
 };
 
 export function campaignTypeText(campaignType: string): string {
