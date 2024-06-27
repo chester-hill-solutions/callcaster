@@ -465,9 +465,7 @@ export default function ScriptEditor() {
                           </table>
                         </div>
                       )}
-                      {!question.nextStep && (
-                        
-                      )}
+                      {!question.nextStep && <div></div>}
                     </div>
                   </div>
                 ))}

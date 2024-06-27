@@ -1,3 +1,4 @@
+import Twilio from "twilio";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
@@ -61,13 +62,16 @@ export async function createNewWorkspace({
     await supabaseClient.rpc("create_new_workspace", {
       new_workspace_name: workspaceName,
     });
-  const registeredAccount = await fetch(`${process.env.BASE_URL}/api/workspace`, {
-    body: JSON.stringify({ workspace_id: insertWorkspaceData }),
-    headers: {
-      "Content-Type": "application/json",
+  const registeredAccount = await fetch(
+    `${process.env.BASE_URL}/api/workspace`,
+    {
+      body: JSON.stringify({ workspace_id: insertWorkspaceData }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+      method: "POST",
     },
-    method: "POST",
-  })
+  )
     .then((res) => res.json())
     .catch((e) => console.error(e));
   if (insertWorkspaceError) {
@@ -135,6 +139,22 @@ export async function getWorkspaceUsers({
     console.log("Error on function getWorkspaceUsers", error);
   }
 
+  return { data, error };
+}
+export async function getWorkspacePhoneNumbers({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const { data, error } = await supabaseClient
+    .from("workspace_number")
+    .select()
+    .eq(`workspace`, workspaceId);
+  if (error) {
+    console.log("Error on function getWorkspacePhoneNumbers", error);
+  }
   return { data, error };
 }
 
@@ -224,4 +244,46 @@ export async function forceTokenRefresh({
 
   console.log("\nREFRESH");
   return { data: refreshData, error: null };
+}
+export async function removeWorkspacePhoneNumber({
+  supabaseClient,
+  workspaceId,
+  numberId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  numberId: bigint;
+}) {
+  try {
+    const { data, error } = await supabaseClient
+      .from("workspace")
+      .select("twilio_data")
+      .eq("id", workspaceId)
+      .single();
+    if (error) throw error;
+    const { data: number, error: numberError } = await supabaseClient
+      .from("workspace_number")
+      .select()
+      .eq("id", numberId)
+      .single();
+    if (numberError) throw numberError;
+    const twilio = new Twilio.Twilio(
+      data.twilio_data.sid,
+      data.twilio_data.authToken,
+    );
+    const outgoingIds = await twilio.outgoingCallerIds.list({
+      friendlyName: number.friendly_name,
+    });
+    outgoingIds.map(async (id) => {
+      return await twilio.outgoingCallerIds(id).remove();
+    });
+    const { error: deletionError } = await supabaseClient
+      .from("workspace_number")
+      .delete()
+      .eq("id", numberId);
+    if (deletionError) throw deletionError;
+    return {error: null}
+  } catch (error) {
+    return { error };
+  }
 }

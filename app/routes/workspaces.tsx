@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import { Form, Link, useActionData, useLoaderData, useOutletContext } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "~/components/ui/button";
@@ -138,6 +138,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 //************COMPONENT************/
 export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<typeof loader>();
+  
   // console.log(workspaces);
 
   const actionData = useActionData<typeof action>();

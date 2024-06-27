@@ -5,13 +5,18 @@ import {
   Form,
   json,
   Link,
+  NavLink,
   useActionData,
   useLoaderData,
 } from "@remix-run/react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
-import { getUserRole, getWorkspaceUsers } from "~/lib/database.server";
+import {
+  getUserRole,
+  getWorkspacePhoneNumbers,
+  getWorkspaceUsers,
+} from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import {
   handleAddUser,
@@ -26,6 +31,12 @@ import {
 import { toast, Toaster } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { capitalize } from "~/lib/utils";
+import {
+  MdCached,
+  MdCheckCircle,
+  MdError,
+  MdErrorOutline,
+} from "react-icons/md";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -36,6 +47,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient,
     workspaceId,
   });
+  const { data: phoneNumbers, error: numbersError } =
+    await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
 
   if (serverSession) {
     const userRole = getUserRole({ serverSession, workspaceId });
@@ -47,6 +60,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         userRole,
         users: users,
         activeUserId: serverSession.user.id,
+        phoneNumbers,
       },
       { headers },
     );
@@ -58,6 +72,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       userRole: null,
       users: null,
       activeUserId: serverSession.user.id,
+      phoneNumbers,
     },
     { headers },
   );
@@ -130,13 +145,12 @@ function compareMembersByRole(a, b) {
 }
 
 export default function WorkspaceSettings() {
-  const { hasAccess, userRole, users, activeUserId } =
+  const { hasAccess, userRole, users, activeUserId, phoneNumbers } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const { theme } = useTheme();
   // console.log("Theme", theme);
   // console.log("Users: ", users);
-
   const workspaceOwner = users?.find(
     (user) => user.user_workspace_role === "owner",
   );
@@ -227,17 +241,8 @@ export default function WorkspaceSettings() {
             </select>
           </label>
           <div className="flex w-full gap-2">
-            <Button className="h-full w-2/3 font-Zilla-Slab text-2xl font-semibold">
+            <Button className="h-full w-full font-Zilla-Slab text-2xl font-semibold">
               Add New User
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="h-full w-1/3 border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
-            >
-              <Link to=".." relative="path">
-                Back
-              </Link>
             </Button>
           </div>
         </Form>
@@ -293,51 +298,64 @@ export default function WorkspaceSettings() {
   );
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
-      <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
-        Manage Team Members
-      </h3>
-      <div className="flex flex-col">
-        <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
-          Owner
-        </p>
-        <TeamMember
-          member={workspaceOwner}
-          userRole={userRole}
-          memberIsUser={workspaceOwner.id === activeUserId}
-          workspaceOwner={workspaceOwner}
-        />
-      </div>
-      <div className="flex flex-col">
-        <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
-          Members
-        </p>
-        <ul className=" flex w-full flex-col items-center gap-2">
-          {users?.map((member) => {
-            if (member.user_workspace_role === "owner") {
-              return <></>;
-            }
-            return (
-              <li key={member.id} className="w-full">
-                <TeamMember
-                  member={member}
-                  userRole={userRole}
-                  memberIsUser={member.id === activeUserId}
-                  workspaceOwner={workspaceOwner}
-                />
-              </li>
-            );
-          })}
-        </ul>
+    <div className="flex flex-col">
+      <div className="flex justify-end pr-4 pt-4">
+        <Button
+          asChild
+          variant="outline"
+          className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+        >
+          <Link to=".." relative="path">
+            Back
+          </Link>
+        </Button>
       </div>
 
-      <div className="flex flex-col">
-        {/* <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+      <div className="flex flex-wrap">
+        <div className="m-8 flex w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
+          <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
+            Manage Team Members
+          </h3>
+          <div className="flex flex-col">
+            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+              Owner
+            </p>
+            <TeamMember
+              member={workspaceOwner}
+              userRole={userRole}
+              memberIsUser={workspaceOwner.id === activeUserId}
+              workspaceOwner={workspaceOwner}
+            />
+          </div>
+          <div className="flex flex-col">
+            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+              Members
+            </p>
+            <ul className=" flex w-full flex-col items-center gap-2">
+              {users?.map((member) => {
+                if (member.user_workspace_role === "owner") {
+                  return <></>;
+                }
+                return (
+                  <li key={member.id} className="w-full">
+                    <TeamMember
+                      member={member}
+                      userRole={userRole}
+                      memberIsUser={member.id === activeUserId}
+                      workspaceOwner={workspaceOwner}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+          <div className="flex flex-col">
+            {/* <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
           Add New Member
         </p> */}
-        {hasAccess ? addUserTabs : callerSelfDeleteForm}
-      </div>
-      {/* {userRole === MemberRole.Owner && (
+            {hasAccess ? addUserTabs : callerSelfDeleteForm}
+          </div>
+          {/* {userRole === MemberRole.Owner && (
         <Form method="POST" className="w-full">
           <input type="hidden" name="formName" value="deleteWorkspace" />
           <Button variant={"destructive"} className="w-full">
@@ -345,7 +363,69 @@ export default function WorkspaceSettings() {
           </Button>
         </Form>
       )} */}
-      <Toaster richColors />
-    </main>
+          <Toaster richColors />
+        </div>
+        <div className="m-8 flex w-fit flex-col justify-between gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
+          <div>
+            <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
+              Manage Phone Numbers
+            </h3>
+            <div className="flex flex-col py-4">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+                Phone Numbers
+              </p>
+              <ul className=" flex w-full flex-col items-center gap-2">
+                {phoneNumbers?.map((number) => {
+                  return (
+                    <li key={number.id} className="w-full">
+                      <div className="flex w-full items-center justify-between bg-transparent p-2 text-xl shadow-sm dark:border-white">
+                        <p className="font-semibold">{number.phone_number}</p>
+                        <div>
+                          {number.capabilities.verification_status ===
+                          "success" ? (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase">
+                                {number.capabilities.verification_status}
+                              </p>
+                              <MdCheckCircle fill="#008800" size={24} />
+                            </div>
+                          ) : number.capabilities.verification_status ===
+                            "failed" ? (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase">
+                                {number.capabilities.verification_status}
+                              </p>
+                              <MdError fill="#880000" size={24} />
+                            </div>
+                          ) : number.capabilities.verification_status ===
+                            "pending" ? (
+                            <div className="i gap-2tems-center flex">
+                              <p className="text-xs uppercase">
+                                {number.capabilities.verification_status}
+                              </p>
+                              <MdCached size={24} />
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          {hasAccess && <div className="">
+            <Button
+              asChild
+              className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
+            >
+              <NavLink to={"./numbers"} relative="path">
+                Manage Numbers
+              </NavLink>
+            </Button>
+          </div>}
+        </div>
+      </div>
+    </div>
   );
 }
