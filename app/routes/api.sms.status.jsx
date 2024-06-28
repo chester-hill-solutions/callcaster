@@ -9,7 +9,9 @@ export const action = async ({ request }) => {
 
     const parsedBody = Object.fromEntries(formData.entries());
     const { SmsSid: sid, SmsStatus: status } = parsedBody;
-    const { data: record, error } = await supabase.from('message').update({status}).eq('sid', sid)
+    const { data: record, error } = await supabase.from('message').update({status}).eq('sid', sid).select();
     if (error) console.log(error)
-    return json(record)
+    const { data: outreach, error:outreachError } = await supabase.from('outreach_attempt').update({disposition: status}).eq('id', record[0].outreach_attempt_id).select();
+    if (outreachError) console.log(outreachError)
+    return json({record, outreach})
 }

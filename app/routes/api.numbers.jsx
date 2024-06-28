@@ -1,5 +1,5 @@
 import Twilio from 'twilio';
-import { createClient } from '@supabase/supabase-js'; // TODO - This needs to be replaced with the server one.
+import { getSupabaseServerClientWithSession } from '../lib/supabase.server';
 
 export const loader = async ({ request }) => {
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -30,8 +30,10 @@ export const loader = async ({ request }) => {
 }
 
 export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { phoneNumber, workspace_id } = await request.json();
+    const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
+    //const { phoneNumber, workspace_id } = await request.json();
+    const { phoneNumber, workspace_id } = Object.fromEntries(await request.formData());
+
     try {
         const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
         if (error) throw error;
@@ -40,14 +42,14 @@ export const action = async ({ request }) => {
             phoneNumber
         });
         const { data: newNumber, error: newNumberError } = await supabase
-        .from('workspace_number')
-        .insert({
-            workspace: workspace_id,
-            friendly_name: number.friendlyName,
-            phone_number: number.phoneNumber,
-            capabilities: number.capabilities
-        })
-        .select().single();
+            .from('workspace_number')
+            .insert({
+                workspace: workspace_id,
+                friendly_name: number.friendlyName,
+                phone_number: number.phoneNumber,
+                capabilities: {...number.capabilities, verification_status:"success"}
+            })
+            .select().single();
         if (newNumberError) throw newNumberError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {

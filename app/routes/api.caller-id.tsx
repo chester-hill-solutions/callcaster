@@ -1,6 +1,6 @@
-import Twilio from 'twilio';
-import { json, ActionFunction } from '@remix-run/node';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import Twilio from "twilio";
+import { json, ActionFunction } from "@remix-run/node";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 interface WorkspaceData {
   twilio_data: {
@@ -16,20 +16,20 @@ interface RequestBody {
 }
 
 function normalizePhoneNumber(input: string): string {
-  let cleaned = input.replace(/[^0-9+]/g, '');
-  if (cleaned.indexOf('+') > 0) {
-    cleaned = cleaned.replace(/\+/g, '');
+  let cleaned = input.replace(/[^0-9+]/g, "");
+  if (cleaned.indexOf("+") > 0) {
+    cleaned = cleaned.replace(/\+/g, "");
   }
-  if (!cleaned.startsWith('+')) {
-    cleaned = '+' + cleaned;
+  if (!cleaned.startsWith("+")) {
+    cleaned = "+" + cleaned;
   }
   const validLength = 11;
   const minLength = 11;
   if (cleaned.length < minLength + 1) {
-    cleaned = '+1' + cleaned.replace('+', '');
+    cleaned = "+1" + cleaned.replace("+", "");
   }
   if (cleaned.length !== validLength + 1) {
-    throw new Error('Invalid phone number length');
+    throw new Error("Invalid phone number length");
   }
   return cleaned;
 }
@@ -38,53 +38,64 @@ export const action: ActionFunction = async ({ request }) => {
   try {
     const supabase: SupabaseClient = createClient(
       process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!
+      process.env.SUPABASE_SERVICE_KEY!,
     );
-
-    const { phoneNumber, workspace_id, friendlyName }: RequestBody = await request.json();
+    //const { phoneNumber, workspace_id, friendlyName }: RequestBody = Object.fromEntries(await request.formData());
+    const { phoneNumber, workspace_id, friendlyName }: RequestBody =
+      await request.json();
 
     const { data, error } = await supabase
-      .from('workspace')
-      .select('twilio_data')
-      .eq('id', workspace_id)
+      .from("workspace")
+      .select()
+      .eq("id", workspace_id)
       .single();
-
     if (error) throw new Error(`Supabase query error: ${error.message}`);
-    if (!data) throw new Error('No workspace data found');
+    if (!data) throw new Error("No workspace data found");
 
     const workspaceData = data as WorkspaceData;
 
-    const twilio = new Twilio.Twilio(workspaceData.twilio_data.sid, workspaceData.twilio_data.authToken);
+    const twilio = new Twilio.Twilio(
+      workspaceData.twilio_data.sid,
+      workspaceData.twilio_data.authToken,
+    );
 
     const validationRequest = await twilio.validationRequests.create({
       friendlyName,
       phoneNumber,
-      statusCallback: `${process.env.BASE_URL}/api/caller-id/status`
+      statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
     });
 
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase
-      .from('workspace_number')
-      .insert({
-        workspace: workspace_id,
-        friendly_name: friendlyName,
-        phone_number: normalizedPhoneNumber,
-        capabilities: {
-          "fax": false,
-          "mms": false,
-          "sms": false,
-          "voice": false,
-          "verification_status":false
-        }
-      })
+      .from("workspace_number")
+      .upsert(
+        {
+          workspace: workspace_id,
+          friendly_name: friendlyName,
+          phone_number: normalizedPhoneNumber,
+          capabilities: {
+            fax: false,
+            mms: false,
+            sms: false,
+            voice: false,
+            verification_status: 'pending',
+          },
+        },
+        {
+          onConflict: "phone_number, workspace",
+        },
+      )
       .select();
 
-    if (numberError) throw new Error(`Error inserting workspace number: ${numberError.message}`);
+    if (numberError)
+      throw new Error(
+        `Error inserting workspace number: ${numberError.message}`,
+      );
 
     return json({ validationRequest, numberRequest });
   } catch (error) {
-    console.error('Action error:', error);
+    console.error("Action error:", error);
     return json({ error: (error as Error).message }, { status: 500 });
   }
 };
