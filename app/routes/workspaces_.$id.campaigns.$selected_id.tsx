@@ -15,6 +15,7 @@ import { MemberRole } from "~/components/Workspace/TeamMember";
 import ResultsScreen from "~/components/ResultsScreen";
 import MessageResultsScreen from "~/components/MessageResultsScreen";
 import { Button } from "~/components/ui/button";
+import { TotalCalls } from "~/components/ResultsScreen.TotalCalls";
 
 export const action = async ({ request, params }) => {
   const { supabaseClient, headers, serverSession } =
@@ -198,7 +199,6 @@ export default function CampaignScreen() {
 
   useEffect(() => {
     if (csvData && csvData.csvContent) {
-      console.log();
       const blob = new Blob([csvData.csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -210,7 +210,6 @@ export default function CampaignScreen() {
       window.URL.revokeObjectURL(url);
     }
   }, [csvData]);
-
   return (
     <div className="flex h-full w-full flex-col">
       <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
@@ -253,15 +252,17 @@ export default function CampaignScreen() {
             {data[0]?.title}
           </h3>
         </div>
-        <NavLink
-          className={({ isActive, isPending }) =>
-            handleNavlinkStyles(isActive, isPending)
-          }
-          to={`${data[0].dial_type || "call"}`}
-          relative="path"
-        >
-          Join Campaign
-        </NavLink>
+        { data[0].type === 'live_call' ?
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to={`${data[0].dial_type || "call"}`}
+            relative="path"
+          >
+            Join Campaign
+          </NavLink> : <div></div>
+        }
       </div>
       {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
@@ -271,45 +272,53 @@ export default function CampaignScreen() {
         </div>
       ) : isCampaignParentRoute && hasAccess ? (
         campaign.type === "message" ? (
-          <MessageResultsScreen {...{ totalCalls, results, expectedTotal }} />
+          <MessageResultsScreen {...{ totalCalls, results, expectedTotal, type: campaign.type, dial_type: data[0].dial_type, handleNavlinkStyles, hasAccess}} />
         ) : (
           hasAccess && (
-            <ResultsScreen {...{ totalCalls, results, expectedTotal }} />
+            <ResultsScreen {...{ totalCalls, results, expectedTotal, type: campaign.type, dial_type: data[0].dial_type, handleNavlinkStyles, hasAccess}} />
           )
         )
       ) : (
         isCampaignParentRoute &&
         !hasAccess &&
-        campaign.type === "live_call" && (
-          <div className="flex flex-auto flex-col items-center">
-            <div className="my-4 flex flex-col items-center">
-              <h3 className="my-4 font-Zilla-Slab text-xl">
-                {campaign.instructions?.join ||
-                  "Join the campaign and start dialing!"}
-              </h3>
-              <div>
-                <NavLink
-                  className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
-                  to={`${data[0].dial_type || "call"}`}
-                  relative="path"
-                >
-                  Join Campaign
-                </NavLink>
-              </div>
+        (campaign.type === "live_call" || !campaign.type) && (
+          <div className="flex">
+            <div className="flex min-w-[200px] flex-auto p-4">
+              <TotalCalls
+                totalCalls={totalCalls}
+                expectedTotal={expectedTotal}
+              />
             </div>
-            <div className="my-4 flex flex-col items-center">
-              <h3 className="my-4 font-Zilla-Slab text-xl">
-                {campaign.instructions?.script ||
-                  "Preview the Script and familiarize yourself before dialing."}
-              </h3>
-              <div>
-                <NavLink
-                  className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
-                  to="script"
-                  relative="path"
-                >
-                  View Script
-                </NavLink>
+            <div className="p-4">
+              <div className="max-w-50 flex flex-col">
+                <h3 className="my-4 font-Zilla-Slab text-xl">
+                  {campaign.instructions?.join ||
+                    "Join the campaign and start dialing!"}
+                </h3>
+                <div>
+                  <NavLink
+                    className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                    to={`${data[0].dial_type || "call"}`}
+                    relative="path"
+                  >
+                    Join Campaign
+                  </NavLink>
+                </div>
+              </div>
+              <div className="my-4 flex flex-col">
+                <h3 className="my-4 font-Zilla-Slab text-xl">
+                  {campaign.instructions?.script ||
+                    "Preview the Script and familiarize yourself before dialing."}
+                </h3>
+                <div>
+                  <NavLink
+                    className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                    to="script"
+                    relative="path"
+                  >
+                    View Script
+                  </NavLink>
+                </div>
               </div>
             </div>
           </div>

@@ -1,8 +1,10 @@
 import { MdAddAPhoto } from "react-icons/md";
 import { useState } from "react";
-import { Form } from "@remix-run/react";
-export const MessageSettings = ({ pageData, submit, bodyText, setBodyText, workspace_id }) => {
+import { Form, useSubmit } from "@remix-run/react";
+
+export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, selected_id }) => {
     const [eraseVisible, setEraseVisible] = useState({});
+    const submit = useSubmit();
 
     const showErase = (imageId) => {
         setEraseVisible((prevState) => ({
@@ -18,13 +20,22 @@ export const MessageSettings = ({ pageData, submit, bodyText, setBodyText, works
         }));
     };
 
-    const removeImage = (e) => {
+    const removeImage = (imageId) => {
         const formData = new FormData();
-        formData.append("fileName", e);
+        formData.append("fileName", imageId);
         submit(formData, {
             method: "POST",
         });
+        onPageDataChange({
+            ...pageData,
+            message_media: pageData.message_media.filter(media => media !== imageId),
+            campaignDetails: {
+                ...pageData.campaignDetails,
+                mediaLinks: pageData.campaignDetails.mediaLinks.filter((_, i) => pageData.message_media[i] !== imageId)
+            }
+        });
     };
+
     const handleAddMedia = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -41,6 +52,14 @@ export const MessageSettings = ({ pageData, submit, bodyText, setBodyText, works
         });
     };
 
+    const handleBodyTextChange = (event) => {
+        onPageDataChange({
+            ...pageData,
+            body_text: event.target.value
+        });
+    };
+
+
     return (
         <div className="flex flex-col items-center">
             <div className="my-1 flex flex-col gap-2 px-2">
@@ -51,12 +70,12 @@ export const MessageSettings = ({ pageData, submit, bodyText, setBodyText, works
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
-                {pageData[0].body_text || pageData[0].message_media ? (
+                {pageData.body_text || pageData.message_media ? (
                     <div className="flex flex-col">
                         <div className="flex flex-wrap justify-between">
-                            {pageData[0].campaignDetails.mediaLinks?.length > 0 &&
-                                pageData[0].campaignDetails.mediaLinks.map((img, i) => {
-                                    const imageId = pageData[0].message_media[i];
+                            {pageData.campaignDetails.mediaLinks?.length > 0 &&
+                                pageData.campaignDetails.mediaLinks.map((img, i) => {
+                                    const imageId = pageData.message_media[i];
                                     return (
                                         <div
                                             key={imageId}
@@ -84,34 +103,31 @@ export const MessageSettings = ({ pageData, submit, bodyText, setBodyText, works
                                 })}
                         </div>
                         <div>
-                            <Form>
+                            <Form >
                                 <div className="text-sm leading-snug text-gray-700">
                                     <textarea
                                         name="body_text"
                                         className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
                                         style={{ caretColor: "black" }}
                                         rows={5}
-                                        value={bodyText}
-                                        onChange={(event) => setBodyText(event.target.value)}
+                                        value={pageData.body_text}
+                                        onChange={handleBodyTextChange}
                                     />
                                 </div>
                                 <div className="flex justify-end my-2">
-                                    <button style={{ border: "none", background: '#008800', padding: "4px 8px", borderRadius: "20px", fontSize: "small" }} type="submit">
-                                        SAVE
-                                    </button>
                                 </div>
                             </Form>
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {bodyText.length % 140} /{" "}
-                                    {Math.max(1, Math.ceil(bodyText.length / 140)) * 140}{" "}
+                                    {pageData.body_text.length % 140} /{" "}
+                                    {Math.max(1, Math.ceil(pageData.body_text.length / 140)) * 140}{" "}
                                     characters
                                 </div>
                                 <div>
-                                    {Math.ceil(bodyText.length / 140)} part
-                                    {bodyText.length > 140 ? "s" : ""}
+                                    {Math.ceil(pageData.body_text.length / 140)} part
+                                    {pageData.body_text.length > 140 ? "s" : ""}
                                 </div>
                             </div>
                             <div>

@@ -16,7 +16,7 @@ export async function action({ request, params }) {
     const mediaName = formData.get("fileName");
     const encodedMediaName = encodeURI(mediaName);
     const campaignId = formData.get("campaignId");
-    const { data: uploadData, error: uploadError } = await supabaseClient.storage
+    const {  error: uploadError } = await supabaseClient.storage
         .from("messageMedia")
         .upload(`${workspaceId}/${encodedMediaName}`, mediaToUpload, {
             cacheControl: "60",

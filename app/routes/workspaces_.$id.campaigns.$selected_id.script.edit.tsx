@@ -1,6 +1,6 @@
 import { FaPlus } from "react-icons/fa";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useSubmit } from "@remix-run/react";
+import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo, useState, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
@@ -8,7 +8,8 @@ import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { MessageSettings } from "../components/MessageSettings";
-import { MdBubbleChart, MdMic } from "react-icons/md";
+import { IVRSettings } from "~/components/IVRSettings";
+
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
 
@@ -38,7 +39,13 @@ export const loader = async ({ request, params }) => {
 
     return media;
   }
-
+  async function listMedia(workspace: string) {
+    const { data, error } = await supabaseClient.storage
+      .from(`workspaceAudio`)
+      .list(workspace);
+    if (error) console.error(error);
+    return data;
+  }
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
 
   const { data: mtmData, error: mtmError } = await supabaseClient
@@ -71,7 +78,7 @@ export const loader = async ({ request, params }) => {
       selected_id,
       data,
       selected,
-      mediaData,
+      mediaNames: await listMedia(workspace_id),
       userRole,
     });
   }
@@ -104,7 +111,6 @@ export const loader = async ({ request, params }) => {
       selected_id,
       data,
       selected,
-      mediaData,
       userRole,
     });
   }
@@ -130,10 +136,12 @@ export const loader = async ({ request, params }) => {
       ...campaignDetails,
       campaignDetails: { mediaLinks: media },
     }));
+    const mediaNames = await listMedia(workspace_id);
     return json({
       workspace_id,
       selected_id,
       data,
+      mediaNames,
       selected,
       userRole,
     });
@@ -142,6 +150,7 @@ export const loader = async ({ request, params }) => {
       workspace_id,
       selected_id,
       data,
+      mediaNames: [],
       selected,
       userRole,
     });
@@ -182,300 +191,79 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, data = [] } = useLoaderData();
+  const { workspace_id, selected_id, mediaNames } = useLoaderData();
+  const data = useOutletContext();
   const submit = useSubmit();
-  const pageData = useMemo(() => data || [], [data]);
-  const initQuestions = useMemo(() => {
-    return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
-      ? [...pageData[0]?.campaignDetails?.questions]
-      : [];
-  }, [pageData]);
-  const [questions, setQuestions] = useState(() => {
-    return initQuestions.map((q, index) => ({ ...q, order: index }));
-  });
+  const [pageData, setPageData] = useState(data);
   const [isChanged, setChanged] = useState(false);
-  const [bodyText, setBodyText] = useState(pageData[0]?.body_text || "");
-  const [openQuestion, setOpenQuestion] = useState(null);
-
   const handleSaveUpdate = () => {
-    const campaign = data[0];
-    const updateData = {
-      campaign_id: campaign.id,
-      ...campaign,
-      questions,
-    };
-    submit(updateData, {
-      method: "patch",
-      encType: "application/json",
-      navigate: false,
-      action: "/api/campaigns",
-    });
+    submit(
+      { ...pageData[0], id: selected_id },
+      {
+        method: "patch",
+        encType: "application/json",
+        navigate: false,
+        action: "/api/campaigns",
+      },
+    );
   };
 
   const handleReset = () => {
-    setQuestions(initQuestions);
-    setChanged(!deepEqual(questions, initQuestions));
-  };
-  const removeQuestion = (id) => {
-    setQuestions((prevQuestions) =>
-      prevQuestions.filter((question) => question.id !== id),
-    );
-    setChanged(!deepEqual(questions, initQuestions));
+    setPageData(data);
+    setChanged(false);
   };
 
-  const addQuestion = () => {
-    setQuestions((prevQuestions) => [
-      ...prevQuestions,
-      {
-        id: `new-question-${questions.length + 1}`,
-        title: "",
-        type: "textarea",
-        order: prevQuestions.length,
-      },
-    ]);
-    setOpenQuestion(`new-question-${questions.length + 1}`);
-    setChanged(!deepEqual(questions, initQuestions));
-  };
-
-  const moveUp = (index) => {
-    if (index <= 0) return;
-    const newQuestions = [...questions];
-    [newQuestions[index], newQuestions[index - 1]] = [
-      newQuestions[index - 1],
-      newQuestions[index],
-    ];
-    newQuestions[index].order = index;
-    newQuestions[index - 1].order = index - 1;
-    setQuestions(newQuestions);
-    setChanged(!deepEqual(questions, initQuestions));
-  };
-
-  const moveDown = (index) => {
-    if (index >= questions.length - 1) return;
-    const newQuestions = [...questions];
-    [newQuestions[index], newQuestions[index + 1]] = [
-      newQuestions[index + 1],
-      newQuestions[index],
-    ];
-    newQuestions[index].order = index;
-    newQuestions[index + 1].order = index + 1;
-    setQuestions(newQuestions);
-    setChanged(!deepEqual(questions, initQuestions));
-  };
-
-  const updateQuestion = (index, updatedQuestion) => {
-    setQuestions((prevQuestions) => {
-      const newQuestions = [...prevQuestions];
-      if (updatedQuestion.id && updatedQuestion.id !== newQuestions[index].id) {
-        const existingIndex = newQuestions.findIndex(
-          (question) => question.id === updatedQuestion.id,
-        );
-        if (existingIndex !== -1) {
-          throw new Error(`ID ${updatedQuestion.id} already exists`);
-        }
-      }
-      newQuestions[index] = { ...newQuestions[index], ...updatedQuestion };
-      return newQuestions;
-    });
-  };
-
-  const dispatchState = (e) => {
-    const quesIndex = questions.findIndex(
-      (question) => question.id === e.oldState.id,
-    );
-    const updatedQuestion = e.newState;
-    setOpenQuestion(e.newState.id);
-    try {
-      updateQuestion(quesIndex, updatedQuestion);
-      setChanged(!deepEqual(e.newState, e.oldState));
-    } catch (error) {
-      console.error(error.message);
-    }
+  const handlePageDataChange = (newPageData) => {
+    setPageData(newPageData);
+    setChanged(!deepEqual(newPageData, data));
   };
 
   useEffect(() => {
-    setChanged(!deepEqual(questions, initQuestions));
-  }, [initQuestions, questions]);
-  console.log(pageData[0].campaignDetails.mediaLinks);
+    setChanged(!deepEqual(pageData, data));
+  }, [data, pageData]);
+
   return (
     <div className="relative flex h-full flex-col">
       {isChanged && (
-        <div
-          className="absolute flex w-full items-center justify-between bg-accent px-4 py-4"
-          style={{ top: "-105px" }}
-        >
-          <Button onClick={handleReset} color="accent">
+        <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between bg-primary px-6 py-5 text-white shadow-md">
+          <Button
+            onClick={handleReset}
+            className="rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100"
+          >
             Reset
           </Button>
-          <div className="font-Zilla-Slab text-xl">
-            You have unsaved changes
-          </div>
-          <Button onClick={handleSaveUpdate}>Save Changes</Button>
+          <div className="text-lg font-semibold">You have unsaved changes</div>
+          <Button
+            onClick={handleSaveUpdate}
+            className="rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white "
+          >
+            Save Changes
+          </Button>
         </div>
       )}
-      {pageData[0].type === "live_call" && (
+      {(pageData[0].type === "live_call" || pageData[0].type === null) && (
         <CampaignSettingsScript
-          {...{
-            questions,
-            addQuestion,
-            removeQuestion,
-            moveUp,
-            moveDown,
-            updateQuestion,
-            openQuestion,
-            setOpenQuestion,
-            dispatchState,
-          }}
+          pageData={pageData[0]}
+          onPageDataChange={(newData) => handlePageDataChange([newData])}
         />
       )}
       {pageData.length > 0 &&
         (pageData[0].type === "robocall" ||
           pageData[0].type === "simple_ivr" ||
           pageData[0].type === "complex_ivr") && (
-          <div>
-            <div className="my-1 flex gap-2 px-2">
-              <div
-                className="flex flex-col"
-                style={{
-                  flex: "1 1 20%",
-                  border: "3px solid #BCEBFF",
-                  borderRadius: "20px",
-                  boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-                  minHeight: "300px",
-                }}
-              >
-                <button
-                  className="gap-2 bg-primary px-2 py-2 font-Zilla-Slab text-xl text-white"
-                  onClick={addQuestion}
-                  style={{
-                    justifyContent: "center",
-                    display: "flex",
-                    alignItems: "center",
-                    borderTopLeftRadius: "18px",
-                    borderTopRightRadius: "18px",
-                  }}
-                >
-                  Add Question
-                  <FaPlus size="16px" />
-                </button>
-                {pageData[0].step_data.map((question) => {
-                  return (
-                    <button
-                      key={question.id}
-                      onClick={() =>
-                        setOpenQuestion((curr) =>
-                          curr === question.id ? null : question.id,
-                        )
-                      }
-                      style={{ textAlign: "left", border: "1px solid #f1f1f1" }}
-                      className={`px-2 hover:bg-accent ${openQuestion === question.id && "bg-brand-secondary"}`}
-                    >
-                      {question.step} - {question.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div
-                className="flex flex-wrap justify-center"
-                style={{ flex: "1 1 80%", gap: "16px" }}
-              >
-                {pageData[0].step_data.map((question, index) => (
-                  <div
-                    key={index}
-                    className="relative flex w-2/5 flex-col rounded-2xl bg-[hsl(var(--card))] p-6"
-                  >
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-auto justify-between">
-                        <div className="text-xl font-semibold">
-                          {question.step} {question.name}
-                        </div>
-                        <div className="flex flex-col items-center text-xs uppercase">
-                          {question.speechType === "synthetic" ? (
-                            <MdBubbleChart size={24} />
-                          ) : (
-                            <MdMic size={24} />
-                          )}
-                          {question.speechType}
-                        </div>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          {question.speechType === "synthetic" ? (
-                            <div className="flex flex-col ">
-                              <div className="font-medium">Script</div>
-                              <div>{question.say}</div>
-                            </div>
-                          ) : (
-                            <audio
-                              src={
-                                pageData[0].campaignDetails?.mediaLinks?.find(
-                                  (media) =>
-                                    Object.keys(media)[0] === question.say,
-                                )?.[question.say]
-                              }
-                              controls
-                            />
-                          )}
-                        </div>
-                      </div>
-                      {question.nextStep && (
-                        <div className="mt-4 overflow-auto">
-                          <table className="w-full table-auto divide-y">
-                            <thead>
-                              <tr>
-                                <th className="px-4 py-2 text-left text-sm font-medium uppercase tracking-wider">
-                                  {question.responseType === "dtmf"
-                                    ? "Digit Entry"
-                                    : question.responseType === "speech"
-                                      ? "Speech"
-                                      : question.responseType === "dtmf speech"
-                                        ? "Digit Entry or Speech"
-                                        : "No response requested."}
-                                </th>
-                                <th className="px-4 py-2 text-left text-sm font-medium uppercase tracking-wider">
-                                  Next step
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {question.nextStep &&
-                                Object.entries(question.nextStep).map(
-                                  ([key, value]) => {
-                                    const nextQuestion =
-                                      pageData[0].step_data.find(
-                                        (q) => q.step == value,
-                                      );
-                                    return (
-                                      <tr key={key}>
-                                        <td className="whitespace-nowrap px-4 py-2 text-sm">
-                                          {key === "vx-any"
-                                            ? "Audio Response"
-                                            : key}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-2 text-sm">
-                                          {nextQuestion?.step}
-                                          {nextQuestion.name &&
-                                            ` - ${nextQuestion.name}`}
-                                        </td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                      {!question.nextStep && <div></div>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <IVRSettings
+            pageData={pageData}
+            edit={true}
+            mediaNames={mediaNames}
+            onChange={(data) => setPageData([data])}
+          />
         )}
       {pageData[0].type === "message" && (
         <MessageSettings
-          {...{ pageData, submit, bodyText, setBodyText, workspace_id }}
+          pageData={pageData[0]}
+          onPageDataChange={(newData) => handlePageDataChange([newData])}
+          workspace_id={workspace_id}
+          selected_id={selected_id}
         />
       )}
     </div>
