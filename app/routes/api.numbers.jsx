@@ -30,8 +30,8 @@ export const loader = async ({ request }) => {
 }
 
 export const action = async ({ request }) => {
-    const {supabaseClient:supabase} = await getSupabaseServerClientWithSession(request);
-    /* const { phoneNumber, workspace_id } = await request.json(); */
+    const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
+    //const { phoneNumber, workspace_id } = await request.json();
     const { phoneNumber, workspace_id } = Object.fromEntries(await request.formData());
 
     try {
@@ -42,14 +42,14 @@ export const action = async ({ request }) => {
             phoneNumber
         });
         const { data: newNumber, error: newNumberError } = await supabase
-        .from('workspace_number')
-        .insert({
-            workspace: workspace_id,
-            friendly_name: number.friendlyName,
-            phone_number: number.phoneNumber,
-            capabilities: number.capabilities
-        })
-        .select().single();
+            .from('workspace_number')
+            .insert({
+                workspace: workspace_id,
+                friendly_name: number.friendlyName,
+                phone_number: number.phoneNumber,
+                capabilities: {...number.capabilities, verification_status:"success"}
+            })
+            .select().single();
         if (newNumberError) throw newNumberError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {

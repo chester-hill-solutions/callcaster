@@ -5,7 +5,6 @@ import {
   Form,
   json,
   Link,
-  NavLink,
   useActionData,
   useFetcher,
   useLoaderData,
@@ -21,26 +20,9 @@ import {
   removeWorkspacePhoneNumber,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import {
-  handleAddUser,
-  handleDeleteSelf,
-  handleDeleteUser,
-  handleDeleteWorkspace,
-  handleInviteCaller,
-  handleTransferWorkspace,
-  handleUpdateUser,
-} from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
-import {useSupabaseRealtime} from "~/hooks/useSupabaseRealtime";
+import { useSupabaseRealtime } from "~/hooks/useSupabaseRealtime";
 import { toast, Toaster } from "sonner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { capitalize } from "~/lib/utils";
-import {
-  MdCached,
-  MdCheckCircle,
-  MdClose,
-  MdError,
-  MdErrorOutline,
-} from "react-icons/md";
+import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import {
   Dialog,
   DialogContent,
@@ -67,7 +49,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return json(
       {
         phoneNumbers,
-        workspaceId
+        workspaceId,
       },
       { headers },
     );
@@ -76,7 +58,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return json(
     {
       phoneNumbers,
-      workspaceId
+      workspaceId,
     },
     { headers },
   );
@@ -136,27 +118,23 @@ export const action = async ({ request, params }) => {
     });
     if (error) return { error };
     return null;
-  } else if (formName === "buy-number") {
-    delete data.formName;
-    const { error } = await removeWorkspacePhoneNumber({
-      supabaseClient,
-      numberId: data.numberId,
-      workspaceId: workspace_id,
-    });
-    if (error) return { error };
-    return null;
   }
   return { error: "What?" };
 };
 
 export default function WorkspaceSettings() {
-  const { phoneNumbers: initNumbers, workspaceId } = useLoaderData<typeof loader>();
+  const { phoneNumbers: initNumbers, workspaceId } =
+    useLoaderData<typeof loader>();
   const { supabase } = useOutletContext();
   const actionData = useActionData<typeof action>();
   const [isDialogOpen, setDialog] = useState(!!actionData?.data);
   const fetcher = useFetcher("numbers");
-  const {phoneNumbers} = useSupabaseRealtime({supabase, workspace:workspaceId, init:{phoneNumbers:initNumbers}});
-  
+  const { phoneNumbers } = useSupabaseRealtime({
+    supabase,
+    workspace: workspaceId,
+    init: { phoneNumbers: initNumbers },
+  });
+
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error);
@@ -423,33 +401,36 @@ export default function WorkspaceSettings() {
                                 </td>
                                 <td className="px-2 py-1 text-sm">$3.00/mo</td>
                                 <td className="px-2 py-1">
-                                  <button className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600">
-                                    Purchase
-                                  </button>
+                                  <Form
+                                    method="POST"
+                                    action="/api/numbers"
+                                    navigate={false}
+                                  >
+                                    <input
+                                      hidden
+                                      readOnly
+                                      name="phoneNumber"
+                                      value={number.phoneNumber}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="workspace_id"
+                                      value={workspaceId}
+                                    />
+
+                                    <button
+                                      className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600"
+                                      type="submit"
+                                    >
+                                      Purchase
+                                    </button>
+                                  </Form>
                                 </td>
                               </tr>
                             ))}
                           {!fetcher.data && (
-                            <><tr className="animate-pulse border-b dark:border-gray-700">
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                              <td className="px-2 py-1">
-                                <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                              </td>
-                            </tr><tr className="animate-pulse border-b dark:border-gray-700">
+                            <>
+                              <tr className="animate-pulse border-b dark:border-gray-700">
                                 <td className="px-2 py-1">
                                   <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
                                 </td>
@@ -468,7 +449,8 @@ export default function WorkspaceSettings() {
                                 <td className="px-2 py-1">
                                   <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
                                 </td>
-                              </tr><tr className="animate-pulse border-b dark:border-gray-700">
+                              </tr>
+                              <tr className="animate-pulse border-b dark:border-gray-700">
                                 <td className="px-2 py-1">
                                   <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
                                 </td>
@@ -487,7 +469,28 @@ export default function WorkspaceSettings() {
                                 <td className="px-2 py-1">
                                   <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
                                 </td>
-                              </tr></>
+                              </tr>
+                              <tr className="animate-pulse border-b dark:border-gray-700">
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
+                                </td>
+                              </tr>
+                            </>
                           )}
                         </tbody>
                       </table>
