@@ -193,7 +193,7 @@ export default function ScriptPage() {
             </Button>
           </div>
         )}
-        {pageData[0].type === "live_call" && !outlet ? (
+        {(pageData[0].type === "live_call" || !pageData[0].type) && !outlet ? (
           <div className="flex flex-col gap-2">
             {!outlet && questions.length > 0 ? (
               questions.map((question) => (
@@ -210,7 +210,7 @@ export default function ScriptPage() {
               </div>
             )}
           </div>
-        ) : pageData[0].type === "live_call" && !outlet ? (
+        ) : pageData[0].type === "message" && !outlet ? (
           <div className="flex flex-col items-center">
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 

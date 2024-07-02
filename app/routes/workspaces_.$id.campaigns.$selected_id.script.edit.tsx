@@ -196,9 +196,11 @@ export default function ScriptEditor() {
   const submit = useSubmit();
   const [pageData, setPageData] = useState(data);
   const [isChanged, setChanged] = useState(false);
+
   const handleSaveUpdate = () => {
+    const body = pageData[0];
     submit(
-      { ...pageData[0], id: selected_id },
+      { ...body, id: selected_id },
       {
         method: "patch",
         encType: "application/json",

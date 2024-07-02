@@ -1,16 +1,10 @@
-import React from 'react';
+import { useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
 import { FaPlus } from "react-icons/fa";
 
 export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
     const questions = pageData.campaignDetails?.questions || [];
-
-    const setOpenQuestion = (questionId) => {
-        onPageDataChange({
-            ...pageData,
-            openQuestionId: questionId === pageData.openQuestionId ? null : questionId
-        });
-    };
+    const [openQuestion, setOpenQuestion] = useState(null);
 
     const addQuestion = () => {
         const newQuestion = {
@@ -77,7 +71,6 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                     flex: '1 1 20%',
                     border: "3px solid #BCEBFF",
                     borderRadius: "20px",
-                    boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
                     minHeight: "300px"
                 }}>
                     <button className="bg-primary text-white font-Zilla-Slab text-xl px-2 py-2 gap-2" onClick={addQuestion} style={{ justifyContent: 'center', display: "flex", alignItems: "center", borderTopLeftRadius: "18px", borderTopRightRadius: "18px" }}>
@@ -102,7 +95,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                             removeQuestion={removeQuestion}
                             moveUp={() => moveQuestion(index, -1)}
                             moveDown={() => moveQuestion(index, 1)}
-                            openQuestion={pageData.openQuestionId}
+                            openQuestion={openQuestion}
                             setOpenQuestion={setOpenQuestion}
                             dispatchState={(newState) => dispatchState(question, newState)}
                         />

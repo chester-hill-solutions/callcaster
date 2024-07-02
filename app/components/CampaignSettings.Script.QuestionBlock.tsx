@@ -3,7 +3,14 @@ import Result from "./CallList/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
 import { ArrowDown, ArrowUp } from "lucide-react";
-
+const questionTypes = [
+  { value: "textarea", label: "Text Input" },
+  { value: "infotext", label: "Static Text" },
+  { value: "radio", label: "Radio" },
+  { value: "dropdown", label: "Dropdown" },
+  { value: "boolean", label: "Boolean" },
+  { value: "multi", label: "Multi-Select" }
+];
 const QuestionHeader = ({
   questionId,
   removeQuestion,
@@ -49,42 +56,8 @@ const QuestionHeader = ({
   </div>
 );
 
-const IDInput = ({ question, handleTextChange }) => {
-  const [id, setId] = useState(question.id);
-  const inputRef = useRef(null);
-
-  const handleIdChange = (e) => {
-    const newId = e.target.value;
-    setId(newId);
-    handleTextChange(e);
-  };
-
-  useEffect(() => {
-    const newInputId = `${question.id}-id`;
-    if (inputRef.current) {
-      inputRef.current.id = newInputId;
-      inputRef.current.focus();
-    }
-  }, [question.id]);
-
-  return (
-    <div className="flex flex-col">
-      <label htmlFor={`${question.id}-id`}>Identifier</label>
-      <input
-        type="text"
-        name="id"
-        ref={inputRef}
-        value={id}
-        onChange={handleIdChange}
-        required
-      />
-    </div>
-  );
-};
-
 const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
   <div className="flex w-1/2 flex-col gap-2">
-    <IDInput question={question} handleTextChange={handleTextChange} />
 
     {[
       { label: "Title", name: "title", value: question.title },
@@ -110,11 +83,10 @@ const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
         value={question.type}
         onChange={handleTypeChange}
       >
-        {["textarea", "textblock", "radio", "dropdown", "boolean", "multi"].map(
+        {questionTypes.map(
           (type) => (
-            <option key={type} value={type}>
-              {type.charAt(0).toUpperCase() +
-                type.slice(1).replace(/block/, " Block")}
+            <option key={type.value} value={type.value}>
+              {type.label}
             </option>
           ),
         )}
@@ -271,9 +243,7 @@ export default function CampaignSettingsScriptQuestionBlock({
       key={question.id}
       className="relative mx-4 my-1 flex flex-col justify-center gap-2 bg-card p-2"
       style={{
-        border: "3px solid #BCEBFF",
         borderRadius: "20px",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
       }}
     >
       <QuestionHeader
@@ -289,8 +259,9 @@ export default function CampaignSettingsScriptQuestionBlock({
       <div
         style={{
           height: isOpen ? "unset" : "0px",
-          overflow: "hidden",
+          overflow: isOpen ? "unset": "hidden",
         }}
+        className="px-4"
       >
         <div className="flex justify-between gap-4">
           <QuestionInputs
