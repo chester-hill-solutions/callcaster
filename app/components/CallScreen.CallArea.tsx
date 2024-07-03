@@ -53,7 +53,7 @@ const CallArea = ({
   const [tooltip, setTooltip] = useState<string | null>(null);
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
-  const isFailed = recentAttempt?.disposition === "failed";
+  const isFailed = recentAttempt?.disposition === "failed" || recentAttempt?.result?.status === 'failed';
   const isDialing =
     activeCall?.parameters?.CallSid && !recentAttempt?.answered_at;
   const isConnected =
