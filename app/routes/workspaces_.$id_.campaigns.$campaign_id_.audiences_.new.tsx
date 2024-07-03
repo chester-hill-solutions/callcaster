@@ -187,7 +187,7 @@ export default function NewAudience() {
               variant="outline"
               className="h-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-3xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
             >
-              <Link to=".." relative="path">
+              <Link to="../../settings" relative="path">
                 Back
               </Link>
             </Button>

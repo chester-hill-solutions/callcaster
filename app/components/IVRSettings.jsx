@@ -34,7 +34,7 @@ export const IVRSettings = ({ pageData, edit = false, mediaNames = [], onChange 
     return (
         <div>
             <div className="my-1 flex gap-2 px-2">
-                <div className="flex gap-6 p-6 flex-wrap">
+                <div className="flex gap-8 p-6 justify-start flex-wrap">
                     {data.step_data && data.step_data.map((question, index) => (
                         <QuestionCard
                             key={index}

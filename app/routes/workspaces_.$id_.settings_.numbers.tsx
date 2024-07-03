@@ -33,7 +33,9 @@ import {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-
+  if (!serverSession.user){
+    return redirect('/signin')
+  }
   const workspaceId = params.id;
   const { data: users, error } = await getWorkspaceUsers({
     supabaseClient,
@@ -59,6 +61,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     {
       phoneNumbers,
       workspaceId,
+      user: serverSession?.user
     },
     { headers },
   );
@@ -123,16 +126,18 @@ export const action = async ({ request, params }) => {
 };
 
 export default function WorkspaceSettings() {
-  const { phoneNumbers: initNumbers, workspaceId } =
+  const { phoneNumbers: initNumbers, workspaceId, user } =
     useLoaderData<typeof loader>();
+    console.log(user)
   const { supabase } = useOutletContext();
   const actionData = useActionData<typeof action>();
   const [isDialogOpen, setDialog] = useState(!!actionData?.data);
   const fetcher = useFetcher("numbers");
   const { phoneNumbers } = useSupabaseRealtime({
     supabase,
+    user,
     workspace: workspaceId,
-    init: { phoneNumbers: initNumbers },
+    init: { phoneNumbers: initNumbers, queue:[] },
   });
 
   useEffect(() => {

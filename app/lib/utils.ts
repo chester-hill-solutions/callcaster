@@ -22,17 +22,71 @@ export function formatTableText(unformatted: string): string {
   return formatted;
 }
 
-export function deepEqual(obj1: any, obj2: any) {
-  if (obj1 === obj2) return true;
-  if (typeof obj1 !== "object" || typeof obj2 !== "object") return false;
-  if (obj1 === null || obj2 === null) return false;
-  if (Object.keys(obj1).length !== Object.keys(obj2).length) return false;
-
-  for (let key of Object.keys(obj1)) {
-    if (!deepEqual(obj1[key], obj2[key])) return false;
+export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = new WeakMap()): boolean {
+  function log(message: string) {
+    //console.log(`[${path}] ${message}`);
   }
 
-  return true;
+  if (obj1 === obj2) return true;
+  if (obj1 == null || obj2 == null) {
+    log(`One value is null or undefined: ${obj1} !== ${obj2}`);
+    return false;
+  }
+  if (typeof obj1 !== 'object' && typeof obj2 !== 'object') {
+    if (obj1 !== obj2) {
+      log(`Primitive values differ at ${path}: ${obj1} !== ${obj2}`);
+    }
+    return obj1 === obj2;
+  }
+
+  if (obj1 instanceof Date && obj2 instanceof Date) {
+    const equal = obj1.getTime() === obj2.getTime();
+    if (!equal) log(`Date values differ: ${obj1} !== ${obj2}`);
+    return equal;
+  }
+  if (obj1 instanceof RegExp && obj2 instanceof RegExp) {
+    const equal = obj1.toString() === obj2.toString();
+    if (!equal) log(`RegExp values differ: ${obj1} !== ${obj2}`);
+    return equal;
+  }
+
+  const type1 = Object.prototype.toString.call(obj1);
+  const type2 = Object.prototype.toString.call(obj2);
+  if (type1 !== type2) {
+    log(`Types differ: ${type1} !== ${type2}`);
+    return false;
+  }
+
+  if (Array.isArray(obj1) && Array.isArray(obj2)) {
+    if (obj1.length !== obj2.length) {
+      log(`Array lengths differ: ${obj1.length} !== ${obj2.length}`);
+      return false;
+    }
+    return obj1.every((item, index) => deepEqual(item, obj2[index], `${path}[${index}]`, seen));
+  }
+
+  if (seen.get(obj1) === obj2) return true;
+  seen.set(obj1, obj2);
+
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) {
+    log(`Number of keys differ: ${keys1.length} !== ${keys2.length}`);
+    const extraKeys1 = keys1.filter(key => !keys2.includes(key));
+    const extraKeys2 = keys2.filter(key => !keys1.includes(key));
+    if (extraKeys1.length) log(`Extra keys in first object: ${extraKeys1.join(', ')}`);
+    if (extraKeys2.length) log(`Extra keys in second object: ${extraKeys2.join(', ')}`);
+    return false;
+  }
+
+  return keys1.every(key => {
+    if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
+      log(`Second object doesn't have key: ${key}`);
+      return false;
+    }
+    return deepEqual(obj1[key], obj2[key], `${path}.${key}`, seen);
+  });
 }
 
 export const parseCSVHeaders = (unparsedHeaders) => {

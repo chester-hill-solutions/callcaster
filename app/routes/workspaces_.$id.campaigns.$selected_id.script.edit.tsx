@@ -90,7 +90,7 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
-    if (campaignDetails.message_media.length > 0) {
+    if (campaignDetails?.message_media?.length > 0) {
       media = await Promise.all(
         campaignDetails.message_media.map(async (mediaName) => {
           const { data, error } = await supabaseClient.storage
@@ -103,15 +103,12 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     return json({
       workspace_id,
       selected_id,
-      data,
       selected,
-      userRole,
     });
   }
   if (
@@ -133,26 +130,19 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     const mediaNames = await listMedia(workspace_id);
     return json({
       workspace_id,
       selected_id,
-      data,
       mediaNames,
-      selected,
-      userRole,
     });
   } else {
     return json({
       workspace_id,
       selected_id,
-      data,
       mediaNames: [],
-      selected,
-      userRole,
     });
   }
 };
@@ -183,6 +173,7 @@ export const action = async ({ request, params }) => {
     })
     .eq("campaign_id", campaignId)
     .select();
+
   if (updateError) {
     console.log(updateError);
     return json({ success: false, error: updateError }, { headers });
@@ -196,16 +187,50 @@ export default function ScriptEditor() {
   const submit = useSubmit();
   const [pageData, setPageData] = useState(data);
   const [isChanged, setChanged] = useState(false);
+
   const handleSaveUpdate = () => {
-    submit(
-      { ...pageData[0], id: selected_id },
-      {
+    let updateData;
+    const body = pageData[0];
+    const blocks = body.campaignDetails?.questions?.blocks;
+    try {
+      let updatedBlocks = {};
+      if (blocks) {
+        updatedBlocks = Object.entries(blocks).reduce((acc, [id, value]) => {
+          const newId = value.title
+            .toLowerCase()
+            .replace(/\s+/g, "_")
+            .replace(/[\s~`!@#$%^&*(){}\[\];:"'<,.>?\/\\|_+=-]/g, "");
+
+          acc[newId] = {
+            ...value,
+            id: newId,
+          };
+          return acc;
+        }, {});
+        updateData = {
+          ...body,
+          campaignDetails: {
+            ...body.campaignDetails,
+            questions: {
+              ...body.campaignDetails.questions,
+              blocks: updatedBlocks,
+            },
+          },
+          id: selected_id,
+        };
+      } else {
+        updateData = { ...body, id: parseInt(selected_id) };
+      }
+      setPageData([updateData]);
+      submit(updateData, {
         method: "patch",
         encType: "application/json",
         navigate: false,
         action: "/api/campaigns",
-      },
-    );
+      });
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   const handleReset = () => {
@@ -244,7 +269,9 @@ export default function ScriptEditor() {
       {(pageData[0].type === "live_call" || pageData[0].type === null) && (
         <CampaignSettingsScript
           pageData={pageData[0]}
-          onPageDataChange={(newData) => handlePageDataChange([newData])}
+          onPageDataChange={(newData) => {
+            handlePageDataChange([newData]);
+          }}
         />
       )}
       {pageData.length > 0 &&

@@ -52,6 +52,7 @@ export const loader = async ({ request, params }) => {
     .list(workspace_id);
 
   let data = [...mtmData];
+  let blockData = null;
   if (
     data.length > 0 &&
     (data[0].type === "live_call" || data[0].type === null)
@@ -67,6 +68,7 @@ export const loader = async ({ request, params }) => {
       ...item,
       campaignDetails,
     }));
+
     return json({
       workspace_id,
       selected_id,
@@ -83,7 +85,7 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
-    if (campaignDetails.message_media.length > 0) {
+    if (campaignDetails && campaignDetails.message_media?.length > 0) {
       media = await Promise.all(
         campaignDetails.message_media.map(async (mediaName) => {
           const { data, error } = await supabaseClient.storage
@@ -96,8 +98,7 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     return json({
       workspace_id,
@@ -125,8 +126,7 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     return json({
       workspace_id,
@@ -155,7 +155,7 @@ export default function ScriptPage() {
   const pageData = useMemo(() => data || [], [data]);
   const initQuestions = useMemo(() => {
     return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
-      ? [...pageData[0]?.campaignDetails?.questions]
+      ? [...Object.values(pageData[0]?.campaignDetails?.questions.blocks)]
       : [];
   }, [pageData]);
   const [questions, setQuestions] = useState(() => {
@@ -183,6 +183,7 @@ export default function ScriptPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [selectedImage]);
+
   return (
     <div className="relative flex h-full flex-col">
       <div className="my-1 flex flex-col gap-2 px-2">
@@ -193,7 +194,7 @@ export default function ScriptPage() {
             </Button>
           </div>
         )}
-        {pageData[0].type === "live_call" && !outlet ? (
+        {(pageData[0].type === "live_call" || !pageData[0].type) && !outlet ? (
           <div className="flex flex-col gap-2">
             {!outlet && questions.length > 0 ? (
               questions.map((question) => (
@@ -201,7 +202,16 @@ export default function ScriptPage() {
                   <div className="font-Zilla-Slab text-lg">
                     {question.title || question.id}
                   </div>
-                  <div className="text-sm">{question.text}</div>
+                  <div className="text-sm">{question.content}</div>
+                  <div className="text-accent-foreground">
+                    <div className="text-sm">Options:</div>
+                    {question.options &&
+                      question.options.map((opt, i) => (
+                        <div key={i} className="text-xs">
+                          {opt.content}
+                        </div>
+                      ))}
+                  </div>
                 </div>
               ))
             ) : (
@@ -210,7 +220,7 @@ export default function ScriptPage() {
               </div>
             )}
           </div>
-        ) : pageData[0].type === "live_call" && !outlet ? (
+        ) : pageData[0].type === "message" && !outlet ? (
           <div className="flex flex-col items-center">
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
@@ -274,7 +284,7 @@ export default function ScriptPage() {
         ) : (
           !outlet && <IVRSettings pageData={pageData} onChange={() => null} />
         )}
-        <Outlet context={pageData}/>
+        <Outlet context={pageData} />
       </div>
     </div>
   );

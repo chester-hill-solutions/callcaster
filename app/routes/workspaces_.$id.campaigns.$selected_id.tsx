@@ -140,18 +140,76 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
+
     data = data.map((item) => ({
       ...item,
       campaignDetails,
     }));
   }
   if (data.length > 0 && data[0].type === "message") {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("message_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
+    let campaignDetails;
+    const { data: fetchCampaignDetails, error: detailsError } =
+      await supabaseClient
+        .from("message_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single();
+    if (detailsError) {
+      if (detailsError.code === "PGRST116") {
+        const { data: newCampaign, error: newCampaignError } =
+          await supabaseClient
+            .from("message_campaign")
+            .insert({ campaign_id: selected_id, workspace: workspace_id })
+            .select()
+            .single();
+        if (newCampaignError) {
+          console.error(newCampaignError);
+        } else {
+          campaignDetails = newCampaign;
+        }
+      } else {
+        console.error(detailsError);
+      }
+    } else {
+      campaignDetails = fetchCampaignDetails;
+    }
+    data = data.map((item) => ({
+      ...item,
+      campaignDetails,
+    }));
+  }
+  if (
+    data.length > 0 &&
+    (data[0].type === "robocall" ||
+      data[0].type === "simple_ivr" ||
+      data[0].type === "complex_ivr")
+  ) {
+    let campaignDetails;
+    const { data: fetchCampaignDetails, error: detailsError } =
+      await supabaseClient
+        .from("ivr_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single();
+    if (detailsError) {
+      if (detailsError.code === "PGRST116") {
+        const { data: newCampaign, error: newCampaignError } =
+          await supabaseClient
+            .from("ivr_campaign")
+            .insert({ campaign_id: selected_id, workspace: workspace_id })
+            .select()
+            .single();
+        if (newCampaignError) {
+          console.error(newCampaignError);
+        } else {
+          campaignDetails = newCampaign;
+        }
+      } else {
+        console.error(detailsError);
+      }
+    } else {
+      campaignDetails = fetchCampaignDetails;
+    }
     data = data.map((item) => ({
       ...item,
       campaignDetails,
@@ -252,7 +310,7 @@ export default function CampaignScreen() {
             {data[0]?.title}
           </h3>
         </div>
-        { data[0].type === 'live_call' ?
+        {data[0].type === "live_call" ? (
           <NavLink
             className={({ isActive, isPending }) =>
               handleNavlinkStyles(isActive, isPending)
@@ -261,8 +319,10 @@ export default function CampaignScreen() {
             relative="path"
           >
             Join Campaign
-          </NavLink> : <div></div>
-        }
+          </NavLink>
+        ) : (
+          <div></div>
+        )}
       </div>
       {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
@@ -272,10 +332,30 @@ export default function CampaignScreen() {
         </div>
       ) : isCampaignParentRoute && hasAccess ? (
         campaign.type === "message" ? (
-          <MessageResultsScreen {...{ totalCalls, results, expectedTotal, type: campaign.type, dial_type: data[0].dial_type, handleNavlinkStyles, hasAccess}} />
+          <MessageResultsScreen
+            {...{
+              totalCalls,
+              results,
+              expectedTotal,
+              type: campaign.type,
+              dial_type: data[0].dial_type,
+              handleNavlinkStyles,
+              hasAccess,
+            }}
+          />
         ) : (
           hasAccess && (
-            <ResultsScreen {...{ totalCalls, results, expectedTotal, type: campaign.type, dial_type: data[0].dial_type, handleNavlinkStyles, hasAccess}} />
+            <ResultsScreen
+              {...{
+                totalCalls,
+                results,
+                expectedTotal,
+                type: campaign.type,
+                dial_type: data[0].dial_type,
+                handleNavlinkStyles,
+                hasAccess,
+              }}
+            />
           )
         )
       ) : (
