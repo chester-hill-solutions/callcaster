@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { GrSubtractCircle } from "react-icons/gr";
-import { iconMapping } from "./CallList/CallContact/Result";
+import { iconMapping } from "./CallList/CallContact/Result.IconMap";
 
 export default function QuestionBlockOption({ 
     question, 
