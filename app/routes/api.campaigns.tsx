@@ -46,7 +46,7 @@ export const action = async ({ request }: { request: Request }) => {
       .eq("id", id)
       .eq("workspace", workspace)
       .select();
-
+      
     if (campaignError) {
       if (campaignError.code === "23505") {
         return json(

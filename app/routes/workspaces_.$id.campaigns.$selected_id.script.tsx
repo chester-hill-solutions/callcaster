@@ -98,8 +98,7 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     return json({
       workspace_id,
@@ -127,8 +126,7 @@ export const loader = async ({ request, params }) => {
     }
     data = data.map((item) => ({
       ...item,
-      ...campaignDetails,
-      campaignDetails: { mediaLinks: media },
+      campaignDetails: { ...campaignDetails, mediaLinks: media },
     }));
     return json({
       workspace_id,
@@ -204,7 +202,16 @@ export default function ScriptPage() {
                   <div className="font-Zilla-Slab text-lg">
                     {question.title || question.id}
                   </div>
-                  <div className="text-sm">{question.text}</div>
+                  <div className="text-sm">{question.content}</div>
+                  <div className="text-accent-foreground">
+                    <div className="text-sm">Options:</div>
+                    {question.options &&
+                      question.options.map((opt, i) => (
+                        <div key={i} className="text-xs">
+                          {opt.content}
+                        </div>
+                      ))}
+                  </div>
                 </div>
               ))
             ) : (

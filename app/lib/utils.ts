@@ -34,7 +34,7 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
   }
   if (typeof obj1 !== 'object' && typeof obj2 !== 'object') {
     if (obj1 !== obj2) {
-      log(`Primitive values differ: ${obj1} !== ${obj2}`);
+      log(`Primitive values differ at ${path}: ${obj1} !== ${obj2}`);
     }
     return obj1 === obj2;
   }
@@ -88,6 +88,7 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
     return deepEqual(obj1[key], obj2[key], `${path}.${key}`, seen);
   });
 }
+
 export const parseCSVHeaders = (unparsedHeaders) => {
   const parsedHeaders = unparsedHeaders.map((header) =>
     header.toLowerCase().trim(),

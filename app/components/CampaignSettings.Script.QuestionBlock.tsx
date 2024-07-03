@@ -74,9 +74,9 @@ const QuestionInputs = ({ question, handleTextChange, handleTypeChange }) => (
         rows={5}
         placeholder="Text that can be used to describe the question, or provide a direct script to the caller"
         style={{ resize: "none" }}
-        name="text"
-        id={`${question.id}-text`}
-        value={question.text}
+        name="content"
+        id={`${question.id}-content`}
+        value={question.content}
         onChange={handleTextChange}
         required={true}
       />

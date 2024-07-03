@@ -5,7 +5,6 @@ import { Form, useSubmit } from "@remix-run/react";
 export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, selected_id }) => {
     const [eraseVisible, setEraseVisible] = useState({});
     const submit = useSubmit();
-
     const showErase = (imageId) => {
         setEraseVisible((prevState) => ({
             ...prevState,
@@ -55,7 +54,10 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
     const handleBodyTextChange = (event) => {
         onPageDataChange({
             ...pageData,
-            body_text: event.target.value
+            campaignDetails: {
+                ...pageData.campaignDetails,
+                body_text: event.target.value
+            }
         });
     };
 
@@ -72,7 +74,7 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
                 { true ? (
                     <div className="flex flex-col">
-                        {pageData.mediaLinks && <div className="flex flex-wrap justify-between">
+                        {pageData.campaignDetails.mediaLinks && <div className="flex flex-wrap justify-between">
                             {pageData.campaignDetails.mediaLinks?.length > 0 &&
                                 pageData.campaignDetails.mediaLinks.map((img, i) => {
                                     const imageId = pageData.message_media[i];
@@ -110,7 +112,7 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
                                         className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
                                         style={{ caretColor: "black" }}
                                         rows={5}
-                                        value={pageData.body_text}
+                                        value={pageData.campaignDetails.body_text}
                                         onChange={handleBodyTextChange}
                                     />
                                 </div>
@@ -121,13 +123,13 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {(pageData.body_text?.length || 0) % 140} /{" "}
-                                    {Math.max(1, Math.ceil(pageData.body_text?.length || 0 / 140)) * 140}{" "}
-                                    character{pageData.body_text?.length !== 1 && 's'}
+                                    {(pageData.campaignDetails.body_text?.length || 0) % 140} /{" "}
+                                    {Math.max(1, Math.ceil(pageData.campaignDetails.body_text?.length || 0 / 140)) * 140}{" "}
+                                    character{pageData.campaignDetails.body_text?.length !== 1 && 's'}
                                 </div>
                                 <div>
-                                    {Math.ceil(pageData.body_text?.length / 140)} part
-                                    {(pageData.body_text?.length) !== 1 && 's'}
+                                    {Math.ceil(pageData.campaignDetails.body_text?.length / 140)} part
+                                    {(pageData.campaignDetails.body_text?.length) !== 1 && 's'}
                                 </div>
                             </div>
                             <div>

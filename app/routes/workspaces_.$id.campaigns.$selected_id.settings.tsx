@@ -3,6 +3,7 @@ import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
+import { getWorkspacePhoneNumbers } from "~/lib/database.server";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -20,6 +21,9 @@ export const loader = async ({ request, params }) => {
         `,
     )
     .eq("id", selected_id);
+    const { data: phoneNumbers, error: numbersError } =
+    await getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id });
+
   let data = [...mtmData];
   if (data.length > 0 && data[0].type === "live_call") {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
@@ -37,12 +41,12 @@ export const loader = async ({ request, params }) => {
     .from("workspaceAudio")
     .list(workspace_id);
 
-  return json({ workspace_id, selected_id, data, selected, mediaData });
+  return json({ workspace_id, selected_id, data, selected, mediaData, phoneNumbers });
 };
 
 export default function Audience() {
   const { audiences } = useOutletContext();
-  const { workspace_id, selected_id, data = [], mediaData } = useLoaderData();
+  const { workspace_id, selected_id, data = [], mediaData, phoneNumbers } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
   return (
       <CampaignSettings
@@ -51,6 +55,8 @@ export default function Audience() {
         audiences={audiences}
         mediaData={mediaData}
         campaign_id={selected_id}
+        phoneNumbers={phoneNumbers}
+
       />
   );
 }

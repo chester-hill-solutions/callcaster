@@ -169,7 +169,7 @@ const Result = ({
                 onChange={(e) =>
                   handleMultiChange(questions.id, value, e.target.checked)
                 }
-                checked={multiResult.includes(value)}
+                checked={result.includes(value)}
               />
               <label htmlFor={inputId} className="ml-2">
                 {content}

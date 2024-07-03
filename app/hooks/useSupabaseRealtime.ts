@@ -174,7 +174,7 @@ export function useSupabaseRealtime({
   const updateAttempts = useCallback(
     (payload: { new: Attempt }) => {
       if (
-        payload.new.user_id !== user.id ||
+        payload.new.user_id !== user?.id ||
         payload.new.campaign_id !== campaign_id
       )
         return;
@@ -202,7 +202,7 @@ export function useSupabaseRealtime({
         isRecent(updatedAttempt.created_at) ? updatedAttempt : null,
       );
     },
-    [callsList, processPendingCalls, user.id, campaign_id],
+    [callsList, processPendingCalls, user, campaign_id],
   );
 
   const updateCalls = useCallback(
@@ -263,7 +263,7 @@ export function useSupabaseRealtime({
           }
           return filteredQueue;
         });
-      } else if (payload.new.status === user.id) {
+      } else if (payload.new.status === user?.id) {
         const contact = findContactById(payload.new.contact_id);
         if (contact?.phone) {
           const newQueueItem = updateQueueItem(payload.new, contact);
@@ -284,7 +284,7 @@ export function useSupabaseRealtime({
       }
     },
     [
-      user.id,
+      user,
       nextRecipient,
       setNextRecipient,
       findContactById,

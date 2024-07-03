@@ -14,7 +14,8 @@ export const QuestionHeader = ({ question, edit, onNameChange, onSpeechTypeChang
                         </h2>
                         {question.step !== 'voicemail' && 
                             <input 
-                                className="text-lg font-semibold uppercase bg-transparent border-0 border-b-2 w-[80%] text-gray-800 dark:text-white" 
+                                className="text-lg font-semibold uppercase bg-transparent border-0 border-b-2 border-primary w-[80%] text-gray-800 dark:text-white" 
+                                style={{border:"none", borderBottom:"2px dashed hsl(var(--brand-primary))"}}
                                 value={question.name} 
                                 onChange={(e) => onNameChange(e.target.value)}
                             />

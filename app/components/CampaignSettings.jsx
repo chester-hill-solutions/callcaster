@@ -12,9 +12,9 @@ const initialState = (data, workspace, campaign_id) => ({
   type: data[0]?.type || "live_call",
   dial_type: data[0]?.dial_type || "call",
   group_household_queue: data[0]?.group_household_queue,
-  caller_id: data[0]?.caller_id,
   start_date: data[0]?.start_date,
   end_date: data[0]?.end_date,
+  caller_id: data[0]?.caller_id,
   voicemail_file: data[0]?.voicemail_file,
   questions: data[0]?.campaignDetails?.questions,
 });
@@ -77,6 +77,7 @@ const CampaignSettings = ({
   audiences = [],
   mediaData,
   workspace,
+  phoneNumbers = []
 }) => {
   const navigate = useNavigate();
   const nav = useNavigation();
@@ -168,7 +169,7 @@ const CampaignSettings = ({
         )}
       </div> */}
       <div className="flex flex-col gap-2">
-        <div className="flex justify-start gap-2">
+        <div className="flex justify-start gap-2 flex-wrap">
           <TextInput
             name="title"
             label={"Campaign Title"}
@@ -210,24 +211,44 @@ const CampaignSettings = ({
             ]}
             className={"flex flex-col"}
           />
-          {(campaignDetails.type === 'live_call' || campaignDetails.type === 'robocall') && <Dropdown
-            name="voicemail"
-            label={campaignDetails.type === 'live_call' ? "Voicemail File" : 'Audio File'}
-            value={campaignDetails.voicemail_file}
-            onChange={(e) =>
-              handleInputChange(
-                actionTypes.SET_VOICEMAIL,
-                e.currentTarget.value,
-              )
-            }
-            options={mediaData.map((media) => ({
-              value: media.name,
-              label: media.name,
-            }))}
-            className={"flex flex-col"}
-          />}
-        </div>
-        {/* <div className="flex justify-start gap-2">
+          {
+            phoneNumbers.length ? <Dropdown
+              name="caller_id"
+              className={"flex flex-col"}
+              label={"Phone Number"}
+              value={campaignDetails.caller_id}
+              onChange={(e) =>
+                handleInputChange(actionTypes.SET_CALL_ID, e.currentTarget.value)
+              }
+              options={phoneNumbers.map((number) => ({
+                value: number.phone_number,
+                label: number.friendly_name
+              }))}
+            /> :
+              <div className="flex flex-col justify-end">
+                <Button asChild>
+                  <NavLink to={"../../../settings/numbers"}>Get a Number</NavLink>
+                </Button>
+                </div>
+              }
+                  {(campaignDetails.type === 'live_call' || campaignDetails.type === 'robocall') && <Dropdown
+                    name="voicemail"
+                    label={campaignDetails.type === 'live_call' ? "Voicemail File" : 'Audio File'}
+                    value={campaignDetails.voicemail_file}
+                    onChange={(e) =>
+                      handleInputChange(
+                        actionTypes.SET_VOICEMAIL,
+                        e.currentTarget.value,
+                      )
+                    }
+                    options={mediaData.map((media) => ({
+                      value: media.name,
+                      label: media.name,
+                    }))}
+                    className={"flex flex-col"}
+                  />}
+                </div>
+                {/* <div className="flex justify-start gap-2">
           <DateTime
             name="start_date"
             label={"Start Date"}
@@ -243,59 +264,59 @@ const CampaignSettings = ({
             className={"relative flex flex-col"}
           />
         </div> */}
-        {campaignDetails.type === 'live_call' && <>
-        <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
-          <Toggle
-            name={"group_household_queue"}
-            label={"Group by household"}
-            isChecked={campaignDetails.group_household_queue}
-            onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
-            rightLabel="Yes" />
+                {campaignDetails.type === 'live_call' && <>
+                  <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
+                    <Toggle
+                      name={"group_household_queue"}
+                      label={"Group by household"}
+                      isChecked={campaignDetails.group_household_queue}
+                      onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
+                      rightLabel="Yes" />
 
-          <Toggle
-            name={"dial_type"}
-            label={"Dial Type"}
-            isChecked={campaignDetails.dial_type === "predictive"}
-            onChange={(e) => handleInputChange(
-              actionTypes.SET_DIAL_TYPE,
-              e === true ? "predictive" : "call"
-            )}
-            leftLabel="Power Dialer"
-            rightLabel="Predictive Dialer" />
-        </div></>}
-        <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-        <span className="text-lg font-semibold">Audiences:</span>
-        {audiences.filter(Boolean).map((audience) => {
-          return (
-            <div key={audience.id} className="flex gap-2">
-              <input
-                type="checkbox"
-                id={`${audience.id}-audience-select`}
-                checked={selectedAudiences.find(
-                  (selected) => selected?.id === audience.id,
-                )}
-                onChange={(event) => handleAudience({ event, audience })}
-              />
-              <label htmlFor={`${audience.id}-audience-select`}>
-                {audience.name || `Unnamed Audience ${audience.id}`}
-              </label>
-            </div>
-          );
-        })}
-        <NavLink to={'../audiences/new'} relative="path">
-          Add an audience
-        </NavLink>
-        <div className="mt-2 flex justify-end">
-          <Button
-            className="text-xl font-semibold uppercase disabled:bg-zinc-400"
-            disabled={busy || !isChanged}
-            onClick={handleSave}
-          >
-            Save Settings
-          </Button>
-        </div>
-      </div>
+                    <Toggle
+                      name={"dial_type"}
+                      label={"Dial Type"}
+                      isChecked={campaignDetails.dial_type === "predictive"}
+                      onChange={(e) => handleInputChange(
+                        actionTypes.SET_DIAL_TYPE,
+                        e === true ? "predictive" : "call"
+                      )}
+                      leftLabel="Power Dialer"
+                      rightLabel="Predictive Dialer" />
+                  </div></>}
+                <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
+                <span className="text-lg font-semibold">Audiences:</span>
+                {audiences.filter(Boolean).map((audience) => {
+                  return (
+                    <div key={audience.id} className="flex gap-2">
+                      <input
+                        type="checkbox"
+                        id={`${audience.id}-audience-select`}
+                        checked={selectedAudiences.find(
+                          (selected) => selected?.id === audience.id,
+                        )}
+                        onChange={(event) => handleAudience({ event, audience })}
+                      />
+                      <label htmlFor={`${audience.id}-audience-select`}>
+                        {audience.name || `Unnamed Audience ${audience.id}`}
+                      </label>
+                    </div>
+                  );
+                })}
+                <NavLink to={'../audiences/new'} relative="path">
+                  Add an audience
+                </NavLink>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    className="text-xl font-semibold uppercase disabled:bg-zinc-400"
+                    disabled={busy || !isChanged}
+                    onClick={handleSave}
+                  >
+                    Save Settings
+                  </Button>
+                </div>
+              </div>
     </div>
-  );
+        );
 };
-export { CampaignSettings };
+        export {CampaignSettings};

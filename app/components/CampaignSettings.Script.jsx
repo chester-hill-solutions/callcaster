@@ -5,7 +5,9 @@ import { FaPlus } from "react-icons/fa";
 export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
     const [blocks, setBlocks] = useState(pageData.campaignDetails?.questions?.blocks || {})
     const [openQuestion, setOpenQuestion] = useState(null);
-
+    const blockOrder = useMemo(() => {
+        return Object.keys(blocks).sort((a, b) => Number(a) - Number(b))
+    }, [blocks])
     const addQuestion = async () => {
         const newBlocks = { ...blocks };
         const newBlockId = Math.max(...Object.keys(newBlocks).map(Number), 0) + 1;
@@ -36,7 +38,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                 }
             }
         });
-        
+
         return newBlockId;
     };
 
@@ -144,7 +146,8 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                     <button className="bg-primary text-white font-Zilla-Slab text-xl px-2 py-2 gap-2" onClick={addQuestion} style={{ justifyContent: 'center', display: "flex", alignItems: "center", borderTopLeftRadius: "18px", borderTopRightRadius: "18px" }}>
                         Add Question<FaPlus size="16px" />
                     </button>
-                    {Object.entries(blocks).map(([id, question]) => {
+                    {blockOrder.map((id) => {
+                        const question = blocks[id]
                         return <button
                             key={id}
                             onClick={() => setOpenQuestion(question.id)}
@@ -156,7 +159,8 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                     })}
                 </div>
                 <div className="flex flex-col" style={{ flex: '1 1 60%' }}>
-                    {Object.entries(blocks).map(([id, question]) => {
+                    {blockOrder.map((id) => {
+                        const question = blocks[id];
                         return <CampaignSettingsScriptQuestionBlock
                             key={id}
                             question={question}
