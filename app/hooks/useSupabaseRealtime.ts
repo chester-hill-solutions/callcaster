@@ -57,7 +57,10 @@ export function useSupabaseRealtime({
   setQuestionContact,
   workspace,
 }: UseSupabaseRealtimeProps): UseSupabaseRealtimeResult {
-  const [queue, setQueue] = useState<QueueItem[]>(init.queue);
+  const uniqueQueue = Array.from(new Set(init.queue.map(item => item.contact_id)))
+  .map(contact_id => init.queue.find(item => item.contact_id === contact_id && item.status === user.id));
+
+  const [queue, setQueue] = useState<QueueItem[]>(uniqueQueue);
   const [predictiveQueue, setPredictiveQueue] = useState<QueueItem[]>(
     init.predictiveQueue,
   );
@@ -247,8 +250,8 @@ export function useSupabaseRealtime({
 
   const updateQueue = useCallback(
     (payload: { new: Tables<"campaign_queue"> }) => {
-      if (payload.new.status === "dequeued") {
-        setQueue((currentQueue) => {
+      setQueue((currentQueue) => {
+        if (payload.new.status === "dequeued") {
           const filteredQueue = currentQueue.filter(
             (item) => item.id !== payload.new.id,
           );
@@ -262,35 +265,28 @@ export function useSupabaseRealtime({
             setNextRecipient(nextUncontacted || filteredQueue[0] || null);
           }
           return filteredQueue;
-        });
-      } else if (payload.new.status === user?.id) {
-        const contact = findContactById(payload.new.contact_id);
-        if (contact?.phone) {
-          const newQueueItem = updateQueueItem(payload.new, contact);
-          setQueue((currentQueue) => {
-            const index = currentQueue.findIndex(
-              (item) => item.id === payload.new.id,
+        } else if (payload.new.status === user.id) {
+          const contact = findContactById(payload.new.contact_id);
+          if (contact?.phone) {
+            const newQueueItem = updateQueueItem(payload.new, contact);
+            const filteredQueue = currentQueue.filter(
+              (item) => item.contact_id !== payload.new.contact_id
             );
-            return index > -1
-              ? currentQueue.map((item) =>
-                  item.id === payload.new.id ? newQueueItem : item,
-                )
-              : [...currentQueue, newQueueItem];
-          });
-          if (!nextRecipient) {
-            setNextRecipient(newQueueItem);
+            return [...filteredQueue, newQueueItem];
           }
         }
-      }
+        return currentQueue;
+      });
     },
     [
-      user,
+      user.id,
       nextRecipient,
       setNextRecipient,
       findContactById,
       updateQueueItem,
     ],
   );
+    
 
   const updateWorkspaceNumbers = useCallback(
     (payload: { eventType: string; old: PhoneNumber; new: PhoneNumber }) => {

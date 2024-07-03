@@ -407,7 +407,6 @@ export default function Campaign() {
   useDebouncedSave(update, recentAttempt, submit, questionContact, campaign, workspaceId);
 
   const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address) || ''];
-console.log(initialQueue)
   return (
     <div
       className=""
