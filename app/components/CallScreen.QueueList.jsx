@@ -49,7 +49,7 @@ function QueueList({
                                         household={household}
                                         firstInHouse={index === 0}
                                         grouped={true}
-                                        selected={nextRecipient?.contact?.id === contact.contact.id}
+                                        selected={nextRecipient?.contact?.id === contact?.contact?.id}
                                     />
                                 ))
                             )) :

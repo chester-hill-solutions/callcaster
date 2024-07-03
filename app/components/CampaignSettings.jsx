@@ -1,6 +1,6 @@
 import { useEffect, useState, useReducer } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
-import { useNavigate, useNavigation, useSubmit } from "@remix-run/react";
+import { NavLink, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { campaignTypeText, deepEqual } from "~/lib/utils";
 
@@ -103,7 +103,7 @@ const CampaignSettings = ({
 
   const saveCampaign = () => {
     if (!deepEqual(campaignDetails, initial)) {
-      submit(campaignDetails, {
+      submit({ ...campaignDetails, id: campaign_id }, {
         method: "patch",
         encType: "application/json",
         navigate: false,
@@ -143,7 +143,7 @@ const CampaignSettings = ({
   useEffect(() => {
     setChanged(
       !deepEqual(campaignDetails, initial) ||
-        !deepEqual(selectedAudiences, initSelectedAudiences),
+      !deepEqual(selectedAudiences, initSelectedAudiences),
     );
   }, [campaignDetails, initSelectedAudiences, initial, selectedAudiences]);
 
@@ -152,7 +152,6 @@ const CampaignSettings = ({
     setInitial(newInitialState);
     dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
   }, [campaign_id, data, workspace]);
-
   return (
     <div
       id="campaignSettingsContainer"
@@ -194,7 +193,7 @@ const CampaignSettings = ({
             ]}
             className={"flex flex-col"}
           />
-          {/* <Dropdown
+          <Dropdown
             name="type"
             disabled
             label={"Campaign Type"}
@@ -210,21 +209,10 @@ const CampaignSettings = ({
               { value: "live_call", label: "Live Call" },
             ]}
             className={"flex flex-col"}
-          /> */}
-          <div className="flex flex-col">
-            <p id="campaign-details-label" className="">
-              Campaign Type
-            </p>
-            <p
-              id="campaign-details-value"
-              className="flex h-full items-center justify-center rounded-sm bg-zinc-300 font-semibold dark:bg-zinc-600 dark:text-white"
-            >
-              {campaignTypeText(campaignDetails.type)}
-            </p>
-          </div>
-          <Dropdown
+          />
+          {(campaignDetails.type === 'live_call' || campaignDetails.type === 'robocall') && <Dropdown
             name="voicemail"
-            label={"Voicemail File"}
+            label={campaignDetails.type === 'live_call' ? "Voicemail File" : 'Audio File'}
             value={campaignDetails.voicemail_file}
             onChange={(e) =>
               handleInputChange(
@@ -237,7 +225,7 @@ const CampaignSettings = ({
               label: media.name,
             }))}
             className={"flex flex-col"}
-          />
+          />}
         </div>
         {/* <div className="flex justify-start gap-2">
           <DateTime
@@ -255,32 +243,26 @@ const CampaignSettings = ({
             className={"relative flex flex-col"}
           />
         </div> */}
-        <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-        <div className="flex justify-start gap-8">
+        {campaignDetails.type === 'live_call' && <>
+        <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
           <Toggle
             name={"group_household_queue"}
             label={"Group by household"}
             isChecked={campaignDetails.group_household_queue}
-            onChange={(e) =>
-              handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)
-            }
-            rightLabel="Yes"
-          />
+            onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
+            rightLabel="Yes" />
 
           <Toggle
             name={"dial_type"}
             label={"Dial Type"}
             isChecked={campaignDetails.dial_type === "predictive"}
-            onChange={(e) =>
-              handleInputChange(
-                actionTypes.SET_DIAL_TYPE,
-                e === true ? "predictive" : "call",
-              )
-            }
+            onChange={(e) => handleInputChange(
+              actionTypes.SET_DIAL_TYPE,
+              e === true ? "predictive" : "call"
+            )}
             leftLabel="Power Dialer"
-            rightLabel="Predictive Dialer"
-          />
-        </div>
+            rightLabel="Predictive Dialer" />
+        </div></>}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <span className="text-lg font-semibold">Audiences:</span>
         {audiences.filter(Boolean).map((audience) => {
@@ -300,6 +282,9 @@ const CampaignSettings = ({
             </div>
           );
         })}
+        <NavLink to={'../audiences/new'} relative="path">
+          Add an audience
+        </NavLink>
         <div className="mt-2 flex justify-end">
           <Button
             className="text-xl font-semibold uppercase disabled:bg-zinc-400"

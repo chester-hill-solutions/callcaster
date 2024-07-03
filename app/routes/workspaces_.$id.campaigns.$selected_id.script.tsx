@@ -52,6 +52,7 @@ export const loader = async ({ request, params }) => {
     .list(workspace_id);
 
   let data = [...mtmData];
+  let blockData = null;
   if (
     data.length > 0 &&
     (data[0].type === "live_call" || data[0].type === null)
@@ -67,6 +68,7 @@ export const loader = async ({ request, params }) => {
       ...item,
       campaignDetails,
     }));
+
     return json({
       workspace_id,
       selected_id,
@@ -83,7 +85,7 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
-    if (campaignDetails.message_media.length > 0) {
+    if (campaignDetails && campaignDetails.message_media?.length > 0) {
       media = await Promise.all(
         campaignDetails.message_media.map(async (mediaName) => {
           const { data, error } = await supabaseClient.storage
@@ -155,7 +157,7 @@ export default function ScriptPage() {
   const pageData = useMemo(() => data || [], [data]);
   const initQuestions = useMemo(() => {
     return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
-      ? [...pageData[0]?.campaignDetails?.questions]
+      ? [...Object.values(pageData[0]?.campaignDetails?.questions.blocks)]
       : [];
   }, [pageData]);
   const [questions, setQuestions] = useState(() => {
@@ -183,6 +185,7 @@ export default function ScriptPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [selectedImage]);
+
   return (
     <div className="relative flex h-full flex-col">
       <div className="my-1 flex flex-col gap-2 px-2">
@@ -274,7 +277,7 @@ export default function ScriptPage() {
         ) : (
           !outlet && <IVRSettings pageData={pageData} onChange={() => null} />
         )}
-        <Outlet context={pageData}/>
+        <Outlet context={pageData} />
       </div>
     </div>
   );

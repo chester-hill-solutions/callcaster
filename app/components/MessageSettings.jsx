@@ -70,9 +70,9 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
-                {pageData.body_text || pageData.message_media ? (
+                { true ? (
                     <div className="flex flex-col">
-                        <div className="flex flex-wrap justify-between">
+                        {pageData.mediaLinks && <div className="flex flex-wrap justify-between">
                             {pageData.campaignDetails.mediaLinks?.length > 0 &&
                                 pageData.campaignDetails.mediaLinks.map((img, i) => {
                                     const imageId = pageData.message_media[i];
@@ -101,7 +101,7 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
                                         </div>
                                     );
                                 })}
-                        </div>
+                        </div>}
                         <div>
                             <Form >
                                 <div className="text-sm leading-snug text-gray-700">
@@ -121,13 +121,13 @@ export const MessageSettings = ({ pageData, onPageDataChange, workspace_id, sele
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {pageData.body_text.length % 140} /{" "}
-                                    {Math.max(1, Math.ceil(pageData.body_text.length / 140)) * 140}{" "}
-                                    characters
+                                    {(pageData.body_text?.length || 0) % 140} /{" "}
+                                    {Math.max(1, Math.ceil(pageData.body_text?.length || 0 / 140)) * 140}{" "}
+                                    character{pageData.body_text?.length !== 1 && 's'}
                                 </div>
                                 <div>
-                                    {Math.ceil(pageData.body_text.length / 140)} part
-                                    {pageData.body_text.length > 140 ? "s" : ""}
+                                    {Math.ceil(pageData.body_text?.length / 140)} part
+                                    {(pageData.body_text?.length) !== 1 && 's'}
                                 </div>
                             </div>
                             <div>

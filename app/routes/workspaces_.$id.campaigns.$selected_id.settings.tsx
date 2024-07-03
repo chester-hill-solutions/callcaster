@@ -12,22 +12,6 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-  if (selected_id === "new") {
-    const query = supabaseClient
-      .from("campaign")
-      .insert({ workspace: workspace_id })
-      .select();
-    const { data, error } = await query;
-    if (error) {
-      console.log(error);
-      return redirect(`/workspaces/${workspace_id}`);
-    }
-
-    const { error: detailsError } = await supabaseClient
-      .from("live_campaign")
-      .insert({ campaign_id: data[0].id, workspace: workspace_id });
-    return redirect(`/workspaces/${workspace_id}/campaign/${data[0].id}`);
-  }
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(

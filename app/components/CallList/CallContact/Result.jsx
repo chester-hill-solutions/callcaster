@@ -82,13 +82,13 @@ const Result = ({ action, initResult = null, questions, questionId, disabled }) 
         action({ column: id, value: newArr });
     };
 
-    const renderIcon = (Icon, value, label) => {
+    const renderIcon = (Icon, value, content) => {
         const IconComponent = iconMapping[Icon];
         if (!IconComponent) {
             //console.error(`Icon component ${Icon} is not found in iconMapping`);
             return (<SupportButton
                 key={value}
-                option={{ Icon, value, label }}
+                option={{ Icon, value, content }}
                 handleChange={() => handleChange(questions.id, value)}
                 current={result}
             />)
@@ -104,7 +104,7 @@ const Result = ({ action, initResult = null, questions, questionId, disabled }) 
             >
                 <IconComponent size="20px" color={result === value ? 'hsl(var(--brand-primary))' : 'hsl(var(--muted-foreground))'} />
                 <div className="caption" style={{ fontSize: "10px", textAlign: 'center', color: result === value ? 'hsl(var(--primary))' : '#333' }}>
-                    {label}
+                    {content}
                 </div>
             </button>
         );
@@ -113,20 +113,20 @@ const Result = ({ action, initResult = null, questions, questionId, disabled }) 
     const renderQuestionContent = () => {
         switch (questions.type) {
             case 'radio':
-                return questions.options.map(({ Icon, value, label }) =>
+                return questions.options.map(({ Icon, value, content }) =>
                     Icon === 'SupportButton'
                         ? <SupportButton
                             key={value}
-                            option={{ Icon, value, label }}
+                            option={{ Icon, value, content }}
                             handleChange={() => handleChange(questions.id, value)}
                             current={result}
                         />
-                        : renderIcon(Icon, value, label)
+                        : renderIcon(Icon, value, content)
                 );
             case 'boolean':
                 return (
                     <div className="flex items-center justify-between gap-2">
-                        <label htmlFor={questions.title}>{questions.text}</label>
+                        <label htmlFor={questions.title}>{questions.text || questions.content}</label>
                         <input
                             id={questions.title}
                             type="checkbox"
@@ -145,15 +145,15 @@ const Result = ({ action, initResult = null, questions, questionId, disabled }) 
                         className="px-2 py-1"
                     >
                         <option value="">---</option>
-                        {questions.options.map(({ value, label }) => (
+                        {questions.options.map(({ value, content }) => (
                             <option key={`question-${questionId}-select-${value}`} value={value}>
-                                {label}
+                                {content}
                             </option>
                         ))}
                     </select>
                 );
             case 'multi':
-                return questions.options.map(({ value, label }) => {
+                return questions.options.map(({ value, content }) => {
                     const inputId = `${questionId}-select-${value}`;
                     return (
                         <div key={inputId} className="flex items-center justify-between gap-2">
@@ -164,7 +164,7 @@ const Result = ({ action, initResult = null, questions, questionId, disabled }) 
                                 onChange={(e) => handleMultiChange(questions.id, value, e.target.checked)}
                                 checked={multiResult.includes(value)}
                             />
-                            <label htmlFor={inputId} className="ml-2">{label}</label>
+                            <label htmlFor={inputId} className="ml-2">{content}</label>
                         </div>
                     );
                 });

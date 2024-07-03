@@ -90,7 +90,7 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
-    if (campaignDetails.message_media.length > 0) {
+    if (campaignDetails?.message_media?.length > 0) {
       media = await Promise.all(
         campaignDetails.message_media.map(async (mediaName) => {
           const { data, error } = await supabaseClient.storage
@@ -246,7 +246,7 @@ export default function ScriptEditor() {
       {(pageData[0].type === "live_call" || pageData[0].type === null) && (
         <CampaignSettingsScript
           pageData={pageData[0]}
-          onPageDataChange={(newData) => handlePageDataChange([newData])}
+          onPageDataChange={(newData) => {handlePageDataChange([newData])}}
         />
       )}
       {pageData.length > 0 &&

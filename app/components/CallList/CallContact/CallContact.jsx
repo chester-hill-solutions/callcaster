@@ -7,10 +7,10 @@ const QueueContact = ({ contact, household = null, firstInHouse = false, grouped
                 background: selected ? '#f1c1c1' :  'unset',
                 borderBottomLeftRadius: isLast ? "18px" : 'unset'
             }}>
-                <td style={{ padding: "8px 16px" }}>{contact.firstname} {contact.surname}</td>
-                <td style={{ padding: "8px 16px", opacity: !household ? '1' : firstInHouse ? '1' : '.6' }}>{contact.phone}</td>
+                <td style={{ padding: "8px 16px" }}>{contact?.firstname} {contact?.surname}</td>
+                <td style={{ padding: "8px 16px", opacity: !household ? '1' : firstInHouse ? '1' : '.6' }}>{contact?.phone}</td>
                 {firstInHouse || !household ? (
-                    <td style={{ padding: "8px 16px", verticalAlign: 'middle', background: !household ? 'unset' : firstInHouse ? "hsl(var(--secondary))" : 'unset', color: !household ? 'unset' : firstInHouse ? "#333" : 'unset', borderBottomRightRadius: isLast ? "18px" : 'unset' }} rowSpan={household?.length} >{contact.address}</td>
+                    <td style={{ padding: "8px 16px", verticalAlign: 'middle', background: !household ? 'unset' : firstInHouse ? "hsl(var(--secondary))" : 'unset', color: !household ? 'unset' : firstInHouse ? "#333" : 'unset', borderBottomRightRadius: isLast ? "18px" : 'unset' }} rowSpan={household?.length} >{contact?.address}</td>
                 ) : null}
             </tr>
 
