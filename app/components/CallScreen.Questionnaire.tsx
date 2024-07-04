@@ -24,7 +24,6 @@ const CallQuestionnaire = ({
   disabled
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
-
   return (
     <div
       style={{

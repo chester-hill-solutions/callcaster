@@ -44,7 +44,8 @@ interface UseSupabaseRealtimeResult {
   setDisposition: (disposition: string | null) => void;
   nextRecipient: QueueItem | null;
   setNextRecipient: (nextRecipient: QueueItem | null) => void;
-  householdMap:HouseholdMap;
+  householdMap: HouseholdMap;
+  activeCall: any;
 }
 
 export function useSupabaseRealtime({
@@ -56,9 +57,16 @@ export function useSupabaseRealtime({
   predictive = false,
   setQuestionContact,
   workspace,
+  activeCall,
 }: UseSupabaseRealtimeProps): UseSupabaseRealtimeResult {
-  const uniqueQueue = Array.from(new Set(init.queue.map(item => item.contact_id)))
-  .map(contact_id => init.queue.find(item => item.contact_id === contact_id && item.status === user.id));
+  const uniqueQueue = Array.from(
+    new Set(init.queue.map((item) => item.contact_id)),
+  ).map((contact_id) =>
+    init.queue.find(
+      (item) => item.contact_id === contact_id && item.status === user.id,
+    ),
+  );
+  const [activeCallState, setActiveCallState] = useState(activeCall);
 
   const [queue, setQueue] = useState<QueueItem[]>(uniqueQueue);
   const [predictiveQueue, setPredictiveQueue] = useState<QueueItem[]>(
@@ -80,7 +88,7 @@ export function useSupabaseRealtime({
       init.recentAttempt?.result?.status ||
       null,
   );
-  const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(
+  const [nextRecipient, setNextRecipientState] = useState<QueueItem | null>(
     init.nextRecipient,
   );
   const sortQueue = useCallback((queue: QueueItem[]): QueueItem[] => {
@@ -95,6 +103,18 @@ export function useSupabaseRealtime({
     });
   }, []);
 
+  const setNextRecipient = useCallback(
+    (recipient: QueueItem | null) => {
+      if (recipient !== null || !activeCallState) {
+        setNextRecipientState(recipient);
+      }
+    },
+    [activeCallState],
+  );
+
+  useEffect(() => {
+    setActiveCallState(activeCall);
+  }, [activeCall]);
 
   const householdMap = useMemo(() => {
     const sortedQueue = sortQueue(queue);
@@ -125,14 +145,13 @@ export function useSupabaseRealtime({
       ...attempt,
       result: {
         ...attempt.result,
-        ...(call && call.status &&
+        ...(call &&
+          call.status &&
           call.direction !== "outbound-api" && { status: call.status }),
       },
     };
   };
 
-
-  
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const findContactById = (contactId: number): Contact | undefined => {
     return contacts.find((contact) => contact.id === contactId);
@@ -270,8 +289,9 @@ export function useSupabaseRealtime({
           if (contact?.phone) {
             const newQueueItem = updateQueueItem(payload.new, contact);
             const filteredQueue = currentQueue.filter(
-              (item) => item.contact_id !== payload.new.contact_id
+              (item) => item.contact_id !== payload.new.contact_id,
             );
+            if (!currentQueue.length && !predictive) setNextRecipient(newQueueItem);
             return [...filteredQueue, newQueueItem];
           }
         }
@@ -286,7 +306,6 @@ export function useSupabaseRealtime({
       updateQueueItem,
     ],
   );
-    
 
   const updateWorkspaceNumbers = useCallback(
     (payload: { eventType: string; old: PhoneNumber; new: PhoneNumber }) => {
@@ -393,6 +412,6 @@ export function useSupabaseRealtime({
     setDisposition,
     nextRecipient,
     setNextRecipient,
-    householdMap
+    householdMap,
   };
 }

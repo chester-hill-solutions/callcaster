@@ -196,19 +196,20 @@ export default function Campaign() {
     initialRecentAttempt,
     token,
   } = useLoaderData<LoaderData>();
+  const [questionContact, setQuestionContact] = useState<QueueItem | null>(
+    initialNextRecipient,
+  );
+
   const [groupByHousehold] = useState<boolean>(true);
   const [update, setUpdate] = useState<Record<string, any>>(
     initialRecentAttempt?.result || {},
   );
+
   const {
-    device,
     status,
-    error,
     activeCall,
     incomingCall,
-    makeCall,
     hangUp,
-    answer,
   } = useTwilioDevice(token);
   const {
     queue,
@@ -217,12 +218,11 @@ export default function Campaign() {
     recentCall,
     recentAttempt,
     setRecentAttempt,
-    setQueue,
     disposition,
     setDisposition,
     householdMap,
     nextRecipient,
-    setNextRecipient
+    setNextRecipient,
   } = useSupabaseRealtime({
     user,
     supabase,
@@ -237,6 +237,8 @@ export default function Campaign() {
     },
     contacts,
     campaign_id: campaign.id,
+    activeCall,
+    setQuestionContact,
   });
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -245,13 +247,8 @@ export default function Campaign() {
     userId: user.id,
   });
 
-  const [questionContact, setQuestionContact] = useState<QueueItem | null>(
-    nextRecipient,
-  );
   const fetcher = useFetcher();
   const submit = useSubmit();
-
-
 
   const handleResponse = useCallback(
     ({ column, value }: { column: string; value: any }) => {
@@ -323,38 +320,6 @@ export default function Campaign() {
     },
     [attemptList, callsList],
   );
-
-  const handleDialNext = useCallback(() => {
-    if (
-      activeCall?.parameters?.CallSid ||
-      incomingCall ||
-      status !== "Registered"
-    ) {
-      return;
-    }
-    if (nextRecipient) {
-      handlePlaceCall(nextRecipient);
-    }
-  }, [activeCall, incomingCall, status, nextRecipient]);
-
-  const handleDequeue = useCallback(
-    (contact: QueueItem) => {
-      submit(
-        {
-          contact_id: contact.contact.id,
-          household: groupByHousehold,
-        },
-        {
-          action: "/api/queues",
-          method: "POST",
-          encType: "application/json",
-          navigate: false,
-          fetcherKey: "dequeue",
-        },
-      );
-    },
-    [submit, groupByHousehold],
-  );
   const handlePlaceCall = useCallback(
     (contact: QueueItem) => {
       if (contact.contact.phone) {
@@ -380,10 +345,49 @@ export default function Campaign() {
     [submit, campaign, user, workspaceId, recentAttempt, nextRecipient],
   );
 
+  const handleDialNext = useCallback(() => {
+    if (
+      activeCall?.parameters?.CallSid ||
+      incomingCall ||
+      status !== "Registered"
+    ) {
+      return;
+    }
+    if (nextRecipient) handlePlaceCall(nextRecipient);
+  }, [
+    activeCall?.parameters?.CallSid,
+    incomingCall,
+    status,
+    nextRecipient,
+    handlePlaceCall,
+  ]);
+
+  const handleDequeue = useCallback(
+    (contact: QueueItem) => {
+      submit(
+        {
+          contact_id: contact.contact.id,
+          household: groupByHousehold,
+        },
+        {
+          action: "/api/queues",
+          method: "POST",
+          encType: "application/json",
+          navigate: false,
+          fetcherKey: "dequeue",
+        },
+      );
+    },
+    [submit, groupByHousehold],
+  );
+
   const handleQueueButton = useCallback(() => {
-    fetcher.load(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${5 - Object.keys(householdMap).length}`, {
-      navigate: false,
-    });
+    fetcher.load(
+      `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${Math.max(0, 5 - Object.keys(householdMap).length)}`,
+      {
+        navigate: false,
+      },
+    );
   }, [fetcher, campaign.id, workspaceId, householdMap]);
 
   const handleDequeueNext = useCallback(() => {
@@ -396,17 +400,36 @@ export default function Campaign() {
   }, [nextRecipient, handleDequeue, handleQueueButton, handleNextNumber]);
 
   const handleQuickSave = useCallback(() => {
-    handleQuestionsSave(update, recentAttempt, submit, questionContact, campaign, workspaceId);
+    handleQuestionsSave(
+      update,
+      recentAttempt,
+      submit,
+      questionContact,
+      campaign,
+      workspaceId,
+    );
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
-
 
   useEffect(() => {
     setQuestionContact(nextRecipient);
   }, [nextRecipient]);
 
-  useDebouncedSave(update, recentAttempt, submit, questionContact, campaign, workspaceId);
+  useDebouncedSave(
+    update,
+    recentAttempt,
+    submit,
+    questionContact,
+    campaign,
+    workspaceId,
+    setUpdate
+  );
 
-  const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact.address) || ''];
+  const house =
+    householdMap[
+      Object.keys(householdMap).find(
+        (house) => house === nextRecipient?.contact.address,
+      ) || ""
+    ];
   return (
     <div
       className=""
@@ -417,7 +440,7 @@ export default function Campaign() {
         style={{ justifyContent: "space-evenly", alignItems: "start" }}
       >
         <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
-        <CallArea
+          <CallArea
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
@@ -463,13 +486,23 @@ export default function Campaign() {
               </div>
             </div>
             {house?.map((contact) => (
-                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-                <div key={contact.id} className="flex justify-center p-2 hover:bg-white" onClick={() => switchToContact(contact)}>
-                    <div className="flex justify-between items-center flex-auto">
-                        <div>{contact.contact.firstname} {contact.contact.surname}</div>
-                        <div>{attemptList.find((attempt) => attempt.contact_id === contact.contact_id)?.result.status && <CheckCircleIcon size={"16px"} />}</div>
-                    </div>
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+              <div
+                key={contact.id}
+                className="flex justify-center p-2 hover:bg-white"
+                onClick={() => switchToContact(contact)}
+              >
+                <div className="flex flex-auto items-center justify-between">
+                  <div>
+                    {contact.contact.firstname} {contact.contact.surname}
+                  </div>
+                  <div>
+                    {attemptList.find(
+                      (attempt) => attempt.contact_id === contact.contact_id,
+                    )?.result.status && <CheckCircleIcon size={"16px"} />}
+                  </div>
                 </div>
+              </div>
             ))}
           </div>
         </div>
@@ -480,7 +513,7 @@ export default function Campaign() {
             update,
             nextRecipient: questionContact,
             handleQuickSave,
-            disabled: !questionContact
+            disabled: !questionContact,
           }}
         />
         <QueueList

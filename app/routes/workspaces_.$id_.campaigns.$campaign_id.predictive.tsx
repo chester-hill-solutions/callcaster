@@ -20,6 +20,7 @@ import { useTwilioDevice } from "../hooks/useTwilioDevice";
 import { CheckCircleIcon } from "lucide-react";
 import { Tables, ScriptBlocksRoot } from "~/lib/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";
+import useSupabaseRoom from "~/hooks/useSupabaseRoom";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -182,9 +183,8 @@ export const action = async ({ request, params }) => {
   }
 };
 
-export default function Campaign() {
+export default function PredictiveCampaign() {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
-    
   const {
     campaign,
     attempts: initialAttempts,
@@ -242,9 +242,16 @@ export default function Campaign() {
     },
     contacts,
     campaign_id: campaign.id,
+    activeCall,
     predictive: true,
     setQuestionContact,
     workspace: workspaceId,
+  });
+  const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
+    supabase,
+    workspace: workspaceId,
+    campaign: campaign.id,
+    userId: user.id,
   });
   
   const fetcher = useFetcher();
@@ -265,19 +272,6 @@ export default function Campaign() {
     [],
   );
 
-  const handleDialNext = useCallback(() => {
-    if (
-      activeCall?.parameters?.CallSid ||
-      incomingCall ||
-      status !== "Registered"
-    ) {
-      return;
-    }
-    handlePowerDial();
-    setNextRecipient(null);
-    setUpdate({});
-  }, [activeCall, incomingCall, status]);
-
   const handlePowerDial = useCallback(() => {
     if (
       activeCall?.parameters?.CallSid ||
@@ -288,6 +282,16 @@ export default function Campaign() {
     }
     begin();
   }, [activeCall, incomingCall, status, begin]);
+
+
+  const handleDialNext = useCallback(() => {
+    if (activeCall?.parameters?.CallSid || incomingCall || status !== "Registered") {
+      return;
+    }
+    handlePowerDial();
+  }, [activeCall, incomingCall, status, handlePowerDial]);
+
+
 
   const switchToContact = useCallback(
     (contact: QueueItem) => {
@@ -364,6 +368,7 @@ export default function Campaign() {
     questionContact,
     campaign,
     workspaceId,
+    setUpdate
   );
 
   const house = nextRecipient?.contact
