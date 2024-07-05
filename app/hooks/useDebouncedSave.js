@@ -42,7 +42,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
             const upd = {...update}
             if (!deepEqual(att, upd)) {
                 console.log(`Saving updated object: `, { new: att}, { old:upd });
-                setUpdate(att)
+
                 handleQuestionsSave();
             }
         }, 1000);
