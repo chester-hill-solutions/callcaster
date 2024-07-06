@@ -1,6 +1,5 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseServerClientWithSession } from '../lib/supabase.server';
 
 const normalizePhoneNumber = (input) => {
     let cleaned = input.replace(/[^0-9+]/g, '');
@@ -30,7 +29,7 @@ const getCampaignData = async ({ supabase, campaign_id }) => {
     return campaign;
 };
 
-const sendMessage = async ({ body, to, from, media, supabase, campaign_id, workspace, contact_id, user_id, queue_id }) => {
+const sendMessage = async ({ body, to, from, media, supabase, campaign_id, workspace, contact_id }) => {
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const message = await twilio.messages.create({
         body,
@@ -38,17 +37,6 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         from,
         statusCallback: `${process.env.BASE_URL}/api/sms/status`,
         ...(media && media.length > 0 && { mediaUrl: [...media] })
-    }).catch(async (error) => {
-        console.log(error);
-        if (error.code === 21614) {
-            const { data: outreach, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id: queue_id, wks_id: workspace, usr_id: user_id });
-            if (outreachError) throw { 'outreach_error:': outreachUpdateError };
-            const { data: outreachUpdate, error: outreachUpdateError } = await supabase.from('outreach_attempt').update({ disposition: 'failed' }).eq('id', outreach).select();
-            if (outreachUpdateError) throw { 'outreach_update_error:': outreachUpdateError };
-            return { outreachUpdate };
-
-        }
-        else throw error;
     });
     const {
         sid,
@@ -72,9 +60,6 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         apiVersion: api_version,
         subresourceUris: subresource_uris
     } = message;
-    if (!sid) return { response: message, data: {} };
-    const { data: outreach, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id: queue_id, wks_id: workspace, usr_id: user_id });
-    if (outreachError) throw { 'outreach_error': outreachError };
     const { data, error } = await supabase.from('message').insert({
         sid,
         body: sentBody,
@@ -98,18 +83,15 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         subresource_uris,
         campaign_id,
         workspace,
-        contact_id,
-        outreach_attempt_id: outreach
+        contact_id
     }).select();
     if (error) throw { 'message_entry_error:': error };
-    return { message, data, outreach };
+    return { message, data };
 };
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-
-    //const { supabaseClient: supabase, headers, serverSession } = getSupabaseServerClientWithSession(request);
-    const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id } = await request.json();
+    const { to_number, campaign_id, workspace_id, contact_id, caller_id } = await request.json();
 
     let to;
 
@@ -129,12 +111,12 @@ export const action = async ({ request }) => {
         const campaign = await getCampaignData({ supabase, campaign_id });
         let media;
         if (campaign.message_media && campaign.message_media.length > 0) {
-            media = await Promise.all(campaign.message_media.map(async (mediaName) => {
+            media = await Promise.all(campaign.message_media.map(async (media) => {
                 const { data, error } = await supabase.storage
                     .from('messageMedia')
-                    .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-                if (error) console.log(error)
-                return data?.signedUrl;
+                    .createSignedUrl(`${workspace_id}/${media}`, 3600);
+                if (error) throw error;
+                return data.signedUrl;
             }));
         }
         const { response, data } = await sendMessage({
@@ -145,28 +127,8 @@ export const action = async ({ request }) => {
             supabase,
             campaign_id,
             workspace: workspace_id,
-            contact_id,
-            queue_id,
-            user_id: 'a656121d-17af-414c-97c7-71f2008f8f14' //serverSession.user.id
+            contact_id
         });
-        if (response) {
-            await fetch(`${process.env.BASE_URL}/api/queues`, {
-                body: JSON.stringify({ contact_id, household: false }),
-                method: "POST",
-                headers: {
-                    "Content-Type": 'application/json'
-                }
-            }).catch((error) => {
-                console.log(error);
-                return new Response(JSON.stringify({ error }), {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    status: 400
-                });
-            }
-            )
-        }
         return new Response(JSON.stringify({ data, response }), {
             headers: {
                 'Content-Type': 'application/json'

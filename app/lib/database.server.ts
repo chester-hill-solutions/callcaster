@@ -62,18 +62,8 @@ export async function createNewWorkspace({
     await supabaseClient.rpc("create_new_workspace", {
       new_workspace_name: workspaceName,
     });
-  const registeredAccount = await fetch(
-    `${process.env.BASE_URL}/api/workspace`,
-    {
-      body: JSON.stringify({ workspace_id: insertWorkspaceData }),
-      headers: {
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    },
-  )
-    .then((res) => res.json())
-    .catch((e) => console.error(e));
+  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
+
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }

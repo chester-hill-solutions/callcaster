@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 
-export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false, setQuestionContact, workspace }) {
+export function useSupabaseRealtime({ user, supabase, init, nextRecipient, contacts, setNextRecipient, campaign_id, predictive = false }) {
     const [queue, setQueue] = useState(init.queue);
     const [predictiveQueue, setPredictiveQueue] = useState(init.predictiveQueue);
     const [callsList, setCalls] = useState(init.callsList);
@@ -84,8 +84,8 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                 setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
             }
         }
-    }, [recentAttempt?.contact?.id, recentCall, queue, setNextRecipient, user?.id]);
-
+    }, [recentAttempt?.contact?.id, recentCall, queue, setNextRecipient, user.id]);
+    
     const updateQueue = useCallback((payload) => {
         if (payload.new.status === 'dequeued') {
             setQueue((currentQueue) => {
@@ -128,26 +128,8 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
                 }
             }
         }
-    }, [user?.id, contacts, nextRecipient, isNextRecipientSet, setNextRecipient]);
-
-    const updateWorkspaceNumbers = useCallback((payload) => {
-        if (payload.eventType === 'DELETE'){
-            setPhoneNumbers((currentNumbers) => {
-                const filtered = currentNumbers.filter(item => item.id !== payload.old.id);
-                return filtered;
-            })
-
-        }
-        if (payload.new.workspace !== workspace) return;
-        setPhoneNumbers((currentNumbers) => {
-            const index = currentNumbers.findIndex(item => item.id === payload.new.id);
-            const updatedNumbers = index > -1 ?
-                currentNumbers.map((item => item.id === payload.new.id ? { ...payload.new } : item)) :
-                [...currentNumbers, { ...payload.new }]
-            return updatedNumbers
-        })
-    },[workspace])
-
+    }, [user.id, contacts, nextRecipient, isNextRecipientSet, setNextRecipient]);
+        
     useEffect(() => {
         const handleChange = (payload) => {
             switch (payload.table) {
@@ -193,5 +175,5 @@ export function useSupabaseRealtime({ user, supabase, init, nextRecipient, conta
         setRecentCall(isRecent(newRecentCall?.date_created) ? newRecentCall : {});
     }, [callsList, nextRecipient]);
 
-    return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue, predictiveQueue, phoneNumbers };
+    return { queue, callsList, attemptList, recentCall, recentAttempt, setRecentAttempt, setQueue };
 }
