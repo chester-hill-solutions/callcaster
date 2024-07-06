@@ -17,15 +17,15 @@ export const IVRSettings = ({ pageData, edit = false, mediaNames = [], onChange 
 
     const addNewQuestion = () => {
         const newQuestion = {
-            step: `${data.step_data.length + 1}`,
-            name: `New Question ${data.step_data.length + 1}`,
+            step: `${data.step_data?.length + 1}`,
+            name: `New Question ${data.step_data?.length + 1}`,
             speechType: "synthetic",
             say: "Enter your question here",
             responseType: "dtmf",
             nextStep: {}
         };
-
-        const newStepData = [...data.step_data, newQuestion];
+        const existingData = data.step_data || []; 
+        const newStepData = [...existingData, newQuestion];
         const newData = { ...data, step_data: newStepData };
         setData(newData);
         onChange(newData);
