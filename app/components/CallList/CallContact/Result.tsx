@@ -117,7 +117,7 @@ const Result = ({
               current={result}
             />
           ) : (
-            renderIcon(Icon, value, content)
+            renderIcon({Icon, value, content})
           ),
         );
       case "boolean":
