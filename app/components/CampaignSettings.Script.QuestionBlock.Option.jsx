@@ -1,37 +1,36 @@
 import { ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { GrSubtractCircle } from "react-icons/gr";
-import { BusyIcon, ClearIcon, FollowUpIcon, SetIcon, ThumbsDownIcon, ThumbsUpIcon, MidIcon, SignIcon, SquareCheckIcon, NoAnswerIcon } from "./Icons";
+import { iconMapping } from "./CallList/CallContact/Result.IconMap";
 
-const IconMapping = {
-    BusyIcon,
-    ClearIcon,
-    FollowUpIcon,
-    SetIcon,
-    ThumbsDownIcon,
-    ThumbsUpIcon,
-    MidIcon,
-    SignIcon,
-    SquareCheckIcon,
-    NoAnswerIcon
-};
-
-export default function QuestionBlockOption({ question, option, handleRemoveOption, index, handleChange, handleIconChange }) {
+export default function QuestionBlockOption({ 
+    question, 
+    option, 
+    handleRemoveOption, 
+    index, 
+    handleChange, 
+    handleIconChange,
+    allQuestions,
+    addNewQuestion,
+    handleNextChange
+}) {
     const [showIcons, setShowIcons] = useState(false);
     const buttonRef = useRef(null);
     const iconContainerRef = useRef(null);
+
     const handleClickOutside = (event) => {
         if (iconContainerRef.current && !iconContainerRef.current.contains(event.target)) {
             setShowIcons(false);
         }
     };
+
     const handleIconClick = (iconName) => {
         handleIconChange({ index, iconName });
         setShowIcons(false);
     };
 
-    const IconComponent = IconMapping[option.Icon] ? IconMapping[option.Icon] : null;
-    
+    const IconComponent = iconMapping[option.Icon] || null;
+
     useEffect(() => {
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
@@ -39,58 +38,106 @@ export default function QuestionBlockOption({ question, option, handleRemoveOpti
         };
     }, []);
 
-    return (
-        <div className="flex gap-2" style={{ alignItems: "center" }} key={`option-${index}`}>
-            <button onClick={() => handleRemoveOption(option)}>
-                <GrSubtractCircle />
-            </button>
+    const handleNextStepChange = async (e) => {
+        const value = e.currentTarget.value;
+        if (value === "add_new") {
+            const newQuestionId = await addNewQuestion();
+        } else {
+            handleNextChange(question.id, index, value);
+        }
+    };
 
-            <input
-                onChange={(e) => handleChange(index, e)}
-                id={`${question.id}-options-${index}`}
-                value={option.label}
-            />
-            {question.type === 'radio' &&
-                <>
-                    <button
-                        ref={buttonRef}
-                        className="relative flex border"
-                        onClick={() => setShowIcons(!showIcons)}
-                    >
-                        {IconComponent && <IconComponent />}
-                        <ChevronDown />
-                    </button>
-                    {showIcons &&
-                        <div
-                            ref={iconContainerRef}
-                            className="absolute bg-secondary border flex"
-                            style={{
-                                height: "150px",
-                                width: '200px',
-                                flexWrap:"wrap",
-                                padding: '24px',
-                                boxShadow: '5px 5px 0 0 rgba(0,0,0,.7)',
-                                zIndex: 1,
-                            }}
-                        >
-                            {Object.keys(IconMapping).map((iconName) => {
-                                const Icon = IconMapping[iconName];
-                                return (
+    return (
+        <div className="flex items-center gap-2 my-2" key={`option-${index}`}>
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Response</th>
+                        <th>Next Step</th>
+                        {question.type === 'radio' && <th>Icon</th>}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <button
+                                onClick={() => handleRemoveOption(option)}
+                                className="text-red-600 hover:text-red-800 transition-colors"
+                            >
+                                <GrSubtractCircle />
+                            </button>
+                        </td>
+                        <td>
+                            {option.value ? (
+                                <input
+                                    onChange={(e) => handleChange(index, e)}
+                                    id={`${question.id}-options-${index}`}
+                                    value={option.content}
+                                    className="flex-grow px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            ) : (
+                                <p className="flex-grow px-2 py-1">Any</p>
+                            )}
+                        </td>
+                        <td>
+                            <select
+                                value={option.next}
+                                onChange={handleNextStepChange}
+                                className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="0">End</option>
+                                {allQuestions.map(([id, q]) => (
+                                    <option key={id} value={id}>
+                                        {q.title || q.id || q.text}
+                                    </option>
+                                ))}
+                                <option value="add_new">Add New Question</option>
+                            </select>
+                        </td>
+                        {question.type === 'radio' && (
+                            <td>
+                                <div className="relative">
                                     <button
-                                        value={`${iconName}`}
-                                        name={`${iconName}`}
-                                        key={iconName}
-                                        onClick={() => handleIconClick(iconName)}
-                                        className="cursor-pointer p-2 hover:bg-gray-200"
+                                        ref={buttonRef}
+                                        className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                                        onClick={() => setShowIcons(!showIcons)}
                                     >
-                                        <Icon fill={'#333'} width="20px" height="20px" />
+                                        {IconComponent && <IconComponent />}
+                                        <ChevronDown size={16} />
                                     </button>
-                                );
-                            })}
-                        </div>
-                    }
-                </>
-            }
+
+                                    {showIcons && (
+                                        <div
+                                            ref={iconContainerRef}
+                                            className="absolute right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg flex flex-wrap p-2 z-10"
+                                            style={{
+                                                width: '240px',
+                                                maxHeight: "300px",
+                                                overflow: 'auto',
+                                                zIndex: 50
+                                            }}
+                                        >
+                                            {Object.keys(iconMapping).map((iconName) => {
+                                                const Icon = iconMapping[iconName];
+                                                return (
+                                                    <button
+                                                        key={iconName}
+                                                        onClick={() => handleIconClick(iconName)}
+                                                        className="p-2 hover:bg-gray-100 rounded transition-colors h-10 w-10"
+                                                    >
+                                                        <Icon size={30} />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </td>
+                        )}
+                    </tr>
+                </tbody>
+            </table>
         </div>
     );
 }

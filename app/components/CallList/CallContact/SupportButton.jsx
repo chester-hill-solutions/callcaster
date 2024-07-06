@@ -6,7 +6,7 @@ const SupportButton = ({ option, handleChange, current }) => {
       className={`support-button button ${current === option.value ? 'selected' : ''}`}
       onClick={() => handleChange(option.value)}
     >
-      {option.label}
+      {option.content}
     </button>
   );
 };

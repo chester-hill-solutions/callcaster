@@ -2,28 +2,93 @@ import { json, redirect } from "@remix-run/node";
 import {
   NavLink,
   Outlet,
+  useActionData,
   useLoaderData,
   useLocation,
-  useNavigate,
-  useNavigation,
-  useOutlet,
   useOutletContext,
-  useSubmit,
 } from "@remix-run/react";
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { CampaignSettings } from "../components/CampaignSettings";
-import { Button } from "~/components/ui/button";
+
 import { getUserRole } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-import { campaignTypeText } from "~/lib/utils";
+import ResultsScreen from "~/components/ResultsScreen";
+import MessageResultsScreen from "~/components/MessageResultsScreen";
+import { Button } from "~/components/ui/button";
+import { TotalCalls } from "~/components/ResultsScreen.TotalCalls";
 
-const formatTime = (milliseconds) => {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+export const action = async ({ request, params }) => {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession?.user) {
+    return redirect("/signin");
+  }
+  const { data, error } = await supabaseClient.rpc(
+    "get_dynamic_outreach_results",
+    { campaign_id_param: params.selected_id },
+  );
+
+  if (error) {
+    console.error("Error fetching data:", error);
+    return new Response("Error fetching data", { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return new Response("No data found", { status: 404 });
+  }
+
+  const dynamicKeys = new Set();
+  data.forEach((row) => {
+    if (row.dynamic_columns) {
+      Object.keys(row.dynamic_columns).forEach((key) => dynamicKeys.add(key));
+    }
+  });
+  const escapeCSV = (field) => {
+    if (field == null) return "";
+    return `"${String(field).replace(/"/g, '""')}"`;
+  };
+
+  const csvHeaders = [
+    "external_id",
+    "disposition",
+    "call_duration",
+    "firstname",
+    "surname",
+    "phone",
+    "username",
+    "created_at",
+    ...Array.from(dynamicKeys),
+  ];
+  let csvContent = csvHeaders.map(escapeCSV).join(",") + "\n";
+
+  data.forEach((row) => {
+    let callDuration = row.call_duration;
+    if (!callDuration || callDuration.startsWith("-")) {
+      callDuration = "00:00:00";
+    }
+
+    const csvRow = [
+      row.external_id,
+      row.disposition,
+      callDuration,
+      row.firstname,
+      row.surname,
+      row.phone,
+      row.username,
+      row.created_at,
+      ...Array.from(dynamicKeys).map((key) =>
+        row.dynamic_columns ? row.dynamic_columns[key] : "",
+      ),
+    ]
+      .map(escapeCSV)
+      .join(",");
+    csvContent += csvRow + "\n";
+  });
+
+  return json({
+    csvContent,
+    filename: `outreach_results_${params.selected_id}.csv`,
+  });
 };
 
 export const loader = async ({ request, params }) => {
@@ -50,15 +115,24 @@ export const loader = async ({ request, params }) => {
       .insert({ campaign_id: data[0].id, workspace: workspace_id });
     return redirect(`/workspaces/${workspace_id}/campaign/${data[0].id}`);
   }
-  const { data: mtmData, error: mtmError } = await supabaseClient
+  const { data: results, error: resultsError } = await supabaseClient.rpc(
+    "get_basic_results",
+    { campaign_id_param: selected_id },
+    { headers },
+  );
+
+  const { data: campaign, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
-      `*,
+      `type,
+        dial_type,
+        title,
         campaign_audience(*)
         `,
     )
     .eq("id", selected_id);
-  let data = [...mtmData];
+
+  let data = [...campaign];
   if (data.length > 0 && data[0].type === "live_call") {
     const { data: campaignDetails, error: detailsError } = await supabaseClient
       .from("live_campaign")
@@ -66,38 +140,92 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", selected_id)
       .single();
     if (detailsError) console.error(detailsError);
+
     data = data.map((item) => ({
       ...item,
       campaignDetails,
     }));
   }
-  const { data: outcomes, error: outcomeError } = await supabaseClient
-    .from("outreach_attempt")
-    .select(`*, call(*)`)
-    .eq("campaign_id", selected_id);
-
-  const { data: queue, error: queueError } = await supabaseClient
-    .from("campaign_queue")
-    .select(`*, contact(*)`)
-    .eq("campaign_id", selected_id);
-
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspace_id);
-
+  if (data.length > 0 && data[0].type === "message") {
+    let campaignDetails;
+    const { data: fetchCampaignDetails, error: detailsError } =
+      await supabaseClient
+        .from("message_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single();
+    if (detailsError) {
+      if (detailsError.code === "PGRST116") {
+        const { data: newCampaign, error: newCampaignError } =
+          await supabaseClient
+            .from("message_campaign")
+            .insert({ campaign_id: selected_id, workspace: workspace_id })
+            .select()
+            .single();
+        if (newCampaignError) {
+          console.error(newCampaignError);
+        } else {
+          campaignDetails = newCampaign;
+        }
+      } else {
+        console.error(detailsError);
+      }
+    } else {
+      campaignDetails = fetchCampaignDetails;
+    }
+    data = data.map((item) => ({
+      ...item,
+      campaignDetails,
+    }));
+  }
+  if (
+    data.length > 0 &&
+    (data[0].type === "robocall" ||
+      data[0].type === "simple_ivr" ||
+      data[0].type === "complex_ivr")
+  ) {
+    let campaignDetails;
+    const { data: fetchCampaignDetails, error: detailsError } =
+      await supabaseClient
+        .from("ivr_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single();
+    if (detailsError) {
+      if (detailsError.code === "PGRST116") {
+        const { data: newCampaign, error: newCampaignError } =
+          await supabaseClient
+            .from("ivr_campaign")
+            .insert({ campaign_id: selected_id, workspace: workspace_id })
+            .select()
+            .single();
+        if (newCampaignError) {
+          console.error(newCampaignError);
+        } else {
+          campaignDetails = newCampaign;
+        }
+      } else {
+        console.error(detailsError);
+      }
+    } else {
+      campaignDetails = fetchCampaignDetails;
+    }
+    data = data.map((item) => ({
+      ...item,
+      campaignDetails,
+    }));
+  }
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess =
     userRole === MemberRole.Owner || userRole === MemberRole.Admin;
-
+  const totalCalls = results?.reduce((sum, item) => sum + item.count, 0);
+  const expectedTotal = (results && results[0]?.expected_total) || 0;
   return json({
-    workspace_id,
-    selected_id,
     data,
-    selected,
-    mediaData,
-    outcomes,
-    queue,
     hasAccess,
+    results,
+    totalCalls,
+    expectedTotal,
   });
 };
 
@@ -116,31 +244,30 @@ function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
 export default function CampaignScreen() {
   const { audiences } = useOutletContext();
   const {
-    workspace_id,
-    selected_id,
     data = [],
-    mediaData,
     hasAccess,
-    outcomes,
-    queue,
+    results = [],
+    totalCalls = 0,
+    expectedTotal = 0,
   } = useLoaderData<typeof loader>();
-  const outcomeKeys = outcomes.reduce((acc, outcome) => {
-    Object.keys(outcome?.result).forEach((key) => {
-      if (!acc.includes(key)) {
-        acc.push(key);
-      }
-    });
-    return acc;
-  }, []);
-
-  const pageData = useMemo(() => data, [data]);
-  const navigate = useNavigate();
-  const nav = useNavigation();
-  const outlet = useOutlet();
-
+  const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+  const campaign = data.length ? data[0] : {};
 
+  useEffect(() => {
+    if (csvData && csvData.csvContent) {
+      const blob = new Blob([csvData.csvContent], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = csvData.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
+  }, [csvData]);
   return (
     <div className="flex h-full w-full flex-col">
       <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
@@ -180,28 +307,102 @@ export default function CampaignScreen() {
         </div>
         <div className="flex items-center gap-2">
           <h3 className="font-Zilla-Slab text-3xl font-semibold">
-            {data[0].title}
+            {data[0]?.title}
           </h3>
-          {/* <p className="flex h-full items-center justify-center rounded-sm bg-zinc-300 px-2 py-1 font-semibold dark:bg-zinc-500 dark:text-white">
-            {campaignTypeText(data[0].type)}
-          </p> */}
         </div>
-        <NavLink
-          className={({ isActive, isPending }) =>
-            handleNavlinkStyles(isActive, isPending)
-          }
-          to={`${data[0].dial_type || "call"}`}
-          relative="path"
-        >
-          Join Campaign
-        </NavLink>
+        {data[0].type === "live_call" ? (
+          <NavLink
+            className={({ isActive, isPending }) =>
+              handleNavlinkStyles(isActive, isPending)
+            }
+            to={`${data[0].dial_type || "call"}`}
+            relative="path"
+          >
+            Join Campaign
+          </NavLink>
+        ) : (
+          <div></div>
+        )}
       </div>
-      {isCampaignParentRoute && (
+      {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
           <h1 className="font-Zilla-Slab text-4xl text-gray-400">
             Your Campaign Results Will Show Here
           </h1>
         </div>
+      ) : isCampaignParentRoute && hasAccess ? (
+        campaign.type === "message" ? (
+          <MessageResultsScreen
+            {...{
+              totalCalls,
+              results,
+              expectedTotal,
+              type: campaign.type,
+              dial_type: data[0].dial_type,
+              handleNavlinkStyles,
+              hasAccess,
+            }}
+          />
+        ) : (
+          hasAccess && (
+            <ResultsScreen
+              {...{
+                totalCalls,
+                results,
+                expectedTotal,
+                type: campaign.type,
+                dial_type: data[0].dial_type,
+                handleNavlinkStyles,
+                hasAccess,
+              }}
+            />
+          )
+        )
+      ) : (
+        isCampaignParentRoute &&
+        !hasAccess &&
+        (campaign.type === "live_call" || !campaign.type) && (
+          <div className="flex">
+            <div className="flex min-w-[200px] flex-auto p-4">
+              <TotalCalls
+                totalCalls={totalCalls}
+                expectedTotal={expectedTotal}
+              />
+            </div>
+            <div className="p-4">
+              <div className="max-w-50 flex flex-col">
+                <h3 className="my-4 font-Zilla-Slab text-xl">
+                  {campaign.instructions?.join ||
+                    "Join the campaign and start dialing!"}
+                </h3>
+                <div>
+                  <NavLink
+                    className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                    to={`${data[0].dial_type || "call"}`}
+                    relative="path"
+                  >
+                    Join Campaign
+                  </NavLink>
+                </div>
+              </div>
+              <div className="my-4 flex flex-col">
+                <h3 className="my-4 font-Zilla-Slab text-xl">
+                  {campaign.instructions?.script ||
+                    "Preview the Script and familiarize yourself before dialing."}
+                </h3>
+                <div>
+                  <NavLink
+                    className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
+                    to="script"
+                    relative="path"
+                  >
+                    View Script
+                  </NavLink>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
       )}
       <Outlet context={{ audiences }} />
     </div>

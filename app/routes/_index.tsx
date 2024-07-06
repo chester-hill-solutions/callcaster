@@ -31,7 +31,8 @@ export default function Index() {
           CallCaster
         </h1>
         <p className="text-center font-Zilla-Slab text-3xl font-black text-slate-800 dark:text-slate-200">
-          Real-Time Connections, Real Results.
+          Real Time Connections, Real Conversations,<br/>
+          Real Results.
         </p>
       </div>
 
