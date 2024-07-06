@@ -11,7 +11,7 @@ export const action = async ({ request, params }) => {
     for (let i = 0; i < data?.length ; i++) {
         let contact = data[i];
         await fetch(`${process.env.BASE_URL}/api/ivr`, {
-            body: JSON.stringify({ to_number: '+19058088017', user_id: user_id.id, campaign_id: campaign_id, workspace_id: contact.workspace, queue_id: contact.id, contact_id: contact.id, caller_id: contact.caller_id }),
+            body: JSON.stringify({ to_number: contact.phone, user_id: user_id.id, campaign_id: campaign_id, workspace_id: contact.workspace, queue_id: contact.id, contact_id: contact.id, caller_id: contact.caller_id }),
             headers: {
                 "Content-Type": "application/json"
             },
