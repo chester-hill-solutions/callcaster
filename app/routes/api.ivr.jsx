@@ -28,14 +28,17 @@ const normalizePhoneNumber = (input) => {
 
 // Function to create a call via Twilio
 const createTwilioCall = async (twilio, to, caller_id, campaign_id, outreach_attempt_id) => {
-    return await twilio.calls.create({
-        to: to,
-        from: caller_id,
-        twiml: `<Response><Redirect>${process.env.BASE_URL}/api/ivr/${campaign_id}/</Redirect></Response>`,
-        machineDetection: 'Enable',
-        statusCallbackEvent: ['answered', 'completed'],
-        statusCallback: `${process.env.BASE_URL}/api/ivr/status`
-    });
+    try {
+        const call = await twilio.calls.create({
+            to: to,
+            from: caller_id,
+            twiml: `<Response><Redirect>${process.env.BASE_URL}/api/ivr/${campaign_id}/</Redirect></Response>`,
+            machineDetection: 'Enable',
+            statusCallbackEvent: ['answered', 'completed'],
+            statusCallback: `${process.env.BASE_URL}/api/ivr/status`
+        });
+        return call
+    } catch (error) { console.error(error) };
 };
 
 // Function to create an outreach attempt via Supabase
@@ -60,7 +63,6 @@ const upsertCallData = async (supabase, callData) => {
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     const { to_number, user_id, campaign_id, workspace_id, queue_id, contact_id, caller_id } = await request.json();
-
     let to;
     try {
         to = normalizePhoneNumber(to_number);
@@ -73,12 +75,12 @@ export const action = async ({ request }) => {
             status: 400
         });
     }
-
+    
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const twiml = new Twilio.twiml.VoiceResponse();
 
     try {
-        
+
         const outreachAttempt = await createOutreachAttempt(supabase, contact_id, campaign_id, queue_id, workspace_id, user_id);
         const call = await createTwilioCall(twilio, to, caller_id, campaign_id, outreachAttempt);
 
@@ -112,7 +114,6 @@ export const action = async ({ request }) => {
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
         await upsertCallData(supabase, callData);
-
     } catch (error) {
         console.error('Error processing call:', error);
         twiml.say('There was an error processing your call. Please try again later.');
