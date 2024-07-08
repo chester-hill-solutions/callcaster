@@ -17,25 +17,40 @@ export const loader = async ({ request, params }) => {
   }
   function getRecordingFileNames(data) {
     const fileNames = data.map((obj) => {
-      if (obj.speechType === "recorded") {
+      if (
+        obj.speechType === "recorded" &&
+        obj.say !== "Enter your question here"
+      ) {
+
         return obj.say;
       }
     });
     return fileNames.filter(Boolean);
   }
   async function getMedia(fileNames: Array<string>) {
-    const media = await Promise.all(
-      fileNames.map(async (mediaName) => {
-        const { data, error } = await supabaseClient.storage
-          .from("workspaceAudio")
-          .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-        if (error) throw error;
-        return { [mediaName]: data.signedUrl };
-      }),
-    );
 
-    return media;
+    try {
+      const media = await Promise.all(
+        fileNames.map(async (mediaName) => {
+          try {
+            const { data, error } = await supabaseClient.storage
+              .from("workspaceAudio")
+              .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
+            if (error) console.error(`unable to retrieve ${mediaName}`);
+            return { [mediaName]: data?.signedUrl };
+          } catch (error) {
+            console.error(`Error creating signed URL for ${mediaName}:`, error);
+            return { [mediaName]: null };
+          }
+        }),
+      );
+      return media.filter((item) => Object.values(item)[0] !== null);
+    } catch (e) {
+      console.error("Error in getMedia function:", e);
+      return [];
+    }
   }
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
 
@@ -86,15 +101,30 @@ export const loader = async ({ request, params }) => {
       .single();
     if (detailsError) console.error(detailsError);
     if (campaignDetails && campaignDetails.message_media?.length > 0) {
-      media = await Promise.all(
-        campaignDetails.message_media.map(async (mediaName) => {
-          const { data, error } = await supabaseClient.storage
-            .from("messageMedia")
-            .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-          if (error) throw error;
-          return data.signedUrl;
-        }),
-      );
+
+      try {
+        media = await Promise.all(
+          campaignDetails.message_media.map(async (mediaName) => {
+            try {
+              const { data, error } = await supabaseClient.storage
+                .from("messageMedia")
+                .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
+              if (error) throw error;
+              return data?.signedUrl;
+            } catch (error) {
+              console.error(
+                `Error creating signed URL for ${mediaName}:`,
+                error,
+              );
+              return null;
+            }
+          }),
+        );
+        media = media.filter(Boolean); // Remove null values
+      } catch (error) {
+        console.error("Error processing message media:", error);
+        media = [];
+      }
     }
     data = data.map((item) => ({
       ...item,
@@ -121,9 +151,16 @@ export const loader = async ({ request, params }) => {
     if (detailsError) console.error(detailsError);
     const fileNames = getRecordingFileNames(campaignDetails.step_data);
     let media = [];
-    if (fileNames.length > 0) {
-      media = await getMedia(fileNames);
+    if (fileNames && fileNames.length > 0) {
+      try {
+        media = await getMedia(fileNames);
+        
+      } catch (error) {
+        console.error("Error getting media for IVR campaign:", error);
+        media = [];
+      }
     }
+
     data = data.map((item) => ({
       ...item,
       campaignDetails: { ...campaignDetails, mediaLinks: media },

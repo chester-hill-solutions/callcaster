@@ -5,6 +5,11 @@ import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
 import { NavLink } from "@remix-run/react";
 import { Button } from "./ui/button";
+import { useSubmit } from "@remix-run/react";
+
+const startCampaign = (submit, campaign_id, user_id) => {
+  submit({campaign_id, user_id}, {action:'/api/initiate-ivr', method:'POST', navigate:false, encType:'application/json'})
+};
 
 const ResultsScreen = ({
   totalCalls = 0,
@@ -14,13 +19,17 @@ const ResultsScreen = ({
   dial_type,
   handleNavlinkStyles,
   hasAccess,
+  campaign_id,
+  user_id
 }: ResultsScreenProps) => {
+  const submit = useSubmit();
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
         <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
         {hasAccess && (
-          <div >
+
+          <div>
             {type === "live_call" || !type ? (
               <NavLink
                 className={({ isActive, isPending }) =>
@@ -32,7 +41,8 @@ const ResultsScreen = ({
                 Join Campaign
               </NavLink>
             ) : (
-              <Button>Start Campaign</Button>
+
+              <Button onClick={() => startCampaign(submit, campaign_id, user_id)}>Start Campaign</Button>
             )}
           </div>
         )}

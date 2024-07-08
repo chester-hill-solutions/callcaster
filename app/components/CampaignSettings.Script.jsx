@@ -22,10 +22,11 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
         newBlocks[newBlockId] = newQuestion;
 
         Object.values(newBlocks).forEach((block) => {
-            block.options = block.options.map(option => ({
+            block.options = block?.options?.map(option => ({
                 ...option,
                 next: option.next === 0 ? newBlockId : option.next
-            }));
+            })) || [];
+
         });
         setBlocks(newBlocks);
         onPageDataChange({
@@ -47,10 +48,10 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
         delete newBlocks[id];
 
         Object.values(newBlocks).forEach((block) => {
-            block.options = block.options.map(option => ({
+            block.options = block?.options?.map(option => ({
                 ...option,
                 next: option.next === Number(id) ? 0 : option.next
-            }));
+            })) || [];
         });
 
         onPageDataChange({
@@ -79,7 +80,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
         [newBlocks[id], newBlocks[targetId]] = [newBlocks[targetId], newBlocks[id]];
 
         Object.values(newBlocks).forEach((block) => {
-            block.options = block.options.map(option => ({
+            block.options = block?.options.map(option => ({
                 ...option,
                 next: option.next === Number(id) ? Number(targetId) :
                     option.next === Number(targetId) ? Number(id) :
