@@ -115,7 +115,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     supabaseClient,
     workspaceName: newWorkspaceName,
   });
-
   if (error) {
     console.log("Error: ", error);
     return json(

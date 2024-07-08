@@ -51,6 +51,17 @@ export async function createNewWorkspaceDeprecated({
   return { data, error };
 }
 
+export async function createSubaccount ({ workspace_id }) {
+  const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+  const account = await twilio.api.v2010.accounts.create({
+      friendlyName: workspace_id
+  }).catch((error) => {
+      console.error('Error creating subaccount', error)
+  });
+  return account
+};
+
+
 export async function createNewWorkspace({
   supabaseClient,
   workspaceName,
@@ -62,16 +73,15 @@ export async function createNewWorkspace({
     await supabaseClient.rpc("create_new_workspace", {
       new_workspace_name: workspaceName,
     });
-  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
+  console.log("Inside createNewWorkspace: ", insertWorkspaceData);
 
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }
-
+  const registeredAccount = await createSubaccount({workspace_id: insertWorkspaceData})
   // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
   //   await supabaseClient.from("workspace_users").insert({ workspace });
-
-  return { data: registeredAccount.id, error: insertWorkspaceError };
+  return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
 export async function getWorkspaceInfo({
