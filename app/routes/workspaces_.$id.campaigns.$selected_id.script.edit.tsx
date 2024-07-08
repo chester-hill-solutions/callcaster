@@ -30,6 +30,7 @@ export const loader = async ({ request, params }) => {
     return fileNames.filter(Boolean);
   }
     async function getMedia(fileNames: Array<string>) {
+
     const media = await Promise.all(
       fileNames.map(async (mediaName) => {
         const { data, error } = await supabaseClient.storage

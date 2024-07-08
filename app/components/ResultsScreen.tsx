@@ -28,6 +28,7 @@ const ResultsScreen = ({
       <div className="flex justify-between">
         <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
         {hasAccess && (
+
           <div>
             {type === "live_call" || !type ? (
               <NavLink
@@ -40,6 +41,7 @@ const ResultsScreen = ({
                 Join Campaign
               </NavLink>
             ) : (
+
               <Button onClick={() => startCampaign(submit, campaign_id, user_id)}>Start Campaign</Button>
             )}
           </div>

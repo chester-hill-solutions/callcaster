@@ -41,12 +41,13 @@ export const IVRSettings = ({ pageData, edit = false, mediaNames = [], onChange 
         setData(newData);
         onChange(newData);
     };
-console.log(data)
+
     return (
         <div>
             <div className="my-1 flex gap-2 px-2">
                 <div className="flex gap-8 p-6 justify-start flex-wrap">
                     {data.campaignDetails?.step_data && data.campaignDetails?.step_data.map((question, index) => (
+
                         <QuestionCard
                             key={index}
                             question={question}

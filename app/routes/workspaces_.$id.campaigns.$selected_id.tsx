@@ -226,6 +226,7 @@ export const loader = async ({ request, params }) => {
     results,
     totalCalls,
     expectedTotal,
+
     user: serverSession?.user
   });
 };
@@ -250,6 +251,7 @@ export default function CampaignScreen() {
     results = [],
     totalCalls = 0,
     expectedTotal = 0,
+
     user
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();

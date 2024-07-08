@@ -26,6 +26,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
                 ...option,
                 next: option.next === 0 ? newBlockId : option.next
             })) || [];
+
         });
         setBlocks(newBlocks);
         onPageDataChange({

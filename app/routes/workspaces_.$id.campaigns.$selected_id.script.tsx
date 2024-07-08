@@ -21,12 +21,14 @@ export const loader = async ({ request, params }) => {
         obj.speechType === "recorded" &&
         obj.say !== "Enter your question here"
       ) {
+
         return obj.say;
       }
     });
     return fileNames.filter(Boolean);
   }
   async function getMedia(fileNames: Array<string>) {
+
     try {
       const media = await Promise.all(
         fileNames.map(async (mediaName) => {
@@ -48,6 +50,8 @@ export const loader = async ({ request, params }) => {
       return [];
     }
   }
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
 
   const { data: mtmData, error: mtmError } = await supabaseClient
@@ -97,6 +101,7 @@ export const loader = async ({ request, params }) => {
       .single();
     if (detailsError) console.error(detailsError);
     if (campaignDetails && campaignDetails.message_media?.length > 0) {
+
       try {
         media = await Promise.all(
           campaignDetails.message_media.map(async (mediaName) => {

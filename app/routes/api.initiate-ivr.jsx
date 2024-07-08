@@ -5,6 +5,7 @@ function sleep(ms) {
 }
 export const action = async ({ request, params }) => {
     const { campaign_id, user_id } = await request.json()
+
     const {supabaseClient: supabase} = await getSupabaseServerClientWithSession(request);
     const { data, error } = await supabase
     .rpc('get_campaign_queue', { campaign_id_pro: campaign_id })

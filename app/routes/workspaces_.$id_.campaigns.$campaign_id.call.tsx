@@ -260,6 +260,7 @@ export default function Campaign() {
   const handleNextNumber = useCallback(
     (skipHousehold = false) => {
       hangUp();
+
       const nextContact = getNextContact(
         queue,
         householdMap,

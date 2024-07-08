@@ -117,6 +117,7 @@ const Result = ({
               current={result}
             />
           ) : (
+
             renderIcon({Icon, value, content})
           ),
         );
