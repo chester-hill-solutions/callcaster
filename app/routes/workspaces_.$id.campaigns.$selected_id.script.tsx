@@ -52,8 +52,6 @@ export const loader = async ({ request, params }) => {
   }
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
 
-  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
-
   const { data: mtmData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(

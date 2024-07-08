@@ -63,7 +63,7 @@ export function useSupabaseRealtime({
     new Set(init.queue.map((item) => item.contact_id)),
   ).map((contact_id) =>
     init.queue.find(
-      (item) => item.contact_id === contact_id && item.status === user.id,
+      (item) => item.contact_id === contact_id && item.status === user?.id,
     ),
   );
   const [activeCallState, setActiveCallState] = useState(activeCall);
@@ -284,7 +284,7 @@ export function useSupabaseRealtime({
             setNextRecipient(nextUncontacted || filteredQueue[0] || null);
           }
           return filteredQueue;
-        } else if (payload.new.status === user.id) {
+        } else if (payload.new.status === user?.id) {
           const contact = findContactById(payload.new.contact_id);
           if (contact?.phone) {
             const newQueueItem = updateQueueItem(payload.new, contact);
@@ -299,7 +299,7 @@ export function useSupabaseRealtime({
       });
     },
     [
-      user.id,
+      user,
       nextRecipient,
       setNextRecipient,
       findContactById,
