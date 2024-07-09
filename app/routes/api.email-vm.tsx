@@ -70,13 +70,13 @@ export const action = async ({ request, params }) => {
     const msg = {
       to: action,
       from: "info@callcaster.ca",
-      subject: `A new voicemail from ${data.From}`,
+      subject: `A new voicemail from ${call.from}`,
       text: `A new voicemail has been recorded for you, you can listen at ${signedUrl}`,
       html: `<p>A new voicemail has been recorded for you, you can listen to it at <a href="${signedUrl}">this link</a>.</p>`,
     };
 
     const result = await MailService.send(msg);
-    return json({ success: true, message: "Voicemail processed and email sent" });
+    return json({ success: true, message: "Voicemail processed and email sent", result });
   } catch (error) {
     console.error('Error processing voicemail:', error);
     return json({ error: 'Failed to process voicemail' }, { status: 500 });
