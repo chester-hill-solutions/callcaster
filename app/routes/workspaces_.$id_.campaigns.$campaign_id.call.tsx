@@ -122,7 +122,7 @@ export const loader = async ({ request, params }) => {
       queue = data;
     }
   } else if (!campaign.dial_type) {
-    return redirect("../settings");
+    return redirect("./../settings");
   }
 
   const errors = [
