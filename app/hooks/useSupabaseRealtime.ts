@@ -16,9 +16,7 @@ export const useSupabaseRealtime = ({
   setQuestionContact,
   workspace,
   activeCall,
-
 }: UseSupabaseRealtimeProps): UseSupabaseRealtimeResult => {
-
   const [disposition, setDisposition] = useState<string | null>(
     init.recentAttempt?.disposition || init.recentAttempt?.result?.status || null
   );
@@ -39,7 +37,6 @@ export const useSupabaseRealtime = ({
     setRecentAttempt,
     updateAttempts
   } = useAttempts(init.attempts, init.recentAttempt);
-
 
   const {
     callsList,

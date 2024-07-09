@@ -197,7 +197,7 @@ export default function Campaign() {
 
   const [groupByHousehold] = useState<boolean>(true);
   const [update, setUpdate] = useState<Record<string, any>>(
-    initialRecentAttempt?.result || {},
+    initialRecentAttempt?.result || null,
   );
 
   const { device, status, activeCall, incomingCall, hangUp } =
@@ -262,6 +262,7 @@ export default function Campaign() {
     setNextRecipient,
     attempts: attemptList,
     calls: callsList,
+    
   });
   const { dequeue, fetchMore } = handleQueue({
     fetcher,
@@ -327,7 +328,7 @@ export default function Campaign() {
       dequeue({contact: nextRecipient});
       fetchMore({ householdMap });
       handleNextNumber({ skipHousehold: true });
-      setRecentAttempt({});
+      setRecentAttempt(null);
     }
   }, [
     dequeue,

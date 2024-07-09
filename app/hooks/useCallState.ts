@@ -25,11 +25,12 @@ function callReducer(state: CallState, action: CallAction): CallState {
   switch (state) {
     case 'idle':
       if (action.type === 'START_DIALING') return 'dialing';
+      if (action.type === 'HANG_UP') return 'completed';
       break;
     case 'dialing':
       if (action.type === 'CONNECT') return 'connected';
       if (action.type === 'FAIL') return 'failed';
-      if (action.type === 'HANG_UP') return 'idle';
+      if (action.type === 'HANG_UP') return 'completed';
       break;
     case 'connected':
       if (action.type === 'HANG_UP') return 'completed';

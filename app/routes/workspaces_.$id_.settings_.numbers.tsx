@@ -505,7 +505,6 @@ export default function WorkspaceSettings() {
               </div>
             </div>
           </div>
-          {actionData && JSON.stringify(actionData)}
         </div>
       </div>
     </Dialog>

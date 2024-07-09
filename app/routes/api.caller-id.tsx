@@ -74,6 +74,7 @@ export const action: ActionFunction = async ({ request }) => {
           workspace: workspace_id,
           friendly_name: friendlyName,
           phone_number: normalizedPhoneNumber,
+          type: 'caller_id',
           capabilities: {
             fax: false,
             mms: false,

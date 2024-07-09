@@ -3,142 +3,134 @@ import { Device } from '@twilio/voice-sdk';
 
 export function useTwilioDevice(token) {
     const deviceRef = useRef(null);
-    const initializedRef = useRef(false);
     const [status, setStatus] = useState('disconnected');
     const [error, setError] = useState(null);
-    const [activeCall, setActiveCall] = useState({});
+    const [activeCall, setActiveCall] = useState(null);
     const [incomingCall, setIncomingCall] = useState(null);
 
     useEffect(() => {
-        if (token && !initializedRef.current) {
-            initializedRef.current = true;
-            const device = new Device(token);
-            deviceRef.current = device;
+        if (!token) return;
 
-            device.on('registered', () => {
-                console.log('Device registered and ready for calls');
-                setStatus('Registered');
-            });
+        const device = new Device(token);
+        deviceRef.current = device;
 
-            device.on('connect', (call) => {
-                setStatus('Connected');
-            });
-
-            device.on('disconnect', () => {
+        const eventHandlers = {
+            registered: () => setStatus('Registered'),
+            connect: () => setStatus('Connected'),
+            disconnect: () => {
                 setStatus('Disconnected');
                 device.disconnectAll();
                 activeCall?.disconnect();
-                setActiveCall({});
+                setActiveCall(null);
                 setStatus('Registered');
-            });
-
-            device.on('cancel', () => {
+            },
+            cancel: () => {
                 setStatus('Cancelled');
-                setActiveCall({});
-                console.log('Call cancelled');
-            });
-
-            device.on('error', (error) => {
+                setActiveCall(null);
+            },
+            error: (error) => {
                 console.error('Twilio Device Error:', error);
                 setStatus('Error');
+                setError(error);
+            },
+            incoming: handleIncomingCall
+        };
+
+        Object.entries(eventHandlers).forEach(([event, handler]) => {
+            device.on(event, handler);
+        });
+
+        device.register();
+
+        return () => {
+            if (device.state === 'registered') {
+                device.unregister();
+            }
+            Object.keys(eventHandlers).forEach(event => {
+                device.removeAllListeners(event);
             });
-
-            device.on('incoming', (call) => {
-                setIncomingCall(call);
-                if (call.parameters.To.includes('client')) {
-                    call.accept();
-                    setStatus('connected');
-                    setIncomingCall(null);
-                }
-                call.on('accept', () => {
-                    setActiveCall(call);
-                    setStatus('connected');
-                    setIncomingCall(null);
-                    console.log('Call accepted');
-                });
-                call.on('disconnect', () => {
-                    setActiveCall({});
-                    setStatus('Registered');
-                    console.log('Call disconnected');
-                });
-                call.on('reject', () => {
-                    setIncomingCall(null);
-                    console.log('Call rejected');
-                });
-                call.on('cancel', () => {
-                    setIncomingCall(null);
-                    console.log('Call canceled');
-                });
-            });
-
-            device.register();
-
-            return () => {
-                if (device.state === 'registered') {
-                    device.unregister();
-                }
-                deviceRef.current = null;
-                initializedRef.current = false;
-            };
-        }
+            deviceRef.current = null;
+        };
     }, [token]);
 
-    const makeCall = useCallback((params) => {
-        if (deviceRef.current) {
-            console.log('Making call with params:', params);
-            const connection = deviceRef.current.connect(params);
-            setActiveCall(connection);
+    const handleIncomingCall = useCallback((call) => {
+        setIncomingCall(call);
+        if (call.parameters.To.includes('client')) {
+            call.accept();
+            setStatus('connected');
+            setIncomingCall(null);
+        }
 
-            connection.on('disconnect', () => {
-                setActiveCall({});
-                setStatus('disconnected');
-                console.log('Call disconnected');
-            });
+        const callEventHandlers = {
+            accept: () => {
+                setActiveCall(call);
+                setStatus('connected');
+                setIncomingCall(null);
+            },
+            disconnect: () => {
+                setActiveCall(null);
+                setStatus('Registered');
+            },
+            reject: () => setIncomingCall(null),
+            cancel: () => setIncomingCall(null)
+        };
+
+        Object.entries(callEventHandlers).forEach(([event, handler]) => {
+            call.on(event, handler);
+        });
+    }, []);
+
+    const makeCall = useCallback((params) => {
+        if (!deviceRef.current) {
+            console.error('Device is not ready');
+            return;
+        }
+
+        const connection = deviceRef.current.connect(params);
+        setActiveCall(connection);
+
+        connection.on('disconnect', () => {
+            setActiveCall(null);
+            setStatus('disconnected');
+        });
 
         connection.on('error', (err) => {
-                setError(err);
-                setStatus('error');
-                console.error('Call error:', err);
-            });
-        } else {
-            console.error('Device is not ready');
-        }
+            setError(err);
+            setStatus('error');
+            console.error('Call error:', err);
+        });
     }, []);
 
     const hangUp = useCallback(() => {
-        if (activeCall) {
-            /* activeCall.disconnect();
-            deviceRef.current.disconnectAll(); */
-            fetch(`/api/hangup`, {
-                method: "POST",
-                body: JSON.stringify({ callSid: activeCall.parameters.CallSid }),
-                headers: { "Content-Type": 'application/json' }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.json();
-            })
-            .then(() => {
-                setStatus('Registered');
-                activeCall?.disconnect();
-                setActiveCall({});
-                deviceRef.current.disconnectAll();
-            })
-            .catch((error) => {
-                console.error('Error hanging up call:', error);
-                setError(error);
-            });
-        } else {
+        if (!activeCall) {
             console.error('No active call to hang up');
             setError(new Error('No active call to hang up'));
+            return;
         }
+
+        fetch('/api/hangup', {
+            method: "POST",
+            body: JSON.stringify({ callSid: activeCall.parameters.CallSid }),
+            headers: { "Content-Type": 'application/json' }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(() => {
+            setStatus('Registered');
+            activeCall.disconnect();
+            setActiveCall(null);
+            deviceRef.current.disconnectAll();
+        })
+        .catch((error) => {
+            console.error('Error hanging up call:', error);
+            setError(error);
+        });
     }, [activeCall]);
     
     const answer = useCallback(() => {
         if (incomingCall) {
-            console.log('Answering incoming call');
             incomingCall.accept();
         } else {
             console.error('No incoming call to answer');
@@ -146,7 +138,7 @@ export function useTwilioDevice(token) {
     }, [incomingCall]);
 
     return {
-        device: deviceRef?.current,
+        device: deviceRef.current,
         status,
         error,
         activeCall,

@@ -59,7 +59,7 @@ export async function createSubaccount ({ workspace_id }) {
       console.error('Error creating subaccount', error)
   });
   return account
-};
+}
 
 
 export async function createNewWorkspace({
@@ -78,9 +78,8 @@ export async function createNewWorkspace({
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }
-  await createSubaccount({workspace_id: insertWorkspaceData})
-  // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
-  //   await supabaseClient.from("workspace_users").insert({ workspace });
+  const account = await  createSubaccount({workspace_id: insertWorkspaceData})
+  const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } = await supabaseClient.from("workspace").update({ 'twilio_data': account }).eq('id', insertWorkspaceData);
   return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
