@@ -12,15 +12,23 @@ import { useEffect, useState, useCallback } from "react";
 import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
 import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import { getNextContact } from "../lib/getNextContact";
 import useDebouncedSave, {
   handleQuestionsSave,
 } from "../hooks/useDebouncedSave";
 import useSupabaseRoom from "../hooks/useSupabaseRoom";
 import { useTwilioDevice } from "../hooks/useTwilioDevice";
-import { CheckCircleIcon } from "lucide-react";
 import { Tables, ScriptBlocksRoot } from "~/lib/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";
+import {
+  handleCall,
+  handleConference,
+  handleContact,
+  handleQueue,
+} from "~/lib/callscreenActions";
+import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
+import { Household } from "~/components/CallScreen.Household";
+import { Toaster } from "sonner";
+import { ErrorBoundary } from "~/components/ErrorBoundary";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -49,14 +57,6 @@ interface LoaderData {
   token: string;
 }
 
-const limit = 30;
-
-const isRecent = (date: string): boolean => {
-  const created = new Date(date);
-  const now = new Date();
-  return (now.getTime() - created.getTime()) / 3600000 < 24;
-};
-
 export const loader = async ({ request, params }) => {
   const { campaign_id: id, id: workspaceId } = params;
   const {
@@ -65,9 +65,11 @@ export const loader = async ({ request, params }) => {
     serverSession,
   } = await getSupabaseServerClientWithSession(request);
   if (!serverSession) return redirect("/signin");
+
   const { token } = await fetch(
     `${process.env.BASE_URL}/api/token?id=${serverSession.user.id}`,
   ).then((res) => res.json());
+
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
     .select()
@@ -78,6 +80,7 @@ export const loader = async ({ request, params }) => {
     .select()
     .eq("campaign_id", id)
     .single();
+
   const { data: audiences, error: audiencesError } = await supabase.rpc(
     "get_audiences_by_campaign",
     { selected_campaign_id: id },
@@ -86,17 +89,43 @@ export const loader = async ({ request, params }) => {
     "get_contacts_by_campaign",
     { selected_campaign_id: id },
   );
+
   const { data: attempts, error: attemptError } = await supabase
     .from("outreach_attempt")
     .select(`*,call(*)`)
     .eq("campaign_id", id)
     .eq("user_id", serverSession.user.id);
-  const { data: queue, error: queueError } = await supabase
-    .from("campaign_queue")
-    .select()
-    .eq("status", serverSession.user.id)
-    .eq("campaign_id", id);
-  let errors = [
+  let queue;
+  let queueError;
+  if (campaign.dial_type === "predictive") {
+    const { data, error } = await supabase
+      .from("campaign_queue")
+      .select()
+      .eq("status", "queued")
+      .eq("campaign_id", id)
+      .order("attempts", { ascending: true })
+      .order("queue_order", { ascending: true });
+    if (error) {
+      queueError = error;
+    } else {
+      queue = data;
+    }
+  } else if (campaign.dial_type === "call") {
+    const { data, error } = await supabase
+      .from("campaign_queue")
+      .select()
+      .eq("status", serverSession.user.id)
+      .eq("campaign_id", id);
+    if (error) {
+      queueError = error;
+    } else {
+      queue = data;
+    }
+  } else if (!campaign.dial_type) {
+    return redirect("../settings");
+  }
+
+  const errors = [
     campaignError,
     detailsError,
     audiencesError,
@@ -105,14 +134,17 @@ export const loader = async ({ request, params }) => {
     queueError,
   ].filter(Boolean);
   if (errors.length) {
-    console.log(errors);
-    throw errors;
+    console.error(errors);
+    throw json({ message: "Error fetching campaign data" }, { status: 500 });
   }
+
   const initialQueue = queue?.map((q) => ({
     ...q,
     contact: contacts?.find((contact) => contact.id === q.contact_id),
   }));
-  const nextRecipient = initialQueue[0] || null;
+
+  const nextRecipient =
+    initialQueue && campaign.dial_type === "call" ? initialQueue[0] : null;
   const initalCallsList = attempts.flatMap((attempt) => attempt.call);
   const initialRecentCall = initalCallsList.find(
     (call) => call.contact_id === nextRecipient?.contact.id,
@@ -120,6 +152,7 @@ export const loader = async ({ request, params }) => {
   const initialRecentAttempt = attempts
     .sort((a, b) => b.created_at - a.created_at)
     .find((call) => call.contact_id === nextRecipient?.contact.id);
+
   return json(
     {
       campaign,
@@ -141,51 +174,12 @@ export const loader = async ({ request, params }) => {
   );
 };
 
-export const action = async ({ request, params }) => {
-  const { id: workspaceId, campaign_id } = params;
-  const update = await request.formData();
-  const firstname = await update.get("firstname");
-  const surname = await update.get("surname");
-  const email = await update.get("email");
-  const phone = await update.get("phone");
-  const audiences = await update.getAll("audiences");
-  const {
-    supabaseClient: supabase,
-    headers,
-    serverSession,
-  } = await getSupabaseServerClientWithSession(request);
-  try {
-    let audienceUpdated = [];
-    const { data: contact, error: contactError } = await supabase
-      .from("contact")
-      .insert({ firstname, surname, email, phone, workspace: workspaceId })
-      .select();
-    if (contactError) throw contactError;
-    for (let i = 0; i < audiences.length; i++) {
-      const { data: audience, error: audienceError } = await supabase
-        .from("contact_audience")
-        .insert({ contact_id: contact[0].id, audience_id: audiences[i] })
-        .select();
-      if (audienceError) {
-        console.log(audienceError);
-        throw audienceError;
-      }
-      if (audience) audienceUpdated.push(audience);
-    }
-    return json({ success: true, contact, audienceUpdated });
-  } catch (e) {
-    console.log(e);
-    return json({ success: false, error: e });
-  }
-};
-
 export default function Campaign() {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const {
     campaign,
     attempts: initialAttempts,
     user,
-    audiences,
     workspaceId,
     campaignDetails,
     contacts,
@@ -196,6 +190,7 @@ export default function Campaign() {
     initialRecentAttempt,
     token,
   } = useLoaderData<LoaderData>();
+
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
     initialNextRecipient,
   );
@@ -205,14 +200,12 @@ export default function Campaign() {
     initialRecentAttempt?.result || {},
   );
 
-  const {
-    status,
-    activeCall,
-    incomingCall,
-    hangUp,
-  } = useTwilioDevice(token);
+  const { device, status, activeCall, incomingCall, hangUp } =
+    useTwilioDevice(token);
+
   const {
     queue,
+    predictiveQueue,
     callsList,
     attemptList,
     recentCall,
@@ -227,8 +220,8 @@ export default function Campaign() {
     user,
     supabase,
     init: {
-      predictiveQueue: [],
-      queue: initialQueue,
+      predictiveQueue: campaign.dial_type === "predictive" ? initialQueue : [],
+      queue: campaign.dial_type === "call" ? initialQueue : [],
       callsList: initalCallsList,
       attempts: initialAttempts,
       recentCall: initialRecentCall || null,
@@ -239,6 +232,7 @@ export default function Campaign() {
     campaign_id: campaign.id,
     activeCall,
     setQuestionContact,
+    predictive: campaign.dial_type === "predictive",
   });
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -247,8 +241,35 @@ export default function Campaign() {
     userId: user.id,
   });
 
+  const { begin, conference, setConference } = useStartConferenceAndDial(
+    user.id,
+    campaign.id,
+    workspaceId,
+    campaign.caller_id,
+  );
   const fetcher = useFetcher();
   const submit = useSubmit();
+
+  const { startCall } = handleCall({ submit });
+  const { handleConferenceStart, handleConferenceEnd } = handleConference({
+    submit,
+    begin,
+  });
+  const { switchQuestionContact, nextNumber } = handleContact({
+    setQuestionContact,
+    setRecentAttempt,
+    setUpdate,
+    setNextRecipient,
+    attempts: attemptList,
+    calls: callsList,
+  });
+  const { dequeue, fetchMore } = handleQueue({
+    fetcher,
+    submit,
+    groupByHousehold,
+    campaign,
+    workspaceId,
+  });
 
   const handleResponse = useCallback(
     ({ column, value }: { column: string; value: any }) => {
@@ -257,153 +278,70 @@ export default function Campaign() {
     [],
   );
 
-  const handleNextNumber = useCallback(
-    (skipHousehold = false) => {
-      hangUp();
-
-      const nextContact = getNextContact(
-        queue,
-        householdMap,
-        nextRecipient,
-        groupByHousehold,
-        skipHousehold,
-      );
-      if (nextContact) {
-        setNextRecipient(nextContact);
-        const newRecentAttempt =
-          attemptList.find(
-            (call) => call.contact_id === nextContact.contact.id,
-          ) || {};
-        if (!isRecent(newRecentAttempt.created_at)) {
-          setRecentAttempt({});
-          setUpdate({});
-          return nextContact;
-        }
-        const attemptCalls = newRecentAttempt
-          ? callsList.filter(
-              (call) => call.outreach_attempt_id === newRecentAttempt.id,
-            )
-          : [];
-        setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-        setUpdate(newRecentAttempt.update || {});
-        return nextContact;
-      }
-      return null;
-    },
-    [
-      attemptList,
-      callsList,
-      setRecentAttempt,
-      groupByHousehold,
-      householdMap,
-      queue,
-      nextRecipient,
-    ],
-  );
-
-  const switchToContact = useCallback(
-    (contact: QueueItem) => {
-      setQuestionContact(contact);
-      const newRecentAttempt =
-        attemptList.find((call) => call.contact_id === contact.contact.id) ||
-        {};
-      if (!isRecent(newRecentAttempt.created_at)) {
-        setRecentAttempt({});
-        setUpdate({});
-        return contact;
-      }
-      const attemptCalls = newRecentAttempt
-        ? callsList.filter(
-            (call) => call.outreach_attempt_id === newRecentAttempt.id,
-          )
-        : [];
-      setRecentAttempt({ ...newRecentAttempt, call: attemptCalls });
-      setUpdate(newRecentAttempt.result || {});
-    },
-    [attemptList, callsList],
-  );
-  const handlePlaceCall = useCallback(
-    (contact: QueueItem) => {
-      if (contact.contact.phone) {
-        const data = {
-          to_number: contact.contact.phone,
-          campaign_id: campaign.id,
-          user_id: user.id,
-          contact_id: contact.contact.id,
-          workspace_id: workspaceId,
-          outreach_id: recentAttempt?.id,
-          queue_id: nextRecipient?.id,
-          caller_id: campaign.caller_id,
-        };
-        submit(data, {
-          action: "/api/dial",
-          method: "POST",
-          encType: "application/json",
-          navigate: false,
-          fetcherKey: "place-call",
-        });
-      }
-    },
-    [submit, campaign, user, workspaceId, recentAttempt, nextRecipient],
-  );
-
-  const handleDialNext = useCallback(() => {
+  const handleDialButton = useCallback(() => {
     if (
       activeCall?.parameters?.CallSid ||
       incomingCall ||
       status !== "Registered"
-    ) {
-      return;
-    }
-    if (nextRecipient) handlePlaceCall(nextRecipient);
+    )
+      return; //Return if not ready to place new call.
+    if (campaign.dial_type === "predictive") handleConferenceStart();
+    if (campaign.dial_type === "call")
+      startCall({
+        contact: nextRecipient?.contact,
+        campaign,
+        user,
+        workspaceId,
+        nextRecipient,
+        recentAttempt,
+      });
   }, [
-    activeCall?.parameters?.CallSid,
+    activeCall,
+    campaign,
+    handleConferenceStart,
     incomingCall,
-    status,
     nextRecipient,
-    handlePlaceCall,
+    recentAttempt,
+    startCall,
+    status,
+    user,
+    workspaceId,
   ]);
 
-  const handleDequeue = useCallback(
-    (contact: QueueItem) => {
-      submit(
-        {
-          contact_id: contact.contact.id,
-          household: groupByHousehold,
-        },
-        {
-          action: "/api/queues",
-          method: "POST",
-          encType: "application/json",
-          navigate: false,
-          fetcherKey: "dequeue",
-        },
-      );
+  const handleNextNumber = useCallback(
+    (skipHousehold = false) => {
+      activeCall?.parameters?.CallSid && hangUp();
+      nextNumber({
+        skipHousehold,
+        queue,
+        householdMap,
+        nextRecipient,
+        groupByHousehold,
+      });
     },
-    [submit, groupByHousehold],
+    [activeCall, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold],
   );
-
-  const handleQueueButton = useCallback(() => {
-    fetcher.load(
-      `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${Math.max(0, 5 - Object.keys(householdMap).length)}`,
-      {
-        navigate: false,
-      },
-    );
-  }, [fetcher, campaign.id, workspaceId, householdMap]);
 
   const handleDequeueNext = useCallback(() => {
     if (nextRecipient) {
-      handleDequeue(nextRecipient);
-      handleQueueButton();
-      handleNextNumber(true);
+      dequeue({contact: nextRecipient});
+      fetchMore({ householdMap });
+      handleNextNumber({ skipHousehold: true });
       setRecentAttempt({});
     }
-  }, [nextRecipient, handleDequeue, handleQueueButton, handleNextNumber]);
+  }, [
+    dequeue,
+    fetchMore,
+    handleNextNumber,
+    householdMap,
+    nextRecipient,
+    setRecentAttempt,
+  ]);
 
   const handleQuickSave = useCallback(() => {
     handleQuestionsSave(
       update,
+      setUpdate,
       recentAttempt,
       submit,
       questionContact,
@@ -413,7 +351,9 @@ export default function Campaign() {
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   useEffect(() => {
-    setQuestionContact(nextRecipient);
+    if (nextRecipient) {
+      setQuestionContact(nextRecipient);
+    }
   }, [nextRecipient]);
 
   useDebouncedSave(
@@ -423,7 +363,6 @@ export default function Campaign() {
     questionContact,
     campaign,
     workspaceId,
-    setUpdate
   );
 
   const house =
@@ -432,8 +371,9 @@ export default function Campaign() {
         (house) => house === nextRecipient?.contact.address,
       ) || ""
     ];
+
   return (
-    <div
+    <main
       className=""
       style={{ padding: "24px", margin: "0 auto", width: "100%" }}
     >
@@ -447,66 +387,17 @@ export default function Campaign() {
             activeCall={activeCall}
             recentCall={recentCall}
             hangUp={hangUp}
-            handleDialNext={handleDialNext}
+            handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
             setDisposition={setDisposition}
             recentAttempt={recentAttempt}
           />
-
-          <div
-            style={{
-              border: "3px solid #BCEBFF",
-              borderRadius: "20px",
-              marginBottom: "2rem",
-              backgroundColor: "hsl(var(--card))",
-              minHeight: "300px",
-              alignItems: "stretch",
-              flexDirection: "column",
-              display: "flex",
-              boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                borderTopLeftRadius: "18px",
-                borderTopRightRadius: "18px",
-                padding: "16px",
-                background: "hsl(var(--brand-secondary))",
-                width: "100%",
-                textAlign: "center",
-              }}
-              className="font-Tabac-Slab text-xl"
-            >
-              <div
-                style={{ display: "flex", flex: "1", justifyContent: "center" }}
-              >
-                Household Members
-              </div>
-            </div>
-            {house?.map((contact) => (
-              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-              <div
-                key={contact.id}
-                className="flex justify-center p-2 hover:bg-white"
-                onClick={() => switchToContact(contact)}
-              >
-                <div className="flex flex-auto items-center justify-between">
-                  <div>
-                    {contact.contact.firstname} {contact.contact.surname}
-                  </div>
-                  <div>
-                    {attemptList.find(
-                      (attempt) => attempt.contact_id === contact.contact_id,
-                    )?.result.status && <CheckCircleIcon size={"16px"} />}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <Household
+            house={house}
+            switchQuestionContact={switchQuestionContact}
+            attemptList={attemptList}
+          />
         </div>
         <CallQuestionnaire
           {...{
@@ -522,14 +413,17 @@ export default function Campaign() {
           {...{
             householdMap,
             groupByHousehold,
-            queue,
+            queue: campaign.dial_type === "call" ? queue : predictiveQueue,
             handleNextNumber,
             nextRecipient,
-            handleQueueButton,
+            handleQueueButton: fetchMore,
+            predictive: campaign.dial_type === "predictive",
           }}
         />
       </div>
       <div></div>
-    </div>
+      <Toaster richColors/>
+    </main>
   );
 }
+Campaign.ErrorBoundary = ErrorBoundary;

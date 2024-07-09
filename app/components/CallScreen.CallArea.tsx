@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { ClearIcon } from "./Icons";
-import { useNavigation } from "@remix-run/react";
+import React, { useEffect } from 'react';
+import { useCallState } from '~/hooks/useCallState';
 import { Tables } from "~/lib/database.types";
 
 type Contact = Tables<"contact">;
@@ -17,11 +16,13 @@ interface ActiveCall {
     CallSid: string;
   };
 }
+
 interface Conference {
   parameters: {
     Sid: string;
   };
 }
+
 interface CallAreaProps {
   nextRecipient: NextRecipient | null;
   activeCall: ActiveCall | null;
@@ -36,10 +37,18 @@ interface CallAreaProps {
   conference: Conference | null;
 }
 
-const CallArea = ({
+const formatTime = (milliseconds: number): string => {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
+export const CallArea: React.FC<CallAreaProps> = ({
   nextRecipient,
-  activeCall = null,
-  recentCall = null,
+  activeCall,
+  recentCall,
   hangUp,
   handleDialNext,
   handleDequeueNext,
@@ -48,48 +57,29 @@ const CallArea = ({
   recentAttempt,
   predictive = false,
   conference = null,
-}: CallAreaProps) => {
-  const [time, setTime] = useState<Date | null>(null);
-  const [tooltip, setTooltip] = useState<string | null>(null);
-  const nav = useNavigation();
-  const isBusy = nav.state !== "idle";
-  const isFailed = recentAttempt?.disposition === "failed" || recentAttempt?.result?.status === 'failed';
-  const isDialing =
-    activeCall?.parameters?.CallSid && !recentAttempt?.answered_at;
-  const isConnected =
-    recentAttempt?.answered_at && activeCall?.parameters?.CallSid;
-  const isComplete = !!(
-    recentAttempt?.disposition || recentAttempt?.result?.status
-  );
-  const isPending =
-    !recentAttempt?.disposition &&
-    !recentAttempt?.result?.status &&
-    !activeCall?.parameters?.CallSid;
+}) => {
+  const { state, context, send } = useCallState();
 
   useEffect(() => {
+    if (activeCall?.parameters?.CallSid && !recentAttempt?.answered_at) {
+      send({ type: 'START_DIALING' });
+    }
     if (recentAttempt?.answered_at) {
-      const tick = () => {
-        setTime(new Date());
-      };
-      const intervalId = setInterval(tick, 100);
-      return () => {
-        clearInterval(intervalId);
-      };
+      send({ type: 'CONNECT' });
     }
-  }, [recentAttempt]);
-
-  useEffect(() => {
-    if (recentCall?.date_created && activeCall?.parameters?.CallSid) {
-      setTime(new Date(recentCall.date_created));
+    if (recentAttempt?.disposition === 'failed' || recentAttempt?.result?.status === 'failed') {
+      send({ type: 'FAIL' });
     }
-  }, [activeCall?.parameters?.CallSid, nextRecipient, recentCall]);
+  }, [activeCall, recentAttempt, send]);
 
-  const formatTime = (milliseconds: number): string => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const handleHangUp = () => {
+    hangUp();
+    send({ type: 'HANG_UP' });
+  };
+
+  const handleSetDisposition = (newDisposition: string) => {
+    setDisposition(newDisposition);
+    send({ type: 'SET_DISPOSITION', disposition: newDisposition });
   };
 
   return (
@@ -117,38 +107,31 @@ const CallArea = ({
             borderTopRightRadius: "18px",
             padding: "16px",
             marginBottom: "8px",
-            background: isFailed
+            background: state === 'failed'
               ? "hsl(var(--primary))"
-              : activeCall?.parameters?.CallSid
+              : state === 'connected' || state === 'dialing'
                 ? "#4CA83D"
                 : "#333333",
           }}
-          className={`font-Tabac-Slab text-xl text-white ${activeCall ? "bg-green-300" : "bg-slate-700"}`}
+          className={`font-Tabac-Slab text-xl text-white ${state === 'connected' || state === 'dialing' ? "bg-green-300" : "bg-slate-700"}`}
         >
           <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-            {isFailed ? (
-              <div>Call Failed</div>
-            ) : isConnected ? (
+            {state === 'failed' && <div>Call Failed</div>}
+            {state === 'connected' && (
               <div>
-                Connected{" "}
-                {`${formatTime(time?.getTime() - new Date(recentAttempt.answered_at).getTime())}`}
+                Connected {formatTime(context.callDuration * 1000)}
               </div>
-            ) : isDialing ? (
-              <div>Dialing...</div>
-            ) : isComplete ? (
-              <div>Complete</div>
-            ) : (
-              isPending && <div>Pending</div>
             )}
+            {state === 'dialing' && <div>Dialing...</div>}
+            {state === 'completed' && <div>Complete</div>}
+            {state === 'idle' && <div>Pending</div>}
           </div>
         </div>
-        {!conference && predictive && (
+        {!conference && predictive && state === 'idle' && (
           <div className="flex h-full flex-1 justify-center align-middle">
             <button
-              disabled={isBusy || !!isConnected}
-              onClick={() => handleDialNext()}
+              onClick={handleDialNext}
               className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
-              style={{ opacity: isBusy || isConnected ? ".7" : "unset" }}
             >
               Start Dialing
             </button>
@@ -180,16 +163,16 @@ const CallArea = ({
             style={{ position: "relative" }}
           >
             <button
-              disabled={isBusy}
-              onClick={() => hangUp()}
+              onClick={handleHangUp}
               style={{
                 flex: "1",
                 padding: "4px 8px",
                 background: "#d60000",
                 borderRadius: "5px",
                 color: "white",
-                opacity: isBusy || !(isConnected || isDialing) ? ".6" : "unset",
+                opacity: state !== 'connected' && state !== 'dialing' ? ".6" : "unset",
               }}
+              disabled={state !== 'connected' && state !== 'dialing'}
             >
               Hang Up
             </button>
@@ -197,8 +180,7 @@ const CallArea = ({
               !nextRecipient?.contact?.phone &&
               predictive && (
                 <button
-                  disabled={isBusy}
-                  onClick={() => handleDequeueNext()}
+                  onClick={handleDequeueNext}
                   style={{
                     flex: "1",
                     padding: "4px 8px",
@@ -212,26 +194,25 @@ const CallArea = ({
               )}
             {
               <button
-                onClick={() => handleDialNext()}
-                disabled={isBusy || isConnected || isDialing}
+                onClick={handleDialNext}
+                disabled={state === 'connected' || state === 'dialing'}
                 style={{
                   flex: "1",
                   padding: "4px 8px",
                   background: "#4CA83D",
                   borderRadius: "5px",
                   color: "white",
-                  opacity: isBusy || isConnected || isDialing ? ".6" : "unset",
+                  opacity: state === 'connected' || state === 'dialing' ? ".6" : "unset",
                 }}
               >
                 {!predictive ? "Dial" : "Start"}
               </button>
             }
           </div>
-          {(isComplete || isFailed) && !predictive && (
+          {(state === 'completed' || state === 'failed') && !predictive && (
             <div className="flex px-4" style={{ paddingBottom: ".5rem" }}>
               <button
-                disabled={isBusy}
-                onClick={() => handleDequeueNext()}
+                onClick={handleDequeueNext}
                 style={{
                   flex: "1",
                   padding: "4px 8px",
@@ -249,4 +230,3 @@ const CallArea = ({
     </div>
   );
 };
-export { CallArea };

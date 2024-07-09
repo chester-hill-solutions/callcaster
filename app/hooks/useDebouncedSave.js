@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { deepEqual } from '~/lib/utils';
 
-export const handleQuestionsSave = (update, recentAttempt, submit, nextRecipient, campaign, workspaceId) => {
+export const handleQuestionsSave = (update, setUpdate, recentAttempt, submit, nextRecipient, campaign, workspaceId) => {
     submit({
         update,
         callId: recentAttempt?.id,
@@ -15,9 +15,10 @@ export const handleQuestionsSave = (update, recentAttempt, submit, nextRecipient
         action: `/api/questions`,
         encType: 'application/json'
     });
+    setUpdate(update);
 };
 
-const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign, workspaceId, setUpdate) => {
+const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign, workspaceId) => {
     const handlerRef = useRef(null);
 
     useEffect(() => {
@@ -38,7 +39,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
         };
 
         handlerRef.current = setTimeout(() => {
-            const att = {...recentAttempt.result}
+            const att = recentAttempt ? {...recentAttempt.result} : {}
             const upd = {...update}
             if (!deepEqual(att, upd)) {
                 console.log(`Saving updated object: `, { new: att}, { old:upd });

@@ -51,6 +51,17 @@ export async function createNewWorkspaceDeprecated({
   return { data, error };
 }
 
+export async function createSubaccount ({ workspace_id }) {
+  const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+  const account = await twilio.api.v2010.accounts.create({
+      friendlyName: workspace_id
+  }).catch((error) => {
+      console.error('Error creating subaccount', error)
+  });
+  return account
+};
+
+
 export async function createNewWorkspace({
   supabaseClient,
   workspaceName,
@@ -62,16 +73,15 @@ export async function createNewWorkspace({
     await supabaseClient.rpc("create_new_workspace", {
       new_workspace_name: workspaceName,
     });
-  // console.log("Inside createNewWorkspace: ", insertWorkspaceData);
+  console.log("Inside createNewWorkspace: ", insertWorkspaceData);
 
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }
-
+  await createSubaccount({workspace_id: insertWorkspaceData})
   // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
   //   await supabaseClient.from("workspace_users").insert({ workspace });
-
-  return { data: registeredAccount.id, error: insertWorkspaceError };
+  return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
 export async function getWorkspaceInfo({
@@ -276,4 +286,28 @@ export async function removeWorkspacePhoneNumber({
   } catch (error) {
     return { error };
   }
+}
+
+export async function endConferenceByUser({user_id, supabaseClient}){
+  const twilio = new Twilio.Twilio(process.env.TWILIO_SID!, process.env.TWILIO_AUTH_TOKEN!);
+    const conferences = await twilio.conferences.list({ friendlyName: user_id, status: ['in-progress'] });
+    
+    await Promise.all(conferences.map(async (conf) => {
+        try {
+            await twilio.conferences(conf.sid).update({ status: 'completed' });
+            
+            const { data, error } = await supabaseClient.from('call').select('sid').eq('conference_id', conf.sid);
+            if (error) throw error;
+
+            await Promise.all(data.map(async (call) => {
+                try {
+                    await twilio.calls(call.sid).update({ twiml: `<Response><Hangup/></Response>` });
+                } catch (callError) {
+                    console.error(`Error updating call ${call.sid}:`, callError);
+                }
+            }));
+        } catch (confError) {
+            console.error(`Error updating conference ${conf.sid}:`, confError);
+        }
+    }))
 }
