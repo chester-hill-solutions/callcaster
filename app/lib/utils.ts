@@ -22,9 +22,16 @@ export function formatTableText(unformatted: string): string {
   return formatted;
 }
 
+export const isRecent = (date: string): boolean => {
+  const created = new Date(date);
+  const now = new Date();
+  return (now.getTime() - created.getTime()) / 3600000 < 24;
+};
+
+
 export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = new WeakMap()): boolean {
   function log(message: string) {
-    //console.log(`[${path}] ${message}`);
+    console.log(`[${path}] ${message}`);
   }
 
   if (obj1 === obj2) return true;
@@ -196,3 +203,38 @@ export function campaignTypeText(campaignType: string): string {
       return "Invalid";
   }
 }
+export const sortQueue = (queue: QueueItem[]): QueueItem[] => {
+  return [...queue].sort((a, b) => {
+    if (a.attempts !== b.attempts) {
+      return b.attempts - a.attempts;
+    }
+    if (a.id !== b.id) {
+      return a.id - b.id;
+    }
+    return a.queue_order - b.queue_order;
+  });
+};
+
+export const createHouseholdMap = (queue: QueueItem[]): Record<string, QueueItem[]> => {
+  return queue.reduce<Record<string, QueueItem[]>>((acc, curr, index) => {
+    if (curr?.contact?.address) {
+      if (!acc[curr.contact.address]) {
+        acc[curr.contact.address] = [];
+      }
+      acc[curr.contact.address].push(curr);
+    } else {
+      acc[`NO_ADDRESS_${index}`] = [curr];
+    }
+    return acc;
+  }, {});
+};
+
+export const updateAttemptWithCall = (attempt: Attempt, call: Call): Attempt => {
+  return {
+    ...attempt,
+    result: {
+      ...attempt.result,
+      ...(call && call.status && call.direction !== "outbound-api" && { status: call.status }),
+    },
+  };
+};
