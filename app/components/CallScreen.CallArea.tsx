@@ -61,6 +61,9 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const { state, context, send } = useCallState();
 
   useEffect(() => {
+    if (!activeCall && !recentAttempt?.id){
+      send({type:'NEXT'});
+    }
     if (activeCall?.parameters?.CallSid && !recentAttempt?.answered_at) {
       send({ type: 'START_DIALING' });
     }
@@ -69,6 +72,9 @@ export const CallArea: React.FC<CallAreaProps> = ({
     }
     if (recentAttempt?.disposition === 'failed' || recentAttempt?.result?.status === 'failed') {
       send({ type: 'FAIL' });
+    }
+    if (!activeCall && recentAttempt?.disposition === 'no-answer'){
+      send({type: 'HANG_UP'});
     }
   }, [activeCall, recentAttempt, send]);
 
