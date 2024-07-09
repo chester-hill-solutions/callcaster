@@ -1324,7 +1324,7 @@ export type Json =
   
   export type ScriptBlock = {
     id: string;
-    type: "radio" | "dropdown" | "boolean" | "multi" | "textarea";
+    type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock";
     title: string;
     content: string;
     options: ScriptBlockBaseOption[] | ScriptBlockRadioOption[];
