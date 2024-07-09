@@ -12,15 +12,15 @@ export const handleConference = ({ submit, begin }) => {
   const handleConferenceStart = () => {
     begin();
   };
-  const handleConferenceEnd = ({ activeCall, setConference }) => {
+  const handleConferenceEnd = ({ activeCall, setConference, workspaceId }) => {
     submit(
-      {},
-      { method: "post", action: "/api/auto-dial/end", navigate: false },
+      {workspaceId},
+      { method: "post", action: "/api/auto-dial/end", navigate: false, encType:'application/json' },
     );
     if (activeCall?.parameters?.CallSid) {
       fetch(`/api/hangup`, {
         method: "POST",
-        body: JSON.stringify({ callSid: activeCall.parameters.CallSid }),
+        body: JSON.stringify({ callSid: activeCall.parameters.CallSid, workspaceId }),
         headers: { "Content-Type": "application/json" },
       });
     }

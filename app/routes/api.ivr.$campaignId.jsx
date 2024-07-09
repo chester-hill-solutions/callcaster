@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json } from "@remix-run/react";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 const getCampaignData = async (supabase, campaign_id) => {
     const { data: campaign, error } = await supabase
@@ -38,7 +39,7 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
             const { data, error } = await supabase.storage
                 .from(`workspaceAudio`)
                 .createSignedUrl(`${dbCall.workspace}/${step.say}`, 3600);
-            if (error) throw {'Campaign':error}
+            if (error) throw { 'Campaign': error }
             await call.update({
                 twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
             });
@@ -48,7 +49,6 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const formData = await request.formData();
 
     try {
@@ -61,6 +61,7 @@ export const action = async ({ request }) => {
             .eq('sid', callSid)
             .single();
         if (callError) throw callError;
+        const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
 
         const campaignPromise = getCampaignData(supabase, dbCall.campaign_id);
         const call = twilio.calls(callSid);

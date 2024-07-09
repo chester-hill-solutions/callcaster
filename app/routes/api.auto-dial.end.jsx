@@ -1,10 +1,12 @@
 import Twilio from "twilio";
 import { json } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 export const action = async ({ request }) => {
     const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+    const { workspaceId: workspace_id } = await request.json();
+    const twilio = await createWorkspaceTwilioInstance({ supabase: supabaseClient, workspace_id });
 
     try {
         const conferences = await twilio.conferences.list({ friendlyName: serverSession.user.id, status: ['in-progress'] });

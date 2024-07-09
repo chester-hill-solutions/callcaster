@@ -387,7 +387,7 @@ export default function Campaign() {
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
-            hangUp={hangUp}
+            hangUp={() => campaign.dial_type === 'predictive' ? handleConferenceEnd({activeCall, setConference, workspaceId}) : hangUp()}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
