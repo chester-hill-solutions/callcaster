@@ -56,12 +56,6 @@ export const action = async ({ request }) => {
 
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const { data, error } = await supabase.from('call').upsert(updateData, { onConflict: 'sid' }).select();
-    if (parsedBody.CallStatus === 'failed') {
-        const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({ ended_at: new Date(), disposition: 'failed', status:'dequeued' }).eq('id', data[0].outreach_attempt_id).select();
-    }
-    if (parsedBody.CallStatus === 'completed') {
-        const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({ ended_at: new Date(), disposition:"completed", status:"dequeued" }).eq('id', data[0].outreach_attempt_id).select();
-    }
-
+    const { data: updateAttempt, error: thisAttemptError } = await supabase.from('outreach_attempt').update({ disposition: underCaseData.call_status }).eq('id', data[0].outreach_attempt_id).select();
     return json({ success: true });
 }
