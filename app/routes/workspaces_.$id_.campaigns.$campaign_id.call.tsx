@@ -122,7 +122,7 @@ export const loader = async ({ request, params }) => {
       queue = data;
     }
   } else if (!campaign.dial_type) {
-    return redirect("../settings");
+    return redirect("./../settings");
   }
 
   const errors = [
@@ -387,7 +387,7 @@ export default function Campaign() {
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
-            hangUp={hangUp}
+            hangUp={() => campaign.dial_type === 'predictive' ? handleConferenceEnd({activeCall, setConference, workspaceId}) : hangUp()}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}

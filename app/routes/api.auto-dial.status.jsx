@@ -2,12 +2,12 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json, redirect } from "@remix-run/react";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 export const action = async ({ request }) => {
     const formData = await request.formData();
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-
+    
     const parsedBody = {};
 
     for (const pair of formData.entries()) {
@@ -15,6 +15,7 @@ export const action = async ({ request }) => {
     }
     let update;
     const { data: dbCall, error: callError } = await supabase.from('call').select().eq('sid', parsedBody.CallSid).single();
+    const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
     if (parsedBody.CallStatus === 'failed') {
         console.log(`Call to ${dbCall.to} failed`)
         const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp), status: 'failed' }).eq('sid', parsedBody.CallSid).select();

@@ -287,6 +287,13 @@ export async function removeWorkspacePhoneNumber({
   }
 }
 
+export async function createWorkspaceTwilioInstance({supabase, workspace_id}){
+  const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
+  if (error) throw error;
+  const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
+  return twilio;
+}
+
 export async function endConferenceByUser({user_id, supabaseClient}){
   const twilio = new Twilio.Twilio(process.env.TWILIO_SID!, process.env.TWILIO_AUTH_TOKEN!);
     const conferences = await twilio.conferences.list({ friendlyName: user_id, status: ['in-progress'] });

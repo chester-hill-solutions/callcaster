@@ -1,10 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 export const action = async ({ request, params }) => {
     const conferenceName = params.roomId;
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const twiml = new Twilio.twiml.VoiceResponse();
     const formData = await request.formData();
     const callSid = formData.get('CallSid');
@@ -12,10 +12,11 @@ export const action = async ({ request, params }) => {
     const callStatus = formData.get('CallStatus');
     const called = formData.get('Called');
     const dial = twiml.dial();
-    const call = twilio.calls(callSid);
-    console.log('Room Call: ', call)
+    
     try {
         const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace').eq('sid', callSid).single();
+        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
+        const call = twilio.calls(callSid);
         if (callError) {
             throw new Error(`Error fetching call data: ${callError.message}`);
         }

@@ -44,9 +44,9 @@ const handleVoiceResponse = (twiml, campaign_id, stepData, formData) => {
 };
 
 export const action = async ({ request, params }) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-
+    
+    const twiml = new Twilio.twiml.VoiceResponse();
     const formData = await request.formData();
     const callSid = formData.get('CallSid');
     const userInput = formData.get('Digits') || formData.get('SpeechResult');

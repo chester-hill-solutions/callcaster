@@ -31,13 +31,16 @@ export const loader = async ({ request }) => {
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { phoneNumber, workspace_id } = await request.json();
+    const formData = await request.formData();
+    const { phoneNumber, workspace_id } = Object.fromEntries(formData);
     try {
         const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
         if (error) throw error;
         const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
         const number = await twilio.incomingPhoneNumbers.create({
-            phoneNumber
+            phoneNumber,
+            statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
+            voiceUrl: `${process.env.BASE_URL}/api/inbound`
         });
         const { data: newNumber, error: newNumberError } = await supabase
         .from('workspace_number')
@@ -45,7 +48,8 @@ export const action = async ({ request }) => {
             workspace: workspace_id,
             friendly_name: number.friendlyName,
             phone_number: number.phoneNumber,
-            capabilities: number.capabilities
+            capabilities: number.capabilities,
+            type:"rented"
         })
         .select().single();
         if (newNumberError) throw newNumberError;

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json } from "@remix-run/react";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 const getCampaignData = async (supabase, campaign_id) => {
     const { data: campaign, error } = await supabase
@@ -62,19 +63,19 @@ const handleCallStatusUpdate = async (supabase, callSid, status, timestamp, outr
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const formData = await request.formData();
     
     const parsedBody = Object.fromEntries(formData.entries());
     const callSid = parsedBody.CallSid;
-
+    
     try {
         const { data: dbCall, error: callError } = await supabase
-            .from('call')
-            .select('campaign_id, outreach_attempt_id, workspace')
-            .eq('sid', callSid)
-            .single();
+        .from('call')
+        .select('campaign_id, outreach_attempt_id, workspace')
+        .eq('sid', callSid)
+        .single();
         if (callError) throw callError;
+        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id:dbCall.workspace});
 
         const callStatus = parsedBody.CallStatus;
         const timestamp = parsedBody.Timestamp;
