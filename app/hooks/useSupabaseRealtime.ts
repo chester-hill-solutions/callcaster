@@ -28,7 +28,7 @@ export const useSupabaseRealtime = ({
     predictiveQueue,
     updateQueue,
     householdMap
-  } = useQueue(init.queue, init.predictiveQueue, user, contacts);
+  } = useQueue(init.queue, init.predictiveQueue, user, contacts, isPredictive: predictive);
 
   const {
     attemptList,
