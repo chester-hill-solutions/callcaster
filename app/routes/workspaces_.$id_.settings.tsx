@@ -311,7 +311,7 @@ export default function WorkspaceSettings() {
         </Button>
       </div>
 
-      <div className="flex flex-wrap">
+      <div className="flex flex-wrap justify-center">
         <div className="m-8 flex w-fit flex-col gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
           <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
             Manage Team Members
@@ -414,16 +414,18 @@ export default function WorkspaceSettings() {
               </ul>
             </div>
           </div>
-          {hasAccess && <div className="">
-            <Button
-              asChild
-              className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
-            >
-              <NavLink to={"./numbers"} relative="path">
-                Manage Numbers
-              </NavLink>
-            </Button>
-          </div>}
+          {hasAccess && (
+            <div className="">
+              <Button
+                asChild
+                className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
+              >
+                <NavLink to={"./numbers"} relative="path">
+                  Manage Numbers
+                </NavLink>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
