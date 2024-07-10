@@ -170,6 +170,50 @@ export function useTwilioDevice(token, workspaceId) {
         return () => clearInterval(interval);
     }, [callState]);
 
+    useEffect(() => {
+        if (!token) return;
+        const device = new Device(token, {});
+        deviceRef.current = device;
+        const eventHandlers = {
+            registered: () => setStatus('Registered'),
+            connect: () => setStatus('Connected'),
+            disconnect: () => {
+                console.log(device)
+                setStatus('Disconnected');
+                device.disconnectAll();
+                activeCall?.disconnect();
+                setActiveCall(null);
+                setStatus('Registered');
+            },
+            cancel: () => {
+                setStatus('Cancelled');
+                setActiveCall(null);
+            },
+            error: (error) => {
+                console.error('Twilio Device Error:', error);
+                setStatus('Error');
+                setError(error);
+            },
+            incoming: handleIncomingCall
+        };
+
+        Object.entries(eventHandlers).forEach(([event, handler]) => {
+            device.on(event, handler);
+        });
+
+        device.register();
+
+        return () => {
+            if (device.state === 'registered') {
+                device.unregister();
+            }
+            Object.keys(eventHandlers).forEach(event => {
+                device.removeAllListeners(event);
+            });
+            deviceRef.current = null;
+        };
+    }, [activeCall, handleIncomingCall, token]);
+
     return {
         device: deviceRef.current,
         status,
