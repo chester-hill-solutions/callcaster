@@ -29,6 +29,7 @@ import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
 import { Household } from "~/components/CallScreen.Household";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
+import { useCallState } from "~/hooks/useCallState";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -123,7 +124,6 @@ export const loader = async ({ request, params }) => {
     }
   } else if (!campaign.dial_type) {
     return redirect("./../settings");
-
   }
 
   const errors = [
@@ -201,8 +201,11 @@ export default function Campaign() {
     initialRecentAttempt?.result || null,
   );
 
-  const { device, status, activeCall, incomingCall, hangUp } =
-    useTwilioDevice(token);
+  const { state, context, send } = useCallState();
+  const { device, status, activeCall, incomingCall, hangUp, callState, callDuration } = useTwilioDevice(
+    token,
+    workspaceId
+  );
 
   const {
     queue,
@@ -286,6 +289,7 @@ export default function Campaign() {
       status !== "Registered"
     )
       return; //Return if not ready to place new call.
+      send({ type: "START_DIALING" });
     if (campaign.dial_type === "predictive") handleConferenceStart();
     if (campaign.dial_type === "call")
       startCall({
@@ -296,6 +300,7 @@ export default function Campaign() {
         nextRecipient,
         recentAttempt,
       });
+   
   }, [
     activeCall,
     campaign,
@@ -303,6 +308,7 @@ export default function Campaign() {
     incomingCall,
     nextRecipient,
     recentAttempt,
+    send,
     startCall,
     status,
     user,
@@ -320,12 +326,20 @@ export default function Campaign() {
         groupByHousehold,
       });
     },
-    [activeCall, hangUp, nextNumber, queue, householdMap, nextRecipient, groupByHousehold],
+    [
+      activeCall,
+      hangUp,
+      nextNumber,
+      queue,
+      householdMap,
+      nextRecipient,
+      groupByHousehold,
+    ],
   );
 
   const handleDequeueNext = useCallback(() => {
     if (nextRecipient) {
-      dequeue({contact: nextRecipient});
+      dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
       handleNextNumber({ skipHousehold: true });
       setRecentAttempt(null);
@@ -387,12 +401,22 @@ export default function Campaign() {
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
-            hangUp={() => campaign.dial_type === 'predictive' ? handleConferenceEnd({activeCall, setConference, workspaceId}) : hangUp()}
+            hangUp={() =>
+              campaign.dial_type === "predictive"
+                ? handleConferenceEnd({
+                    activeCall,
+                    setConference,
+                    workspaceId,
+                  })
+                : hangUp()
+            }
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
             setDisposition={setDisposition}
             recentAttempt={recentAttempt}
+            callState={callState}
+            callDuration={callDuration}
           />
           <Household
             house={house}
@@ -423,7 +447,7 @@ export default function Campaign() {
         />
       </div>
       <div></div>
-      <Toaster richColors/>
+      <Toaster richColors />
     </main>
   );
 }

@@ -1,4 +1,4 @@
-import { useReducer, useEffect } from 'react';
+import { useReducer, useEffect, useCallback } from 'react';
 
 type CallState = 'idle' | 'dialing' | 'connected' | 'failed' | 'completed';
 
@@ -22,6 +22,7 @@ const initialContext: CallContext = {
 };
 
 function callReducer(state: CallState, action: CallAction): CallState {
+  console.log(action, state)
   switch (state) {
     case 'idle':
       if (action.type === 'START_DIALING') return 'dialing';
@@ -40,6 +41,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'NEXT') return 'idle';
       break;
     case 'completed':
+      if (action.type === 'START_DIALING') return 'dialing';
       if (action.type === 'NEXT') return 'idle';
       break;
   }
@@ -64,10 +66,10 @@ export function useCallState() {
   const [state, dispatch] = useReducer(callReducer, 'idle');
   const [context, contextDispatch] = useReducer(contextReducer, initialContext);
 
-  const send = (action: CallAction) => {
+  const send = useCallback((action: CallAction) => {
     dispatch(action);
     contextDispatch(action);
-  };
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -77,7 +79,11 @@ export function useCallState() {
       }, 1000);
     }
     return () => clearInterval(interval);
+  }, [state, send]);
+/* 
+  useEffect(() => {
+    console.log('Current state:', state);
   }, [state]);
-
+ */
   return { state, context, send };
 }
