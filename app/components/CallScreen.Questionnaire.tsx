@@ -75,7 +75,7 @@ const CallQuestionnaire = ({
                   questions={key}
                   key={`questions-${key.id}`}
                   questionId={key.id}
-                  initResult={update[key.id]}
+                  initResult={update ? update[key.id] : null}
                   type={key.type}
                 />
               ),

@@ -59,7 +59,8 @@ export async function createSubaccount ({ workspace_id }) {
       console.error('Error creating subaccount', error)
   });
   return account
-};
+
+}
 
 
 export async function createNewWorkspace({
@@ -78,9 +79,9 @@ export async function createNewWorkspace({
   if (insertWorkspaceError) {
     return { data: null, error: insertWorkspaceError };
   }
-  await createSubaccount({workspace_id: insertWorkspaceData})
-  // const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } =
-  //   await supabaseClient.from("workspace_users").insert({ workspace });
+
+  const account = await  createSubaccount({workspace_id: insertWorkspaceData})
+  const { data: insertWorkspaceUsersData, error: insertWorkspaceUsersError } = await supabaseClient.from("workspace").update({ 'twilio_data': account }).eq('id', insertWorkspaceData);
   return { data: insertWorkspaceData, error: insertWorkspaceError };
 }
 
@@ -286,6 +287,13 @@ export async function removeWorkspacePhoneNumber({
   } catch (error) {
     return { error };
   }
+}
+
+export async function createWorkspaceTwilioInstance({supabase, workspace_id}){
+  const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
+  if (error) throw error;
+  const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
+  return twilio;
 }
 
 export async function endConferenceByUser({user_id, supabaseClient}){

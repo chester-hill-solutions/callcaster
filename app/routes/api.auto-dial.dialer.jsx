@@ -1,5 +1,6 @@
 import Twilio from 'twilio';
 import { createClient } from "@supabase/supabase-js";
+import { createWorkspaceTwilioInstance } from '../lib/database.server';
 
 function normalizePhoneNumber(input) {
     let cleaned = input.replace(/[^0-9+]/g, '');
@@ -23,8 +24,8 @@ function normalizePhoneNumber(input) {
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
     const { user_id, campaign_id, workspace_id, } = await request.json();
+    const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id});
     try {
         const { data: record, error: contactError } = await supabase
             .rpc('auto_dial_queue',

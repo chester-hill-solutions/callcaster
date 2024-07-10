@@ -1,35 +1,35 @@
 import Twilio from 'twilio';
 import { createSupabaseServerClient } from '../lib/supabase.server';
-
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
     const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id } = await request.json();
-    
+
     function normalizePhoneNumber(input) {
-    let cleaned = input.replace(/[^0-9+]/g, '');
-    
-    if (cleaned.indexOf('+') > 0) {
-        cleaned = cleaned.replace(/\+/g, '');
-    }
-    if (!cleaned.startsWith('+')) {
-        cleaned = '+' + cleaned;
-    }
+        let cleaned = input.replace(/[^0-9+]/g, '');
 
-    const validLength = 11; 
-    const minLength = 11; 
-  
-    if (cleaned.length < minLength + 1) { // +1 for the +
-        cleaned = '+1' + cleaned.replace('+', '');
-    }
+        if (cleaned.indexOf('+') > 0) {
+            cleaned = cleaned.replace(/\+/g, '');
+        }
+        if (!cleaned.startsWith('+')) {
+            cleaned = '+' + cleaned;
+        }
 
-    if (cleaned.length !== validLength + 1) { // +1 for the +
-        throw new Error('Invalid phone number length');
-    }
+        const validLength = 11;
+        const minLength = 11;
 
-    return cleaned;
-}
-let to = normalizePhoneNumber(to_number)
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+        if (cleaned.length < minLength + 1) { // +1 for the +
+            cleaned = '+1' + cleaned.replace('+', '');
+        }
+
+        if (cleaned.length !== validLength + 1) { // +1 for the +
+            throw new Error('Invalid phone number length');
+        }
+
+        return cleaned;
+    }
+    let to = normalizePhoneNumber(to_number)
+    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await twilio.calls.create({
