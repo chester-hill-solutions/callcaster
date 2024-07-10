@@ -12,6 +12,7 @@ export const handleConference = ({ submit, begin }) => {
   const handleConferenceStart = () => {
     begin();
   };
+
   const handleConferenceEnd = ({ activeCall, setConference, workspaceId }) => {
     submit(
       {workspaceId},

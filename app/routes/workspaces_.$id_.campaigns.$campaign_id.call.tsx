@@ -123,6 +123,7 @@ export const loader = async ({ request, params }) => {
     }
   } else if (!campaign.dial_type) {
     return redirect("./../settings");
+
   }
 
   const errors = [
@@ -262,7 +263,6 @@ export default function Campaign() {
     setNextRecipient,
     attempts: attemptList,
     calls: callsList,
-    
   });
   const { dequeue, fetchMore } = handleQueue({
     fetcher,
