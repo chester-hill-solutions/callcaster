@@ -290,7 +290,7 @@ export async function removeWorkspacePhoneNumber({
 }
 
 export async function createWorkspaceTwilioInstance({supabase, workspace_id}){
-  const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
+  const { data, error } = await supabase.from('workspace').select('twilio_data, key, token').eq('id', workspace_id).single();
   if (error) throw error;
   const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
   return twilio;

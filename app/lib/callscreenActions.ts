@@ -50,6 +50,7 @@ export const handleCall = ({ submit }) => {
         queue_id: nextRecipient?.id,
         caller_id: campaign.caller_id,
       };
+      console.log(data)
       submit(data, {
         action: "/api/dial",
         method: "POST",

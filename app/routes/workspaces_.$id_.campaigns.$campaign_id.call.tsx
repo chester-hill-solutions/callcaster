@@ -67,7 +67,7 @@ export const loader = async ({ request, params }) => {
   if (!serverSession) return redirect("/signin");
 
   const { token } = await fetch(
-    `${process.env.BASE_URL}/api/token?id=${serverSession.user.id}`,
+    `${process.env.BASE_URL}/api/token?id=${serverSession.user.id}&workspace=${workspaceId}`,
   ).then((res) => res.json());
 
   const { data: campaign, error: campaignError } = await supabase

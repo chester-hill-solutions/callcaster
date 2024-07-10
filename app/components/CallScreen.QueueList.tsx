@@ -44,7 +44,6 @@ const QueueList = ({
       );
     } else {
       return queue.map((contact) => {
-        console.log(contact)
         return (
           <QueueContact
             key={contact.contact?.id}
