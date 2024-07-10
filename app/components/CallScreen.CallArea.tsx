@@ -38,7 +38,7 @@ interface CallAreaProps {
 }
 
 const formatTime = (milliseconds: number): string => {
-  const totalSeconds = Math.floor(milliseconds / 1000);
+  const totalSeconds = Math.floor(milliseconds);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -57,36 +57,17 @@ export const CallArea: React.FC<CallAreaProps> = ({
   recentAttempt,
   predictive = false,
   conference = null,
+  callState: state,
+  callDuration
 }) => {
-  const { state, context, send } = useCallState();
-
-  useEffect(() => {
-    if (!activeCall && !recentAttempt?.id){
-      send({type:'NEXT'});
-    }
-    if (activeCall?.parameters?.CallSid && !recentAttempt?.answered_at) {
-      send({ type: 'START_DIALING' });
-    }
-    if (recentAttempt?.answered_at) {
-      send({ type: 'CONNECT' });
-    }
-    if (recentAttempt?.disposition === 'failed' || recentAttempt?.result?.status === 'failed') {
-      send({ type: 'FAIL' });
-    }
-    if (!activeCall && recentAttempt?.disposition === 'no-answer'){
-      send({type: 'HANG_UP'});
-    }
-  }, [activeCall, recentAttempt, send]);
-
   const handleHangUp = () => {
     hangUp();
-    send({ type: 'HANG_UP' });
   };
 
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
-    send({ type: 'SET_DISPOSITION', disposition: newDisposition });
   };
+  console.log(state)
 
   return (
     <div
@@ -125,7 +106,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
             {state === 'failed' && <div>Call Failed</div>}
             {state === 'connected' && (
               <div>
-                Connected {formatTime(context.callDuration * 1000)}
+                Connected {formatTime(callDuration)}
               </div>
             )}
             {state === 'dialing' && <div>Dialing...</div>}

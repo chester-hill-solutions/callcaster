@@ -297,7 +297,9 @@ export async function createWorkspaceTwilioInstance({supabase, workspace_id}){
 }
 
 export async function endConferenceByUser({user_id, supabaseClient}){
-  const twilio = new Twilio.Twilio(process.env.TWILIO_SID!, process.env.TWILIO_AUTH_TOKEN!);
+  const { data, error } = await supabase.from('workspace').select('twilio_data, key, token').eq('id', workspace_id).single();
+  const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
+
     const conferences = await twilio.conferences.list({ friendlyName: user_id, status: ['in-progress'] });
     
     await Promise.all(conferences.map(async (conf) => {
