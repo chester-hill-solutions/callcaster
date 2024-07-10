@@ -36,7 +36,8 @@ export const action = async ({ request }) => {
             to: `client:${user_id}`,
             from: caller_id,
             url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to)}`,
-        });
+
+        })
         let outreach_attempt_id;
         if (!outreach_id) {
             const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contact_id, cam_id: campaign_id, queue_id, wks_id: workspace_id, usr_id: user_id });

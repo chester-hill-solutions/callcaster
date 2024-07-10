@@ -66,7 +66,7 @@ export default function TeamMember({
     <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
       <div className="flex items-center gap-2">
         <div className={iconStyles} />
-        <p className="font-semibold">{memberName}</p>
+        <p className="pr-4 font-semibold">{member.username}</p>
       </div>
       <div className="flex items-center gap-2">
         <p className={roleTextStyles}>{capitalize(memberRole)}</p>
