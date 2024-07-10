@@ -150,10 +150,9 @@ export const loader = async ({ request, params }) => {
   const initialRecentCall = initalCallsList.find(
     (call) => call.contact_id === nextRecipient?.contact.id,
   );
-  const initialRecentAttempt = attempts
+const initialRecentAttempt = attempts
     .sort((a, b) => b.created_at - a.created_at)
-    .find((call) => call.contact_id === nextRecipient?.contact.id);
-
+    .find((call) => call.contact_id === nextRecipient?.contact?.id);
   return json(
     {
       campaign,
