@@ -123,26 +123,28 @@ export default function WorkspaceAudio() {
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
+    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm ">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={true}
         userRole={userRole}
       />
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null
-            ? `${workspace?.name} Audio Library`
-            : "No Workspace"}
-        </h1>
-        <div className="flex items-center gap-4">
-          <Button asChild className="font-Zilla-Slab text-xl font-semibold">
+      <div className="flex flex-col sm:flex-row sm:justify-between">
+        <div className="flex">
+          <h1 className="font-Zilla-Slab font-bold text-2xl text-brand-primary dark:text-white text-center mb-4">
+            {workspace != null
+              ? `${workspace?.name} Audio Library`
+              : "No Workspace"}
+          </h1>
+        </div>
+        <div className="flex items-center gap-4 justify-evenly">
+          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
             <Link to={`./new`}>Add Audio</Link>
           </Button>
           <Button
             asChild
             variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
+            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white hover:bg-zinc-300 dark:border-white"
           >
             <Link to=".." relative="path">
               Back
@@ -156,7 +158,7 @@ export default function WorkspaceAudio() {
         </h4>
       )}
       {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
+        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
           Add Your Own Audio to this Workspace!
         </h4>
       )}

@@ -227,20 +227,20 @@ export const loader = async ({ request, params }) => {
     totalCalls,
     expectedTotal,
 
-    user: serverSession?.user
+    user: serverSession?.user,
   });
 };
 
 function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
   if (isActive) {
-    return "rounded-md border-2 border-brand-secondary bg-brand-secondary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
+    return "rounded-md border-2 border-brand-secondary bg-brand-secondary px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
   }
 
   if (isPending) {
-    return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+    return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
   }
 
-  return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-xl font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+  return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
 }
 
 export default function CampaignScreen() {
@@ -252,7 +252,7 @@ export default function CampaignScreen() {
     totalCalls = 0,
     expectedTotal = 0,
 
-    user
+    user,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
@@ -274,19 +274,36 @@ export default function CampaignScreen() {
   }, [csvData]);
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex items-center justify-between border-b-2 border-zinc-300 p-4">
+      <div className="mt-2 flex justify-center gap-2 sm:hidden">
+        <NavLink
+          className={({ isActive, isPending }) =>
+            `text-zinc-800 hover:text-brand-primary`
+          }
+          to="."
+          relative="path"
+          end
+        >
+          <h3 className="font-Zilla-Slab text-2xl font-semibold">
+            {data[0]?.title}
+          </h3>
+        </NavLink>
+      </div>
+      <div className="flex items-center sm:justify-between justify-center border-b-2 border-zinc-300 p-4">
+      <div className="mt-2 hidden sm:flex justify-center gap-2 ">
+        <NavLink
+          className={({ isActive, isPending }) =>
+            `text-zinc-800 hover:text-brand-primary`
+          }
+          to="."
+          relative="path"
+          end
+        >
+          <h3 className="font-Zilla-Slab text-2xl font-semibold">
+            {data[0]?.title}
+          </h3>
+        </NavLink>
+      </div>
         <div className="flex gap-2">
-          <NavLink
-            className={({ isActive, isPending }) =>
-              handleNavlinkStyles(isActive, isPending)
-            }
-            to="."
-            relative="path"
-            end
-          >
-            Dashboard
-          </NavLink>
-
           <NavLink
             className={({ isActive, isPending }) =>
               handleNavlinkStyles(isActive, isPending)
@@ -308,25 +325,20 @@ export default function CampaignScreen() {
               Settings
             </NavLink>
           )}
+          {data[0].type === "live_call" ? (
+            <NavLink
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
+              to={`call`}
+              relative="path"
+            >
+              Join Campaign
+            </NavLink>
+          ) : (
+            <div></div>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <h3 className="font-Zilla-Slab text-3xl font-semibold">
-            {data[0]?.title}
-          </h3>
-        </div>
-        {data[0].type === "live_call" ? (
-          <NavLink
-            className={({ isActive, isPending }) =>
-              handleNavlinkStyles(isActive, isPending)
-            }
-            to={`call`}
-            relative="path"
-          >
-            Join Campaign
-          </NavLink>
-        ) : (
-          <div></div>
-        )}
       </div>
       {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
         <div className="flex flex-auto items-center justify-center">
@@ -358,9 +370,9 @@ export default function CampaignScreen() {
                 dial_type: data[0].dial_type,
                 handleNavlinkStyles,
                 hasAccess,
-                campaign_id: campaign.id || campaign.campaignDetails?.campaign_id,
-                user_id: user
-
+                campaign_id:
+                  campaign.id || campaign.campaignDetails?.campaign_id,
+                user_id: user,
               }}
             />
           )
