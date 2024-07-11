@@ -114,6 +114,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { data: newWorkspaceId, error } = await createNewWorkspace({
     supabaseClient,
     workspaceName: newWorkspaceName,
+    user_id: serverSession?.user.id
   });
   if (error) {
     console.log("Error: ", error);
