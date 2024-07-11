@@ -1,41 +1,46 @@
 import { useEffect, useMemo, useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
 import { FaPlus } from "react-icons/fa";
+import { Button } from "./ui/button";
 
-export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
-    const [blocks, setBlocks] = useState(pageData.campaignDetails?.questions?.blocks || {})
-    const [openQuestion, setOpenQuestion] = useState(null);
-    const blockOrder = useMemo(() => {
-        return Object.keys(blocks).sort((a, b) => Number(a) - Number(b))
-    }, [blocks])
-    const addQuestion = async () => {
-        const newBlocks = { ...blocks };
-        const newBlockId = Math.max(...Object.keys(newBlocks).map(Number), 0) + 1;
-        const newQuestion = {
-            id: `new-question-${newBlockId}`,
-            title: "",
+export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts }) {
+    const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script.steps || {});
+    const [currentPage, setCurrentPage] = useState(scriptData.startPage);
+    const [openBlock, setOpenBlock] = useState(null);
+
+    const addBlock = () => {
+        const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
+        const newBlock = {
+            id: newBlockId,
+            title: "New Block",
             type: "textarea",
             content: "",
-            options: [{ next: 0 }]
+            options: []
         };
 
-        newBlocks[newBlockId] = newQuestion;
+        const updatedScriptData = {
+            ...scriptData,
+            blocks: {
+                ...scriptData.blocks,
+                [newBlockId]: newBlock
+            },
+            pages: {
+                ...scriptData.pages,
+                [currentPage]: {
+                    ...scriptData.pages[currentPage],
+                    blocks: [...(scriptData.pages[currentPage].blocks || []), newBlockId]
+                }
+            }
+        };
 
-        Object.values(newBlocks).forEach((block) => {
-            block.options = block?.options?.map(option => ({
-                ...option,
-                next: option.next === 0 ? newBlockId : option.next
-            })) || [];
-
-        });
-        setBlocks(newBlocks);
+        setScriptData(updatedScriptData);
         onPageDataChange({
             ...pageData,
             campaignDetails: {
                 ...pageData.campaignDetails,
-                questions: {
-                    ...pageData.campaignDetails.questions,
-                    blocks: newBlocks
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: updatedScriptData
                 }
             }
         });
@@ -43,140 +48,182 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange }) {
         return newBlockId;
     };
 
-    const removeQuestion = (id) => {
-        const newBlocks = { ...blocks };
-        delete newBlocks[id];
+    const removeBlock = (id) => {
+        const updatedBlocks = { ...scriptData.blocks };
+        delete updatedBlocks[id];
 
-        Object.values(newBlocks).forEach((block) => {
-            block.options = block?.options?.map(option => ({
-                ...option,
-                next: option.next === Number(id) ? 0 : option.next
-            })) || [];
+        const updatedPages = { ...scriptData.pages };
+        Object.keys(updatedPages).forEach(pageId => {
+            updatedPages[pageId].blocks = updatedPages[pageId].blocks.filter(blockId => blockId !== id);
         });
 
+        const updatedScriptData = {
+            ...scriptData,
+            blocks: updatedBlocks,
+            pages: updatedPages
+        };
+
+        setScriptData(updatedScriptData);
         onPageDataChange({
             ...pageData,
             campaignDetails: {
                 ...pageData.campaignDetails,
-                questions: {
-                    ...pageData.campaignDetails.questions,
-                    blocks: newBlocks
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: updatedScriptData
                 }
             }
         });
-        setBlocks(newBlocks);
     };
 
-    const moveQuestion = (id, direction) => {
-        const blockIds = Object.keys(blocks).map(Number).sort((a, b) => a - b);
-        const currentIndex = blockIds.indexOf(Number(id));
-        if ((direction === -1 && currentIndex === 0) || (direction === 1 && currentIndex === blockIds.length - 1)) {
+    const moveBlock = (id, direction) => {
+        const currentPageBlocks = scriptData.pages[currentPage].blocks;
+        const currentIndex = currentPageBlocks.indexOf(id);
+        if ((direction === -1 && currentIndex === 0) || (direction === 1 && currentIndex === currentPageBlocks.length - 1)) {
             return;
         }
-        const targetIndex = currentIndex + direction;
-        const targetId = blockIds[targetIndex];
 
-        const newBlocks = { ...blocks };
-        [newBlocks[id], newBlocks[targetId]] = [newBlocks[targetId], newBlocks[id]];
+        const newIndex = currentIndex + direction;
+        const newBlocksOrder = [...currentPageBlocks];
+        [newBlocksOrder[currentIndex], newBlocksOrder[newIndex]] = [newBlocksOrder[newIndex], newBlocksOrder[currentIndex]];
 
-        Object.values(newBlocks).forEach((block) => {
-            block.options = block?.options.map(option => ({
-                ...option,
-                next: option.next === Number(id) ? Number(targetId) :
-                    option.next === Number(targetId) ? Number(id) :
-                        option.next
-            }));
-        });
+        const updatedScriptData = {
+            ...scriptData,
+            pages: {
+                ...scriptData.pages,
+                [currentPage]: {
+                    ...scriptData.pages[currentPage],
+                    blocks: newBlocksOrder
+                }
+            }
+        };
 
+        setScriptData(updatedScriptData);
         onPageDataChange({
             ...pageData,
             campaignDetails: {
                 ...pageData.campaignDetails,
-                questions: {
-                    ...pageData.campaignDetails.questions,
-                    blocks: newBlocks
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: updatedScriptData
                 }
             }
         });
-        setBlocks(newBlocks);
     };
 
-    const dispatchState = (id, newState) => {
-        const updatedBlocks = { ...blocks, [id]: newState };
+    const updateBlock = (id, newBlockData) => {
+        const updatedScriptData = {
+            ...scriptData,
+            blocks: {
+                ...scriptData.blocks,
+                [id]: {
+                    ...scriptData.blocks[id],
+                    ...newBlockData
+                }
+            }
+        };
+
+        setScriptData(updatedScriptData);
         onPageDataChange({
             ...pageData,
             campaignDetails: {
                 ...pageData.campaignDetails,
-                questions: {
-                    ...pageData.campaignDetails.questions,
-                    blocks: updatedBlocks
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: updatedScriptData
                 }
             }
         });
-        setBlocks(updatedBlocks);
     };
-
-    const handleNextChange = (questionId, optionIndex, nextValue) => {
-        const updatedBlocks = { ...blocks };
-        const question = updatedBlocks[questionId];
-        if (question) {
-            question.options[optionIndex].next = Number(nextValue);
-        }
+    
+    const addPage = () => {
+        const newPageId = `page_${Object.keys(scriptData.pages || {}).length + 1}`;
+        const updatedScriptData = {
+            ...scriptData,
+            pages: {
+                ...scriptData.pages,
+                [newPageId]: {
+                    id: newPageId,
+                    title: `New Page ${Object.keys(scriptData.pages || {}).length + 1}`,
+                    blocks: []
+                }
+            }
+        };
+        setScriptData(updatedScriptData);
         onPageDataChange({
             ...pageData,
             campaignDetails: {
                 ...pageData.campaignDetails,
-                questions: {
-                    ...pageData.campaignDetails.questions,
-                    blocks: updatedBlocks
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: updatedScriptData
                 }
             }
         });
-        setBlocks(updatedBlocks);
+        setCurrentPage(newPageId);
     };
 
+    if (!scriptData.pages || !scriptData.blocks) {
+        return <div>Error: Invalid script data</div>;
+    }
     return (
-        <div>
-            <div className="flex gap-2 px-2 my-1">
-                <div className="flex flex-col" style={{
-                    flex: '1 1 20%',
-                    border: "3px solid #BCEBFF",
-                    borderRadius: "20px",
-                    minHeight: "300px"
-                }}>
-                    <button className="bg-primary text-white font-Zilla-Slab text-xl px-2 py-2 gap-2" onClick={addQuestion} style={{ justifyContent: 'center', display: "flex", alignItems: "center", borderTopLeftRadius: "18px", borderTopRightRadius: "18px" }}>
-                        Add Question<FaPlus size="16px" />
-                    </button>
-                    {blockOrder.map((id) => {
-                        const question = blocks[id]
-                        return <button
-                            key={id}
-                            onClick={() => setOpenQuestion(question.id)}
-                            style={{ textAlign: 'left', border: "1px solid #f1f1f1" }}
-                            className={`px-2 hover:bg-accent ${openQuestion === question.id && 'bg-brand-secondary'}`}
-                        >
-                            {question.title || question.id}
-                        </button>
-                    })}
-                </div>
-                <div className="flex flex-col" style={{ flex: '1 1 60%' }}>
-                    {blockOrder.map((id) => {
-                        const question = blocks[id];
-                        return <CampaignSettingsScriptQuestionBlock
-                            key={id}
-                            question={question}
-                            removeQuestion={() => removeQuestion(id)}
-                            moveUp={() => moveQuestion(id, -1)}
-                            moveDown={() => moveQuestion(id, 1)}
-                            openQuestion={openQuestion}
-                            setOpenQuestion={setOpenQuestion}
-                            dispatchState={(newState) => dispatchState(id, newState)}
-                            allQuestions={Object.entries(blocks)}
-                            addNewQuestion={addQuestion}
-                            handleNextChange={handleNextChange}
-                        />
-                    })}
-                </div>
+        <div className="flex gap-4">
+            <div className="w-1/4 border-r pr-4">
+            <div className="text-center w-full mb-1">Pages</div>
+                <Button
+                    className="w-full mb-4"
+                    onClick={addPage}
+                >
+                    Add Page <FaPlus size="16px" className="inline ml-2" />
+                </Button>
+                {Object.values(scriptData.pages).map((page) => (
+                    <Button
+                        key={page.id}
+                        className={`w-full mb-2 justify-start bg-transparent' ${currentPage === page.id ? 'text-primary border-2 border-brand-primary': 'text-black border-2 border-zinc-800'}`}
+                        onClick={() => setCurrentPage(page.id)}
+                    >
+                        {page.title}
+                    </Button>
+                ))}
+                <hr className="my-4" />
+                <div className="text-center w-full mb-1">Question Blocks</div>
+                <Button
+                    className="w-full mb-4"
+                    onClick={addBlock}
+                >
+                    Add Block <FaPlus size="16px" className="inline ml-2" />
+                </Button>
+                {scriptData.pages[currentPage]?.blocks.map((blockId) => (
+                    <Button
+                        key={blockId}
+                        className={`w-full mb-2 justify-start ${openBlock === blockId ? 'bg-brand-secondary' : ''}`}
+                        onClick={() => setOpenBlock(blockId)}
+                    >
+                        {scriptData.blocks[blockId].title || blockId}
+                    </Button>
+                ))}
+            </div>
+            <div className="w-3/4">
+                <h2 className="text-2xl font-bold mb-4">{scriptData.pages[currentPage]?.title}</h2>
+                {scriptData.pages[currentPage]?.blocks.map((blockId) => (
+                    <CampaignSettingsScriptQuestionBlock
+                        key={blockId}
+                        question={scriptData.blocks[blockId]}
+                        removeQuestion={() => removeBlock(blockId)}
+                        moveUp={() => moveBlock(blockId, -1)}
+                        moveDown={() => moveBlock(blockId, 1)}
+                        openQuestion={openBlock}
+                        setOpenQuestion={setOpenBlock}
+                        dispatchState={(newState) => updateBlock(blockId, newState)}
+                        scriptData={scriptData}
+                        addNewQuestion={addBlock}
+                        handleNextChange={(optionIndex, nextValue) => {
+                            const updatedOptions = [...scriptData.blocks[blockId].options];
+                            updatedOptions[optionIndex].next = nextValue;
+                            updateBlock(blockId, { options: updatedOptions });
+                        }}
+                    />
+                ))}
             </div>
         </div>
     );

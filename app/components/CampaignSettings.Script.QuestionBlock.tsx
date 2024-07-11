@@ -105,7 +105,7 @@ const OptionsSection = ({
   handleRemoveOption,
   handleOptionChange,
   handleIconChange,
-  allQuestions,
+  scriptData,
   addNewQuestion,
   handleNextChange,
 }) =>
@@ -122,12 +122,12 @@ const OptionsSection = ({
           <QuestionBlockOption
             key={`${question.id}-option-${i}`}
             index={i}
-            question={question}
+            block={question}
             option={option}
             handleRemoveOption={handleRemoveOption}
             handleChange={handleOptionChange}
             handleIconChange={handleIconChange}
-            allQuestions={allQuestions}
+            scriptData={scriptData}
             addNewQuestion={addNewQuestion}
             handleNextChange={handleNextChange}
           />
@@ -157,7 +157,7 @@ export default function CampaignSettingsScriptQuestionBlock({
   dispatchState,
   openQuestion,
   setOpenQuestion,
-  allQuestions,
+  scriptData,
   addNewQuestion,
   handleNextChange,
 }) {
@@ -279,7 +279,7 @@ export default function CampaignSettingsScriptQuestionBlock({
         <div className="p-4">
           <OptionsSection
             question={question}
-            allQuestions={allQuestions}
+            scriptData={scriptData}
             handleAddOption={handleAddOption}
             handleRemoveOption={handleRemoveOption}
             handleOptionChange={handleOptionChange}

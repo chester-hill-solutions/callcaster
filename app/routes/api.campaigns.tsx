@@ -1,9 +1,12 @@
 import { json } from "@remix-run/node";
-import { createSupabaseServerClient } from "../lib/supabase.server";
+import {
+  createSupabaseServerClient,
+  getSupabaseServerClientWithSession,
+} from "../lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient: supabase } =
-    await createSupabaseServerClient(request);
+  const { supabaseClient: supabase, serverSession } =
+    await getSupabaseServerClientWithSession(request);
   const data = await request.json();
   const {
     id,
@@ -46,7 +49,7 @@ export const action = async ({ request }: { request: Request }) => {
       .eq("id", id)
       .eq("workspace", workspace)
       .select();
-      
+
     if (campaignError) {
       if (campaignError.code === "23505") {
         return json(
@@ -76,9 +79,26 @@ export const action = async ({ request }: { request: Request }) => {
       if (campaignDetailsError) throw campaignDetailsError;
       updatedCampaignDetails = detailsData;
     } else {
+      const { data: scriptData, error: scriptError } = await supabase
+        .from("script")
+        .upsert({
+          id: campaignDetails.script.id,
+          steps: campaignDetails.script.steps,
+          updated_at: new Date(),
+          updated_by: serverSession.user.id,
+          created_by: serverSession.user.id,
+        },
+        {
+          onConflict: 'id',
+          ignoreDuplicates: false
+        }
+      ).select();
+
+      if (scriptError) throw scriptError;
+      delete campaignDetails.script;
       const { data: detailsData, error: campaignDetailsError } = await supabase
         .from("live_campaign")
-        .update({...campaignDetails})
+        .update({ ...campaignDetails, script_id: scriptData[0].id })
         .eq("campaign_id", id)
         .select();
       if (campaignDetailsError) throw campaignDetailsError;

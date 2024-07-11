@@ -4,14 +4,14 @@ import { GrSubtractCircle } from "react-icons/gr";
 import { iconMapping } from "./CallList/CallContact/Result.IconMap";
 
 export default function QuestionBlockOption({ 
-    question, 
+    block, 
     option, 
     handleRemoveOption, 
     index, 
     handleChange, 
     handleIconChange,
-    allQuestions,
-    addNewQuestion,
+    scriptData,
+    addNewBlock,
     handleNextChange
 }) {
     const [showIcons, setShowIcons] = useState(false);
@@ -40,13 +40,15 @@ export default function QuestionBlockOption({
 
     const handleNextStepChange = async (e) => {
         const value = e.currentTarget.value;
-        if (value === "add_new") {
-            const newQuestionId = await addNewQuestion();
+        if (value === "add_new_block") {
+            const newBlockId = await addNewBlock();
+            handleNextChange(index, newBlockId);
+        } else if (value.startsWith("page_")) {
+            handleNextChange(index, value);
         } else {
-            handleNextChange(question.id, index, value);
+            handleNextChange(index, value);
         }
     };
-
     return (
         <div className="flex items-center gap-2 my-2" key={`option-${index}`}>
             <table>
@@ -55,7 +57,7 @@ export default function QuestionBlockOption({
                         <th></th>
                         <th>Response</th>
                         <th>Next Step</th>
-                        {question.type === 'radio' && <th>Icon</th>}
+                        {block.type === 'radio' && <th>Icon</th>}
                     </tr>
                 </thead>
                 <tbody>
@@ -72,7 +74,7 @@ export default function QuestionBlockOption({
                             {option.value ? (
                                 <input
                                     onChange={(e) => handleChange(index, e)}
-                                    id={`${question.id}-options-${index}`}
+                                    id={`${block.id}-options-${index}`}
                                     value={option.content}
                                     className="flex-grow px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 />
@@ -86,16 +88,24 @@ export default function QuestionBlockOption({
                                 onChange={handleNextStepChange}
                                 className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                                <option value="0">End</option>
-                                {allQuestions.map(([id, q]) => (
-                                    <option key={id} value={id}>
-                                        {q.title || q.id || q.text}
-                                    </option>
+                                <option value="end">End</option>
+                                {Object.entries(scriptData.pages).map(([pageId, page]) => (
+                                    <optgroup key={pageId} label={page.title}>
+                                        <option value={`page_${pageId}`}>Go to Page: {page.title}</option>
+                                        {page.blocks.map(blockId => {
+                                            const blockData = scriptData.blocks[blockId];
+                                            return (
+                                                <option key={blockId} value={blockId}>
+                                                    {blockData.title || blockData.id}
+                                                </option>
+                                            );
+                                        })}
+                                    </optgroup>
                                 ))}
-                                <option value="add_new">Add New Question</option>
+                                <option value="add_new_block">Add New Block</option>
                             </select>
                         </td>
-                        {question.type === 'radio' && (
+                        {block.type === 'radio' && (
                             <td>
                                 <div className="relative">
                                     <button

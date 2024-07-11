@@ -188,14 +188,17 @@ export default function ScriptPage() {
 
   const outlet = useOutlet();
   const pageData = useMemo(() => data || [], [data]);
+
   const initQuestions = useMemo(() => {
     return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
       ? [...Object.values(pageData[0]?.campaignDetails?.questions.blocks)]
       : [];
   }, [pageData]);
+  
   const [questions, setQuestions] = useState(() => {
     return initQuestions.map((q, index) => ({ ...q, order: index }));
   });
+  
   const [selectedImage, setSelectedImage] = useState(null);
   const clickImage = (e) => {
     setSelectedImage(e.target.src);
@@ -218,6 +221,8 @@ export default function ScriptPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [selectedImage]);
+
+  
 
   return (
     <div className="relative flex h-full flex-col">

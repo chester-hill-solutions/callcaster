@@ -395,3 +395,56 @@ export async function endConferenceByUser({ user_id, supabaseClient }) {
     }),
   );
 }
+
+export async function getWorkspaceScripts({workspace, supabase}){
+  const {data, error} = await supabase.from('script').select().eq('workspace', workspace);
+  if (error) console.error('Error fetching scripts', error);
+  return data; 
+}
+  
+export function getRecordingFileNames(stepData) {
+  if (!Array.isArray(stepData)) {
+    console.warn('stepData is not an array');
+    return [];
+  }
+
+  return stepData.reduce((fileNames, step) => {
+    if (step.speechType === "recorded" && step.say && step.say !== "Enter your question here") {
+      fileNames.push(step.say);
+    }
+    return fileNames;
+  }, []);
+}
+export async function getMedia(fileNames: Array<string>, supabaseClient:SupabaseClient, workspace_id:string) {
+  const media = await Promise.all(
+    fileNames.map(async (mediaName) => {
+      const { data, error } = await supabaseClient.storage
+        .from("workspaceAudio")
+        .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
+      if (error) throw error;
+      return { [mediaName]: data.signedUrl };
+    }),
+  );
+
+  return media;
+}
+
+export async function listMedia(supabaseClient, workspace) {
+  const { data, error } = await supabaseClient.storage
+    .from(`workspaceAudio`)
+    .list(workspace);
+  if (error) console.error(error);
+  return data;
+}
+
+export async function getSignedUrls(supabaseClient, workspace_id, mediaNames) {
+  return Promise.all(
+    mediaNames.map(async (mediaName) => {
+      const { data, error } = await supabaseClient.storage
+        .from("messageMedia")
+        .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
+      if (error) throw error;
+      return data.signedUrl;
+    })
+  );
+}
