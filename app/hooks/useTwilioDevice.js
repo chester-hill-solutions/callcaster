@@ -9,7 +9,6 @@ export function useTwilioDevice(token, workspaceId) {
     const [incomingCall, setIncomingCall] = useState(null);
     const [callState, setCallState] = useState('idle');
     const [callDuration, setCallDuration] = useState(0);
-
     const handleIncomingCall = useCallback((call) => {
         setIncomingCall(call);
         if (call.parameters.To.includes('client')) {

@@ -52,15 +52,32 @@ export const action = async ({ request }) => {
         recording_sid: underCaseData.recording_sid,
         recording_url: underCaseData.recording_url,
     };
-
-
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
     const { data, error } = await supabase.from('call').upsert(updateData, { onConflict: 'sid' }).select();
-    if (parsedBody.CallStatus === 'failed') {
-        const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({ ended_at: new Date(), disposition: 'failed', status:'dequeued' }).eq('id', data[0].outreach_attempt_id).select();
+    if (error) {
+        console.error('Error updating call:', error);
+        return json({ success: false, error: 'Failed to update call' }, { status: 500 });
     }
-    if (parsedBody.CallStatus === 'completed') {
-        const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({ ended_at: new Date(), disposition:"completed", status:"dequeued" }).eq('id', data[0].outreach_attempt_id).select();
+    const { data: currentAttempt, error: fetchError } = await supabase
+        .from('outreach_attempt')
+        .select('disposition')
+        .eq('id', data[0].outreach_attempt_id)
+        .single();
+    if (fetchError) {
+        console.error('Error fetching current attempt:', fetchError);
+        return json({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
+    }
+    if (currentAttempt.disposition !== 'no-answer' && currentAttempt.disposition !== 'voicemail') {
+        const { data: updateAttempt, error: updateError } = await supabase
+            .from('outreach_attempt')
+            .update({ disposition: underCaseData.call_status })
+            .eq('id', data[0].outreach_attempt_id)
+            .select();
+
+        if (updateError) {
+            console.error('Error updating attempt:', updateError);
+            return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
+        }
     }
 
     return json({ success: true });
