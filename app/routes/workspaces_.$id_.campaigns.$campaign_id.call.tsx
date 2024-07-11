@@ -378,11 +378,11 @@ export default function Campaign() {
     campaign,
     workspaceId,
   );
-
+  
   const house =
     householdMap[
       Object.keys(householdMap).find(
-        (house) => house === nextRecipient?.contact.address,
+        (house) => house === nextRecipient?.contact?.address,
       ) || ""
     ];
 

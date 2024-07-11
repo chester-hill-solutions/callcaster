@@ -5,6 +5,8 @@ import { Tables } from "~/lib/database.types";
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
+type CallState = 'idle' | 'dialing' | 'connected' | 'failed' | 'completed';
+type AttemptDisposition = 'initiated' | 'ringing' | 'in-progress' | 'no-answer' | 'voicemail' | 'failed';
 
 interface NextRecipient {
   contact: Contact;
@@ -37,6 +39,17 @@ interface CallAreaProps {
   conference: Conference | null;
 }
 
+const getDisplayState = (state: CallState, disposition: AttemptDisposition | undefined, activeCall : object): string => {
+  if (state === 'failed' || disposition === 'failed') return 'failed';
+  if (state === 'dialing' || disposition === 'initiated' || disposition === 'ringing' || (activeCall && !(disposition === 'in-progress'))) return 'dialing';
+  if (disposition === 'in-progress') return 'connected';
+  if (disposition === 'no-answer') return 'no-answer';
+  if (disposition === 'voicemail') return 'voicemail';
+  if (state === 'completed' && disposition) return 'completed';
+  return 'idle';
+};
+
+
 const formatTime = (milliseconds: number): string => {
   const totalSeconds = Math.floor(milliseconds);
   const hours = Math.floor(totalSeconds / 3600);
@@ -63,12 +76,15 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleHangUp = () => {
     hangUp();
   };
-
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
-  console.log(state)
-
+  const displayState = getDisplayState(state, recentAttempt?.disposition as AttemptDisposition, activeCall);
+  
+  const showNextButton = () => {
+    const disposition = recentAttempt?.disposition;
+    return ['no-answer', 'voicemail', 'completed', 'failed'].includes(disposition);
+  };
   return (
     <div
       style={{
@@ -94,24 +110,24 @@ export const CallArea: React.FC<CallAreaProps> = ({
             borderTopRightRadius: "18px",
             padding: "16px",
             marginBottom: "8px",
-            background: state === 'failed'
-              ? "hsl(var(--primary))"
-              : state === 'connected' || state === 'dialing'
-                ? "#4CA83D"
-                : "#333333",
+            background: displayState === 'failed' ? "hsl(var(--primary))" : 
+                        displayState === 'connected' || displayState === 'dialing' ? "#4CA83D" :
+                        "#333333",
           }}
           className={`font-Tabac-Slab text-xl text-white ${state === 'connected' || state === 'dialing' ? "bg-green-300" : "bg-slate-700"}`}
         >
           <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-            {state === 'failed' && <div>Call Failed</div>}
-            {state === 'connected' && (
+            {displayState === 'failed' && <div>Call Failed</div>}
+            {displayState === 'dialing' && <div>Dialing... {formatTime(callDuration)}</div>}
+            {displayState === 'connected' && (
               <div>
                 Connected {formatTime(callDuration)}
               </div>
             )}
-            {state === 'dialing' && <div>Dialing...</div>}
-            {state === 'completed' && <div>Complete</div>}
-            {state === 'idle' && <div>Pending</div>}
+            {displayState === 'no-answer' && <div>No Answer</div>}
+            {displayState === 'voicemail' && <div>Voicemail Left</div>}
+            {displayState === 'completed' && <div>Call Completed</div>}
+            {displayState === 'idle' && <div>Pending</div>}
           </div>
         </div>
         {!conference && predictive && state === 'idle' && (
@@ -196,7 +212,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
               </button>
             }
           </div>
-          {(state === 'completed' || state === 'failed') && !predictive && (
+          {showNextButton() && !predictive && (
             <div className="flex px-4" style={{ paddingBottom: ".5rem" }}>
               <button
                 onClick={handleDequeueNext}
