@@ -22,6 +22,7 @@ const initialContext: CallContext = {
 };
 
 function callReducer(state: CallState, action: CallAction): CallState {
+  console.log(action, state)
   switch (state) {
     case 'idle':
       if (action.type === 'START_DIALING') return 'dialing';
