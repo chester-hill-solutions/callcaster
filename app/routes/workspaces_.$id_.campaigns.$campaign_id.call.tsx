@@ -150,7 +150,7 @@ export const loader = async ({ request, params }) => {
   const initialRecentCall = initalCallsList.find(
     (call) => call.contact_id === nextRecipient?.contact.id,
   );
-const initialRecentAttempt = attempts
+  const initialRecentAttempt = attempts
     .sort((a, b) => b.created_at - a.created_at)
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
   return json(
@@ -201,10 +201,15 @@ export default function Campaign() {
   );
 
   const { state, context, send } = useCallState();
-  const { device, status, activeCall, incomingCall, hangUp, callState, callDuration } = useTwilioDevice(
-    token,
-    workspaceId
-  );
+  const {
+    device,
+    status,
+    activeCall,
+    incomingCall,
+    hangUp,
+    callState,
+    callDuration,
+  } = useTwilioDevice(token, workspaceId);
 
   const {
     queue,
@@ -288,7 +293,7 @@ export default function Campaign() {
       status !== "Registered"
     )
       return; //Return if not ready to place new call.
-      send({ type: "START_DIALING" });
+    send({ type: "START_DIALING" });
     if (campaign.dial_type === "predictive") handleConferenceStart();
     if (campaign.dial_type === "call")
       startCall({
@@ -299,7 +304,6 @@ export default function Campaign() {
         nextRecipient,
         recentAttempt,
       });
-   
   }, [
     activeCall,
     campaign,
@@ -378,7 +382,7 @@ export default function Campaign() {
     campaign,
     workspaceId,
   );
-  
+
   const house =
     householdMap[
       Object.keys(householdMap).find(
@@ -392,10 +396,15 @@ export default function Campaign() {
       style={{ padding: "24px", margin: "0 auto", width: "100%" }}
     >
       <div
-        className="flex justify-evenly gap-4"
-        style={{ justifyContent: "space-evenly", alignItems: "start" }}
+        className="flex flex-wrap justify-evenly"
+        style={{
+          justifyContent: "space-evenly",
+          alignItems: "start",
+          gap: "2rem",
+          display:"flex"
+        }}
       >
-        <div className="flex flex-col" style={{ flex: "0 0 20%" }}>
+        <div className="flex flex-col" style={{flex:"1 1 20%", gap:"2rem"}}>
           <CallArea
             nextRecipient={nextRecipient}
             activeCall={activeCall}

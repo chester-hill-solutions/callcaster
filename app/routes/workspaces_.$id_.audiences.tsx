@@ -67,25 +67,29 @@ export default function AudienceChart() {
         isInChildRoute={true}
         userRole={userRole}
       />
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null ? `${workspace?.name} Audiences` : "No Workspace"}
-        </h1>
-        <div className="flex items-center gap-4">
-          <Button asChild className="font-Zilla-Slab text-xl font-semibold">
-            <Link to={`./new`}>Add Audience</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
-          </Button>
+      <div className="flex flex-col sm:flex-row sm:justify-between">
+        <div className="flex">
+        <h1 className="font-Zilla-Slab font-bold text-2xl text-brand-primary dark:text-white text-center mb-4">
+        {workspace != null
+              ? `${workspace?.name} Audiences`
+              : "No Workspace"}
+          </h1>
+          </div>
+          <div className="flex items-center gap-4 justify-evenly">
+          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+              <Link to={`./new`}>Add Audience</Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white hover:bg-zinc-300 dark:border-white"
+              >
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
         </div>
-      </div>
       {error && !isWorkspaceAudioEmpty && (
         <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
           {error}

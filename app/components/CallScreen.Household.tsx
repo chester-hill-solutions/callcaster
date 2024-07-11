@@ -6,7 +6,6 @@ export const Household = ({ house, switchQuestionContact, attemptList }) => {
       style={{
         border: "3px solid #BCEBFF",
         borderRadius: "20px",
-        marginBottom: "2rem",
         backgroundColor: "hsl(var(--card))",
         minHeight: "300px",
         alignItems: "stretch",

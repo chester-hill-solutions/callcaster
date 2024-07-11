@@ -58,10 +58,9 @@ const QueueList = ({
   return (
     <div
       style={{
-        flex: "1 0 20%",
+        flex: "1 1 20%",
         border: "3px solid #BCEBFF",
         borderRadius: "20px",
-        marginBottom: "2rem",
         minHeight: "300px",
         boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
       }}

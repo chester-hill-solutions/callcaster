@@ -28,11 +28,10 @@ const CallQuestionnaire = ({
     <div
       style={{
         position: "relative",
-        minWidth: "40%",
+        minWidth: "30%",
         flex: "1 1 auto",
         border: "3px solid #BCEBFF",
         borderRadius: "20px",
-        marginBottom: "2rem",
         backgroundColor: "hsl(var(--card))",
         boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
       }}
