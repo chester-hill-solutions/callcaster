@@ -1318,14 +1318,25 @@ export type Json =
     content?: string;
   };
   
+  export type IVROption = {
+    value: number | "vx-any";
+    next: string;
+    content?: string;
+  }
+
   export type Block = {
     id: string;
     type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock" | "audio";
     title: string;
     content: string;
-    options: BlockOption[];
-    audioFile?: string; 
+    options: BlockOption[] | IVROption[];
   };
+
+  export type IVRBlock = Block & {
+    audioFile: string; 
+    speechType: "recorded" | "synthetic";
+    responseType: "dtmf" | "speech" | "dtmf speech" | null;
+  }
   
   export type Page = {
     id: string;

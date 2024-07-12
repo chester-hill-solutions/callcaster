@@ -8,7 +8,7 @@ export const QuestionCard = ({ question, edit, mediaNames, onQuestionChange, nav
     };
 
     return (
-        <div className="w-64 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden" style={{width:'10rem'}}>
             <QuestionHeader
                 question={question}
                 edit={edit}

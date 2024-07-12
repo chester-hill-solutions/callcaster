@@ -2,11 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "./ui/button";
+import IVRQuestionBlock from "./CampaignSettings.Script.IVRQuestionBlock";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "~/components/ui/select";
+import { useNavigate } from "@remix-run/react";
+import { MdCircle } from "react-icons/md";
 
-export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts }) {
-    const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script.steps || {});
-    const [currentPage, setCurrentPage] = useState(scriptData.startPage);
+export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [] }) {
+    const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script?.steps || {});
+    const [currentPage, setCurrentPage] = useState(scriptData?.startPage || null);
     const [openBlock, setOpenBlock] = useState(null);
+    const [selectedScript, setSelectedScript] = useState(pageData.campaignDetails?.script ? scripts[pageData.campaignDetails?.script?.id] : null);
+    const navigate = useNavigate();
 
     const addBlock = () => {
         const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
@@ -135,7 +147,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
             }
         });
     };
-    
+
     const addPage = () => {
         const newPageId = `page_${Object.keys(scriptData.pages || {}).length + 1}`;
         const updatedScriptData = {
@@ -163,13 +175,59 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         setCurrentPage(newPageId);
     };
 
-    if (!scriptData.pages || !scriptData.blocks) {
-        return <div>Error: Invalid script data</div>;
+    const handleScriptChange = (value) => {
+        if (value === `create-new-${scripts.length + 1}`) navigate('../../../../scripts/new');
+        const newScript = scripts.find(script => script.id === value);
+        if (newScript) {
+            setSelectedScript(newScript);
+            setScriptData(newScript.steps)
+            const newPageData = {
+                ...pageData,
+                campaignDetails: {
+                    ...pageData.campaignDetails,
+                    script_id: newScript.id,
+                    script: newScript
+                }
+            }
+            onPageDataChange(newPageData);
+        }
     }
+    if (!scriptData) return (<div><MdCircle /></div>)
+
+    if (!scriptData.pages || !scriptData.blocks) {
+        return (
+            <div className="flex flex-col gap-4 h-full">
+                <div className="flex">
+                    <h3 className="text-lg font-Zilla-Slab">No Script</h3>
+                </div>
+                <div className="flex">
+                    <Select value={selectedScript?.id} onValueChange={handleScriptChange}>
+                        <SelectTrigger className="bg-white dark:bg-transparent">
+                            <SelectValue
+                                className="text-brand-primary"
+                                placeholder="Select a script"
+                            />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {scripts.map((script) => (
+                                <SelectItem key={script.id} value={script.id}>
+                                    {script.name}
+                                </SelectItem>
+                            ))}
+                            <SelectItem value={`create-new-${scripts.length + 1}`}>
+                                Create New
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex gap-4">
-            <div className="w-1/4 border-r pr-4">
-            <div className="text-center w-full mb-1">Pages</div>
+            <div className="w-1/4 border-r pr-4" style={{ width: "25%" }}>
+                <div className="text-center w-full mb-1">Pages</div>
                 <Button
                     className="w-full mb-4"
                     onClick={addPage}
@@ -179,7 +237,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 {Object.values(scriptData.pages).map((page) => (
                     <Button
                         key={page.id}
-                        className={`w-full mb-2 justify-start bg-transparent' ${currentPage === page.id ? 'text-primary border-2 border-brand-primary': 'text-black border-2 border-zinc-800'}`}
+                        className={`w-full mb-2 justify-start  ${currentPage === page.id ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
                         onClick={() => setCurrentPage(page.id)}
                     >
                         {page.title}
@@ -196,16 +254,16 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 {scriptData.pages[currentPage]?.blocks.map((blockId) => (
                     <Button
                         key={blockId}
-                        className={`w-full mb-2 justify-start ${openBlock === blockId ? 'bg-brand-secondary' : ''}`}
+                        className={`w-full mb-2 justify-start ${openBlock === blockId ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
                         onClick={() => setOpenBlock(blockId)}
                     >
                         {scriptData.blocks[blockId].title || blockId}
                     </Button>
                 ))}
             </div>
-            <div className="w-3/4">
+            <div className="w-3/4" style={{ width: "75%" }}>
                 <h2 className="text-2xl font-bold mb-4">{scriptData.pages[currentPage]?.title}</h2>
-                {scriptData.pages[currentPage]?.blocks.map((blockId) => (
+                {scriptData.type !== 'script' ? scriptData.pages[currentPage]?.blocks.map((blockId) => (
                     <CampaignSettingsScriptQuestionBlock
                         key={blockId}
                         question={scriptData.blocks[blockId]}
@@ -216,14 +274,27 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                         setOpenQuestion={setOpenBlock}
                         dispatchState={(newState) => updateBlock(blockId, newState)}
                         scriptData={scriptData}
-                        addNewQuestion={addBlock}
+                        addNewBlock={addBlock}
                         handleNextChange={(optionIndex, nextValue) => {
                             const updatedOptions = [...scriptData.blocks[blockId].options];
                             updatedOptions[optionIndex].next = nextValue;
                             updateBlock(blockId, { options: updatedOptions });
                         }}
                     />
-                ))}
+                )) : scriptData.pages[currentPage]?.blocks.map((blockId) => (
+                    <IVRQuestionBlock
+                        key={blockId}
+                        block={scriptData.blocks[blockId]}
+                        onRemove={() => removeBlock(blockId)}
+                        onUpdate={(newState) => updateBlock(blockId, newState)}
+                        onMoveDown={() => moveBlock(blockId, 1)}
+                        onMoveUp={() => moveBlock(blockId, -1)}
+                        pages={scriptData.pages}
+                        isOpen={openBlock === blockId}
+                        onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
+                        mediaNames={mediaNames}
+                    />)
+                )}
             </div>
         </div>
     );

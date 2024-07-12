@@ -3,202 +3,107 @@ import { NavLink, Outlet, useLoaderData, useOutlet } from "@remix-run/react";
 import { useMemo, useState, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
+import {
+  getMedia,
+  getRecordingFileNames,
+  getSignedUrls,
+  getUserRole,
+  getWorkspaceScripts,
+  listMedia,
+} from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-import { IVRSettings } from "~/components/IVRSettings";
+import {ScriptPreview} from "~/components/ScriptPreview";
 
 export const loader = async ({ request, params }) => {
-  const { id: workspace_id, selected_id, selected } = params;
+  const { id: workspace_id, selected_id } = params;
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-  function getRecordingFileNames(data) {
-    const fileNames = data.map((obj) => {
-      if (
-        obj.speechType === "recorded" &&
-        obj.say !== "Enter your question here"
-      ) {
 
-        return obj.say;
-      }
-    });
-    return fileNames.filter(Boolean);
-  }
-  async function getMedia(fileNames: Array<string>) {
-
-    try {
-      const media = await Promise.all(
-        fileNames.map(async (mediaName) => {
-          try {
-            const { data, error } = await supabaseClient.storage
-              .from("workspaceAudio")
-              .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-            if (error) console.error(`unable to retrieve ${mediaName}`);
-            return { [mediaName]: data?.signedUrl };
-          } catch (error) {
-            console.error(`Error creating signed URL for ${mediaName}:`, error);
-            return { [mediaName]: null };
-          }
-        }),
-      );
-      return media.filter((item) => Object.values(item)[0] !== null);
-    } catch (e) {
-      console.error("Error in getMedia function:", e);
-      return [];
-    }
-  }
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const scripts = await getWorkspaceScripts({
+    workspace: workspace_id,
+    supabase: supabaseClient,
+  });
 
-  const { data: mtmData, error: mtmError } = await supabaseClient
+  const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
-    .select(
-      `*,
-        campaign_audience(*)
-        `,
-    )
-    .eq("id", selected_id);
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspace_id);
+    .select(`*, campaign_audience(*)`)
+    .eq("id", selected_id)
+    .single();
 
-  let data = [...mtmData];
-  let blockData = null;
-  if (
-    data.length > 0 &&
-    (data[0].type === "live_call" || data[0].type === null)
-  ) {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("live_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails,
-    }));
-
-    return json({
-      workspace_id,
-      selected_id,
-      data,
-      selected,
-      mediaData,
-      userRole,
-    });
-  } else if (data.length > 0 && data[0].type === "message") {
-    let media;
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("message_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-    if (campaignDetails && campaignDetails.message_media?.length > 0) {
-
-      try {
-        media = await Promise.all(
-          campaignDetails.message_media.map(async (mediaName) => {
-            try {
-              const { data, error } = await supabaseClient.storage
-                .from("messageMedia")
-                .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-              if (error) throw error;
-              return data?.signedUrl;
-            } catch (error) {
-              console.error(
-                `Error creating signed URL for ${mediaName}:`,
-                error,
-              );
-              return null;
-            }
-          }),
-        );
-        media = media.filter(Boolean); // Remove null values
-      } catch (error) {
-        console.error("Error processing message media:", error);
-        media = [];
-      }
-    }
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails: { ...campaignDetails, mediaLinks: media },
-    }));
-    return json({
-      workspace_id,
-      selected_id,
-      data,
-      selected,
-      mediaData,
-      userRole,
-    });
-  } else if (
-    data[0].type === "robocall" ||
-    data[0].type === "simple_ivr" ||
-    data[0].type === "complex_ivr"
-  ) {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("ivr_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-    const fileNames = getRecordingFileNames(campaignDetails.step_data);
-    let media = [];
-    if (fileNames && fileNames.length > 0) {
-      try {
-        media = await getMedia(fileNames);
-        
-      } catch (error) {
-        console.error("Error getting media for IVR campaign:", error);
-        media = [];
-      }
-    }
-
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails: { ...campaignDetails, mediaLinks: media },
-    }));
-    return json({
-      workspace_id,
-      selected_id,
-      data,
-      selected,
-      mediaData,
-      userRole,
-    });
-  } else {
-    return json({
-      workspace_id,
-      selected_id,
-      data,
-      selected,
-      mediaData,
-      userRole,
-    });
+  if (campaignError) {
+    console.error(campaignError);
+    throw new Response("Error fetching campaign data", { status: 500 });
   }
+
+  let campaignDetails, mediaNames;
+
+  switch (campaignData.type) {
+    case "live_call":
+    case null:
+      ({ data: campaignDetails } = await supabaseClient
+        .from("live_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      mediaNames = await listMedia(supabaseClient, workspace_id);
+      break;
+
+    case "message":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("message_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single());
+      if (campaignDetails?.message_media?.length > 0) {
+        campaignDetails.mediaLinks = await getSignedUrls(
+          supabaseClient,
+          workspace_id,
+          campaignDetails.message_media,
+        );
+      }
+      break;
+
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("ivr_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      const fileNames = getRecordingFileNames(campaignDetails.step_data);
+      campaignDetails.mediaLinks = await getMedia(
+        fileNames,
+        supabaseClient,
+        workspace_id,
+      );
+      mediaNames = await listMedia(supabaseClient, workspace_id);
+      break;
+
+    default:
+      throw new Response("Invalid campaign type", { status: 400 });
+  }
+
+  return json({
+    workspace_id,
+    selected_id,
+    data: { ...campaignData, campaignDetails },
+    mediaNames,
+    userRole,
+    scripts,
+  });
 };
 
 export default function ScriptPage() {
-  const { data = [], userRole } = useLoaderData();
-
+  const { workspace_id, selected_id, mediaNames, scripts, data, userRole } =
+    useLoaderData();
+    
   const outlet = useOutlet();
-  const pageData = useMemo(() => data || [], [data]);
-
-  const initQuestions = useMemo(() => {
-    return pageData.length > 0 && pageData[0]?.campaignDetails?.questions
-      ? [...Object.values(pageData[0]?.campaignDetails?.questions.blocks)]
-      : [];
-  }, [pageData]);
-  
-  const [questions, setQuestions] = useState(() => {
-    return initQuestions.map((q, index) => ({ ...q, order: index }));
-  });
-  
   const [selectedImage, setSelectedImage] = useState(null);
   const clickImage = (e) => {
     setSelectedImage(e.target.src);
@@ -221,67 +126,39 @@ export default function ScriptPage() {
       document.removeEventListener("keydown", handleEscape);
     };
   }, [selectedImage]);
-
-  
-
   return (
     <div className="relative flex h-full flex-col">
-      <div className="my-1 flex flex-col gap-2 px-2">
+      <div className="my-1 flex flex-col gap-2 px-2 relative">
         {!outlet && userRole !== MemberRole.Caller && (
-          <div className="m-4 flex flex-1 justify-end">
+          <div className="m-4 absolute" style={{top:'-78px', right: 0}}>
             <Button asChild>
               <NavLink to={"edit"}>Edit </NavLink>
             </Button>
           </div>
         )}
-        {(pageData[0].type === "live_call" || !pageData[0].type) && !outlet ? (
-          <div className="flex flex-col gap-2">
-            {!outlet && questions.length > 0 ? (
-              questions.map((question) => (
-                <div key={question.id} className="flex flex-col px-2">
-                  <div className="font-Zilla-Slab text-lg">
-                    {question.title || question.id}
-                  </div>
-                  <div className="text-sm">{question.content}</div>
-                  <div className="text-accent-foreground">
-                    <div className="text-sm">Options:</div>
-                    {question.options &&
-                      question.options.map((opt, i) => (
-                        <div key={i} className="text-xs">
-                          {opt.content}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex flex-col items-center">
-                <div>Get started on your campaign Script and survey.</div>
-              </div>
-            )}
-          </div>
-        ) : pageData[0].type === "message" && !outlet ? (
+        {(data.type !== "message" || !data.type) && !outlet ? (
+          <ScriptPreview pageData={data}/>
+        ) : data.type === "message" && !outlet ? (
           <div className="flex flex-col items-center">
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
-              {!outlet &&
-              (pageData[0].body_text || pageData[0].message_media) ? (
+              {!outlet && (data.body_text || data.message_media) ? (
                 <div className="flex flex-wrap justify-between">
-                  {pageData[0].campaignDetails.mediaLinks?.length > 0 &&
-                    pageData[0].campaignDetails.mediaLinks.map((img, i) => (
+                  {data.campaignDetails.mediaLinks?.length > 0 &&
+                    data.campaignDetails.mediaLinks.map((img, i) => (
                       <img
                         onClick={clickImage}
-                        id={pageData[0].message_media[i]}
-                        key={pageData[0].message_media[i]}
+                        id={data.message_media[i]}
+                        key={data.message_media[i]}
                         src={img}
-                        alt={`${pageData[0].message_media[i]}`}
+                        alt={`${data.message_media[i]}`}
                         className="mb-2 rounded-lg"
                         width={"45%"}
                       />
                     ))}
                   <div className="text-sm leading-snug text-gray-700">
-                    {pageData[0].body_text}
+                    {data.body_text}
                   </div>
                   {selectedImage && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
@@ -321,10 +198,10 @@ export default function ScriptPage() {
               )}
             </div>
           </div>
-        ) : (
-          !outlet && <IVRSettings pageData={pageData} onChange={() => null} />
+        ) : !outlet && (
+          <div>An error occured.</div>
         )}
-        <Outlet context={pageData} />
+        <Outlet />
       </div>
     </div>
   );

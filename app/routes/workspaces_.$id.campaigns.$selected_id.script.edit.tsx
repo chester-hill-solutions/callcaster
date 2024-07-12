@@ -15,7 +15,6 @@ import {
   listMedia,
 } from "~/lib/database.server";
 import { MessageSettings } from "../components/MessageSettings";
-import { IVRSettings } from "~/components/IVRSettings";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id } = params;
@@ -137,7 +136,8 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, mediaNames, scripts, data } = useLoaderData();
+  const { workspace_id, selected_id, mediaNames, scripts, data } =
+    useLoaderData();
   const [initData, setInitData] = useState(data);
   const submit = useSubmit();
   const [pageData, setPageData] = useState(initData);
@@ -154,10 +154,9 @@ export default function ScriptEditor() {
         navigate: false,
         action: "/api/campaigns",
       });
-      setInitData(updateData)
-      setPageData(updateData)
-      setChanged(false)
-
+      setInitData(updateData);
+      setPageData(updateData);
+      setChanged(false);
     } catch (error) {
       console.log(error);
     }
@@ -172,23 +171,21 @@ export default function ScriptEditor() {
     setPageData(newPageData);
     let obj1 = initData;
     let obj2 = newPageData;
-    obj1.campaignDetails.script.updated_at;
-    obj2.campaignDetails.script.updated_at;
+    delete obj1.campaignDetails.script?.updated_at;
+    delete obj2.campaignDetails.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
     let obj1 = initData;
     let obj2 = pageData;
-    console.log(obj1, obj2, deepEqual(obj1, obj2))
-    obj1.campaignDetails.script.updated_at;
-    obj2.campaignDetails.script.updated_at;
-
+    delete obj1.campaignDetails.script?.updated_at;
+    delete obj2.campaignDetails.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="relative flex h-full overflow-visible flex-col">
       {isChanged && (
         <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
           <Button
@@ -208,7 +205,7 @@ export default function ScriptEditor() {
           </Button>
         </div>
       )}
-      <div className="flex-grow overflow-auto p-4">
+      <div className="flex-grow p-4">
         {(pageData.type === "live_call" || pageData.type === null) && (
           <CampaignSettingsScript
             pageData={pageData}
@@ -218,17 +215,18 @@ export default function ScriptEditor() {
             scripts={scripts}
           />
         )}
-        {pageData.length > 0 &&
-          (pageData.type === "robocall" ||
-            pageData.type === "simple_ivr" ||
-            pageData.type === "complex_ivr") && (
-            <IVRSettings
-              pageData={pageData}
-              edit={true}
-              mediaNames={mediaNames}
-              onChange={(data) => setPageData(data)}
-            />
-          )}
+        {(pageData.type === "robocall" ||
+          pageData.type === "simple_ivr" ||
+          pageData.type === "complex_ivr") && (
+          <CampaignSettingsScript
+            pageData={pageData}
+            onPageDataChange={(newData) => {
+              handlePageDataChange(newData);
+            }}
+            scripts={scripts}
+            mediaNames={mediaNames}
+          />
+        )}
         {pageData.type === "message" && (
           <MessageSettings
             pageData={pageData}

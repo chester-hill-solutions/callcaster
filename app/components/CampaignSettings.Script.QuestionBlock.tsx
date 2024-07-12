@@ -106,7 +106,7 @@ const OptionsSection = ({
   handleOptionChange,
   handleIconChange,
   scriptData,
-  addNewQuestion,
+  addNewBlock,
   handleNextChange,
 }) =>
   question.options && (
@@ -128,7 +128,7 @@ const OptionsSection = ({
             handleChange={handleOptionChange}
             handleIconChange={handleIconChange}
             scriptData={scriptData}
-            addNewQuestion={addNewQuestion}
+            addNewBlock={addNewBlock}
             handleNextChange={handleNextChange}
           />
         ))}
@@ -158,7 +158,7 @@ export default function CampaignSettingsScriptQuestionBlock({
   openQuestion,
   setOpenQuestion,
   scriptData,
-  addNewQuestion,
+  addNewBlock,
   handleNextChange,
 }) {
   const [question, setQuestion] = useState(initQuestion);
@@ -284,7 +284,7 @@ export default function CampaignSettingsScriptQuestionBlock({
             handleRemoveOption={handleRemoveOption}
             handleOptionChange={handleOptionChange}
             handleIconChange={handleIconChange}
-            addNewQuestion={addNewQuestion}
+            addNewBlock={addNewBlock}
             handleNextChange={handleNextChange}
           />
         </div>
