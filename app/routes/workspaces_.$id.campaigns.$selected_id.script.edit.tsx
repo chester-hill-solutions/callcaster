@@ -15,6 +15,14 @@ import {
   listMedia,
 } from "~/lib/database.server";
 import { MessageSettings } from "../components/MessageSettings";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id } = params;
@@ -109,6 +117,7 @@ export const action = async ({ request, params }) => {
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
+
   const { data: campaign, error } = await supabaseClient
     .from("message_campaign")
     .select("id, message_media")
@@ -142,26 +151,36 @@ export default function ScriptEditor() {
   const submit = useSubmit();
   const [pageData, setPageData] = useState(initData);
   const [isChanged, setChanged] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
-  const handleSaveUpdate = () => {
-    let updateData;
-    const body = pageData;
+  const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
     try {
-      updateData = { ...body, id: parseInt(selected_id) };
-      submit(updateData, {
-        method: "patch",
-        encType: "application/json",
-        navigate: false,
-        action: "/api/campaigns",
+      const response = await fetch('/api/campaigns', {
+        method: !saveScriptAsCopy ? 'PATCH' : 'POST',
+        body: JSON.stringify({
+          campaignData: pageData,
+          campaignDetails: pageData.campaignDetails,
+          scriptData: pageData.campaignDetails.script,
+          saveScriptAsCopy
+        }),
+        headers: { 'Content-Type': 'application/json' },
       });
-      setInitData(updateData);
-      setPageData(updateData);
+      const result = await response.json();
+  
+      if (result.error) {
+        throw new Error(result.error);
+      }
+  
+      // Handle successful update
+      setPageData(data);
       setChanged(false);
+      setShowSaveModal(false);
+  
     } catch (error) {
-      console.log(error);
+      console.error("Error saving update:", error);
+      // Handle the error (e.g., show an error message to the user)
     }
   };
-
   const handleReset = () => {
     setPageData(data);
     setChanged(false);
@@ -171,71 +190,89 @@ export default function ScriptEditor() {
     setPageData(newPageData);
     let obj1 = initData;
     let obj2 = newPageData;
-    delete obj1.campaignDetails.script?.updated_at;
-    delete obj2.campaignDetails.script?.updated_at;
+    delete obj1.campaignDetails?.script?.updated_at;
+    delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
     let obj1 = initData;
     let obj2 = pageData;
-    delete obj1.campaignDetails.script?.updated_at;
-    delete obj2.campaignDetails.script?.updated_at;
+    delete obj1.campaignDetails?.script?.updated_at;
+    delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
 
   return (
-    <div className="relative flex h-full overflow-visible flex-col">
-      {isChanged && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
-          <Button
-            onClick={handleReset}
-            className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
-          >
-            Reset
-          </Button>
-          <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
-            You have unsaved changes
+    <>
+      <div className="relative flex h-full flex-col overflow-visible">
+        {isChanged && (
+          <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
+            <Button
+              onClick={handleReset}
+              className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
+            >
+              Reset
+            </Button>
+            <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
+              You have unsaved changes
+            </div>
+            <Button
+              onClick={() => setShowSaveModal(true)}
+              className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
+            >
+              Save Changes
+            </Button>
           </div>
-          <Button
-            onClick={handleSaveUpdate}
-            className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
-          >
-            Save Changes
-          </Button>
+        )}
+        <div className="flex-grow p-4 h-full">
+          {(pageData.type === "live_call" || pageData.type === null) && (
+            <CampaignSettingsScript
+              pageData={pageData}
+              onPageDataChange={(newData) => {
+                handlePageDataChange(newData);
+              }}
+              scripts={scripts}
+            />
+          )}
+          {(pageData.type === "robocall" ||
+            pageData.type === "simple_ivr" ||
+            pageData.type === "complex_ivr") && (
+            <CampaignSettingsScript
+              pageData={pageData}
+              onPageDataChange={(newData) => {
+                handlePageDataChange(newData);
+              }}
+              scripts={scripts}
+              mediaNames={mediaNames}
+            />
+          )}
+          {pageData.type === "message" && (
+            <MessageSettings
+              pageData={pageData}
+              onPageDataChange={(newData) => handlePageDataChange(newData)}
+              workspace_id={workspace_id}
+              selected_id={selected_id}
+            />
+          )}
         </div>
-      )}
-      <div className="flex-grow p-4">
-        {(pageData.type === "live_call" || pageData.type === null) && (
-          <CampaignSettingsScript
-            pageData={pageData}
-            onPageDataChange={(newData) => {
-              handlePageDataChange(newData);
-            }}
-            scripts={scripts}
-          />
-        )}
-        {(pageData.type === "robocall" ||
-          pageData.type === "simple_ivr" ||
-          pageData.type === "complex_ivr") && (
-          <CampaignSettingsScript
-            pageData={pageData}
-            onPageDataChange={(newData) => {
-              handlePageDataChange(newData);
-            }}
-            scripts={scripts}
-            mediaNames={mediaNames}
-          />
-        )}
-        {pageData.type === "message" && (
-          <MessageSettings
-            pageData={pageData}
-            onPageDataChange={(newData) => handlePageDataChange(newData)}
-            workspace_id={workspace_id}
-            selected_id={selected_id}
-          />
-        )}
       </div>
-    </div>
+      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <DialogContent className="bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle>Save {pageData.campaignDetails?.script?.name}</DialogTitle>
+            <DialogDescription>
+              Would you like to save changes to the existing {pageData.campaignDetails.script?.name}, or save as a copy?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => handleSaveUpdate(false)} className="mr-2" variant={'outline'}>
+              Save
+            </Button>
+            <Button onClick={() => handleSaveUpdate(true)}>Save as Copy</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

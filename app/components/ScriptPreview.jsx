@@ -77,8 +77,8 @@ export const ScriptPreview = ({ pageData }) => {
         <div className="relative w-full h-full overflow-auto">
             <div className="relative flex flex-wrap">
                 <div className="flex flex-col w-full">
-                    {data.campaignDetails?.script?.steps &&
-                        Object.values(data.campaignDetails.script.steps.pages).map((page) => (
+                    {data.campaignDetails?.script?.steps?.pages &&
+                        Object.values(data.campaignDetails.script.steps.pages || {}).map((page) => (
                             <Page key={page.id} page={page} data={data} />
                         ))}
                 </div>

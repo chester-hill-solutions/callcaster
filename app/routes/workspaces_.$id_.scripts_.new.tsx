@@ -8,8 +8,8 @@ import {
   useLoaderData,
   useNavigate,
 } from "@remix-run/react";
-import { FaPlus } from "react-icons/fa";
-import { MdAdd } from "react-icons/md";
+
+import { MdAdd, MdClose } from "react-icons/md";
 import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";

@@ -127,7 +127,7 @@ export default function Workspace() {
             </NavLink>
           ))}
         </div>
-        <div className="min-h-3/4 flex w-full flex-auto overflow-hidden dark:bg-zinc-700">
+        <div className="min-h-3/4 flex w-full flex-auto  dark:bg-zinc-700">
           <Outlet
             context={{
               audiences,

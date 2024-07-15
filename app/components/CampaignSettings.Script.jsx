@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "./ui/button";
@@ -12,13 +12,51 @@ import {
 } from "~/components/ui/select";
 import { useNavigate } from "@remix-run/react";
 import { MdCircle } from "react-icons/md";
+import { Toggle } from "./Inputs";
 
 export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [] }) {
+    const [script, setScript] = useState(pageData.campaignDetails?.script);
     const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script?.steps || {});
-    const [currentPage, setCurrentPage] = useState(scriptData?.startPage || null);
+    const firstPage = Object.values(scriptData.pages || {}).length > 0 ? Object.values(scriptData.pages)[0].id : null;
+    const [currentPage, setCurrentPage] = useState(firstPage);
     const [openBlock, setOpenBlock] = useState(null);
-    const [selectedScript, setSelectedScript] = useState(pageData.campaignDetails?.script ? scripts[pageData.campaignDetails?.script?.id] : null);
+
     const navigate = useNavigate();
+
+    const changeType = useCallback((newType) => {
+        setScript(prevScript => ({
+            ...prevScript,
+            type: newType
+        }));
+        onPageDataChange(prevData => ({
+            ...prevData,
+            campaignDetails: {
+                ...prevData.campaignDetails,
+                script: {
+                    ...prevData.campaignDetails.script,
+                    type: newType
+                }
+            }
+        }));
+    }, [onPageDataChange]);
+
+    const handleTitle = useCallback((event) => {
+        const newTitle = event.target.value;
+        setScript(prevScript => ({
+            ...prevScript,
+            name: newTitle
+        }));
+        onPageDataChange(prevData => ({
+            ...prevData,
+            campaignDetails: {
+                ...prevData.campaignDetails,
+                script: {
+                    ...prevData.campaignDetails.script,
+                    name: newTitle
+                }
+            }
+        }));
+    }, [onPageDataChange]);
 
     const addBlock = () => {
         const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
@@ -156,7 +194,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 ...scriptData.pages,
                 [newPageId]: {
                     id: newPageId,
-                    title: `New Page ${Object.keys(scriptData.pages || {}).length + 1}`,
+                    title: `New Section ${Object.keys(scriptData.pages || {}).length + 1}`,
                     blocks: []
                 }
             }
@@ -179,7 +217,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         if (value === `create-new-${scripts.length + 1}`) navigate('../../../../scripts/new');
         const newScript = scripts.find(script => script.id === value);
         if (newScript) {
-            setSelectedScript(newScript);
+            setScript(newScript);
             setScriptData(newScript.steps)
             const newPageData = {
                 ...pageData,
@@ -189,112 +227,188 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                     script: newScript
                 }
             }
+            setCurrentPage(scriptData?.startPage || null)
+            setOpenBlock(null)
             onPageDataChange(newPageData);
         }
     }
-    if (!scriptData) return (<div><MdCircle /></div>)
 
-    if (!scriptData.pages || !scriptData.blocks) {
-        return (
-            <div className="flex flex-col gap-4 h-full">
-                <div className="flex">
-                    <h3 className="text-lg font-Zilla-Slab">No Script</h3>
-                </div>
-                <div className="flex">
-                    <Select value={selectedScript?.id} onValueChange={handleScriptChange}>
-                        <SelectTrigger className="bg-white dark:bg-transparent">
-                            <SelectValue
-                                className="text-brand-primary"
-                                placeholder="Select a script"
-                            />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {scripts.map((script) => (
-                                <SelectItem key={script.id} value={script.id}>
-                                    {script.name}
-                                </SelectItem>
-                            ))}
-                            <SelectItem value={`create-new-${scripts.length + 1}`}>
-                                Create New
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+    const handleSectionNameChange = useCallback((event) => {
+        const newTitle = event.target.value;
+        if (currentPage) {
+            const updatedScriptData = {
+                ...scriptData,
+                pages: {
+                    ...scriptData.pages,
+                    [currentPage]: {
+                        ...scriptData.pages[currentPage],
+                        title: newTitle
+                    }
+                }
+            };
+            setScriptData(updatedScriptData);
+            onPageDataChange({
+                ...pageData,
+                campaignDetails: {
+                    ...pageData.campaignDetails,
+                    script: {
+                        ...pageData.campaignDetails.script,
+                        steps: updatedScriptData
+                    }
+                }
+            });
+        }
+    }, [currentPage, scriptData, pageData, onPageDataChange]);
+
+    const ScriptSelector = () => (
+        <div className="flex flex-col">
+            <div className="flex">
+                <h3 className="text-lg font-Zilla-Slab">Your Scripts</h3>
             </div>
-        );
-    }
-
+            <div className="flex">
+                <Select value={script?.id} onValueChange={handleScriptChange}>
+                    <SelectTrigger className="bg-white dark:bg-transparent">
+                        <SelectValue
+                            className="text-brand-primary"
+                            placeholder="Select a script"
+                        />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {scripts.map((script) => (
+                            <SelectItem key={script.id} value={script.id}>
+                                {script.name} - {script.type}
+                            </SelectItem>
+                        ))}
+                        <SelectItem value={`create-new-${scripts.length + 1}`}>
+                            Create New
+                        </SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+        </div>
+    )
     return (
-        <div className="flex gap-4">
+        <div className="flex gap-4 h-full">
             <div className="w-1/4 border-r pr-4" style={{ width: "25%" }}>
-                <div className="text-center w-full mb-1">Pages</div>
-                <Button
-                    className="w-full mb-4"
-                    onClick={addPage}
-                >
-                    Add Page <FaPlus size="16px" className="inline ml-2" />
-                </Button>
-                {Object.values(scriptData.pages).map((page) => (
-                    <Button
-                        key={page.id}
-                        className={`w-full mb-2 justify-start  ${currentPage === page.id ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
-                        onClick={() => setCurrentPage(page.id)}
-                    >
-                        {page.title}
-                    </Button>
-                ))}
-                <hr className="my-4" />
-                <div className="text-center w-full mb-1">Question Blocks</div>
-                <Button
-                    className="w-full mb-4"
-                    onClick={addBlock}
-                >
-                    Add Block <FaPlus size="16px" className="inline ml-2" />
-                </Button>
-                {scriptData.pages[currentPage]?.blocks.map((blockId) => (
-                    <Button
-                        key={blockId}
-                        className={`w-full mb-2 justify-start ${openBlock === blockId ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
-                        onClick={() => setOpenBlock(blockId)}
-                    >
-                        {scriptData.blocks[blockId].title || blockId}
-                    </Button>
-                ))}
+                <div className="flex flex-col justify-between h-full">
+                    <div>
+                        <div className="text-center w-full mb-1">Sections</div>
+                        <Button
+                            className="w-full mb-4"
+                            onClick={addPage}
+                        >
+                            Add Section <FaPlus size="16px" className="inline ml-2" />
+                        </Button>
+                        {Object.values(scriptData?.pages || {}).length > 0 && Object.values(scriptData.pages || {}).map((page) => (
+                            <Button
+                                key={page.id}
+                                className={`w-full mb-2 justify-start  ${currentPage === page.id ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
+                                onClick={() => setCurrentPage(page.id)}
+                            >
+                                {page.title}
+                            </Button>
+                        ))}
+                        <hr className="my-4" />
+                        <div className="text-center w-full mb-1">Question Blocks</div>
+                        <Button
+                            className="w-full mb-4"
+                            onClick={addBlock}
+                        >
+                            Add Block <FaPlus size="16px" className="inline ml-2" />
+                        </Button>
+                        {currentPage && scriptData?.pages[currentPage]?.blocks?.map((blockId) => (
+                            <Button
+                                key={blockId}
+                                className={`w-full mb-2 justify-start ${openBlock === blockId ? 'bg-primary text-white' : 'bg-transparent text-black border-2 border-zinc-800'}`}
+                                onClick={() => setOpenBlock(blockId)}
+                            >
+                                {scriptData?.blocks && scriptData?.blocks[blockId].title || blockId}
+                            </Button>
+                        ))}
+                    </div>
+                    <div>
+                        <ScriptSelector />
+                    </div>
+                </div>
             </div>
             <div className="w-3/4" style={{ width: "75%" }}>
-                <h2 className="text-2xl font-bold mb-4">{scriptData.pages[currentPage]?.title}</h2>
-                {scriptData.type !== 'script' ? scriptData.pages[currentPage]?.blocks.map((blockId) => (
-                    <CampaignSettingsScriptQuestionBlock
-                        key={blockId}
-                        question={scriptData.blocks[blockId]}
-                        removeQuestion={() => removeBlock(blockId)}
-                        moveUp={() => moveBlock(blockId, -1)}
-                        moveDown={() => moveBlock(blockId, 1)}
-                        openQuestion={openBlock}
-                        setOpenQuestion={setOpenBlock}
-                        dispatchState={(newState) => updateBlock(blockId, newState)}
-                        scriptData={scriptData}
-                        addNewBlock={addBlock}
-                        handleNextChange={(optionIndex, nextValue) => {
-                            const updatedOptions = [...scriptData.blocks[blockId].options];
-                            updatedOptions[optionIndex].next = nextValue;
-                            updateBlock(blockId, { options: updatedOptions });
-                        }}
-                    />
-                )) : scriptData.pages[currentPage]?.blocks.map((blockId) => (
-                    <IVRQuestionBlock
-                        key={blockId}
-                        block={scriptData.blocks[blockId]}
-                        onRemove={() => removeBlock(blockId)}
-                        onUpdate={(newState) => updateBlock(blockId, newState)}
-                        onMoveDown={() => moveBlock(blockId, 1)}
-                        onMoveUp={() => moveBlock(blockId, -1)}
-                        pages={scriptData.pages}
-                        isOpen={openBlock === blockId}
-                        onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
-                        mediaNames={mediaNames}
-                    />)
-                )}
+                <div className="flex flex-col">
+                    <div className="flex justify-between">
+                        <div className="flex flex-col">
+                            <label htmlFor="campaign-name">
+                                Script Name
+                            </label>
+                            <input
+                                id="campaign-name"
+                                value={script?.name || ''}
+                                type="text"
+                                onChange={handleTitle}
+                            />
+                        </div>
+                        <div>
+                            <Toggle 
+                            name="campaign-type" 
+                            label="Script Type"
+                            isChecked={script.type === 'script'}
+                            leftLabel="Recording/Synthetic"
+                            rightLabel="Live Script"
+                            onChange={(val) => changeType(!val ? 'ivr' : 'script')}
+                            />
+                        </div>
+                    </div>
+                    {currentPage && (
+                        <>
+                            <label htmlFor="section-name" className="mt-4">
+                                Section Name
+                            </label>
+                            <input
+                                id="section-name"
+                                value={scriptData.pages[currentPage]?.title || ''}
+                                type="text"
+                                onChange={handleSectionNameChange}
+                                className="mb-4"
+                            />
+                        </>
+                    )}
+                    {(scriptData.type === 'script' ?
+                        (scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
+                            <CampaignSettingsScriptQuestionBlock
+                                key={blockId}
+                                question={scriptData.blocks[blockId] || {}}
+                                removeQuestion={() => removeBlock(blockId)}
+                                moveUp={() => moveBlock(blockId, -1)}
+                                moveDown={() => moveBlock(blockId, 1)}
+                                openQuestion={openBlock}
+                                setOpenQuestion={setOpenBlock}
+                                dispatchState={(newState) => updateBlock(blockId, newState)}
+                                scriptData={scriptData}
+                                addNewBlock={addBlock}
+                                handleNextChange={(optionIndex, nextValue) => {
+                                    const updatedOptions = [...(scriptData.blocks[blockId]?.options || [])];
+                                    if (updatedOptions[optionIndex]) {
+                                        updatedOptions[optionIndex].next = nextValue;
+                                        updateBlock(blockId, { options: updatedOptions });
+                                    }
+                                }}
+                            />
+                        ))
+                        :
+                        (currentPage && scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
+                            <IVRQuestionBlock
+                                key={blockId}
+                                block={scriptData.blocks[blockId] || {}}
+                                onRemove={() => removeBlock(blockId)}
+                                onUpdate={(newState) => updateBlock(blockId, newState)}
+                                onMoveDown={() => moveBlock(blockId, 1)}
+                                onMoveUp={() => moveBlock(blockId, -1)}
+                                pages={scriptData.pages || {}}
+                                isOpen={openBlock === blockId}
+                                onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
+                                mediaNames={mediaNames}
+                            />
+                        ))
+                    )}
+                </div>
             </div>
         </div>
     );

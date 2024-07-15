@@ -2,7 +2,7 @@ import { useEffect, useState, useReducer } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { NavLink, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
-import { campaignTypeText, deepEqual } from "~/lib/utils";
+import { deepEqual } from "~/lib/utils";
 
 const initialState = (data, workspace, campaign_id) => ({
   campaign_id,
@@ -29,8 +29,7 @@ const actionTypes = {
   SET_CALL_ID: "SET_CALL_ID",
   SET_START_DATE: "SET_START_DATE",
   SET_END_DATE: "SET_END_DATE",
-  SET_VOICEMAIL: "SET_VOICEMAIL",
-  SET_QUESTION: "SET_QUESTION",
+  SET_VOICEMAIL: "SET_VOICEMAIL"
 };
 
 const reducer = (state, action) => {
@@ -55,17 +54,6 @@ const reducer = (state, action) => {
       return { ...state, group_household_queue: action.payload };
     case actionTypes.SET_CALL_ID:
       return { ...state, caller_id: action.payload };
-    case actionTypes.SET_QUESTION:
-      return {
-        ...state,
-        questions: {
-          ...state.questions,
-          [action.payload.question]: {
-            ...state.questions[action.payload.question],
-            [action.payload.key]: action.payload.value,
-          },
-        },
-      };
     default:
       return state;
   }

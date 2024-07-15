@@ -66,37 +66,44 @@ const IVRQuestionBlockOption = ({
         initialInput={option.value}
       />
       <div className="mb-2 flex items-center space-x-2">
-        <div
-          className="flex h-10 w-[100px] items-center justify-between rounded-md border border-input bg-background bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent [&>span]:line-clamp-1"
-          onClick={() => setIsModalOpen(!isModalOpen)}
-        >
-          {option.value === "vx-any" ? "Voice - Any" : option.value}
-          <MdDialpad />
-        </div>
-        <div className="flex flex-1">
-          <Select
-            value={option.next}
-            onValueChange={(value) => onNextChange(index, value)}
+        <div className="flex flex-col">
+          <p>Input</p>
+          <div
+            className="flex h-10 w-[100px] items-center justify-between rounded-md border border-input bg-background bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent [&>span]:line-clamp-1"
+            onClick={() => setIsModalOpen(!isModalOpen)}
           >
-            <SelectTrigger className="bg-white dark:bg-transparent">
-              <SelectValue
-                className="text-brand-primary"
-                placeholder="Select an audio file"
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(pages).map(([pageId, page]) => {
-                return (
-                <SelectItem key={pageId} value={pageId}>
-                  {page.title}
-                </SelectItem>
-              )})}
-              <SelectItem value={"hangup"}>Hang Up</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="icon" onClick={() => onRemove(index)}>
-            <MdRemove size={24} className="text-primary" />
-          </Button>
+            {option.value === "vx-any" ? "Voice - Any" : option.value}
+            <MdDialpad />
+          </div>
+        </div>
+        <div className="flex w-full flex-col">
+          <p>Next Step</p>
+          <div className="flex flex-1">
+            <Select
+              value={option.next}
+              onValueChange={(value) => onNextChange(index, value)}
+            >
+              <SelectTrigger className="bg-white dark:bg-transparent">
+                <SelectValue
+                  className="text-brand-primary"
+                  placeholder="Select an audio file"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(pages).map(([pageId, page]) => {
+                  return (
+                    <SelectItem key={pageId} value={pageId}>
+                      {page.title}
+                    </SelectItem>
+                  );
+                })}
+                <SelectItem value={"hangup"}>Hang Up</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="icon" onClick={() => onRemove(index)}>
+              <MdRemove size={24} className="text-primary" />
+            </Button>
+          </div>
         </div>
       </div>
     </>
@@ -141,10 +148,10 @@ const IVRQuestionBlock = ({
       if (i !== index) return opt;
       return {
         ...opt,
-        next: value
-      }
+        next: value,
+      };
     });
-    handleChange('options', newOptions);
+    handleChange("options", newOptions);
   };
 
   const handleOptionChange = (index, newOption) => {
@@ -247,7 +254,12 @@ const IVRQuestionBlock = ({
             )}
           </div>
           <div className="pt-4">
-            <h3>Responses</h3>
+            <div className="flex items-center gap-2">
+              <h3>Responses</h3>
+              <Button variant={"ghost"} onClick={() => handleAddOption()}>
+                <MdAddCircleOutline />
+              </Button>{" "}
+            </div>
             {localBlock.options.map((option, index) => (
               <IVRQuestionBlockOption
                 key={option.id}
