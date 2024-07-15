@@ -116,6 +116,12 @@ export default function Index() {
             Sign Up
           </Link>
         </div>
+        <Link
+          to="/remember"
+          className="underline transition-colors duration-150 ease-in-out hover:text-brand-primary"
+        >
+          Forgot Your Password? Click Here
+        </Link>
         {/* <Link
           to={"/signup"}
           className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all
