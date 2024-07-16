@@ -10,8 +10,8 @@ export const EditResponseModal = ({ isOpen, onClose, onSave, initialInput }) => 
     const inputOptions = [...Array(10).keys(), 'Voice - Any'];
     return (
         isOpen && (
-            <div className="absolute" style={{ zIndex: 20, transform:"translateY(40px)" }}>
-                <div className="bg-white p-6 rounded-lg flex flex-col">
+            <div className="absolute rounded-lg shadow-lg bg-white dark:bg-slate-900" style={{ zIndex: 20, transform:"translateY(40px)" }}>
+                <div className="p-6 flex flex-col">
                     <h2 className="text-xl font-bold mb-4">Response</h2>
                     <div className='flex justify-between'>
                         <div className="mb-4">

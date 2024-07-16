@@ -5,9 +5,11 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 const getCampaignData = async (supabase, campaign_id) => {
     const { data: campaign, error } = await supabase
-        .from('ivr_campaign')
-        .select()
-        .eq('campaign_id', campaign_id)
+        .from('campaign')
+        .select(`*,
+            ivr_campaign(*, 
+            script(*))`)
+        .eq('id', campaign_id)
         .single();
     if (error) throw error;
     return campaign;
@@ -21,29 +23,22 @@ const updateResult = async (supabase, outreach_attempt_id, update) => {
     if (error) throw error;
 };
 
-const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
+const handleVoicemail = async (twilio, callSid, dbCall, script, supabase) => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail' });
-
-    const step = campaign.step_data.find((i) => i.step === 'voicemail');
-    if (!step) {
+    const vm = script.voicemail_file;
+    if (!vm) {
         await call.update({
             twiml: `<Response><Hangup/></Response>`
         });
     } else {
-        if (step.speechType === 'synthetic') {
-            await call.update({
-                twiml: `<Response><Pause length="5"/><Say>${step.say}</Say></Response>`
-            });
-        } else {
-            const { data, error } = await supabase.storage
-                .from(`workspaceAudio`)
-                .createSignedUrl(`${dbCall.workspace}/${step.say}`, 3600);
-            if (error) throw { 'Campaign': error }
-            await call.update({
-                twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
-            });
-        }
+        const { data, error } = await supabase.storage
+            .from(`workspaceAudio`)
+            .createSignedUrl(`${dbCall.workspace}/${script.voicemail_file}`, 3600);
+        if (error) throw { 'Campaign': error }
+        await call.update({
+            twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
+        });
     }
 };
 
@@ -63,7 +58,7 @@ export const action = async ({ request }) => {
         if (callError) throw callError;
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
 
-        const campaignPromise = getCampaignData(supabase, dbCall.campaign_id);
+        const campaignDetails = getCampaignData(supabase, dbCall.campaign_id);
         const call = twilio.calls(callSid);
 
         const updateCallAndAttempt = async (answeredBy) => {
@@ -93,8 +88,7 @@ export const action = async ({ request }) => {
         const updateOperations = [];
 
         if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && parsedBody.CallStatus !== 'completed') {
-            const campaign = await campaignPromise;
-            updateOperations.push(handleVoicemail(twilio, callSid, dbCall, campaign, supabase));
+            updateOperations.push(handleVoicemail(twilio, callSid, dbCall, campaignDetails, supabase));
         } else if (parsedBody.AnsweredBy === 'human' || parsedBody.AnsweredBy === 'unknown') {
             updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy));
         } else {

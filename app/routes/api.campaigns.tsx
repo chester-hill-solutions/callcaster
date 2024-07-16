@@ -1,7 +1,5 @@
 import { json } from "@remix-run/node";
-import {
-  getSupabaseServerClientWithSession,
-} from "../lib/supabase.server";
+import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import {
   updateCampaign,
   updateCampaignScript,
@@ -12,22 +10,25 @@ export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, serverSession } =
     await getSupabaseServerClientWithSession(request);
   const data = await request.json();
-  const saveAsCopy = request.method === 'POST';
+  const saveAsCopy = request.method === "POST";
   const { campaignData, campaignDetails, scriptData } = data;
   try {
-    const updatedScript = await updateOrCopyScript(
-      {supabase,
-      scriptData,
-      saveAsCopy,
-    });
+      const updatedScript = await updateOrCopyScript({
+        supabase,
+        scriptData,
+        saveAsCopy,
+        campaignData,
+        created_by: serverSession.user.id,
+        created_at: new Date()
+      })
     if (
-      campaignData.type === "live_call" ||
+      scriptData && campaignData.type === "live_call" ||
       ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
     ) {
       campaignDetails.script_id = updatedScript.id;
     }
     const { campaign, campaignDetails: updatedCampaignDetails } =
-      await updateCampaign({supabase, campaignData, campaignDetails});
+      await updateCampaign({ supabase, campaignData, campaignDetails });
     if (
       campaignData.type === "live_call" ||
       ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)

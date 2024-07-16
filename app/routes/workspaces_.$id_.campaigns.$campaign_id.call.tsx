@@ -78,7 +78,7 @@ export const loader = async ({ request, params }) => {
     .single();
   const { data: campaignDetails, error: detailsError } = await supabase
     .from("live_campaign")
-    .select()
+    .select(`*, script(*)`)
     .eq("campaign_id", id)
     .single();
 

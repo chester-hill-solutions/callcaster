@@ -5,9 +5,9 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 const getCampaignData = async (supabase, campaign_id) => {
     const { data: campaign, error } = await supabase
-        .from('ivr_campaign')
-        .select()
-        .eq('campaign_id', campaign_id)
+        .from('campaign')
+        .select(`*, ivr_campaign(*, script(*))`)
+        .eq('id', campaign_id)
         .single();
     if (error) throw error;
     return campaign;

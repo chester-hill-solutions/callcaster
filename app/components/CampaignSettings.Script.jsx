@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import CampaignSettingsScriptQuestionBlock from "./CampaignSettings.Script.QuestionBlock";
+import { useCallback, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "./ui/button";
-import IVRQuestionBlock from "./CampaignSettings.Script.IVRQuestionBlock";
 import {
     Select,
     SelectContent,
@@ -11,8 +9,9 @@ import {
     SelectValue,
 } from "~/components/ui/select";
 import { useNavigate } from "@remix-run/react";
-import { MdCircle } from "react-icons/md";
 import { Toggle } from "./Inputs";
+import MergedQuestionBlock from "./ScriptBlock";
+import { MdRemoveCircleOutline } from "react-icons/md";
 
 export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [] }) {
     const [script, setScript] = useState(pageData.campaignDetails?.script);
@@ -28,6 +27,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
             ...prevScript,
             type: newType
         }));
+
         onPageDataChange(prevData => ({
             ...prevData,
             campaignDetails: {
@@ -58,7 +58,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         }));
     }, [onPageDataChange]);
 
-    const addBlock = () => {
+    const addBlock= () => {
         const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
         const newBlock = {
             id: newBlockId,
@@ -212,6 +212,25 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         });
         setCurrentPage(newPageId);
     };
+    const removeSection = (id) => {
+        const newScriptData = scriptData;
+        delete newScriptData.pages[id];
+        setScriptData(newScriptData);
+        setScript({
+            ...pageData.campaignDetails.script,
+            steps: newScriptData
+        });
+        onPageDataChange({
+            ...pageData,
+            campaignDetails: {
+                ...pageData.campaignDetails,
+                script: {
+                    ...pageData.campaignDetails.script,
+                    steps: newScriptData
+                }
+            }
+        })
+    }
 
     const handleScriptChange = (value) => {
         if (value === `create-new-${scripts.length + 1}`) navigate('../../../../scripts/new');
@@ -346,13 +365,13 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             />
                         </div>
                         <div>
-                            <Toggle 
-                            name="campaign-type" 
-                            label="Script Type"
-                            isChecked={script.type === 'script'}
-                            leftLabel="Recording/Synthetic"
-                            rightLabel="Live Script"
-                            onChange={(val) => changeType(!val ? 'ivr' : 'script')}
+                            <Toggle
+                                name="campaign-type"
+                                label="Script Type"
+                                isChecked={script?.type === 'script'}
+                                leftLabel="Recording/Synthetic"
+                                rightLabel="Live Script"
+                                onChange={(val) => changeType(!val ? 'ivr' : 'script')}
                             />
                         </div>
                     </div>
@@ -361,19 +380,26 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             <label htmlFor="section-name" className="mt-4">
                                 Section Name
                             </label>
-                            <input
-                                id="section-name"
-                                value={scriptData.pages[currentPage]?.title || ''}
-                                type="text"
-                                onChange={handleSectionNameChange}
-                                className="mb-4"
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    id="section-name"
+                                    value={scriptData.pages[currentPage]?.title || ''}
+                                    type="text"
+                                    onChange={handleSectionNameChange}
+                                    className="mb-4"
+                                />
+                                <Button onClick={() => removeSection(currentPage)} variant={'icon'}>
+                                    <MdRemoveCircleOutline />
+                                </Button>
+                            </div>
                         </>
                     )}
                     {(scriptData.type === 'script' ?
                         (scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
-                            <CampaignSettingsScriptQuestionBlock
+                            <MergedQuestionBlock
+                                type={scriptData.type}
                                 key={blockId}
+                                blocks={scriptData.blocks}
                                 question={scriptData.blocks[blockId] || {}}
                                 removeQuestion={() => removeBlock(blockId)}
                                 moveUp={() => moveBlock(blockId, -1)}
@@ -394,8 +420,10 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                         ))
                         :
                         (currentPage && scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
-                            <IVRQuestionBlock
+                            <MergedQuestionBlock
+                                type={script.type}
                                 key={blockId}
+                                blocks={scriptData.blocks}
                                 block={scriptData.blocks[blockId] || {}}
                                 onRemove={() => removeBlock(blockId)}
                                 onUpdate={(newState) => updateBlock(blockId, newState)}

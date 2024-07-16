@@ -92,7 +92,7 @@ const CampaignSettings = ({
 
   const saveCampaign = () => {
     if (!deepEqual(campaignDetails, initial)) {
-      submit({ ...campaignDetails, id: campaign_id }, {
+      submit({ campaignData: {...campaignDetails}, id: campaign_id }, {
         method: "patch",
         encType: "application/json",
         navigate: false,
@@ -219,9 +219,9 @@ const CampaignSettings = ({
                 </Button>
                 </div>
               }
-                  {(campaignDetails.type === 'live_call' || campaignDetails.type === 'robocall') && <Dropdown
+                  {(campaignDetails.type !== 'message') && <Dropdown
                     name="voicemail"
-                    label={campaignDetails.type === 'live_call' ? "Voicemail File" : 'Audio File'}
+                    label={"Voicemail File"}
                     value={campaignDetails.voicemail_file}
                     onChange={(e) =>
                       handleInputChange(

@@ -154,6 +154,7 @@ export default function ScriptEditor() {
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
+    console.log(pageData)
     try {
       const response = await fetch('/api/campaigns', {
         method: !saveScriptAsCopy ? 'PATCH' : 'POST',

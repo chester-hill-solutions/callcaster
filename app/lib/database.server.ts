@@ -462,23 +462,24 @@ export async function getSignedUrls(supabaseClient, workspace_id, mediaNames) {
 
 export async function updateCampaign({
   supabase,
-  campaignData,
-  campaignDetails,
+  campaignData = {},
+  campaignDetails = {},
 }) {
-  const { id, workspace, ...updateData } = campaignData;
-
+  const updateData = campaignData;
   delete updateData.campaign_audience;
   delete updateData.campaignDetails;
   delete updateData.mediaLinks;
   delete updateData.script;
+  const id = campaignDetails.campaign_id
+  delete updateData.campaign_id;
+  delete updateData.questions;
 
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
     .update(updateData)
     .eq("id", id)
-    .eq("workspace", workspace)
+    .eq("workspace", updateData.workspace)
     .select();
-
   if (campaignError) {
     if (campaignError.code === "23505") {
       throw new Error(
@@ -489,7 +490,7 @@ export async function updateCampaign({
   }
 
   let tableKey: "live_campaign" | "message_campaign" | "ivr_campaign";
-  if (campaignData.type === "live_call" || !campaignData.type)
+  if (campaignData?.type === "live_call" || !campaignData?.type)
     tableKey = "live_campaign";
   else if (campaignData.type === "message") tableKey = "message_campaign";
   else if (
@@ -511,29 +512,30 @@ export async function updateCampaign({
   return { campaign: campaign[0], campaignDetails: updatedCampaignDetails[0] };
 }
 
-export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy }) {
+export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, campaignData, created_by, created_at }) {
   const { id, ...updateData } = scriptData;
-  const {data: originalScript, error: fetchScriptError} = await supabase.from('script').select().eq('id', id);
-
+  const {data: originalScript, error: fetchScriptError} = id ? await supabase.from('script').select().eq('id', id) : {data: null, error: null};
   let scriptOperation;
   if (saveAsCopy || !id) {
     scriptOperation = supabase
       .from("script")
       .insert({
-        ...updateData,
+        ...scriptData,
         name: saveAsCopy && originalScript?.name === updateData.name ? `${updateData.name} (Copy)` : updateData.name,
+        created_by,
+        created_at,
+        workspace: campaignData.workspace
       })
       .select();
+      
   } else {
     scriptOperation = supabase
       .from("script")
-      .update(updateData)
+      .update({...scriptData, updated_by: created_by, updated_at: created_at})
       .eq("id", id)
       .select();
   }
-
   const { data: updatedScript, error: scriptError } = await scriptOperation;
-  console.log(updatedScript)
   if (scriptError) {
     if (scriptError.code === "23505") {
       throw new Error(
