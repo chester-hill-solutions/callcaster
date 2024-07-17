@@ -1,4 +1,7 @@
-export const AudienceContactRow = ({ contact, otherDataHeaders }) => (
+import { MdRemoveCircleOutline } from "react-icons/md";
+import { Button } from "./ui/button";
+
+export const AudienceContactRow = ({ contact, otherDataHeaders, handleRemoveContact }) => (
   <tr id={contact.id} className="text-gray-400">
     <td className="whitespace-nowrap px-2 py-1 text-sm">{contact.id}</td>
     <td className="whitespace-nowrap px-2 py-1 text-sm">{contact.external_id}</td>
@@ -27,5 +30,12 @@ export const AudienceContactRow = ({ contact, otherDataHeaders }) => (
         {contact.other_data.find((data) => data[header] !== undefined)?.[header] || ""}
       </td>
     ))}
+    <td className="whitespace-nowrap px-2 py-1 ">
+      <div className="flex justify-center">
+      <Button variant={"ghost"} onClick={() => handleRemoveContact(contact.id)}>
+        <MdRemoveCircleOutline />
+      </Button>
+      </div>
+    </td>
   </tr>
 );

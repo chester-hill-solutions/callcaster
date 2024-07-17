@@ -8,6 +8,7 @@ const ContactTable = ({
   handleInputChange,
   handleSaveContact,
   workspace_id,
+  handleRemoveContact,
 }) => {
   const otherDataHeaders = Array.from(
     new Set(
@@ -19,48 +20,54 @@ const ContactTable = ({
 
   return (
     <table className="divide-y divide-gray-200">
-      <thead className="overflow-x-scroll relative">
+      <thead className="relative overflow-x-scroll">
         <tr className=" sticky top-0 bg-primary">
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             ID
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             External ID
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             First Name
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Last Name
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Phone
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Email
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Address
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             City
           </th>
-          <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap">
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Date Created
           </th>
           {otherDataHeaders.map((header) => (
             <th
               key={header}
-              className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider whitespace-nowrap"
+              className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
             >
               {header}
             </th>
           ))}
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            Remove
+          </th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-200 ">
         {contacts.map((contact) => (
-          <AudienceContactRow {...{ contact, otherDataHeaders }} key={contact.id} />
+          <AudienceContactRow
+            {...{ contact, otherDataHeaders, handleRemoveContact }}
+            key={contact.id}
+          />
         ))}
         <tr hidden>
           <td colSpan={4}>
