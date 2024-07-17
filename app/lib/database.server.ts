@@ -513,6 +513,7 @@ export async function updateCampaign({
 }
 
 export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, campaignData, created_by, created_at }) {
+  
   const { id, ...updateData } = scriptData;
   const {data: originalScript, error: fetchScriptError} = id ? await supabase.from('script').select().eq('id', id) : {data: null, error: null};
   let scriptOperation;

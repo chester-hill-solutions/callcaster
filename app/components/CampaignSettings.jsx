@@ -7,16 +7,16 @@ import { deepEqual } from "~/lib/utils";
 const initialState = (data, workspace, campaign_id) => ({
   campaign_id,
   workspace,
-  title: data[0]?.title,
-  status: data[0]?.status,
-  type: data[0]?.type || "live_call",
-  dial_type: data[0]?.dial_type || "call",
-  group_household_queue: data[0]?.group_household_queue,
-  start_date: data[0]?.start_date,
-  end_date: data[0]?.end_date,
-  caller_id: data[0]?.caller_id,
-  voicemail_file: data[0]?.voicemail_file,
-  questions: data[0]?.campaignDetails?.questions,
+  title: data?.title,
+  status: data?.status,
+  type: data?.type || "live_call",
+  dial_type: data?.dial_type || "call",
+  group_household_queue: data?.group_household_queue,
+  start_date: data?.start_date,
+  end_date: data?.end_date,
+  caller_id: data?.caller_id,
+  voicemail_file: data?.voicemail_file,
+  questions: data?.campaignDetails?.questions,
 });
 
 const actionTypes = {
@@ -65,7 +65,8 @@ const CampaignSettings = ({
   audiences = [],
   mediaData,
   workspace,
-  phoneNumbers = []
+  phoneNumbers = [],
+  campaignDetails : details
 }) => {
   const navigate = useNavigate();
   const nav = useNavigation();
@@ -76,9 +77,7 @@ const CampaignSettings = ({
   );
   const [campaignDetails, dispatch] = useReducer(reducer, initial);
   const initSelectedAudiences = audiences.filter((audience) => {
-    return data
-      .map((row) => row.campaign_audience[0]?.audience_id)
-      .includes(audience.id);
+    return data.campaign_audience?.audience_id === audience.id;
   });
   const [selectedAudiences, setSelectedAudience] = useState([
     ...initSelectedAudiences,
@@ -92,7 +91,7 @@ const CampaignSettings = ({
 
   const saveCampaign = () => {
     if (!deepEqual(campaignDetails, initial)) {
-      submit({ campaignData: {...campaignDetails}, id: campaign_id }, {
+      submit({ campaignData: {...campaignDetails}, id: campaign_id, campaignDetails:details }, {
         method: "patch",
         encType: "application/json",
         navigate: false,

@@ -47,7 +47,7 @@ export const action = async ({ request, params }) => {
       ...result,
       [pageId]: {
         ...result[pageId],
-        [blockId]: userInput,
+        [(currentBlock.title || blockId)]: userInput,
       },
     };
     await supabase

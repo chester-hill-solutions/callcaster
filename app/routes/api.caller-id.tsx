@@ -40,7 +40,6 @@ export const action: ActionFunction = async ({ request }) => {
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_KEY!,
     );
-    //const { phoneNumber, workspace_id, friendlyName }: RequestBody = Object.fromEntries(await request.formData());
     const { phoneNumber, workspace_id, friendlyName }: RequestBody =
       await request.json();
 
@@ -55,16 +54,17 @@ export const action: ActionFunction = async ({ request }) => {
     const workspaceData = data as WorkspaceData;
 
     const twilio = new Twilio.Twilio(
-      workspaceData.twilio_data.sid,
-      workspaceData.twilio_data.authToken,
+      workspaceData.key,
+      workspaceData.token,
+      {accountSid: workspaceData.twilio_data.sid}
     );
 
     const validationRequest = await twilio.validationRequests.create({
       friendlyName,
       phoneNumber,
       statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
-    });
-
+    }).catch((error) => console.log(error));
+    console.log(validationRequest)
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase

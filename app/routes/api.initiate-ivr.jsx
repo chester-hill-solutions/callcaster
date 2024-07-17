@@ -11,7 +11,7 @@ export const action = async ({ request, params }) => {
         let contact = data[i];
         console.log(contact)
         const formData = new FormData();
-        formData.append('to_number', '9058088017');
+        formData.append('to_number', contact.phone);
         formData.append('user_id', user_id.id);
         formData.append('campaign_id', campaign_id);
         formData.append('workspace_id', contact.workspace);

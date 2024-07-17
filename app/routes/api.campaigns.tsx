@@ -13,15 +13,14 @@ export const action = async ({ request }: { request: Request }) => {
   const saveAsCopy = request.method === "POST";
   const { campaignData, campaignDetails, scriptData } = data;
   try {
-      const updatedScript = await updateOrCopyScript({
+      const updatedScript = scriptData ? await updateOrCopyScript({
         supabase,
         scriptData,
         saveAsCopy,
         campaignData,
         created_by: serverSession.user.id,
         created_at: new Date()
-      })
-
+      }) : {};
     if (
       scriptData && campaignData.type === "live_call" ||
       ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type) || !campaignData.type
