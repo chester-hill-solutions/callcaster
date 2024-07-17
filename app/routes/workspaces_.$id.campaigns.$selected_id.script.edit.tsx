@@ -172,14 +172,12 @@ export default function ScriptEditor() {
         throw new Error(result.error);
       }
   
-      // Handle successful update
       setPageData(data);
       setChanged(false);
       setShowSaveModal(false);
   
     } catch (error) {
       console.error("Error saving update:", error);
-      // Handle the error (e.g., show an error message to the user)
     }
   };
   const handleReset = () => {
@@ -188,6 +186,7 @@ export default function ScriptEditor() {
   };
 
   const handlePageDataChange = (newPageData) => {
+    console.log(newPageData)
     setPageData(newPageData);
     let obj1 = initData;
     let obj2 = newPageData;

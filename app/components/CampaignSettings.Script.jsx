@@ -16,7 +16,7 @@ import { MdRemoveCircleOutline } from "react-icons/md";
 export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [] }) {
     const [script, setScript] = useState(pageData.campaignDetails?.script);
     const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script?.steps || {});
-    const firstPage = Object.values(scriptData.pages || {}).length > 0 ? Object.values(scriptData.pages)[0].id : null;
+    const firstPage = Object.values(scriptData?.pages || {}).length > 0 ? Object.values(scriptData.pages)[0].id : null;
     const [currentPage, setCurrentPage] = useState(firstPage);
     const [openBlock, setOpenBlock] = useState(null);
 
@@ -46,12 +46,12 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
             ...prevScript,
             name: newTitle
         }));
-        onPageDataChange(prevData => ({
-            ...prevData,
+        onPageDataChange(({
+            ...pageData,
             campaignDetails: {
-                ...prevData.campaignDetails,
+                ...pageData.campaignDetails,
                 script: {
-                    ...prevData.campaignDetails.script,
+                    ...pageData.campaignDetails.script,
                     name: newTitle
                 }
             }
@@ -394,8 +394,8 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             </div>
                         </>
                     )}
-                    {(scriptData.type === 'script' ?
-                        (scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
+                    {(( scriptData.type === 'script') ?
+                        (scriptData?.pages?.[currentPage]?.blocks || []).map((blockId) => (
                             <MergedQuestionBlock
                                 type={scriptData.type}
                                 key={blockId}
@@ -404,6 +404,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 removeQuestion={() => removeBlock(blockId)}
                                 moveUp={() => moveBlock(blockId, -1)}
                                 moveDown={() => moveBlock(blockId, 1)}
+                                onUpdate={(newState) => updateBlock(blockId, newState)}
                                 openQuestion={openBlock}
                                 setOpenQuestion={setOpenBlock}
                                 dispatchState={(newState) => updateBlock(blockId, newState)}

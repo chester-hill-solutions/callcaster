@@ -275,8 +275,8 @@ export default function Campaign() {
   });
 
   const handleResponse = useCallback(
-    ({ column, value }: { column: string; value: any }) => {
-      setUpdate((curr) => ({ ...curr, [column]: value }));
+    ({ blockId, value }: { blockId: string; value: string | string[]; }) => {
+      setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
     [],
   );

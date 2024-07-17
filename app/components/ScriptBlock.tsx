@@ -74,7 +74,7 @@ const QuestionBlockOption = ({
               <SelectValue placeholder="Select next step" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(pages).map(([pageId, page]) => (
+              {Object.entries(pages || {}).map(([pageId, page]) => (
                 <SelectGroup key={pageId}>
                   <SelectLabel>{page.title}</SelectLabel>
                   <SelectItem value={pageId}>Go to {page.title}</SelectItem>
@@ -134,21 +134,23 @@ const MergedQuestionBlock = ({
   }, [block]);
 
   const handleChange = (field, value) => {
-    
-    const updatedBlock = { ...localBlock, [field]: value, ...(field === 'content' && {"value": value.toLowerCase()}) };
-    console.log(localBlock, updatedBlock);
+    const updatedBlock = {
+      ...localBlock,
+      [field]: value,
+      ...(field === "content" && { value: value.toLowerCase() }),
+    };
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
 
   const handleOptionChange = (index, newOption) => {
-    const newOptions = [...localBlock.options];
+    const newOptions = [...(localBlock.options || [])];
     newOptions[index] = newOption;
     handleChange("options", newOptions);
   };
 
   const handleNextChange = (index, value) => {
-    const newOptions = localBlock.options.map((opt, i) => {
+    const newOptions = (localBlock.options || []).map((opt, i) => {
       if (i !== index) return opt;
       return { ...opt, next: value };
     });
@@ -157,19 +159,19 @@ const MergedQuestionBlock = ({
 
   const handleAddOption = () => {
     const newOptions = [
-      ...localBlock.options,
+      ...(localBlock.options || []),
       { content: "", next: "", value: type === "ivr" ? "vx-any" : "" },
     ];
     handleChange("options", newOptions);
   };
 
   const handleRemoveOption = (index) => {
-    const newOptions = localBlock.options.filter((_, i) => i !== index);
+    const newOptions = (localBlock.options || []).filter((_, i) => i !== index);
     handleChange("options", newOptions);
   };
 
   const renderContentInput = () => {
-    if (type === "script" || localBlock.type === "synthetic") {
+    if (type === "script" || localBlock?.type === "synthetic") {
       return (
         <textarea
           value={localBlock.content || localBlock.audioFile}
@@ -195,7 +197,7 @@ const MergedQuestionBlock = ({
           className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100"
         />
       );
-    } else if (localBlock.type === "recorded") {
+    } else if (localBlock?.type === "recorded") {
       return (
         <div className="flex gap-2">
           <Select
@@ -235,7 +237,7 @@ const MergedQuestionBlock = ({
             className="w-full cursor-pointer"
             onClick={() => setIsOpen(!isOpen)}
           >
-            {localBlock.title || `Block ${localBlock.id}`}
+            {localBlock?.title || `Block ${localBlock?.id}`}
           </CardTitle>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="icon" onClick={onMoveUp}>
@@ -254,12 +256,12 @@ const MergedQuestionBlock = ({
         <CardContent>
           <div className="space-y-4">
             <TextInput
-              value={localBlock.title}
+              value={localBlock?.title}
               onChange={(e) => handleChange("title", e.target.value)}
               placeholder="Block Title"
             />
             <Select
-              value={localBlock.type}
+              value={localBlock?.type}
               onValueChange={(value) => handleChange("type", value)}
             >
               <SelectTrigger className="bg-white dark:bg-transparent">
@@ -279,7 +281,7 @@ const MergedQuestionBlock = ({
             {renderContentInput()}
           </div>
           {["radio", "dropdown", "multi", "synthetic", "recorded"].includes(
-            localBlock.type,
+            localBlock?.type,
           ) && (
             <div className="mt-4">
               <div className="flex items-center justify-between">

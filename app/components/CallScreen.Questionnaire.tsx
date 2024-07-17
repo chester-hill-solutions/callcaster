@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigation } from "@remix-run/react";
 import Result from "./CallList/CallContact/Result";
 import { Button } from "./ui/button";
@@ -42,7 +42,6 @@ interface CallQuestionnaireProps {
   handleQuickSave: () => void;
   disabled: boolean;
 }
-
 const CallQuestionnaire = ({
   handleResponse,
   campaignDetails,
@@ -53,29 +52,38 @@ const CallQuestionnaire = ({
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
   const [currentPageId, setCurrentPageId] = useState(
-    Object.keys(campaignDetails.script.steps.pages)[0],
+    Object.keys(campaignDetails.script.steps.pages)[0]
   );
+  const [localUpdate, setLocalUpdate] = useState(update || {});
+
+  useEffect(() => {
+    setLocalUpdate(update || {});
+      }, [update]);
 
   const handleBlockResponse = (blockId: string, value: any) => {
     console.log(blockId, value)
+    const newUpdate = {
+      ...localUpdate,
+      [currentPageId]: {
+        ...(localUpdate[currentPageId] || {}),
+        [blockId]: value,
+      },
+    };
+    setLocalUpdate(newUpdate);
     handleResponse({ pageId: currentPageId, blockId, value });
   };
 
   const renderBlock = (blockId: string) => {
     const block = campaignDetails.script.steps.blocks[blockId];
-    console.log(block)
+    
     return (
       <Result
         disabled={disabled}
-        action={(response) => handleBlockResponse(blockId, response.value)}
+        action={(response) => handleBlockResponse(block.title, response.value)}
         questions={block}
         key={`questions-${blockId}`}
         questionId={blockId}
-        initResult={
-          update && update[currentPageId]
-            ? update[currentPageId][blockId]
-            : null
-        }
+        initResult={localUpdate[block.title] || null}
         type={block.type}
       />
     );

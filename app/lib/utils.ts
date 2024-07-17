@@ -31,7 +31,7 @@ export const isRecent = (date: string): boolean => {
 
 export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = new WeakMap()): boolean {
   function log(message: string) {
-    console.log(`[${path}] ${message}`);
+   // console.log(`[${path}] ${message}`);
   }
 
   if (obj1 === obj2) return true;

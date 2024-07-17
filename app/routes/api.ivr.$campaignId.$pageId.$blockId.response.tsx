@@ -68,8 +68,6 @@ export const action = async ({ request, params }) => {
       });
 
       nextStep = matchedOption ? matchedOption.next : null;
-      console.log("Matched Option:", matchedOption);
-      console.log("Next Step:", nextStep);
     }
 
     if (nextStep) {

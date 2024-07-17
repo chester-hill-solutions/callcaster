@@ -21,9 +21,10 @@ export const action = async ({ request }: { request: Request }) => {
         created_by: serverSession.user.id,
         created_at: new Date()
       })
+
     if (
       scriptData && campaignData.type === "live_call" ||
-      ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
+      ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type) || !campaignData.type
     ) {
       campaignDetails.script_id = updatedScript.id;
     }
@@ -32,6 +33,7 @@ export const action = async ({ request }: { request: Request }) => {
     if (
       campaignData.type === "live_call" ||
       ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
+      || !campaignData.type
     ) {
       await updateCampaignScript({
         supabase,
