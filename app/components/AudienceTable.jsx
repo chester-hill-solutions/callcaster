@@ -128,6 +128,18 @@ const AudienceTable = ({
 
   const inputRef = useRef(null);
 
+  const handleRemoveContact = async (id) => {
+    setContacts((curr) => curr.filter((contact) => contact.id !== id));
+    const formData = new FormData();
+    formData.append('contact_id', id)
+    formData.append('audience_id', audience_id);
+    submit(formData, {
+      action:'/api/contact-audience',
+      method:"DELETE",
+      navigate:false
+    })
+  }
+
   return (
     <div className="w-full">
       <div id="audience-settings" className="flex justify-between items-center">
@@ -172,6 +184,7 @@ const AudienceTable = ({
             handleInputChange,
             handleSaveContact,
             workspace_id,
+            handleRemoveContact
           }}
         />
       </div>

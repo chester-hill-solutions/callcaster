@@ -78,7 +78,7 @@ export const loader = async ({ request, params }) => {
     .single();
   const { data: campaignDetails, error: detailsError } = await supabase
     .from("live_campaign")
-    .select()
+    .select(`*, script(*)`)
     .eq("campaign_id", id)
     .single();
 
@@ -280,8 +280,8 @@ export default function Campaign() {
   });
 
   const handleResponse = useCallback(
-    ({ column, value }: { column: string; value: any }) => {
-      setUpdate((curr) => ({ ...curr, [column]: value }));
+    ({ blockId, value }: { blockId: string; value: string | string[]; }) => {
+      setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
     [],
   );

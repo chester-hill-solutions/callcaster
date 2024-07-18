@@ -40,7 +40,7 @@ export default function AudienceView() {
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {audience?.name || `Unnamed Audience ${audience_id}`}
         </h1>
-        <div>
+        <div className="flex gap-1">
           <Button
             asChild
             variant="outline"
@@ -49,6 +49,9 @@ export default function AudienceView() {
             <Link to=".." relative="path">
               Back
             </Link>
+          </Button>
+          <Button variant={'destructive'} className="font-Zilla-Slab">
+            Delete Audience
           </Button>
         </div>
       </div>

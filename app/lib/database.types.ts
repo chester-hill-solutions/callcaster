@@ -1312,32 +1312,47 @@ export type Json =
     }
   }
   
-  export type ScriptBlockBaseOption = {
-    next: number;
+  export type BlockOption = {
+    next: string;
     value?: string;
     content?: string;
   };
   
-  export type ScriptBlockRadioOption = ScriptBlockBaseOption & {
-    Icon: string;
-  };
-  
-  export type ScriptBlock = {
+  export type IVROption = {
+    value: number | "vx-any";
+    next: string;
+    content?: string;
+  }
+
+  export type Block = {
     id: string;
-    type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock";
+    type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock" | "audio";
     title: string;
     content: string;
-    options: ScriptBlockBaseOption[] | ScriptBlockRadioOption[];
-    next?: number;
+    options: BlockOption[] | IVROption[];
+  };
+
+  export type IVRBlock = Block & {
+    audioFile: string; 
+    speechType: "recorded" | "synthetic";
+    responseType: "dtmf" | "speech" | "dtmf speech" | null;
+  }
+  
+  export type Page = {
+    id: string;
+    title: string;
+    blocks: string[];
   };
   
-  export type ScriptBlocks = {
-    [key: string]: ScriptBlock;
-  };
-  
-  export type ScriptBlocksRoot = {
-    type: "static" | "dynamic";
-    blocks: ScriptBlocks;
+  export type Flow = {
+    type: "ivr" | "script";
+    pages: {
+      [key: string]: Page;
+    };
+    blocks: {
+      [key: string]: Block;
+    };
+    startPage: string; 
   };
 
 type PublicSchema = Database[Extract<keyof Database, "public">]

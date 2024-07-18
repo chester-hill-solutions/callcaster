@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from "react";
 import { useNavigation } from "@remix-run/react";
 import Result from "./CallList/CallContact/Result";
 import { Button } from "./ui/button";
@@ -6,25 +7,90 @@ import { Tables } from "~/lib/database.types";
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
 type CampaignDetails = Tables<"live_campaign">;
+
+interface Script {
+  steps: {
+    pages: {
+      [key: string]: {
+        id: string;
+        title: string;
+        blocks: string[];
+      };
+    };
+    blocks: {
+      [key: string]: {
+        id: string;
+        type: string;
+        title: string;
+        content: string;
+        options: any[];
+        audioFile: string;
+      };
+    };
+  };
+}
+
 interface CallQuestionnaireProps {
-  handleResponse: (response: { column: string; value: any }) => void;
-  campaignDetails: CampaignDetails;
+  handleResponse: (response: {
+    pageId: string;
+    blockId: string;
+    value: any;
+  }) => void;
+  campaignDetails: CampaignDetails & { script: Script };
   update: Record<string, any>;
   nextRecipient: QueueItem | null;
   handleQuickSave: () => void;
   disabled: boolean;
 }
-
 const CallQuestionnaire = ({
-  handleResponse: intentAction,
+  handleResponse,
   campaignDetails,
   update,
   nextRecipient: contact,
   handleQuickSave,
-  disabled
+  disabled,
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
+  const [currentPageId, setCurrentPageId] = useState(
+    Object.keys(campaignDetails.script.steps.pages)[0]
+  );
+  const [localUpdate, setLocalUpdate] = useState(update || {});
+
+  useEffect(() => {
+    setLocalUpdate(update || {});
+      }, [update]);
+
+  const handleBlockResponse = (blockId: string, value: any) => {
+    console.log(blockId, value)
+    const newUpdate = {
+      ...localUpdate,
+      [currentPageId]: {
+        ...(localUpdate[currentPageId] || {}),
+        [blockId]: value,
+      },
+    };
+    setLocalUpdate(newUpdate);
+    handleResponse({ pageId: currentPageId, blockId, value });
+  };
+
+  const renderBlock = (blockId: string) => {
+    const block = campaignDetails.script.steps.blocks[blockId];
+    
+    return (
+      <Result
+        disabled={disabled}
+        action={(response) => handleBlockResponse(block.title, response.value)}
+        questions={block}
+        key={`questions-${blockId}`}
+        questionId={blockId}
+        initResult={localUpdate[block.title] || null}
+        type={block.type}
+      />
+    );
+  };
+
   return (
+
     <div
       style={{
         position: "relative",
@@ -53,41 +119,56 @@ const CallQuestionnaire = ({
           Script & Questionnaire{" "}
           {contact &&
             contact.contact &&
-            `- ${contact.contact?.firstname} ${contact.contact?.surname}`}
+            ` - ${contact.contact.firstname} ${contact.contact.surname}`}
         </div>
       </div>
-      <div>
-        <div style={{ padding: "8px 16px", width: "100%" }}>
-          <div
-            style={{
-              padding: "8px 16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
+      <div className="p-4">
+        <div className="flex flex-col gap-4">
+          {campaignDetails.script.steps.pages[currentPageId].blocks.map(
+            renderBlock,
+          )}
+        </div>
+        <div className="mt-4 flex justify-between">
+          <Button
+            onClick={() => {
+              const pageIds = Object.keys(campaignDetails.script.steps.pages);
+              const currentIndex = pageIds.indexOf(currentPageId);
+              if (currentIndex > 0) {
+                setCurrentPageId(pageIds[currentIndex - 1]);
+              }
             }}
+            disabled={
+              currentPageId ===
+              Object.keys(campaignDetails.script.steps.pages)[0]
+            }
           >
-            {Object.values(campaignDetails?.questions?.blocks || {}).map(
-              (key) => (
-                <Result
-                  disabled={disabled}
-                  action={intentAction}
-                  questions={key}
-                  key={`questions-${key.id}`}
-                  questionId={key.id}
-                  initResult={update ? update[key.id] : null}
-                  type={key.type}
-                />
-              ),
-            )}
-          </div>
-          <div className="flex flex-auto justify-end p-2">
-            <Button
-              onClick={handleQuickSave}
-              disabled={navigation.state !== "idle"}
-            >
-              Save
-            </Button>
-          </div>
+            Previous Page
+          </Button>
+          <Button
+            onClick={() => {
+              const pageIds = Object.keys(campaignDetails.script.steps.pages);
+              const currentIndex = pageIds.indexOf(currentPageId);
+              if (currentIndex < pageIds.length - 1) {
+                setCurrentPageId(pageIds[currentIndex + 1]);
+              }
+            }}
+            disabled={
+              currentPageId ===
+              Object.keys(campaignDetails.script.steps.pages)[
+                Object.keys(campaignDetails.script.steps.pages).length - 1
+              ]
+            }
+          >
+            Next Page
+          </Button>
+        </div>
+        <div className="flex justify-end p-2">
+          <Button
+            onClick={handleQuickSave}
+            disabled={navigation.state !== "idle"}
+          >
+            Save
+          </Button>
         </div>
       </div>
     </div>
