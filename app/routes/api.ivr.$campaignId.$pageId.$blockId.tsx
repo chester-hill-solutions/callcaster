@@ -11,80 +11,64 @@ const getCampaignData = async (supabase, campaign_id) => {
   return campaign;
 };
 
-const handleBlock = async (
-  supabase,
-  twiml,
-  block,
-  dbCall,
-  campaignId,
-  pageId,
-  blockId,
-) => {
-  const { type, audioFile, options } = block;
-
+const handleAudio = async (supabase, twiml, block, dbCall) => {
+  const { type, audioFile } = block;
   if (type === "recorded") {
-    const { data: signedUrlData, error: signedUrlError } =
-      await supabase.storage
-        .from("workspaceAudio")
-        .createSignedUrl(`${dbCall.workspace}/${audioFile}`, 3600);
-
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from("workspaceAudio")
+      .createSignedUrl(`${dbCall.workspace}/${audioFile}`, 3600);
     if (signedUrlError) throw signedUrlError;
-
     twiml.play(signedUrlData.signedUrl);
   } else {
     twiml.say(audioFile);
   }
+};
 
+const handleOptions = (twiml, options, campaignId, pageId, blockId) => {
   if (options && options.length > 0) {
-    let gather = twiml.gather({
+    const gather = twiml.gather({
       action: `${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
       input: "dtmf speech",
       speechTimeout: "auto",
       speechModel: "phone_call",
     });
-
-   
+    // Add options handling here
   } else {
     twiml.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}`);
   }
 };
 
+const handleBlock = async (supabase, twiml, block, dbCall, campaignId, pageId, blockId) => {
+  await handleAudio(supabase, twiml, block, dbCall);
+  handleOptions(twiml, block.options, campaignId, pageId, blockId);
+};
+
 export const action = async ({ params, request }) => {
   const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY
   );
   const twiml = new Twilio.twiml.VoiceResponse();
 
   const { pageId, blockId, campaignId } = params;
-  const url = new URL(request.url);
-  const callSid = url.searchParams.get("CallSid");
+  const callSid = new URL(request.url).searchParams.get("CallSid");
 
   try {
-    const { data: call } = await supabase
-      .from("call")
-      .select("*")
-      .eq("sid", callSid)
-      .single();
-    const campaignData = await getCampaignData(supabase, campaignId);
-    const script = campaignData.ivr_campaign[0].script.steps;
-    const currentBlock = script.blocks[blockId];
+    const [call, campaignData] = await Promise.all([
+      supabase.from("call").select("*").eq("sid", callSid).single(),
+      getCampaignData(supabase, campaignId)
+    ]);
+
+    const currentBlock = campaignData.ivr_campaign[0].script.steps.blocks[blockId];
+    
     if (currentBlock) {
-      await handleBlock(
-        supabase,
-        twiml,
-        currentBlock,
-        call,
-        campaignId,
-        pageId,
-        blockId,
-      );
+      await handleBlock(supabase, twiml, currentBlock, call.data, campaignId, pageId, blockId);
     } else {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();
     }
   } catch (e) {
-    console.error(e);
+    console.error("IVR Error:", e);
     twiml.say("An error occurred. Please try again later.");
     twiml.hangup();
   }
