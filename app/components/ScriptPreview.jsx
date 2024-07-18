@@ -47,11 +47,11 @@ const Page = ({ page, data }) => (
             <ul className="flex flex-col w-full">
                 {page.blocks.length > 0 ? (
                     page.blocks.map((blockId) => (
-                        <div id={blockId}>
+                        <div id={blockId} key={blockId}>
                             <PageBlock
                                 id={blockId}
                                 key={`${page.id}-${blockId}`}
-                                block={data.campaignDetails?.script?.steps.blocks[blockId]}
+                                block={data?.campaignDetails?.script?.steps.blocks[blockId]}
                                 data={data}
                             />
                         </div>

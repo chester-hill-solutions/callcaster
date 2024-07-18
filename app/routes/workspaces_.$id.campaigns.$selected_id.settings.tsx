@@ -22,6 +22,7 @@ export const loader = async ({ request, params }) => {
     )
     .eq("id", selected_id)
     .single();
+    
   const { data: phoneNumbers, error: numbersError } =
     await getWorkspacePhoneNumbers({
       supabaseClient,

@@ -3,7 +3,7 @@ import { Button } from "./ui/button";
 import { ImportIcon, XIcon } from "lucide-react";
 import 'tailwindcss/tailwind.css';
 
-const TextInput = ({ name, value, onChange, className, label = name, placeholder }) => (
+const TextInput = ({ name, value, onChange, className, label = name, placeholder, disabled }) => (
     <div className={className}>
         <label htmlFor={name}>{label}</label>
         <input
@@ -13,6 +13,7 @@ const TextInput = ({ name, value, onChange, className, label = name, placeholder
             value={value}
             onChange={onChange}
             placeholder={placeholder}
+            disabled={disabled}
         />
     </div>
 );

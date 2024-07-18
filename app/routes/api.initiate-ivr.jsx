@@ -2,14 +2,12 @@ import { getSupabaseServerClientWithSession } from '../lib/supabase.server';
 
 export const action = async ({ request, params }) => {
     const { campaign_id, user_id } = await request.json()
-
     const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
     const { data, error } = await supabase
         .rpc('get_campaign_queue', { campaign_id_pro: campaign_id })
 
     for (let i = 0; i < data?.length; i++) {
         let contact = data[i];
-        console.log(contact)
         const formData = new FormData();
         formData.append('to_number', contact.phone);
         formData.append('user_id', user_id.id);
