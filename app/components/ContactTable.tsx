@@ -60,6 +60,9 @@ const ContactTable = ({
           <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
             Remove
           </th>
+          <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+            Edit
+          </th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-200 ">

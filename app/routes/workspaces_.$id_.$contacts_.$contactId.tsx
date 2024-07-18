@@ -25,6 +25,7 @@ import {
 } from "~/components/ui/dialog";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import ContactDetails from "~/components/ContactDetails";
+import { Session, SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, contactId: selected_id } = params;
@@ -41,14 +42,14 @@ export const loader = async ({ request, params }) => {
     .single();
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
-  const {data: contact, error: contactError} = await supabaseClient
+  const { data: contact, error: contactError } = await supabaseClient
     .from("contact")
-    .select(`*, outreach_attempt(*)`)
+    .select(`*, outreach_attempt(*, campaign(*))`)
     .eq("id", selected_id)
     .single();
 
   return json({
-    workspace:workspaceData,
+    workspace: workspaceData,
     workspace_id,
     selected_id,
     contact,
@@ -57,31 +58,23 @@ export const loader = async ({ request, params }) => {
 };
 
 export const action = async ({ request, params }) => {
-  const campaignId = params.selected_id;
-  const formData = await request.formData();
-  const mediaName = formData.get("fileName");
-  const encodedMediaName = encodeURI(mediaName);
+  const { contactId } = params;
+  const contact = await request.json();
+  delete contact.outreach_attempt;
+  const {
+    supabaseClient,
+    headers,
+    serverSession,
+  }: {
+    supabaseClient: SupabaseClient;
+    headers: Headers;
+    serverSession: Session;
+  } = await getSupabaseServerClientWithSession(request);
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-
-  const { data: campaign, error } = await supabaseClient
-    .from("message_campaign")
-    .select("id, message_media")
-    .eq("campaign_id", campaignId)
-    .single();
-  if (error) {
-    console.log("Campaign Error", error);
-    return json({ success: false, error: error }, { headers });
-  }
-  const { data: campaignUpdate, error: updateError } = await supabaseClient
-    .from("message_campaign")
-    .update({
-      message_media: campaign.message_media.filter(
-        (med) => med !== encodedMediaName,
-      ),
-    })
-    .eq("campaign_id", campaignId)
+  const { data: contactUpdate, error: updateError } = await supabaseClient
+    .from("contact")
+    .update(contact)
+    .eq("id", contactId)
     .select();
 
   if (updateError) {
@@ -92,37 +85,31 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, contact:initContact, userRole, workspace } = useLoaderData();
-    const [isChanged, setChanged] = useState(false)
-    const [contact, setContact] = useState(initContact);
+  const {
+    workspace_id,
+    selected_id,
+    contact: initContact,
+    userRole,
+    workspace,
+  } = useLoaderData();
+  const [isChanged, setChanged] = useState(false);
+  const [contact, setContact] = useState(initContact);
+  const submit = useSubmit();
 
-  /* const handleSaveUpdate = async () => {
-    try {
-      const response = await fetch("/api/scripts", {
-        method: "PATCH",
-        body: JSON.stringify({
-          con: script,
-        }),
-        headers: { "Content-Type": "application/json" },
-      });
-      const result = await response.json();
+  const handleSave = () => {
+    submit(contact, {
+      method: "PATCH",
+      encType:"application/json"
+    });
+  };
 
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      setScript(script)
-      setChanged(false);
-    } catch (error) {
-      console.error("Error saving update:", error);
-    }
-  }; */
   const handleReset = () => {
     setContact(initContact);
     setChanged(false);
   };
 
   return (
-        <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm">
+    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={true}
@@ -150,7 +137,7 @@ export default function ScriptEditor() {
           </div>
         )}
         <div className="h-full flex-grow p-4">
-            <ContactDetails contact={contact}/>
+          <ContactDetails contact={contact} setContact={setContact} onSave={handleSave} />
         </div>
       </div>
     </main>

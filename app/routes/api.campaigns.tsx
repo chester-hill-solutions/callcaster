@@ -12,6 +12,7 @@ export const action = async ({ request }: { request: Request }) => {
   const data = await request.json();
   const saveAsCopy = request.method === "POST";
   const { campaignData, campaignDetails, scriptData } = data;
+  delete campaignData?.audiences;
   try {
       const updatedScript = scriptData ? await updateOrCopyScript({
         supabase,

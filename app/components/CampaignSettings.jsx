@@ -17,6 +17,7 @@ const initialState = (data, workspace, campaign_id) => ({
   caller_id: data?.caller_id,
   voicemail_file: data?.voicemail_file,
   questions: data?.campaignDetails?.questions,
+  audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
 });
 
 const actionTypes = {
@@ -29,7 +30,8 @@ const actionTypes = {
   SET_CALL_ID: "SET_CALL_ID",
   SET_START_DATE: "SET_START_DATE",
   SET_END_DATE: "SET_END_DATE",
-  SET_VOICEMAIL: "SET_VOICEMAIL"
+  SET_VOICEMAIL: "SET_VOICEMAIL",
+  SET_AUDIENCES: "SET_AUDIENCES",
 };
 
 const reducer = (state, action) => {
@@ -54,6 +56,8 @@ const reducer = (state, action) => {
       return { ...state, group_household_queue: action.payload };
     case actionTypes.SET_CALL_ID:
       return { ...state, caller_id: action.payload };
+    case actionTypes.SET_AUDIENCES:
+      return { ...state, audiences: action.payload };
     default:
       return state;
   }
@@ -66,7 +70,7 @@ const CampaignSettings = ({
   mediaData,
   workspace,
   phoneNumbers = [],
-  campaignDetails : details
+  campaignDetails: details
 }) => {
   const navigate = useNavigate();
   const nav = useNavigation();
@@ -75,13 +79,10 @@ const CampaignSettings = ({
   const [initial, setInitial] = useState(
     initialState(data, workspace, campaign_id),
   );
-  const [campaignDetails, dispatch] = useReducer(reducer, initial);
+  const [campaignDetails, dispatch] = useReducer(reducer, initialState(data, workspace, campaign_id));
   const initSelectedAudiences = audiences.filter((audience) => {
     return data.campaign_audience?.audience_id === audience.id;
   });
-  const [selectedAudiences, setSelectedAudience] = useState([
-    ...initSelectedAudiences,
-  ]);
   const [isChanged, setChanged] = useState(false);
 
   const handleInputChange = (type, value) => {
@@ -89,72 +90,66 @@ const CampaignSettings = ({
     setChanged(!deepEqual(campaignDetails, initial));
   };
 
-  const saveCampaign = () => {
-    if (!deepEqual(campaignDetails, initial)) {
-      submit({ campaignData: {...campaignDetails}, id: campaign_id, campaignDetails:details }, {
+  const saveAudience = () => {
+    submit(
+      { campaign_id: campaign_id, updated: campaignDetails.audiences },
+      {
+        method: "put",
+        encType: "application/json",
+        navigate: false,
+        action: "/api/campaign_audience",
+      },
+    );
+  };
+
+  const handleSave = () => {
+    if (isChanged) {
+      const updates = {
+        campaignData: { ...campaignDetails },
+        id: campaign_id,
+        campaignDetails: details,
+      };
+      if (!deepEqual(campaignDetails.audiences, initial.audiences)) {
+        updates.updatedAudiences = campaignDetails.audiences;
+        saveAudience();
+      }
+
+      submit(updates, {
         method: "patch",
         encType: "application/json",
         navigate: false,
         action: "/api/campaigns",
       });
+
       setInitial(campaignDetails);
+      setChanged(false);
     }
   };
 
-  const saveAudience = () => {
-    if (!deepEqual(selectedAudiences, initSelectedAudiences)) {
-      submit(
-        { campaign_id: campaign_id, updated: selectedAudiences },
-        {
-          method: "put",
-          encType: "application/json",
-          navigate: false,
-          action: "/api/campaign_audience",
-        },
-      );
-    }
-  };
-  const handleSave = () => {
-    saveCampaign();
-    saveAudience();
-  };
   const handleAudience = ({ event, audience }) => {
-    if (event.target.checked) {
-      setSelectedAudience((curr) => [...curr, audience]);
-    } else {
-      setSelectedAudience((curr) =>
-        curr.filter((aud) => aud.id !== audience.id),
-      );
-    }
+    const updatedAudiences = event.target.checked
+      ? [...campaignDetails.audiences, { audience_id: audience.id, campaign_id: parseInt(campaign_id), created_at: audience.created_at }]
+      : campaignDetails.audiences.filter((aud) => aud.id !== audience.audience_id);
+    dispatch({ type: actionTypes.SET_AUDIENCES, payload: updatedAudiences });
   };
 
   useEffect(() => {
     setChanged(
-      !deepEqual(campaignDetails, initial) ||
-      !deepEqual(selectedAudiences, initSelectedAudiences),
+      !deepEqual(campaignDetails, initial)
     );
-  }, [campaignDetails, initSelectedAudiences, initial, selectedAudiences]);
+  }, [campaignDetails, initial]);
 
   useEffect(() => {
     const newInitialState = initialState(data, workspace, campaign_id);
     setInitial(newInitialState);
     dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
   }, [campaign_id, data, workspace]);
+
   return (
     <div
       id="campaignSettingsContainer"
       className="flex h-full flex-col gap-4 p-4"
     >
-      {/* <div className="flex justify-between">
-        <h3 className="font-Zilla-Slab text-3xl font-bold">
-          {campaignDetails.title}
-        </h3>
-        {isChanged && (
-          <Button disabled={busy} onClick={handleSave}>
-            SAVE
-          </Button>
-        )}
-      </div> */}
       <div className="flex flex-col gap-2">
         <div className="flex justify-start gap-2 flex-wrap">
           <TextInput
@@ -216,94 +211,81 @@ const CampaignSettings = ({
                 <Button asChild>
                   <NavLink to={"../../../settings/numbers"}>Get a Number</NavLink>
                 </Button>
-                </div>
-              }
-                  {(campaignDetails.type !== 'message') && <Dropdown
-                    name="voicemail"
-                    label={"Voicemail File"}
-                    value={campaignDetails.voicemail_file}
-                    onChange={(e) =>
-                      handleInputChange(
-                        actionTypes.SET_VOICEMAIL,
-                        e.currentTarget.value,
-                      )
-                    }
-                    options={mediaData.map((media) => ({
-                      value: media.name,
-                      label: media.name,
-                    }))}
-                    className={"flex flex-col"}
-                  />}
-                </div>
-                {/* <div className="flex justify-start gap-2">
-          <DateTime
-            name="start_date"
-            label={"Start Date"}
-            value={campaignDetails.start_date || new Date()}
-            onChange={(e) => handleInputChange(actionTypes.SET_START_DATE, e)}
-            className={"relative flex flex-col"}
-          />
-          <DateTime
-            name="end_date"
-            label={"End Date"}
-            value={campaignDetails.end_date || new Date()}
-            onChange={(e) => handleInputChange(actionTypes.SET_END_DATE, e)}
-            className={"relative flex flex-col"}
-          />
-        </div> */}
-                {campaignDetails.type === 'live_call' && <>
-                  <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
-                    <Toggle
-                      name={"group_household_queue"}
-                      label={"Group by household"}
-                      isChecked={campaignDetails.group_household_queue}
-                      onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
-                      rightLabel="Yes" />
-
-                    <Toggle
-                      name={"dial_type"}
-                      label={"Dial Type"}
-                      isChecked={campaignDetails.dial_type === "predictive"}
-                      onChange={(e) => handleInputChange(
-                        actionTypes.SET_DIAL_TYPE,
-                        e === true ? "predictive" : "call"
-                      )}
-                      leftLabel="Power Dialer"
-                      rightLabel="Predictive Dialer" />
-                  </div></>}
-                <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-                <span className="text-lg font-semibold">Audiences:</span>
-                {audiences.filter(Boolean).map((audience) => {
-                  return (
-                    <div key={audience.id} className="flex gap-2">
-                      <input
-                        type="checkbox"
-                        id={`${audience.id}-audience-select`}
-                        checked={selectedAudiences.find(
-                          (selected) => selected?.id === audience.id,
-                        )}
-                        onChange={(event) => handleAudience({ event, audience })}
-                      />
-                      <label htmlFor={`${audience.id}-audience-select`}>
-                        {audience.name || `Unnamed Audience ${audience.id}`}
-                      </label>
-                    </div>
-                  );
-                })}
-                <NavLink to={'../audiences/new'} relative="path">
-                  Add an audience
-                </NavLink>
-                <div className="mt-2 flex justify-end">
-                  <Button
-                    className="text-xl font-semibold uppercase disabled:bg-zinc-400"
-                    disabled={busy || !isChanged}
-                    onClick={handleSave}
-                  >
-                    Save Settings
-                  </Button>
-                </div>
               </div>
+          }
+          {(campaignDetails.type !== 'message') && <Dropdown
+            name="voicemail"
+            label={"Voicemail File"}
+            value={campaignDetails.voicemail_file}
+            onChange={(e) =>
+              handleInputChange(
+                actionTypes.SET_VOICEMAIL,
+                e.currentTarget.value,
+              )
+            }
+            options={mediaData.map((media) => ({
+              value: media.name,
+              label: media.name,
+            }))}
+            className={"flex flex-col"}
+          />}
+        </div>
+   
+        {campaignDetails.type === 'live_call' && <>
+          <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
+            <Toggle
+              name={"group_household_queue"}
+              label={"Group by household"}
+              isChecked={campaignDetails.group_household_queue}
+              onChange={(e) => handleInputChange(actionTypes.SET_GROUP_HOUSEHOLD, e)}
+              rightLabel="Yes" />
+
+            <Toggle
+              name={"dial_type"}
+              label={"Dial Type"}
+              isChecked={campaignDetails.dial_type === "predictive"}
+              onChange={(e) => handleInputChange(
+                actionTypes.SET_DIAL_TYPE,
+                e === true ? "predictive" : "call"
+              )}
+              leftLabel="Power Dialer"
+              rightLabel="Predictive Dialer" />
+          </div></>}
+        <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
+        <span className="text-lg font-semibold">Audiences:</span>
+        {audiences.filter(Boolean).map((audience) => {
+          return (
+            <div key={audience.id} className="flex gap-2">
+              <input
+                type="checkbox"
+                id={`${audience.id}-audience-select`}
+                checked={campaignDetails.audiences.find(
+                  (selected) => {
+                    return selected?.audience_id === audience.id
+                  },
+                )}
+                onChange={(event) => handleAudience({ event, audience })}
+              />
+              <label htmlFor={`${audience.id}-audience-select`}>
+                {audience.name || `Unnamed Audience ${audience.id}`}
+              </label>
+            </div>
+          );
+        })}
+        <NavLink to={'../audiences/new'} relative="path">
+          Add an audience
+        </NavLink>
+        <div className="mt-2 flex justify-end">
+          <Button
+            className="text-xl font-semibold uppercase disabled:bg-zinc-400"
+            disabled={busy || !isChanged}
+            onClick={handleSave}
+          >
+            Save Settings
+          </Button>
+        </div>
+      </div>
     </div>
-        );
+  );
 };
-        export {CampaignSettings};
+export { CampaignSettings };
