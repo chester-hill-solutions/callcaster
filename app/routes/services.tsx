@@ -56,7 +56,7 @@ export default function OtherServices() {
         />
       </ul>
       <p className="font-Zilla-Slab text-2xl font-semibold">
-        Take your campaign to the next level with Chester Hill Solutions!
+        Contact <span className="text-brand-primary font-bold">info@callcaster.ca</span> for more information 
       </p>
     </main>
   );
