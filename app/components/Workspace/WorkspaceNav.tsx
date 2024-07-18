@@ -56,6 +56,17 @@ export default function WorkspaceNav({ workspace, isInChildRoute, userRole }) {
               Audiences
             </NavLink>
           )}
+          {!userIsCaller && (
+            <NavLink
+              to={isInChildRoute ? `../scripts` : `./scripts`}
+              relative="path"
+              className={({ isActive, isPending }) =>
+                handleNavlinkStyles(isActive, isPending)
+              }
+            >
+              Scripts
+            </NavLink>
+          )}
         </div>
         <h3 className="absolute left-1/2 translate-x-[-50%] font-Tabac-Slab text-2xl">
           {workspace?.name}

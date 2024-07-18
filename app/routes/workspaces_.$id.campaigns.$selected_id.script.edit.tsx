@@ -1,154 +1,112 @@
 import { FaPlus } from "react-icons/fa";
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
+import {
+  getMedia,
+  getRecordingFileNames,
+  getSignedUrls,
+  getUserRole,
+  getWorkspaceScripts,
+  listMedia,
+} from "~/lib/database.server";
 import { MessageSettings } from "../components/MessageSettings";
-import { IVRSettings } from "~/components/IVRSettings";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 
 export const loader = async ({ request, params }) => {
-  const { id: workspace_id, selected_id, selected } = params;
+  const { id: workspace_id, selected_id } = params;
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-  function getRecordingFileNames(data) {
-    const fileNames = data.map((obj) => {
-      if (
-        obj.speechType === "recorded" &&
-        obj.say !== "Enter your question here"
-      ) {
-        return obj.say;
-      }
-    });
-    return fileNames.filter(Boolean);
-  }
-    async function getMedia(fileNames: Array<string>) {
 
-    const media = await Promise.all(
-      fileNames.map(async (mediaName) => {
-        const { data, error } = await supabaseClient.storage
-          .from("workspaceAudio")
-          .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-        if (error) throw error;
-        return { [mediaName]: data.signedUrl };
-      }),
-    );
-
-    return media;
-  }
-  async function listMedia(workspace: string) {
-    const { data, error } = await supabaseClient.storage
-      .from(`workspaceAudio`)
-      .list(workspace);
-    if (error) console.error(error);
-    return data;
-  }
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const scripts = await getWorkspaceScripts({
+    workspace: workspace_id,
+    supabase: supabaseClient,
+  });
 
-  const { data: mtmData, error: mtmError } = await supabaseClient
+  const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
-    .select(
-      `*,
-        campaign_audience(*)
-        `,
-    )
-    .eq("id", selected_id);
+    .select(`*, campaign_audience(*)`)
+    .eq("id", selected_id)
+    .single();
 
-  let data = [...mtmData];
-  if (
-    data.length > 0 &&
-    (data[0].type === "live_call" || data[0].type === null)
-  ) {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("live_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails,
-    }));
-    return json({
-      workspace_id,
-      selected_id,
-      data,
-      selected,
-      mediaNames: await listMedia(workspace_id),
-      userRole,
-    });
+  if (campaignError) {
+    console.error(campaignError);
+    throw new Response("Error fetching campaign data", { status: 500 });
   }
-  if (data.length > 0 && data[0].type === "message") {
-    let media;
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("message_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-    if (campaignDetails?.message_media?.length > 0) {
-      media = await Promise.all(
-        campaignDetails.message_media.map(async (mediaName) => {
-          const { data, error } = await supabaseClient.storage
-            .from("messageMedia")
-            .createSignedUrl(`${workspace_id}/${mediaName}`, 3600);
-          if (error) throw error;
-          return data.signedUrl;
-        }),
+
+  let campaignDetails, mediaNames;
+
+  switch (campaignData.type) {
+    case "live_call":
+    case null:
+      ({ data: campaignDetails } = await supabaseClient
+        .from("live_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      mediaNames = await listMedia(supabaseClient, workspace_id);
+      break;
+
+    case "message":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("message_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single());
+      if (campaignDetails?.message_media?.length > 0) {
+        campaignDetails.mediaLinks = await getSignedUrls(
+          supabaseClient,
+          workspace_id,
+          campaignDetails.message_media,
+        );
+      }
+      break;
+
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("ivr_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      const fileNames = getRecordingFileNames(campaignDetails.step_data);
+      campaignDetails.mediaLinks = await getMedia(
+        fileNames,
+        supabaseClient,
+        workspace_id,
       );
-    }
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails: { ...campaignDetails, mediaLinks: media },
-    }));
-    return json({
-      workspace_id,
-      selected_id,
-      selected,
-    });
+      mediaNames = await listMedia(supabaseClient, workspace_id);
+      break;
+
+    default:
+      throw new Response("Invalid campaign type", { status: 400 });
   }
-  if (
-    data.length > 0 &&
-    (data[0].type === "robocall" ||
-      data[0].type === "simple_ivr" ||
-      data[0].type === "complex_ivr")
-  ) {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("ivr_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-    const fileNames = getRecordingFileNames(campaignDetails.step_data);
-    let media = [];
-    if (fileNames.length > 0) {
-      media = await getMedia(fileNames);
-    }
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails: { ...campaignDetails, mediaLinks: media },
-    }));
-    const mediaNames = await listMedia(workspace_id);
-    return json({
-      workspace_id,
-      selected_id,
-      mediaNames,
-    });
-  } else {
-    return json({
-      workspace_id,
-      selected_id,
-      mediaNames: [],
-    });
-  }
+
+  return json({
+    workspace_id,
+    selected_id,
+    data: { ...campaignData, campaignDetails },
+    mediaNames,
+    userRole,
+    scripts,
+  });
 };
 
 export const action = async ({ request, params }) => {
@@ -159,6 +117,7 @@ export const action = async ({ request, params }) => {
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
+
   const { data: campaign, error } = await supabaseClient
     .from("message_campaign")
     .select("id, message_media")
@@ -186,117 +145,134 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, mediaNames } = useLoaderData();
-  const data = useOutletContext();
+  const { workspace_id, selected_id, mediaNames, scripts, data } =
+    useLoaderData();
+  const [initData, setInitData] = useState(data);
   const submit = useSubmit();
-  const [pageData, setPageData] = useState(data);
+  const [pageData, setPageData] = useState(initData);
   const [isChanged, setChanged] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
-  const handleSaveUpdate = () => {
-    let updateData;
-    const body = pageData[0];
-    const blocks = body.campaignDetails?.questions?.blocks;
+  const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
+    console.log(pageData)
     try {
-      let updatedBlocks = {};
-      if (blocks) {
-        updatedBlocks = Object.entries(blocks).reduce((acc, [id, value]) => {
-          const newId = value.title
-            .toLowerCase()
-            .replace(/\s+/g, "_")
-            .replace(/[\s~`!@#$%^&*(){}\[\];:"'<,.>?\/\\|_+=-]/g, "");
-
-          acc[newId] = {
-            ...value,
-            id: newId,
-          };
-          return acc;
-        }, {});
-        updateData = {
-          ...body,
-          campaignDetails: {
-            ...body.campaignDetails,
-            questions: {
-              ...body.campaignDetails.questions,
-              blocks: updatedBlocks,
-            },
-          },
-          id: selected_id,
-        };
-      } else {
-        updateData = { ...body, id: parseInt(selected_id) };
-      }
-      setPageData([updateData]);
-      submit(updateData, {
-        method: "patch",
-        encType: "application/json",
-        navigate: false,
-        action: "/api/campaigns",
+      const response = await fetch('/api/campaigns', {
+        method: !saveScriptAsCopy ? 'PATCH' : 'POST',
+        body: JSON.stringify({
+          campaignData: pageData,
+          campaignDetails: pageData.campaignDetails,
+          scriptData: pageData.campaignDetails.script,
+          saveScriptAsCopy
+        }),
+        headers: { 'Content-Type': 'application/json' },
       });
+      const result = await response.json();
+  
+      if (result.error) {
+        throw new Error(result.error);
+      }
+  
+      setPageData(data);
+      setChanged(false);
+      setShowSaveModal(false);
+  
     } catch (error) {
-      console.log(error);
+      console.error("Error saving update:", error);
     }
   };
-
   const handleReset = () => {
     setPageData(data);
     setChanged(false);
   };
 
   const handlePageDataChange = (newPageData) => {
+    console.log(newPageData)
     setPageData(newPageData);
-    setChanged(!deepEqual(newPageData, data));
+    let obj1 = initData;
+    let obj2 = newPageData;
+    delete obj1.campaignDetails?.script?.updated_at;
+    delete obj2.campaignDetails?.script?.updated_at;
+    setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
-    setChanged(!deepEqual(pageData, data));
-  }, [data, pageData]);
+    let obj1 = initData;
+    let obj2 = pageData;
+    delete obj1.campaignDetails?.script?.updated_at;
+    delete obj2.campaignDetails?.script?.updated_at;
+    setChanged(!deepEqual(obj1, obj2));
+  }, [data, initData, pageData]);
 
   return (
-    <div className="relative flex h-full flex-col">
-      {isChanged && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex items-center justify-between bg-primary px-6 py-5 text-white shadow-md">
-          <Button
-            onClick={handleReset}
-            className="rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100"
-          >
-            Reset
-          </Button>
-          <div className="text-lg font-semibold">You have unsaved changes</div>
-          <Button
-            onClick={handleSaveUpdate}
-            className="rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white "
-          >
-            Save Changes
-          </Button>
-        </div>
-      )}
-      {(pageData[0].type === "live_call" || pageData[0].type === null) && (
-        <CampaignSettingsScript
-          pageData={pageData[0]}
-          onPageDataChange={(newData) => {
-            handlePageDataChange([newData]);
-          }}
-        />
-      )}
-      {pageData.length > 0 &&
-        (pageData[0].type === "robocall" ||
-          pageData[0].type === "simple_ivr" ||
-          pageData[0].type === "complex_ivr") && (
-          <IVRSettings
-            pageData={pageData}
-            edit={true}
-            mediaNames={mediaNames}
-            onChange={(data) => setPageData([data])}
-          />
+    <>
+      <div className="relative flex h-full flex-col overflow-visible">
+        {isChanged && (
+          <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
+            <Button
+              onClick={handleReset}
+              className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
+            >
+              Reset
+            </Button>
+            <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
+              You have unsaved changes
+            </div>
+            <Button
+              onClick={() => setShowSaveModal(true)}
+              className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
+            >
+              Save Changes
+            </Button>
+          </div>
         )}
-      {pageData[0].type === "message" && (
-        <MessageSettings
-          pageData={pageData[0]}
-          onPageDataChange={(newData) => handlePageDataChange([newData])}
-          workspace_id={workspace_id}
-          selected_id={selected_id}
-        />
-      )}
-    </div>
+        <div className="flex-grow p-4 h-full">
+          {(pageData.type === "live_call" || pageData.type === null) && (
+            <CampaignSettingsScript
+              pageData={pageData}
+              onPageDataChange={(newData) => {
+                handlePageDataChange(newData);
+              }}
+              scripts={scripts}
+            />
+          )}
+          {(pageData.type === "robocall" ||
+            pageData.type === "simple_ivr" ||
+            pageData.type === "complex_ivr") && (
+            <CampaignSettingsScript
+              pageData={pageData}
+              onPageDataChange={(newData) => {
+                handlePageDataChange(newData);
+              }}
+              scripts={scripts}
+              mediaNames={mediaNames}
+            />
+          )}
+          {pageData.type === "message" && (
+            <MessageSettings
+              pageData={pageData}
+              onPageDataChange={(newData) => handlePageDataChange(newData)}
+              workspace_id={workspace_id}
+              selected_id={selected_id}
+            />
+          )}
+        </div>
+      </div>
+      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+        <DialogContent className="bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle>Save {pageData.campaignDetails?.script?.name}</DialogTitle>
+            <DialogDescription>
+              Would you like to save changes to the existing {pageData.campaignDetails.script?.name}, or save as a copy?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => handleSaveUpdate(false)} className="mr-2" variant={'outline'}>
+              Save
+            </Button>
+            <Button onClick={() => handleSaveUpdate(true)}>Save as Copy</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

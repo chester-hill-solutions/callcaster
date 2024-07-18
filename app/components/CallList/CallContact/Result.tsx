@@ -25,7 +25,7 @@ const Result = ({
   const [result, setResult] = useState<string | boolean | string[]>(
     initResult || "",
   );
-
+  
   useEffect(() => {
     setResult(initResult || (questions.type === "multi" ? [] : ""));
   }, [initResult, questions.type]);

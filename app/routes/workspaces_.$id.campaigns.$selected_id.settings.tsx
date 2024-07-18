@@ -3,7 +3,7 @@ import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
-import { getWorkspacePhoneNumbers } from "~/lib/database.server";
+import { getMedia, getRecordingFileNames, getSignedUrls, getWorkspacePhoneNumbers, listMedia } from "~/lib/database.server";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id, selected } = params;
@@ -13,42 +13,91 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-  const { data: mtmData, error: mtmError } = await supabaseClient
+  const { data: campaignData, error: mtmError } = await supabaseClient
     .from("campaign")
     .select(
       `*,
         campaign_audience(*)
         `,
     )
-    .eq("id", selected_id);
-    const { data: phoneNumbers, error: numbersError } =
-    await getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id });
+    .eq("id", selected_id)
+    .single();
+    
+  const { data: phoneNumbers, error: numbersError } =
+    await getWorkspacePhoneNumbers({
+      supabaseClient,
+      workspaceId: workspace_id,
+    });
 
-  let data = [...mtmData];
-  if (data.length > 0 && data[0].type === "live_call") {
-    const { data: campaignDetails, error: detailsError } = await supabaseClient
-      .from("live_campaign")
-      .select()
-      .eq("campaign_id", selected_id)
-      .single();
-    if (detailsError) console.error(detailsError);
-    data = data.map((item) => ({
-      ...item,
-      campaignDetails,
-    }));
+  let campaignDetails, mediaNames;
+
+  switch (campaignData.type) {
+    case "live_call":
+    case null:
+      ({ data: campaignDetails } = await supabaseClient
+        .from("live_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      mediaNames = await listMedia(supabaseClient, workspace_id);
+      break;
+
+    case "message":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("message_campaign")
+        .select()
+        .eq("campaign_id", selected_id)
+        .single());
+      if (campaignDetails?.message_media?.length > 0) {
+        campaignDetails.mediaLinks = await getSignedUrls(
+          supabaseClient,
+          workspace_id,
+          campaignDetails.message_media,
+        );
+      }
+      break;
+
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      ({ data: campaignDetails } = await supabaseClient
+        .from("ivr_campaign")
+        .select(`*, script(*)`)
+        .eq("campaign_id", selected_id)
+        .single());
+      break;
+
+    default:
+      throw new Response("Invalid campaign type", { status: 400 });
   }
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspace_id);
 
-  return json({ workspace_id, selected_id, data, selected, mediaData, phoneNumbers });
+  return json({
+    workspace_id,
+    selected_id,
+    data: campaignData,
+    selected,
+    mediaData,
+    campaignDetails,
+    phoneNumbers,
+  });
 };
 
 export default function Audience() {
   const { audiences } = useOutletContext();
-  const { workspace_id, selected_id, data = [], mediaData, phoneNumbers } = useLoaderData();
+  const {
+    workspace_id,
+    selected_id,
+    data,
+    mediaData,
+    phoneNumbers,
+    campaignDetails
+  } = useLoaderData();
   const pageData = useMemo(() => data, [data]);
   return (
+    <>
       <CampaignSettings
         workspace={workspace_id}
         data={pageData}
@@ -56,7 +105,8 @@ export default function Audience() {
         mediaData={mediaData}
         campaign_id={selected_id}
         phoneNumbers={phoneNumbers}
-
+        campaignDetails={campaignDetails}
       />
+    </>
   );
 }
