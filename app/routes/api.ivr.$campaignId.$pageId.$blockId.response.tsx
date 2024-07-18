@@ -94,6 +94,7 @@ export const action = async ({ request, params }) => {
       const nextBlockId = currentPage.blocks[currentBlockIndex + 1];
 
       if (nextBlockId) {
+        twiml.say("Sorry, I didn't understand that. Please try again.");
         twiml.redirect(
           `${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}/${nextBlockId}/`,
         );

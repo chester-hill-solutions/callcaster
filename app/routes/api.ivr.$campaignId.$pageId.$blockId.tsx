@@ -43,13 +43,7 @@ const handleBlock = async (
       speechModel: "phone_call",
     });
 
-    const hints = options
-      .map((opt) => opt.content)
-      .filter(Boolean)
-      .join(" ");
-    if (hints) {
-      gather.say(`You can say ${hints}, or press the corresponding number.`);
-    }
+   
   } else {
     twiml.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}`);
   }

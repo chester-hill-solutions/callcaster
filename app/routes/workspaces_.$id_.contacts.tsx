@@ -14,7 +14,6 @@ import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { formatDateToLocale } from "~/lib/utils";
-import { useEffect } from "react";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =

@@ -27,9 +27,9 @@ export const AudienceContactRow = ({ contact, otherDataHeaders, handleRemoveCont
           })}
         </>
       ) : ''}</td>
-      {otherDataHeaders.map((header) => (
+      {otherDataHeaders?.map((header) => (
         <td key={header} className="whitespace-nowrap px-2 py-1 text-sm">
-          {contact.other_data.find((data) => data[header] !== undefined)?.[header] || ""}
+          {contact.other_data?.find((data) => data[header] !== undefined)?.[header] || ""}
         </td>
       ))}
       <td className="whitespace-nowrap px-2 py-1 ">

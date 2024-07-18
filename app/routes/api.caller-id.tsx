@@ -64,7 +64,6 @@ export const action: ActionFunction = async ({ request }) => {
       phoneNumber,
       statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
     }).catch((error) => console.log(error));
-    console.log(validationRequest)
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase

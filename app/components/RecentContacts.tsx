@@ -10,7 +10,7 @@ const ResultItem = ({ label, value }) => (
   </li>
 );
 
-const AttemptCard = ({ attempt, isOpen, toggleOpen, index, campaign }) => {
+const AttemptCard = ({ attempt, isOpen, toggleOpen, index }) => {
   const contentRef = React.useRef(null);
   return (
     <Card className="mb-4 overflow-hidden bg-white shadow-md transition-shadow duration-300 hover:shadow-lg dark:bg-gray-800">
