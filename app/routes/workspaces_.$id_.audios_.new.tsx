@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Toaster, toast } from "sonner";
+import { Card, CardActions, CardContent, CardTitle } from "~/components/CustomCard";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
@@ -48,14 +49,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       { headers },
     );
   }
-
-  console.log("XXXXXXXXXXXXXXXXXXXX");
-  console.log("HERE");
-  // const formData = await unstable_parseMultipartFormData(
-  //   request,
-  //   uploadHandler,
-  // );
-
   const formData = await request.formData();
   const mediaName = formData.get("media-name") as string;
   const mediaToUpload = formData.get("media");
@@ -100,76 +93,80 @@ export default function Media() {
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col items-center gap-4 rounded-sm text-black dark:text-white">
       <section
         id="form"
-        className="flex w-fit flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-16 pb-10 pt-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        className="flex w-fit flex-col items-center justify-center"
       >
-        <h1 className="flex items-center gap-2 text-center font-Zilla-Slab text-4xl font-bold">
-          Add Audio to{" "}
-          <span className="rounded-md bg-gray-400 bg-opacity-30 px-4 py-2 font-Zilla-Slab text-xl">
-            {workspace.name}
-          </span>
-        </h1>
-        {actionData?.error != null && (
-          <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-            Error: {actionData.error.message}
-          </p>
-        )}
-        <Form
-          method="POST"
-          className="flex flex-col gap-8"
-          encType="multipart/form-data"
-        >
-          <label
-            htmlFor="media-name"
-            className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
-          >
-            Audio Name
-            <input
-              type="text"
-              name="media-name"
-              id="media-name"
-              className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
-            />
-          </label>
-          <label
-            htmlFor="media"
-            className="flex w-full cursor-pointer flex-col gap-2 font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
-          >
-            Upload:
-            <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
-              {pendingFileName === "" ? (
-                <FaPlus size={"64px"} />
-              ) : (
-                <p>{pendingFileName}</p>
-              )}
-              <input
-                type="file"
-                name="media"
-                id="media"
-                className="hidden"
-                onChange={displayFileToUpload}
-              />
-            </div>
-          </label>
+        <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
+          <CardTitle>
+            Add Audio to{" "}
+            <span className="rounded-md bg-gray-400 bg-opacity-30 px-4 py-2 font-Zilla-Slab text-xl">
+              {workspace.name}
+            </span>
+          </CardTitle>
+          {actionData?.error != null && (
+            <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+              Error: {actionData.error.message}
+            </p>
+          )}
+          <CardContent>
+            <Form
+              method="POST"
+              className="flex flex-col gap-8"
+              encType="multipart/form-data"
+            >
+              <label
+                htmlFor="media-name"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                Audio Name
+                <input
+                  type="text"
+                  name="media-name"
+                  id="media-name"
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
+                />
+              </label>
+              <label
+                htmlFor="media"
+                className="flex w-full cursor-pointer flex-col gap-2 font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
+              >
+                Upload:
+                <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
+                  {pendingFileName === "" ? (
+                    <FaPlus size={"64px"} />
+                  ) : (
+                    <p>{pendingFileName}</p>
+                  )}
+                  <input
+                    type="file"
+                    name="media"
+                    id="media"
+                    className="hidden"
+                    onChange={displayFileToUpload}
+                  />
+                </div>
+              </label>
 
-          <div className="flex items-center gap-4">
-            <Button
-              className="h-fit min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-            transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
-              type="submit"
-            >
-              Upload Audio
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="h-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-3xl font-semibold text-white dark:border-white"
-            >
-              <Link to=".." relative="path">
-                Back
-              </Link>
-            </Button>
-          </div>
-        </Form>
+              <CardActions>
+                <Button
+                  className="h-fit min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
+            transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black w-full"
+                  type="submit"
+                >
+                  Upload Audio
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
+                >
+                  <Link to=".." relative="path">
+                    Back
+                  </Link>
+                </Button>
+                </CardActions>
+            </Form>
+          </CardContent>
+        </Card>
       </section>
 
       <Toaster richColors />

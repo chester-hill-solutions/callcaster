@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
@@ -8,8 +9,7 @@ import {
   Outlet,
   NavLink,
 } from "@remix-run/react";
-import { FaPlus } from "react-icons/fa6";
-import { PlusIcon } from "~/components/Icons";
+import { FaPlus, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
@@ -43,7 +43,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
   const userRole = getUserRole({ serverSession, workspaceId });
   if (userRole == null) {
-    console.log("~~~~~~~~~~Refreshing JWT~~~~~~~~~~~");
     const { data: refreshData, error: refreshError } = await forceTokenRefresh({
       serverSession,
       supabaseClient,
@@ -71,16 +70,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function Workspace() {
   const { workspace, audiences, campaigns, userRole } = useLoaderData();
-
-  // campaigns.sort((campaign1, campaign2) => {
-  //   if (campaign1.created_at < campaign2.created_at) {
-  //     return 1;
-  //   } else if (campaign1.created_at > campaign2.created_at) {
-  //     return -1;
-  //   }
-
-  //   return 0;
-  // });
+  const [campaignsListOpen, setCampaignsListOpen] = useState(false);
 
   function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
     if (isActive) {
@@ -94,40 +84,56 @@ export default function Workspace() {
     return "border-b-2 border-solid border-zinc-600 p-2 text-xl font-semibold text-brand-primary hover:bg-slate-300 hover:text-slate-800 dark:text-white";
   }
 
+  const CampaignsList = () => (
+    <div
+      className={`bg-brand-secondary transition-all duration-300 ease-in-out dark:bg-zinc-800 sm:max-h-full sm:bg-secondary md:h-auto md:overflow-visible flex flex-col ${
+        campaignsListOpen
+          ? "h-[600px] overflow-y-auto"
+          : "max-h-0 overflow-hidden"
+      }`}
+      style={{ height: "100%" }}
+    >
+      <Link
+        to={`campaigns/new`}
+        className="flex items-center justify-center gap-2 border-b-2 border-zinc-600 px-2 py-1 font-Zilla-Slab text-xl font-bold dark:bg-brand-primary dark:text-white"
+      >
+        <span>Add Campaign</span>
+        <FaPlus size="20px" />
+      </Link>
+      {campaigns?.map((row, i) => (
+        <NavLink
+          to={`campaigns/${row.id}`}
+          key={row.id}
+          className={({ isActive, isPending }) =>
+            handleNavlinkStyles(isActive, isPending)
+          }
+          onClick={() => setCampaignsListOpen(false)}
+        >
+          {row.title || `Unnamed campaign ${i + 1}`}
+        </NavLink>
+      ))}
+    </div>
+  );
+
   return (
-    <main className="mx-auto h-full w-[80%] items-center py-8">
+    <main className="mx-auto h-full w-full max-w-7xl px-4 py-8 md:w-[80%]">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={false}
         userRole={userRole}
       />
-      <div id="campaigns-container" className="flex border-2 border-zinc-600">
-        <div
-          className="flex min-h-[600px] w-60 min-w-60 flex-col overflow-scroll border-r-2 border-zinc-400 bg-brand-secondary  dark:bg-transparent"
-          style={{ scrollbarWidth: "none" }}
-        >
-          <Link
-            to={`campaigns/new`}
-            className="flex items-center justify-center gap-2 border-b-2 border-zinc-600 px-2 py-1 font-Zilla-Slab text-xl font-bold dark:bg-brand-primary dark:text-white"
+      <div id="campaigns-container" className="flex flex-col md:flex-row">
+        <div className="w-full md:w-60 md:min-w-60">
+          <Button
+            className="flex w-full items-center justify-between md:hidden"
+            onClick={() => setCampaignsListOpen(!campaignsListOpen)}
           >
-            <span>Add Campaign</span>
-            <FaPlus size="20px" />
-          </Link>
-          {campaigns?.map((row, i) => (
-            <NavLink
-              to={`campaigns/${row.id}`}
-              key={row.id}
-              className={({ isActive, isPending }) =>
-                handleNavlinkStyles(isActive, isPending)
-              }
-            >
-              <h3 className="capitalize">
-                {row.title || `Unnamed campaign ${i + 1}`}
-              </h3>
-            </NavLink>
-          ))}
+            <span>Campaigns</span>
+            {campaignsListOpen ? <FaChevronUp /> : <FaChevronDown />}
+          </Button>
+          <CampaignsList />
         </div>
-        <div className="min-h-3/4 flex w-full flex-auto  dark:bg-zinc-700">
+        <div className="min-h-[600px] w-full flex-auto overflow-hidden dark:bg-zinc-700">
           <Outlet
             context={{
               audiences,

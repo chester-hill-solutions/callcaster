@@ -89,8 +89,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
     <div
       style={{
         border: "3px solid #BCEBFF",
+        flex: "1 1 20%",
         borderRadius: "20px",
-        marginBottom: "2rem",
         backgroundColor: "hsl(var(--card))",
         minHeight: "300px",
         alignItems: "stretch",

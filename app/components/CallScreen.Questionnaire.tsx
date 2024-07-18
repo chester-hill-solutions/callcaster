@@ -90,10 +90,33 @@ const CallQuestionnaire = ({
   };
 
   return (
-    <div className="border-3 mb-8 flex min-w-[40%] flex-1 flex-col rounded-[20px] border-[#BCEBFF] bg-card shadow-[3px_5px_0_rgba(50,50,50,.6)]">
-      <div className="mb-2.5 flex items-center justify-between rounded-t-[18px] bg-brand-primary p-4 font-Tabac-Slab text-xl text-white">
-        <div className="flex-1 text-center">
-          Script & Questionnaire
+
+    <div
+      style={{
+        position: "relative",
+        minWidth: "30%",
+        flex: "1 1 auto",
+        border: "3px solid #BCEBFF",
+        borderRadius: "20px",
+        backgroundColor: "hsl(var(--card))",
+        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+      }}
+      className="flex flex-col"
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTopLeftRadius: "18px",
+          borderTopRightRadius: "18px",
+          padding: "16px",
+          marginBottom: "10px",
+        }}
+        className="bg-brand-primary font-Tabac-Slab text-xl text-white "
+      >
+        <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
+          Script & Questionnaire{" "}
           {contact &&
             contact.contact &&
             ` - ${contact.contact.firstname} ${contact.contact.surname}`}

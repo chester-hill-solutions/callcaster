@@ -1,11 +1,16 @@
+import { useEffect, useState } from "react";
 import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink, Params } from "@remix-run/react";
-import { AuthError, User } from "@supabase/supabase-js";
+import {
+  Link,
+  NavLink,
+  Params,
+  useLocation,
+  useNavigation,
+} from "@remix-run/react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
 import { WorkspaceData } from "~/lib/types";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +19,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-
-import { FaUserAlt } from "react-icons/fa";
+import { FaBars, FaUserAlt } from "react-icons/fa";
 import { MdOutlineLogout } from "react-icons/md";
 import { capitalize } from "~/lib/utils";
+import { MobileMenu } from "./Navbar.MobileMenu";
 
 type NavbarProps = {
   className?: string;
@@ -38,6 +43,65 @@ type NavbarProps = {
   params: Params<string>;
 };
 
+export const NavButton = ({ to, children, className = "" }) => (
+  <NavLink
+    to={to}
+    className={({ isActive }) =>
+      `rounded-md px-3 py-2 font-Zilla-Slab text-lg font-bold transition-colors duration-150 ease-in-out ${
+        isActive
+          ? "bg-brand-primary text-white"
+          : "bg-secondary text-brand-primary hover:bg-white"
+      } ${className}`
+    }
+  >
+    {children}
+  </NavLink>
+);
+
+const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button
+        variant="outline"
+        className="border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:text-black"
+      >
+        <FaUserAlt size="20px" />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent className="w-56">
+      <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel className="font-normal">
+        {capitalize(user.first_name)}
+      </DropdownMenuLabel>
+      <DropdownMenuLabel className="font-normal">
+        {user.username}
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <Button
+          id="logoutButton"
+          variant="ghost"
+          className="w-full justify-start font-Zilla-Slab"
+          onClick={handleSignOut}
+        >
+          <MdOutlineLogout className="mr-2 h-4 w-4" />
+          <span>Log Out</span>
+        </Button>
+      </DropdownMenuItem>
+      {workspaceId && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
+          <DropdownMenuItem asChild>
+            <Link to={`/workspaces/${workspaceId}/settings`}>Users</Link>
+          </DropdownMenuItem>
+        </>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
 export default function Navbar({
   className,
   handleSignOut,
@@ -46,21 +110,21 @@ export default function Navbar({
   user,
   params,
 }: NavbarProps) {
-  const navLinkStyles =
-    "rounded-sm border-2 border-zinc-700/30 bg-secondary px-2 py-[6px] font-bold text-brand-primary transition-colors duration-150 ease-in-out hover:bg-white sm:px-4";
-
-  const activeNavLinkStyles =
-    "rounded-sm bg-brand-primary px-2 py-[6px] font-bold text-white transition-colors duration-150 ease-in-out sm:px-4";
-
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const workspaceId = params.id;
-  const userInWorkspace = workspaceId != null;
+  const location = useLocation();
+  const [loc, setLoc] = useState(location);
+
+  useEffect(() => {
+    if (location.pathname !== loc.pathname) {
+      setMobileMenuOpen(false);
+      setLoc(location);
+    }
+  }, [loc, location]);
 
   return (
     <header className={`w-full ${className}`}>
-      <nav
-        className="relative flex w-full items-center gap-1 px-4 py-4 sm:h-[80px] sm:justify-between sm:gap-0 sm:px-8"
-        id="global-nav"
-      >
+      <nav className="relative flex w-full items-center justify-between px-4 py-4 sm:h-[80px] sm:px-8">
         <Link
           to="/"
           className="hidden font-Tabac-Slab text-4xl font-black text-brand-primary sm:block"
@@ -69,109 +133,49 @@ export default function Navbar({
         </Link>
         <Link
           to="/"
-          className="block font-Tabac-Slab text-4xl font-black text-brand-primary sm:hidden"
+          className="font-Tabac-Slab text-4xl font-black text-brand-primary sm:hidden"
         >
           CC
         </Link>
-        {workspaces != null && (
-          <div className="absolute left-1/2 translate-x-[-50%]">
+        {workspaces && (
+          <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
             <WorkspaceSelectorCombobox workspaces={workspaces} />
           </div>
         )}
-        <div className="flex h-full items-center sm:gap-4">
-          <NavLink
-            to="/"
-            className={({ isActive }) =>
-              isActive ? activeNavLinkStyles : navLinkStyles
-            }
-          >
-            Home
-          </NavLink>
-          <NavLink
-            to="/services"
-            className={({ isActive }) =>
-              isActive ? activeNavLinkStyles : navLinkStyles
-            }
-          >
-            Services
-          </NavLink>
-          {isSignedIn === false && (
+        <div className="hidden items-center space-x-4 sm:flex">
+          <NavButton to="/">Home</NavButton>
+          <NavButton to="/services">Services</NavButton>
+          {!isSignedIn && (
             <>
-              <NavLink
-                to="/signin"
-                className={({ isActive }) =>
-                  isActive
-                    ? "rounded-md bg-brand-primary px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-white shadow-md transition-colors ease-in-out sm:px-4 sm:text-2xl"
-                    : "rounded-md bg-white px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-brand-primary shadow-md transition-colors ease-in-out hover:bg-white hover:text-brand-primary sm:px-4 sm:text-2xl"
-                }
-              >
-                <p className="block sm:hidden">Login</p>
-                <p className="hidden sm:block">Sign In</p>
-              </NavLink>
-              <NavLink
-                to="/signup"
-                className={({ isActive }) =>
-                  isActive
-                    ? "rounded-md border-2 border-zinc-600 bg-white px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-zinc-600 shadow-md transition-colors ease-in-out sm:px-4 sm:text-2xl"
-                    : "rounded-md bg-zinc-400 px-2 py-1 text-center font-Zilla-Slab text-xl font-bold text-white shadow-md transition-colors ease-in-out hover:bg-zinc-600 sm:px-4 sm:text-2xl"
-                }
-              >
-                <p className="">Sign Up</p>
-              </NavLink>
+              <NavButton to="/signin">Sign In</NavButton>
+              <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
-          {user != null && (
-            <DropdownMenu>
-              <DropdownMenuTrigger>
-                <Button
-                  variant="outline"
-                  className="border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:[color:black]"
-                >
-                  <FaUserAlt size="20px" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="font-normal">
-                  {capitalize(user.first_name)}
-                </DropdownMenuLabel>
-                <DropdownMenuLabel className="font-normal">
-                  {user.username}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <Button
-                  id="logoutButton"
-                  variant="ghost"
-                  className="flex w-full gap-2 rounded-md px-2 font-Zilla-Slab text-xl font-bold text-black transition-colors ease-in-out hover:bg-zinc-300 dark:text-white dark:hover:bg-zinc-600"
-                  type="button"
-                  onClick={() => {
-                    handleSignOut();
-                  }}
-                >
-                  <MdOutlineLogout />
-                  <span>Log Out</span>
-                </Button>
-                {/* RENDER IF USER IN WORKSPACE */}
-
-                {false && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                      <Link to={`/workspaces/${workspaceId}/settings`}>
-                        Users
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+          {user && (
+            <UserDropdownMenu
+              user={user}
+              handleSignOut={handleSignOut}
+              workspaceId={workspaceId}
+            />
           )}
           <ModeToggle />
         </div>
+        <button
+          className="text-2xl sm:hidden"
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          <FaBars />
+        </button>
       </nav>
+      {mobileMenuOpen && (
+        <MobileMenu
+          isSignedIn={isSignedIn}
+          user={user}
+          handleSignOut={handleSignOut}
+          workspaceId={workspaceId}
+          onClose={() => setMobileMenuOpen(false)}
+        />
+      )}
     </header>
   );
 }
