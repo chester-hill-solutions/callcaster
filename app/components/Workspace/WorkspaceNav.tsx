@@ -49,8 +49,6 @@ export default function WorkspaceNav({ workspace, isInChildRoute, userRole }) {
             >
               Campaigns
             </NavLink>
-
-          )}
           {!userIsCaller && (
             <NavLink
               to={isInChildRoute ? `../scripts` : `./scripts`}
