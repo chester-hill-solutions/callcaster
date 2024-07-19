@@ -128,13 +128,13 @@ export default function ScriptPage() {
   }, [selectedImage]);
   return (
     <div className="relative flex h-full flex-col">
-      <div className="my-1 flex flex-col gap-2 px-2 relative">
+      <div className="my-1 flex flex-col gap-2 relative items-end ">
         {!outlet && userRole !== MemberRole.Caller && (
-          <div className="m-4 absolute" style={{top:'-78px', right: 0}}>
+          <div>
             <Button asChild>
               <NavLink to={"edit"}>Edit </NavLink>
             </Button>
-          </div>
+            </div>
         )}
         {(data.type !== "message" || !data.type) && !outlet ? (
           <ScriptPreview pageData={data}/>

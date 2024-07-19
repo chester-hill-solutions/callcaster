@@ -107,14 +107,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     },
   );
 }
-export default function WorkspaceAudio() {
+export default function WorkspaceScripts() {
   const { scripts, error, userRole, workspace } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   useEffect(() => {
     if (actionData) {
-        console.log(actionData)
       const blob = new Blob([actionData.fileContent], { type: actionData.contentType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -125,22 +124,23 @@ export default function WorkspaceAudio() {
       link.parentNode.removeChild(link);
     }
   }, [actionData]);
-
-  const isWorkspaceAudioEmpty = !scripts?.length > 0;
+  
+  const isWorkspaceAudioEmpty = !scripts?.length;
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
       <WorkspaceNav
         workspace={workspace}
-        isInChildRoute={true}
         userRole={userRole}
       />
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="min-w-[300px]">
+        <h1 className="font-Zilla-Slab text-xl font-bold text-brand-primary dark:text-white">
           {workspace != null
-            ? `${workspace?.name} Audio Library`
+            ? `${workspace?.name} Scripts`
             : "No Workspace"}
         </h1>
-        <div className="flex items-center gap-4">
+        </div>
+        <div className="flex items-center gap-4 justify-center sm:justify-end flex-1">
           <Button asChild className="font-Zilla-Slab text-xl font-semibold">
             <Link to={`./new`}>Add a Script</Link>
           </Button>
@@ -162,7 +162,7 @@ export default function WorkspaceAudio() {
       )}
       {isWorkspaceAudioEmpty && (
         <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
+          Add Your Own Script to this Workspace!
         </h4>
       )}
 

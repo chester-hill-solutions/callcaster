@@ -6,11 +6,16 @@ import {
   json,
   useActionData,
   useLoaderData,
+  useNavigate,
+  useSearchParams,
 } from "@remix-run/react";
 import { MdDownload, MdEdit } from "react-icons/md";
+import { paginatedContactColumns } from "~/components/Contacts/columns";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
+import { contactColumns } from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
+import { PaginatedDataTable } from "~/components/ui/paginatedtable";
 import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { formatDateToLocale } from "~/lib/utils";
@@ -18,12 +23,15 @@ import { formatDateToLocale } from "~/lib/utils";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
+  const { id: workspaceId } = params;
+  const url = new URL(request.url);
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const perPage = parseInt(url.searchParams.get("perPage") || "30", 10);
 
-  const workspaceId = params.id;
   if (workspaceId == null) {
     return json(
       {
-        audioMedia: null,
+        contacts: null,
         workspace: null,
         error: "Workspace does not exist",
         userRole: null,
@@ -39,15 +47,22 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", workspaceId)
     .single();
 
-  const { data: contacts, error: contactError } = await supabaseClient
-    .from("contact")
-    .select()
-    .eq("workspace", workspaceId);
+  const from = (page - 1) * perPage;
+  const to = from + perPage - 1;
 
+  const {
+    data: contacts,
+    error: contactError,
+    count,
+  } = await supabaseClient
+    .from("contact")
+    .select("*", { count: "exact" })
+    .eq("workspace", workspaceId)
+    .range(from, to);
   if ([contactError, workspaceError].filter(Boolean).length) {
     return json(
       {
-        scripts: null,
+        contacts: null,
         error: [contactError, workspaceError]
           .filter(Boolean)
           .map((error) => error.message)
@@ -57,8 +72,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-
-  return json({ contacts, workspace, error: null, userRole }, { headers });
+  return json(
+    {
+      contacts,
+      workspace,
+      error: null,
+      userRole,
+      pagination: {
+        page,
+        perPage,
+        total: count,
+      },
+    },
+    { headers },
+  );
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -110,8 +137,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function WorkspaceContacts() {
-  const { contacts, error, userRole, workspace } =
+  const { contacts, error, userRole, workspace, pagination } =
     useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  const handlePageChange = (newPage: number, newPerPage: number) => {
+    searchParams.set("page", newPage.toString());
+    searchParams.set("perPage", newPerPage.toString());
+    navigate(`?${searchParams.toString()}`);
+  };
+
   /*     const actionData = useActionData<typeof action>();
   
     useEffect(() => {
@@ -131,20 +167,16 @@ export default function WorkspaceContacts() {
   const isWorkspaceAudioEmpty = !contacts?.length > 0;
   return (
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
-      <WorkspaceNav
-        workspace={workspace}
-        isInChildRoute={true}
-        userRole={userRole}
-      />
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null
-            ? `${workspace?.name} Audio Library`
-            : "No Workspace"}
-        </h1>
-        <div className="flex items-center gap-4">
+      <WorkspaceNav workspace={workspace} userRole={userRole} />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="min-w-[300px]">
+          <h1 className="font-Zilla-Slab text-xl font-bold text-brand-primary dark:text-white">
+            {workspace != null ? `${workspace?.name} Contacts` : "No Workspace"}
+          </h1>
+        </div>
+        <div className="flex flex-1 items-center justify-center gap-4 sm:justify-end">
           <Button asChild className="font-Zilla-Slab text-xl font-semibold">
-            <Link to={`./new`}>Add a Script</Link>
+            <Link to={`./new`}>New Contact</Link>
           </Button>
           <Button
             asChild
@@ -164,80 +196,20 @@ export default function WorkspaceContacts() {
       )}
       {isWorkspaceAudioEmpty && (
         <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
+          Add Your Contacts to this Workspace!
         </h4>
       )}
 
       {contacts != null && (
-        <DataTable
-          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
-          data={contacts}
-          columns={[
-            {
-              accessorKey: "firstname",
-              header: "First",
-            },
-            {
-              accessorKey: "surname",
-              header: "Last",
-            },
-            {
-              accessorKey: "phone",
-              header: "Phone Number",
-            },
-            {
-              accessorKey: "email",
-              header: "Email Address",
-            },
-            {
-              accessorKey: "address",
-              header: "Street Address",
-            },
-            {
-              accessorKey: "city",
-              header: "City",
-            },
-            {
-              header: "Other Data",
-              cell: ({ row }) => {
-                return (
-                  <div>
-                    {row.original.other_data?.map((item, i) => {
-                      return (
-                        <div key={`${row.id}-other-data-${i}`}>
-                          {Object.keys(item)}: {Object.values(item)}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              },
-            },
-            {
-              accessorKey: "created_at",
-              header: "Created",
-              cell: ({ row }) => {
-                const formatted = formatDateToLocale(
-                  row.getValue("created_at"),
-                );
-                return <div className="">{formatted.split(",")[0]}</div>;
-              },
-            },
-            {
-              header: "Edit",
-              cell: ({ row }) => {
-                const id = row.original.id;
-                return (
-                  <Button variant="ghost" asChild>
-                    <NavLink to={`./${id}`} relative="path">
-                      <MdEdit />
-                    </NavLink>
-                  </Button>
-                );
-              },
-            },
-          ]}
-        />
+        <div className="py-2 mb-8">
+          <PaginatedDataTable
+            className="rounded-md text-sm border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
+            data={contacts}
+            columns={paginatedContactColumns}
+            pagination={pagination}
+            onPageChange={handlePageChange}
+          />
+        </div>
       )}
     </main>
   );

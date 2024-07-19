@@ -26,6 +26,7 @@ import {
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 
 export const loader = async ({ request, params }) => {
+  console.log("Hi");
   const { id: workspace_id, scriptId: selected_id } = params;
 
   const { supabaseClient, headers, serverSession } =
@@ -33,22 +34,25 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
+
+  const { data: workspace, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()
     .eq("id", workspace_id)
     .single();
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
-  const {data: script} = await supabaseClient
+
+  const { data: script } = await supabaseClient
     .from("script")
     .select()
     .eq("id", selected_id)
     .single();
+
   const mediaNames = await listMedia(supabaseClient, workspace_id);
 
   return json({
-    workspace:workspaceData,
+    workspace,
     workspace_id,
     selected_id,
     script,
@@ -93,9 +97,16 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, script:initScript, mediaNames, userRole, workspace } = useLoaderData();
-    const [isChanged, setChanged] = useState(false)
-    const [script, setScript] = useState(initScript);
+  const {
+    workspace_id,
+    selected_id,
+    script: initScript,
+    mediaNames,
+    userRole,
+    workspace,
+  } = useLoaderData();
+  const [isChanged, setChanged] = useState(false);
+  const [script, setScript] = useState(initScript);
 
   const handleSaveUpdate = async () => {
     try {
@@ -111,7 +122,7 @@ export default function ScriptEditor() {
       if (result.error) {
         throw new Error(result.error);
       }
-      setScript(script)
+      setScript(script);
       setChanged(false);
     } catch (error) {
       console.error("Error saving update:", error);
@@ -126,26 +137,22 @@ export default function ScriptEditor() {
     setScript(newPageData.campaignDetails.script);
     let obj1 = script;
     let obj2 = newPageData;
-    delete obj1.campaignDetails?.script?.updated_at;
-    delete obj2.campaignDetails?.script?.updated_at;
+    delete obj1?.campaignDetails?.script?.updated_at;
+    delete obj2?.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
     let obj1 = script;
     let obj2 = initScript;
-    delete obj1.updated_at;
-    delete obj2.updated_at;
+    delete obj1?.updated_at;
+    delete obj2?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [initScript, script]);
-
+  console.log(script);
   return (
-        <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm">
-      <WorkspaceNav
-        workspace={workspace}
-        isInChildRoute={true}
-        userRole={userRole}
-      />
+    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm">
+      <WorkspaceNav workspace={workspace} userRole={userRole} />
 
       <div className="relative flex h-full flex-col overflow-visible">
         {isChanged && (
@@ -168,15 +175,13 @@ export default function ScriptEditor() {
           </div>
         )}
         <div className="h-full flex-grow p-4">
-            <CampaignSettingsScript
-              pageData={{campaignDetails:
-                {script}
-              }}
-              onPageDataChange={(newData) => {
-                handlePageDataChange(newData);
-              }}
-              scripts={[]}
-            />
+          <CampaignSettingsScript
+            pageData={{ campaignDetails: { script } }}
+            onPageDataChange={(newData) => {
+              handlePageDataChange(newData);
+            }}
+            scripts={[]}
+          />
         </div>
       </div>
     </main>

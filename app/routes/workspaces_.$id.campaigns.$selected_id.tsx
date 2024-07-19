@@ -288,7 +288,7 @@ export default function CampaignScreen() {
           </h3>
         </NavLink>
       </div>
-      <div className="flex items-center sm:justify-between justify-center border-b-2 border-zinc-300 p-4">
+      <div className="flex items-center h-[84px] sm:justify-between justify-center border-b-2 border-zinc-300 p-4 ">
       <div className="mt-2 hidden sm:flex justify-center gap-2 ">
         <NavLink
           className={({ isActive, isPending }) =>

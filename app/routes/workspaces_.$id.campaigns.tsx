@@ -1,5 +1,13 @@
 import { json, redirect } from "@remix-run/node";
-import { Outlet, useLoaderData, useOutletContext } from "@remix-run/react";
+import {
+  Outlet,
+  useLoaderData,
+  useNavigate,
+  useOutlet,
+  useOutletContext,
+} from "@remix-run/react";
+import { MdAssignment } from "react-icons/md";
+import { EmptyState } from "~/components/ui/emptystate";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
@@ -13,5 +21,9 @@ export const loader = async ({ request, params }) => {
 
 export default function SelectedType() {
   const { selectedTable, audiences, campaigns } = useOutletContext();
-  return <Outlet context={{ selectedTable, audiences, campaigns }} />;
+  return (
+    <div>
+      <Outlet context={{ selectedTable, audiences, campaigns }} />
+    </div>
+  );
 }
