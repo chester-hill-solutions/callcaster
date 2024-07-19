@@ -9,15 +9,15 @@ type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
 type CampaignDetails = Tables<"live_campaign">;
 
 interface Script {
-  steps: {
-    pages: {
+  steps?: {
+    pages?: {
       [key: string]: {
         id: string;
         title: string;
         blocks: string[];
       };
     };
-    blocks: {
+    blocks?: {
       [key: string]: {
         id: string;
         type: string;
@@ -52,7 +52,7 @@ const CallQuestionnaire = ({
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
   const [currentPageId, setCurrentPageId] = useState(
-    Object.keys(campaignDetails.script.steps.pages)[0]
+    Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
@@ -74,7 +74,7 @@ const CallQuestionnaire = ({
   };
 
   const renderBlock = (blockId: string) => {
-    const block = campaignDetails.script.steps.blocks[blockId];
+    const block = campaignDetails.script?.steps.blocks[blockId];
     
     return (
       <Result
@@ -124,14 +124,14 @@ const CallQuestionnaire = ({
       </div>
       <div className="p-4">
         <div className="flex flex-col gap-4">
-          {campaignDetails.script.steps.pages[currentPageId].blocks.map(
+          {campaignDetails.script?.steps?.pages?.[currentPageId]?.blocks.map(
             renderBlock,
           )}
         </div>
-        <div className="mt-4 flex justify-between">
+        {campaignDetails.script?.step?.pages && <div className="mt-4 flex justify-between">
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script.steps.pages);
+              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex > 0) {
                 setCurrentPageId(pageIds[currentIndex - 1]);
@@ -139,14 +139,14 @@ const CallQuestionnaire = ({
             }}
             disabled={
               currentPageId ===
-              Object.keys(campaignDetails.script.steps.pages)[0]
+              Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
             }
           >
             Previous Page
           </Button>
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script.steps.pages);
+              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex < pageIds.length - 1) {
                 setCurrentPageId(pageIds[currentIndex + 1]);
@@ -154,14 +154,14 @@ const CallQuestionnaire = ({
             }}
             disabled={
               currentPageId ===
-              Object.keys(campaignDetails.script.steps.pages)[
-                Object.keys(campaignDetails.script.steps.pages).length - 1
+              Object.keys(campaignDetails.script?.steps.pages || {})[
+                Object.keys(campaignDetails.script?.steps.pages || {}).length - 1
               ]
             }
           >
             Next Page
           </Button>
-        </div>
+        </div>}
         <div className="flex justify-end p-2">
           <Button
             onClick={handleQuickSave}

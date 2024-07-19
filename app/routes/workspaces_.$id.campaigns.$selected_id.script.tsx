@@ -130,9 +130,9 @@ export default function ScriptPage() {
     <div className="relative flex h-full flex-col">
       <div className="my-1 flex flex-col gap-2 px-2 relative">
         {!outlet && userRole !== MemberRole.Caller && (
-          <div className="m-4 absolute" style={{top:'-78px', right: 0}}>
+          <div className="m-4 absolute" style={{top:'-10px', right: '0px', zIndex:"10"}}>
             <Button asChild>
-              <NavLink to={"edit"}>Edit </NavLink>
+              <NavLink to={"edit"}>Edit Script</NavLink>
             </Button>
           </div>
         )}
