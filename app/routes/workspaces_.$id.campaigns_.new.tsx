@@ -62,8 +62,8 @@ export default function CampaignsNew() {
       )}
       <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
         <CardTitle>Add Campaign</CardTitle>
-        <CardContent>
-          <Form method="POST" className="space-y-6">
+        <Form method="POST" className="space-y-6">
+          <CardContent>
             <input type="hidden" name="formAction" value="newCampaign" />
             <label
               htmlFor="campaign-name"
@@ -88,45 +88,40 @@ export default function CampaignsNew() {
                 id="campaign-type"
                 required
               >
+                <option value="live_call" className="dark:bg-black">
+                  Live Call
+                </option>
+
                 <option value="message" className="dark:bg-black">
                   Message
                 </option>
                 <option value="robocall" className="dark:bg-black">
-                  Robocall
-                </option>
-                <option value="simple_ivr" className="dark:bg-black">
-                  Simple IVR
-                </option>
-                <option value="complex_ivr" className="dark:bg-black">
-                  Complex IVR
-                </option>
-                <option value="live_call" className="dark:bg-black">
-                  Live Call
+                  Interactive Voice Recording
                 </option>
               </select>
             </label>
-          </Form>
-        </CardContent>
-        <CardActions>
-          <div className="flex items-center gap-4">
-            <Button
-              size="lg"
-              className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
-              type="submit"
-            >
-              Add Campaign
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="w-full px-4 py-2 text-center font-bold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition duration-150 ease-in-out dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 font-Zilla-Slab"
-            >
-              <Link to=".." relative="path">
-                Back
-              </Link>
-            </Button>
-          </div>
-        </CardActions>
+          </CardContent>
+          <CardActions>
+            <div className="flex items-center gap-4">
+              <Button
+                size="lg"
+                className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
+                type="submit"
+              >
+                Add Campaign
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="w-full rounded-md bg-gray-200 px-4 py-2 text-center font-Zilla-Slab font-bold text-gray-700 transition duration-150 ease-in-out hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+              >
+                <Link to=".." relative="path">
+                  Back
+                </Link>
+              </Button>
+            </div>
+          </CardActions>
+        </Form>
       </Card>
     </section>
   );
