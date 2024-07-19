@@ -8,6 +8,8 @@ import {
   Link,
   Outlet,
   NavLink,
+  useOutlet,
+  useLocation,
 } from "@remix-run/react";
 import { FaPlus, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
@@ -20,6 +22,8 @@ import {
   updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { EmptyState } from "~/components/ui/emptystate";
+import { MdAssignment } from "react-icons/md";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -71,6 +75,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function Workspace() {
   const { workspace, audiences, campaigns, userRole } = useLoaderData();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
+  const outlet = useOutlet();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
 
   function handleNavlinkStyles(isActive: boolean, isPending: boolean): string {
     if (isActive) {
@@ -114,12 +122,11 @@ export default function Workspace() {
       ))}
     </div>
   );
-
+  
   return (
     <main className="mx-auto h-full w-full max-w-7xl px-4 py-8 md:w-[80%]">
       <WorkspaceNav
         workspace={workspace}
-        isInChildRoute={false}
         userRole={userRole}
       />
       <div id="campaigns-container" className="flex flex-col md:flex-row">
@@ -134,6 +141,17 @@ export default function Workspace() {
           <CampaignsList />
         </div>
         <div className="min-h-[600px] w-full flex-auto overflow-hidden dark:bg-zinc-700">
+        {(!outlet || location.pathname.split('/')[location.pathname.split('/').length - 1] === 'campaigns')&& (
+            <EmptyState
+              title="No Campaign Selected"
+              description="Select a campaign from the list or create a new one to get started."
+              icon={<MdAssignment size={48} />}
+              action={{
+                label: "Create New Campaign",
+                onClick: () => navigate("campaigns/new")
+              }}
+            />
+         )}
           <Outlet
             context={{
               audiences,
