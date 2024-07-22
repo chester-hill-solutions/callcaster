@@ -1,4 +1,7 @@
+import { User } from "@supabase/supabase-js";
 import { useState, useCallback, useEffect } from "react";
+import { Tables } from "~/lib/database.types";
+import { Contact } from "~/lib/types";
 import { sortQueue, createHouseholdMap } from "~/lib/utils";
 
 export const useQueue = (
@@ -6,7 +9,9 @@ export const useQueue = (
   initialPredictiveQueue: QueueItem[], 
   user: User, 
   contacts: Contact[],
-  isPredictive: boolean
+  isPredictive: boolean,
+  nextRecipient: QueueItem | null,
+  setNextRecipient: (recipient: QueueItem | null) => void
 ) => {
   const [queue, setQueue] = useState<QueueItem[]>(
     isPredictive 
@@ -18,13 +23,14 @@ export const useQueue = (
 
   const updateQueue = useCallback((
     payload: { new: Tables<"campaign_queue"> }, 
-    nextRecipient: QueueItem | null, 
-    setNextRecipient: (recipient: QueueItem | null) => void
+    currentNextRecipient: QueueItem | null, 
+    setNextRecipient: (recipient: QueueItem | null) => void,
+    isPredictive: boolean
   ) => {
     if (payload.new.status === "dequeued") {
       setQueue((currentQueue) => {
         const filteredQueue = currentQueue.filter((item) => item.id !== payload.new.id);
-        if (nextRecipient && nextRecipient.contact_id === payload.new.contact_id) {
+        if (currentNextRecipient && currentNextRecipient.contact_id === payload.new.contact_id) {
           const nextUncontacted = filteredQueue.find((item) => item.attempts === 0);
           setNextRecipient(nextUncontacted || filteredQueue[0] || null);
         }
@@ -36,12 +42,12 @@ export const useQueue = (
       );
     } else {
       setQueue((currentQueue) => {
-        if (!isPredictive && payload.new.status === user?.id) {
+        if (payload.new.status === user?.id) {
           const contact = contacts.find((c) => c.id === payload.new.contact_id);
           if (contact?.phone) {
             const newQueueItem = { ...payload.new, contact };
             const filteredQueue = currentQueue.filter((item) => item.contact_id !== payload.new.contact_id);
-            if (!currentQueue.length) setNextRecipient(newQueueItem);
+            if (!currentNextRecipient) setNextRecipient(newQueueItem);
             return sortQueue([...filteredQueue, newQueueItem]);
           }
         } else if (isPredictive && payload.new.status === "queued") {
@@ -59,6 +65,12 @@ export const useQueue = (
   useEffect(() => {
     setHouseholdMap(createHouseholdMap(queue));
   }, [queue]);
+
+  useEffect(() => {
+    if (!nextRecipient && queue.length > 0) {
+      setNextRecipient(queue[0]);
+    }
+  }, [queue, nextRecipient, setNextRecipient]);
 
   return { queue, setQueue, predictiveQueue, setPredictiveQueue, updateQueue, householdMap };
 };
