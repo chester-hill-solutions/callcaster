@@ -37,7 +37,7 @@ export const Household = ({ house, switchQuestionContact, attemptList, questionC
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
           key={contact.id}
-          className={`flex justify-center p-2 m-4 rounded-2xl ${isSelected?.id === contact?.id ? "bg-secondary" : 'unset'} hover:shadow-inner hover:opacity-85`}
+          className={`flex justify-center p-2 m-1 rounded-2xl  ${isSelected?.id === contact?.id ? "bg-gray-100 border-primary border-2" : 'bg-secondary'} hover:shadow-inner-lg hover:opacity-85 hover:bg-gray-100 transition-all`}
           onClick={() => switchQuestionContact({ contact })}
         >
           <div className="flex flex-auto items-center justify-between font-semibold font-Zilla-Slab text-lg dark:text-slate-800">

@@ -162,7 +162,7 @@ export default function WorkspaceAudio() {
       )}
       {isWorkspaceAudioEmpty && (
         <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
+          Add Your Own Scripts to this Workspace!
         </h4>
       )}
 

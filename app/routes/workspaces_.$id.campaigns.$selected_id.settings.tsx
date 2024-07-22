@@ -1,6 +1,6 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { getMedia, getRecordingFileNames, getSignedUrls, getWorkspacePhoneNumbers, listMedia } from "~/lib/database.server";
@@ -95,7 +95,7 @@ export default function Audience() {
     phoneNumbers,
     campaignDetails
   } = useLoaderData();
-  const pageData = useMemo(() => data, [data]);
+  const [pageData, setPageData] = useState(data);
   return (
     <>
       <CampaignSettings
@@ -106,6 +106,7 @@ export default function Audience() {
         campaign_id={selected_id}
         phoneNumbers={phoneNumbers}
         campaignDetails={campaignDetails}
+        onPageDataChange={setPageData}
       />
     </>
   );

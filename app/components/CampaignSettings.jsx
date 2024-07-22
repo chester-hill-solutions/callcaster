@@ -1,4 +1,4 @@
-import { useEffect, useState, useReducer } from "react";
+import { useEffect, useState, useReducer, useCallback } from "react";
 import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { NavLink, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
@@ -70,7 +70,8 @@ const CampaignSettings = ({
   mediaData,
   workspace,
   phoneNumbers = [],
-  campaignDetails: details
+  campaignDetails: details,
+  onPageDataChange
 }) => {
   const navigate = useNavigate();
   const nav = useNavigation();
@@ -89,6 +90,17 @@ const CampaignSettings = ({
     dispatch({ type, payload: value });
     setChanged(!deepEqual(campaignDetails, initial));
   };
+
+  const handleAddDispositionOptions = useCallback((event) => {
+    const newVal = event.target.value;
+    onPageDataChange(({
+        ...data,
+        campaignDetails: {
+            ...data.campaignDetails,
+            disposition_options: [...data.campaignDetails?.disposition_options, { value: newVal.replace(" ", "_").toLowerCase(), label: newVal }]
+        }
+    }));
+}, [onPageDataChange, data]);
 
   const saveAudience = () => {
     submit(
@@ -230,7 +242,7 @@ const CampaignSettings = ({
             className={"flex flex-col"}
           />}
         </div>
-   
+
         {campaignDetails.type === 'live_call' && <>
           <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" /><div className="flex justify-start gap-8">
             <Toggle
@@ -250,6 +262,18 @@ const CampaignSettings = ({
               )}
               leftLabel="Power Dialer"
               rightLabel="Predictive Dialer" />
+            <form className="flex flex-col gap-2" onSubmit={handleAddDispositionOptions}>
+              <label htmlFor="disposition-options">
+                Disposition Options
+              </label>
+              <div className="flex">
+                <input type="text" id="disposition-options" name="disposition-options-add" />
+                <Button type="submit" >Add</Button>
+              </div>
+              <div className="flex flex-col">
+                {details.disposition_options?.map((i, index) => (<p key={index}>{i.label}</p>))}
+              </div>
+            </form>
           </div></>}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <span className="text-lg font-semibold">Audiences:</span>

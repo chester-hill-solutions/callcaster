@@ -9,7 +9,7 @@ export const action = async ({ request }) => {
         // Update the existing record
         const { data, error } = await supabaseClient
             .from('outreach_attempt')
-            .upsert({id: callId, result: update, contact_id, user_id: serverSession.user.id, campaign_id })
+            .upsert({id: callId, ...(update && {result: update}), contact_id, user_id: serverSession.user.id, campaign_id })
             
             .select();
 
@@ -21,7 +21,7 @@ export const action = async ({ request }) => {
     } else {
         const { data, error } = await supabaseClient
             .from('outreach_attempt')
-            .insert({ result: update, contact_id, user_id: serverSession.user.id, campaign_id })
+            .insert({ ...(update && {result: update}), contact_id, user_id: serverSession.user.id, campaign_id })
             .select();
         if (error) {
             console.error(error)

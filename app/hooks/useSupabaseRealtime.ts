@@ -88,7 +88,7 @@ export const useSupabaseRealtime = ({
     if (recentAttempt) {
       setDisposition(recentAttempt.disposition || recentAttempt.result?.status || null);
     }
-  }, [recentAttempt]);
+  }, [disposition, recentAttempt]);
 
   useEffect(() => {
     if (!nextRecipient && queue.length > 0) {

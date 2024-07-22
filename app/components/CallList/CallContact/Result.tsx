@@ -161,7 +161,7 @@ const Result = ({
           return (
             <div
               key={inputId}
-              className="flex items-center justify-between gap-2"
+              className="flex items-center gap-2 min-w-[250px]"
             >
               <input
                 id={inputId}
@@ -198,7 +198,7 @@ const Result = ({
       <div>
         <p className="">{questions.type !== 'boolean' && questions.content}</p>
       </div>
-        <div className="wrap flex flex-auto gap-2">
+        <div className="flex-wrap flex flex-auto gap-2 max-w-[500px]">
           {renderQuestionContent()}
         </div>
     </div>

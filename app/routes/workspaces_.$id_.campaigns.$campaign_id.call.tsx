@@ -5,10 +5,11 @@ import {
   useOutletContext,
   redirect,
   useSubmit,
+  Form,
 } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { QueueList } from "../components/CallScreen.QueueList";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
 import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
@@ -32,7 +33,9 @@ import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { useCallState } from "~/hooks/useCallState";
 import { Button } from "~/components/ui/button";
 import { MdVolumeMute } from "react-icons/md";
-import InputVolumeMeter from "~/components/VolumeBar";
+import InputSelector from "~/components/InputSelector";
+import OutputSelector from "~/components/OutputSelector";
+import { formatTime, playTone } from "~/lib/utils";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -78,6 +81,7 @@ export const loader = async ({ request, params }) => {
     .from("campaign")
     .select()
     .eq("id", id)
+
     .single();
   const { data: campaignDetails, error: detailsError } = await supabase
     .from("live_campaign")
@@ -89,6 +93,18 @@ export const loader = async ({ request, params }) => {
     "get_audiences_by_campaign",
     { selected_campaign_id: id },
   );
+
+  const { count, queueCountError } = await supabase
+    .from("campaign_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", id);
+
+  const { count: completed, queueCompleteError } = await supabase
+    .from("campaign_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("campaign_id", id)
+    .eq("status", "dequeued");
+
   const { data: contacts, error: contactsError } = await supabase.rpc(
     "get_contacts_by_campaign",
     { selected_campaign_id: id },
@@ -104,7 +120,7 @@ export const loader = async ({ request, params }) => {
   if (campaign.dial_type === "predictive") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select()
+      .select(`*`)
       .eq("status", "queued")
       .eq("campaign_id", id)
       .order("attempts", { ascending: true })
@@ -136,6 +152,8 @@ export const loader = async ({ request, params }) => {
     contactsError,
     attemptError,
     queueError,
+    queueCountError,
+    queueCompleteError,
   ].filter(Boolean);
   if (errors.length) {
     console.error(errors);
@@ -172,13 +190,38 @@ export const loader = async ({ request, params }) => {
       originalQueue: queue,
       initialRecentAttempt,
       token,
+      count,
+      completed,
     },
     { headers },
   );
 };
 
+export const action = async ({ request, params }) => {
+  const { campaign_id } = params;
+
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession?.user) {
+    return redirect("/signin");
+  }
+  const update = await supabaseClient
+    .from("campaign_queue")
+    .update({ status: "queued" })
+    .eq("status", serverSession.user.id)
+    .eq("campaign_id", campaign_id)
+    .select();
+  if (update.error) {
+    console.error(update.error);
+    throw update.error;
+  }
+  return redirect('/workspaces');
+};
+
 const Campaign: React.FC = () => {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  const audioContextRef = useRef<AudioContext | null>(null);
+
   const {
     campaign,
     attempts: initialAttempts,
@@ -192,6 +235,8 @@ const Campaign: React.FC = () => {
     initialRecentCall,
     initialRecentAttempt,
     token,
+    count,
+    completed,
   } = useLoaderData<LoaderData>();
 
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
@@ -343,23 +388,6 @@ const Campaign: React.FC = () => {
       groupByHousehold,
     ],
   );
-
-  const handleDequeueNext = useCallback(() => {
-    if (nextRecipient) {
-      dequeue({ contact: nextRecipient });
-      fetchMore({ householdMap });
-      handleNextNumber({ skipHousehold: true });
-      setRecentAttempt(null);
-    }
-  }, [
-    dequeue,
-    fetchMore,
-    handleNextNumber,
-    householdMap,
-    nextRecipient,
-    setRecentAttempt,
-  ]);
-
   const handleQuickSave = useCallback(() => {
     handleQuestionsSave(
       update,
@@ -371,6 +399,18 @@ const Campaign: React.FC = () => {
       workspaceId,
     );
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
+
+  const handleDequeueNext = useCallback(() => {
+    if (nextRecipient) {
+      handleQuickSave();
+      dequeue({ contact: nextRecipient });
+      fetchMore({ householdMap });
+      handleNextNumber({ skipHousehold: true });
+      send({type: "HANG_UP"});
+      setRecentAttempt(null);
+    }
+  }, [dequeue, fetchMore, handleNextNumber, handleQuickSave, householdMap, nextRecipient, send, setRecentAttempt]);
+
 
   useEffect(() => {
     if (nextRecipient) {
@@ -386,7 +426,6 @@ const Campaign: React.FC = () => {
             audio: true,
             video: false,
           });
-          console.log(mediaStream)
           setStream(mediaStream);
         } catch (error) {
           console.error("Error accessing microphone:", error);
@@ -404,35 +443,159 @@ const Campaign: React.FC = () => {
     campaign,
     workspaceId,
   );
+  useEffect(() => {
+    audioContextRef.current = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
 
+  const getDisplayState = (
+    state: CallState,
+    disposition: AttemptDisposition | undefined,
+    activeCall: object,
+  ): string => {
+    if (state === "failed" || disposition === "failed") return "failed";
+    if (
+      disposition === "ringing" ||
+      (activeCall && !(disposition === "in-progress"))
+    )
+      return "dialing";
+    if (disposition === "in-progress") return "connected";
+    if (disposition === "no-answer") return "no-answer";
+    if (disposition === "voicemail") return "voicemail";
+    if (state === "completed" && disposition) return "completed";
+    return "idle";
+  };
+  const displayState = getDisplayState(
+    state,
+    recentAttempt?.disposition as AttemptDisposition,
+    activeCall,
+  );
+
+  const handleDTMF = (key) => {
+    playTone(key, audioContextRef?.current);
+    if (!activeCall) return;
+    else {
+      activeCall?.sendDigits(key);
+    }
+  };
+  const handleKeypress = (e) => {
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(e.key)
+      ? handleDTMF(e.key)
+      : null;
+  };
   const house =
     householdMap[
       Object.keys(householdMap).find(
         (house) => house === nextRecipient?.contact?.address,
       ) || ""
     ];
+  const displayColor =
+    displayState === "failed"
+      ? "hsl(var(--primary))"
+      : displayState === "connected" || displayState === "dialing"
+        ? "#4CA83D"
+        : "#333333";
+
+  useEffect(() => {
+    window.addEventListener("keypress", handleKeypress);
+
+    return () => window.removeEventListener("keypress", handleKeypress);
+  }, [handleKeypress]);
+  
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      submit(null, { method: 'POST' });
+      event.preventDefault();
+      event.returnValue = '';
+    };
+  
+    //window.addEventListener('beforeunload', handleBeforeUnload);
+  
+    return () => {
+      //window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [submit]);
 
   return (
     <main className="container mx-auto p-6">
       <div
         style={{
           border: "3px solid #BCEBFF",
-          borderRadius: "20px",
-          //backgroundColor: "hsl(var(--card))",
           alignItems: "stretch",
           flexDirection: "column",
           display: "flex",
-          boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+          borderRadius: "20px",
         }}
         className="mb-6"
       >
-        <div className="p-4">
-          {device && <InputVolumeMeter device={device} />}
-
-          <div className="flex">
-            <Button>
-              <MdVolumeMute />
-            </Button>
+        <div className="flex justify-between px-4">
+          <div className="flex flex-col justify-between gap-2 py-4">
+            {/* TITLES */}
+            <div className="flex items-center justify-between">
+              <div className="px-1 font-Zilla-Slab">
+                <h1 className="text-3xl">{campaign.title}</h1>
+                <h4>
+                  {count - completed} of {count} remaining
+                </h4>
+              </div>
+              <Form method="POST">
+                <Button type="submit">Leave Campaign</Button>
+              </Form>
+            </div>
+            {/* Inputs */}
+            <div className="space-y-2">
+              {device && <InputSelector device={device} />}
+              {device && <OutputSelector device={device} />}
+            </div>
+          </div>
+          {/* Phone with DTMF */}
+          <div className={`my-4 border-2 border-[${displayColor}] rounded-lg`}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "4px",
+                background: displayColor,
+              }}
+              className={`rounded-t-lg font-Tabac-Slab text-white ${state === "connected" || state === "dialing" ? "bg-green-300" : "bg-slate-700"}`}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  flex: "1",
+                  justifyContent: "center",
+                }}
+              >
+                {displayState === "failed" && <div>Call Failed</div>}
+                {displayState === "dialing" && (
+                  <div>Dialing... {formatTime(callDuration)}</div>
+                )}
+                {displayState === "connected" && (
+                  <div>Connected {formatTime(callDuration)}</div>
+                )}
+                {displayState === "no-answer" && <div>No Answer</div>}
+                {displayState === "voicemail" && <div>Voicemail Left</div>}
+                {displayState === "completed" && <div>Call Completed</div>}
+                {displayState === "idle" && <div>Pending</div>}
+              </div>
+            </div>
+            <div className="flex w-[130px] flex-wrap justify-between p-4">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, "*", 0, "#"].map((item, index) => (
+                <Button
+                  className="m-0.5 h-6 w-6 rounded-xl p-1 text-xs transition-all hover:shadow-inner active:bg-red-900"
+                  key={index}
+                  onClick={() => handleDTMF(`${item}`)}
+                >
+                  {item}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -451,6 +614,8 @@ const Campaign: React.FC = () => {
                   })
                 : hangUp()
             }
+            displayState={displayState}
+            dispositionOptions={campaignDetails.disposition_options}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}

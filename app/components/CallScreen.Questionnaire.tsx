@@ -77,6 +77,7 @@ const CallQuestionnaire = ({
     const block = campaignDetails.script?.steps.blocks[blockId];
     
     return (
+      <div>
       <Result
         disabled={disabled}
         action={(response) => handleBlockResponse(block.title, response.value)}
@@ -86,6 +87,7 @@ const CallQuestionnaire = ({
         initResult={localUpdate[block.title] || null}
         type={block.type}
       />
+      </div>
     );
   };
 
