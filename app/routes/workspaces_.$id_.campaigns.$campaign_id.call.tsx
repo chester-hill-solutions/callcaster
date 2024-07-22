@@ -30,6 +30,9 @@ import { Household } from "~/components/CallScreen.Household";
 import { Toaster } from "sonner";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { useCallState } from "~/hooks/useCallState";
+import { Button } from "~/components/ui/button";
+import { MdVolumeMute } from "react-icons/md";
+import InputVolumeMeter from "~/components/VolumeBar";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -174,7 +177,7 @@ export const loader = async ({ request, params }) => {
   );
 };
 
-export default function Campaign() {
+const Campaign: React.FC = () => {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const {
     campaign,
@@ -194,12 +197,11 @@ export default function Campaign() {
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
     initialNextRecipient,
   );
-
   const [groupByHousehold] = useState<boolean>(true);
   const [update, setUpdate] = useState<Record<string, any>>(
     initialRecentAttempt?.result || null,
   );
-
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const { state, context, send } = useCallState();
   const {
     device,
@@ -242,6 +244,7 @@ export default function Campaign() {
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
   });
+
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
     workspace: workspaceId,
@@ -255,6 +258,7 @@ export default function Campaign() {
     workspaceId,
     campaign.caller_id,
   );
+
   const fetcher = useFetcher();
   const submit = useSubmit();
 
@@ -280,7 +284,7 @@ export default function Campaign() {
   });
 
   const handleResponse = useCallback(
-    ({ blockId, value }: { blockId: string; value: string | string[]; }) => {
+    ({ blockId, value }: { blockId: string; value: string | string[] }) => {
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
     [],
@@ -292,7 +296,7 @@ export default function Campaign() {
       incomingCall ||
       status !== "Registered"
     )
-      return; //Return if not ready to place new call.
+      return;
     send({ type: "START_DIALING" });
     if (campaign.dial_type === "predictive") handleConferenceStart();
     if (campaign.dial_type === "call")
@@ -374,6 +378,24 @@ export default function Campaign() {
     }
   }, [nextRecipient]);
 
+  useEffect(() => {
+    const getStream = async () => {
+      if (!stream) {
+        try {
+          const mediaStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+          });
+          console.log(mediaStream)
+          setStream(mediaStream);
+        } catch (error) {
+          console.error("Error accessing microphone:", error);
+        }
+      }
+    };
+    getStream();
+  }, [stream]);
+
   useDebouncedSave(
     update,
     recentAttempt,
@@ -391,20 +413,31 @@ export default function Campaign() {
     ];
 
   return (
-    <main
-      className=""
-      style={{ padding: "24px", margin: "0 auto", width: "100%" }}
-    >
+    <main className="container mx-auto p-6">
       <div
-        className="flex flex-wrap justify-evenly"
         style={{
-          justifyContent: "space-evenly",
-          alignItems: "start",
-          gap: "2rem",
-          display:"flex"
+          border: "3px solid #BCEBFF",
+          borderRadius: "20px",
+          //backgroundColor: "hsl(var(--card))",
+          alignItems: "stretch",
+          flexDirection: "column",
+          display: "flex",
+          boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
         }}
+        className="mb-6"
       >
-        <div className="flex flex-col" style={{flex:"1 1 20%", gap:"2rem"}}>
+        <div className="p-4">
+          {device && <InputVolumeMeter device={device} />}
+
+          <div className="flex">
+            <Button>
+              <MdVolumeMute />
+            </Button>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-6">
           <CallArea
             nextRecipient={nextRecipient}
             activeCall={activeCall}
@@ -430,33 +463,32 @@ export default function Campaign() {
             house={house}
             switchQuestionContact={switchQuestionContact}
             attemptList={attemptList}
+            questionContact={questionContact}
           />
         </div>
         <CallQuestionnaire
-          {...{
-            handleResponse,
-            campaignDetails,
-            update,
-            nextRecipient: questionContact,
-            handleQuickSave,
-            disabled: !questionContact,
-          }}
+          handleResponse={handleResponse}
+          campaignDetails={campaignDetails}
+          update={update}
+          nextRecipient={questionContact}
+          handleQuickSave={handleQuickSave}
+          disabled={!questionContact}
         />
         <QueueList
-          {...{
-            householdMap,
-            groupByHousehold,
-            queue: campaign.dial_type === "call" ? queue : predictiveQueue,
-            handleNextNumber,
-            nextRecipient,
-            handleQueueButton: fetchMore,
-            predictive: campaign.dial_type === "predictive",
-          }}
+          householdMap={householdMap}
+          groupByHousehold={groupByHousehold}
+          queue={campaign.dial_type === "call" ? queue : predictiveQueue}
+          handleNextNumber={handleNextNumber}
+          nextRecipient={nextRecipient}
+          handleQueueButton={fetchMore}
+          predictive={campaign.dial_type === "predictive"}
         />
       </div>
-      <div></div>
       <Toaster richColors />
     </main>
   );
-}
+};
+
 Campaign.ErrorBoundary = ErrorBoundary;
+
+export default Campaign;

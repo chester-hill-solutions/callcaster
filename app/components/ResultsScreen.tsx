@@ -7,18 +7,6 @@ import { NavLink } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { useSubmit } from "@remix-run/react";
 
-const startCampaign = (submit, campaign_id, user_id) => {
-  submit(
-    { campaign_id, user_id },
-    {
-      action: "/api/initiate-ivr",
-      method: "POST",
-      navigate: false,
-      encType: "application/json",
-    },
-  );
-};
-
 const ResultsScreen = ({
   totalCalls = 0,
   results = [],
@@ -30,22 +18,11 @@ const ResultsScreen = ({
   campaign_id,
   user_id,
 }: ResultsScreenProps) => {
-  const submit = useSubmit();
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
         <h1 className="mb-6 text-3xl font-bold">Call Campaign Results</h1>
-        {hasAccess && (
-          <div>
-            {type !== "live_call" && (
-              <Button
-                onClick={() => startCampaign(submit, campaign_id, user_id)}
-              >
-                Start Campaign
-              </Button>
-            )}
-          </div>
-        )}
       </div>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">

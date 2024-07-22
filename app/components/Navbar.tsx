@@ -122,7 +122,11 @@ export default function Navbar({
     }
   }, [loc, location]);
 
-  return (
+  return loc.pathname.endsWith("call") ? (
+    <div>
+      
+    </div>
+  ) : (
     <header className={`w-full ${className}`}>
       <nav className="relative flex w-full items-center justify-between px-4 py-4 sm:h-[80px] sm:px-8">
         <Link

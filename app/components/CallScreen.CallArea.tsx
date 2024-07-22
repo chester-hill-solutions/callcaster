@@ -171,7 +171,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 flex: "1",
                 padding: "4px 8px",
                 background: "#d60000",
-                borderRadius: "5px",
+                borderRadius: "20px",
                 color: "white",
                 opacity: state !== 'connected' && state !== 'dialing' ? ".6" : "unset",
               }}
@@ -188,7 +188,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                     flex: "1",
                     padding: "4px 8px",
                     border: "1px solid #333",
-                    borderRadius: "5px",
+                    borderRadius: "20px",
                     color: "#333",
                   }}
                 >
@@ -198,15 +198,16 @@ export const CallArea: React.FC<CallAreaProps> = ({
             {
               <button
                 onClick={handleDialNext}
-                disabled={state === 'connected' || state === 'dialing'}
+                disabled={state === 'connected' || state === 'dialing' || !nextRecipient}
                 style={{
                   flex: "1",
                   padding: "4px 8px",
                   background: "#4CA83D",
-                  borderRadius: "5px",
+                  borderRadius: "20px",
                   color: "white",
-                  opacity: state === 'connected' || state === 'dialing' ? ".6" : "unset",
+                  opacity: state === 'connected' || state === 'dialing' || !nextRecipient ? ".6" : "unset",
                 }}
+                title={(state === 'connected' || state === 'dialing' || !nextRecipient) ? 'Load your queue to get started' : `Dial ${nextRecipient?.contact?.phone}`}
               >
                 {!predictive ? "Dial" : "Start"}
               </button>
@@ -220,7 +221,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                   flex: "1",
                   padding: "4px 8px",
                   border: "1px solid #333",
-                  borderRadius: "5px",
+                  borderRadius: "20px",
                   color: "#333",
                 }}
               >

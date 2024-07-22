@@ -182,7 +182,7 @@ export default function Workspaces() {
 
   const workspaceCards = useMemo(() => 
     workspaces?.map((workspaceUser) => (
-      <div key={workspaceUser.workspace.id} className="w-full sm:w-1/4">
+      <div key={workspaceUser.workspace.id} className="w-full sm:w-48">
         <WorkspaceCard
           workspace={workspaceUser.workspace}
           role={workspaceUser.role}
@@ -197,8 +197,8 @@ export default function Workspaces() {
       <h1 className="text-center font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
         Your Workspaces
       </h1>
-      <div className="flex w-full flex-wrap justify-center gap-4">
-        <div className="w-full sm:w-1/4">
+      <div className="flex flex-wrap justify-center sm:justify-start gap-4">
+        <div className="w-full sm:w-48">
           <NewWorkspaceDialog userId={userId} />
         </div>
         {workspaceCards}
