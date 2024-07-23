@@ -357,7 +357,7 @@ export default function CampaignScreen() {
         </div>
       </div>
       {hasAccess && isCampaignParentRoute && totalCalls < 1 ? (
-        <div className="flex flex-auto items-center justify-center">
+        <div className="flex flex-auto items-center justify-center gap-2 sm:flex-col mt-8">
             {campaign.type !== "live_call" && (
               <Button
                 onClick={() => startCampaign(submit, campaign.id, user.id)}

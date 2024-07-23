@@ -8,6 +8,7 @@ import {
   Link,
   Outlet,
   NavLink,
+  useOutlet,
 } from "@remix-run/react";
 import { FaPlus, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
@@ -73,7 +74,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function Workspace() {
   const { workspace, audiences, campaigns, userRole } = useLoaderData();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
-
+  const outlet = useOutlet();
   const handleNavlinkStyles = ({ isActive, isPending }) =>
     `flex items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
       isActive
@@ -112,13 +113,13 @@ export default function Workspace() {
   );
 
   return (
-    <main className="container mx-auto py-8">
+    <main className="container mx-auto py-8 space-y-2">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={false}
         userRole={userRole}
       />
-      <div className="mt-8 grid gap-8 md:grid-cols-[250px_1fr]">
+      <div className="grid gap-8 md:grid-cols-[250px_1fr]">
         <div className="bg-secondary dark:bg-slate-900 rounded-lg border-2 border-gray-300">
           <Button
             variant="outline"
@@ -132,8 +133,9 @@ export default function Workspace() {
             <CampaignsList />
           </div>
         </div>
-        <Card className="min-h-[600px]">
+        <Card className="min-h-[600px] bg-gray-50 dark:bg-slate-800">
           <CardContent>
+            
             <Outlet context={{ audiences, campaigns }} />
           </CardContent>
         </Card>
