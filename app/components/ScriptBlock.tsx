@@ -57,7 +57,7 @@ const QuestionBlockOption = ({
           <TextInput
             value={option.content}
             onChange={(e) =>
-              onChange(index, { ...option, content: e.target.value })
+              onChange(index, { ...option, content: e.target.value, value: e.target.value.replace(" ", "-").toLowerCase() })
             }
             placeholder="Option content"
           />
@@ -139,6 +139,7 @@ const MergedQuestionBlock = ({
       [field]: value,
       ...(field === "content" && { value: value.toLowerCase() }),
     };
+    console.log(updatedBlock)
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
