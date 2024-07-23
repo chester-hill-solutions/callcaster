@@ -25,7 +25,7 @@ const Result = ({
   const [result, setResult] = useState<string | boolean | string[]>(
     initResult || "",
   );
-  
+
   useEffect(() => {
     setResult(initResult || (questions.type === "multi" ? [] : ""));
   }, [initResult, questions.type]);
@@ -117,8 +117,7 @@ const Result = ({
               current={result}
             />
           ) : (
-
-            renderIcon({Icon, value, content})
+            renderIcon({ Icon, value, content })
           ),
         );
       case "boolean":
@@ -128,6 +127,7 @@ const Result = ({
               {questions.text || questions.content}
             </label>
             <input
+              disabled={disabled}
               id={questions.title}
               type="checkbox"
               name={questions.title}
@@ -139,6 +139,7 @@ const Result = ({
       case "dropdown":
         return (
           <select
+          disabled={disabled}
             name={questions.title}
             value={result}
             onChange={(e) => handleChange(questions.id, e.currentTarget.value)}
@@ -161,9 +162,10 @@ const Result = ({
           return (
             <div
               key={inputId}
-              className="flex items-center justify-between gap-2"
+              className="flex min-w-[250px] items-center gap-2"
             >
               <input
+              disabled={disabled}
                 id={inputId}
                 name={inputId}
                 type="checkbox"
@@ -185,6 +187,7 @@ const Result = ({
             placeholder="Notes/Key Issues"
             onChange={(e) => handleChange(questions.id, e.target.value)}
             value={result}
+            disabled={disabled}
             key={`question-${questionId}-notes`}
           />
         );
@@ -196,11 +199,11 @@ const Result = ({
   return (
     <div className="flex flex-col gap-2">
       <div>
-        <p className="">{questions.type !== 'boolean' && questions.content}</p>
+        <p className="">{questions.type !== "boolean" && questions.content}</p>
       </div>
-        <div className="wrap flex flex-auto gap-2">
-          {renderQuestionContent()}
-        </div>
+      <div className="flex max-w-[500px] flex-auto flex-wrap gap-2">
+        {renderQuestionContent()}
+      </div>
     </div>
   );
 };

@@ -6,6 +6,7 @@ import {
   useLoaderData,
   useLocation,
   useOutletContext,
+  useSubmit,
 } from "@remix-run/react";
 import { useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -258,6 +259,21 @@ export default function CampaignScreen() {
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
   const campaign = data.length ? data[0] : {};
+  const submit = useSubmit()
+
+  const startCampaign = (submit, campaign_id, user_id) => {
+    submit(
+      { campaign_id, user_id },
+      {
+        action: "/api/initiate-ivr",
+        method: "POST",
+        navigate: false,
+        encType: "application/json",
+      },
+    );
+  };
+  
+  
 
   useEffect(() => {
     if (csvData && csvData.csvContent) {
@@ -340,8 +356,15 @@ export default function CampaignScreen() {
           )}
         </div>
       </div>
-      {hasAccess && isCampaignParentRoute && totalCalls < 0 ? (
+      {hasAccess && isCampaignParentRoute && totalCalls < 1 ? (
         <div className="flex flex-auto items-center justify-center">
+            {campaign.type !== "live_call" && (
+              <Button
+                onClick={() => startCampaign(submit, campaign.id, user.id)}
+              >
+                Start Campaign
+              </Button>
+            )}
           <h1 className="font-Zilla-Slab text-4xl text-gray-400">
             Your Campaign Results Will Show Here
           </h1>

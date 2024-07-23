@@ -238,3 +238,47 @@ export const updateAttemptWithCall = (attempt: Attempt, call: Call): Attempt => 
     },
   };
 };
+
+export const playTone = (tone: string, audioContext: AudioContext) => {
+  const dtmfFrequencies: { [key: string]: [number, number] } = {
+    '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+    '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+    '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+    '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+  };
+
+  if (!audioContext) return;
+
+  const [lowFreq, highFreq] = dtmfFrequencies[tone];
+  const duration = 0.15; // Duration of the tone in seconds
+
+  const oscillator1 = audioContext.createOscillator();
+  oscillator1.type = 'sine';
+  oscillator1.frequency.setValueAtTime(lowFreq, audioContext.currentTime);
+
+  const oscillator2 = audioContext.createOscillator();
+  oscillator2.type = 'sine';
+  oscillator2.frequency.setValueAtTime(highFreq, audioContext.currentTime);
+
+  const gainNode = audioContext.createGain();
+  gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+
+  oscillator1.connect(gainNode);
+  oscillator2.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  oscillator1.start();
+  oscillator2.start();
+  oscillator1.stop(audioContext.currentTime + duration);
+  oscillator2.stop(audioContext.currentTime + duration);
+};
+
+
+export const formatTime = (milliseconds: number): string => {
+  const totalSeconds = Math.floor(milliseconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+};
+

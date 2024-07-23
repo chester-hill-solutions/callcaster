@@ -56,9 +56,10 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 }
             }
         }));
-    }, [onPageDataChange]);
+    }, [onPageDataChange, pageData]);
 
-    const addBlock= () => {
+
+    const addBlock = () => {
         const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
         const newBlock = {
             id: newBlockId,
@@ -364,7 +365,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 onChange={handleTitle}
                             />
                         </div>
-                        <div>
+                        <div className="flex flex-col gap-2">
                             <Toggle
                                 name="campaign-type"
                                 label="Script Type"
@@ -373,6 +374,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 rightLabel="Live Script"
                                 onChange={(val) => changeType(!val ? 'ivr' : 'script')}
                             />
+                           
                         </div>
                     </div>
                     {currentPage && (
@@ -394,7 +396,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             </div>
                         </>
                     )}
-                    {(( scriptData.type === 'script') ?
+                    {((scriptData.type === 'script') ?
                         (scriptData?.pages?.[currentPage]?.blocks || []).map((blockId) => (
                             <MergedQuestionBlock
                                 type={scriptData.type}
