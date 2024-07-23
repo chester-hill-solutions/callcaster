@@ -8,14 +8,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { MdMic, MdMicOff, MdFiberManualRecord, MdStop, MdPlayArrow } from "react-icons/md";
+import {
+  MdMic,
+  MdMicOff,
+  MdFiberManualRecord,
+  MdStop,
+  MdPlayArrow,
+} from "react-icons/md";
 
 interface InputSelectorProps {
   device: Device;
 }
 
 const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
-  const [inputDevices, setInputDevices] = useState<Map<string, MediaDeviceInfo>>(new Map());
+  const [inputDevices, setInputDevices] = useState<
+    Map<string, MediaDeviceInfo>
+  >(new Map());
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -92,7 +100,9 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
       };
 
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/wav",
+        });
         setAudioBlob(audioBlob);
       };
 
@@ -107,7 +117,10 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
@@ -135,11 +148,7 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
   const deviceEntries = Array.from(inputDevices.entries());
 
   return (
-    <div className="space-y-4 rounded-lg bg-white">
-      {error && (
-        <div className="rounded bg-red-100 p-2 text-red-500">{error}</div>
-      )}
-      <div className="flex items-center space-x-2">
+      <div className="flex flex-col space-x-2 sm:flex-row sm:items-center">
         <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
           <SelectTrigger className="w-[200px]">
             <SelectValue placeholder="Select a microphone" />
@@ -158,8 +167,8 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
             )}
           </SelectContent>
         </Select>
-        <div className="flex" style={{width:"125px"}}>
-          <Button 
+        <div className="flex flex-1 sm:w-[125px]">
+          <Button
             onClick={handleTestClick}
             disabled={isPlaying}
             className="rounded-r-none"
@@ -180,12 +189,21 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
         <Button
           variant="outline"
           onClick={toggleMute}
-          className={`flex gap-1 w-[125px] transition-colors ${isMuted ? "bg-red-100 hover:bg-red-200 text-red-500" : ""}`}
-          >
-          {isMuted ? <><MdMicOff className="text-red-500" />MUTED</>: <><MdMic />MUTE</>}
+          className={`flex w-[125px] gap-1 transition-colors ${isMuted ? "bg-red-100 text-red-500 hover:bg-red-200" : ""}`}
+        >
+          {isMuted ? (
+            <>
+              <MdMicOff className="text-red-500" />
+              MUTED
+            </>
+          ) : (
+            <>
+              <MdMic />
+              MUTE
+            </>
+          )}
         </Button>
       </div>
-    </div>
   );
 };
 

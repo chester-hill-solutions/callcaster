@@ -146,7 +146,7 @@ export default function WorkspaceSettings() {
     supabase,
     user,
     workspace: workspaceId,
-    init: { phoneNumbers: initNumbers, queue:[] },
+    init: { phoneNumbers: initNumbers, queue:[], callsList:[] },
   });
 
   useEffect(() => {

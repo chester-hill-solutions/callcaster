@@ -16,11 +16,13 @@ interface OutputSelectorProps {
 }
 
 const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
-  const [outputDevices, setOutputDevices] = useState<Map<string, MediaDeviceInfo>>(new Map());
+  const [outputDevices, setOutputDevices] = useState<
+    Map<string, MediaDeviceInfo>
+  >(new Map());
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState<boolean>(false)
-  
+  const [isMuted, setIsMuted] = useState<boolean>(false);
+
   const handleDeviceChange = useCallback(() => {
     if (!device?.audio) {
       setError("Audio interface is not available");
@@ -78,44 +80,54 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
   };
 
   const testDevice = () => {
-    device.audio?.speakerDevices?.test()
-  }
+    device.audio?.speakerDevices?.test();
+  };
 
   const deviceEntries = Array.from(outputDevices.entries());
 
   return (
-    <div className="space-y-4 rounded-lg bg-white">
-      {error && (
-        <div className="rounded bg-red-100 p-2 text-red-500">{error}</div>
-      )}
-        <div className="flex items-center space-x-2">
-          <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select output device" />
-            </SelectTrigger>
-            <SelectContent>
-              {deviceEntries.length > 0 ? (
-                deviceEntries.map(([id, info]) => (
-                  <SelectItem key={id} value={id}>
-                    {info?.label || `Device ${id.slice(0, 5)}...`}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value={null} disabled>
-                  No output devices available
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select output device" />
+          </SelectTrigger>
+          <SelectContent>
+            {deviceEntries.length > 0 ? (
+              deviceEntries.map(([id, info]) => (
+                <SelectItem key={id} value={id}>
+                  {info?.label || `Device ${id.slice(0, 5)}...`}
                 </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-          <Button variant={'outline'} className="w-[125px]" onClick={testDevice}>Test Output</Button>
+              ))
+            ) : (
+              <SelectItem value={null} disabled>
+                No output devices available
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        <div className="flex flex-1 sm:w-[125px] gap-2">
+          <Button
+            variant={"outline"}
+            className="w-[125px]"
+            onClick={testDevice}
+          >
+            Test Output
+          </Button>
           <Button
             variant="outline"
             onClick={toggleMute}
             title="Test output device"
-            className={`flex gap-1 w-[125px] transition-colors ${isMuted ? "bg-red-100 hover:bg-red-200 text-red-500" : ""}`}
+            className={`flex w-[125px] gap-1 transition-colors ${isMuted ? "bg-red-100 text-red-500 hover:bg-red-200" : ""}`}
           >
-           
-            {isMuted ? <><MdVolumeOff /> MUTED</> : <><MdVolumeUp/> MUTE</>}
+            {isMuted ? (
+              <>
+                <MdVolumeOff /> MUTED
+              </>
+            ) : (
+              <>
+                <MdVolumeUp /> MUTE
+              </>
+            )}
           </Button>
         </div>
       </div>

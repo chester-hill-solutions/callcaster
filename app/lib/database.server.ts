@@ -313,20 +313,18 @@ export async function removeWorkspacePhoneNumber({
       .eq("id", numberId)
       .single();
     if (numberError) throw numberError;
-    const twilio = new Twilio.Twilio(
-      data.twilio_data.sid,
-      data.twilio_data.authToken,
-    );
+    const twilio = await createWorkspaceTwilioInstance({supabase: supabaseClient, workspace_id: workspaceId})
     const outgoingIds = await twilio.outgoingCallerIds.list({
       friendlyName: number.friendly_name,
     });
     outgoingIds.map(async (id) => {
-      return await twilio.outgoingCallerIds(id).remove();
+      return await twilio.outgoingCallerIds(id.sid).remove();
     });
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
       .delete()
       .eq("id", numberId);
+      
     if (deletionError) throw deletionError;
     return { error: null };
   } catch (error) {
@@ -555,7 +553,6 @@ export async function updateCampaignScript({
   scriptId,
   campaignType
 }) {
-  console.log(scriptId, campaignId)
   let tableKey: "live_campaign" | "ivr_campaign";
   if (campaignType === "live_call" || !campaignType) tableKey = "live_campaign";
   else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)) tableKey = "ivr_campaign";

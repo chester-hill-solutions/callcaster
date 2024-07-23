@@ -66,7 +66,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
-
+  
   return (
     <div
       style={{

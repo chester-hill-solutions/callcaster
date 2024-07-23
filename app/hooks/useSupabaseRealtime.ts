@@ -76,8 +76,8 @@ export const useSupabaseRealtime = ({
         "postgres_changes",
         { event: "*", schema: "public", table: "*" },
         handleChange
-      )
-      .subscribe();
+    )
+    .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
@@ -86,7 +86,9 @@ export const useSupabaseRealtime = ({
 
   useEffect(() => {
     if (recentAttempt) {
-      setDisposition(recentAttempt.disposition || recentAttempt.result?.status || null);
+      setDisposition((curr) => recentAttempt.disposition || recentAttempt.result?.status || curr);
+    } else {
+      setDisposition(null)
     }
   }, [disposition, recentAttempt]);
 

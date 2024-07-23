@@ -32,7 +32,6 @@ import { Toaster } from "sonner";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { useCallState } from "~/hooks/useCallState";
 import { Button } from "~/components/ui/button";
-import { MdVolumeMute } from "react-icons/md";
 import InputSelector from "~/components/InputSelector";
 import OutputSelector from "~/components/OutputSelector";
 import { formatTime, playTone } from "~/lib/utils";
@@ -533,10 +532,10 @@ const Campaign: React.FC = () => {
         }}
         className="mb-6"
       >
-        <div className="flex justify-between px-4">
+        <div className="flex justify-between px-4 flex-wrap">
           <div className="flex flex-col justify-between gap-2 py-4">
             {/* TITLES */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-w-[400px] gap-2 flex-wrap sm:flex-nowrap">
               <div className="px-1 font-Zilla-Slab">
                 <h1 className="text-3xl">{campaign.title}</h1>
                 <h4>
@@ -548,7 +547,7 @@ const Campaign: React.FC = () => {
               </Form>
             </div>
             {/* Inputs */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-wrap gap-2 sm:max-w-[500px]">
               {device && <InputSelector device={device} />}
               {device && <OutputSelector device={device} />}
             </div>

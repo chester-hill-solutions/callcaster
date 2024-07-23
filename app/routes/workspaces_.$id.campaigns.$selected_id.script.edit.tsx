@@ -138,7 +138,6 @@ export const action = async ({ request, params }) => {
     .select();
 
   if (updateError) {
-    console.log(updateError);
     return json({ success: false, error: updateError }, { headers });
   }
   return json({ success: false, error: updateError }, { headers });
@@ -154,7 +153,6 @@ export default function ScriptEditor() {
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
-    console.log(pageData)
     try {
       const response = await fetch('/api/campaigns', {
         method: !saveScriptAsCopy ? 'PATCH' : 'POST',
@@ -186,7 +184,6 @@ export default function ScriptEditor() {
   };
 
   const handlePageDataChange = (newPageData) => {
-    console.log(newPageData)
     setPageData(newPageData);
     let obj1 = initData;
     let obj2 = newPageData;
