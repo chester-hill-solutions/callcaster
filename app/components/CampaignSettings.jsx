@@ -262,7 +262,7 @@ const CampaignSettings = ({
               )}
               leftLabel="Power Dialer"
               rightLabel="Predictive Dialer" />
-            <form className="flex flex-col gap-2" onSubmit={handleAddDispositionOptions}>
+{/*             <form className="flex flex-col gap-2" onSubmit={handleAddDispositionOptions}>
               <label htmlFor="disposition-options">
                 Disposition Options
               </label>
@@ -273,7 +273,7 @@ const CampaignSettings = ({
               <div className="flex flex-col">
                 {details.disposition_options?.map((i, index) => (<p key={index}>{i.label}</p>))}
               </div>
-            </form>
+            </form> */}
           </div></>}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <span className="text-lg font-semibold">Audiences:</span>
