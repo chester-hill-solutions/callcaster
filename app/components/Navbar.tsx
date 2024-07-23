@@ -144,7 +144,7 @@ export default function Navbar({
         <div className="hidden items-center space-x-4 sm:flex">
         
         
-          <NavButton to="/">Home</NavButton>
+          {/* <NavButton to="/">Home</NavButton> */}
 {/*           <NavButton to="/services">Services</NavButton>
  */}          {!isSignedIn && (
             <>
