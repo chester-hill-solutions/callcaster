@@ -116,7 +116,7 @@ const ServiceShowcase = () => (
             </li>
           ))}
         </ul>
-        <p className="text-xl font-bold">Only $0.03 / Dial</p>
+        <p className="text-xl font-bold">Affordable per Dial pricing</p>
       </Card>
 
       <Card className="p-8" bgColor="bg-brand-secondary dark:bg-blue-900">

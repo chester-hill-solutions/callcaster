@@ -141,20 +141,20 @@ export default function Navbar({
         >
           CC
         </Link>
-        {workspaces && (
-          <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
-            <WorkspaceSelectorCombobox workspaces={workspaces} />
-          </div>
-        )}
         <div className="hidden items-center space-x-4 sm:flex">
+        
+        
           <NavButton to="/">Home</NavButton>
-          <NavButton to="/services">Services</NavButton>
-          {!isSignedIn && (
+{/*           <NavButton to="/services">Services</NavButton>
+ */}          {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
               <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
+          {workspaces && (
+          <NavButton to={"/workspaces"}>Workspaces</NavButton>
+        )}
           {user && (
             <UserDropdownMenu
               user={user}
