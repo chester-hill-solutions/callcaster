@@ -3,7 +3,7 @@ import MailService from "@sendgrid/mail";
 import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 
-export const action = async ({ request, params }) => {
+/* export const action = async ({ request, params }) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
@@ -24,4 +24,4 @@ export const action = async ({ request, params }) => {
     console.error('Error processing voicemail:', error);
     return json({ error: 'Failed to process voicemail' }, { status: 500 });
   }
-};
+}; */
