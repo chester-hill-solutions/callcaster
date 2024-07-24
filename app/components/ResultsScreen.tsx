@@ -17,6 +17,7 @@ const ResultsScreen = ({
   hasAccess,
   campaign_id,
   user_id,
+  isBusy
 }: ResultsScreenProps) => {
 
   return (
@@ -27,7 +28,7 @@ const ResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalCalls totalCalls={totalCalls} expectedTotal={expectedTotal} />
-          <ExportButton />
+          <ExportButton isBusy={isBusy}/>
         </div>
         <DispositionBreakdown
           results={results}

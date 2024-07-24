@@ -12,7 +12,7 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) return redirect("/signin");
 
   try {
-    const [campaignData, phoneNumbers, { data: mediaData }] = await Promise.all([
+    const [campaignData, {data: phoneNumbers}, { data: mediaData }] = await Promise.all([
       fetchCampaignWithAudience(supabaseClient, selected_id),
       getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
       supabaseClient.storage.from("workspaceAudio").list(workspace_id)
@@ -23,7 +23,6 @@ export const loader = async ({ request, params }) => {
     if (campaignData.type === "live_call" || campaignData.type === null) {
       mediaNames = await listMedia(supabaseClient, workspace_id);
     }
-
     return json({
       workspace_id,
       selected_id,

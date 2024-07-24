@@ -1,9 +1,9 @@
 import { Button } from "~/components/ui/button";
 import { Form } from "@remix-run/react";
 
-export const ExportButton = () => (
+export const ExportButton = ({isBusy}:{isBusy:boolean;}) => (
     <Form method="POST">
-      <Button type="submit">Export Results</Button>
+      <Button disabled={isBusy} type="submit">Export Results</Button>
     </Form>
   );
   
