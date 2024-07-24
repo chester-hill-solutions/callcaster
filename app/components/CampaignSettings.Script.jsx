@@ -213,6 +213,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         });
         setCurrentPage(newPageId);
     };
+
     const removeSection = (id) => {
         const newScriptData = scriptData;
         delete newScriptData.pages[id];
@@ -234,24 +235,29 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
     }
 
     const handleScriptChange = (value) => {
-        if (value === `create-new-${scripts.length + 1}`) navigate('../../../../scripts/new');
-        const newScript = scripts.find(script => script.id === value);
-        if (newScript) {
-            setScript(newScript);
-            setScriptData(newScript.steps)
-            const newPageData = {
-                ...pageData,
-                campaignDetails: {
-                    ...pageData.campaignDetails,
-                    script_id: newScript.id,
-                    script: newScript
-                }
+        if (value === `create-new-${scripts.length + 1}`) {
+            navigate('../../../../scripts/new');
+        } else {
+            const newScript = scripts.find(script => script.id === value);
+            if (newScript) {
+                setScript(newScript);
+                setScriptData(newScript.steps);
+                setCurrentPage(newScript.steps?.startPage || Object.values(scriptData.pages)[0].id || null);
+                setOpenBlock(null);
+                
+                const newPageData = {
+                    ...pageData,
+                    campaignDetails: {
+                        ...pageData.campaignDetails,
+                        script_id: newScript.id,
+                        script: newScript
+                    }
+                };
+                onPageDataChange(newPageData);
             }
-            setCurrentPage(scriptData?.startPage || null)
-            setOpenBlock(null)
-            onPageDataChange(newPageData);
         }
-    }
+    };
+
 
     const handleSectionNameChange = useCallback((event) => {
         const newTitle = event.target.value;

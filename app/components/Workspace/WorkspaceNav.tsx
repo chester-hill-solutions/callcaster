@@ -51,7 +51,7 @@ export default function WorkspaceNav({ workspace, isInChildRoute, userRole }) {
             </NavLink>
           {!userIsCaller && (
             <NavLink
-              to={isInChildRoute ? `../scripts` : `./scripts`}
+              to={isInChildRoute ? `./../scripts` : `./scripts`}
               relative="path"
               className={({ isActive, isPending }) =>
                 handleNavlinkStyles(isActive, isPending)
