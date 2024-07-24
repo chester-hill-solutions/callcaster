@@ -347,7 +347,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                         ))}
                     </div>
                     <div>
-                        <ScriptSelector />
+                        {scripts.length > 0 && <ScriptSelector />}
                     </div>
                 </div>
             </div>

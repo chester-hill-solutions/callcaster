@@ -113,7 +113,6 @@ export default function WorkspaceScripts() {
 
   useEffect(() => {
     if (actionData) {
-        console.log(actionData)
       const blob = new Blob([actionData.fileContent], { type: actionData.contentType });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
