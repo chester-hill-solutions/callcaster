@@ -95,7 +95,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 }
             }
         });
-
+        setOpenBlock(newBlockId)
         return newBlockId;
     };
 
@@ -213,6 +213,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         });
         setCurrentPage(newPageId);
     };
+
     const removeSection = (id) => {
         const newScriptData = scriptData;
         delete newScriptData.pages[id];
@@ -234,24 +235,29 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
     }
 
     const handleScriptChange = (value) => {
-        if (value === `create-new-${scripts.length + 1}`) navigate('../../../../scripts/new');
-        const newScript = scripts.find(script => script.id === value);
-        if (newScript) {
-            setScript(newScript);
-            setScriptData(newScript.steps)
-            const newPageData = {
-                ...pageData,
-                campaignDetails: {
-                    ...pageData.campaignDetails,
-                    script_id: newScript.id,
-                    script: newScript
-                }
+        if (value === `create-new-${scripts.length + 1}`) {
+            navigate('../../../../scripts/new');
+        } else {
+            const newScript = scripts.find(script => script.id === value);
+            if (newScript) {
+                setScript(newScript);
+                setScriptData(newScript.steps);
+                setCurrentPage(newScript.steps?.startPage || Object.values(scriptData.pages)[0].id || null);
+                setOpenBlock(null);
+                
+                const newPageData = {
+                    ...pageData,
+                    campaignDetails: {
+                        ...pageData.campaignDetails,
+                        script_id: newScript.id,
+                        script: newScript
+                    }
+                };
+                onPageDataChange(newPageData);
             }
-            setCurrentPage(scriptData?.startPage || null)
-            setOpenBlock(null)
-            onPageDataChange(newPageData);
         }
-    }
+    };
+
 
     const handleSectionNameChange = useCallback((event) => {
         const newTitle = event.target.value;
@@ -347,7 +353,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                         ))}
                     </div>
                     <div>
-                        <ScriptSelector />
+                        {scripts.length > 0 && <ScriptSelector />}
                     </div>
                 </div>
             </div>
@@ -407,8 +413,8 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 moveUp={() => moveBlock(blockId, -1)}
                                 moveDown={() => moveBlock(blockId, 1)}
                                 onUpdate={(newState) => updateBlock(blockId, newState)}
-                                openQuestion={openBlock}
-                                setOpenQuestion={setOpenBlock}
+                                openBlock={openBlock}
+                                setOpenBlock={setOpenBlock}
                                 dispatchState={(newState) => updateBlock(blockId, newState)}
                                 scriptData={scriptData}
                                 addNewBlock={addBlock}
@@ -432,8 +438,9 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 onUpdate={(newState) => updateBlock(blockId, newState)}
                                 onMoveDown={() => moveBlock(blockId, 1)}
                                 onMoveUp={() => moveBlock(blockId, -1)}
+                                openBlock={openBlock}
+                                setOpenBlock={setOpenBlock}
                                 pages={scriptData.pages || {}}
-                                isOpen={openBlock === blockId}
                                 onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
                                 mediaNames={mediaNames}
                             />

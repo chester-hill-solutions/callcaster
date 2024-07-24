@@ -71,20 +71,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
   else {
     steps = {pages:{}, blocks:{}}
   }
-  console.log(steps)
-  const { error } = await supabaseClient.from("script").insert({
+  const { data, error } = await supabaseClient.from("script").insert({
     name,
     type,
     steps,
     created_by: serverSession.user.id,
     workspace: workspaceId,
-  });
+  }).select();
 
   if (error) {
     return json({ success: false, error: error }, { headers });
   }
 
-  return json({ success: true, error: null }, { headers });
+  return json({ data, success: true, error: null }, { headers });
 }
 
 export default function NewScript() {
@@ -96,7 +95,7 @@ export default function NewScript() {
     useEffect(() => {
       if (actionData?.success) {
         toast.success("Script successfully added to your workspace!");
-        setTimeout(() => navigate("../", { relative: "path" }), 750);
+        setTimeout(() => navigate(`${actionData.data[0].id}`, { relative: "path" }), 750);
       } else if (actionData?.error) {
         toast.error(`Error: ${actionData.error.message || actionData.error}`);
       }

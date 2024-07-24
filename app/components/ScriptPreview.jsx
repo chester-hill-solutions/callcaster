@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MdOutlineAddCircleOutline } from "react-icons/md";
 import Result from "./CallList/CallContact/Result";
 
-const PageBlock = ({ block, data }) => (
-    <li className="p-4" style={{ borderTop: "2px solid #ccc" }}>
+const PageBlock = ({ block, data, index }) => (
+    <li className="p-4" style={{ borderTop: index > 0 ? "2px solid #ccc" : 'unset' }}>
         <div className="flex justify-between">
             <div style={{ width: "50%" }}>
                 <div><h4>{block.title}</h4></div>
@@ -78,8 +78,8 @@ export const ScriptPreview = ({ pageData }) => {
             <div className="relative flex flex-wrap">
                 <div className="flex flex-col">
                     {data.campaignDetails?.script?.steps?.pages &&
-                        Object.values(data.campaignDetails.script.steps.pages || {}).map((page) => (
-                            <Page key={page.id} page={page} data={data} />
+                        Object.values(data.campaignDetails.script.steps.pages || {}).map((page, index) => (
+                            <Page key={page.id} page={page} data={data} index={index} />
                         ))}
                 </div>
             </div>

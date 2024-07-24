@@ -154,23 +154,18 @@ export default function ScriptEditor() {
 
   const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
     try {
-      const response = await fetch('/api/campaigns', {
+      submit({
+        campaignData: pageData,
+        campaignDetails: pageData.campaignDetails,
+        scriptData: pageData.campaignDetails.script,
+        saveScriptAsCopy
+      }, {
         method: !saveScriptAsCopy ? 'PATCH' : 'POST',
-        body: JSON.stringify({
-          campaignData: pageData,
-          campaignDetails: pageData.campaignDetails,
-          scriptData: pageData.campaignDetails.script,
-          saveScriptAsCopy
-        }),
-        headers: { 'Content-Type': 'application/json' },
+        action: "/api/campaigns",
+        navigate:false,
+        encType:"application/json"
       });
-      const result = await response.json();
-  
-      if (result.error) {
-        throw new Error(result.error);
-      }
-  
-      setPageData(data);
+      setInitData(pageData)
       setChanged(false);
       setShowSaveModal(false);
   
@@ -199,7 +194,7 @@ export default function ScriptEditor() {
     delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
-
+  
   return (
     <>
       <div className="relative flex h-full flex-col overflow-visible">
