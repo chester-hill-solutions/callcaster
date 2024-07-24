@@ -118,10 +118,6 @@ export const action = async ({ request, params }) => {
     return stringField;
   };
 
-  const toUTF8 = (str) => {
-    return unescape(encodeURIComponent(str));
-  };
-
   const flattenedData = data.map((row) => {
     const flattenedRow = {};
     getAllKeys(row, "", flattenedRow);
@@ -156,6 +152,10 @@ export const action = async ({ request, params }) => {
     if ("id" in flattenedRow) {
       flattenedRow.attempt_id = flattenedRow.id;
       delete flattenedRow.id;
+    }
+    if ("contact_id" in flattenedRow) {
+      flattenedRow.callcaster_id = flattenedRow.contact_id;
+      delete flattenedRow.contact_id;
     }
 
     return flattenedRow;
