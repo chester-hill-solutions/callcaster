@@ -259,6 +259,7 @@ const Campaign: React.FC = () => {
 
   const {
     queue,
+    setQueue,
     predictiveQueue,
     callsList,
     attemptList,
@@ -320,11 +321,11 @@ const Campaign: React.FC = () => {
     calls: callsList,
   });
   const { dequeue, fetchMore } = handleQueue({
-    fetcher,
     submit,
     groupByHousehold,
     campaign,
     workspaceId,
+    setQueue
   });
 
   const handleResponse = useCallback(
@@ -450,6 +451,7 @@ const Campaign: React.FC = () => {
     campaign,
     workspaceId,
   );
+  
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext ||
       (window as any).webkitAudioContext)();
@@ -495,7 +497,7 @@ const Campaign: React.FC = () => {
       : displayState === "connected" || displayState === "dialing"
         ? "#4CA83D"
         : "#333333";
-        
+
   const handleDTMF = (key) => {
     if (audioContextRef.current) playTone(key, audioContextRef?.current);
     if (!activeCall) return;
