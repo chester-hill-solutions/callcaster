@@ -214,7 +214,7 @@ export const action = async ({ request, params }) => {
     console.error(update.error);
     throw update.error;
   }
-  return redirect('/workspaces');
+  return redirect("/workspaces");
 };
 
 const Campaign: React.FC = () => {
@@ -259,6 +259,7 @@ const Campaign: React.FC = () => {
 
   const {
     queue,
+    setQueue,
     predictiveQueue,
     callsList,
     attemptList,
@@ -320,11 +321,11 @@ const Campaign: React.FC = () => {
     calls: callsList,
   });
   const { dequeue, fetchMore } = handleQueue({
-    fetcher,
     submit,
     groupByHousehold,
     campaign,
     workspaceId,
+    setQueue
   });
 
   const handleResponse = useCallback(
@@ -405,11 +406,19 @@ const Campaign: React.FC = () => {
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
       handleNextNumber({ skipHousehold: true });
-      send({type: "HANG_UP"});
+      send({ type: "HANG_UP" });
       setRecentAttempt(null);
     }
-  }, [dequeue, fetchMore, handleNextNumber, handleQuickSave, householdMap, nextRecipient, send, setRecentAttempt]);
-
+  }, [
+    dequeue,
+    fetchMore,
+    handleNextNumber,
+    handleQuickSave,
+    householdMap,
+    nextRecipient,
+    send,
+    setRecentAttempt,
+  ]);
 
   useEffect(() => {
     if (nextRecipient) {
@@ -442,6 +451,7 @@ const Campaign: React.FC = () => {
     campaign,
     workspaceId,
   );
+  
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext ||
       (window as any).webkitAudioContext)();
@@ -475,18 +485,6 @@ const Campaign: React.FC = () => {
     activeCall,
   );
 
-  const handleDTMF = (key) => {
-    playTone(key, audioContextRef?.current);
-    if (!activeCall) return;
-    else {
-      activeCall?.sendDigits(key);
-    }
-  };
-  const handleKeypress = (e) => {
-    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(e.key)
-      ? handleDTMF(e.key)
-      : null;
-  };
   const house =
     householdMap[
       Object.keys(householdMap).find(
@@ -500,25 +498,27 @@ const Campaign: React.FC = () => {
         ? "#4CA83D"
         : "#333333";
 
+  const handleDTMF = (key) => {
+    if (audioContextRef.current) playTone(key, audioContextRef?.current);
+    if (!activeCall) return;
+    else {
+      activeCall?.sendDigits(key);
+    }
+  };
+
   useEffect(() => {
+    const handleKeypress = (e) => {
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(
+        e.key,
+      )
+        ? handleDTMF(e.key)
+        : null;
+    };
+
     window.addEventListener("keypress", handleKeypress);
 
     return () => window.removeEventListener("keypress", handleKeypress);
-  }, [handleKeypress]);
-  
-  useEffect(() => {
-    const handleBeforeUnload = (event) => {
-      submit(null, { method: 'POST' });
-      event.preventDefault();
-      event.returnValue = '';
-    };
-  
-    //window.addEventListener('beforeunload', handleBeforeUnload);
-  
-    return () => {
-      //window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [submit]);
+  }, [activeCall]);
 
   return (
     <main className="container mx-auto p-6">
@@ -532,10 +532,10 @@ const Campaign: React.FC = () => {
         }}
         className="mb-6"
       >
-        <div className="flex justify-between px-4 flex-wrap">
+        <div className="flex flex-wrap justify-between px-4">
           <div className="flex flex-col justify-between gap-2 py-4">
             {/* TITLES */}
-            <div className="flex items-center justify-between max-w-[400px] gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex max-w-[400px] flex-wrap items-center justify-between gap-2 sm:flex-nowrap">
               <div className="px-1 font-Zilla-Slab">
                 <h1 className="text-3xl">{campaign.title}</h1>
                 <h4>
@@ -547,7 +547,7 @@ const Campaign: React.FC = () => {
               </Form>
             </div>
             {/* Inputs */}
-            <div className="space-y-2 flex flex-wrap gap-2 sm:max-w-[500px]">
+            <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px]">
               {device && <InputSelector device={device} />}
               {device && <OutputSelector device={device} />}
             </div>

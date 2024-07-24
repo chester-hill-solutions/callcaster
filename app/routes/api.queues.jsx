@@ -1,23 +1,20 @@
 import { json } from "@remix-run/node";
-import { createSupabaseServerClient } from "../lib/supabase.server";
+import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "../lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
-    const { supabaseClient: supabase } = createSupabaseServerClient(request);
+    const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const campaign_id = searchParams.get('campaign_id');
-    const limit = searchParams.get('limit') ?? 5;
+    const limit = searchParams.get('limit') ?? 6;
     if (parseInt(limit) === 0) {
         return json([]);
     }
 
-    const { data: contacts, error: contactsError } = limit > 0 ? await supabase.rpc('get_contacts_by_households', { selected_campaign_id: campaign_id, households_limit: limit }).order('attempts').order('id',{ascending:true}).order('queue_order', {ascending:true}) : { data: [], error: null };
-
-    if (contactsError) {
-        console.error(contactsError);
-        return json({ error: contactsError.message });
-    }
-    return json(contacts);
+    const { data: newQueue, error: newQueueError } = await supabase.rpc('select_and_update_campaign_contacts', {p_campaign_id:campaign_id, p_initial_limit:limit})
+    if (newQueueError || !newQueue.length) return json([]);
+    const {data: queueItems, error: queueItemsError} = await supabase.from('campaign_queue').select('*, contact(*)').in('id', newQueue.map((i) => i.queue_id));
+    return json(queueItems);
 };
 
 export const action = async ({ request, params }) => {

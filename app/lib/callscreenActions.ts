@@ -117,12 +117,13 @@ export const handleContact = ({
   return { switchQuestionContact, nextNumber };
 };
 
+
 export const handleQueue = ({
-  fetcher,
   submit,
   groupByHousehold,
   campaign,
   workspaceId,
+  setQueue
 }) => {
   const dequeue = ({ contact }) => {
     submit(
@@ -139,15 +140,38 @@ export const handleQueue = ({
       },
     );
   };
-  const fetchMore = ({ householdMap }) => {
+
+const updateQueue = (newContacts) => {
+  setQueue(prevQueue => {
+    const existingHouseholds = new Map();
+    prevQueue.forEach(contact => {
+      const address = contact.contact.address;
+      if (!existingHouseholds.has(address)) {
+        existingHouseholds.set(address, []);
+      }
+      existingHouseholds.get(address).push(contact);
+    });
+
+    newContacts.forEach(newContact => {
+      const address = newContact.contact.address;
+      if (existingHouseholds.has(address)) {
+        const household = existingHouseholds.get(address);
+        if (!household.some(c => c.queue_id === newContact.queue_id)) {
+          household.push(newContact);
+        }
+      } else {
+        existingHouseholds.set(address, [newContact]);
+      }
+    });
+    return Array.from(existingHouseholds.values()).flat();
+  });
+};
+
+  const fetchMore = async ({ householdMap }) => {
     const map = {...householdMap};
-    const length = Math.max(0, 5 - Object.keys(map).length)
-    fetcher.load(
-      `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`,
-      {
-        navigate: false,
-      },
-    );
+    const length = Math.max(0, 6 - Object.keys(map).length)
+    const res = await fetch(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`).then(res => res.json()).catch(error => console.log('Unable to fetch queue: ', error));
+    updateQueue(res);
   };
   return { dequeue, fetchMore };
 };
