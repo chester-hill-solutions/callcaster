@@ -18,7 +18,7 @@ export default function WorkspaceNav({ workspace, isInChildRoute, userRole }) {
 
   const userIsCaller = userRole === MemberRole.Caller;
   const path = useLocation().pathname;
-  const isEnd = !path.includes("audios") && !path.includes("audiences");
+  const isEnd = !path.includes("audios") && !path.includes("audiences") && !path.includes("scripts");
 
   return (
     <div className="flex flex-col justify-center">

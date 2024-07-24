@@ -22,7 +22,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (workspaceId == null) {
     return json(
       {
-        audioMedia: null,
         workspace: null,
         error: "Workspace does not exist",
         userRole: null,
@@ -107,7 +106,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     },
   );
 }
-export default function WorkspaceAudio() {
+export default function WorkspaceScripts() {
   const { scripts, error, userRole, workspace } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -137,7 +136,7 @@ export default function WorkspaceAudio() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null
-            ? `${workspace?.name} Audio Library`
+            ? `${workspace?.name} Script Library`
             : "No Workspace"}
         </h1>
         <div className="flex items-center gap-4">

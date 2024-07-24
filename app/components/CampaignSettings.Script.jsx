@@ -95,7 +95,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 }
             }
         });
-
+        setOpenBlock(newBlockId)
         return newBlockId;
     };
 
@@ -407,8 +407,8 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 moveUp={() => moveBlock(blockId, -1)}
                                 moveDown={() => moveBlock(blockId, 1)}
                                 onUpdate={(newState) => updateBlock(blockId, newState)}
-                                openQuestion={openBlock}
-                                setOpenQuestion={setOpenBlock}
+                                openBlock={openBlock}
+                                setOpenBlock={setOpenBlock}
                                 dispatchState={(newState) => updateBlock(blockId, newState)}
                                 scriptData={scriptData}
                                 addNewBlock={addBlock}
@@ -432,8 +432,9 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 onUpdate={(newState) => updateBlock(blockId, newState)}
                                 onMoveDown={() => moveBlock(blockId, 1)}
                                 onMoveUp={() => moveBlock(blockId, -1)}
+                                openBlock={openBlock}
+                                setOpenBlock={setOpenBlock}
                                 pages={scriptData.pages || {}}
-                                isOpen={openBlock === blockId}
                                 onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
                                 mediaNames={mediaNames}
                             />
