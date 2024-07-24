@@ -8,8 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Volume, Volume2 } from "lucide-react";
-import { MdVolumeMute, MdVolumeOff, MdVolumeUp } from "react-icons/md";
+import { MdVolumeOff, MdVolumeUp } from "react-icons/md";
 
 interface OutputSelectorProps {
   device: Device;
@@ -22,49 +21,84 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const getDefaultDevice = useCallback(() => {
+    if (!device?.audio) return null;
+    const speakerDevices = device.audio.speakerDevices.get();
+    return speakerDevices.size > 0 ? Array.from(speakerDevices)[0] : null;
+  }, [device]);
 
   const handleDeviceChange = useCallback(() => {
     if (!device?.audio) {
       setError("Audio interface is not available");
+      setIsLoading(false);
       return;
     }
+
     const availableDevices = device.audio.availableOutputDevices;
 
-    if (!availableDevices) {
+    if (!availableDevices || availableDevices.size === 0) {
       setError("No output devices available");
+      setIsLoading(false);
       return;
     }
-
     setOutputDevices(availableDevices);
-    if (!selectedDeviceId) {
-      const speakerDevices = device.audio.speakerDevices.get();
-      if (speakerDevices.size > 0) {
-        setSelectedDeviceId(Array.from(speakerDevices)[0].deviceId);
-      }
+
+    const defaultDevice = getDefaultDevice();
+    if (
+      defaultDevice &&
+      (!selectedDeviceId || !availableDevices.has(selectedDeviceId))
+    ) {
+      setSelectedDeviceId(defaultDevice.deviceId);
     }
-  }, [device, selectedDeviceId]);
+
+    setIsLoading(false);
+    setError(null);
+  }, [device, selectedDeviceId, getDefaultDevice]);
+
+  const initializeDevices = useCallback(() => {
+    let retryCount = 0;
+    const maxRetries = 5;
+    const retryInterval = 1000; 
+
+    const tryInitialize = () => {
+      if (device?.audio?.availableOutputDevices?.size > 0) {
+        handleDeviceChange();
+      } else if (retryCount < maxRetries) {
+        retryCount++;
+        setTimeout(tryInitialize, retryInterval);
+      } else {
+        setError("Failed to initialize audio devices after multiple attempts");
+        setIsLoading(false);
+      }
+    };
+
+    tryInitialize();
+  }, [device, handleDeviceChange]);
 
   useEffect(() => {
     if (!device) {
       setError("Device is undefined");
+      setIsLoading(false);
       return;
     }
 
     device.audio?.on("deviceChange", handleDeviceChange);
 
-    handleDeviceChange();
+    initializeDevices();
 
     return () => {
       device.audio?.off("deviceChange", handleDeviceChange);
     };
-  }, [device, handleDeviceChange]);
-
+  }, [device, handleDeviceChange, initializeDevices]);
   const handleDeviceSelection = async (deviceId: string) => {
     try {
       await device?.audio?.speakerDevices.set(deviceId);
       await device?.audio?.ringtoneDevices.set(deviceId);
       setSelectedDeviceId(deviceId);
       setError(null);
+      console.log("Successfully set output device:", deviceId);
     } catch (error) {
       console.error("Failed to set output device:", error);
       setError(`Failed to set output device: ${error.message}`);
@@ -80,57 +114,62 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
   };
 
   const testDevice = () => {
-    device.audio?.speakerDevices?.test();
+    if (device?.audio?.speakerDevices) {
+      device.audio.speakerDevices.test();
+      console.log("Testing device:", selectedDeviceId);
+    } else {
+      console.error("Speaker devices not available for testing");
+    }
   };
 
   const deviceEntries = Array.from(outputDevices.entries());
 
+  if (isLoading) {
+    return <div>Loading audio devices...</div>;
+  }
+
   return (
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select output device" />
-          </SelectTrigger>
-          <SelectContent>
-            {deviceEntries.length > 0 ? (
-              deviceEntries.map(([id, info]) => (
-                <SelectItem key={id} value={id}>
-                  {info?.label || `Device ${id.slice(0, 5)}...`}
-                </SelectItem>
-              ))
-            ) : (
-              <SelectItem value={null} disabled>
-                No output devices available
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
+        <SelectTrigger className="w-[200px]">
+          <SelectValue placeholder="Select output device" />
+        </SelectTrigger>
+        <SelectContent>
+        {deviceEntries.length > 0 ? (
+            deviceEntries.map(([id, info]) => (
+              <SelectItem key={id} value={id}>
+                {info?.label || `Device ${id.slice(0, 5)}...`}
               </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
-        <div className="flex flex-1 sm:w-[125px] gap-2">
-          <Button
-            variant={"outline"}
-            className="w-[125px]"
-            onClick={testDevice}
-          >
-            Test Output
-          </Button>
-          <Button
-            variant="outline"
-            onClick={toggleMute}
-            title="Test output device"
-            className={`flex w-[125px] gap-1 transition-colors ${isMuted ? "bg-red-100 text-red-500 hover:bg-red-200" : ""}`}
-          >
-            {isMuted ? (
-              <>
-                <MdVolumeOff /> MUTED
-              </>
-            ) : (
-              <>
-                <MdVolumeUp /> MUTE
-              </>
-            )}
-          </Button>
-        </div>
+            ))
+          ) : (
+            <SelectItem value={"none"} disabled>
+              No output devices available
+            </SelectItem>
+          )}
+        </SelectContent>
+      </Select>
+      <div className="flex flex-1 gap-2 sm:w-[125px]">
+        <Button variant={"outline"} className="w-[125px]" onClick={testDevice}>
+          Test Output
+        </Button>
+        <Button
+          variant="outline"
+          onClick={toggleMute}
+          title="Test output device"
+          className={`flex w-[125px] gap-1 transition-colors ${isMuted ? "bg-red-100 text-red-500 hover:bg-red-200" : ""}`}
+        >
+          {isMuted ? (
+            <>
+              <MdVolumeOff /> MUTED
+            </>
+          ) : (
+            <>
+              <MdVolumeUp /> MUTE
+            </>
+          )}
+        </Button>
       </div>
+    </div>
   );
 };
 

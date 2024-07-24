@@ -161,7 +161,7 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
                 </SelectItem>
               ))
             ) : (
-              <SelectItem value={null} disabled>
+              <SelectItem value={"none"} disabled>
                 No input devices available
               </SelectItem>
             )}
