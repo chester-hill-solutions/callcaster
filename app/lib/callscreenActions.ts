@@ -169,7 +169,7 @@ const updateQueue = (newContacts) => {
 
   const fetchMore = async ({ householdMap }) => {
     const map = {...householdMap};
-    const length = Math.max(0, 6 - Object.keys(map).length)
+    const length = Math.max(0, 10 - Object.keys(map).length)
     const res = await fetch(`/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`).then(res => res.json()).catch(error => console.log('Unable to fetch queue: ', error));
     updateQueue(res);
   };

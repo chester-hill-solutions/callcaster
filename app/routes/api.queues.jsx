@@ -6,7 +6,7 @@ export const loader = async ({ request, params }) => {
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const campaign_id = searchParams.get('campaign_id');
-    const limit = searchParams.get('limit') ?? 6;
+    const limit = searchParams.get('limit') ?? 10;
     if (parseInt(limit) === 0) {
         return json([]);
     }
