@@ -194,7 +194,7 @@ export default function ScriptEditor() {
     delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
-  console.log(pageData.campaignDetails.script)
+  
   return (
     <>
       <div className="relative flex h-full flex-col overflow-visible">

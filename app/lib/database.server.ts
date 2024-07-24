@@ -619,3 +619,51 @@ export const fetchCampaignDetails = async (supabaseClient, campaignId, workspace
   }
   return data;
 };
+
+export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
+  const { data, error } = await supabaseClient
+    .from("campaign")
+    .select(`*, campaign_audience(*)`)
+    .eq("id", campaignId)
+    .single();
+
+  if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
+  return data;
+};
+
+
+export const fetchAdvancedCampaignDetails = async (supabaseClient, campaignId, campaignType, workspaceId) => {
+  let table, extraSelect = '';
+  switch (campaignType) {
+    case "live_call":
+    case null:
+      table = "live_campaign";
+      extraSelect = ', script(*)';
+      break;
+    case "message":
+      table = "message_campaign";
+      break;
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      table = "ivr_campaign";
+      extraSelect = ', script(*)';
+      break;
+    default:
+      throw new Error(`Invalid campaign type: ${campaignType}`);
+  }
+
+  const { data, error } = await supabaseClient
+    .from(table)
+    .select(`*${extraSelect}`)
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
+
+  if (campaignType === "message" && data?.message_media?.length > 0) {
+    data.mediaLinks = await getSignedUrls(supabaseClient, workspaceId, data.message_media);
+  }
+
+  return data;
+};
