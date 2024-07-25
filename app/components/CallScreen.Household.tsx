@@ -1,6 +1,6 @@
 import { CheckCircleIcon } from "lucide-react";
 
-export const Household = ({ house, switchQuestionContact, attemptList, questionContact }) => {
+export const Household = ({ house, switchQuestionContact, attemptList, questionContact, isBusy }) => {
   const isSelected = house?.find((contact) => contact?.id === questionContact?.id)
   return (
     <div
@@ -38,7 +38,7 @@ export const Household = ({ house, switchQuestionContact, attemptList, questionC
         <div
           key={contact.id}
           className={`flex justify-center p-2 m-1 rounded-2xl  ${isSelected?.id === contact?.id ? "bg-gray-100 border-primary border-2" : 'bg-secondary'} hover:shadow-inner-lg hover:opacity-85 hover:bg-gray-100 transition-all`}
-          onClick={() => switchQuestionContact({ contact })}
+          onClick={() => !isBusy && switchQuestionContact({ contact })}
         >
           <div className="flex flex-auto items-center justify-between font-semibold font-Zilla-Slab text-lg dark:text-slate-800">
             <div>

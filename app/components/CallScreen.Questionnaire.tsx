@@ -41,6 +41,7 @@ interface CallQuestionnaireProps {
   nextRecipient: QueueItem | null;
   handleQuickSave: () => void;
   disabled: boolean;
+  isBusy: boolean;
 }
 const CallQuestionnaire = ({
   handleResponse,
@@ -49,11 +50,13 @@ const CallQuestionnaire = ({
   nextRecipient: contact,
   handleQuickSave,
   disabled,
+  isBusy
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
   const [currentPageId, setCurrentPageId] = useState(
     Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
   );
+  
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
   useEffect(() => {
@@ -140,6 +143,7 @@ const CallQuestionnaire = ({
               }
             }}
             disabled={
+              isBusy ||
               currentPageId ===
               Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
             }
@@ -155,6 +159,7 @@ const CallQuestionnaire = ({
               }
             }}
             disabled={
+              isBusy ||
               currentPageId ===
               Object.keys(campaignDetails.script?.steps.pages || {})[
                 Object.keys(campaignDetails.script?.steps.pages || {}).length - 1
@@ -167,7 +172,7 @@ const CallQuestionnaire = ({
         <div className="flex justify-end p-2">
           <Button
             onClick={handleQuickSave}
-            disabled={navigation.state !== "idle"}
+            disabled={isBusy}
           >
             Save
           </Button>

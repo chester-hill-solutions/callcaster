@@ -9,15 +9,14 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { MdVolumeOff, MdVolumeUp } from "react-icons/md";
+import DeviceSelector from "./AudioSelector";
 
 interface OutputSelectorProps {
   device: Device;
 }
 
 const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
-  const [outputDevices, setOutputDevices] = useState<
-    Map<string, MediaDeviceInfo>
-  >(new Map());
+  const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -35,15 +34,14 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
       setIsLoading(false);
       return;
     }
-
     const availableDevices = device.audio.availableOutputDevices;
-
     if (!availableDevices || availableDevices.size === 0) {
       setError("No output devices available");
       setIsLoading(false);
       return;
     }
-    setOutputDevices(availableDevices);
+    const deviceArray = Array.from(availableDevices.values());
+    setOutputDevices(deviceArray);
 
     const defaultDevice = getDefaultDevice();
     if (
@@ -60,7 +58,7 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
   const initializeDevices = useCallback(() => {
     let retryCount = 0;
     const maxRetries = 5;
-    const retryInterval = 1000; 
+    const retryInterval = 1000;
 
     const tryInitialize = () => {
       if (device?.audio?.availableOutputDevices?.size > 0) {
@@ -92,18 +90,7 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
       device.audio?.off("deviceChange", handleDeviceChange);
     };
   }, [device, handleDeviceChange, initializeDevices]);
-  const handleDeviceSelection = async (deviceId: string) => {
-    try {
-      await device?.audio?.speakerDevices.set(deviceId);
-      await device?.audio?.ringtoneDevices.set(deviceId);
-      setSelectedDeviceId(deviceId);
-      setError(null);
-      console.log("Successfully set output device:", deviceId);
-    } catch (error) {
-      console.error("Failed to set output device:", error);
-      setError(`Failed to set output device: ${error.message}`);
-    }
-  };
+
 
   const toggleMute = () => {
     if (device?.audio) {
@@ -122,32 +109,17 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
     }
   };
 
-  const deviceEntries = Array.from(outputDevices.entries());
-
   if (isLoading) {
     return <div>Loading audio devices...</div>;
   }
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <Select onValueChange={handleDeviceSelection} value={selectedDeviceId}>
-        <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="Select output device" />
-        </SelectTrigger>
-        <SelectContent>
-        {deviceEntries.length > 0 ? (
-            deviceEntries.map(([id, info]) => (
-              <SelectItem key={id} value={id}>
-                {info?.label || `Device ${id.slice(0, 5)}...`}
-              </SelectItem>
-            ))
-          ) : (
-            <SelectItem value={"none"} disabled>
-              No output devices available
-            </SelectItem>
-          )}
-        </SelectContent>
-      </Select>
+      <DeviceSelector
+        devices={outputDevices}
+        onDeviceChange={setSelectedDeviceId}
+        selectedDeviceId={selectedDeviceId}
+      />
       <div className="flex flex-1 gap-2 sm:w-[125px]">
         <Button variant={"outline"} className="w-[125px]" onClick={testDevice}>
           Test Output
