@@ -1,4 +1,4 @@
-import { Form, Link, NavLink, useLoaderData } from "@remix-run/react";
+import { Form, Link, NavLink, useLoaderData, useNavigation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -27,7 +27,7 @@ export const loader = async ({ request }) => {
   return { user: serverSession.user };
 };
 
-const ContactForm = () => (
+const ContactForm = ({isBusy}) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
     <h2 className="mb-6 text-center text-3xl font-bold">Get In Touch</h2>
     <div className="flex flex-wrap gap-8">
@@ -47,9 +47,9 @@ const ContactForm = () => (
           We have the tools and expertise to support your goals. Get in touch with us today to see if we're the right fit for your business. Let's explore how CallCaster can elevate your communication strategy!
         </p>
       </div>
-      <Card className="flex-1 min-w-[300px] bg-white dark:bg-zinc-800">
+      <Card className="flex-1 min-w-[300px] dark:bg-zinc-800 bg-secondary">
         <CardContent>
-          <Form className="space-y-4">
+          <Form className="space-y-4" action="/api/contact-form" method="POST" navigate={false}>
             <div>
               <label
                 htmlFor="name"
@@ -96,6 +96,7 @@ const ContactForm = () => (
               ></textarea>
             </div>
             <Button
+            disabled={isBusy}
               type="submit"
               className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
             >
@@ -356,7 +357,8 @@ const LoginSection = () => (
   </Card>
 );
 export default function Index() {
-  const { user } = useLoaderData();
+  const {state}= useNavigation();
+  const isBusy = state !== "idle"
   return (
     <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
       <div className="z-10 w-full max-w-6xl space-y-16">
@@ -367,7 +369,7 @@ export default function Index() {
 
         <div>
           <div className="animate-fade-in-up animation-delay-900 mb-16 font-Zilla-Slab">
-            <ContactForm />
+            <ContactForm isBusy={isBusy}/>
           </div>
         </div>
       </div>

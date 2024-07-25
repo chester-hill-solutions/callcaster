@@ -3,7 +3,7 @@ import MailService from "@sendgrid/mail";
 import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 
-/* export const action = async ({ request, params }) => {
+export const action = async ({ request, params }) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
@@ -12,10 +12,10 @@ import { createWorkspaceTwilioInstance } from "~/lib/database.server";
     const msg = {
       to: 'info@callcaster.ca',
       from: "info@callcaster.ca",
-      replyTo
-      subject: `A new email from ${data.from}`,
-      text: `A new `,
-      html: `<p>A new voicemail has been recorded for you, you can listen to it at <a href="${signedUrl}">this link</a>.</p>`,
+      reply_to: data.email,
+      subject: `A new form submission from ${data.email}`,
+      text: `From: ${data.name}, ${data.message}`,
+      html: `<p>From: ${data.name}.</p><br/>${data.message}`,
     };
 
     const result = await MailService.send(msg);
@@ -24,4 +24,4 @@ import { createWorkspaceTwilioInstance } from "~/lib/database.server";
     console.error('Error processing voicemail:', error);
     return json({ error: 'Failed to process voicemail' }, { status: 500 });
   }
-}; */
+};
