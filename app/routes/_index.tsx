@@ -1,4 +1,4 @@
-import { Form, Link, NavLink } from "@remix-run/react";
+import { Form, Link, NavLink, useLoaderData, useNavigation } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -16,6 +16,99 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
+import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+
+export const loader = async ({ request }) => {
+  const {
+    supabaseClient: supabase,
+    headers,
+    serverSession,
+  } = await getSupabaseServerClientWithSession(request);
+  return { user: serverSession.user };
+};
+
+const ContactForm = ({isBusy}) => (
+  <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
+    <h2 className="mb-6 text-center text-3xl font-bold">Get In Touch</h2>
+    <div className="flex flex-wrap gap-8">
+      <div className="flex-1 min-w-[300px]">
+        <h3 className="text-2xl font-semibold mb-4">We Support All Kinds of Businesses</h3>
+        <p className="mb-4 text-lg">
+          At CallCaster, we understand that every business has unique communication needs. Whether you're a:
+        </p>
+        <ul className="list-disc list-inside mb-4 space-y-2">
+          <li>Small startup looking to grow</li>
+          <li>Medium-sized company aiming to streamline operations</li>
+          <li>Large enterprise seeking advanced communication solutions</li>
+          <li>Non-profit organization reaching out to supporters</li>
+          <li>Political campaign connecting with voters</li>
+        </ul>
+        <p className="text-lg">
+          We have the tools and expertise to support your goals. Get in touch with us today to see if we're the right fit for your business. Let's explore how CallCaster can elevate your communication strategy!
+        </p>
+      </div>
+      <Card className="flex-1 min-w-[300px] dark:bg-zinc-800 bg-secondary">
+        <CardContent>
+          <Form className="space-y-4" action="/api/contact-form" method="POST" navigate={false}>
+            <div>
+              <label
+                htmlFor="name"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                required
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="message"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+              >
+                Message
+              </label>
+              <textarea
+                id="message"
+                name="message"
+                rows={4}
+                required
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+              ></textarea>
+            </div>
+            <Button
+            disabled={isBusy}
+              type="submit"
+              className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
+            >
+              Send Message
+            </Button>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+);
+
 
 const FeatureCard = ({
   icon: Icon,
@@ -48,15 +141,15 @@ const WhyPhoneCalls = () => (
       Why CallCaster Phone Calls?
     </h2>
     <div className="flex flex-wrap-reverse">
-      <div className="flex flex-col min-w-[300px] px-4">
+      <div className="flex min-w-[300px] flex-col px-4">
         <div className="hidden sm:flex">
           <PersonImage />
         </div>
-        <Button asChild className="text-2xl self-center" size={"lg"}>
+        <Button asChild className="self-center text-2xl" size={"lg"}>
           <NavLink to={"./signup"}>Sign Up</NavLink>
         </Button>
       </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 flex-1">
+      <div className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-2">
         <FeatureCard
           icon={Phone}
           title="Direct Connection"
@@ -264,6 +357,8 @@ const LoginSection = () => (
   </Card>
 );
 export default function Index() {
+  const {state}= useNavigation();
+  const isBusy = state !== "idle"
   return (
     <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
       <div className="z-10 w-full max-w-6xl space-y-16">
@@ -271,7 +366,12 @@ export default function Index() {
         <WhyPhoneCalls />
         <ServiceShowcase />
         <EnhancedOutreachSection />
-        <LoginSection />
+
+        <div>
+          <div className="animate-fade-in-up animation-delay-900 mb-16 font-Zilla-Slab">
+            <ContactForm isBusy={isBusy}/>
+          </div>
+        </div>
       </div>
     </main>
   );
