@@ -110,8 +110,9 @@ const MergedQuestionBlock = ({
   blocks,
   type,
   mediaNames,
+ openBlock,
+ setOpenBlock,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [localBlock, setLocalBlock] = useState(block);
 
   const questionTypes =
@@ -236,7 +237,7 @@ const MergedQuestionBlock = ({
         <div className="flex items-center justify-between">
           <CardTitle
             className="w-full cursor-pointer"
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={() => setOpenBlock((curr) => curr !== block.id ? block.id : null)}
           >
             {localBlock?.title || `Block ${localBlock?.id}`}
           </CardTitle>
@@ -253,7 +254,7 @@ const MergedQuestionBlock = ({
           </div>
         </div>
       </CardHeader>
-      {isOpen && (
+      {openBlock === block.id && (
         <CardContent>
           <div className="space-y-4">
             <TextInput

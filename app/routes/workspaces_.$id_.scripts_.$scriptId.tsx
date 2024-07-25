@@ -102,7 +102,7 @@ export default function ScriptEditor() {
       const response = await fetch("/api/scripts", {
         method: "PATCH",
         body: JSON.stringify({
-          scriptData: script,
+          ...script
         }),
         headers: { "Content-Type": "application/json" },
       });

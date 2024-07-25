@@ -471,6 +471,7 @@ export async function updateCampaign({
   const id = campaignDetails.campaign_id
   delete updateData.campaign_id;
   delete updateData.questions;
+  delete updateData.created_at;
 
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
@@ -515,30 +516,32 @@ export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, cam
   const { id, ...updateData } = scriptData;
   const {data: originalScript, error: fetchScriptError} = id ? await supabase.from('script').select().eq('id', id) : {data: null, error: null};
   let scriptOperation;
+  const upsertData = {
+    ...scriptData,
+    name: saveAsCopy && originalScript?.name === updateData.name ? `${updateData.name} (Copy)` : updateData.name,
+    ...(saveAsCopy || !id ? {updated_by: created_by, updated_at: created_at} : {created_by, created_at})
+  }
+
   if (saveAsCopy || !id) {
+    delete upsertData.id
     scriptOperation = supabase
       .from("script")
-      .insert({
-        ...scriptData,
-        name: saveAsCopy && originalScript?.name === updateData.name ? `${updateData.name} (Copy)` : updateData.name,
-        created_by,
-        created_at,
-        workspace: campaignData.workspace
-      })
+      .insert(upsertData)
       .select();
       
   } else {
     scriptOperation = supabase
       .from("script")
-      .update({...scriptData, updated_by: created_by, updated_at: created_at})
+      .update(upsertData)
       .eq("id", id)
       .select();
   }
   const { data: updatedScript, error: scriptError } = await scriptOperation;
   if (scriptError) {
     if (scriptError.code === "23505") {
+      console.log(scriptError)
       throw new Error(
-        "A script with this name already exists in the workspace",
+        `A script with this name (${upsertData.name}) already exists in the workspace`,
       );
     }
     throw scriptError;
@@ -565,3 +568,103 @@ export async function updateCampaignScript({
 
   if (scriptIdUpdateError) throw scriptIdUpdateError;
 }
+
+export const fetchBasicResults = async (supabaseClient, campaignId, headers) => {
+  const { data, error } = await supabaseClient.rpc(
+    "get_basic_results",
+    { campaign_id_param: campaignId },
+    { headers }
+  );
+  if (error) console.error('Error fetching basic results:', error);
+  return data || [];
+};
+
+export const fetchCampaignData = async (supabaseClient, campaignId) => {
+  const { data, error } = await supabaseClient
+    .from("campaign")
+    .select(`
+      type,
+      dial_type,
+      title,
+      campaign_audience(*)
+    `)
+    .eq("id", campaignId)
+    .single();
+  if (error) console.error('Error fetching campaign data:', error);
+  return data;
+};
+
+export const fetchCampaignDetails = async (supabaseClient, campaignId, workspaceId, tableName) => {
+  const { data, error } = await supabaseClient
+    .from(tableName)
+    .select()
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      const { data: newCampaign, error: newCampaignError } = await supabaseClient
+        .from(tableName)
+        .insert({ campaign_id: campaignId, workspace: workspaceId })
+        .select()
+        .single();
+
+      if (newCampaignError) {
+        console.error(`Error creating new ${tableName}:`, newCampaignError);
+        return null;
+      }
+      return newCampaign;
+    }
+    console.error(`Error fetching ${tableName}:`, error);
+    return null;
+  }
+  return data;
+};
+
+export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
+  const { data, error } = await supabaseClient
+    .from("campaign")
+    .select(`*, campaign_audience(*)`)
+    .eq("id", campaignId)
+    .single();
+
+  if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
+  return data;
+};
+
+
+export const fetchAdvancedCampaignDetails = async (supabaseClient, campaignId, campaignType, workspaceId) => {
+  let table, extraSelect = '';
+  switch (campaignType) {
+    case "live_call":
+    case null:
+      table = "live_campaign";
+      extraSelect = ', script(*)';
+      break;
+    case "message":
+      table = "message_campaign";
+      break;
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      table = "ivr_campaign";
+      extraSelect = ', script(*)';
+      break;
+    default:
+      throw new Error(`Invalid campaign type: ${campaignType}`);
+  }
+
+  const { data, error } = await supabaseClient
+    .from(table)
+    .select(`*${extraSelect}`)
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
+
+  if (campaignType === "message" && data?.message_media?.length > 0) {
+    data.mediaLinks = await getSignedUrls(supabaseClient, workspaceId, data.message_media);
+  }
+
+  return data;
+};
