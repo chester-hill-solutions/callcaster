@@ -17,6 +17,7 @@ interface QueueListProps {
   nextRecipient: QueueItem | null;
   predictive: boolean;
   handleQueueButton: () => void;
+  isBusy:boolean;
 }
 
 const QueueList = ({
@@ -27,6 +28,7 @@ const QueueList = ({
   nextRecipient,
   predictive = false,
   handleQueueButton,
+  isBusy
 }: QueueListProps) => {
   const renderQueueContacts = () => {
     if (groupByHousehold && Object.keys(householdMap).length) {
@@ -92,6 +94,8 @@ const QueueList = ({
                   color: "white",
                   fontSize: "small",
                 }}
+                disabled={isBusy}
+
               >
                 Skip Household
               </button>
@@ -104,6 +108,7 @@ const QueueList = ({
                   borderRadius: "5px",
                   fontSize: "small",
                 }}
+                disabled={isBusy}
               >
                 Skip Person
               </button>

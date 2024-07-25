@@ -1,19 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { useCallState } from "~/hooks/useCallState";
 import { Tables } from "~/lib/database.types";
 import { formatTime } from "~/lib/utils";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
-type CallState = "idle" | "dialing" | "connected" | "failed" | "completed";
-type AttemptDisposition =
-  | "initiated"
-  | "ringing"
-  | "in-progress"
-  | "no-answer"
-  | "voicemail"
-  | "failed";
 
 interface NextRecipient {
   contact: Contact;
@@ -33,6 +23,7 @@ interface Conference {
 }
 
 interface CallAreaProps {
+  isBusy:boolean;
   nextRecipient: NextRecipient | null;
   activeCall: ActiveCall | null;
   recentCall: Call | null;
@@ -47,6 +38,7 @@ interface CallAreaProps {
 }
 
 export const CallArea: React.FC<CallAreaProps> = ({
+  isBusy,
   nextRecipient,
   displayState,
   hangUp,
@@ -66,7 +58,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
-  
+
   return (
     <div
       style={{
@@ -118,6 +110,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
         {!conference && predictive && state === "idle" && (
           <div className="flex h-full flex-1 justify-center align-middle">
             <button
+            disabled={isBusy}
               onClick={handleDialNext}
               className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
             >
@@ -161,14 +154,14 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 opacity:
                   state !== "connected" && state !== "dialing" ? ".6" : "unset",
               }}
-              disabled={state !== "connected" && state !== "dialing"}
+              disabled={isBusy || state !== "connected" && state !== "dialing"}
             >
               Hang Up
             </button>
               <button
                 onClick={handleDialNext}
                 disabled={
-                  state === "connected" || state === "dialing" || !nextRecipient
+                  isBusy || state === "connected" || state === "dialing" || !nextRecipient
                 }
                 style={{
                   flex: "1",
@@ -205,11 +198,11 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 color: "#333",
               }}
             >
-              <option value={null}>Select a disposition</option>
+              <option value={"idle"}>Select a disposition</option>
              {dispositionOptions.map(({value, label}, i) => (<option value={value} key={i}>{label}</option>))}
             </select>
             <button
-            disabled={!disposition}
+            disabled={isBusy || disposition === 'idle'}
             onClick={() => handleDequeueNext()}
               style={{
                 flex: "1 1 25%",

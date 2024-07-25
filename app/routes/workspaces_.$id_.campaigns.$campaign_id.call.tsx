@@ -6,6 +6,7 @@ import {
   redirect,
   useSubmit,
   Form,
+  useNavigation,
 } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { QueueList } from "../components/CallScreen.QueueList";
@@ -220,6 +221,8 @@ export const action = async ({ request, params }) => {
 const Campaign: React.FC = () => {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const audioContextRef = useRef<AudioContext | null>(null);
+  const { state: navState } = useNavigation();
+  const isBusy = navState !== "idle";
 
   const {
     campaign,
@@ -246,6 +249,8 @@ const Campaign: React.FC = () => {
     initialRecentAttempt?.result || null,
   );
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+
   const { state, context, send } = useCallState();
   const {
     device,
@@ -325,7 +330,7 @@ const Campaign: React.FC = () => {
     groupByHousehold,
     campaign,
     workspaceId,
-    setQueue
+    setQueue,
   });
 
   const handleResponse = useCallback(
@@ -388,6 +393,7 @@ const Campaign: React.FC = () => {
       groupByHousehold,
     ],
   );
+
   const handleQuickSave = useCallback(() => {
     handleQuestionsSave(
       update,
@@ -420,47 +426,38 @@ const Campaign: React.FC = () => {
     setRecentAttempt,
   ]);
 
-  useEffect(() => {
-    if (nextRecipient) {
-      setQuestionContact(nextRecipient);
+  const requestMicrophoneAccess = useCallback(async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      setStream(mediaStream);
+      setPermissionError(null);
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      if (error.name === "NotAllowedError") {
+        setPermissionError(
+          "Microphone access was denied. Please grant permission to use this feature.",
+        );
+      } else {
+        setPermissionError(
+          "An error occurred while trying to access the microphone.",
+        );
+      }
     }
-  }, [nextRecipient]);
-
-  useEffect(() => {
-    const getStream = async () => {
-      if (!stream) {
-        try {
-          const mediaStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-            video: false,
-          });
-          setStream(mediaStream);
-        } catch (error) {
-          console.error("Error accessing microphone:", error);
-        }
-      }
-    };
-    getStream();
-  }, [stream]);
-
-  useDebouncedSave(
-    update,
-    recentAttempt,
-    submit,
-    questionContact,
-    campaign,
-    workspaceId,
-  );
-  
-  useEffect(() => {
-    audioContextRef.current = new (window.AudioContext ||
-      (window as any).webkitAudioContext)();
-    return () => {
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
   }, []);
+
+  const handleDTMF = useCallback(
+    (key) => {
+      if (audioContextRef.current) playTone(key, audioContextRef?.current);
+      if (!activeCall) return;
+      else {
+        activeCall?.sendDigits(key);
+      }
+    },
+    [activeCall],
+  );
 
   const getDisplayState = (
     state: CallState,
@@ -498,14 +495,6 @@ const Campaign: React.FC = () => {
         ? "#4CA83D"
         : "#333333";
 
-  const handleDTMF = (key) => {
-    if (audioContextRef.current) playTone(key, audioContextRef?.current);
-    if (!activeCall) return;
-    else {
-      activeCall?.sendDigits(key);
-    }
-  };
-
   useEffect(() => {
     const handleKeypress = (e) => {
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(
@@ -518,7 +507,39 @@ const Campaign: React.FC = () => {
     window.addEventListener("keypress", handleKeypress);
 
     return () => window.removeEventListener("keypress", handleKeypress);
-  }, [activeCall]);
+  }, [activeCall, handleDTMF]);
+
+  useEffect(() => {
+    if (!stream && !permissionError) {
+      requestMicrophoneAccess();
+    }
+  }, [stream, permissionError, requestMicrophoneAccess]);
+
+  useEffect(() => {
+    audioContextRef.current = new (window.AudioContext ||
+      (window as any).webkitAudioContext)();
+    return () => {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (nextRecipient) {
+      setQuestionContact(nextRecipient);
+    }
+  }, [nextRecipient]);
+
+  useDebouncedSave(
+    update,
+    recentAttempt,
+    submit,
+    questionContact,
+    campaign,
+    workspaceId,
+    disposition,
+  );
 
   return (
     <main className="container mx-auto p-6">
@@ -543,7 +564,9 @@ const Campaign: React.FC = () => {
                 </h4>
               </div>
               <Form method="POST">
-                <Button type="submit">Leave Campaign</Button>
+                <Button disabled={isBusy} type="submit">
+                  Leave Campaign
+                </Button>
               </Form>
             </div>
             {/* Inputs */}
@@ -601,6 +624,7 @@ const Campaign: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-6">
           <CallArea
+            isBusy={isBusy}
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
@@ -624,6 +648,7 @@ const Campaign: React.FC = () => {
             callDuration={callDuration}
           />
           <Household
+            isBusy={isBusy}
             house={house}
             switchQuestionContact={switchQuestionContact}
             attemptList={attemptList}
@@ -631,6 +656,7 @@ const Campaign: React.FC = () => {
           />
         </div>
         <CallQuestionnaire
+          isBusy={isBusy}
           handleResponse={handleResponse}
           campaignDetails={campaignDetails}
           update={update}
@@ -639,6 +665,7 @@ const Campaign: React.FC = () => {
           disabled={!questionContact}
         />
         <QueueList
+          isBusy={isBusy}
           householdMap={householdMap}
           groupByHousehold={groupByHousehold}
           queue={campaign.dial_type === "call" ? queue : predictiveQueue}
