@@ -563,10 +563,8 @@ const Campaign: React.FC = () => {
                   {count - completed} of {count} remaining
                 </h4>
               </div>
-              <Form method="POST">
-                <Button disabled={isBusy} type="submit">
-                  Leave Campaign
-                </Button>
+              <Form method="POST" onSubmit={() => device?.destroy()}>
+                <Button type="submit">Leave Campaign</Button>
               </Form>
             </div>
             {/* Inputs */}

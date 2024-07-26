@@ -9,6 +9,7 @@ export function useTwilioDevice(token, workspaceId) {
     const [incomingCall, setIncomingCall] = useState(null);
     const [callState, setCallState] = useState('idle');
     const [callDuration, setCallDuration] = useState(0);
+
     const handleIncomingCall = useCallback((call) => {
         setIncomingCall(call);
         if (call.parameters.To.includes('client')) {
@@ -109,21 +110,29 @@ export function useTwilioDevice(token, workspaceId) {
     }, [incomingCall]);
 
     useEffect(() => {
-        if (!token) return;
-        const device = new Device(token, {});
+        if (!token) {
+            console.error('No token provided');
+            setError(new Error('No token provided'));
+            return;
+        }
+
+        const device = new Device(token, {
+            debug: true
+        });
         deviceRef.current = device;
+
         const eventHandlers = {
             registered: () => setStatus('Registered'),
-            connect: () => {
+            unregistered: () => setStatus('Unregistered'),
+            connecting: () => setStatus('Connecting'),
+            connected: () => {
                 setStatus('Connected');
                 setCallState('connected');
             },
-            disconnect: () => {
+            disconnected: () => {
                 setStatus('Disconnected');
                 device.disconnectAll();
-                activeCall?.disconnect();
                 setActiveCall(null);
-                setStatus('Registered');
                 setCallState('completed');
                 setCallDuration(0);
             },
@@ -146,18 +155,23 @@ export function useTwilioDevice(token, workspaceId) {
             device.on(event, handler);
         });
 
-        device.register();
+        device.register()
+            .catch(error => {
+                console.error('Failed to register device:', error);
+                setError(error);
+                setStatus('RegistrationFailed');
+            });
 
         return () => {
             if (device.state === 'registered') {
-                device.unregister();
+                device.unregister().catch(console.error);
             }
             Object.keys(eventHandlers).forEach(event => {
                 device.removeAllListeners(event);
             });
             deviceRef.current = null;
         };
-    }, [activeCall, handleIncomingCall, token]);
+    }, [handleIncomingCall, token]);
 
     useEffect(() => {
         let interval;
@@ -168,50 +182,6 @@ export function useTwilioDevice(token, workspaceId) {
         }
         return () => clearInterval(interval);
     }, [callState]);
-
-    useEffect(() => {
-        if (!token) return;
-        const device = new Device(token, {});
-        deviceRef.current = device;
-        const eventHandlers = {
-            registered: () => setStatus('Registered'),
-            connect: () => setStatus('Connected'),
-            disconnect: () => {
-                console.log(device)
-                setStatus('Disconnected');
-                device.disconnectAll();
-                activeCall?.disconnect();
-                setActiveCall(null);
-                setStatus('Registered');
-            },
-            cancel: () => {
-                setStatus('Cancelled');
-                setActiveCall(null);
-            },
-            error: (error) => {
-                console.error('Twilio Device Error:', error);
-                setStatus('Error');
-                setError(error);
-            },
-            incoming: handleIncomingCall
-        };
-
-        Object.entries(eventHandlers).forEach(([event, handler]) => {
-            device.on(event, handler);
-        });
-
-        device.register();
-
-        return () => {
-            if (device.state === 'registered') {
-                device.unregister();
-            }
-            Object.keys(eventHandlers).forEach(event => {
-                device.removeAllListeners(event);
-            });
-            deviceRef.current = null;
-        };
-    }, [activeCall, handleIncomingCall, token]);
 
     return {
         device: deviceRef.current,
