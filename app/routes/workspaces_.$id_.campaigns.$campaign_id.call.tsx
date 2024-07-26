@@ -164,7 +164,7 @@ export const loader = async ({ request, params }) => {
   const nextRecipient =
     queue && campaign.dial_type === "call" ? queue[0] : null;
   const initalCallsList = attempts.flatMap((attempt) => attempt.call);
-  const initialRecentCall = nextRecipient.contact && initalCallsList.find(
+  const initialRecentCall = nextRecipient?.contact && initalCallsList.find(
     (call) => call.contact_id === nextRecipient?.contact.id,
   );
   const initialRecentAttempt = attempts
