@@ -143,6 +143,11 @@ export default function SignIn() {
         </Link> */}
       </div>
       <Toaster richColors visibleToasts={1} />
+      <img
+        alt="background"
+        src="/Hero-1.png"
+        className="absolute left-0 top-[10px] z-[-1] h-screen overflow-hidden object-cover opacity-10"
+      />
     </main>
   );
 }

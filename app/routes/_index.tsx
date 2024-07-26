@@ -2,10 +2,8 @@ import { Form, Link, NavLink, useLoaderData, useNavigation } from "@remix-run/re
 import { Button } from "~/components/ui/button";
 import {
   Card,
-  CardActions,
   CardContent,
-  CardTitle,
-} from "~/components/CustomCard";
+} from "~/components/ui/card";
 import {
   Phone,
   Zap,
@@ -24,7 +22,7 @@ export const loader = async ({ request }) => {
     headers,
     serverSession,
   } = await getSupabaseServerClientWithSession(request);
-  return { user: serverSession.user };
+  return { user: serverSession?.user };
 };
 
 const ContactForm = ({isBusy}) => (
@@ -47,7 +45,7 @@ const ContactForm = ({isBusy}) => (
           We have the tools and expertise to support your goals. Get in touch with us today to see if we're the right fit for your business. Let's explore how CallCaster can elevate your communication strategy!
         </p>
       </div>
-      <Card className="flex-1 min-w-[300px] dark:bg-zinc-800 bg-secondary">
+      <Card className="flex-1 min-w-[300px] dark:bg-zinc-800 bg-secondary py-8">
         <CardContent>
           <Form className="space-y-4" action="/api/contact-form" method="POST" navigate={false}>
             <div>
@@ -293,69 +291,7 @@ const EnhancedOutreachSection = () => (
   </div>
 );
 
-const LoginSection = () => (
-  <Card
-    bgColor="bg-brand-secondary dark:bg-zinc-900"
-    className="animate-fade-in-up animation-delay-1500"
-  >
-    <CardTitle>Start Calling</CardTitle>
-    <CardContent>
-      <Form
-        id="homepage-signin-form"
-        method="POST"
-        className="space-y-6"
-        action="/signin"
-      >
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-          >
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-          />
-        </div>
-        <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-          >
-            Password
-          </label>
-          <input
-            type="password"
-            name="password"
-            id="password"
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-          />
-        </div>
-      </Form>
-    </CardContent>
-    <CardActions>
-      <Button
-        size="lg"
-        className="w-full bg-brand-primary font-Zilla-Slab text-white transition-all duration-300 hover:bg-brand-secondary"
-        type="submit"
-        form="homepage-signin-form"
-      >
-        Login
-      </Button>
-      <Link
-        to="/signup"
-        className="w-full rounded-md bg-gray-200 px-4 py-2 text-center font-Zilla-Slab font-bold text-gray-700 transition duration-300 ease-in-out hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-      >
-        Sign Up
-      </Link>
-    </CardActions>
-  </Card>
-);
+
 export default function Index() {
   const {state}= useNavigation();
   const isBusy = state !== "idle"
