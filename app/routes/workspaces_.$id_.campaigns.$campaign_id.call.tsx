@@ -122,7 +122,7 @@ export const loader = async ({ request, params }) => {
   if (campaign.dial_type === "predictive") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select(`*`)
+      .select(`*, contact(*)`)
       .eq("status", "queued")
       .eq("campaign_id", id)
       .order("attempts", { ascending: true })
