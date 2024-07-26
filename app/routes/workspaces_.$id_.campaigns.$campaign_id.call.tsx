@@ -7,6 +7,7 @@ import {
   useSubmit,
   Form,
   useNavigation,
+  NavLink,
 } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { QueueList } from "../components/CallScreen.QueueList";
@@ -36,6 +37,12 @@ import { Button } from "~/components/ui/button";
 import InputSelector from "~/components/InputSelector";
 import OutputSelector from "~/components/OutputSelector";
 import { formatTime, playTone } from "~/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -294,6 +301,7 @@ const Campaign: React.FC = () => {
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
   });
+  const [isDialogOpen, setDialog] = useState((!(queue.length > 0) || campaign.dial_type === 'predictive'));
 
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -671,9 +679,41 @@ const Campaign: React.FC = () => {
           nextRecipient={nextRecipient}
           handleQueueButton={fetchMore}
           predictive={campaign.dial_type === "predictive"}
+          count={count}
+          completed={completed}
         />
       </div>
       <Toaster richColors />
+      <Dialog onOpenChange={setDialog} open={isDialogOpen}>
+        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
+              Welcome to {campaign.title}.
+            </DialogTitle>
+            <div className="w-[400px] my-4">
+              <p>
+                This is a{" "}
+                {campaign.dial_type === "call"
+                  ? "power dialer campaign. Contacts will load into your queue as you dial."
+                  : "predictive dialer campaign. Contacts will be dialed automatically until a conversation is found for you. When you have completed a call, you can press 'Dial' to resume the predictive dialer."}
+              </p>
+              <br />
+              <p>
+                {campaign.voicemail_file && campaign.dial_type === "call"
+                  ? "The dialer will automatically detect voicemailboxes, and leave a voicemail with the contact."
+                  : "The dialer will automatically detect voicemailboxes, and disconnect your call accordingly."}
+              </p>
+              <div className="flex justify-between mt-4">
+                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
+                <Button onClick={() => {
+                  campaign.dial_type === 'call' && fetchMore({householdMap})
+                  setDialog(false)
+                  }}>Get started</Button>
+              </div>
+            </div>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
