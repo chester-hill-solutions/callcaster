@@ -7,7 +7,7 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 export const action = async ({ request }) => {
     const formData = await request.formData();
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    
+
     const parsedBody = {};
 
     for (const pair of formData.entries()) {
@@ -15,13 +15,14 @@ export const action = async ({ request }) => {
     }
     let update;
     const { data: dbCall, error: callError } = await supabase.from('call').select().eq('sid', parsedBody.CallSid).single();
-    const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
+    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
     if (parsedBody.CallStatus === 'failed') {
         console.log(`Call to ${dbCall.to} failed`)
         const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp), status: 'failed' }).eq('sid', parsedBody.CallSid).select();
         if (updateError) console.error(updateError)
         const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'failed' }).eq('id', dbCall.outreach_attempt_id).select();
         if (attemptError) console.error(attemptError)
+        const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', attemptUpdate[0].contact_id).select();
 
         const conferences = await twilio.conferences.list({ friendlyName: callUpdate.conference_id, status: ['in-progress'] });
         console.log(`${conferences.length} active conferences.`)
@@ -43,8 +44,9 @@ export const action = async ({ request }) => {
     if (parsedBody.CallStatus === 'no-answer') {
         const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp), status: 'no-answer' }).eq('sid', parsedBody.CallSid).select();
         if (updateError) console.error(updateError)
-        const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'no-answer', status: 'dequeued' }).eq('id', dbCall.outreach_attempt_id).select();
+        const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'no-answer' }).eq('id', dbCall.outreach_attempt_id).select();
         if (attemptError) console.error(attemptError)
+        const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', attemptUpdate[0].contact_id).select();
 
         const conferences = await twilio.conferences.list({ friendlyName: callUpdate.conference_id, status: ['in-progress'] });
         if (conferences.length) {
@@ -66,7 +68,8 @@ export const action = async ({ request }) => {
         && (parsedBody.ReasonParticipantLeft === 'participant_updated_via_api'
             || parsedBody.ReasonParticipantLeft === 'participant_hung_up')) {
         const { data: callUpdate, error: updateError } = await supabase.from('call').update({ end_time: new Date(parsedBody.Timestamp) }).eq('sid', parsedBody.CallSid).select();
-        const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').select('contact_id').eq('id', dbCall.outreach_attempt_id).single();
+        const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'completed' }).eq('id', dbCall.outreach_attempt_id).select();
+        const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', outreachStatus[0].contact_id).select();
         if (updateError) console.error(updateError)
         update = callUpdate;
         const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
