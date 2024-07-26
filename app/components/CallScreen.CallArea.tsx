@@ -1,4 +1,5 @@
 import { Tables } from "~/lib/database.types";
+import { QueueItem } from "~/lib/types";
 import { formatTime } from "~/lib/utils";
 
 type Contact = Tables<"contact">;
@@ -24,7 +25,7 @@ interface Conference {
 
 interface CallAreaProps {
   isBusy:boolean;
-  nextRecipient: NextRecipient | null;
+  nextRecipient: QueueItem | null;
   activeCall: ActiveCall | null;
   recentCall: Call | null;
   hangUp: () => void;
@@ -108,17 +109,17 @@ export const CallArea: React.FC<CallAreaProps> = ({
           </div>
         </div>
         {!conference && predictive && state === "idle" && (
-          <div className="flex h-full flex-1 justify-center align-middle">
+        <div className="flex h-full flex-1 justify-center align-middle">
             <button
             disabled={isBusy}
               onClick={handleDialNext}
-              className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
+              className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white rounded-lg"
             >
               Start Dialing
             </button>
           </div>
         )}
-        {nextRecipient && (
+        {nextRecipient &&  (
           <div className="flex justify-between p-4">
             <div className="flex flex-col">
               <div className="font-Zilla-Slab text-lg font-bold">

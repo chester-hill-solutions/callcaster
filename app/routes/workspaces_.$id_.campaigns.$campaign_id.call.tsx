@@ -123,7 +123,7 @@ export const loader = async ({ request, params }) => {
     const { data, error } = await supabase
       .from("campaign_queue")
       .select(`*, contact(*)`)
-      .eq("status", "queued")
+      .in("status", ["queued", serverSession.user.id])
       .eq("campaign_id", id)
       .order("attempts", { ascending: true })
       .order("queue_order", { ascending: true });
@@ -256,6 +256,7 @@ const Campaign: React.FC = () => {
     hangUp,
     callState,
     callDuration,
+    setCallDuration
   } = useTwilioDevice(token, workspaceId);
 
   const {
@@ -289,6 +290,7 @@ const Campaign: React.FC = () => {
     activeCall,
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
+    setCallDuration
   });
   const [isDialogOpen, setDialog] = useState((!(queue.length > 0) || campaign.dial_type === 'predictive'));
 
@@ -310,10 +312,12 @@ const Campaign: React.FC = () => {
   const submit = useSubmit();
 
   const { startCall } = handleCall({ submit });
+
   const { handleConferenceStart, handleConferenceEnd } = handleConference({
     submit,
     begin,
   });
+
   const { switchQuestionContact, nextNumber } = handleContact({
     setQuestionContact,
     setRecentAttempt,
@@ -322,6 +326,7 @@ const Campaign: React.FC = () => {
     attempts: attemptList,
     calls: callsList,
   });
+
   const { dequeue, fetchMore } = handleQueue({
     submit,
     groupByHousehold,
@@ -404,7 +409,13 @@ const Campaign: React.FC = () => {
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   const handleDequeueNext = useCallback(() => {
-    if (nextRecipient) {
+    if (campaign.dial_type === "predictive" && nextRecipient){
+      dequeue({contact: nextRecipient});
+      send({ type: "HANG_UP" });
+      setRecentAttempt(null);
+      handleDialButton();
+    }
+     else if (campaign.dial_type === "call" && nextRecipient) {
       handleQuickSave();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
@@ -412,16 +423,7 @@ const Campaign: React.FC = () => {
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
     }
-  }, [
-    dequeue,
-    fetchMore,
-    handleNextNumber,
-    handleQuickSave,
-    householdMap,
-    nextRecipient,
-    send,
-    setRecentAttempt,
-  ]);
+  }, [campaign.dial_type, dequeue, fetchMore, handleDialButton, handleNextNumber, handleQuickSave, householdMap, nextRecipient, send, setRecentAttempt]);
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
@@ -473,24 +475,16 @@ const Campaign: React.FC = () => {
     if (state === "completed" && disposition) return "completed";
     return "idle";
   };
+
   const displayState = getDisplayState(
     state,
     recentAttempt?.disposition as AttemptDisposition,
     activeCall,
   );
 
-  const house =
-    householdMap[
-      Object.keys(householdMap).find(
-        (house) => house === nextRecipient?.contact?.address,
-      ) || ""
-    ];
-  const displayColor =
-    displayState === "failed"
-      ? "hsl(var(--primary))"
-      : displayState === "connected" || displayState === "dialing"
-        ? "#4CA83D"
-        : "#333333";
+  const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact?.address,) || ""];
+  
+  const displayColor = displayState === "failed" ? "hsl(var(--primary))" : displayState === "connected" || displayState === "dialing" ? "#4CA83D" : "#333333";
 
   useEffect(() => {
     const handleKeypress = (e) => {
@@ -619,7 +613,9 @@ const Campaign: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-6">
           <CallArea
+            conference={conference}
             isBusy={isBusy}
+            predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
