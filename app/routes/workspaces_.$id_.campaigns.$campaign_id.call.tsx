@@ -112,11 +112,6 @@ export const loader = async ({ request, params }) => {
     .eq("campaign_id", id)
     .eq("status", "dequeued");
 
-  const { data: contacts, error: contactsError } = await supabase.rpc(
-    "get_contacts_by_campaign",
-    { selected_campaign_id: id },
-  );
-
   const { data: attempts, error: attemptError } = await supabase
     .from("outreach_attempt")
     .select(`*,call(*)`)
@@ -140,7 +135,7 @@ export const loader = async ({ request, params }) => {
   } else if (campaign.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select()
+      .select('*, contact(*)')
       .eq("status", serverSession.user.id)
       .eq("campaign_id", id);
     if (error) {
@@ -156,7 +151,6 @@ export const loader = async ({ request, params }) => {
     campaignError,
     detailsError,
     audiencesError,
-    contactsError,
     attemptError,
     queueError,
     queueCountError,
@@ -167,15 +161,10 @@ export const loader = async ({ request, params }) => {
     throw json({ message: "Error fetching campaign data" }, { status: 500 });
   }
 
-  const initialQueue = queue?.map((q) => ({
-    ...q,
-    contact: contacts?.find((contact) => contact.id === q.contact_id),
-  }));
-
   const nextRecipient =
-    initialQueue && campaign.dial_type === "call" ? initialQueue[0] : null;
+    queue && campaign.dial_type === "call" ? queue[0] : null;
   const initalCallsList = attempts.flatMap((attempt) => attempt.call);
-  const initialRecentCall = initalCallsList.find(
+  const initialRecentCall = nextRecipient.contact && initalCallsList.find(
     (call) => call.contact_id === nextRecipient?.contact.id,
   );
   const initialRecentAttempt = attempts
@@ -189,8 +178,8 @@ export const loader = async ({ request, params }) => {
       audiences,
       campaignDetails,
       workspaceId,
-      queue: initialQueue,
-      contacts,
+      queue,
+      contacts: queue.map((queueItem) => queueItem.contact),
       nextRecipient,
       initalCallsList,
       initialRecentCall,
