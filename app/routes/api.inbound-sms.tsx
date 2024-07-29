@@ -18,9 +18,18 @@ export const action = async ({ request, params }) => {
     )
     .eq("phone_number", data.To)
     .single();
+
   if (number) {
+    const { data: contact, error: contactError } = await supabase
+      .from("contact")
+      .select("id")
+      .ilike("phone", data.To)
+      .eq("workspace", number.workspace);
+    if (contactError){
+        console.error(contactError)
+    }
     const messageData: Message = {
-      sid: data.sid,
+      sid: data.MessageSid,
       account_sid: data.AccountSid,
       body: data.Body,
       from: data.From,
@@ -32,6 +41,7 @@ export const action = async ({ request, params }) => {
       date_created: new Date(),
       date_sent: new Date(),
       subresource_uris: data.MediaContentType,
+      ...(contact && {contact_id: contact[0].id})
     };
     const { data: message, error: messageError } = await supabase
       .from("message")
@@ -39,7 +49,7 @@ export const action = async ({ request, params }) => {
       .select();
     if (messageError) {
       console.error(messageError);
-      return json({messageError},400)
+      return json({ messageError }, 400);
     }
     return json({ message }, 201);
   } else {
