@@ -12,6 +12,7 @@ interface UseQueueProps {
   user: User;
   isPredictive: boolean;
   campaign_id: string;
+  setCallDuration: (time: number) => void,
 }
 
 export const useQueue = ({
@@ -19,7 +20,7 @@ export const useQueue = ({
   initialPredictiveQueue,
   user,
   isPredictive,
-  campaign_id,
+  setCallDuration,
 }: UseQueueProps) => {
   const [queue, setQueue] = useState<QueueItem[]>(
     isPredictive
@@ -59,6 +60,7 @@ export const useQueue = ({
               : [];
             if (newStatus === user.id) {
               setNextRecipient(newQueueItem);
+              setCallDuration(0);
             }
           } else if (!isPredictive && newStatus === user.id) {
             updatedQueue = sortQueue([
@@ -72,7 +74,9 @@ export const useQueue = ({
             isPredictive &&
             !(newStatus === user.id || newStatus === "queued")
           ) {
-            updatedQueue =  [...currentQueue.filter((item) => item.id !== payload.new.id)]
+            updatedQueue = [
+              ...currentQueue.filter((item) => item.id !== payload.new.id),
+            ];
           }
         }
 

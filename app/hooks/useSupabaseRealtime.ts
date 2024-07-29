@@ -35,6 +35,7 @@ export const useSupabaseRealtime = ({
     user,
     isPredictive: predictive,
     campaign_id,
+    setCallDuration
   });
 
   const {

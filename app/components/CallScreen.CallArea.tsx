@@ -2,14 +2,9 @@ import { Tables } from "~/lib/database.types";
 import { QueueItem } from "~/lib/types";
 import { formatTime } from "~/lib/utils";
 
-type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
 
-interface NextRecipient {
-  contact: Contact;
-  id: number;
-}
 
 interface ActiveCall {
   parameters: {
