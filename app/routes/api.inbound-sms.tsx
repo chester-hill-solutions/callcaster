@@ -41,7 +41,7 @@ export const action = async ({ request, params }) => {
       date_created: new Date(),
       date_sent: new Date(),
       subresource_uris: data.MediaContentType,
-      ...(contact && {contact_id: contact[0].id})
+      ...(contact?.length > 0 && {contact_id: contact[0].id})
     };
     const { data: message, error: messageError } = await supabase
       .from("message")
