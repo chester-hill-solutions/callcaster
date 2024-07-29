@@ -64,7 +64,6 @@ const CallQuestionnaire = ({
       }, [update]);
 
   const handleBlockResponse = (blockId: string, value: any) => {
-    console.log(blockId, value)
     const newUpdate = {
       ...localUpdate,
       [currentPageId]: {

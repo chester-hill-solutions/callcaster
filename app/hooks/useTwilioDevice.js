@@ -193,6 +193,7 @@ export function useTwilioDevice(token, workspaceId) {
         hangUp,
         answer,
         callState,
-        callDuration
+        callDuration,
+        setCallDuration
     };
 }
