@@ -13,6 +13,7 @@ export function formatDateToLocale(dateFromSupabase: string) {
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+export const stripPhoneNumber = (phoneNumber:string) => phoneNumber.replace(/\D/g, "");
 
 export function formatTableText(unformatted: string): string {
   const pattern = new RegExp(/[,_/\- ]/g);
@@ -309,4 +310,28 @@ export function isEmail(email) {
     return false;
   }
   return true;
+}
+
+export function normalizePhoneNumber(input) {
+  let cleaned = input.replace(/[^0-9+]/g, '');
+
+  if (cleaned.indexOf('+') > 0) {
+      cleaned = cleaned.replace(/\+/g, '');
+  }
+  if (!cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned;
+  }
+
+  const validLength = 11;
+  const minLength = 11;
+
+  if (cleaned.length < minLength + 1) { // +1 for the +
+      cleaned = '+1' + cleaned.replace('+', '');
+  }
+
+  if (cleaned.length !== validLength + 1) { // +1 for the +
+      throw new Error('Invalid phone number length');
+  }
+
+  return cleaned;
 }
