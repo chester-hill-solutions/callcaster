@@ -2,6 +2,7 @@ import { Form } from "@remix-run/react";
 import { Button } from "./ui/button";
 
 const ContactForm = ({
+  isNew,
   newContact,
   handleInputChange,
   handleSaveContact,
@@ -11,7 +12,7 @@ const ContactForm = ({
   <Form
     onSubmit={handleSaveContact}
     action="/api/contacts"
-    method="POST"
+    method={isNew ? "POST" : "PATCH"}
     navigate={false}
     encType="application/x-www-form-urlencoded"
     className="space-y-2"

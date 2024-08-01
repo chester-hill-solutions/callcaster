@@ -36,7 +36,7 @@ export function useContactSearch({
   contact_number,
   potentialContacts,
   dropdownRef,
-  initialContact
+  initialContact,
 }: UseContactSearchProps) {
   const [isValid, setIsValid] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(contact_number);
@@ -67,9 +67,67 @@ export function useContactSearch({
     setSelectedContact(null);
   }, []);
 
+  const searchContact = useCallback(async (phoneNumber: string) => {
+    try {
+      const { data, error } = await supabase.rpc("find_contact_by_phone", {
+        p_workspace_id: workspace_id,
+        p_phone_number: phoneNumber,
+      });
+      
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setContacts(data);
+        setSelectedContact(null);
+        setIsContactMenuOpen(true);
+        setSearchError(null);
+      } else {
+        setContacts([]);
+        setSelectedContact(null);
+        setSearchError("No contact found. A new contact will be created.");
+      }
+    } catch (error) {
+      console.error("Contact search error:", error);
+      setContacts([]);
+      setSelectedContact(null);
+      setSearchError("Error searching for contact.");
+    }
+  }, [supabase, workspace_id]);
+
+  const searchConversation = useCallback(async (phoneNumber: string) => {
+    try {
+      const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+      const { data: latestMessage, error: messageSearchError } = await supabase
+        .from("message")
+        .select("*")
+        .eq("workspace", workspace_id)
+        .or(`from.eq.${normalizedPhoneNumber},to.eq.${normalizedPhoneNumber}`)
+        .order("date_created", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (messageSearchError) {
+        setExistingConversation(null);
+      } else if (latestMessage) {
+        setExistingConversation({
+          phoneNumber: normalizedPhoneNumber,
+          latestMessage: latestMessage.body,
+          date: new Date(latestMessage.date_created).toLocaleString(),
+        });
+      } else {
+        setExistingConversation(null);
+      }
+    } catch (error) {
+      console.error("Conversation search error:", error);
+      setExistingConversation(null);
+    }
+  }, [supabase, workspace_id]);
+
   useEffect(() => {
-    setPhoneNumber(contact_number);
-    setIsValid(phoneRegex.test(contact_number));
+    if (phoneRegex.test(contact_number)) {
+      setPhoneNumber(contact_number);
+      setIsValid(true);
+    }
   }, [contact_number]);
 
   useEffect(() => {
@@ -77,69 +135,16 @@ export function useContactSearch({
   }, [initialContact]);
 
   useEffect(() => {
-    const searchContact = async () => {
-      if (isValid && phoneNumber) {
-        try {
-          const { data, error } = await supabase.rpc("find_contact_by_phone", {
-            p_workspace_id: workspace_id,
-            p_phone_number: phoneNumber,
-          });
-          
-          if (error) throw error;
-          
-          if (data && data.length > 0) {
-            setContacts(data);
-            setSelectedContact(null);
-            setIsContactMenuOpen(true);
-            setSearchError(null);
-            setExistingConversation(null);
-          } else {
-            setContacts([]);
-            setSelectedContact(null);
-            if (phoneNumber.length > 8) {
-              const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-              const { data: latestMessage, error: messageSearchError } = await supabase
-                .from("message")
-                .select("*")
-                .eq("workspace", workspace_id)
-                .or(`from.eq.${normalizedPhoneNumber},to.eq.${normalizedPhoneNumber}`)
-                .order('date_created', { ascending: false })
-                .limit(1)
-                .single();
-
-              if (messageSearchError) {
-                setSearchError(messageSearchError.message);
-                setExistingConversation(null);
-              } else if (latestMessage) {
-                setExistingConversation({
-                  phoneNumber: normalizedPhoneNumber,
-                  latestMessage: latestMessage.body,
-                  date: new Date(latestMessage.date_created).toLocaleString(),
-                });
-                setSearchError(null);
-              } else {
-                setExistingConversation(null);
-                setSearchError("No contact or conversation found. A new contact will be created.");
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Contact search error:", error);
-          setContacts([]);
-          setSelectedContact(null);
-          setSearchError("Error searching for contact.");
-          setExistingConversation(null);
-        }
-      } else {
-        setContacts([]);
-        setSelectedContact(null);
-        setSearchError(null);
-        setExistingConversation(null);
-      }
-    };
-
-    searchContact();
-  }, [phoneNumber, isValid, supabase, workspace_id]);
+    if (isValid && phoneNumber) {
+      searchContact(phoneNumber);
+      searchConversation(phoneNumber);
+    } else {
+      setContacts([]);
+      setSelectedContact(null);
+      setSearchError(null);
+      setExistingConversation(null);
+    }
+  }, [phoneNumber, isValid, searchContact, searchConversation]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -147,7 +152,7 @@ export function useContactSearch({
         setIsContactMenuOpen(false);
       }
     };
-    
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);

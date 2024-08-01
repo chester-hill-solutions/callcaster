@@ -9,6 +9,7 @@ import {
   json,
   useFetcher,
   useLoaderData,
+  useLocation,
   useNavigate,
   useOutlet,
   useOutletContext,
@@ -16,7 +17,13 @@ import {
 } from "@remix-run/react";
 import { MdAdd } from "react-icons/md";
 import { Button } from "~/components/ui/button";
-import { findPotentialContacts, getUserRole } from "~/lib/database.server";
+import {
+  fetchContactData,
+  fetchConversationSummary,
+  fetchWorkspaceData,
+  findPotentialContacts,
+  getUserRole,
+} from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { normalizePhoneNumber } from "~/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +33,8 @@ import ChatHeader from "~/components/Chat/ChatHeader";
 import ChatInput from "~/components/Chat/ChatInput";
 import { useContactSearch } from "~/hooks/useContactSearch";
 import ChatAddContactDialog from "~/components/Chat/ChatAddContactDialog";
+
+const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
@@ -56,7 +65,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { contact, potentialContacts, contactError } = contactData;
 
   const errors = [workspaceError, chatsError, contactError].filter(Boolean);
-
+  console.log("Potential Contacts: ", potentialContacts);
   if (errors.length) {
     return json(
       {
@@ -81,63 +90,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-async function fetchWorkspaceData(supabaseClient, workspaceId) {
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(`*, workspace_number(*)`)
-    .eq("id", workspaceId)
-    .eq("workspace_number.type", "rented")
-    .single();
-
-  return { workspace, workspaceError };
-}
-
-async function fetchConversationSummary(supabaseClient, workspaceId) {
-  const { data: chats, error: chatsError } = await supabaseClient.rpc(
-    "get_conversation_summary",
-    { p_workspace: workspaceId },
-  );
-
-  return { chats, chatsError };
-}
-
-async function fetchContactData(
-  supabaseClient,
-  workspaceId,
-  contact_id,
-  contact_number,
-) {
-  let potentialContacts = [];
-  let contact = null;
-  let contactError = null;
-
-  if (contact_number && !contact_id) {
-    const { data: contacts } = await findPotentialContacts(
-      supabaseClient,
-      contact_number,
-      workspaceId,
-    );
-    potentialContacts = contacts;
-  }
-
-  if (contact_id) {
-    const { data: findContact, error: findContactError } = await supabaseClient
-      .from("contact")
-      .select()
-      .eq("workspace", workspaceId)
-      .eq("id", contact_id)
-      .single();
-
-    if (findContactError) {
-      contactError = findContactError;
-    } else {
-      contact = findContact;
-    }
-  }
-
-  return { contact, potentialContacts, contactError };
-}
-
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
@@ -159,7 +111,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       caller_id: data.from,
       workspace_id: workspaceId,
       contact_id: data.contact_id,
-      media: data.media
+      media: data.media,
     }),
   });
   const responseData = await res.json();
@@ -168,21 +120,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 export default function ChatsList() {
   const { supabase } = useOutletContext();
-  const {
-    chats,
-    workspace,
-    userRole,
-    potentialContacts,
-    contact_number,
-    contact,
-  } = useLoaderData();
+  const { chats, workspace, userRole, potentialContacts, contact } =
+    useLoaderData();
   const messageFetcher = useFetcher({ key: "messages" });
   const imageFetcher = useFetcher({ key: "images" });
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
-  const [isDialogOpen, setDialog] = useState(false);
-  const [params, setParams] = useSearchParams();
+  const [dialogContact, setDialog] = useState(false);
   const outlet = useOutlet();
+  const loc = useLocation();
+  const contact_number = !!outlet ? loc.pathname.split("/").pop() : '';
+
   const {
     selectedContact,
     isContactMenuOpen,
@@ -202,7 +150,6 @@ export default function ChatsList() {
     dropdownRef,
     initialContact: contact,
   });
-  
   const [selectedImages, setSelectedImages] = useState([]);
 
   const { conversations } = useConversationSummaryRealTime({
@@ -252,13 +199,13 @@ export default function ChatsList() {
   const handleContactSelect = useCallback(
     (contact) => {
       const number = normalizePhoneNumber(contact.phone);
-      setParams((prev) => {
+      /*   setParams((prev) => {
         prev.set("contact_id", contact.id);
         return prev;
       });
-      navigate(`./${number}?contact_id=${contact.id}`);
+      navigate(`./${number}?contact_id=${contact.id}`); */
     },
-    [navigate, setParams],
+    [navigate],
   );
 
   const handleExistingConversationClick = useCallback(
@@ -283,7 +230,11 @@ export default function ChatsList() {
       }
     }
   }, [imageFetcher]);
-  
+
+  useEffect(() => {
+    console.log(contact_number)
+    !phoneRegex.test(contact_number) && navigate(".");
+  }, [contact_number, navigate]);
   return (
     <main className="mx-auto flex h-full w-[95%] gap-4">
       <Card className="flex h-full flex-col space-y-0 rounded-sm sm:w-[250px]">
@@ -358,7 +309,8 @@ export default function ChatsList() {
         />
       </Card>
       <ChatAddContactDialog
-        isDialogOpen={isDialogOpen}
+        existingContact={dialogContact}
+        isDialogOpen={Boolean(dialogContact)}
         setDialog={setDialog}
         contact_number={contact_number}
         workspace_id={workspace.id}

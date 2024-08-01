@@ -5,17 +5,17 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { ContactForm } from "~/components/ContactForm";
-import { Form } from "@remix-run/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-const ChatAddContactDialog = ({ isDialogOpen, setDialog, contact_number, workspace_id }) => {
-  const [contact, setContact] = useState({
-    firstname: "",
-    surname: "",
-    phone: contact_number,
-    email: "",
-    address: "",
-  });
+const ChatAddContactDialog = ({
+  isDialogOpen,
+  setDialog,
+  contact_number,
+  workspace_id,
+  existingContact,
+}) => {
+  const [contact, setContact] = useState(existingContact);
+
   const handleUpdateContact = (e) => {
     setContact((curr) => ({
       ...curr,
@@ -25,22 +25,24 @@ const ChatAddContactDialog = ({ isDialogOpen, setDialog, contact_number, workspa
   const handleSaveContact = (e) => {
     setDialog(false);
   };
-
   return (
     <Dialog open={isDialogOpen} onOpenChange={setDialog}>
       <DialogContent className="flex w-[450px] flex-col items-center bg-card">
         <DialogHeader>
           <DialogTitle className="text-center text-xl">
-            Add {contact_number} to contacts
+            {existingContact?.id
+              ? `Edit ${contact.firstname} ${contact.surname}`
+              : `Add ${contact_number} to contacts`}
           </DialogTitle>
         </DialogHeader>
-            <ContactForm
-              newContact={contact}
-              handleInputChange={handleUpdateContact}
-              handleSaveContact={handleSaveContact}
-              workspace_id={workspace_id}
-              audience_id={null}
-            />
+        <ContactForm
+          isNew={!!existingContact?.id}
+          newContact={contact}
+          handleInputChange={handleUpdateContact}
+          handleSaveContact={handleSaveContact}
+          workspace_id={workspace_id}
+          audience_id={null}
+        />
       </DialogContent>
     </Dialog>
   );

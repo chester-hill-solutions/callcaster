@@ -741,3 +741,60 @@ export const findPotentialContacts = async (
     .neq("phone", "");
   return data;
 };
+
+export async function fetchWorkspaceData(supabaseClient, workspaceId) {
+  const { data: workspace, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select(`*, workspace_number(*)`)
+    .eq("id", workspaceId)
+    .eq("workspace_number.type", "rented")
+    .single();
+
+  return { workspace, workspaceError };
+}
+
+export async function fetchConversationSummary(supabaseClient, workspaceId) {
+  const { data: chats, error: chatsError } = await supabaseClient.rpc(
+    "get_conversation_summary",
+    { p_workspace: workspaceId },
+  );
+
+  return { chats, chatsError };
+}
+
+export async function fetchContactData(
+  supabaseClient,
+  workspaceId,
+  contact_id,
+  contact_number,
+) {
+  let potentialContacts = [];
+  let contact = null;
+  let contactError = null;
+
+  if (contact_number && !contact_id) {
+    const { data: contacts } = await findPotentialContacts(
+      supabaseClient,
+      contact_number,
+      workspaceId,
+    );
+    potentialContacts = contacts;
+  }
+
+  if (contact_id) {
+    const { data: findContact, error: findContactError } = await supabaseClient
+      .from("contact")
+      .select()
+      .eq("workspace", workspaceId)
+      .eq("id", contact_id)
+      .single();
+
+    if (findContactError) {
+      contactError = findContactError;
+    } else {
+      contact = findContact;
+    }
+  }
+
+  return { contact, potentialContacts, contactError };
+}

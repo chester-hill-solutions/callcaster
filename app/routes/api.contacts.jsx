@@ -9,14 +9,13 @@ export const action = async ({ request }) => {
 
     let response;
 
-    if (method === 'PATCH' && contentType === 'application/json') {
-        const data = await request.json();
+    if (method === 'PATCH') {
+        const data = contentType === 'application/json' ? await request.json() : Object.entries(await request.formData());
         const { data: update, error } = await supabaseClient
             .from('contact')
             .update(data)
             .eq('id', data.id)
             .select();
-
         if (error) {
             console.error(error);
             return json({ error: 'Failed to update contact' }, { status: 500 });
