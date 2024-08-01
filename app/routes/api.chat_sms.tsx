@@ -20,13 +20,14 @@ const normalizePhoneNumber = (input) => {
 };
 
 const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id }) => {
+    const mediaData = media && JSON.parse(media);
     const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id:workspace});
     const message = await twilio.messages.create({
         body,
         to,
         from,
         statusCallback: `${process.env.BASE_URL}/api/sms/status`,
-        ...(media && media.length > 0 && { mediaUrl: [...media] })
+        ...(mediaData && mediaData.length > 0 && { mediaUrl: [...mediaData] })
     });
     const {
         sid,
@@ -48,7 +49,7 @@ const sendMessage = async ({ body, to, from, media, supabase, workspace, contact
         errorCode: error_code,
         priceUnit: price_unit,
         apiVersion: api_version,
-        subresourceUris: subresource_uris
+        subresourceUris: subresource_uris,
     } = message;
     const { data, error } = await supabase.from('message').insert({
         sid,
@@ -72,7 +73,8 @@ const sendMessage = async ({ body, to, from, media, supabase, workspace, contact
         api_version,
         subresource_uris,
         workspace,
-        ...(contact_id && {contact_id})
+        ...(contact_id && {contact_id}),
+        ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] })
     }).select();
     if (error) throw { 'message_entry_error:': error };
     return { message, data };
@@ -95,9 +97,8 @@ export const action = async ({ request }) => {
     }
 
     try {
-        let media;
         const { message, data } = await sendMessage({
-            body,
+            body: body || " ",
             media,
             to,
             from: caller_id,

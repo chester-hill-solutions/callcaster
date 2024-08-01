@@ -1,88 +1,297 @@
-import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
-  Form,
-  Link,
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
+import {
   NavLink,
   Outlet,
   json,
-  useActionData,
+  useFetcher,
   useLoaderData,
+  useNavigate,
+  useOutlet,
   useOutletContext,
+  useSearchParams,
 } from "@remix-run/react";
-import { MdAdd, MdDownload, MdEdit } from "react-icons/md";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
-import { DataTable } from "~/components/WorkspaceTable/DataTable";
+import { MdAdd } from "react-icons/md";
 import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
+import { findPotentialContacts, getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { formatDateToLocale } from "~/lib/utils";
-import { useEffect } from "react";
+import { normalizePhoneNumber } from "~/lib/utils";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "~/components/ui/card";
-import { CardContent } from "~/components/CustomCard";
 import { useConversationSummaryRealTime } from "~/hooks/useChatRealtime";
+import ChatHeader from "~/components/Chat/ChatHeader";
+import ChatInput from "~/components/Chat/ChatInput";
+import { useContactSearch } from "~/hooks/useContactSearch";
+import ChatAddContactDialog from "~/components/Chat/ChatAddContactDialog";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
+  const url = new URL(request.url);
+  const contact_id = url.searchParams.get("contact_id");
   const workspaceId = params.id;
-  if (workspaceId == null) {
+  const contact_number = params.contact_number;
+
+  if (!workspaceId) {
     return json(
-      {
-        workspace: null,
-        error: "Workspace does not exist",
-        userRole: null,
-      },
+      { workspace: null, error: "Workspace does not exist", userRole: null },
       { headers },
     );
   }
 
   const userRole = getUserRole({ serverSession, workspaceId });
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
 
-  const { data: chats, error: chatsError } = await supabaseClient.rpc(
-    "get_conversation_summary",
-    { p_workspace: workspaceId },
-  );
+  const [workspaceData, chatsData, contactData] = await Promise.all([
+    fetchWorkspaceData(supabaseClient, workspaceId),
+    fetchConversationSummary(supabaseClient, workspaceId),
+    fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
+  ]);
 
-  if ([chatsError, workspaceError].filter(Boolean).length) {
+  const { workspace, workspaceError } = workspaceData;
+  const { chats, chatsError } = chatsData;
+  const { contact, potentialContacts, contactError } = contactData;
+
+  const errors = [workspaceError, chatsError, contactError].filter(Boolean);
+
+  if (errors.length) {
     return json(
       {
-        scripts: null,
-        error: [chatsError, workspaceError]
-          .filter(Boolean)
-          .map((error) => error.message)
-          .join(", "),
+        error: errors.map((error) => error.message).join(", "),
         userRole,
       },
       { headers },
     );
   }
-  return json({ chats, workspace, error: null, userRole }, { headers });
+
+  return json(
+    {
+      chats,
+      potentialContacts,
+      contact,
+      workspace,
+      error: null,
+      userRole,
+      contact_number,
+    },
+    { headers },
+  );
 }
 
+async function fetchWorkspaceData(supabaseClient, workspaceId) {
+  const { data: workspace, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select(`*, workspace_number(*)`)
+    .eq("id", workspaceId)
+    .eq("workspace_number.type", "rented")
+    .single();
+
+  return { workspace, workspaceError };
+}
+
+async function fetchConversationSummary(supabaseClient, workspaceId) {
+  const { data: chats, error: chatsError } = await supabaseClient.rpc(
+    "get_conversation_summary",
+    { p_workspace: workspaceId },
+  );
+
+  return { chats, chatsError };
+}
+
+async function fetchContactData(
+  supabaseClient,
+  workspaceId,
+  contact_id,
+  contact_number,
+) {
+  let potentialContacts = [];
+  let contact = null;
+  let contactError = null;
+
+  if (contact_number && !contact_id) {
+    const { data: contacts } = await findPotentialContacts(
+      supabaseClient,
+      contact_number,
+      workspaceId,
+    );
+    potentialContacts = contacts;
+  }
+
+  if (contact_id) {
+    const { data: findContact, error: findContactError } = await supabaseClient
+      .from("contact")
+      .select()
+      .eq("workspace", workspaceId)
+      .eq("id", contact_id)
+      .single();
+
+    if (findContactError) {
+      contactError = findContactError;
+    } else {
+      contact = findContact;
+    }
+  }
+
+  return { contact, potentialContacts, contactError };
+}
+
+export async function action({ request, params }: ActionFunctionArgs) {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+
+  const workspaceId = params.id;
+  const formData = await request.formData();
+  const data = Object.fromEntries(formData);
+  const contact_number = normalizePhoneNumber(
+    params.contact_number || data.contact_number,
+  );
+  const res = await fetch(`${process.env.BASE_URL}/api/chat_sms`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      body: data.body,
+      to_number: contact_number,
+      caller_id: data.from,
+      workspace_id: workspaceId,
+      contact_id: data.contact_id,
+      media: data.media
+    }),
+  });
+  const responseData = await res.json();
+  if (!params.contact_number) return redirect(contact_number);
+  return json({ responseData });
+}
 export default function ChatsList() {
-  const context = useOutletContext();
-  const { chats, workspace, userRole } = useLoaderData();
+  const { supabase } = useOutletContext();
+  const {
+    chats,
+    workspace,
+    userRole,
+    potentialContacts,
+    contact_number,
+    contact,
+  } = useLoaderData();
+  const messageFetcher = useFetcher({ key: "messages" });
+  const imageFetcher = useFetcher({ key: "images" });
+  const navigate = useNavigate();
+  const dropdownRef = useRef(null);
+  const [isDialogOpen, setDialog] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const outlet = useOutlet();
+  const {
+    selectedContact,
+    isContactMenuOpen,
+    searchError,
+    contacts,
+    phoneNumber,
+    existingConversation,
+    handleSearch: handlePhoneChange,
+    toggleContactMenu,
+    clearSelectedContact,
+    isValid,
+  } = useContactSearch({
+    supabase,
+    workspace_id: workspace.id,
+    contact_number,
+    potentialContacts,
+    dropdownRef,
+    initialContact: contact,
+  });
+  
+  const [selectedImages, setSelectedImages] = useState([]);
 
   const { conversations } = useConversationSummaryRealTime({
-    supabase: context.supabase,
+    supabase: supabase,
     initial: chats,
     workspace: workspace.id,
   });
 
+  const handleImageSelect = useCallback(
+    (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const data = new FormData();
+        data.append("workspaceId", workspace.id);
+        data.append("image", file);
+        data.append("fileName", file.name);
+        imageFetcher.submit(data, {
+          action: "/api/message_media",
+          method: "POST",
+          encType: "multipart/form-data",
+        });
+      }
+    },
+    [workspace.id, imageFetcher],
+  );
+
+  const handleImageRemove = useCallback((imageUrl) => {
+    setSelectedImages((prevImages) =>
+      prevImages.filter((image) => image !== imageUrl),
+    );
+  }, []);
+
+  const handleSubmit = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!phoneNumber || messageFetcher.state !== "idle") return;
+      const formData = new FormData(e.target);
+      formData.append("media", JSON.stringify(selectedImages));
+      messageFetcher.submit(formData, { method: "POST" });
+      const messageBody = document.getElementById("body");
+      if (messageBody) messageBody.value = "";
+      setSelectedImages([]);
+    },
+    [phoneNumber, messageFetcher, selectedImages],
+  );
+
+  const handleContactSelect = useCallback(
+    (contact) => {
+      const number = normalizePhoneNumber(contact.phone);
+      setParams((prev) => {
+        prev.set("contact_id", contact.id);
+        return prev;
+      });
+      navigate(`./${number}?contact_id=${contact.id}`);
+    },
+    [navigate, setParams],
+  );
+
+  const handleExistingConversationClick = useCallback(
+    (phoneNumber) => {
+      navigate(`./${phoneNumber}`);
+    },
+    [navigate],
+  );
+
+  useEffect(() => {
+    if (imageFetcher.state === "idle" && imageFetcher.data) {
+      if (imageFetcher.data.success && imageFetcher.data.url) {
+        setSelectedImages((prevImages) => {
+          const newImagesSet = new Set([...prevImages, imageFetcher.data.url]);
+          return Array.from(newImagesSet);
+        });
+
+        const fileInput = document.getElementById("image");
+        if (fileInput) fileInput.value = "";
+      } else if (imageFetcher.data.error) {
+        console.error("Image upload error:", imageFetcher.data.error);
+      }
+    }
+  }, [imageFetcher]);
+  
   return (
-    <main className="mx-auto mt-8 flex h-full w-[95%] gap-4">
+    <main className="mx-auto flex h-full w-[95%] gap-4">
       <Card className="flex h-full flex-col space-y-0 rounded-sm sm:w-[250px]">
         <Button
-          className="flex flex-auto rounded-none rounded-t-sm text-lg"
+          className="flex h-fit rounded-none rounded-t-sm text-lg"
           asChild
         >
-          <NavLink to={"new"}>
+          <NavLink to={"."}>
             New Chat <MdAdd size={24} />
           </NavLink>
         </Button>
@@ -111,9 +320,49 @@ export default function ChatsList() {
             })}
         </div>
       </Card>
-      <Card className="flex max-h-[800px] w-full flex-1 flex-col overflow-scroll rounded-sm">
-        <Outlet context={context} />
+      <Card className="flex h-full w-full flex-1 flex-col rounded-sm">
+        <ChatHeader
+          contact={contact}
+          outlet={outlet}
+          potentialContacts={potentialContacts}
+          phoneNumber={phoneNumber}
+          contactNumber={contact_number}
+          handlePhoneChange={handlePhoneChange}
+          isValid={isValid}
+          selectedContact={selectedContact}
+          clearSelectedContact={clearSelectedContact}
+          contacts={contacts}
+          toggleContactMenu={toggleContactMenu}
+          isContactMenuOpen={isContactMenuOpen}
+          handleContactSelect={handleContactSelect}
+          dropdownRef={dropdownRef}
+          searchError={searchError}
+          existingConversation={existingConversation}
+          handleExistingConversationClick={handleExistingConversationClick}
+          setDialog={setDialog}
+        />
+        <div className="flex h-full flex-col overflow-y-scroll bg-gray-100">
+          <Outlet context={{ supabase, workspace }} />
+        </div>
+        <ChatInput
+          isValid={isValid}
+          phoneNumber={phoneNumber}
+          workspace={workspace}
+          initialFrom={workspace.workspace_number?.[0]}
+          handleSubmit={handleSubmit}
+          handleImageSelect={handleImageSelect}
+          handleImageRemove={handleImageRemove}
+          selectedImages={selectedImages}
+          selectedContact={selectedContact}
+          messageFetcher={messageFetcher}
+        />
       </Card>
+      <ChatAddContactDialog
+        isDialogOpen={isDialogOpen}
+        setDialog={setDialog}
+        contact_number={contact_number}
+        workspace_id={workspace.id}
+      />
     </main>
   );
 }

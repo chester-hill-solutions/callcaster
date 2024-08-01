@@ -28,7 +28,8 @@ export const action = async ({ request }) => {
             const formData = await request.formData();
             const audience_id = formData.get('audience_id');
             const workspace = formData.get('workspace');
-            const [firstname, surname] = formData.get('name')?.split(" ") || ["", ""];
+            const firstname = formData.get('firstname');
+            const surname = formData.get('surname')
             const phone = formData.get('phone');
             const email = formData.get('email');
             const address = formData.get('address');

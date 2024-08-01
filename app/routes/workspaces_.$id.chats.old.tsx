@@ -11,10 +11,11 @@ import {
 } from "@remix-run/react";
 import { findPotentialContacts, getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { MdSend, MdExpandMore, MdClose } from "react-icons/md";
+import { MdSend, MdExpandMore, MdClose, MdImage } from "react-icons/md";
 import { normalizePhoneNumber, stripPhoneNumber } from "~/lib/utils";
+import MessagesImages from "~/components/Chat/ChatImages";
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
@@ -67,11 +68,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       caller_id: data.from,
       workspace_id: workspaceId,
       contact_id: data.contact_id,
+      ...(data.media && {media: data.media})
     }),
   });
   const responseData = await res.json();
-
-  return redirect(`../${normalizePhoneNumber(data.to_number)}`);
+  
+  return json({ responseData });
 }
 
 export default function NewChat() {
@@ -83,8 +85,78 @@ export default function NewChat() {
   const [selectedContact, setSelectedContact] = useState(null);
   const [searchError, setSearchError] = useState(null);
   const messageFetcher = useFetcher({ key: "messages" });
+  const imageFetcher = useFetcher({ key: "images" });
   const [isContactMenuOpen, setIsContactMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const [selectedImages, setSelectedImages] = useState([]);
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value;
+    setPhoneNumber(value);
+    setIsValid(phoneRegex.test(value));
+    setSelectedContact(null);
+  };
+
+  const handleContactSelect = (contact) => {
+    setSelectedContact(contact);
+    setIsContactMenuOpen(false);
+  };
+
+  const toggleContactMenu = () => {
+    setIsContactMenuOpen(!isContactMenuOpen);
+  };
+
+  const clearSelectedContact = () => {
+    setSelectedContact(null);
+  };
+
+  const handleImageSelect = useCallback((e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const data = new FormData();
+      data.append("workspaceId", workspace.id);
+      data.append("image", file);
+      data.append("fileName", file.name);
+      imageFetcher.submit(data, {
+        action: "/api/message_media",
+        method: "POST",
+        encType: "multipart/form-data",
+      });
+    }
+  }, [workspace.id, imageFetcher]);
+
+
+  const handleImageRemove = useCallback((imageUrl) => {
+    setSelectedImages(prevImages => prevImages.filter(image => image !== imageUrl));
+  }, []);
+
+  const handleSubmit = useCallback((e) => {
+    e.preventDefault();
+    if (!isValid || !phoneNumber || messageFetcher.state !== "idle") return;
+    const formData = new FormData(e.target);
+    formData.append("media", JSON.stringify(selectedImages));
+    messageFetcher.submit(formData, { method: "POST" });
+    const messageBody = document.getElementById("body");
+    if (messageBody) messageBody.value = "";
+    setSelectedImages([]);
+  }, [isValid, phoneNumber, messageFetcher, selectedImages]);
+
+
+  useEffect(() => {
+    if (imageFetcher.state === "idle" && imageFetcher.data) {
+      if (imageFetcher.data.success && imageFetcher.data.url) {
+        setSelectedImages((prevImages) => {
+          const newImagesSet = new Set([...prevImages, imageFetcher.data.url]);
+          return Array.from(newImagesSet);
+        });
+
+        const fileInput = document.getElementById("image");
+        if (fileInput) fileInput.value = "";
+      } else if (imageFetcher.data.error) {
+        console.error("Image upload error:", imageFetcher.data.error);
+      }
+    }
+  }, [imageFetcher]);
 
   useEffect(() => {
     const searchContact = async () => {
@@ -133,26 +205,6 @@ export default function NewChat() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
-  const handlePhoneChange = (e) => {
-    const value = e.target.value;
-    setPhoneNumber(value);
-    setIsValid(phoneRegex.test(value));
-    setSelectedContact(null);
-  };
-
-  const handleContactSelect = (contact) => {
-    setSelectedContact(contact);
-    setIsContactMenuOpen(false);
-  };
-
-  const toggleContactMenu = () => {
-    setIsContactMenuOpen(!isContactMenuOpen);
-  };
-
-  const clearSelectedContact = () => {
-    setSelectedContact(null);
-  };
 
   if (workspaceError) {
     return <div>Error: {workspaceError.message}</div>;
@@ -244,12 +296,12 @@ export default function NewChat() {
         <p className="px-4 py-2 text-sm text-red-500">{searchError}</p>
       )}
 
-      <div className="h-[400px] flex-1 overflow-y-auto p-4"></div>
+      <div className="h-full overflow-y-auto p-4"></div>
 
       <div className="border-t bg-white p-4">
-        <messageFetcher.Form method="POST" className="flex flex-col space-y-2">
+        <messageFetcher.Form method="POST" className="flex flex-col space-y-2" onSubmit={handleSubmit}>
           <div className="flex items-center space-x-2">
-            <label htmlFor="from" className="text-sm font-medium">
+            <label htmlFor="from" className="w-[50px] text-sm font-medium">
               From:
             </label>
             <select
@@ -265,13 +317,33 @@ export default function NewChat() {
             </select>
           </div>
           <div className="flex items-center space-x-2">
-            <textarea
-              placeholder="Type your message"
-              rows={3}
-              className="flex-grow resize-none rounded-md border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              name="body"
-              id="body"
+            <label
+              htmlFor="image"
+              className="flex w-[50px] cursor-pointer justify-center"
+            >
+              <div className="">
+                <MdImage
+                  size={24}
+                  className="text-gray-500 hover:text-blue-500"
+                />
+              </div>
+            </label>
+            <input
+              type="file"
+              id="image"
+              className="hidden"
+              accept="image/*"
+              onChange={handleImageSelect}
             />
+            <div className="relative flex flex-auto">
+              <textarea
+                placeholder="Type your message"
+                rows={3}
+                className="flex-grow resize-none rounded-md border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                name="body"
+                id="body"
+              />
+            </div>
             <button
               type="submit"
               disabled={messageFetcher.state !== "idle" || !isValid}
@@ -280,6 +352,12 @@ export default function NewChat() {
               <MdSend size={20} />
             </button>
           </div>
+          {selectedImages.filter(Boolean).length > 0 && (
+            <MessagesImages
+              selectedImages={selectedImages}
+              onRemove={handleImageRemove}
+            />
+          )}
           <input hidden value={phoneNumber} type="hidden" name="to_number" />
           {selectedContact && (
             <input
@@ -288,6 +366,9 @@ export default function NewChat() {
               type="hidden"
               name="contact_id"
             />
+          )}
+          {selectedImages && (
+            <input hidden type="hidden" name="media" value={JSON.stringify(selectedImages)} />
           )}
         </messageFetcher.Form>
       </div>

@@ -14,16 +14,27 @@ const ContactForm = ({
     method="POST"
     navigate={false}
     encType="application/x-www-form-urlencoded"
+    className="space-y-2"
   >
     <div className="flex space-x-2">
       <input
         type="text"
-        name="name"
-        placeholder="Full Name"
-        value={newContact.name}
+        name="firstname"
+        placeholder="First Name"
+        value={newContact.firstname}
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
+      <input
+        type="text"
+        name="surname"
+        placeholder="Last Name"
+        value={newContact.surname}
+        onChange={handleInputChange}
+        className="w-full px-2 py-1"
+      />
+    </div>
+    <div className="flex space-x-2">
       <input
         type="tel"
         name="phone"
@@ -40,19 +51,23 @@ const ContactForm = ({
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
-      <input
-        type="text"
-        name="address"
-        placeholder="Street Address"
-        value={newContact.address}
-        onChange={handleInputChange}
-        className="w-full px-2 py-1"
-      />
-      <input hidden name="workspace" value={workspace_id} readOnly />
-      <input hidden name="audience_id" value={audience_id} readOnly />
-      <Button type="submit" className="ml-2">
-        SAVE
-      </Button>
+    </div>
+    <input
+      type="text"
+      name="address"
+      placeholder="Street Address"
+      value={newContact.address}
+      onChange={handleInputChange}
+      className="w-full px-2 py-1"
+    />
+    <input hidden name="workspace" value={workspace_id} readOnly />
+    <input hidden name="audience_id" value={audience_id} readOnly />
+    <div className="flex flex-auto justify-end">
+      <div>
+        <Button type="submit" className="ml-2">
+          SAVE
+        </Button>
+      </div>
     </div>
   </Form>
 );

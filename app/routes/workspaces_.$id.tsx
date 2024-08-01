@@ -135,11 +135,10 @@ export default function Workspace() {
             <CampaignsList />
           </div>
         </div>
-        <Card className="min-h-[600px] bg-gray-50 dark:bg-slate-800">
-          <CardContent>
-            
+        <Card className="h-[800px] bg-gray-50 dark:bg-slate-800">
+          <div className="h-full py-4">
             <Outlet context={{ audiences, campaigns, ...context }} />
-          </CardContent>
+          </div>
         </Card>
       </div>
     </main>
