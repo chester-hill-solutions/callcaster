@@ -14,9 +14,9 @@ const ContactForm = ({
     action="/api/contacts"
     method={isNew ? "POST" : "PATCH"}
     navigate={false}
-    encType="application/x-www-form-urlencoded"
     className="space-y-2"
   >
+    <input hidden name="id" value={newContact.id} type="hidden"/>
     <div className="flex space-x-2">
       <input
         type="text"

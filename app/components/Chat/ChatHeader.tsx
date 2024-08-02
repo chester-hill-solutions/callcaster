@@ -1,6 +1,60 @@
-import React, { useState } from "react";
-import { MdClose, MdEdit, MdExpandMore } from "react-icons/md";
+import React, { RefObject, useState } from "react";
+import { MdEdit, MdExpandMore } from "react-icons/md";
+import { Contact } from "~/lib/types";
 import { Button } from "../ui/button";
+
+const getSortableName = (contact) => {
+  if (contact.firstname && contact.surname) {
+    return `${contact.firstname} ${contact.surname}`;
+  } else if (contact.firstname) {
+    return contact.firstname;
+  } else if (contact.surname) {
+    return contact.surname;
+  } else {
+    return contact.phone || "";
+  }
+};
+const getDisplayName = (contact) => {
+  if (contact.firstname && contact.surname) {
+    return `${contact.firstname} ${contact.surname}`;
+  } else if (contact.firstname) {
+    return contact.firstname;
+  } else if (contact.surname) {
+    return contact.surname;
+  } else {
+    return contact.phone || "Unknown";
+  }
+};
+
+type Chat = {
+  contact_phone: string;
+  user_phone: string;
+  conversation_start: string;
+  conversation_last_update: string;
+  message_count: number;
+  unread_count: number
+}
+
+type ChatHeaderParams = {
+  contact?: Contact,
+  outlet: boolean,
+  phoneNumber?: string,
+  handlePhoneChange: (e:string | null) => null;
+  isValid: boolean;
+  selectedContact?: Contact;
+  contacts: Contact[];
+  toggleContactMenu: () => null;
+  isContactMenuOpen: boolean;
+  handleContactSelect: (e:Contact) => null;
+  dropdownRef: RefObject<HTMLElement | null>;
+  searchError?: string;
+  existingConversation: Chat;
+  handleExistingConversationClick: (phoneNumber:string) => null;
+  potentialContacts: Contact[];
+  contactNumber?: string;
+  setDialog: (contact: Contact)  => null;
+
+}
 
 export default function ChatHeader({
   contact,
@@ -9,7 +63,6 @@ export default function ChatHeader({
   handlePhoneChange,
   isValid,
   selectedContact,
-  clearSelectedContact,
   contacts,
   toggleContactMenu,
   isContactMenuOpen,
@@ -21,13 +74,18 @@ export default function ChatHeader({
   potentialContacts,
   contactNumber,
   setDialog,
-}) {
+}:ChatHeaderParams) {
   const [isContactListOpen, setIsContactListOpen] = useState(false);
 
   const allContacts = React.useMemo(() => {
-    const combinedContacts = [...new Set([...contacts, ...potentialContacts])];
-    return combinedContacts.sort((a, b) =>
-      a.firstname.localeCompare(b.firstname),
+    const combinedContacts = [...contacts, ...potentialContacts];
+    const uniqueContacts = Array.from(
+      new Map(
+        combinedContacts.map((contact) => [contact.id, contact]),
+      ).values(),
+    );
+    return uniqueContacts.sort((a, b) =>
+      getSortableName(a).localeCompare(getSortableName(b)),
     );
   }, [contacts, potentialContacts]);
 
@@ -152,12 +210,12 @@ export default function ChatHeader({
                 >
                   {allContacts.map((contact) => (
                     <div
-                      key={contact.id}
+                      key={contact.id || contact.phone}
                       className="flex items-center justify-between px-4 py-2 hover:bg-gray-100"
                     >
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {contact.firstname} {contact.surname}
+                          {getDisplayName(contact)}
                         </p>
                         <p className="text-sm text-gray-600">{contact.phone}</p>
                       </div>
@@ -173,10 +231,8 @@ export default function ChatHeader({
               </div>
             )}
           </div>
-        ) : (
-          <div>
-            <Button onClick={() => setDialog({phone: phoneNumber})}>Add Contact</Button>
-          </div>
+        ):(
+          <Button onClick={() => setDialog({phone: phoneNumber})}>Add {phoneNumber}</Button>
         )}
       </div>
     </div>

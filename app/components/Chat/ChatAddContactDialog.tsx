@@ -7,6 +7,18 @@ import {
 import { ContactForm } from "~/components/ContactForm";
 import { useEffect, useState } from "react";
 
+const getDisplayName = (contact) => {
+  if (contact.firstname && contact.surname) {
+    return `${contact.firstname} ${contact.surname}`;
+  } else if (contact.firstname) {
+    return contact.firstname;
+  } else if (contact.surname) {
+    return contact.surname;
+  } else {
+    return contact.phone || "Unknown";
+  }
+};
+
 const ChatAddContactDialog = ({
   isDialogOpen,
   setDialog,
@@ -14,7 +26,13 @@ const ChatAddContactDialog = ({
   workspace_id,
   existingContact,
 }) => {
-  const [contact, setContact] = useState(existingContact);
+  const [contact, setContact] = useState(
+    existingContact || { phone: contact_number },
+  );
+
+  useEffect(() => {
+    setContact(existingContact || { phone: contact_number });
+  }, [existingContact, contact_number]);
 
   const handleUpdateContact = (e) => {
     setContact((curr) => ({
@@ -26,17 +44,17 @@ const ChatAddContactDialog = ({
     setDialog(false);
   };
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setDialog}>
+    <Dialog open={isDialogOpen} onOpenChange={() => setDialog(null)}>
       <DialogContent className="flex w-[450px] flex-col items-center bg-card">
         <DialogHeader>
           <DialogTitle className="text-center text-xl">
             {existingContact?.id
-              ? `Edit ${contact.firstname} ${contact.surname}`
+              ? `Edit ${getDisplayName(contact)}`
               : `Add ${contact_number} to contacts`}
           </DialogTitle>
         </DialogHeader>
         <ContactForm
-          isNew={!!existingContact?.id}
+          isNew={!(contact?.id)}
           newContact={contact}
           handleInputChange={handleUpdateContact}
           handleSaveContact={handleSaveContact}
