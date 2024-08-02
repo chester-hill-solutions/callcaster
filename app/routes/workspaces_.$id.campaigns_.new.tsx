@@ -98,6 +98,9 @@ export default function CampaignsNew() {
                 <option value="robocall" className="dark:bg-black">
                   Interactive Voice Recording
                 </option>
+                <option value="email" className="dark:bg-black">
+                  Email
+                </option>
               </select>
             </label>
           </CardContent>

@@ -1,6 +1,6 @@
-import { useEffect, useState, useReducer, useCallback } from "react";
-import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
-import { NavLink, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
+import { useEffect, useState, useReducer } from "react";
+import { TextInput, Dropdown, Toggle } from "./Inputs";
+import { NavLink, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
 
@@ -71,9 +71,7 @@ const CampaignSettings = ({
   workspace,
   phoneNumbers = [],
   campaignDetails: details,
-  onPageDataChange
 }) => {
-  const navigate = useNavigate();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const submit = useSubmit();
@@ -81,9 +79,6 @@ const CampaignSettings = ({
     initialState(data, workspace, campaign_id),
   );
   const [campaignDetails, dispatch] = useReducer(reducer, initialState(data, workspace, campaign_id));
-  const initSelectedAudiences = audiences.filter((audience) => {
-    return data.campaign_audience?.audience_id === audience.id;
-  });
   const [isChanged, setChanged] = useState(false);
 
   const handleInputChange = (type, value) => {
@@ -91,16 +86,6 @@ const CampaignSettings = ({
     setChanged(!deepEqual(campaignDetails, initial));
   };
 
-  const handleAddDispositionOptions = useCallback((event) => {
-    const newVal = event.target.value;
-    onPageDataChange(({
-        ...data,
-        campaignDetails: {
-            ...data.campaignDetails,
-            disposition_options: [...data.campaignDetails?.disposition_options, { value: newVal.replace(" ", "_").toLowerCase(), label: newVal }]
-        }
-    }));
-}, [onPageDataChange, data]);
 
   const saveAudience = () => {
     submit(
@@ -203,6 +188,7 @@ const CampaignSettings = ({
               { value: "simple_ivr", label: "Simple IVR" },
               { value: "complex_ivr", label: "Complex IVR" },
               { value: "live_call", label: "Live Call" },
+              { value: "email", label: "Email" },
             ]}
             className={"flex flex-col"}
           />
@@ -263,18 +249,6 @@ const CampaignSettings = ({
               )}
               leftLabel="Power Dialer"
               rightLabel="Predictive Dialer" />
-{/*             <form className="flex flex-col gap-2" onSubmit={handleAddDispositionOptions}>
-              <label htmlFor="disposition-options">
-                Disposition Options
-              </label>
-              <div className="flex">
-                <input type="text" id="disposition-options" name="disposition-options-add" />
-                <Button type="submit" >Add</Button>
-              </div>
-              <div className="flex flex-col">
-                {details.disposition_options?.map((i, index) => (<p key={index}>{i.label}</p>))}
-              </div>
-            </form> */}
           </div></>}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <span className="text-lg font-semibold">Audiences:</span>

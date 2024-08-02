@@ -1,3 +1,21 @@
+import {
+  Button as EmailButton,
+  Container,
+  CodeBlock,
+  CodeInline,
+  Column,
+  Row,
+  Font,
+  Heading,
+  Hr,
+  Img as Image,
+  Link,
+  Markdown,
+  Section,
+  Tailwind,
+  Text,
+} from "@react-email/components";
+
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "./database.types";
 
@@ -37,3 +55,46 @@ export type WorkspaceData =
       users: string[] | null;
     }[]
   | null;
+
+  type ReactEmailComponent =
+  | typeof EmailButton
+  | typeof Container
+  | typeof CodeBlock
+  | typeof CodeInline
+  | typeof Column
+  | typeof Row
+  | typeof Font
+  | typeof Heading
+  | typeof Hr
+  | typeof Image
+  | typeof Link
+  | typeof Markdown
+  | typeof Section
+  | typeof Tailwind
+  | typeof Text;
+
+type EmailHead = {
+  title?: string;
+  meta?: Array<{
+    name: string;
+    content: string;
+  }>;
+};
+
+export type EmailBlock = {
+  component: keyof ReactEmailComponent;
+  id: string;
+  content: string | { src: string; alt: string } | ReactNode;
+  props?: Record<string, any>;
+};
+
+export type EmailBody = {
+  order: string[];
+  blocks: Record<string, EmailBlock>;
+};
+
+export type Email = {
+  head: EmailHead;
+  preview?: string;
+  body: EmailBody;
+};

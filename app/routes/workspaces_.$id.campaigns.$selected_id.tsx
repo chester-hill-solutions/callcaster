@@ -223,6 +223,13 @@ export const loader = async ({ request, params }) => {
       workspace_id,
       "ivr_campaign",
     );
+  } else if (campaignType === 'email'){
+    campaignDetails = await fetchCampaignDetails(
+      supabaseClient, 
+      selected_id,
+      workspace_id,
+      "email_campaign"
+    )
   }
 
   const data = { ...campaignData, campaignDetails };

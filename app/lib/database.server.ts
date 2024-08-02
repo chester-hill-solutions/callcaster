@@ -397,6 +397,14 @@ export async function endConferenceByUser({ user_id, supabaseClient }) {
   );
 }
 
+export async function getWorkspaceEmails({ workspace, supabase }) {
+  const { data, error } = await supabase
+    .from("email")
+    .select()
+    .eq("workspace", workspace);
+  if (error) console.error("Error fetching scripts", error);
+  return data;
+}
 export async function getWorkspaceScripts({ workspace, supabase }) {
   const { data, error } = await supabase
     .from("script")
@@ -491,7 +499,11 @@ export async function updateCampaign({
     throw campaignError;
   }
 
-  let tableKey: "live_campaign" | "message_campaign" | "ivr_campaign";
+  let tableKey:
+    | "live_campaign"
+    | "message_campaign"
+    | "ivr_campaign"
+    | "email_campaign";
   if (campaignData?.type === "live_call" || !campaignData?.type)
     tableKey = "live_campaign";
   else if (campaignData.type === "message") tableKey = "message_campaign";
@@ -499,6 +511,7 @@ export async function updateCampaign({
     ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
   )
     tableKey = "ivr_campaign";
+    else if (campaignData?.type === " email") tableKey = "email_campaign";
   else throw new Error("Invalid campaign type");
   delete campaignDetails.mediaLinks;
   delete campaignDetails.script;
@@ -568,10 +581,11 @@ export async function updateCampaignScript({
   scriptId,
   campaignType,
 }) {
-  let tableKey: "live_campaign" | "ivr_campaign";
+  let tableKey: "live_campaign" | "ivr_campaign" | "email_campaign";
   if (campaignType === "live_call" || !campaignType) tableKey = "live_campaign";
   else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType))
     tableKey = "ivr_campaign";
+  else if (campaignType === " email") tableKey = "email_campaign";
   else throw new Error("Invalid campaign type for script update");
 
   const { error: scriptIdUpdateError } = await supabase
@@ -681,6 +695,10 @@ export const fetchAdvancedCampaignDetails = async (
       table = "ivr_campaign";
       extraSelect = ", script(*)";
       break;
+    case "email":
+      table = "email_campaign";
+      extraSelect = ", email(*)";
+      break;
     default:
       throw new Error(`Invalid campaign type: ${campaignType}`);
   }
@@ -690,7 +708,7 @@ export const fetchAdvancedCampaignDetails = async (
     .select(`*${extraSelect}`)
     .eq("campaign_id", campaignId)
     .single();
-
+  console.log(error)
   if (error)
     throw new Error(`Error fetching campaign details: ${error.message}`);
 
