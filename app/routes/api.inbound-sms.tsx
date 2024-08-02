@@ -67,7 +67,6 @@ export const action = async ({ request, params }) => {
         console.error('Contact lookup error:', contactError);
       }
       
-      console.log('Contact:', contact);
   
       const messageData = {
         sid: data.MessageSid,
@@ -81,7 +80,8 @@ export const action = async ({ request, params }) => {
         direction: "inbound",
         date_created: now,
         date_sent: now,
-        inbound_media: media,
+        status: "received",
+        ...(media.length > 0 && {inbound_media: media}),
         ...(contact && contact.length > 0 && { contact_id: contact[0].id }),
       };
   

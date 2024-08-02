@@ -9,6 +9,7 @@ import {
   Outlet,
   NavLink,
   useOutlet,
+  useOutletContext,
 } from "@remix-run/react";
 import { FaPlus, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
@@ -75,6 +76,7 @@ export default function Workspace() {
   const { workspace, audiences, campaigns, userRole } = useLoaderData();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
+  const context = useOutletContext();
   const handleNavlinkStyles = ({ isActive, isPending }) =>
     `flex items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
       isActive
@@ -133,11 +135,10 @@ export default function Workspace() {
             <CampaignsList />
           </div>
         </div>
-        <Card className="min-h-[600px] bg-gray-50 dark:bg-slate-800">
-          <CardContent>
-            
-            <Outlet context={{ audiences, campaigns }} />
-          </CardContent>
+        <Card className="h-[800px] bg-gray-50 dark:bg-slate-800">
+          <div className="h-full py-4">
+            <Outlet context={{ audiences, campaigns, ...context }} />
+          </div>
         </Card>
       </div>
     </main>

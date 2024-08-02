@@ -313,7 +313,10 @@ export async function removeWorkspacePhoneNumber({
       .eq("id", numberId)
       .single();
     if (numberError) throw numberError;
-    const twilio = await createWorkspaceTwilioInstance({supabase: supabaseClient, workspace_id: workspaceId})
+    const twilio = await createWorkspaceTwilioInstance({
+      supabase: supabaseClient,
+      workspace_id: workspaceId,
+    });
     const outgoingIds = await twilio.outgoingCallerIds.list({
       friendlyName: number.friendly_name,
     });
@@ -324,7 +327,7 @@ export async function removeWorkspacePhoneNumber({
       .from("workspace_number")
       .delete()
       .eq("id", numberId);
-      
+
     if (deletionError) throw deletionError;
     return { error: null };
   } catch (error) {
@@ -468,7 +471,7 @@ export async function updateCampaign({
   delete updateData.campaignDetails;
   delete updateData.mediaLinks;
   delete updateData.script;
-  const id = campaignDetails.campaign_id
+  const id = campaignDetails.campaign_id;
   delete updateData.campaign_id;
   delete updateData.questions;
   delete updateData.created_at;
@@ -511,24 +514,33 @@ export async function updateCampaign({
   return { campaign: campaign[0], campaignDetails: updatedCampaignDetails[0] };
 }
 
-export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, campaignData, created_by, created_at }) {
-  
+export async function updateOrCopyScript({
+  supabase,
+  scriptData,
+  saveAsCopy,
+  campaignData,
+  created_by,
+  created_at,
+}) {
   const { id, ...updateData } = scriptData;
-  const {data: originalScript, error: fetchScriptError} = id ? await supabase.from('script').select().eq('id', id) : {data: null, error: null};
+  const { data: originalScript, error: fetchScriptError } = id
+    ? await supabase.from("script").select().eq("id", id)
+    : { data: null, error: null };
   let scriptOperation;
   const upsertData = {
     ...scriptData,
-    name: saveAsCopy && originalScript?.name === updateData.name ? `${updateData.name} (Copy)` : updateData.name,
-    ...(saveAsCopy || !id ? {updated_by: created_by, updated_at: created_at} : {created_by, created_at})
-  }
+    name:
+      saveAsCopy && originalScript?.name === updateData.name
+        ? `${updateData.name} (Copy)`
+        : updateData.name,
+    ...(saveAsCopy || !id
+      ? { updated_by: created_by, updated_at: created_at }
+      : { created_by, created_at }),
+  };
 
   if (saveAsCopy || !id) {
-    delete upsertData.id
-    scriptOperation = supabase
-      .from("script")
-      .insert(upsertData)
-      .select();
-      
+    delete upsertData.id;
+    scriptOperation = supabase.from("script").insert(upsertData).select();
   } else {
     scriptOperation = supabase
       .from("script")
@@ -539,7 +551,7 @@ export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, cam
   const { data: updatedScript, error: scriptError } = await scriptOperation;
   if (scriptError) {
     if (scriptError.code === "23505") {
-      console.log(scriptError)
+      console.log(scriptError);
       throw new Error(
         `A script with this name (${upsertData.name}) already exists in the workspace`,
       );
@@ -554,11 +566,12 @@ export async function updateCampaignScript({
   supabase,
   campaignId,
   scriptId,
-  campaignType
+  campaignType,
 }) {
   let tableKey: "live_campaign" | "ivr_campaign";
   if (campaignType === "live_call" || !campaignType) tableKey = "live_campaign";
-  else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)) tableKey = "ivr_campaign";
+  else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType))
+    tableKey = "ivr_campaign";
   else throw new Error("Invalid campaign type for script update");
 
   const { error: scriptIdUpdateError } = await supabase
@@ -569,32 +582,43 @@ export async function updateCampaignScript({
   if (scriptIdUpdateError) throw scriptIdUpdateError;
 }
 
-export const fetchBasicResults = async (supabaseClient, campaignId, headers) => {
+export const fetchBasicResults = async (
+  supabaseClient,
+  campaignId,
+  headers,
+) => {
   const { data, error } = await supabaseClient.rpc(
     "get_basic_results",
     { campaign_id_param: campaignId },
-    { headers }
+    { headers },
   );
-  if (error) console.error('Error fetching basic results:', error);
+  if (error) console.error("Error fetching basic results:", error);
   return data || [];
 };
 
 export const fetchCampaignData = async (supabaseClient, campaignId) => {
   const { data, error } = await supabaseClient
     .from("campaign")
-    .select(`
+    .select(
+      `
       type,
       dial_type,
       title,
       campaign_audience(*)
-    `)
+    `,
+    )
     .eq("id", campaignId)
     .single();
-  if (error) console.error('Error fetching campaign data:', error);
+  if (error) console.error("Error fetching campaign data:", error);
   return data;
 };
 
-export const fetchCampaignDetails = async (supabaseClient, campaignId, workspaceId, tableName) => {
+export const fetchCampaignDetails = async (
+  supabaseClient,
+  campaignId,
+  workspaceId,
+  tableName,
+) => {
   const { data, error } = await supabaseClient
     .from(tableName)
     .select()
@@ -603,11 +627,12 @@ export const fetchCampaignDetails = async (supabaseClient, campaignId, workspace
 
   if (error) {
     if (error.code === "PGRST116") {
-      const { data: newCampaign, error: newCampaignError } = await supabaseClient
-        .from(tableName)
-        .insert({ campaign_id: campaignId, workspace: workspaceId })
-        .select()
-        .single();
+      const { data: newCampaign, error: newCampaignError } =
+        await supabaseClient
+          .from(tableName)
+          .insert({ campaign_id: campaignId, workspace: workspaceId })
+          .select()
+          .single();
 
       if (newCampaignError) {
         console.error(`Error creating new ${tableName}:`, newCampaignError);
@@ -632,14 +657,19 @@ export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
   return data;
 };
 
-
-export const fetchAdvancedCampaignDetails = async (supabaseClient, campaignId, campaignType, workspaceId) => {
-  let table, extraSelect = '';
+export const fetchAdvancedCampaignDetails = async (
+  supabaseClient,
+  campaignId,
+  campaignType,
+  workspaceId,
+) => {
+  let table,
+    extraSelect = "";
   switch (campaignType) {
     case "live_call":
     case null:
       table = "live_campaign";
-      extraSelect = ', script(*)';
+      extraSelect = ", script(*)";
       break;
     case "message":
       table = "message_campaign";
@@ -648,7 +678,7 @@ export const fetchAdvancedCampaignDetails = async (supabaseClient, campaignId, c
     case "simple_ivr":
     case "complex_ivr":
       table = "ivr_campaign";
-      extraSelect = ', script(*)';
+      extraSelect = ", script(*)";
       break;
     default:
       throw new Error(`Invalid campaign type: ${campaignType}`);
@@ -660,11 +690,111 @@ export const fetchAdvancedCampaignDetails = async (supabaseClient, campaignId, c
     .eq("campaign_id", campaignId)
     .single();
 
-  if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
+  if (error)
+    throw new Error(`Error fetching campaign details: ${error.message}`);
 
   if (campaignType === "message" && data?.message_media?.length > 0) {
-    data.mediaLinks = await getSignedUrls(supabaseClient, workspaceId, data.message_media);
+    data.mediaLinks = await getSignedUrls(
+      supabaseClient,
+      workspaceId,
+      data.message_media,
+    );
   }
 
   return data;
 };
+
+export const findPotentialContacts = async (
+  supabaseClient,
+  phoneNumber,
+  workspaceId,
+) => {
+  const fullNumber = phoneNumber.replace(/\D/g, "");
+  const last10 = fullNumber.slice(-10);
+  const last7 = fullNumber.slice(-7);
+  const areaCode = last10.slice(0, 3);
+  const data = await supabaseClient
+    .from("contact")
+    .select()
+    .eq("workspace", workspaceId)
+    .or(
+      `phone.eq.${fullNumber},` +
+        `phone.eq.+${fullNumber},` +
+        `phone.eq.+1${fullNumber},` +
+        `phone.eq.1${fullNumber},` +
+        `phone.eq.(${areaCode}) ${last7},` +
+        `phone.eq.(${areaCode})${last7},` +
+        `phone.eq.${areaCode}-${last7},` +
+        `phone.eq.${areaCode}.${last7},` +
+        `phone.eq.(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)},` +
+        `phone.ilike.%${fullNumber},` +
+        `phone.ilike.%+${fullNumber},` +
+        `phone.ilike.%+1${fullNumber},` +
+        `phone.ilike.%1${fullNumber},` +
+        `phone.ilike.%(${areaCode})%${last7},` +
+        `phone.ilike.%${areaCode}-%${last7},` +
+        `phone.ilike.%${areaCode}.%${last7},` +
+        `phone.ilike.%(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)}%,` +
+        `phone.ilike.${last10}%`,
+    )
+    .not("phone", "is", null)
+    .neq("phone", "");
+  return data;
+};
+
+export async function fetchWorkspaceData(supabaseClient, workspaceId) {
+  const { data: workspace, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select(`*, workspace_number(*)`)
+    .eq("id", workspaceId)
+    .eq("workspace_number.type", "rented")
+    .single();
+
+  return { workspace, workspaceError };
+}
+
+export async function fetchConversationSummary(supabaseClient, workspaceId) {
+  const { data: chats, error: chatsError } = await supabaseClient.rpc(
+    "get_conversation_summary",
+    { p_workspace: workspaceId },
+  );
+
+  return { chats, chatsError };
+}
+
+export async function fetchContactData(
+  supabaseClient,
+  workspaceId,
+  contact_id,
+  contact_number,
+) {
+  let potentialContacts = [];
+  let contact = null;
+  let contactError = null;
+
+  if (contact_number && !contact_id) {
+    const { data: contacts } = await findPotentialContacts(
+      supabaseClient,
+      contact_number,
+      workspaceId,
+    );
+    potentialContacts = contacts;
+  }
+
+  if (contact_id) {
+    const { data: findContact, error: findContactError } = await supabaseClient
+      .from("contact")
+      .select()
+      .eq("workspace", workspaceId)
+      .eq("id", contact_id)
+      .single();
+
+    if (findContactError) {
+      contactError = findContactError;
+    } else {
+      contact = findContact;
+    }
+  }
+
+  return { contact, potentialContacts, contactError };
+}

@@ -19,24 +19,15 @@ const normalizePhoneNumber = (input) => {
     return cleaned;
 };
 
-const getCampaignData = async ({ supabase, campaign_id }) => {
-    const { data: campaign, error } = await supabase
-        .from('message_campaign')
-        .select()
-        .eq('campaign_id', campaign_id)
-        .single();
-    if (error) throw { campaignError: error };
-    return campaign;
-};
-
-const sendMessage = async ({ body, to, from, media, supabase, campaign_id, workspace, contact_id }) => {
+const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id }) => {
+    const mediaData = media && JSON.parse(media);
     const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id:workspace});
     const message = await twilio.messages.create({
         body,
         to,
         from,
         statusCallback: `${process.env.BASE_URL}/api/sms/status`,
-        ...(media && media.length > 0 && { mediaUrl: [...media] })
+        ...(mediaData && mediaData.length > 0 && { mediaUrl: [...mediaData] })
     });
     const {
         sid,
@@ -58,7 +49,7 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         errorCode: error_code,
         priceUnit: price_unit,
         apiVersion: api_version,
-        subresourceUris: subresource_uris
+        subresourceUris: subresource_uris,
     } = message;
     const { data, error } = await supabase.from('message').insert({
         sid,
@@ -81,9 +72,9 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         price_unit,
         api_version,
         subresource_uris,
-        campaign_id,
         workspace,
-        contact_id
+        ...(contact_id && {contact_id}),
+        ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] })
     }).select();
     if (error) throw { 'message_entry_error:': error };
     return { message, data };
@@ -91,10 +82,8 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
 
 export const action = async ({ request }) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { to_number, campaign_id, workspace_id, contact_id, caller_id } = await request.json();
-
+    const { to_number, workspace_id, contact_id, caller_id, body, media } = await request.json();
     let to;
-
     try {
         to = normalizePhoneNumber(to_number);
     } catch (error) {
@@ -108,28 +97,16 @@ export const action = async ({ request }) => {
     }
 
     try {
-        const campaign = await getCampaignData({ supabase, campaign_id });
-        let media;
-        if (campaign.message_media && campaign.message_media.length > 0) {
-            media = await Promise.all(campaign.message_media.map(async (media) => {
-                const { data, error } = await supabase.storage
-                    .from('messageMedia')
-                    .createSignedUrl(`${workspace_id}/${media}`, 3600);
-                if (error) throw error;
-                return data.signedUrl;
-            }));
-        }
-        const { response, data } = await sendMessage({
-            body: campaign.body_text,
+        const { message, data } = await sendMessage({
+            body: body || " ",
             media,
             to,
             from: caller_id,
             supabase,
-            campaign_id,
             workspace: workspace_id,
             contact_id
         });
-        return new Response(JSON.stringify({ data, response }), {
+        return new Response(JSON.stringify({ data, message }), {
             headers: {
                 'Content-Type': 'application/json'
             },
