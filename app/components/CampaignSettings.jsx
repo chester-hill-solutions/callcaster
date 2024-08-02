@@ -185,6 +185,7 @@ const CampaignSettings = ({
               { value: "running", label: "Running" },
               { value: "complete", label: "Complete" },
               { value: "paused", label: "Paused" },
+              { value: "draft", label: "Draft" },
             ]}
             className={"flex flex-col"}
           />

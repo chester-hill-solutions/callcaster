@@ -346,7 +346,7 @@ export default function CampaignScreen() {
               Settings
             </NavLink>
           )}
-          {data.type === "live_call" ? (
+          {data.type === "live_call" && data.status === 'running' ? (
             <NavLink
               className={({ isActive, isPending }) =>
                 handleNavlinkStyles(isActive, isPending)

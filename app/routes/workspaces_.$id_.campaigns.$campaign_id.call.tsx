@@ -292,7 +292,8 @@ const Campaign: React.FC = () => {
     predictive: campaign.dial_type === "predictive",
     setCallDuration
   });
-  const [isDialogOpen, setDialog] = useState((!(queue.length > 0) || campaign.dial_type === 'predictive'));
+  const [isErrorDialogOpen, setErrorDialog] = useState((!Object.keys(campaignDetails?.script || {}).length));
+  const [isDialogOpen, setDialog] = useState(((!(queue.length > 0) || campaign.dial_type === 'predictive') && !isErrorDialogOpen));
 
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -694,6 +695,22 @@ const Campaign: React.FC = () => {
                   campaign.dial_type === 'call' && fetchMore({householdMap})
                   setDialog(false)
                   }}>Get started</Button>
+              </div>
+            </div>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+      <Dialog onOpenChange={setErrorDialog} open={isErrorDialogOpen}>
+        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
+              NO SCRIPT SET UP
+            </DialogTitle>
+            <div className="w-[400px] my-4">
+              <p>This campaign has not been configured with a script. Contact your administrator to get one set up</p>
+                
+              <div className="flex justify-between mt-4">
+                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
               </div>
             </div>
           </DialogHeader>

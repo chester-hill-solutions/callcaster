@@ -604,7 +604,8 @@ export const fetchCampaignData = async (supabaseClient, campaignId) => {
       type,
       dial_type,
       title,
-      campaign_audience(*)
+      campaign_audience(*),
+      status
     `,
     )
     .eq("id", campaignId)

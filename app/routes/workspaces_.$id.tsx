@@ -23,7 +23,7 @@ import {
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Card, CardHeader } from "~/components/ui/card";
-import { CardContent } from "~/components/CustomCard";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -78,51 +78,61 @@ export default function Workspace() {
   const outlet = useOutlet();
   const context = useOutletContext();
   const handleNavlinkStyles = ({ isActive, isPending }) =>
-    `flex items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
+    `flex bg-gray-100 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
       isActive
         ? "border-primary border-2 text-primary-accent bg-white dark:bg-slate-700"
         : isPending
-        ? "bg-muted"
-        : "hover:bg-muted"
+          ? "bg-muted"
+          : "hover:bg-muted"
     }`;
 
   const CampaignsList = () => (
-    <Card className="h-full border-none">
+    <Card className="flex flex-col flex-auto border-none bg-secondary">
       <CardHeader className="p-0">
         <Link
           to={`campaigns/new`}
-          className="flex items-center justify-center gap-2 bg-primary p-2 text-primary-foreground rounded-t-lg"
+          className="flex items-center justify-center gap-2 rounded-none bg-primary p-2 text-primary-foreground md:rounded-t-lg"
         >
           <span>Add Campaign</span>
           <FaPlus size="16" />
         </Link>
       </CardHeader>
-      <CardContent>
-        <nav className="flex flex-col space-y-">
-          {campaigns?.map((row, i) => (
-            <NavLink
-              to={`campaigns/${row.id}`}
-              key={row.id}
-              className={handleNavlinkStyles}
-              onClick={() => setCampaignsListOpen(false)}
-            >
-              {row.title || `Unnamed campaign ${i + 1}`}
-            </NavLink>
-          ))}
+      <div className="flex flex-col flex-grow justify-between">
+        <nav className="flex flex-col">
+          {campaigns?.map((row, i) => {
+            const draftNotAllowed = (userRole === MemberRole.Caller || userRole === MemberRole.Member) && row.status === 'draft';
+            return (
+              row.status !== "complete" && !(draftNotAllowed) && (
+                <NavLink
+                  to={`campaigns/${row.id}`}
+                  key={row.id}
+                  className={handleNavlinkStyles}
+                  onClick={() => setCampaignsListOpen(false)}
+                >
+                  {row.title || `Unnamed campaign ${i + 1}`}
+                </NavLink>
+              )
+            );
+          })}
         </nav>
-      </CardContent>
+        <nav className="">
+          <NavLink className={`flex bg-gray-100 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab justify-center rounded-b-md hover:bg-white`} to={"#"}> {/* Todo: build "campaigns/archive" to display completed campaigns */}
+            Archived Campaigns ({campaigns.filter((i) => i.status === "complete").length})
+          </NavLink>
+        </nav>
+      </div>
     </Card>
   );
 
   return (
-    <main className="container mx-auto py-8 space-y-2">
+    <main className="container mx-auto space-y-2 py-8">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={false}
         userRole={userRole}
       />
       <div className="grid gap-8 md:grid-cols-[250px_1fr]">
-        <div className="bg-secondary dark:bg-slate-900 rounded-lg border-2 border-gray-300">
+        <div className="relative rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900">
           <Button
             variant="outline"
             className="flex w-full items-center justify-between md:hidden"
@@ -131,7 +141,9 @@ export default function Workspace() {
             <span>Campaigns</span>
             {campaignsListOpen ? <FaChevronUp /> : <FaChevronDown />}
           </Button>
-          <div className={`md:block ${campaignsListOpen ? "block" : "hidden"}`}>
+          <div
+            className={`${campaignsListOpen ? "block" : "hidden"} h-full md:flex`}
+          >
             <CampaignsList />
           </div>
         </div>
