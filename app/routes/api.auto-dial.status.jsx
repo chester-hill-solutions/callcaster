@@ -23,7 +23,7 @@ export const action = async ({ request }) => {
         const { data: attemptUpdate, error: attemptError } = await supabase.from('outreach_attempt').update({ disposition: 'failed' }).eq('id', dbCall.outreach_attempt_id).select();
         if (attemptError) console.error(attemptError)
         const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', attemptUpdate[0].contact_id).select();
-
+        
         const conferences = await twilio.conferences.list({ friendlyName: callUpdate.conference_id, status: ['in-progress'] });
         console.log(`${conferences.length} active conferences.`)
         if (conferences.length) {

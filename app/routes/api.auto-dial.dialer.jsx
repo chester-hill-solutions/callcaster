@@ -1,6 +1,6 @@
 import Twilio from 'twilio';
-import { createClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance } from '../lib/database.server';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { meterEvent, createWorkspaceTwilioInstance } from '../lib/database.server';
 
 function normalizePhoneNumber(input) {
     let cleaned = input.replace(/[^0-9+]/g, '');
@@ -51,6 +51,9 @@ export const action = async ({ request }) => {
                 statusCallbackEvent: ['answered', 'completed', 'ringing'],
                 statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`
             });
+
+            const dialEvent = await meterEvent({supabaseClient:supabase, workspace_id, amount: 1, type: 'dial'})
+
             console.log('Dialing: ', call)
             const callData = {
                 sid: call.sid,

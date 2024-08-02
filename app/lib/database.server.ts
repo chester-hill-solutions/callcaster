@@ -1,4 +1,5 @@
 import Twilio from "twilio";
+import Stripe from "stripe";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
@@ -50,6 +51,7 @@ export async function createNewWorkspaceDeprecated({
 
   return { data, error };
 }
+
 export async function createKeys({ workspace_id, sid, token }) {
   const twilio = new Twilio.Twilio(sid, token);
   try {
@@ -112,9 +114,12 @@ export async function createNewWorkspace({
     if (!newKey) {
       throw new Error("Failed to create Twilio API keys");
     }
+
+    const newStripeCustomer = await createStripeContact({supabaseClient, workspace_id: insertWorkspaceData});
+
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
-      .update({ twilio_data: account, key: newKey.sid, token: newKey.secret })
+      .update({ twilio_data: account, key: newKey.sid, token: newKey.secret, stripe_id: newStripeCustomer.id })
       .eq("id", insertWorkspaceData);
     if (insertWorkspaceUsersError) {
       throw insertWorkspaceUsersError;
@@ -291,6 +296,7 @@ export async function forceTokenRefresh({
   console.log("\nREFRESH");
   return { data: refreshData, error: null };
 }
+
 export async function removeWorkspacePhoneNumber({
   supabaseClient,
   workspaceId,
@@ -423,6 +429,7 @@ export function getRecordingFileNames(stepData) {
     return fileNames;
   }, []);
 }
+
 export async function getMedia(
   fileNames: Array<string>,
   supabaseClient: SupabaseClient,
@@ -798,4 +805,66 @@ export async function fetchContactData(
   }
 
   return { contact, potentialContacts, contactError };
+}
+
+export async function createStripeContact({ supabaseClient, workspace_id }) {
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select(`
+      name,
+      workspace_users!inner(
+        role,
+        user:user_id(
+          id,
+          username
+        )
+      )
+    `)
+    .eq("id", workspace_id)
+    .eq("workspace_users.role", "owner")
+    .single();
+
+  if (error) {
+    console.error("Error fetching workspace data:", error);
+    throw error;
+  }
+
+  if (!data || !data.workspace_users || data.workspace_users.length === 0) {
+    throw new Error("No owner found for the workspace");
+  }
+
+  const ownerUser = data.workspace_users[0].user;
+
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!, { apiVersion: '2020-08-27' });
+  
+  console.log("Creating Stripe customer for:", data.name, ownerUser.username);
+  
+  return await stripe.customers.create({
+    name: data.name,
+    email: ownerUser.username
+  });
+}
+
+export async function meterEvent({
+  supabaseClient,
+  workspace_id,
+  amount,
+  type,
+}) {
+  const {
+    data: { stripe_id },
+    error,
+  } = await supabaseClient
+    .from("workspace")
+    .select("stripe_id")
+    .eq("id", workspace_id)
+    .single();
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!);
+  return await stripe.billing.meterEvents.create({
+    event_name: type,
+    payload: {
+      value: amount,
+      stripe_customer_id: stripe_id,
+    },
+  });
 }
