@@ -147,6 +147,7 @@ export default function WorkspaceSettings() {
     user,
     workspace: workspaceId,
     init: { phoneNumbers: initNumbers, queue:[], callsList:[] },
+    setQuestionContact: () => null
   });
 
   useEffect(() => {

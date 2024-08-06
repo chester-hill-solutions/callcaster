@@ -3,7 +3,7 @@ import BgImage from "./TransparentBGImage";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
 
-const CampaignEmptyState = ({hasAccess = false}) => {
+const CampaignEmptyState = ({hasAccess = false, type}:{hasAcces:boolean; type: "number" | "campaign"}) => {
     const loc = useLocation();
     let isCampaignsRoute = loc?.pathname?.split('/').pop() === 'campaigns';
     return (
@@ -18,18 +18,27 @@ const CampaignEmptyState = ({hasAccess = false}) => {
             <h1 className="font-Zilla-Slab text-4xl text-center">
               Get started!
             </h1>
-            <p className="font-Zilla-Slab text-lg max-w-md text-center">Select an available campaign{hasAccess  ?', or add a new one to get started!':' or contact your admin team to get set up.'}</p>
+            {type === 'campaign' ? <p className="font-Zilla-Slab text-lg max-w-md text-center">Select an available campaign{hasAccess  ?', or add a new one to get started!':' or contact your admin team to get set up.'}</p> :
+            <p className="font-Zilla-Slab text-lg max-w-md text-center">Get started by renting a number or setting up your own.</p>
+            }
           </CardHeader>
          {hasAccess && <div className="py-4 flex justify-center">
-            <Button asChild>
+            {type === 'campaign' ? <Button asChild>
             <NavLink to={isCampaignsRoute ? "new" : "campaigns/new"}>
               Add Campaign
               </NavLink>
+            </Button>:
+            <Button asChild>
+            <NavLink to={isCampaignsRoute ? "settings/numbers" : "./settings/numbers"}>
+              Get a Number
+              </NavLink>
             </Button>
+            }
           </div>}
         </Card>
       </div>
     </BgImage>
 )}
+
 
 export default CampaignEmptyState;
