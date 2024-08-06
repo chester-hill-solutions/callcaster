@@ -1,5 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, json, useLoaderData } from "@remix-run/react";
+import { Form, Link, json, useActionData, useLoaderData, useLocation, useNavigate, useNavigation } from "@remix-run/react";
+import { useEffect } from "react";
 import { AudienceTable } from "~/components/AudienceTable";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -29,30 +30,27 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     { headers },
   );
 }
-
 export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id } =
     useLoaderData<typeof loader>();
-  //   const actionData = useActionData<typeof action>();
+    const navigate = useNavigate();
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
+    <main className="flex h-full flex-col gap-4 text-white">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {audience?.name || `Unnamed Audience ${audience_id}`}
         </h1>
         <div className="flex gap-1">
-          <Button
-            asChild
-            variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
-          </Button>
-          <Button variant={'destructive'} className="font-Zilla-Slab">
-            Delete Audience
-          </Button>
+          <Form method="DELETE" action="/api/audiences" navigate={false} onSubmit={() => navigate('..', {relative:'path'})}>
+            <input hidden type="hidden" name="id" value={audience_id} />
+            <Button
+              type="submit"
+              variant={"destructive"}
+              className="font-Zilla-Slab"
+            >
+              Delete Audience
+            </Button>
+          </Form>
         </div>
       </div>
       <AudienceTable

@@ -126,12 +126,7 @@ export default function WorkspaceScripts() {
 
   const isWorkspaceAudioEmpty = !scripts?.length > 0;
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
-      <WorkspaceNav
-        workspace={workspace}
-        isInChildRoute={true}
-        userRole={userRole}
-      />
+    <main className="mx-auto flex h-full w-full flex-col gap-4 rounded-sm text-white">
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null
@@ -141,15 +136,6 @@ export default function WorkspaceScripts() {
         <div className="flex items-center gap-4">
           <Button asChild className="font-Zilla-Slab text-xl font-semibold">
             <Link to={`./new`}>Add a Script</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
           </Button>
         </div>
       </div>

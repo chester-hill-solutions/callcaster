@@ -1,4 +1,5 @@
 import { type ClassValue, clsx } from "clsx";
+import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -96,97 +97,158 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
     return deepEqual(obj1[key], obj2[key], `${path}.${key}`, seen);
   });
 }
-
-export const parseCSVHeaders = (unparsedHeaders) => {
-  const parsedHeaders = unparsedHeaders.map((header) =>
-    header.toLowerCase().trim(),
-  );
-  return parsedHeaders;
+const headerMappings = {
+  firstname: [
+    /^(contact[-_\s]?)?(first[-_\s]?name|given[-_\s]?name|forename)$/i,
+  ],
+  surname: [
+    /^(contact[-_\s]?)?(last[-_\s]?name|surname|family[-_\s]?name)$/i,
+  ],
+  phone: [
+    /^(contact[-_\s]?)?(phone|phone[-_\s]?number|mobile|mobile[-_\s]?number|cell|cell[-_\s]?phone|telephone|tel)$/i,
+  ],
+  email: [
+    /^(contact[-_\s]?)?(email|email[-_\s]?address|e-mail|e-mail[-_\s]?address)$/i,
+  ],
+  address: [
+    /^(contact[-_\s]?)?(address|street|street[-_\s]?address|mailing[-_\s]?address|property[-_\s]?address|address[-_\s]?line[-_\s]?1)$/i,
+  ],
+  city: [/^(contact[-_\s]?)?(city|town|municipality)$/i],
+  opt_out: [
+    /^(contact[-_\s]?)?(opt[-_]?out|unsubscribe|do[-_\s]?not[-_\s]?contact|consent|permission)$/i,
+  ],
+  external_id: [
+    /^(contact[-_\s]?)?(external[-_\s]?id|vanid|van[-_\s]?id|id|record[-_\s]?id|unique[-_\s]?identifier)$/i,
+  ],
+  postal: [
+    /^(contact[-_\s]?)?(postal|postal[-_]?code|zip|zip[-_]?code|postcode)$/i,
+  ],
+  name: [/^(contact[-_\s]?)?(full[-_\s]?name|name)$/i],
+  province: [/^(contact[-_\s]?)?(province|state|region)$/i],
+  country: [/^(contact[-_\s]?)?(country|nation)$/i],
 };
-export const parseCSVData = (data, parsedHeaders) => {
+
+const parseCSVHeaders = (unparsedHeaders) => {
+  return unparsedHeaders.map((header) => header.toLowerCase().trim());
+};
+
+const matchHeader = (header) => {
+  for (const [key, patterns] of Object.entries(headerMappings)) {
+    if (patterns.some((pattern) => pattern.test(header))) {
+      return key;
+    }
+  }
+  return null;
+};
+const parseEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) ? email.toLowerCase() : null;
+};
+function parsePhoneNumber(input) {
+  let cleaned = input.replace(/[^0-9+]/g, '');
+
+  if (cleaned.indexOf('+') > 0) {
+      cleaned = cleaned.replace(/\+/g, '');
+  }
+  if (!cleaned.startsWith('+')) {
+      cleaned = '+' + cleaned;
+  }
+
+  const validLength = 11;
+  const minLength = 11;
+
+  if (cleaned.length < minLength + 1) {
+      cleaned = '+1' + cleaned.replace('+', '');
+  }
+
+  if (cleaned.length !== validLength + 1) { 
+      return null;
+  }
+  return cleaned;
+}
+
+const parseName = (name) => {
+  const parts = name.split(/\s+/);
+  if (parts.length === 1) {
+    return { firstname: parts[0], surname: null };
+  } else if (parts.length === 2) {
+    return { firstname: parts[0], surname: parts[1] };
+  } else if (parts.length > 2) {
+    return { firstname: parts[0], surname: parts.slice(1).join(' ') };
+  }
+  return { firstname: null, surname: null };
+};
+const parseOptOut = (value) => {
+  if (typeof value === 'string') {
+    value = value.toLowerCase().trim();
+    return ['yes', 'true', '1', 'opt-out', 'unsubscribe'].includes(value);
+  }
+  return Boolean(value);
+};
+
+const parseCSVData = (data, parsedHeaders) => {
   return data.slice(1).map((row) => {
     const contact = {
-      firstname: undefined,
-      surname: undefined,
-      phone: undefined,
-      email: undefined,
-      address: undefined,
-      city: undefined,
-      opt_out: undefined,
-      created_at: undefined,
-      workspace: undefined,
-      external_id: undefined,
-      postal: undefined,
+      firstname: null,
+      surname: null,
+      phone: null,
+      email: null,
+      address: null,
+      city: null,
+      opt_out: false,
+      created_at: new Date().toISOString(),
+      workspace: null,
+      external_id: null,
+      postal: null,
+      province: null,
+      country: null,
       other_data: [],
     };
-    for (let i = 0; i < row.length; i++) {
-      const key = parsedHeaders[i];
-      const value = row[i]?.trim();
-      if (
-        key.match(
-          /^(contact[-_\s]?)?(first[-_\s]?name|given[-_\s]?name|forename)$/i,
-        )
-      ) {
-        contact.firstname = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(last[-_\s]?name|surname|family[-_\s]?name)$/i,
-        )
-      ) {
-        contact.surname = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(phone|phone[-_\s]?number|mobile|mobile[-_\s]?number|cell|cell[-_\s]?phone)$/i,
-        )
-      ) {
-        contact.phone = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(email|email[-_\s]?address|e-mail|e-mail[-_\s]?address)$/i,
-        )
-      ) {
-        contact.email = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(address|street|street[-_\s]?address|mailing[-_\s]?address|property[-_\s]?address|address[-_\s]?line[-_\s]?1)$/i,
-        )
-      ) {
-        contact.address = value;
-      } else if (key.match(/^(contact[-_\s]?)?(city|town)$/i)) {
-        contact.city = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(opt[-_]?out|unsubscribe|do[-_\s]?not[-_\s]?contact)$/i,
-        )
-      ) {
-        contact.opt_out = value?.toLowerCase() === "true";
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(external[-_]?id|vanid|van[-_]?id|id|record[-_\s]?id)$/i,
-        )
-      ) {
-        contact.external_id = value;
-      } else if (
-        key.match(
-          /^(contact[-_\s]?)?(postal|postal[-_]?code|zip|zip[-_]?code)$/i,
-        )
-      ) {
-        contact.postal = value;
-      } else if (key.match(/^(contact[-_\s]?)?(name)$/i)) {
-        const names = value.split(",").map((name) => name.trim());
-        contact.surname = names[0];
-        contact.firstname = names[1];
-      } else if (key.match(/^(contact[-_\s]?)?(province|state)$/i)) {
-        contact.province = value;
-      } else if (key.match(/^(contact[-_\s]?)?(country)$/i)) {
-        contact.country = value;
-      } else {
-        contact.other_data.push({ [key]: value });
+
+    parsedHeaders.forEach((header, index) => {
+      const value = row[index]?.trim() || null;
+      const key = matchHeader(header);
+
+      if (key) {
+        switch (key) {
+          case 'name':
+            const { firstname, surname } = parseName(value);
+            contact.firstname = firstname;
+            contact.surname = surname;
+            break;
+          case 'phone':
+            contact.phone = parsePhoneNumber(value);
+            break;
+          case 'email':
+            contact.email = parseEmail(value);
+            break;
+          case 'opt_out':
+            contact.opt_out = parseOptOut(value);
+            break;
+          default:
+            contact[key] = value;
+        }
+      } else if (value !== null) {
+        contact.other_data.push({[header]: value});
       }
-    }
+    });
+
     return contact;
   });
 };
+export const parseCSV = (csvString) => {
+  try {
+    const records = parse(csvString);
+    const headers = parseCSVHeaders(records[0]);
+    const contacts = parseCSVData(records, headers);
+
+    return { headers, contacts };
+  } catch (error) {
+    console.error('Error parsing CSV:', error);
+    throw new Error('Failed to parse CSV file');
+  }
+};
+
 
 export function campaignTypeText(campaignType: string): string {
   switch (campaignType) {

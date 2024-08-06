@@ -7,22 +7,9 @@ import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
-  getMedia,
-  getRecordingFileNames,
-  getSignedUrls,
   getUserRole,
-  getWorkspaceScripts,
   listMedia,
 } from "~/lib/database.server";
-import { MessageSettings } from "../components/MessageSettings";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 
 export const loader = async ({ request, params }) => {
@@ -140,13 +127,6 @@ export default function ScriptEditor() {
   }, [initScript, script]);
 
   return (
-        <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm">
-      <WorkspaceNav
-        workspace={workspace}
-        isInChildRoute={true}
-        userRole={userRole}
-      />
-
       <div className="relative flex h-full flex-col overflow-visible">
         {isChanged && (
           <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
@@ -179,6 +159,5 @@ export default function ScriptEditor() {
             />
         </div>
       </div>
-    </main>
   );
 }

@@ -24,6 +24,7 @@ import {
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Card, CardHeader } from "~/components/ui/card";
 import { MemberRole } from "~/components/Workspace/TeamMember";
+import CampaignEmptyState from "~/components/CampaignEmptyState";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -87,7 +88,7 @@ export default function Workspace() {
     }`;
 
   const CampaignsList = () => (
-    <Card className="flex flex-col flex-auto border-none bg-secondary">
+    <Card className="flex flex-auto flex-col border-none bg-secondary">
       <CardHeader className="p-0">
         <Link
           to={`campaigns/new`}
@@ -97,12 +98,16 @@ export default function Workspace() {
           <FaPlus size="16" />
         </Link>
       </CardHeader>
-      <div className="flex flex-col flex-grow justify-between">
+      <div className="flex flex-grow flex-col justify-between">
         <nav className="flex flex-col">
           {campaigns?.map((row, i) => {
-            const draftNotAllowed = (userRole === MemberRole.Caller || userRole === MemberRole.Member) && row.status === 'draft';
+            const draftNotAllowed =
+              (userRole === MemberRole.Caller ||
+                userRole === MemberRole.Member) &&
+              row.status === "draft";
             return (
-              row.status !== "complete" && !(draftNotAllowed) && (
+              row.status !== "complete" &&
+              !draftNotAllowed && (
                 <NavLink
                   to={`campaigns/${row.id}`}
                   key={row.id}
@@ -116,8 +121,14 @@ export default function Workspace() {
           })}
         </nav>
         <nav className="">
-          <NavLink className={`flex bg-gray-100 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab justify-center rounded-b-md hover:bg-white`} to={"#"}> {/* Todo: build "campaigns/archive" to display completed campaigns */}
-            Archived Campaigns ({campaigns.filter((i) => i.status === "complete").length})
+          <NavLink
+            className={`flex items-center justify-center rounded-b-md bg-gray-100 px-4 py-2 font-Zilla-Slab text-sm font-medium transition-colors hover:bg-white`}
+            to={"#"}
+          >
+            {" "}
+            {/* Todo: build "campaigns/archive" to display completed campaigns */}
+            Archived Campaigns (
+            {campaigns.filter((i) => i.status === "complete").length})
           </NavLink>
         </nav>
       </div>
@@ -125,14 +136,14 @@ export default function Workspace() {
   );
 
   return (
-    <main className="container mx-auto space-y-2 py-8">
+    <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
       <WorkspaceNav
         workspace={workspace}
         isInChildRoute={false}
         userRole={userRole}
       />
-      <div className="grid gap-8 md:grid-cols-[250px_1fr]">
-        <div className="relative rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900">
+      <div className="flex flex-grow flex-col gap-8 sm:flex-row">
+        <div className="relative w-full flex-shrink-0 rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900 sm:w-[250px]">
           <Button
             variant="outline"
             className="flex w-full items-center justify-between md:hidden"
@@ -147,11 +158,15 @@ export default function Workspace() {
             <CampaignsList />
           </div>
         </div>
-        <Card className="h-[800px] bg-gray-50 dark:bg-slate-800">
-          <div className="h-full py-4">
+        <div className="flex flex-auto flex-col contain-content overflow-x-auto">
+          {!outlet ? (
+            <CampaignEmptyState
+              hasAccess={userRole === "admin" || userRole === "owner"}
+            />
+          ) : (
             <Outlet context={{ audiences, campaigns, ...context }} />
-          </div>
-        </Card>
+          )}
+        </div>
       </div>
     </main>
   );

@@ -2,14 +2,55 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Audience, Campaign, Contact } from "~/lib/types";
 import { formatDateToLocale, formatTableText } from "~/lib/utils";
 import { Progress } from "~/components/ui/progress";
+import { MdEdit, MdRemoveCircle } from "react-icons/md";
+import { Button } from "../ui/button";
+import { NavLink, useSubmit } from "@remix-run/react";
 
 export const audienceColumns: ColumnDef<Audience>[] = [
   {
     accessorKey: "name",
     header: "Name",
-    cell: ({row}) => {
-      return <div>{row.original.name || `Unnamed audience`}</div>
-    }
+    cell: ({ row }) => {
+      return (
+        <div className="flex flex-auto min-w-[250px]">
+          {row.original.name || `Unnamed audience`}
+        </div>
+      );
+    },
+    minSize: 270,
+  },
+  {
+    header: "Edit",
+    cell: ({ row }) => {
+      return (
+        <Button asChild variant="ghost">
+          <NavLink to={`${row.original?.id}`}>
+            <MdEdit />
+          </NavLink>
+        </Button>
+      );
+    },
+    maxSize: 50,
+  },
+  {
+    header: "Delete",
+    cell: ({ row }) => {
+      const submit = useSubmit();
+      return (
+          <Button
+            onClick={(e) => {
+              submit({id: row.original.id}, {
+                method:"DELETE",
+                action:"/api/audiences",
+                navigate:false
+              })
+            }}
+          >
+            <MdRemoveCircle />
+          </Button>
+      );
+    },
+    maxSize: 50,
   },
 ];
 
