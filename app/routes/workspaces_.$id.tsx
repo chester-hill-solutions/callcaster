@@ -116,10 +116,14 @@ export default function Workspace() {
         </div>
         <div className="flex flex-auto flex-col overflow-x-auto contain-content">
           {!numbers?.length > 0 ? (
-            
+            <CampaignEmptyState
+            hasAccess={userRole === "admin" || userRole === "owner"}
+            type="number"
+          />
           ) : !outlet ? (
             <CampaignEmptyState
               hasAccess={userRole === "admin" || userRole === "owner"}
+              type="campaign"
             />
           ) : (
             <Outlet context={{ audiences, campaigns, ...context }} />
