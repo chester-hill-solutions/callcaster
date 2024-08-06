@@ -87,6 +87,7 @@ export default function CampaignsNew() {
                 name="campaign-type"
                 id="campaign-type"
                 required
+                defaultValue={"live_call"}
               >
                 <option value="live_call" className="dark:bg-black">
                   Live Call
