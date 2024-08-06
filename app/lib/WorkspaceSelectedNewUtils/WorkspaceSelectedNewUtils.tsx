@@ -1,39 +1,59 @@
 import { json } from "@remix-run/node";
 import { redirect } from "react-router";
+import { parseCSV } from "../utils";
+import { bulkCreateContacts } from "../database.server";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export async function handleNewAudience({
   supabaseClient,
   formData,
   workspaceId,
   headers,
+  contactsFile
+}: {
+  supabaseClient: SupabaseClient;
+  formData: FormData;
+  workspaceId: string;
+  headers: Headers;
+  contactsFile: File;
 }) {
   const newAudienceName = formData.get("audience-name") as string;
-  // const campaignId = formData.get("campaign-select") as string;
 
-  const { data: createAudienceData, error: createAudienceError } =
-    await supabaseClient
-      .from("audience")
-      .insert({
-        name: newAudienceName,
-        workspace: workspaceId,
-      })
-      .select()
-      .single();
+  try {
+    const { data: createAudienceData, error: createAudienceError } =
+      await supabaseClient
+        .from("audience")
+        .insert({
+          name: newAudienceName,
+          workspace: workspaceId,
+        })
+        .select()
+        .single();
 
-  if (createAudienceError) {
+    if (createAudienceError) {
+      throw createAudienceError;
+    }
+
+    if (contactsFile && contactsFile.size > 0) {
+      const fileContent = await contactsFile.text();
+      const { headers: csvHeaders, contacts } = parseCSV(fileContent);
+      await bulkCreateContacts(supabaseClient, contacts, workspaceId, createAudienceData.id);
+    }
+
+    return redirect(
+      `/workspaces/${workspaceId}/audiences/${createAudienceData.id}`,
+      { headers }
+    );
+  } catch (error) {
+    console.error('Error in handleNewAudience:', error);
     return json(
       {
         audienceData: null,
-        // campaignAudienceData: null,
-        error: createAudienceError,
+        error: error.message || 'An unexpected error occurred',
       },
-      { headers },
+      { status: 500, headers }
     );
   }
-
-  return redirect(
-    `/workspaces/${workspaceId}/audiences/${createAudienceData.id}`,
-  );
 }
 
 export async function handleNewCampaign({

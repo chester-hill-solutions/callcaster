@@ -4,6 +4,7 @@ import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
 import { jwtDecode } from "jwt-decode";
+import { json } from "@remix-run/node";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -115,11 +116,19 @@ export async function createNewWorkspace({
       throw new Error("Failed to create Twilio API keys");
     }
 
-    const newStripeCustomer = await createStripeContact({supabaseClient, workspace_id: insertWorkspaceData});
+    const newStripeCustomer = await createStripeContact({
+      supabaseClient,
+      workspace_id: insertWorkspaceData,
+    });
 
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
-      .update({ twilio_data: account, key: newKey.sid, token: newKey.secret, stripe_id: newStripeCustomer.id })
+      .update({
+        twilio_data: account,
+        key: newKey.sid,
+        token: newKey.secret,
+        stripe_id: newStripeCustomer.id,
+      })
       .eq("id", insertWorkspaceData);
     if (insertWorkspaceUsersError) {
       throw insertWorkspaceUsersError;
@@ -810,7 +819,8 @@ export async function fetchContactData(
 export async function createStripeContact({ supabaseClient, workspace_id }) {
   const { data, error } = await supabaseClient
     .from("workspace")
-    .select(`
+    .select(
+      `
       name,
       workspace_users!inner(
         role,
@@ -819,7 +829,8 @@ export async function createStripeContact({ supabaseClient, workspace_id }) {
           username
         )
       )
-    `)
+    `,
+    )
     .eq("id", workspace_id)
     .eq("workspace_users.role", "owner")
     .single();
@@ -835,13 +846,15 @@ export async function createStripeContact({ supabaseClient, workspace_id }) {
 
   const ownerUser = data.workspace_users[0].user;
 
-  const stripe = new Stripe(process.env.STRIPE_API_KEY!, { apiVersion: '2020-08-27' });
-  
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
+    apiVersion: "2020-08-27",
+  });
+
   console.log("Creating Stripe customer for:", data.name, ownerUser.username);
-  
+
   return await stripe.customers.create({
     name: data.name,
-    email: ownerUser.username
+    email: ownerUser.username,
   });
 }
 
@@ -868,3 +881,96 @@ export async function meterEvent({
     },
   });
 }
+
+export const parseRequestData = async (request) => {
+  const contentType = request.headers.get("Content-Type");
+  if (contentType === "application/json") {
+    return await request.json();
+  } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
+    const formData = await request.formData();
+    return Object.fromEntries(formData);
+  }
+  throw new Error("Unsupported content type");
+};
+
+export const handleError = (error, message, status = 500) => {
+  console.error(`${message}:`, error);
+  return json({ error: message }, { status });
+};
+
+export const updateContact = async (supabaseClient, data) => {
+  if (!data.id) {
+    throw new Error("Contact ID is required");
+  }
+  Object.keys(data).forEach(
+    (key) => data[key] === undefined && delete data[key],
+  );
+  delete data.audience_id;
+
+  const { data: update, error } = await supabaseClient
+    .from("contact")
+    .update(data)
+    .eq("id", data.id)
+    .select();
+
+  if (error) throw error;
+  if (!update || update.length === 0) throw new Error("Contact not found");
+
+  return update[0];
+};
+
+export const createContact = async (
+  supabaseClient,
+  contactData,
+  audience_id,
+) => {
+  const { workspace, firstname, surname, phone, email, address } = contactData;
+  const { data: insert, error } = await supabaseClient
+    .from("contact")
+    .insert({ workspace, firstname, surname, phone, email, address })
+    .select();
+
+  if (error) throw error;
+
+  if (audience_id && insert) {
+    const contactAudienceData = insert.map((contact) => ({
+      contact_id: contact.id,
+      audience_id,
+    }));
+    const { error: contactAudienceError } = await supabaseClient
+      .from("contact_audience")
+      .insert(contactAudienceData)
+      .select();
+    if (contactAudienceError) throw contactAudienceError;
+  }
+
+  return insert;
+};
+
+export const bulkCreateContacts = async (supabaseClient, contacts, workspace_id, audience_id) => {
+  const contactsWithWorkspace = contacts.map(contact => ({
+    ...contact,
+    workspace: workspace_id,
+  }));
+
+  const { data: insert, error } = await supabaseClient
+    .from('contact')
+    .insert(contactsWithWorkspace)
+    .select();
+
+  if (error) throw error;
+
+  const audienceMap = insert.map(contact => ({
+    contact_id: contact.id,
+    audience_id
+  }));
+
+  const { data: audience_insert, error: audience_insert_error } = await supabaseClient
+    .from('contact_audience')
+    .insert(audienceMap)
+    .select();
+
+  if (audience_insert_error) throw audience_insert_error;
+
+  return { insert, audience_insert };
+};

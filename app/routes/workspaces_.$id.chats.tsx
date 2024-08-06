@@ -244,7 +244,7 @@ export default function ChatsList() {
   
 
   return (
-    <main className="mx-auto flex h-full w-[95%] gap-4">
+    <main className="mx-auto flex h-full w-full gap-4">
       <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
         <Button
           className="flex items-center justify-center rounded-none bg-primary p-4 text-lg font-semibold text-white hover:bg-primary/90"

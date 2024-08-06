@@ -39,7 +39,7 @@ export default function WorkspaceNav({ workspace, userRole }) {
   }
 
   return (
-    <div className="flex flex-col justify-center">
+    <div className="flex-col justify-center">
       <div className="relative mb-4 flex items-center justify-between">
         <h3 className="font-Tabac-Slab sm:text-xl">{workspace?.name}</h3>
       </div>

@@ -106,7 +106,11 @@ export const action = async ({ request, params }) => {
     .concat(Array.from(otherDataKeys));
 
   csvHeaders = csvHeaders.map((header) =>
-    header === "id" ? "attempt_id" : header === "contact_id" ? "callcaster_id" : header,
+    header === "id"
+      ? "attempt_id"
+      : header === "contact_id"
+        ? "callcaster_id"
+        : header,
   );
 
   const escapeCSV = (field) => {
@@ -161,10 +165,9 @@ export const action = async ({ request, params }) => {
     return flattenedRow;
   });
 
-  csvHeaders = csvHeaders.filter(header => 
-    flattenedData.some(row => row[header] != null && row[header] !== "")
+  csvHeaders = csvHeaders.filter((header) =>
+    flattenedData.some((row) => row[header] != null && row[header] !== ""),
   );
-
 
   let csvContent = "\ufeff"; // Add BOM for Excel to recognize UTF-8
   csvContent += csvHeaders.map(escapeCSV).join(",") + "\n";
@@ -177,12 +180,10 @@ export const action = async ({ request, params }) => {
     csvContent += csvRow + "\n";
   });
 
-  return json(
-    {
-      csvContent,
-      filename: `outreach_results_${params.selected_id}.csv`,
-    },
-  );
+  return json({
+    csvContent,
+    filename: `outreach_results_${params.selected_id}.csv`,
+  });
 };
 
 export const loader = async ({ request, params }) => {
@@ -346,7 +347,7 @@ export default function CampaignScreen() {
               Settings
             </NavLink>
           )}
-          {data.type === "live_call" && data.status === 'running' ? (
+          {data.type === "live_call" && data.status === "running" ? (
             <NavLink
               className={({ isActive, isPending }) =>
                 handleNavlinkStyles(isActive, isPending)
@@ -439,12 +440,7 @@ function ErrorLoadingResults() {
 
 function NoResultsYet({ campaign, user, submit }) {
   return (
-    <div className="mt-8 flex flex-auto items-center justify-center gap-2 sm:flex-col">
-      {campaign.type !== "live_call" && (
-        <Button onClick={() => startCampaign(submit, campaign.id, user.id)}>
-          Start Campaign
-        </Button>
-      )}
+    <div className="flex flex-auto items-center justify-center gap-2 sm:flex-col pb-20">
       <h1 className="font-Zilla-Slab text-4xl text-gray-400">
         Your Campaign Results Will Show Here
       </h1>

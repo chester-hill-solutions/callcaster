@@ -12,7 +12,7 @@ export const action = async ({ request }) => {
     if (method === 'PATCH') {
         const formData = await request.formData();
         const data = {}
-        for (let pair of formData.entries()){
+        for (let pair of formData.entries()) {
             data[pair[0]] = pair[1];
         }
 
@@ -24,6 +24,21 @@ export const action = async ({ request }) => {
         response = update;
         console.log(update, error)
     }
+    if (method === "DELETE") {
+        const formData = await request.formData();
+        const data = {}
+        for (let pair of formData.entries()) {
+            data[pair[0]] = pair[1];
+        }
 
-    return json(response, {headers});
+        const { error } = await supabaseClient
+            .from('audience')
+            .delete()
+            .eq('id', data.id);
+            if (error){
+                console.log(error)
+            }
+        response = { success: true }
+    }
+    return json(response, { headers });
 };

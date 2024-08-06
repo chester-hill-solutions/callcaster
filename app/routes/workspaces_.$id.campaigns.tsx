@@ -1,5 +1,6 @@
 import { json, redirect } from "@remix-run/node";
-import { Outlet, useLoaderData, useOutletContext } from "@remix-run/react";
+import { NavLink, Outlet, useLoaderData, useOutlet, useOutletContext } from "@remix-run/react";
+import CampaignEmptyState from "~/components/CampaignEmptyState";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request, params }) => {
@@ -12,6 +13,7 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function SelectedType() {
+  const outlet = useOutlet();
   const { selectedTable, audiences, campaigns } = useOutletContext();
-  return <Outlet context={{ selectedTable, audiences, campaigns }} />;
+  return !outlet ? <CampaignEmptyState/> : <Outlet context={{ selectedTable, audiences, campaigns }} />;
 }

@@ -90,19 +90,13 @@ export default function Media() {
   };
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col items-center gap-4 rounded-sm text-black dark:text-white">
       <section
         id="form"
-        className="flex w-fit flex-col items-center justify-center"
-      >
-        <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-          <CardTitle>
-            Add Audio to{" "}
-            <span className="rounded-md bg-gray-400 bg-opacity-30 px-4 py-2 font-Zilla-Slab text-xl">
-              {workspace.name}
-            </span>
-          </CardTitle>
-          {actionData?.error != null && (
+        className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
+        >
+      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
+      <CardTitle>Add Audio</CardTitle>
+      {actionData?.error != null && (
             <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
               Error: {actionData.error.message}
             </p>
@@ -110,29 +104,29 @@ export default function Media() {
           <CardContent>
             <Form
               method="POST"
-              className="flex flex-col gap-8"
+              className="space-y-6"
               encType="multipart/form-data"
             >
               <label
                 htmlFor="media-name"
                 className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-              >
+                >
                 Audio Name
                 <input
                   type="text"
                   name="media-name"
                   id="media-name"
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                />
+                  />
               </label>
               <label
                 htmlFor="media"
-                className="flex w-full cursor-pointer flex-col gap-2 font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
-              >
+                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+                >
                 Upload:
                 <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
                   {pendingFileName === "" ? (
-                    <FaPlus size={"64px"} />
+                    <FaPlus size={"26px"} />
                   ) : (
                     <p>{pendingFileName}</p>
                   )}
@@ -168,8 +162,5 @@ export default function Media() {
           </CardContent>
         </Card>
       </section>
-
-      <Toaster richColors />
-    </main>
   );
 }

@@ -39,6 +39,7 @@ export const action = async ({ request }) => {
         if (contactRecord.contact_id) {
             const toNumber = normalizePhoneNumber(contactRecord.contact_phone);
             let outreach_attempt_id;
+            const dialEvent = await meterEvent({supabaseClient:supabase, workspace_id, amount: 1, type: 'dial'})
             const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt', { con_id: contactRecord.contact_id, cam_id: campaign_id, queue_id: contactRecord.queue_id, wks_id: workspace_id, usr_id: user_id });
             if (outreachError) throw outreachError;
             outreach_attempt_id = outreachAttempt;
@@ -52,7 +53,7 @@ export const action = async ({ request }) => {
                 statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`
             });
 
-            const dialEvent = await meterEvent({supabaseClient:supabase, workspace_id, amount: 1, type: 'dial'})
+            
 
             console.log('Dialing: ', call)
             const callData = {

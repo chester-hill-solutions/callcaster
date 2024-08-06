@@ -123,34 +123,18 @@ export default function WorkspaceAudio() {
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
 
   return (
-    <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm ">
-      <WorkspaceNav
-        workspace={workspace}
-        isInChildRoute={true}
-        userRole={userRole}
-      />
+    <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">
         <div className="flex">
-          <h1 className="font-Zilla-Slab font-bold text-2xl text-brand-primary dark:text-white text-center mb-4">
+          <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
             {workspace != null
               ? `${workspace?.name} Audio Library`
               : "No Workspace"}
           </h1>
         </div>
-        <div className="flex items-center gap-4 justify-evenly">
-          <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-            <Link to={`./new`}>Add Audio</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white hover:bg-zinc-300 dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
-          </Button>
-        </div>
+        <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+          <Link to={`./new`}>Add Audio</Link>
+        </Button>
       </div>
       {error && !isWorkspaceAudioEmpty && (
         <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
