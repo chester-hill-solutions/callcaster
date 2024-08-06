@@ -3,6 +3,7 @@ import { TextInput, Dropdown, DateTime, Toggle } from "./Inputs";
 import { NavLink, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
+import { MdAdd } from "react-icons/md";
 
 const initialState = (data, workspace, campaign_id) => ({
   campaign_id,
@@ -94,13 +95,13 @@ const CampaignSettings = ({
   const handleAddDispositionOptions = useCallback((event) => {
     const newVal = event.target.value;
     onPageDataChange(({
-        ...data,
-        campaignDetails: {
-            ...data.campaignDetails,
-            disposition_options: [...data.campaignDetails?.disposition_options, { value: newVal.replace(" ", "_").toLowerCase(), label: newVal }]
-        }
+      ...data,
+      campaignDetails: {
+        ...data.campaignDetails,
+        disposition_options: [...data.campaignDetails?.disposition_options, { value: newVal.replace(" ", "_").toLowerCase(), label: newVal }]
+      }
     }));
-}, [onPageDataChange, data]);
+  }, [onPageDataChange, data]);
 
   const saveAudience = () => {
     submit(
@@ -199,9 +200,7 @@ const CampaignSettings = ({
             }
             options={[
               { value: "message", label: "Message" },
-              { value: "robocall", label: "Robocall" },
-              { value: "simple_ivr", label: "Simple IVR" },
-              { value: "complex_ivr", label: "Complex IVR" },
+              { value: "robocall", label: "Interactive Voice Recording" },
               { value: "live_call", label: "Live Call" },
             ]}
             className={"flex flex-col"}
@@ -226,22 +225,28 @@ const CampaignSettings = ({
                 </Button>
               </div>
           }
-          {(campaignDetails.type !== 'message') && <Dropdown
-            name="voicemail"
-            label={"Voicemail File"}
-            value={campaignDetails.voicemail_file}
-            onChange={(e) =>
-              handleInputChange(
-                actionTypes.SET_VOICEMAIL,
-                e.currentTarget.value,
-              )
-            }
-            options={mediaData.map((media) => ({
-              value: media.name,
-              label: media.name,
-            }))}
-            className={"flex flex-col"}
-          />}
+          {(campaignDetails.type !== 'message') && (
+            <div className="flex items-end gap-1">
+              <Dropdown
+                name="voicemail"
+                label={"Voicemail File"}
+                value={campaignDetails.voicemail_file}
+                onChange={(e) =>
+                  handleInputChange(
+                    actionTypes.SET_VOICEMAIL,
+                    e.currentTarget.value,
+                  )
+                }
+                options={mediaData?.map((media) => ({
+                  value: media.name,
+                  label: media.name,
+                }))}
+                className={"flex flex-col"}
+              />
+              <Button variant="outline" asChild><NavLink to={"../../../audios/new"}><MdAdd/></NavLink></Button>
+            </div>
+
+          )}
         </div>
 
         {campaignDetails.type === 'live_call' && <>
@@ -263,18 +268,6 @@ const CampaignSettings = ({
               )}
               leftLabel="Power Dialer"
               rightLabel="Predictive Dialer" />
-{/*             <form className="flex flex-col gap-2" onSubmit={handleAddDispositionOptions}>
-              <label htmlFor="disposition-options">
-                Disposition Options
-              </label>
-              <div className="flex">
-                <input type="text" id="disposition-options" name="disposition-options-add" />
-                <Button type="submit" >Add</Button>
-              </div>
-              <div className="flex flex-col">
-                {details.disposition_options?.map((i, index) => (<p key={index}>{i.label}</p>))}
-              </div>
-            </form> */}
           </div></>}
         <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
         <span className="text-lg font-semibold">Audiences:</span>

@@ -94,5 +94,5 @@ export async function handleNewCampaign({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/campaigns/${campaignData.id}`);
+  return redirect(`/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`);
 }
