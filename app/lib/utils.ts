@@ -14,7 +14,8 @@ export function formatDateToLocale(dateFromSupabase: string) {
 export function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
-export const stripPhoneNumber = (phoneNumber:string) => phoneNumber.replace(/\D/g, "");
+export const stripPhoneNumber = (phoneNumber: string) =>
+  phoneNumber.replace(/\D/g, "");
 
 export function formatTableText(unformatted: string): string {
   const pattern = new RegExp(/[,_/\- ]/g);
@@ -30,10 +31,14 @@ export const isRecent = (date: string): boolean => {
   return (now.getTime() - created.getTime()) / 3600000 < 24;
 };
 
-
-export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = new WeakMap()): boolean {
+export function deepEqual(
+  obj1: any,
+  obj2: any,
+  path: string = "root",
+  seen = new WeakMap(),
+): boolean {
   function log(message: string) {
-   // console.log(`[${path}] ${message}`);
+    // console.log(`[${path}] ${message}`);
   }
 
   if (obj1 === obj2) return true;
@@ -41,7 +46,7 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
     log(`One value is null or undefined: ${obj1} !== ${obj2}`);
     return false;
   }
-  if (typeof obj1 !== 'object' && typeof obj2 !== 'object') {
+  if (typeof obj1 !== "object" && typeof obj2 !== "object") {
     if (obj1 !== obj2) {
       log(`Primitive values differ at ${path}: ${obj1} !== ${obj2}`);
     }
@@ -71,7 +76,9 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
       log(`Array lengths differ: ${obj1.length} !== ${obj2.length}`);
       return false;
     }
-    return obj1.every((item, index) => deepEqual(item, obj2[index], `${path}[${index}]`, seen));
+    return obj1.every((item, index) =>
+      deepEqual(item, obj2[index], `${path}[${index}]`, seen),
+    );
   }
 
   if (seen.get(obj1) === obj2) return true;
@@ -82,14 +89,16 @@ export function deepEqual(obj1: any, obj2: any, path: string = 'root', seen = ne
 
   if (keys1.length !== keys2.length) {
     log(`Number of keys differ: ${keys1.length} !== ${keys2.length}`);
-    const extraKeys1 = keys1.filter(key => !keys2.includes(key));
-    const extraKeys2 = keys2.filter(key => !keys1.includes(key));
-    if (extraKeys1.length) log(`Extra keys in first object: ${extraKeys1.join(', ')}`);
-    if (extraKeys2.length) log(`Extra keys in second object: ${extraKeys2.join(', ')}`);
+    const extraKeys1 = keys1.filter((key) => !keys2.includes(key));
+    const extraKeys2 = keys2.filter((key) => !keys1.includes(key));
+    if (extraKeys1.length)
+      log(`Extra keys in first object: ${extraKeys1.join(", ")}`);
+    if (extraKeys2.length)
+      log(`Extra keys in second object: ${extraKeys2.join(", ")}`);
     return false;
   }
 
-  return keys1.every(key => {
+  return keys1.every((key) => {
     if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
       log(`Second object doesn't have key: ${key}`);
       return false;
@@ -101,9 +110,7 @@ const headerMappings = {
   firstname: [
     /^(contact[-_\s]?)?(first[-_\s]?name|given[-_\s]?name|forename)$/i,
   ],
-  surname: [
-    /^(contact[-_\s]?)?(last[-_\s]?name|surname|family[-_\s]?name)$/i,
-  ],
+  surname: [/^(contact[-_\s]?)?(last[-_\s]?name|surname|family[-_\s]?name)$/i],
   phone: [
     /^(contact[-_\s]?)?(phone|phone[-_\s]?number|mobile|mobile[-_\s]?number|cell|cell[-_\s]?phone|telephone|tel)$/i,
   ],
@@ -145,43 +152,51 @@ const parseEmail = (email) => {
   return emailRegex.test(email) ? email.toLowerCase() : null;
 };
 function parsePhoneNumber(input) {
-  let cleaned = input.replace(/[^0-9+]/g, '');
+  if (input) {
+    let cleaned = input.replace(/[^0-9+]/g, "");
 
-  if (cleaned.indexOf('+') > 0) {
-      cleaned = cleaned.replace(/\+/g, '');
-  }
-  if (!cleaned.startsWith('+')) {
-      cleaned = '+' + cleaned;
-  }
+    if (cleaned.indexOf("+") > 0) {
+      cleaned = cleaned.replace(/\+/g, "");
+    }
+    if (!cleaned.startsWith("+")) {
+      cleaned = "+" + cleaned;
+    }
 
-  const validLength = 11;
-  const minLength = 11;
+    const validLength = 11;
+    const minLength = 11;
 
-  if (cleaned.length < minLength + 1) {
-      cleaned = '+1' + cleaned.replace('+', '');
-  }
+    if (cleaned.length < minLength + 1) {
+      cleaned = "+1" + cleaned.replace("+", "");
+    }
 
-  if (cleaned.length !== validLength + 1) { 
+    if (cleaned.length !== validLength + 1) {
       return null;
+    }
+    return cleaned;
+  } else {
+    return "";
   }
-  return cleaned;
 }
 
 const parseName = (name) => {
-  const parts = name.split(/\s+/);
-  if (parts.length === 1) {
-    return { firstname: parts[0], surname: null };
-  } else if (parts.length === 2) {
-    return { firstname: parts[0], surname: parts[1] };
-  } else if (parts.length > 2) {
-    return { firstname: parts[0], surname: parts.slice(1).join(' ') };
+  if (name) {
+    const parts = name.split(/\s+/);
+    if (parts.length === 1) {
+      return { firstname: parts[0], surname: null };
+    } else if (parts.length === 2) {
+      return { firstname: parts[0], surname: parts[1] };
+    } else if (parts.length > 2) {
+      return { firstname: parts[0], surname: parts.slice(1).join(" ") };
+    }
+    return { firstname: null, surname: null };
+  } else {
+    return { firstname: null, surname: null };
   }
-  return { firstname: null, surname: null };
 };
 const parseOptOut = (value) => {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     value = value.toLowerCase().trim();
-    return ['yes', 'true', '1', 'opt-out', 'unsubscribe'].includes(value);
+    return ["yes", "true", "1", "opt-out", "unsubscribe"].includes(value);
   }
   return Boolean(value);
 };
@@ -211,25 +226,25 @@ const parseCSVData = (data, parsedHeaders) => {
 
       if (key) {
         switch (key) {
-          case 'name':
+          case "name":
             const { firstname, surname } = parseName(value);
             contact.firstname = firstname;
             contact.surname = surname;
             break;
-          case 'phone':
+          case "phone":
             contact.phone = parsePhoneNumber(value);
             break;
-          case 'email':
+          case "email":
             contact.email = parseEmail(value);
             break;
-          case 'opt_out':
+          case "opt_out":
             contact.opt_out = parseOptOut(value);
             break;
           default:
             contact[key] = value;
         }
       } else if (value !== null) {
-        contact.other_data.push({[header]: value});
+        contact.other_data.push({ [header]: value });
       }
     });
 
@@ -244,11 +259,10 @@ export const parseCSV = (csvString) => {
 
     return { headers, contacts };
   } catch (error) {
-    console.error('Error parsing CSV:', error);
-    throw new Error('Failed to parse CSV file');
+    console.error("Error parsing CSV:", error);
+    throw new Error("Failed to parse CSV file");
   }
 };
-
 
 export function campaignTypeText(campaignType: string): string {
   switch (campaignType) {
@@ -278,7 +292,9 @@ export const sortQueue = (queue: QueueItem[]): QueueItem[] => {
   });
 };
 
-export const createHouseholdMap = (queue: QueueItem[]): Record<string, QueueItem[]> => {
+export const createHouseholdMap = (
+  queue: QueueItem[],
+): Record<string, QueueItem[]> => {
   return queue.reduce<Record<string, QueueItem[]>>((acc, curr, index) => {
     if (curr?.contact?.address) {
       if (!acc[curr.contact.address]) {
@@ -292,22 +308,35 @@ export const createHouseholdMap = (queue: QueueItem[]): Record<string, QueueItem
   }, {});
 };
 
-export const updateAttemptWithCall = (attempt: Attempt, call: Call): Attempt => {
+export const updateAttemptWithCall = (
+  attempt: Attempt,
+  call: Call,
+): Attempt => {
   return {
     ...attempt,
     result: {
       ...attempt.result,
-      ...(call && call.status && call.direction !== "outbound-api" && { status: call.status }),
+      ...(call &&
+        call.status &&
+        call.direction !== "outbound-api" && { status: call.status }),
     },
   };
 };
 
 export const playTone = (tone: string, audioContext: AudioContext) => {
   const dtmfFrequencies: { [key: string]: [number, number] } = {
-    '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
-    '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
-    '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
-    '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+    "1": [697, 1209],
+    "2": [697, 1336],
+    "3": [697, 1477],
+    "4": [770, 1209],
+    "5": [770, 1336],
+    "6": [770, 1477],
+    "7": [852, 1209],
+    "8": [852, 1336],
+    "9": [852, 1477],
+    "*": [941, 1209],
+    "0": [941, 1336],
+    "#": [941, 1477],
   };
 
   if (!audioContext) return;
@@ -316,11 +345,11 @@ export const playTone = (tone: string, audioContext: AudioContext) => {
   const duration = 0.15; // Duration of the tone in seconds
 
   const oscillator1 = audioContext.createOscillator();
-  oscillator1.type = 'sine';
+  oscillator1.type = "sine";
   oscillator1.frequency.setValueAtTime(lowFreq, audioContext.currentTime);
 
   const oscillator2 = audioContext.createOscillator();
-  oscillator2.type = 'sine';
+  oscillator2.type = "sine";
   oscillator2.frequency.setValueAtTime(highFreq, audioContext.currentTime);
 
   const gainNode = audioContext.createGain();
@@ -335,7 +364,6 @@ export const playTone = (tone: string, audioContext: AudioContext) => {
   oscillator1.stop(audioContext.currentTime + duration);
   oscillator2.stop(audioContext.currentTime + duration);
 };
-
 
 export const formatTime = (milliseconds: number): string => {
   const totalSeconds = Math.floor(milliseconds);
@@ -375,24 +403,26 @@ export function isEmail(email) {
 }
 
 export function normalizePhoneNumber(input) {
-  let cleaned = input.replace(/[^0-9+]/g, '');
+  let cleaned = input.replace(/[^0-9+]/g, "");
 
-  if (cleaned.indexOf('+') > 0) {
-      cleaned = cleaned.replace(/\+/g, '');
+  if (cleaned.indexOf("+") > 0) {
+    cleaned = cleaned.replace(/\+/g, "");
   }
-  if (!cleaned.startsWith('+')) {
-      cleaned = '+' + cleaned;
+  if (!cleaned.startsWith("+")) {
+    cleaned = "+" + cleaned;
   }
 
   const validLength = 11;
   const minLength = 11;
 
-  if (cleaned.length < minLength + 1) { // +1 for the +
-      cleaned = '+1' + cleaned.replace('+', '');
+  if (cleaned.length < minLength + 1) {
+    // +1 for the +
+    cleaned = "+1" + cleaned.replace("+", "");
   }
 
-  if (cleaned.length !== validLength + 1) { // +1 for the +
-      throw new Error('Invalid phone number length');
+  if (cleaned.length !== validLength + 1) {
+    // +1 for the +
+    throw new Error("Invalid phone number length");
   }
 
   return cleaned;
