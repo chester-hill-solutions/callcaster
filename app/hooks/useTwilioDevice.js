@@ -82,24 +82,36 @@ export function useTwilioDevice(token, workspaceId) {
             body: JSON.stringify({ callSid: activeCall.parameters.CallSid, workspaceId }),
             headers: { "Content-Type": 'application/json' }
         })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(() => {
-            setStatus('Registered');
-            activeCall.disconnect();
-            setActiveCall(null);
-            deviceRef.current.disconnectAll();
-            setCallState('completed');
-            setCallDuration(0);
-        })
-        .catch((error) => {
-            console.error('Error hanging up call:', error);
-            setError(error);
-        });
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.message || 'Network response was not ok');
+                    });
+                }
+                return response.json();
+            })
+            .then(() => {
+                setStatus('Registered');
+                activeCall.disconnect();
+                setActiveCall(null);
+                deviceRef.current.disconnectAll();
+                setCallState('completed');
+                setCallDuration(0);
+            })
+            .catch((error) => {
+                console.error('Error hanging up call:', error);
+                if (error.message === 'Call is not in-progress. Cannot redirect.') {
+                    console.log('Call was already disconnected');
+                    setStatus('Registered');
+                    setActiveCall(null);
+                    setCallState('completed');
+                    setCallDuration(0);
+                } else {
+                    setError(error);
+                }
+            });
     }, [activeCall, workspaceId]);
-    
+
     const answer = useCallback(() => {
         if (incomingCall) {
             incomingCall.accept();

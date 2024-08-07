@@ -21,16 +21,19 @@ export const useCalls = (
     currentQueue: QueueItem[], 
     recentAttempt: Attempt | null, 
     setNextRecipient: (recipient: QueueItem | null) => void, 
-    setQuestionContact: (contact: QueueItem | null) => void
+    setQuestionContact: (contact: QueueItem | null) => void,
+    setRecentAttempt: (attempt: Attempt | null) => void,
+    setUpdate: (update: any) => void
   ) => {
     const attemptId = payload.new.outreach_attempt_id;
     let updatedCall = payload.new;
     
     if (attemptId) {
       setCalls((currentCalls) => [...currentCalls, updatedCall]);
-      setRecentCall(
-        recentAttempt?.contact_id === updatedCall.contact_id ? updatedCall : recentCall
-      );
+      setRecentCall(updatedCall);
+      setRecentAttempt(null);
+      setUpdate({});
+      
       const newRecipient = currentQueue.find((item) => updatedCall.contact_id === item.contact_id);
       if (newRecipient) {
         setNextRecipient(newRecipient);
@@ -42,7 +45,8 @@ export const useCalls = (
     } else if (payload.new.contact_id) {
       setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
     }
-  }, [recentCall]);
+  }, []);
+  
 
   useEffect(() => {
     if (!recentCall && callsList.length > 0) {
