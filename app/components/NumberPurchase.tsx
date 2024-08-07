@@ -76,9 +76,16 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                           <td className="px-2 py-1">
                             <Form
                               method="POST"
-                              action="/api/numbers"
+                              action="/api/checkout"
                               navigate={false}
                             >
+                              
+                              <input
+                                hidden
+                                readOnly
+                                name="lookup_key"
+                                value={'price_1PlCDAJejbJxIQ3bP6CongwA'}
+                              />
                               <input
                                 hidden
                                 readOnly

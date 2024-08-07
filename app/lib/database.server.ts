@@ -886,9 +886,7 @@ export async function createStripeContact({ supabaseClient, workspace_id }) {
 
   const ownerUser = data.workspace_users[0].user;
 
-  const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
-    apiVersion: "2020-08-27",
-  });
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!);
 
   console.log("Creating Stripe customer for:", data.name, ownerUser.username);
 
