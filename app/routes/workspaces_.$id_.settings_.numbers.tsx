@@ -1,8 +1,7 @@
-import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
+import  { MemberRole } from "~/components/Workspace/TeamMember";
 
-import { ActionFunctionArgs, redirect } from "@remix-run/node";
+import {redirect } from "@remix-run/node";
 import {
-  Form,
   json,
   Link,
   useActionData,
@@ -10,7 +9,6 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -22,7 +20,6 @@ import {
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { useSupabaseRealtime } from "~/hooks/useSupabaseRealtime";
 import { toast, Toaster } from "sonner";
-import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +29,7 @@ import {
 import { NumbersTable } from "~/components/NumbersTable";
 import { NumberCallerId } from "~/components/NumberCallerId";
 import { NumberPurchase } from "~/components/NumberPurchase";
+import { CallerIDResponse } from "~/lib/types";
 
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -71,32 +69,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
     { headers },
   );
-};
-type ValidationRequest = {
-  accountSid: string;
-  callSid: string;
-  friendlyName: string;
-  phoneNumber: string;
-  validationCode: string;
-};
-type NumberCapabilities = {
-  fax: boolean;
-  mms: boolean;
-  sms: boolean;
-  voice: boolean;
-  verification_status: boolean;
-};
-type NumberRequest = Array<{
-  id: bigint;
-  created_at: string;
-  workspace: string;
-  friendly_name: string;
-  phone_number: string;
-  capabilities: NumberCapabilities;
-}>;
-type CallerIDResponse = {
-  validationRequest: ValidationRequest;
-  numberRequest: NumberRequest;
 };
 
 export const action = async ({ request, params }) => {
@@ -185,7 +157,7 @@ export default function WorkspaceSettings() {
           <Button
             asChild
             variant="outline"
-            className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+            className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
           >
             <Link to=".." relative="path">
               Back

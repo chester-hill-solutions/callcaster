@@ -51,6 +51,12 @@ export const NumberCallerId = () => {
                 phone number, and will be prompted to enter the code.
               </p>
             </div>
+            <p className="max-w-[400px] mt-4">
+              This number can be used as an outgoing Caller ID for Live Calls
+              and Interactive Voice Recording campaings.
+              <br />
+              To chat via SMS, you will need to rent a number.
+            </p>
           </div>
         </div>
       </div>

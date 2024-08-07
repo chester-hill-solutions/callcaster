@@ -37,3 +37,31 @@ export type WorkspaceData =
       users: string[] | null;
     }[]
   | null;
+
+  type ValidationRequest = {
+    accountSid: string;
+    callSid: string;
+    friendlyName: string;
+    phoneNumber: string;
+    validationCode: string;
+  };
+  type NumberCapabilities = {
+    fax: boolean;
+    mms: boolean;
+    sms: boolean;
+    voice: boolean;
+    verification_status: boolean;
+  };
+  type NumberRequest = Array<{
+    id: bigint;
+    created_at: string;
+    workspace: string;
+    friendly_name: string;
+    phone_number: string;
+    capabilities: NumberCapabilities;
+  }>;
+  export type CallerIDResponse = {
+    validationRequest: ValidationRequest;
+    numberRequest: NumberRequest;
+  };
+  

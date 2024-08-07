@@ -18,9 +18,9 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                 <fetcher.Form action="/api/numbers">
                   <input type="hidden" name="formName" value="caller-id" />
                   <div className="flex flex-col items-start">
-                    <label htmlFor="areaCode">Area Code</label>
-                    <div className="flex">
-                      <input id="areaCode" name="areaCode" className="w-full" />
+                    <label className="flex gap-2" htmlFor="areaCode">Area Code <span className="text-xs">Optional</span></label>
+                    <div className="flex flex-auto gap-1">
+                      <input id="areaCode" name="areaCode" className="w-full" placeholder="3-digit Area Code"/>
                       <Button type="submit">Search</Button>
                     </div>
                     <caption>
