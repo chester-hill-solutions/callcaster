@@ -4,7 +4,7 @@ import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
 import { NavLink } from "@remix-run/react";
-import { Button } from "./ui/button";
+import { Button } from "../ui/button";
 
 const MessageResultsScreen = ({
   totalCalls = 0,

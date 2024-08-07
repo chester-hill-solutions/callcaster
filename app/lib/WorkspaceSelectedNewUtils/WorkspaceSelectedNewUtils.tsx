@@ -4,18 +4,39 @@ import { parseCSV } from "../utils";
 import { bulkCreateContacts } from "../database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
+async function insertCampaignAudience({
+  campaignId,
+  audienceId,
+  supabaseClient,
+}) {
+  return await supabaseClient
+    .from("campaign_audience")
+    .insert({
+      campaign_id: campaignId,
+      audience_id: audienceId,
+    })
+    .select()
+    .single();
+}
+
+async function removeCampaignAudience({ supabaseClient, id }) {
+  return await supabaseClient.from("audience").delete().eq("id", id);
+}
+
 export async function handleNewAudience({
   supabaseClient,
   formData,
   workspaceId,
   headers,
-  contactsFile
+  contactsFile,
+  campaignId,
 }: {
   supabaseClient: SupabaseClient;
   formData: FormData;
   workspaceId: string;
   headers: Headers;
   contactsFile: File;
+  campaignId?: string;
 }) {
   const newAudienceName = formData.get("audience-name") as string;
 
@@ -33,25 +54,38 @@ export async function handleNewAudience({
     if (createAudienceError) {
       throw createAudienceError;
     }
-
+    if (campaignId) {
+      const { error: campaignInsertError } = await insertCampaignAudience({
+        campaignId,
+        audienceId: createAudienceData.id,
+        supabaseClient,
+      });
+      if (campaignInsertError)
+        removeCampaignAudience({ supabaseClient, id: createAudienceData.id });
+    }
     if (contactsFile && contactsFile.size > 0) {
       const fileContent = await contactsFile.text();
       const { headers: csvHeaders, contacts } = parseCSV(fileContent);
-      await bulkCreateContacts(supabaseClient, contacts, workspaceId, createAudienceData.id);
+      await bulkCreateContacts(
+        supabaseClient,
+        contacts,
+        workspaceId,
+        createAudienceData.id,
+      );
     }
 
     return redirect(
       `/workspaces/${workspaceId}/audiences/${createAudienceData.id}`,
-      { headers }
+      { headers },
     );
   } catch (error) {
-    console.error('Error in handleNewAudience:', error);
+    console.error("Error in handleNewAudience:", error);
     return json(
       {
         audienceData: null,
-        error: error.message || 'An unexpected error occurred',
+        error: error.message || "An unexpected error occurred",
       },
-      { status: 500, headers }
+      { status: 500, headers },
     );
   }
 }
@@ -94,5 +128,7 @@ export async function handleNewCampaign({
     );
   }
 
-  return redirect(`/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`);
+  return redirect(
+    `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
+  );
 }

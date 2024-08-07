@@ -1,12 +1,13 @@
+import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
-  ActionFunctionArgs,
-  createReadableStreamFromReadable,
-  LoaderFunctionArgs,
-} from "@remix-run/node";
-import { Form, Link, NavLink, json, useActionData, useLoaderData } from "@remix-run/react";
+  Form,
+  Link,
+  NavLink,
+  json,
+  useActionData,
+  useLoaderData,
+} from "@remix-run/react";
 import { MdDownload, MdEdit } from "react-icons/md";
-import { Readable } from "node:stream";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
@@ -113,7 +114,9 @@ export default function WorkspaceScripts() {
 
   useEffect(() => {
     if (actionData) {
-      const blob = new Blob([actionData.fileContent], { type: actionData.contentType });
+      const blob = new Blob([actionData.fileContent], {
+        type: actionData.contentType,
+      });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -126,18 +129,19 @@ export default function WorkspaceScripts() {
 
   const isWorkspaceAudioEmpty = !scripts?.length > 0;
   return (
-    <main className="mx-auto flex h-full w-full flex-col gap-4 rounded-sm text-white">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null
+    <main className="flex h-full flex-col gap-4 rounded-sm ">
+      <div className="flex flex-col sm:flex-row sm:justify-between">
+      <div className="flex">
+
+      <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
+      {workspace != null
             ? `${workspace?.name} Script Library`
             : "No Workspace"}
         </h1>
-        <div className="flex items-center gap-4">
-          <Button asChild className="font-Zilla-Slab text-xl font-semibold">
+        </div>
+        <Button asChild className="font-Zilla-Slab text-lg font-semibold">
             <Link to={`./new`}>Add a Script</Link>
           </Button>
-        </div>
       </div>
       {error && !isWorkspaceAudioEmpty && (
         <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
@@ -145,12 +149,12 @@ export default function WorkspaceScripts() {
         </h4>
       )}
       {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
+        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
           Add Your Own Scripts to this Workspace!
         </h4>
       )}
 
-      {scripts != null && (
+      {scripts?.length > 0 && (
         <DataTable
           className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
           columns={[

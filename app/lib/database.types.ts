@@ -1446,5 +1446,6 @@ export interface ResultsScreenProps {
       totalCalls: number;
       results: DispositionResult[];
       expectedTotal: number;
+      isBusy:boolean;
     }
     
