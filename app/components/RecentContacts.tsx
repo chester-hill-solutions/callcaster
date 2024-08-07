@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "~/components/ui/card";
 import { Calendar, Clipboard, ChevronRight, ChevronDown } from "lucide-react";
+import { Contact, OutreachAttempt, QueueItem } from "~/lib/types";
 
 const ResultItem = ({ label, value }) => (
   <li className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
@@ -80,8 +81,8 @@ const AttemptCard = ({ attempt, isOpen, toggleOpen, index }) => {
   );
 };
 
-export const RecentContacts = ({ contact }) => {
-  const recentContacts = contact.outreach_attempt.slice(-5).reverse();
+export const RecentContacts = ({ contact }: {contact?: Contact & {outreach_attempt: OutreachAttempt}}) => {
+  const recentContacts = contact && contact?.outreach_attempt?.length > 0 ? contact.outreach_attempt.slice(-5).reverse() : [];
   const [openCard, setOpenCard] = useState(0);
 
   const toggleCard = (index) => {

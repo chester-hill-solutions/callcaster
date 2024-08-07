@@ -17,6 +17,8 @@ export type Campaign = Database["public"]["Tables"]["campaign"]["Row"] | null;
 export type Contact = Database["public"]["Tables"]["contact"]["Row"] | null;
 export type Queue = Database["public"]["Tables"]["contact"]["Row"] | null;
 export type Message = Database["public"]["Tables"]["message"]["Row"] | null;
+export type OutreachAttempt = Database["public"]["Tables"]["outreach_attempt"]["Row"] | null;
+export type ContactAudience = Database["public"]["Tables"]["contact_audience"]["Row"] | null;
 
 export type QueueItem = Queue & {contact: Contact}
 

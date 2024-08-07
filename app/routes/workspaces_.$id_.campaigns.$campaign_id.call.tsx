@@ -90,6 +90,7 @@ export const loader = async ({ request, params }) => {
     .eq("id", id)
 
     .single();
+    
   const { data: campaignDetails, error: detailsError } = await supabase
     .from("live_campaign")
     .select(`*, script(*)`)
@@ -135,7 +136,7 @@ export const loader = async ({ request, params }) => {
   } else if (campaign.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select('*, contact(*)')
+      .select("*, contact(*)")
       .eq("status", serverSession.user.id)
       .eq("campaign_id", id);
     if (error) {
@@ -164,9 +165,11 @@ export const loader = async ({ request, params }) => {
   const nextRecipient =
     queue && campaign.dial_type === "call" ? queue[0] : null;
   const initalCallsList = attempts.flatMap((attempt) => attempt.call);
-  const initialRecentCall = nextRecipient?.contact && initalCallsList.find(
-    (call) => call.contact_id === nextRecipient?.contact.id,
-  );
+  const initialRecentCall =
+    nextRecipient?.contact &&
+    initalCallsList.find(
+      (call) => call.contact_id === nextRecipient?.contact.id,
+    );
   const initialRecentAttempt = attempts
     .sort((a, b) => b.created_at - a.created_at)
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
@@ -256,7 +259,7 @@ const Campaign: React.FC = () => {
     hangUp,
     callState,
     callDuration,
-    setCallDuration
+    setCallDuration,
   } = useTwilioDevice(token, workspaceId);
 
   const {
@@ -290,10 +293,15 @@ const Campaign: React.FC = () => {
     activeCall,
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
-    setCallDuration
+    setCallDuration,
   });
-  const [isErrorDialogOpen, setErrorDialog] = useState((!Object.keys(campaignDetails?.script || {}).length));
-  const [isDialogOpen, setDialog] = useState(((!(queue.length > 0) || campaign.dial_type === 'predictive') && !isErrorDialogOpen));
+  const [isErrorDialogOpen, setErrorDialog] = useState(
+    !Object.keys(campaignDetails?.script || {}).length,
+  );
+  const [isDialogOpen, setDialog] = useState(
+    (!(queue.length > 0) || campaign.dial_type === "predictive") &&
+      !isErrorDialogOpen,
+  );
 
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -410,21 +418,39 @@ const Campaign: React.FC = () => {
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   const handleDequeueNext = useCallback(() => {
-    if (campaign.dial_type === "predictive" && nextRecipient){
-      dequeue({contact: nextRecipient});
+    if (campaign.dial_type === "predictive" && nextRecipient) {
+      dequeue({ contact: nextRecipient });
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
+      setUpdate({});
+      setDisposition("idle");
+      setCallDuration(0);
       handleDialButton();
-    }
-     else if (campaign.dial_type === "call" && nextRecipient) {
+    } else if (campaign.dial_type === "call" && nextRecipient) {
       handleQuickSave();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
       handleNextNumber({ skipHousehold: true });
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
+      setUpdate({});
+      setDisposition("idle");
+      setCallDuration(0);
     }
-  }, [campaign.dial_type, dequeue, fetchMore, handleDialButton, handleNextNumber, handleQuickSave, householdMap, nextRecipient, send, setRecentAttempt]);
+  }, [
+    campaign.dial_type,
+    dequeue,
+    fetchMore,
+    handleDialButton,
+    handleNextNumber,
+    handleQuickSave,
+    householdMap,
+    nextRecipient,
+    send,
+    setRecentAttempt,
+    setDisposition,
+    setCallDuration,
+  ]);
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
@@ -462,8 +488,9 @@ const Campaign: React.FC = () => {
   const getDisplayState = (
     state: CallState,
     disposition: AttemptDisposition | undefined,
-    activeCall: object,
+    activeCall: object | null,
   ): string => {
+    console.log(state, disposition);
     if (state === "failed" || disposition === "failed") return "failed";
     if (
       disposition === "ringing" ||
@@ -474,18 +501,28 @@ const Campaign: React.FC = () => {
     if (disposition === "no-answer") return "no-answer";
     if (disposition === "voicemail") return "voicemail";
     if (state === "completed" && disposition) return "completed";
+    if (!activeCall && !disposition) return "idle";
     return "idle";
   };
-
   const displayState = getDisplayState(
     state,
     recentAttempt?.disposition as AttemptDisposition,
     activeCall,
   );
 
-  const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact?.address,) || ""];
-  
-  const displayColor = displayState === "failed" ? "hsl(var(--primary))" : displayState === "connected" || displayState === "dialing" ? "#4CA83D" : "#333333";
+  const house =
+    householdMap[
+      Object.keys(householdMap).find(
+        (house) => house === nextRecipient?.contact?.address,
+      ) || ""
+    ];
+
+  const displayColor =
+    displayState === "failed"
+      ? "hsl(var(--primary))"
+      : displayState === "connected" || displayState === "dialing"
+        ? "#4CA83D"
+        : "#333333";
 
   useEffect(() => {
     const handleKeypress = (e) => {
@@ -520,8 +557,11 @@ const Campaign: React.FC = () => {
   useEffect(() => {
     if (nextRecipient) {
       setQuestionContact(nextRecipient);
+      send({ type: "NEXT" });
+      setCallDuration(0);
+  
     }
-  }, [nextRecipient]);
+  }, [nextRecipient, send, setCallDuration]);
 
   useDebouncedSave(
     update,
@@ -532,7 +572,6 @@ const Campaign: React.FC = () => {
     workspaceId,
     disposition,
   );
-
   return (
     <main className="container mx-auto p-6">
       <div
@@ -676,7 +715,7 @@ const Campaign: React.FC = () => {
             <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
               Welcome to {campaign.title}.
             </DialogTitle>
-            <div className="w-[400px] my-4">
+            <div className="my-4 w-[400px]">
               <p>
                 This is a{" "}
                 {campaign.dial_type === "call"
@@ -689,12 +728,21 @@ const Campaign: React.FC = () => {
                   ? "The dialer will automatically detect voicemailboxes, and leave a voicemail with the contact."
                   : "The dialer will automatically detect voicemailboxes, and disconnect your call accordingly."}
               </p>
-              <div className="flex justify-between mt-4">
-                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
-                <Button onClick={() => {
-                  campaign.dial_type === 'call' && fetchMore({householdMap})
-                  setDialog(false)
-                  }}>Get started</Button>
+              <div className="mt-4 flex justify-between">
+                <Button asChild className="border-primary" variant={"outline"}>
+                  <NavLink to={".."} relative="path">
+                    Go Back
+                  </NavLink>
+                </Button>
+                <Button
+                  onClick={() => {
+                    campaign.dial_type === "call" &&
+                      fetchMore({ householdMap });
+                    setDialog(false);
+                  }}
+                >
+                  Get started
+                </Button>
               </div>
             </div>
           </DialogHeader>
@@ -706,11 +754,18 @@ const Campaign: React.FC = () => {
             <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
               NO SCRIPT SET UP
             </DialogTitle>
-            <div className="w-[400px] my-4">
-              <p>This campaign has not been configured with a script. Contact your administrator to get one set up</p>
-                
-              <div className="flex justify-between mt-4">
-                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
+            <div className="my-4 w-[400px]">
+              <p>
+                This campaign has not been configured with a script. Contact
+                your administrator to get one set up
+              </p>
+
+              <div className="mt-4 flex justify-between">
+                <Button asChild className="border-primary" variant={"outline"}>
+                  <NavLink to={".."} relative="path">
+                    Go Back
+                  </NavLink>
+                </Button>
               </div>
             </div>
           </DialogHeader>

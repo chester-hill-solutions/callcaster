@@ -49,7 +49,7 @@ export const action = async ({ request, params }) => {
   }
   const { csvHeaders, flattenedData } = processOutreachExportData(outreachData, users);
   const csvContent = generateCSVContent(csvHeaders, flattenedData);
-
+  
   return json({
     csvContent,
     filename: `outreach_results_${campaign_id}.csv`,

@@ -107,21 +107,22 @@ export const handleContact = ({
       skipHousehold,
     );
     if (!nextContact) return;
+
     setNextRecipient(nextContact);
+    setRecentAttempt(null);
+    setUpdate({});
     const newRecentAttempt = getRecentAttempt({
       attempts,
       contact: nextContact,
     });
-    if (!isRecent(newRecentAttempt.created_at)) {
-      setRecentAttempt({});
-      setUpdate({});
-      return nextContact;
-    } else {
+
+    if (isRecent(newRecentAttempt.created_at)) {
       const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
       setRecentAttempt({ ...newRecentAttempt, call: recentCalls });
       setUpdate(newRecentAttempt.result || {});
     }
   };
+
   return { switchQuestionContact, nextNumber };
 };
 
