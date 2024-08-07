@@ -439,3 +439,112 @@ export const handleNavlinkStyles = (isActive: boolean, isPending: boolean): stri
 
   return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
 };
+
+export function extractKeys(data) {
+  const dynamicKeys = new Set();
+  const resultKeys = new Set();
+  const otherDataKeys = new Set();
+
+  data.forEach(row => {
+    getAllKeys(row, "", dynamicKeys);
+    getAllKeys(row.contact, "contact_", dynamicKeys);
+
+    if (row.result && typeof row.result === "object") {
+      Object.keys(row.result).forEach(key => resultKeys.add(key));
+    }
+
+    if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
+      row.contact.other_data.forEach((item, index) => {
+        if (typeof item === "object") {
+          Object.keys(item).forEach(key =>
+            otherDataKeys.add(`other_data_${index}_${key}`)
+          );
+        }
+      });
+    }
+  });
+
+  return { dynamicKeys, resultKeys, otherDataKeys };
+}
+
+export function flattenRow(row, users) {
+  const flattenedRow = {};
+  getAllKeys(row, "", flattenedRow);
+  getAllKeys(row.contact, "contact_", flattenedRow);
+
+  const user = users.find(user => row.user_id === user.id);
+  flattenedRow.user_id = user ? user.username : row.user_id;
+
+  if (row.result && typeof row.result === "object") {
+    Object.assign(flattenedRow, row.result);
+  }
+
+  if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
+    row.contact.other_data.forEach((item, index) => {
+      if (typeof item === "object") {
+        Object.keys(item).forEach(key => {
+          flattenedRow[`other_data_${index}_${key}`] = item[key];
+        });
+      }
+    });
+    delete flattenedRow.contact_other_data;
+  }
+
+  flattenedRow.call_duration = (!row.call_duration || row.call_duration.startsWith("-"))
+    ? "00:00:00"
+    : row.call_duration;
+
+  if ("id" in flattenedRow) {
+    flattenedRow.attempt_id = flattenedRow.id;
+    delete flattenedRow.id;
+  }
+  if ("contact_id" in flattenedRow) {
+    flattenedRow.callcaster_id = flattenedRow.contact_id;
+    delete flattenedRow.contact_id;
+  }
+
+  return flattenedRow;
+}
+
+export function generateCSVContent(headers, data) {
+  let csvContent = "\ufeff";
+  csvContent += headers.map(escapeCSV).join(",") + "\n";
+
+  data.forEach(row => {
+    const csvRow = headers
+      .map(header => escapeCSV(row[header] || ""))
+      .join(",");
+    csvContent += csvRow + "\n";
+  });
+
+  return csvContent;
+}
+
+export function getAllKeys(obj, prefix = "", target = new Set()) {
+  Object.keys(obj).forEach(key => {
+    if (
+      typeof obj[key] === "object" &&
+      obj[key] !== null &&
+      !Array.isArray(obj[key])
+    ) {
+      getAllKeys(obj[key], `${prefix}${key}_`, target);
+    } else {
+      const fullKey = `${prefix}${key}`;
+      if (target instanceof Set) {
+        target.add(fullKey);
+      } else if (typeof target === "object") {
+        target[fullKey] = obj[key];
+      }
+    }
+  });
+  return target;
+}
+
+export function escapeCSV(field) {
+  if (field == null) return "";
+  const stringField = String(field);
+  if (/[",\n]/.test(stringField)) {
+    return `"${stringField.replace(/"/g, '""')}"`;
+  }
+  return stringField;
+}

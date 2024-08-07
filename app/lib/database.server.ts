@@ -5,6 +5,7 @@ import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
 import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
+import { extractKeys, flattenRow } from "./utils";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -482,6 +483,10 @@ export async function updateCampaign({
   campaignData = {},
   campaignDetails = {},
 }) {
+  if (campaignData.script_id && !campaignDetails.script_id) {
+    campaignDetails.script_id = campaignData.script_id;
+    delete campaignData.script_id;
+  }
   const updateData = campaignData;
   delete updateData.campaign_audience;
   delete updateData.campaignDetails;
@@ -491,7 +496,8 @@ export async function updateCampaign({
   delete updateData.campaign_id;
   delete updateData.questions;
   delete updateData.created_at;
-  delete updateData.disposition_options
+  delete updateData.disposition_options;
+
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
     .update(updateData)
@@ -816,6 +822,40 @@ export async function fetchContactData(
   return { contact, potentialContacts, contactError };
 }
 
+export async function fetchOutreachData(supabaseClient, campaignId) {
+  const { data, error } = await supabaseClient
+    .from("outreach_attempt")
+    .select(`*, contact(*)`)
+    .eq("campaign_id", campaignId);
+
+  if (error) {
+    console.error("Error fetching data:", error);
+    throw new Error("Error fetching data");
+  }
+
+  return data;
+}
+
+export function processOutreachExportData(data, users) {
+  const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
+  let csvHeaders = [...dynamicKeys, ...resultKeys, ...otherDataKeys].map(
+    (header) =>
+      header === "id"
+        ? "attempt_id"
+        : header === "contact_id"
+          ? "callcaster_id"
+          : header,
+  );
+
+  const flattenedData = data.map((row) => flattenRow(row, users));
+
+  csvHeaders = csvHeaders.filter((header) =>
+    flattenedData.some((row) => row[header] != null && row[header] !== ""),
+  );
+
+  return { csvHeaders, flattenedData };
+}
+
 export async function createStripeContact({ supabaseClient, workspace_id }) {
   const { data, error } = await supabaseClient
     .from("workspace")
@@ -947,28 +987,31 @@ export const createContact = async (
   return insert;
 };
 
-export const bulkCreateContacts = async (supabaseClient, contacts, workspace_id, audience_id) => {
-  const contactsWithWorkspace = contacts.map(contact => ({
+export const bulkCreateContacts = async (
+  supabaseClient,
+  contacts,
+  workspace_id,
+  audience_id,
+) => {
+  const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
   }));
 
   const { data: insert, error } = await supabaseClient
-    .from('contact')
+    .from("contact")
     .insert(contactsWithWorkspace)
     .select();
 
   if (error) throw error;
 
-  const audienceMap = insert.map(contact => ({
+  const audienceMap = insert.map((contact) => ({
     contact_id: contact.id,
-    audience_id
+    audience_id,
   }));
 
-  const { data: audience_insert, error: audience_insert_error } = await supabaseClient
-    .from('contact_audience')
-    .insert(audienceMap)
-    .select();
+  const { data: audience_insert, error: audience_insert_error } =
+    await supabaseClient.from("contact_audience").insert(audienceMap).select();
 
   if (audience_insert_error) throw audience_insert_error;
 

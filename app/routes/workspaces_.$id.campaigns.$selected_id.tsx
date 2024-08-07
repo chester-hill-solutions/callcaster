@@ -15,8 +15,10 @@ import {
   fetchBasicResults,
   fetchCampaignData,
   fetchCampaignDetails,
+  fetchOutreachData,
   getUserRole,
   getWorkspaceUsers,
+  processOutreachExportData,
 } from "~/lib/database.server";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 import {
@@ -29,165 +31,31 @@ import {CampaignInstructions} from "~/components/CampaignHomeScreen/CampaignInst
 import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
 import { useCsvDownload } from "~/hooks/useCsvDownload";
+import { generateCSVContent } from "~/lib/utils";
 
 export const action = async ({ request, params }) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) {
     return redirect("/signin");
   }
+
   const { id: workspace_id, selected_id: campaign_id } = params;
 
-  const { data: users, error: usersError } = await getWorkspaceUsers({
-    supabaseClient,
-    workspaceId: workspace_id,
-  });
+  const {data: users} = await getWorkspaceUsers({supabaseClient, workspaceId: workspace_id});
+  const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
 
-  if (usersError) {
-    console.error("Error fetching users:", usersError);
-    return new Response("Error fetching users", { status: 500 });
-  }
-
-  const { data, error } = await supabaseClient
-    .from("outreach_attempt")
-    .select(`*, contact(*)`)
-    .eq("campaign_id", campaign_id);
-
-  if (error) {
-    console.error("Error fetching data:", error);
-    return new Response("Error fetching data", { status: 500 });
-  }
-
-  if (!data || data.length === 0) {
+  if (!outreachData || outreachData.length === 0) {
     return new Response("No data found", { status: 404 });
   }
-
-  const dynamicKeys = new Set();
-  const resultKeys = new Set();
-  const otherDataKeys = new Set();
-
-  const getAllKeys = (obj, prefix = "", target = dynamicKeys) => {
-    Object.keys(obj).forEach((key) => {
-      if (
-        typeof obj[key] === "object" &&
-        obj[key] !== null &&
-        !Array.isArray(obj[key])
-      ) {
-        getAllKeys(obj[key], `${prefix}${key}_`, target);
-      } else {
-        const fullKey = `${prefix}${key}`;
-        if (target instanceof Set) {
-          target.add(fullKey);
-        } else if (typeof target === "object") {
-          target[fullKey] = obj[key];
-        }
-      }
-    });
-  };
-
-  data.forEach((row) => {
-    getAllKeys(row);
-    getAllKeys(row.contact, "contact_");
-
-    if (row.result && typeof row.result === "object") {
-      Object.keys(row.result).forEach((key) => resultKeys.add(key));
-    }
-
-    if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
-      row.contact.other_data.forEach((item, index) => {
-        if (typeof item === "object") {
-          Object.keys(item).forEach((key) =>
-            otherDataKeys.add(`other_data_${index}_${key}`),
-          );
-        }
-      });
-    }
-  });
-
-  let csvHeaders = Array.from(dynamicKeys)
-    .concat(Array.from(resultKeys))
-    .concat(Array.from(otherDataKeys));
-
-  csvHeaders = csvHeaders.map((header) =>
-    header === "id"
-      ? "attempt_id"
-      : header === "contact_id"
-        ? "callcaster_id"
-        : header,
-  );
-
-  const escapeCSV = (field) => {
-    if (field == null) return "";
-    const stringField = String(field);
-    if (/[",\n]/.test(stringField)) {
-      return `"${stringField.replace(/"/g, '""')}"`;
-    }
-    return stringField;
-  };
-
-  const flattenedData = data.map((row) => {
-    const flattenedRow = {};
-    getAllKeys(row, "", flattenedRow);
-    getAllKeys(row.contact, "contact_", flattenedRow);
-
-    const user = users.find((user) => row.user_id === user.id);
-    flattenedRow.user_id = user ? user.username : row.user_id;
-
-    const resultObj =
-      row.result && typeof row.result === "object" ? row.result : {};
-    Object.keys(resultObj).forEach((key) => {
-      flattenedRow[key] = resultObj[key];
-    });
-
-    if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
-      row.contact.other_data.forEach((item, index) => {
-        if (typeof item === "object") {
-          Object.keys(item).forEach((key) => {
-            flattenedRow[`other_data_${index}_${key}`] = item[key];
-          });
-        }
-      });
-      delete flattenedRow.contact_other_data;
-    }
-
-    let callDuration = row.call_duration;
-    if (!callDuration || callDuration.startsWith("-")) {
-      callDuration = "00:00:00";
-    }
-    flattenedRow.call_duration = callDuration;
-
-    if ("id" in flattenedRow) {
-      flattenedRow.attempt_id = flattenedRow.id;
-      delete flattenedRow.id;
-    }
-    if ("contact_id" in flattenedRow) {
-      flattenedRow.callcaster_id = flattenedRow.contact_id;
-      delete flattenedRow.contact_id;
-    }
-
-    return flattenedRow;
-  });
-
-  csvHeaders = csvHeaders.filter((header) =>
-    flattenedData.some((row) => row[header] != null && row[header] !== ""),
-  );
-
-  let csvContent = "\ufeff"; // Add BOM for Excel to recognize UTF-8
-  csvContent += csvHeaders.map(escapeCSV).join(",") + "\n";
-
-  flattenedData.forEach((flattenedRow) => {
-    const csvRow = csvHeaders
-      .map((header) => escapeCSV(flattenedRow[header] || ""))
-      .join(",");
-
-    csvContent += csvRow + "\n";
-  });
+  const { csvHeaders, flattenedData } = processOutreachExportData(outreachData, users);
+  const csvContent = generateCSVContent(csvHeaders, flattenedData);
 
   return json({
     csvContent,
-    filename: `outreach_results_${params.selected_id}.csv`,
+    filename: `outreach_results_${campaign_id}.csv`,
   });
 };
+
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id } = params;

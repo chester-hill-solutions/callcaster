@@ -13,7 +13,7 @@ import { Toggle } from "./Inputs";
 import MergedQuestionBlock from "./ScriptBlock";
 import { MdRemoveCircleOutline } from "react-icons/md";
 
-export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [] }) {
+export default function CampaignSettingsScript({ pageData, onPageDataChange, scripts, mediaNames = [], scriptDefault }) {
     const [script, setScript] = useState(pageData.campaignDetails?.script);
     const [scriptData, setScriptData] = useState(pageData.campaignDetails?.script?.steps || {});
     const firstPage = Object.values(scriptData?.pages || {}).length > 0 ? Object.values(scriptData.pages)[0].id : null;
@@ -375,7 +375,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             <Toggle
                                 name="campaign-type"
                                 label="Script Type"
-                                isChecked={script?.type === 'script'}
+                                isChecked={!!script?.type ? (script?.type === 'script') : (scriptDefault === 'live_call')}
                                 leftLabel="Recording/Synthetic"
                                 rightLabel="Live Script"
                                 onChange={(val) => changeType(!val ? 'ivr' : 'script')}

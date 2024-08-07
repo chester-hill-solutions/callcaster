@@ -152,23 +152,25 @@ export default function ScriptEditor() {
   const [isChanged, setChanged] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
-  const handleSaveUpdate = async (saveScriptAsCopy:boolean) => {
+  const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
     try {
-      submit({
-        campaignData: pageData,
-        campaignDetails: pageData.campaignDetails,
-        scriptData: pageData.campaignDetails.script,
-        saveScriptAsCopy
-      }, {
-        method: !saveScriptAsCopy ? 'PATCH' : 'POST',
-        action: "/api/campaigns",
-        navigate:false,
-        encType:"application/json"
-      });
-      setInitData(pageData)
+      submit(
+        {
+          campaignData: pageData,
+          campaignDetails: pageData.campaignDetails,
+          scriptData: pageData.campaignDetails.script,
+          saveScriptAsCopy,
+        },
+        {
+          method: !saveScriptAsCopy ? "PATCH" : "POST",
+          action: "/api/campaigns",
+          navigate: false,
+          encType: "application/json",
+        },
+      );
+      setInitData(pageData);
       setChanged(false);
       setShowSaveModal(false);
-  
     } catch (error) {
       console.error("Error saving update:", error);
     }
@@ -194,7 +196,7 @@ export default function ScriptEditor() {
     delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
-  
+
   return (
     <>
       <div className="relative flex h-full flex-col overflow-visible">
@@ -217,9 +219,10 @@ export default function ScriptEditor() {
             </Button>
           </div>
         )}
-        <div className="flex-grow p-4 h-full">
+        <div className="h-full flex-grow p-4">
           {(pageData.type === "live_call" || pageData.type === null) && (
             <CampaignSettingsScript
+              scriptDefault={"live_call"}
               pageData={pageData}
               onPageDataChange={(newData) => {
                 handlePageDataChange(newData);
@@ -231,6 +234,7 @@ export default function ScriptEditor() {
             pageData.type === "simple_ivr" ||
             pageData.type === "complex_ivr") && (
             <CampaignSettingsScript
+              scriptDefault={"robo"}
               pageData={pageData}
               onPageDataChange={(newData) => {
                 handlePageDataChange(newData);
@@ -252,13 +256,20 @@ export default function ScriptEditor() {
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
         <DialogContent className="bg-white dark:bg-slate-900">
           <DialogHeader>
-            <DialogTitle>Save {pageData.campaignDetails?.script?.name}</DialogTitle>
+            <DialogTitle>
+              Save {pageData.campaignDetails?.script?.name}
+            </DialogTitle>
             <DialogDescription>
-              Would you like to save changes to the existing {pageData.campaignDetails.script?.name}, or save as a copy?
+              Would you like to save changes to the existing{" "}
+              {pageData.campaignDetails.script?.name}, or save as a copy?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => handleSaveUpdate(false)} className="mr-2" variant={'outline'}>
+            <Button
+              onClick={() => handleSaveUpdate(false)}
+              className="mr-2"
+              variant={"outline"}
+            >
               Save
             </Button>
             <Button onClick={() => handleSaveUpdate(true)}>Save as Copy</Button>
