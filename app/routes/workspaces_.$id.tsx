@@ -71,7 +71,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     if (numbersError) throw { numbersError };
 
     return json(
-      { workspace, audiences, campaigns, userRole, numbersError },
+      { workspace, audiences, campaigns, userRole, phoneNumbers },
       { headers },
     );
   } catch (error) {
@@ -81,12 +81,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, userRole, numbers } =
+  const { workspace, audiences, campaigns, userRole, phoneNumbers } =
     useLoaderData();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
   const context = useOutletContext();
-
   return (
     <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
       <WorkspaceNav
@@ -115,7 +114,7 @@ export default function Workspace() {
           </div>
         </div>
         <div className="flex flex-auto flex-col overflow-x-auto contain-content">
-          {!numbers?.length > 0 ? (
+          {!phoneNumbers?.length > 0 ? (
             <CampaignEmptyState
             hasAccess={userRole === "admin" || userRole === "owner"}
             type="number"
