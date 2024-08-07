@@ -1,25 +1,64 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, Link, useActionData } from "@remix-run/react";
-import { useState } from "react";
-import { MdAdd, MdClose } from "react-icons/md";
-import { Card, CardContent, CardTitle } from "~/components/CustomCard";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import {
+  Form,
+  Link,
+  json,
+  useActionData,
+  useLoaderData,
+} from "@remix-run/react";
+import { useEffect, useState } from "react";
+import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-
+import { Card, CardContent, CardTitle } from "~/components/CustomCard";
 import { handleNewAudience } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
+import { MdAdd, MdClose } from "react-icons/md";
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+
+  const workspaceId = params.id;
+  const campaignId = params.campaign_id;
+
+  if (workspaceId == null || campaignId == null) {
+    return json(
+      {
+        campaign: null,
+        error:
+          workspaceId == null ? "Workspace not found" : "Campaign not found",
+      },
+      { headers },
+    );
+  }
+
+  const { data: campaignData, error: campaignError } = await supabaseClient
+    .from("campaign")
+    .select()
+    .eq("id", campaignId)
+    .eq("workspace", workspaceId)
+    .single();
+
+  if (campaignError) {
+    return json({ campaign: null, error: campaignError }, { headers });
+  }
+
+  return json({ campaign: campaignData, error: null }, { headers });
+}
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
+  const campaignId = params.campaign_id;
 
-  if (workspaceId == null) {
+  if (!(workspaceId && campaignId)) {
     return json(
       {
         audienceData: null,
         campaignAudienceData: null,
-        error: "Workspace not found",
+        error: !workspaceId ? "Workspace not found" : "Campaign not found",
       },
       { headers },
     );
@@ -46,6 +85,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         workspaceId,
         headers,
         contactsFile,
+        campaignId,
       });
     }
     default:
@@ -55,7 +95,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   return json({ error: "Form Action not recognized" }, { headers });
 }
 
-export default function AudiencesNew() {
+export default function NewAudience() {
+  const { campaign, error } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [pendingFileName, setPendingFileName] = useState("");
 
@@ -146,7 +187,7 @@ export default function AudiencesNew() {
             <div className="flex items-center gap-4">
               <Button
                 className="h-fit min-h-[48px] w-full rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px]
-                  text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+                text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
                 type="submit"
               >
                 Add Audience

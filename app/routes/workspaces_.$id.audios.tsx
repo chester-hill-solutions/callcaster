@@ -1,7 +1,7 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, json, useLoaderData } from "@remix-run/react";
 import { mediaColumns } from "~/components/Media/columns";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
+
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
@@ -43,9 +43,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  //   Getting All Buckets
-  //   const { data, error } = await supabaseClient.storage.listBuckets();
-  //   console.log("Buckets: ", data, error);
 
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
@@ -76,7 +73,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-  // console.log("Media Data: ", mediaData);
 
   const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
   const { data: signedUrls, error: signedUrlsError } =
@@ -98,7 +94,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
     ).signedUrl;
-    // console.log(`${media.name}: ${url}`);
     media["signedUrl"] = url;
   }
 
@@ -108,17 +103,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-// export async function action({ request, params }: ActionFunctionArgs) {
-//   const { supabaseClient, headers, serverSession } =
-//     await getSupabaseServerClientWithSession(request);
-
-//   return json({}, { headers });
-// }
-
 export default function WorkspaceAudio() {
   const { audioMedia, workspace, error, userRole } =
     useLoaderData<typeof loader>();
-  //   const actionData = useActionData<typeof action>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
 

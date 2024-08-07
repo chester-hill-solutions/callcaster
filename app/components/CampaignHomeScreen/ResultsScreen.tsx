@@ -3,20 +3,11 @@ import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
-import { NavLink } from "@remix-run/react";
-import { Button } from "./ui/button";
-import { useSubmit } from "@remix-run/react";
 
 const ResultsScreen = ({
   totalCalls = 0,
   results = [],
   expectedTotal = 0,
-  type,
-  dial_type,
-  handleNavlinkStyles,
-  hasAccess,
-  campaign_id,
-  user_id,
   isBusy
 }: ResultsScreenProps) => {
 

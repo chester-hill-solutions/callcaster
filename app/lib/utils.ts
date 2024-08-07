@@ -427,3 +427,15 @@ export function normalizePhoneNumber(input) {
 
   return cleaned;
 }
+
+export const handleNavlinkStyles = (isActive: boolean, isPending: boolean): string => {
+  if (isActive) {
+    return "rounded-md border-2 border-brand-secondary bg-brand-secondary px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out dark:text-black";
+  }
+
+  if (isPending) {
+    return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+  }
+
+  return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+};
