@@ -15,6 +15,7 @@ export const useSupabaseRealtime = ({
   setQuestionContact,
   workspace,
   setCallDuration,
+  setUpdate
 }: UseSupabaseRealtimeProps) => {
   const [disposition, setDisposition] = useState<string>(
     init.recentAttempt?.disposition || "idle",
@@ -72,6 +73,8 @@ export const useSupabaseRealtime = ({
             recentAttempt,
             setNextRecipient,
             setQuestionContact,
+            setUpdate,
+            setRecentAttempt
           );
           break;
         case "campaign_queue":
@@ -95,7 +98,7 @@ export const useSupabaseRealtime = ({
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
+  }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, setRecentAttempt, setUpdate, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
 
   useEffect(() => {
     if (recentAttempt) {

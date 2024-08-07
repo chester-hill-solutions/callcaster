@@ -294,6 +294,7 @@ const Campaign: React.FC = () => {
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
     setCallDuration,
+    setUpdate
   });
   const [isErrorDialogOpen, setErrorDialog] = useState(
     !Object.keys(campaignDetails?.script || {}).length,
@@ -594,7 +595,7 @@ const Campaign: React.FC = () => {
                   {count - completed} of {count} remaining
                 </h4>
               </div>
-              <Form method="POST" onSubmit={() => device?.destroy()}>
+              <Form method="POST" onSubmit={() => {hangUp(); device?.destroy()}}>
                 <Button type="submit">Leave Campaign</Button>
               </Form>
             </div>

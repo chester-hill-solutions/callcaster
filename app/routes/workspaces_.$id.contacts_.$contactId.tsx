@@ -59,7 +59,7 @@ function compareContactAudiences(
 ): AudienceChanges {
   const additions: ContactAudience[] = [];
   const deletions: ContactAudience[] = [];
-  currentAudiences.forEach((currentAudience) => {
+  currentAudiences?.forEach((currentAudience) => {
     if (
       !initialAudiences.some(
         (initialAudience) =>
@@ -177,7 +177,7 @@ export default function ContactScreen() {
 
         if (checked) {
           if (
-            !prevContact.contact_audience.some(
+            !prevContact.contact_audience?.some(
               (ca) => ca.audience_id === audienceId,
             )
           ) {
@@ -205,7 +205,7 @@ export default function ContactScreen() {
 
   const handleSave = () => {
     submit(
-      { ...contact, initial_audiences: initContact.contact_audience },
+      { ...contact, initial_audiences: initContact?.contact_audience || [] },
       {
         method: "PATCH",
         encType: "application/json",

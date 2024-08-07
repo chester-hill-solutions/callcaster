@@ -19,7 +19,7 @@ const ContactDetails = ({
   audiences,
   handleAudience,
 }: {
-  contact?: Contact & { contact_audience: ContactAudience[] };
+  contact?: Contact & { contact_audience?: ContactAudience[] };
   onSave: () => void;
   setContact: (data: object) => void;
   handleAudience: (data: object) => void;
@@ -58,7 +58,7 @@ const ContactDetails = ({
                 <input
                   type="checkbox"
                   value={audience.id}
-                  checked={contact.contact_audience.some(
+                  checked={contact?.contact_audience?.some(
                     (contactAud) => contactAud.audience_id === audience.id
                   )}
                   name={audience.name}

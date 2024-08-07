@@ -10,8 +10,8 @@ export const loader = async ({ request, params }) => {
     if (parseInt(limit) === 0) {
         return json([]);
     }
-
     const { data: newQueue, error: newQueueError } = await supabase.rpc('select_and_update_campaign_contacts', {p_campaign_id:campaign_id, p_initial_limit:limit})
+    
     if (newQueueError || !newQueue.length) return json([]);
     const {data: queueItems, error: queueItemsError} = await supabase.from('campaign_queue').select('*, contact(*)').in('id', newQueue.map((i) => i.queue_id));
     return json(queueItems);

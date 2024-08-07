@@ -497,7 +497,7 @@ export async function updateCampaign({
   delete updateData.questions;
   delete updateData.created_at;
   delete updateData.disposition_options;
-
+  delete updateData.script_id;
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
     .update(updateData)
