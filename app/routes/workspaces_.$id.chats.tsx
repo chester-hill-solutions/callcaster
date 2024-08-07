@@ -321,7 +321,7 @@ export default function ChatsList() {
           handleExistingConversationClick={handleExistingConversationClick}
           setDialog={setDialog}
         />
-        <div className="flex h-full flex-col overflow-y-scroll bg-gray-100">
+        <div className="flex h-full flex-col max-h-[800px] overflow-y-scroll bg-gray-100">
           <Outlet context={{ supabase, workspace }} />
         </div>
         <ChatInput
