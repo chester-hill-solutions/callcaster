@@ -39,8 +39,8 @@ const NextSteps = ({ data, all }) => (
 );
 
 const Page = ({ page, data }) => (
-    <div className="flex items-center">
-        <div className="h-full bg-brand-secondary p-4 flex justify-center items-center" style={{ width: "250px" }}>
+    <div className="flex items-center m-4">
+        <div className="bg-brand-secondary p-4 flex justify-center items-center rounded-md" style={{ width: "250px", height:'95%' }}>
             <h3 className="text-lg font-Zilla-Slab">{page.title}</h3>
         </div>
         <div className="flex flex-1">
@@ -74,9 +74,9 @@ export const ScriptPreview = ({ pageData }) => {
     }, []);
 
     return (
-        <div className="relative flex flex-1 h-full overflow-auto">
-            <div className="relative flex flex-wrap">
-                <div className="flex flex-col">
+        <div className="relative flex flex-auto h-full overflow-auto">
+            <div className="relative flex flex-wrap flex-auto w-full">
+                <div className="flex flex-col w-full">
                     {data.campaignDetails?.script?.steps?.pages &&
                         Object.values(data.campaignDetails.script.steps.pages || {}).map((page, index) => (
                             <Page key={page.id} page={page} data={data} index={index} />

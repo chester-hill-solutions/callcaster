@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { deepEqual } from "~/lib/utils";
 import { MdAdd } from "react-icons/md";
 
-const initialState = (data, workspace, campaign_id) => ({
+const initialState = (data, workspace, campaign_id, script_id) => ({
   campaign_id,
   workspace,
   title: data?.title,
@@ -19,6 +19,7 @@ const initialState = (data, workspace, campaign_id) => ({
   voicemail_file: data?.voicemail_file,
   questions: data?.campaignDetails?.questions,
   audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
+  script_id: script_id
 });
 
 const actionTypes = {
@@ -33,6 +34,8 @@ const actionTypes = {
   SET_END_DATE: "SET_END_DATE",
   SET_VOICEMAIL: "SET_VOICEMAIL",
   SET_AUDIENCES: "SET_AUDIENCES",
+  SET_SCRIPT: "SET_SCRIPT",
+
 };
 
 const reducer = (state, action) => {
@@ -59,6 +62,8 @@ const reducer = (state, action) => {
       return { ...state, caller_id: action.payload };
     case actionTypes.SET_AUDIENCES:
       return { ...state, audiences: action.payload };
+    case actionTypes.SET_SCRIPT:
+      return { ...state, script_id: action.payload };
     default:
       return state;
   }
@@ -72,16 +77,17 @@ const CampaignSettings = ({
   workspace,
   phoneNumbers = [],
   campaignDetails: details,
-  onPageDataChange
+  onPageDataChange,
+  scripts
 }) => {
   const navigate = useNavigate();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const submit = useSubmit();
   const [initial, setInitial] = useState(
-    initialState(data, workspace, campaign_id),
+    initialState(data, workspace, campaign_id, details.script_id),
   );
-  const [campaignDetails, dispatch] = useReducer(reducer, initialState(data, workspace, campaign_id));
+  const [campaignDetails, dispatch] = useReducer(reducer, initialState(data, workspace, campaign_id, details.script_id));
   const initSelectedAudiences = audiences.filter((audience) => {
     return data.campaign_audience?.audience_id === audience.id;
   });
@@ -91,17 +97,6 @@ const CampaignSettings = ({
     dispatch({ type, payload: value });
     setChanged(!deepEqual(campaignDetails, initial));
   };
-
-  const handleAddDispositionOptions = useCallback((event) => {
-    const newVal = event.target.value;
-    onPageDataChange(({
-      ...data,
-      campaignDetails: {
-        ...data.campaignDetails,
-        disposition_options: [...data.campaignDetails?.disposition_options, { value: newVal.replace(" ", "_").toLowerCase(), label: newVal }]
-      }
-    }));
-  }, [onPageDataChange, data]);
 
   const saveAudience = () => {
     submit(
@@ -153,7 +148,7 @@ const CampaignSettings = ({
   }, [campaignDetails, initial]);
 
   useEffect(() => {
-    const newInitialState = initialState(data, workspace, campaign_id);
+    const newInitialState = initialState(data, workspace, campaign_id, details.script_id);
     setInitial(newInitialState);
     dispatch({ type: actionTypes.SET_INITIAL_STATE, payload: newInitialState });
   }, [campaign_id, data, workspace]);
@@ -226,26 +221,47 @@ const CampaignSettings = ({
               </div>
           }
           {(campaignDetails.type !== 'message') && (
-            <div className="flex items-end gap-1">
-              <Dropdown
-                name="voicemail"
-                label={"Voicemail File"}
-                value={campaignDetails.voicemail_file}
-                onChange={(e) =>
-                  handleInputChange(
-                    actionTypes.SET_VOICEMAIL,
-                    e.currentTarget.value,
-                  )
-                }
-                options={mediaData?.map((media) => ({
-                  value: media.name,
-                  label: media.name,
-                }))}
-                className={"flex flex-col"}
-              />
-              <Button variant="outline" asChild><NavLink to={"../../../audios/new"}><MdAdd/></NavLink></Button>
-            </div>
+            <div className="flex gap-2">
+              <div className="flex items-end gap-1">
+                <Dropdown
+                  name="voicemail"
+                  label={"Voicemail File"}
+                  value={campaignDetails.voicemail_file}
+                  onChange={(e) =>
+                    handleInputChange(
+                      actionTypes.SET_VOICEMAIL,
+                      e.currentTarget.value,
+                    )
+                  }
+                  options={mediaData?.map((media) => ({
+                    value: media.name,
+                    label: media.name,
+                  }))}
+                  className={"flex flex-col"}
+                />
+                <Button variant="outline" asChild><NavLink to={"../../../audios/new"}><MdAdd /></NavLink></Button>
+              </div>
+              <div className="flex items-end gap-1">
 
+                <Dropdown
+                  name="script"
+                  label={"Script"}
+                  value={campaignDetails.script_id}
+                  onChange={(e) =>
+                    handleInputChange(
+                      actionTypes.SET_SCRIPT,
+                      e.currentTarget.value,
+                    )
+                  }
+                  options={scripts?.map((script) => ({
+                    value: script.id,
+                    label: script.name,
+                  }))}
+                  className={"flex flex-col"}
+                />
+                <Button variant="outline" asChild><NavLink to={"../script/edit"}><MdAdd /></NavLink></Button>
+              </div>
+            </div>
           )}
         </div>
 

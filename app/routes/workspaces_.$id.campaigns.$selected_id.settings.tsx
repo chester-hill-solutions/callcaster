@@ -3,7 +3,7 @@ import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useMemo, useState } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
-import { fetchAdvancedCampaignDetails, fetchCampaignWithAudience, getWorkspacePhoneNumbers, listMedia } from "~/lib/database.server";
+import { fetchAdvancedCampaignDetails, fetchCampaignWithAudience, getWorkspacePhoneNumbers, getWorkspaceScripts, listMedia } from "~/lib/database.server";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id } = params;
@@ -12,13 +12,13 @@ export const loader = async ({ request, params }) => {
   if (!serverSession?.user) return redirect("/signin");
 
   try {
-    const [campaignData, {data: phoneNumbers}, { data: mediaData }] = await Promise.all([
+    const [campaignData, {data: phoneNumbers}, { data: mediaData }, scripts] = await Promise.all([
       fetchCampaignWithAudience(supabaseClient, selected_id),
       getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
-      supabaseClient.storage.from("workspaceAudio").list(workspace_id)
+      supabaseClient.storage.from("workspaceAudio").list(workspace_id),
+      getWorkspaceScripts({workspace:workspace_id, supabase: supabaseClient})
     ]);
     const campaignDetails = await fetchAdvancedCampaignDetails(supabaseClient, selected_id, campaignData.type, workspace_id);
-
     let mediaNames = null;
     if (campaignData.type === "live_call" || campaignData.type === null) {
       mediaNames = await listMedia(supabaseClient, workspace_id);
@@ -27,6 +27,7 @@ export const loader = async ({ request, params }) => {
       workspace_id,
       selected_id,
       data: campaignData,
+      scripts,
       mediaData,
       phoneNumbers,
       campaignDetails,
@@ -47,7 +48,8 @@ export default function Audience() {
     data,
     mediaData,
     phoneNumbers,
-    campaignDetails
+    campaignDetails,
+    scripts
   } = useLoaderData();
   const [pageData, setPageData] = useState(data);
   return (
@@ -55,6 +57,7 @@ export default function Audience() {
       <CampaignSettings
         workspace={workspace_id}
         data={pageData}
+        scripts={scripts}
         audiences={audiences}
         mediaData={mediaData}
         campaign_id={selected_id}
