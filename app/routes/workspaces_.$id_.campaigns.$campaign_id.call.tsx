@@ -34,8 +34,7 @@ import { Toaster } from "sonner";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { useCallState } from "~/hooks/useCallState";
 import { Button } from "~/components/ui/button";
-import InputSelector from "~/components/InputSelector";
-import OutputSelector from "~/components/OutputSelector";
+import AudioSelector from "~/components/AudioSelector";
 import { formatTime, playTone } from "~/lib/utils";
 import {
   Dialog,
@@ -43,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Device, Call as TwilioCall, AudioProcessor } from "@twilio/voice-sdk";
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -54,6 +54,7 @@ type Audience = Tables<"audience">;
 interface CampaignDetails {
   questions: ScriptBlocksRoot;
 }
+type CallState = "idle" | "dialing" | "connected" | "completed" | "failed";
 
 interface LoaderData {
   campaign: Campaign;
@@ -135,7 +136,7 @@ export const loader = async ({ request, params }) => {
   } else if (campaign.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select('*, contact(*)')
+      .select("*, contact(*)")
       .eq("status", serverSession.user.id)
       .eq("campaign_id", id);
     if (error) {
@@ -164,9 +165,11 @@ export const loader = async ({ request, params }) => {
   const nextRecipient =
     queue && campaign.dial_type === "call" ? queue[0] : null;
   const initalCallsList = attempts.flatMap((attempt) => attempt.call);
-  const initialRecentCall = nextRecipient?.contact && initalCallsList.find(
-    (call) => call.contact_id === nextRecipient?.contact.id,
-  );
+  const initialRecentCall =
+    nextRecipient?.contact &&
+    initalCallsList.find(
+      (call) => call.contact_id === nextRecipient?.contact.id,
+    );
   const initialRecentAttempt = attempts
     .sort((a, b) => b.created_at - a.created_at)
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
@@ -251,13 +254,27 @@ const Campaign: React.FC = () => {
   const {
     device,
     status,
+    error,
     activeCall,
     incomingCall,
+    makeCall,
     hangUp,
+    answer,
     callState,
     callDuration,
-    setCallDuration
-  } = useTwilioDevice(token, workspaceId);
+    setCallDuration,
+    inputDevices,
+    outputDevices,
+    selectedInputDevice,
+    selectedOutputDevice,
+    setInputDevice,
+    setOutputDevice,
+    toggleInputMute,
+    toggleOutputMute,
+    isInputMuted,
+    isOutputMuted,
+    testOutputDevice,
+  } = useTwilioDevice(token || '', workspaceId, user.id);
 
   const {
     queue,
@@ -290,10 +307,15 @@ const Campaign: React.FC = () => {
     activeCall,
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
-    setCallDuration
+    setCallDuration,
   });
-  const [isErrorDialogOpen, setErrorDialog] = useState((!Object.keys(campaignDetails?.script || {}).length));
-  const [isDialogOpen, setDialog] = useState(((!(queue.length > 0) || campaign.dial_type === 'predictive') && !isErrorDialogOpen));
+  const [isErrorDialogOpen, setErrorDialog] = useState(
+    !Object.keys(campaignDetails?.script || {}).length,
+  );
+  const [isDialogOpen, setDialog] = useState(
+    (!(queue.length > 0) || campaign.dial_type === "predictive") &&
+      !isErrorDialogOpen,
+  );
 
   const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
     supabase,
@@ -344,10 +366,11 @@ const Campaign: React.FC = () => {
   );
 
   const handleDialButton = useCallback(() => {
+    console.log(status)
     if (
       activeCall?.parameters?.CallSid ||
       incomingCall ||
-      status !== "Registered"
+      status !== "registered"
     )
       return;
     send({ type: "START_DIALING" });
@@ -410,13 +433,12 @@ const Campaign: React.FC = () => {
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   const handleDequeueNext = useCallback(() => {
-    if (campaign.dial_type === "predictive" && nextRecipient){
-      dequeue({contact: nextRecipient});
+    if (campaign.dial_type === "predictive" && nextRecipient) {
+      dequeue({ contact: nextRecipient });
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
       handleDialButton();
-    }
-     else if (campaign.dial_type === "call" && nextRecipient) {
+    } else if (campaign.dial_type === "call" && nextRecipient) {
       handleQuickSave();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
@@ -424,7 +446,18 @@ const Campaign: React.FC = () => {
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
     }
-  }, [campaign.dial_type, dequeue, fetchMore, handleDialButton, handleNextNumber, handleQuickSave, householdMap, nextRecipient, send, setRecentAttempt]);
+  }, [
+    campaign.dial_type,
+    dequeue,
+    fetchMore,
+    handleDialButton,
+    handleNextNumber,
+    handleQuickSave,
+    householdMap,
+    nextRecipient,
+    send,
+    setRecentAttempt,
+  ]);
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
@@ -462,7 +495,7 @@ const Campaign: React.FC = () => {
   const getDisplayState = (
     state: CallState,
     disposition: AttemptDisposition | undefined,
-    activeCall: object,
+    activeCall: TwilioCall,
   ): string => {
     if (state === "failed" || disposition === "failed") return "failed";
     if (
@@ -483,9 +516,19 @@ const Campaign: React.FC = () => {
     activeCall,
   );
 
-  const house = householdMap[Object.keys(householdMap).find((house) => house === nextRecipient?.contact?.address,) || ""];
-  
-  const displayColor = displayState === "failed" ? "hsl(var(--primary))" : displayState === "connected" || displayState === "dialing" ? "#4CA83D" : "#333333";
+  const house =
+    householdMap[
+      Object.keys(householdMap).find(
+        (house) => house === nextRecipient?.contact?.address,
+      ) || ""
+    ];
+
+  const displayColor =
+    displayState === "failed"
+      ? "hsl(var(--primary))"
+      : displayState === "connected" || displayState === "dialing"
+        ? "#4CA83D"
+        : "#333333";
 
   useEffect(() => {
     const handleKeypress = (e) => {
@@ -561,8 +604,25 @@ const Campaign: React.FC = () => {
             </div>
             {/* Inputs */}
             <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px]">
-              {device && <InputSelector device={device} />}
-              {device && <OutputSelector device={device} />}
+              {device && (
+                <AudioSelector
+                  device={device}
+                  activeCall={activeCall}
+                  {...{
+                    inputDevices,
+                    outputDevices,
+                    selectedInputDevice,
+                    selectedOutputDevice,
+                    setInputDevice,
+                    setOutputDevice,
+                    toggleInputMute,
+                    toggleOutputMute,
+                    isInputMuted,
+                    isOutputMuted,
+                    testOutputDevice,
+                  }}
+                />
+              )}
             </div>
           </div>
           {/* Phone with DTMF */}
@@ -676,7 +736,7 @@ const Campaign: React.FC = () => {
             <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
               Welcome to {campaign.title}.
             </DialogTitle>
-            <div className="w-[400px] my-4">
+            <div className="my-4 w-[400px]">
               <p>
                 This is a{" "}
                 {campaign.dial_type === "call"
@@ -689,12 +749,21 @@ const Campaign: React.FC = () => {
                   ? "The dialer will automatically detect voicemailboxes, and leave a voicemail with the contact."
                   : "The dialer will automatically detect voicemailboxes, and disconnect your call accordingly."}
               </p>
-              <div className="flex justify-between mt-4">
-                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
-                <Button onClick={() => {
-                  campaign.dial_type === 'call' && fetchMore({householdMap})
-                  setDialog(false)
-                  }}>Get started</Button>
+              <div className="mt-4 flex justify-between">
+                <Button asChild className="border-primary" variant={"outline"}>
+                  <NavLink to={".."} relative="path">
+                    Go Back
+                  </NavLink>
+                </Button>
+                <Button
+                  onClick={() => {
+                    campaign.dial_type === "call" &&
+                      fetchMore({ householdMap });
+                    setDialog(false);
+                  }}
+                >
+                  Get started
+                </Button>
               </div>
             </div>
           </DialogHeader>
@@ -706,11 +775,18 @@ const Campaign: React.FC = () => {
             <DialogTitle className="text-center  font-Zilla-Slab text-2xl">
               NO SCRIPT SET UP
             </DialogTitle>
-            <div className="w-[400px] my-4">
-              <p>This campaign has not been configured with a script. Contact your administrator to get one set up</p>
-                
-              <div className="flex justify-between mt-4">
-                <Button asChild className="border-primary" variant={"outline"}><NavLink to={".."} relative="path">Go Back</NavLink></Button>
+            <div className="my-4 w-[400px]">
+              <p>
+                This campaign has not been configured with a script. Contact
+                your administrator to get one set up
+              </p>
+
+              <div className="mt-4 flex justify-between">
+                <Button asChild className="border-primary" variant={"outline"}>
+                  <NavLink to={".."} relative="path">
+                    Go Back
+                  </NavLink>
+                </Button>
               </div>
             </div>
           </DialogHeader>

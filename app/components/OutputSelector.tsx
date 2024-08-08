@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { MdVolumeOff, MdVolumeUp } from "react-icons/md";
-import DeviceSelector from "./AudioSelector";
+import DeviceSelector from "./DeviceSelector";
 
 interface OutputSelectorProps {
   device: Device;
