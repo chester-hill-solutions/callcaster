@@ -54,7 +54,6 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
-
   return (
     <div
       style={{
@@ -150,7 +149,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 opacity:
                   state !== "connected" && state !== "dialing" ? ".6" : "unset",
               }}
-              disabled={isBusy || state !== "connected" && state !== "dialing"}
+              disabled={ state !== "connected" && state !== "dialing"}
             >
               Hang Up
             </button>

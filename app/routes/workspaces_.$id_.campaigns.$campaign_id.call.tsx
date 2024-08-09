@@ -90,7 +90,7 @@ export const loader = async ({ request, params }) => {
     .eq("id", id)
 
     .single();
-    
+
   const { data: campaignDetails, error: detailsError } = await supabase
     .from("live_campaign")
     .select(`*, script(*)`)
@@ -249,7 +249,6 @@ const Campaign: React.FC = () => {
   );
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-
   const { state, context, send } = useCallState();
   const {
     device,
@@ -260,6 +259,8 @@ const Campaign: React.FC = () => {
     callState,
     callDuration,
     setCallDuration,
+    deviceIsBusy,
+    setIsBusy,
   } = useTwilioDevice(token, workspaceId);
 
   const {
@@ -294,7 +295,7 @@ const Campaign: React.FC = () => {
     setQuestionContact,
     predictive: campaign.dial_type === "predictive",
     setCallDuration,
-    setUpdate
+    setUpdate,
   });
   const [isErrorDialogOpen, setErrorDialog] = useState(
     !Object.keys(campaignDetails?.script || {}).length,
@@ -353,12 +354,16 @@ const Campaign: React.FC = () => {
   );
 
   const handleDialButton = useCallback(() => {
+    setIsBusy(true);
     if (
       activeCall?.parameters?.CallSid ||
       incomingCall ||
-      status !== "Registered"
-    )
+      status !== "Registered" ||
+      device?.calls.length > 0
+    ) {
+      console.log("Device Busy", status, device.calls.length);
       return;
+    }
     send({ type: "START_DIALING" });
     if (campaign.dial_type === "predictive") handleConferenceStart();
     if (campaign.dial_type === "call")
@@ -373,6 +378,7 @@ const Campaign: React.FC = () => {
   }, [
     activeCall,
     campaign,
+    device,
     handleConferenceStart,
     incomingCall,
     nextRecipient,
@@ -491,7 +497,6 @@ const Campaign: React.FC = () => {
     disposition: AttemptDisposition | undefined,
     activeCall: object | null,
   ): string => {
-    console.log(state, disposition);
     if (state === "failed" || disposition === "failed") return "failed";
     if (
       disposition === "ringing" ||
@@ -560,7 +565,6 @@ const Campaign: React.FC = () => {
       setQuestionContact(nextRecipient);
       send({ type: "NEXT" });
       setCallDuration(0);
-  
     }
   }, [nextRecipient, send, setCallDuration]);
 
@@ -595,7 +599,13 @@ const Campaign: React.FC = () => {
                   {count - completed} of {count} remaining
                 </h4>
               </div>
-              <Form method="POST" onSubmit={() => {hangUp(); device?.destroy()}}>
+              <Form
+                method="POST"
+                onSubmit={() => {
+                  hangUp();
+                  device?.destroy();
+                }}
+              >
                 <Button type="submit">Leave Campaign</Button>
               </Form>
             </div>
@@ -655,7 +665,7 @@ const Campaign: React.FC = () => {
         <div className="space-y-6">
           <CallArea
             conference={conference}
-            isBusy={isBusy}
+            isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
             activeCall={activeCall}
