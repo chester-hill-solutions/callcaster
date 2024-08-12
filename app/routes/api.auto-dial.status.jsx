@@ -92,31 +92,20 @@ export const action = async ({ request }) => {
         const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'completed', ended_at:new Date() }).eq('id', dbCall.outreach_attempt_id).select();
         const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', outreachStatus[0].contact_id).select();
         update = callUpdate;
-        /* const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
-        if (conferences.length) {
-            await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
-                method: 'POST',
-                headers: { "Content-Type": 'application/json' },
-                body: JSON.stringify({
-                    user_id: parsedBody.FriendlyName,
-                    campaign_id: dbCall.campaign_id,
-                    workspace_id: dbCall.workspace,
-                    conference_id: parsedBody.ConferenceSid
-                })
-            })
-        } */
-    }
+        const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
+        conferences.map(({sid}) => {
+            twilio.conferences(sid).update({status: "completed"});
+        })
+        } 
     if (parsedBody.StatusCallbackEvent === 'participant-join') {
-
         if (dbCall) {
             if (!dbCall.conference_id) {
-
                 const { data: callUpdate, error: updateError } = await supabase.from('call').update({ conference_id: parsedBody.ConferenceSid, start_time: new Date(parsedBody.Timestamp) }).eq('sid', parsedBody.CallSid).select();
                 if (updateError) console.error(updateError)
                 update = callUpdate
             }
             if (dbCall.outreach_attempt_id) {
-                const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').select('contact_id').eq('id', dbCall.outreach_attempt_id).single();
+                const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({disposition: "in-progress", answered_at: Date.now()}).eq('id', dbCall.outreach_attempt_id).single();
                 const { data: queueStatus, error: queueError } = await supabase.from('campaign_queue').update({ status: parsedBody.FriendlyName }).eq('contact_id', outreachStatus.contact_id).select();
             }
         }
