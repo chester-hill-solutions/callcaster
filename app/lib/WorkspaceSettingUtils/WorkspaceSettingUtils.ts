@@ -167,6 +167,22 @@ export async function handleInviteCaller(
   headers: Headers,
 ) {
   const callerEmail = formData.get("callerEmail") as string;
+  const role = formData.get("role") as string || "caller";
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+  const { data: invitation, error: invitationError } = await supabaseClient
+    .from("invitations")
+    .insert({
+      email: callerEmail,
+      workspace_id: workspaceId,
+      role: role,
+      token: token,
+      expires_at: expiresAt.toISOString(),
+    })
+    .select()
+    .single();
 
   const session = await supabaseClient.auth.getSession();
   if (session == null) {

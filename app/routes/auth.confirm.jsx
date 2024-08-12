@@ -34,6 +34,6 @@ export async function loader({ request }) {
             return redirect(next, { headers })
         }
     }
-
+    
     return redirect('/auth/auth-code-error', { headers })
 }
