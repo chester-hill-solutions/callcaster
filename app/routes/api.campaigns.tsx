@@ -27,6 +27,7 @@ export const action = async ({ request }: { request: Request }) => {
       ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type) || !campaignData.type
     ) {
       campaignDetails.script_id = updatedScript.id;
+      delete campaignDetails.disposition_options
     }
     const { campaign, campaignDetails: updatedCampaignDetails } =
       await updateCampaign({ supabase, campaignData, campaignDetails });
