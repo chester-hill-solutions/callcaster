@@ -12,8 +12,8 @@ const supabase = createClient(
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
 
-const testEmail = "stevenbob312@gmail.com";
-const workspaceId = "d915f70e-4f32-4f2f-984f-72e2064e8e3c";
+const testEmail = `nathanielarfin+123@gmail.com`;
+const workspaceId = "d16720a3-5614-4f8a-93fa-6736325a1601";
 
 Deno.serve(async (req) => {
   const { data, error } = await supabase
@@ -23,25 +23,23 @@ Deno.serve(async (req) => {
     .single();
 
   const { data: callerSignUpData, error: callerSignUpError } =
-    await supabase.auth.admin.generateLink({
-      type: "signup",
-      email: testEmail,
-      password: "password1234",
-      options: {
-        data: {
-          user_workspace_role: "caller",
-          add_to_workspace: workspaceId,
-          first_name: "New",
-          last_name: "Caller",
-        },
-        redirectTo: "http://localhost:3000/signin",
+    await supabase.auth.admin.inviteUserByEmail(testEmail, {
+      data: {
+        user_workspace_role: "caller",
+        add_to_workspace: workspaceId,
+        first_name: "New",
+        last_name: "Caller",
       },
+      redirectTo: `http://localhost:3000/accept-invite`,
     });
 
   if (callerSignUpError) {
-    return new Response(JSON.stringify(callerSignUpData), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ ...callerSignUpData, error: callerSignUpError }),
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   return new Response(JSON.stringify(callerSignUpData), {
