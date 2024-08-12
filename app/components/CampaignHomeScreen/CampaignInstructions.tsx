@@ -15,7 +15,7 @@ export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal
         <div>
           <NavLink
             className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
-            to={`${data.dial_type || "call"}`}
+            to={`${"call"}`}
             relative="path"
           >
             Join Campaign
