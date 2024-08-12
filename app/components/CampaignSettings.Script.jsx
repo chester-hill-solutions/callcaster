@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "./ui/button";
 import {
@@ -285,6 +285,13 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
             });
         }
     }, [currentPage, scriptData, pageData, onPageDataChange]);
+
+    useEffect(() => {
+        if (!script?.type){
+            console.log(script, scriptDefault, scriptData)
+            changeType(scriptDefault === "live_call" ? "script" : "ivr")
+        }
+    },[])
 
     const ScriptSelector = () => (
         <div className="flex flex-col">

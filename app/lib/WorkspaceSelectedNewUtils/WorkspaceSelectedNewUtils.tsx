@@ -105,6 +105,7 @@ export async function handleNewCampaign({
     .insert({
       title: newCampaignName,
       workspace: workspaceId,
+      status: "draft"
     })
     .select()
     .single();

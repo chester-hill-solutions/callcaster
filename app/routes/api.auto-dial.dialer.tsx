@@ -1,5 +1,5 @@
 import Twilio from 'twilio';
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient} from "@supabase/supabase-js";
 import { meterEvent, createWorkspaceTwilioInstance } from '../lib/database.server';
 
 function normalizePhoneNumber(input) {
@@ -23,7 +23,7 @@ function normalizePhoneNumber(input) {
 
 
 export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     const { user_id, campaign_id, workspace_id, } = await request.json();
     const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id});
     try {
@@ -35,8 +35,8 @@ export const action = async ({ request }) => {
                 })
 
         if (contactError) throw contactError;
-        const contactRecord = record[0];
-        if (contactRecord.contact_id) {
+        if (record.length > 0 && record[0].id) {
+            const contactRecord = record[0];
             const toNumber = normalizePhoneNumber(contactRecord.contact_phone);
             let outreach_attempt_id;
             //const dialEvent = await meterEvent({supabaseClient:supabase, workspace_id, amount: 1, type: 'dial'})
@@ -72,7 +72,6 @@ export const action = async ({ request }) => {
                 direction: call.direction,
                 answered_by: call.answeredBy,
                 api_version: call.apiVersion,
-                annotation: call.annotation,
                 forwarded_from: call.forwardedFrom,
                 group_sid: call.groupSid,
                 caller_name: call.callerName,
@@ -83,6 +82,7 @@ export const action = async ({ request }) => {
                 outreach_attempt_id,
                 conference_id: user_id
             };
+
             Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
             const { error } = await supabase.from('call').upsert({ ...callData }).select();
             if (error) console.error('Error saving the call to the database:', error);
@@ -92,7 +92,9 @@ export const action = async ({ request }) => {
                 }
             });
         } else {
-            console.log('No queued contacts')
+            console.log('No queued contacts');
+            await Promise.resolve(setTimeout(() => null, 3000))
+            await twilio.conferences.get(user_id).update({status:"completed"});
             return new Response(JSON.stringify({ success: true, message: "No queued contacts" }), {
                 headers: {
                     'Content-Type': 'application/json'
@@ -108,3 +110,5 @@ export const action = async ({ request }) => {
         });
     }
 };
+
+// Use server-sent twilio errors/messages to connect with client. Can maybe use this for more reliable setting of state?

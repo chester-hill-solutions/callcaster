@@ -106,7 +106,7 @@ export default function NewScript() {
     if (actionData?.success) {
       toast.success("Script successfully added to your workspace!");
       setTimeout(
-        () => navigate(`${actionData.data[0].id}`, { relative: "path" }),
+        () => navigate(`../${actionData.data[0].id}`, { relative: "path" }),
         750,
       );
     } else if (actionData?.error) {
