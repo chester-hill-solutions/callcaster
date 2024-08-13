@@ -123,9 +123,7 @@ export default function Navbar({
   }, [loc, location]);
 
   return loc.pathname.endsWith("call") ? (
-    <div>
-      
-    </div>
+    <div></div>
   ) : (
     <header className={`w-full ${className}`}>
       <nav className="relative flex w-full items-center justify-between px-4 py-4 sm:h-[80px] sm:px-8">
@@ -142,32 +140,30 @@ export default function Navbar({
           CC
         </Link>
         <div className="hidden items-center space-x-4 sm:flex">
-        
-        
           {/* <NavButton to="/">Home</NavButton> */}
-{/*           <NavButton to="/services">Services</NavButton>
- */}          {!isSignedIn && (
+          {/*           <NavButton to="/services">Services</NavButton>
+           */}{" "}
+          {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
               <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
-          {workspaces && (
-          <NavButton to={"/workspaces"}>Workspaces</NavButton>
-        )}
+          {workspaces && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
           {user && (
             <UserDropdownMenu
-              user={user}
-              handleSignOut={handleSignOut}
-              workspaceId={workspaceId}
+            user={user}
+            handleSignOut={handleSignOut}
+            workspaceId={workspaceId}
             />
           )}
+          {isSignedIn && <Button onClick={handleSignOut}>Sign Out</Button>}
           <ModeToggle />
         </div>
         <button
           className="text-2xl sm:hidden"
           onClick={() => setMobileMenuOpen(true)}
-        >
+          >
           <FaBars />
         </button>
       </nav>
