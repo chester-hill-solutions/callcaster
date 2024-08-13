@@ -222,11 +222,24 @@ export async function getWorkspacePhoneNumbers({
 export async function addUserToWorkspace({
   supabaseClient,
   workspaceId,
+  userId,
+  role,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  userId: string;
+  role: "owner" | "admin" | "caller" | "member";
 }) {
-  return;
+  const { data, error } = await supabaseClient
+    .from("workspace_users")
+    .insert({ workspace_id: workspaceId, user_id: userId, role })
+    .select()
+    .single();
+  if (error) {
+    console.error("Failed to join workspace", error);
+    return { data: null, error };
+  }
+  return { data, error: null };
 }
 
 export async function testAuthorize({
@@ -285,6 +298,60 @@ export async function updateUserWorkspaceAccessDate({
   }
 
   return;
+}
+export async function handleExistingUserSession(
+  supabaseClient: SupabaseClient,
+  serverSession: Session,
+  headers: Headers,
+) {
+  const { data: invites, error: inviteError } = await supabaseClient
+    .from("workspace_invite")
+    .select()
+    .eq("user_id", serverSession.user.id);
+  if (inviteError) return json({ error: inviteError, newSession:null, invites:[] }, { headers });
+  return json({ newSession: serverSession, invites, error:null }, { headers });
+}
+
+export async function handleNewUserOTPVerification(
+  supabaseClient: SupabaseClient,
+  token_hash: string,
+  type: "signup" | "invite" | "magiclink" | "recovery" | "email_change",
+  headers: Headers,
+) {
+  if (!token_hash) {
+    return json({ error: "Invalid invitation link" }, { headers });
+  }
+
+  const { data, error } = await supabaseClient.auth.verifyOtp({
+    token_hash,
+    type: type as
+      | "signup"
+      | "invite"
+      | "magiclink"
+      | "recovery"
+      | "email_change",
+  });
+
+  if (error) return json({ error }, { headers });
+
+  const newSession = data.session;
+
+  if (newSession) {
+    const { error: sessionError } =
+      await supabaseClient.auth.setSession(newSession);
+    if (sessionError) return json({ error: sessionError }, { headers });
+
+    const { data: invites, error: inviteError } = await supabaseClient
+      .from("workspace_invite")
+      .select()
+      .eq("user_id", newSession.user.id);
+
+    if (inviteError) return json({ error: inviteError }, { headers });
+
+    return json({ newSession, invites }, { headers });
+  } else {
+    return json({ error: "Failed to create session" }, { headers });
+  }
 }
 
 export async function forceTokenRefresh({
@@ -476,6 +543,39 @@ export async function getSignedUrls(supabaseClient, workspace_id, mediaNames) {
       return data.signedUrl;
     }),
   );
+}
+
+export async function acceptWorkspaceInvitations(
+  supabaseClient: SupabaseClient<any, "public", any>,
+  invitationIds: string[],
+  userId: string,
+) {
+  for (const invitationId of invitationIds) {
+    const { data: invite, error: inviteError } = await supabaseClient
+      .from("workspace_invite")
+      .select()
+      .eq("id", invitationId)
+      .single();
+    console.error(inviteError);
+    if (inviteError) return { error: inviteError };
+
+    const { error: workspaceError } = await addUserToWorkspace({
+      supabaseClient: supabaseClient,
+      workspaceId: invite.workspace,
+      userId: userId,
+      role: invite.role,
+    });
+    console.error(workspaceError);
+    if (workspaceError) return { error: workspaceError };
+
+    const { error: deletionError } = await supabaseClient
+      .from("workspace_invite")
+      .delete()
+      .eq("id", invitationId);
+
+    if (deletionError) return { error: deletionError };
+    return { error: null };
+  }
 }
 
 export async function updateCampaign({
