@@ -7,6 +7,7 @@ import {
   useNavigate,
   Form,
   useLocation,
+  useSubmit,
 } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { createClient, Session, SupabaseClient } from "@supabase/supabase-js";
@@ -31,6 +32,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
+  const email = url.searchParams.get("email");
 
   if (session) {
     const { data: invites, error: inviteError } = await supabaseClient
@@ -38,9 +40,70 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       .select()
       .eq("user_id", session.user.id);
     if (inviteError) return json({ error: inviteError }, { headers });
-    return json({ status: "existing_user", session, invites }, { headers });
+    
+    if (
+      session.user.user_metadata.first_name === "New" &&
+      session.user.user_metadata.last_name === "Caller"
+    ) {
+      return json({ 
+        status: "verified", 
+        session, 
+        invites, 
+        email: email || session.user.email,
+      }, { headers });
+    } else {
+      return json({ status: "existing_user", session, invites }, { headers });
+    }
   } else if (token_hash && type) {
-    return json({ status: "new_user", token_hash, type }, { headers });
+    try {
+      const { data: verifyData, error: verifyError } =
+        await supabaseClient.auth.verifyOtp({
+          token_hash,
+          type: type as "signup" | "invite" | "magiclink" | "recovery" | "email_change",
+        });
+
+      if (verifyError) {
+        if (verifyError.message.includes("Email link is invalid or has expired")) {
+          return json({ 
+            status: "invalid_link", 
+            error: "The invitation link is invalid or has expired. Please request a new invitation."
+          }, { headers });
+        }
+        throw verifyError;
+      }
+
+      if (!verifyData.session) {
+        throw new Error("Failed to verify OTP: No session returned");
+      }
+      const { error: setSessionError } = await supabaseClient.auth.setSession(verifyData.session);
+      if (setSessionError) throw setSessionError;
+      const { error: updateError } = await supabaseClient.auth.updateUser({
+        data: { first_name: "New", last_name: "Caller" }
+      });
+      if (updateError) throw updateError;
+
+      const { data: invites, error: inviteError } = await supabaseClient
+        .from("workspace_invite")
+        .select()
+        .eq("user_id", verifyData.session.user.id);
+      if (inviteError) throw inviteError;
+
+      return json(
+        { 
+          status: "verified", 
+          session: verifyData.session, 
+          invites, 
+          email
+        },
+        { headers },
+      );
+    } catch (error) {
+      console.error("Error in verifyOtp:", error);
+      return json(
+        { status: "error", error: error.message || "An unexpected error occurred" },
+        { headers },
+      );
+    }
   } else {
     return json({ status: "not_signed_in" }, { headers });
   }
@@ -51,32 +114,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const actionType = formData.get("actionType");
 
-  if (actionType === "signUpAndVerify") {
-    const { email, password, firstName, lastName, token_hash, type } =
-      Object.fromEntries(formData);
-
+  if (actionType === "updateUser") {
     try {
-      const { data: verifyData, error: verifyError } =
-        await supabaseClient.auth.verifyOtp({
-          token_hash: token_hash as string,
-          type: type as
-            | "signup"
-            | "invite"
-            | "magiclink"
-            | "recovery"
-            | "email_change",
-        });
+      const { email, password, firstName, lastName } =
+        Object.fromEntries(formData);
 
-      if (verifyError) throw verifyError;
-
-      if (!verifyData.session) {
-        throw new Error("Failed to verify OTP: No session returned");
-      }
-      const { data: newAuth, error: setSessionError } =
-        await supabaseClient.auth.setSession(verifyData.session);
-      if (setSessionError) throw setSessionError;
-      
-      headers.append("Set-Cookie", newAuth);
       const { data: userData, error: updateError } =
         await supabaseClient.auth.updateUser({
           email: email as string,
@@ -85,6 +127,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
       if (updateError) throw updateError;
+
       const { data: invites, error: inviteError } = await supabaseClient
         .from("workspace_invite")
         .select()
@@ -92,12 +135,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (inviteError) throw inviteError;
 
-      return json(
-        { status: "existing_user", session: verifyData.session, invites },
-        { headers },
-      );
+      return json({ status: "updated", invites }, { headers });
     } catch (error) {
-      console.error("Error in signUpAndVerify:", error);
+      console.error("Error in updateUser:", error);
       return json(
         { error: error.message || "An unexpected error occurred" },
         { headers },
@@ -125,28 +165,61 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return json({ error: "Invalid action type" }, { headers });
 };
 
+function VerifiedNewUser({ email, state, onSubmit }) {
+  return (
+    <NewUserSignup
+      email={email}
+      state={state}
+      onSubmit={onSubmit}
+    />
+  );
+}
+
+function ExistingUser({ invites, state }) {
+  if (!invites?.length) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p>No new invitations.</p>
+        <Button asChild>
+          <NavLink to="/workspaces">Workspaces</NavLink>
+        </Button>
+      </div>
+    );
+  }
+  return <ExistingUserInvites invites={invites} state={state} />;
+}
+
+function NotSignedIn() {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="">Sign in to see your available invitations.</p>
+      <Button asChild className="font-Zilla-Slab text-lg">
+        <NavLink to="/signin?next=/accept-invite">Sign in</NavLink>
+      </Button>
+    </div>
+  );
+}
+
 export default function AcceptInvite() {
-  const {
-    session,
-    invites,
-    error: loaderError,
-  } = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const { state } = useNavigation();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location?.search);
-  const token_hash = searchParams.get("token_hash");
-  const type = searchParams.get("type");
-  const email = searchParams.get("email");
-
+  const submit = useSubmit();
   useEffect(() => {
-    if (state === "idle" && actionData?.success) {
-      toast.success("Successfully accepted invitations");
+    if (state === "idle" && actionData?.status === "updated") {
+      toast.success("Successfully signed up and accepted invitation");
       const timeout = setTimeout(() => navigate("/workspaces"), 3000);
       return () => clearTimeout(timeout);
     }
-  }, [actionData?.success, navigate, state]);
+  }, [actionData, navigate, state]);
+
+  const handleUpdateUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    formData.append("actionType", "updateUser");
+    submit(formData, { method: "post" });
+  };
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
@@ -154,33 +227,18 @@ export default function AcceptInvite() {
         <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           Accept your invitations
         </h1>
-        <ErrorAlert error={loaderError || actionData?.error} />
-        {!session ? (
-          <NewUserSignup
-            email={email}
+        {/* <ErrorAlert error={loaderData.error || actionData?.error} /> */}
+        {loaderData.status === "verified" && (
+          <VerifiedNewUser
+            email={loaderData.email}
             state={state}
-            token_hash={token_hash}
-            type={type}
+            onSubmit={handleUpdateUser}
           />
-        ) : (
-          <ExistingUserInvites invites={invites} state={state} />
         )}
-        {!session && !token_hash && (
-          <div className="flex flex-col gap-2">
-            <p className="">Sign in to see your available invitations.</p>
-            <Button asChild className="font-Zilla-Slab text-lg">
-              <NavLink to={"/signin?next=/accept-invite"}>Sign in</NavLink>
-            </Button>
-          </div>
+        {loaderData.status === "existing_user" && (
+          <ExistingUser invites={loaderData.invites} state={state} />
         )}
-        {!invites?.length && session && (
-          <div className="flex flex-col gap-2">
-            <p>No new invitations.</p>
-            <Button asChild>
-              <NavLink to={"/workspaces"}>Workspaces</NavLink>
-            </Button>
-          </div>
-        )}
+        {loaderData.status === "not_signed_in" && <NotSignedIn />}
       </div>
       <Toaster richColors />
     </main>
