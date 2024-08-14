@@ -1,7 +1,5 @@
 import { Form } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Label } from "~/components/ui/label";
 import { InviteCheckbox } from "./InviteCheckbox";
 
 interface ExistingUserInvitesProps {
@@ -16,6 +14,7 @@ export function ExistingUserInvites({ invites, state }: ExistingUserInvitesProps
       {invites.map((invite) => (
         <InviteCheckbox key={invite.id} invite={invite} />
       ))}
+      <input hidden value={"acceptInvitations"} id="actionType" name="actionType"/>
       <Button type="submit" disabled={state !== "idle"} className="mt-4">
         Accept Invitations
       </Button>

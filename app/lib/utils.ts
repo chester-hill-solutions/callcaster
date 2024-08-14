@@ -12,7 +12,7 @@ export function formatDateToLocale(dateFromSupabase: string) {
 }
 
 export function capitalize(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  return text?.charAt(0).toUpperCase() + text?.slice(1);
 }
 export const stripPhoneNumber = (phoneNumber: string) =>
   phoneNumber.replace(/\D/g, "");

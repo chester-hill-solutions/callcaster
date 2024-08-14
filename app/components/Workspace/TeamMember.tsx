@@ -13,6 +13,7 @@ import {
 } from "../ui/sheet";
 
 import { Form } from "@remix-run/react";
+import { MdCancel } from "react-icons/md";
 
 export enum MemberRole {
   Owner = "owner",
@@ -20,11 +21,6 @@ export enum MemberRole {
   Member = "member",
   Caller = "caller",
 }
-
-type TeamMemberProps = {
-  memberName: string;
-  memberRole: MemberRole;
-};
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
   clsx(
@@ -72,7 +68,7 @@ export default function TeamMember({
         <p className={roleTextStyles}>{capitalize(memberRole)}</p>
         {!memberIsOwner && (
           <Sheet>
-            {userRole !== MemberRole.Caller && (
+            {userRole !== MemberRole.Caller && memberRole !== "invited" && (
               <SheetTrigger asChild>
                 <Button className="h-fit rounded-full bg-transparent p-2">
                   {theme === "dark" ? (
@@ -91,6 +87,28 @@ export default function TeamMember({
                 </Button>
               </SheetTrigger>
             )}
+            {userRole !== MemberRole.Caller && memberRole === "invited" && (
+              <Form method="POST">
+                <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
+                <input type="hidden" value={member.id} name="userId" id="userId"/>
+              <Button className="h-fit rounded-full bg-transparent p-2" type="submit">
+                {theme === "dark" ? (
+                  <MdCancel
+                    size="16px"
+                    className="mx-auto aspect-square w-fit"
+                    color="white"
+                  />
+                ) : (
+                  <MdCancel
+                    size="16px"
+                    className="mx-auto aspect-square w-fit"
+                    color="black"
+                  />
+                )}
+              </Button>
+              </Form>
+            )}
+
             <SheetContent className="z-[100] flex flex-col gap-4 bg-white dark:bg-inherit">
               <SheetHeader>
                 <SheetTitle>Manage Team Member</SheetTitle>
@@ -122,7 +140,6 @@ export default function TeamMember({
                         required
                       >
                         {Object.values(MemberRole).map((role) => {
-                          // console.log(role.valueOf());
                           if (role.valueOf() === "owner") {
                             return <></>;
                           }
