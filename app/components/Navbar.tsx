@@ -155,7 +155,6 @@ export default function Navbar({
             workspaceId={workspaceId}
             />
           )}
-          {isSignedIn && <Button onClick={handleSignOut}>Sign Out</Button>}
           <ModeToggle />
         </div>
         <button
