@@ -1,11 +1,10 @@
 import { capitalize } from "~/lib/utils";
 
-import { Link, useLocation, useNavigation } from '@remix-run/react';
+import { Link, NavLink } from '@remix-run/react';
 import { FaTimes } from 'react-icons/fa';
-import { NavButton } from './Navbar';
-import { useEffect, useState } from "react";
+import { Button } from "./ui/button";
 
-export const MobileMenu = ({ isSignedIn, user, handleSignOut, workspaceId, onClose }) => {
+export const MobileMenu = ({ isSignedIn, user, handleSignOut,onClose }) => {
   return (
     <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
       <div className="flex justify-between items-center p-4">
@@ -16,20 +15,15 @@ export const MobileMenu = ({ isSignedIn, user, handleSignOut, workspaceId, onClo
           <FaTimes />
         </button>
       </div>
-      <div className="flex flex-col items-center space-y-4 mt-8">
-        <NavButton to="/" onClick={onClose}>Home</NavButton>
-        <NavButton to="/services" onClick={onClose}>Services</NavButton>
-        {!isSignedIn && (
-          <>
-            <NavButton to="/signin" onClick={onClose}>Sign In</NavButton>
-            <NavButton to="/signup" onClick={onClose}>Sign Up</NavButton>
-          </>
-        )}
+      <div className="flex flex-col space-y-2 mt-8 px-2">
         {user && (
           <>
-            <p className="font-Zilla-Slab text-lg">{capitalize(user.first_name)}</p>
-            <p className="font-Zilla-Slab text-lg">{user.username}</p>
-            <button
+            <div>
+              <p className="font-Zilla-Slab text-lg">{capitalize(user.first_name)}</p>
+              <p className="font-Zilla-Slab text-lg">{user.username}</p>
+            </div>
+            <Button
+              variant={"outline"}
               onClick={() => {
                 handleSignOut();
                 onClose();
@@ -37,18 +31,19 @@ export const MobileMenu = ({ isSignedIn, user, handleSignOut, workspaceId, onClo
               className="font-Zilla-Slab text-lg"
             >
               Log Out
-            </button>
-            {workspaceId && (
-              <Link 
-                to={`/workspaces/${workspaceId}/settings`}
-                onClick={onClose}
-                className="font-Zilla-Slab text-lg"
-              >
-                Workspace Settings
-              </Link>
-            )}
+            </Button>
+            <Button className="font-Zilla-Slab text-lg"><NavLink to="/workspaces" onClick={onClose}>Workspaces</NavLink></Button>
           </>
         )}
+        <Button className="font-Zilla-Slab text-lg"><NavLink to="/" onClick={onClose}>Home</NavLink></Button>
+        <Button className="font-Zilla-Slab text-lg"><NavLink to="/services" onClick={onClose}>Services</NavLink></Button>
+        {!isSignedIn && (
+          <>
+            <Button className="font-Zilla-Slab text-lg"><NavLink to="/signin" onClick={onClose}>Sign In</NavLink></Button>
+            <Button className="font-Zilla-Slab text-lg"><NavLink to="/signup" onClick={onClose}>Sign Up</NavLink></Button>
+          </>
+        )}
+
       </div>
     </div>
   );

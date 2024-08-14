@@ -5,11 +5,9 @@ import {
   NavLink,
   Params,
   useLocation,
-  useNavigation,
 } from "@remix-run/react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
-import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
 import { WorkspaceData } from "~/lib/types";
 import {
   DropdownMenu,
