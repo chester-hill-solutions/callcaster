@@ -13,7 +13,7 @@ export const action = async ({ request, params }) => {
       to: 'info@callcaster.ca',
       from: "info@callcaster.ca",
       reply_to: data.email,
-      subject: `A new form submission from ${data.email}`,
+      subject: data.signup ? `A new request to Sign Up from ${data.email}` : `A new form submission from ${data.email}`,
       text: `From: ${data.name}, ${data.message}`,
       html: `<p>From: ${data.name}.</p><br/>${data.message}`,
     };
