@@ -1,9 +1,12 @@
-import { Form, Link, NavLink, useLoaderData, useNavigation } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
 import {
-  Card,
-  CardContent,
-} from "~/components/ui/card";
+  Form,
+  Link,
+  NavLink,
+  useLoaderData,
+  useNavigation,
+} from "@remix-run/react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent } from "~/components/ui/card";
 import {
   Phone,
   Zap,
@@ -25,16 +28,19 @@ export const loader = async ({ request }) => {
   return { user: serverSession?.user };
 };
 
-const ContactForm = ({isBusy}) => (
+const ContactForm = ({ isBusy }) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
     <h2 className="mb-6 text-center text-3xl font-bold">Get In Touch</h2>
     <div className="flex flex-wrap gap-8">
-      <div className="flex-1 min-w-[300px]">
-        <h3 className="text-2xl font-semibold mb-4">We Support All Kinds of Businesses</h3>
+      <div className="min-w-[300px] flex-1">
+        <h3 className="mb-4 text-2xl font-semibold">
+          We Support All Kinds of Businesses
+        </h3>
         <p className="mb-4 text-lg">
-          At CallCaster, we understand that every business has unique communication needs. Whether you're a:
+          At CallCaster, we understand that every business has unique
+          communication needs. Whether you're a:
         </p>
-        <ul className="list-disc list-inside mb-4 space-y-2">
+        <ul className="mb-4 list-inside list-disc space-y-2">
           <li>Small startup looking to grow</li>
           <li>Medium-sized company aiming to streamline operations</li>
           <li>Large enterprise seeking advanced communication solutions</li>
@@ -42,12 +48,19 @@ const ContactForm = ({isBusy}) => (
           <li>Political campaign connecting with voters</li>
         </ul>
         <p className="text-lg">
-          We have the tools and expertise to support your goals. Get in touch with us today to see if we're the right fit for your business. Let's explore how CallCaster can elevate your communication strategy!
+          We have the tools and expertise to support your goals. Get in touch
+          with us today to see if we're the right fit for your business. Let's
+          explore how CallCaster can elevate your communication strategy!
         </p>
       </div>
-      <Card className="flex-1 min-w-[300px] dark:bg-zinc-800 bg-secondary py-8">
+      <Card className="min-w-[300px] flex-1 bg-secondary py-8 dark:bg-zinc-800">
         <CardContent>
-          <Form className="space-y-4" action="/api/contact-form" method="POST" navigate={false}>
+          <Form
+            className="space-y-4"
+            action="/api/contact-form"
+            method="POST"
+            navigate={false}
+          >
             <div>
               <label
                 htmlFor="name"
@@ -94,7 +107,7 @@ const ContactForm = ({isBusy}) => (
               ></textarea>
             </div>
             <Button
-            disabled={isBusy}
+              disabled={isBusy}
               type="submit"
               className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
             >
@@ -106,7 +119,6 @@ const ContactForm = ({isBusy}) => (
     </div>
   </div>
 );
-
 
 const FeatureCard = ({
   icon: Icon,
@@ -125,7 +137,7 @@ const FeatureCard = ({
 
 const HeroSection = () => (
   <div className="mb-16 text-center font-Zilla-Slab">
-    <h1 className="animate-fade-in-up font-Tabac-Slab text-[5rem] font-bold text-brand-primary">
+    <h1 className="animate-fade-in-up font-Tabac-Slab text-6xl font-bold text-brand-primary">
       CallCaster
     </h1>
     <p className="animate-fade-in-up animation-delay-300 text-3xl font-semibold text-slate-800 dark:text-slate-200">
@@ -139,15 +151,17 @@ const WhyPhoneCalls = () => (
       Why CallCaster Phone Calls?
     </h2>
     <div className="flex flex-wrap-reverse">
-      <div className="flex min-w-[300px] flex-col px-4">
+      <div className="min-w-[300px]">
         <div className="hidden sm:flex">
           <PersonImage />
         </div>
-        <Button asChild className="self-center text-2xl" size={"lg"}>
-          <NavLink to={"./signup"}>Sign Up</NavLink>
-        </Button>
+        <div className="flex-1 flex justify-center">
+          <Button asChild className="flex-1 text-2xl mt-4 sm:flex-initial" size={"lg"}>
+            <NavLink to={"./signup"}>Sign Up</NavLink>
+          </Button>
+        </div>
       </div>
-      <div className="grid flex-1 grid-cols-1 gap-6 md:grid-cols-2">
+      <div className="grid min-w-[300px] flex-1 grid-cols-1 gap-6 md:grid-cols-2">
         <FeatureCard
           icon={Phone}
           title="Direct Connection"
@@ -197,7 +211,7 @@ const ServiceShowcase = () => (
             "Automatic voicemail detection",
             "Skip next call",
             "Household Groups",
-            "Local Calle rID",
+            "Local Caller ID",
             "Custom Phone Numbers",
             "Voicemail to Email",
           ].map((feature, index) => (
@@ -291,10 +305,9 @@ const EnhancedOutreachSection = () => (
   </div>
 );
 
-
 export default function Index() {
-  const {state}= useNavigation();
-  const isBusy = state !== "idle"
+  const { state } = useNavigation();
+  const isBusy = state !== "idle";
   return (
     <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
       <div className="z-10 w-full max-w-6xl space-y-16">
@@ -305,7 +318,7 @@ export default function Index() {
 
         <div>
           <div className="animate-fade-in-up animation-delay-900 mb-16 font-Zilla-Slab">
-            <ContactForm isBusy={isBusy}/>
+            <ContactForm isBusy={isBusy} />
           </div>
         </div>
       </div>
