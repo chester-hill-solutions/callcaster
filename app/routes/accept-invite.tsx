@@ -77,10 +77,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
       const { error: setSessionError } = await supabaseClient.auth.setSession(verifyData.session);
       if (setSessionError) throw setSessionError;
-      const { error: updateError } = await supabaseClient.auth.updateUser({
-        data: { first_name: "New", last_name: "Caller" }
-      });
-      if (updateError) throw updateError;
 
       const { data: invites, error: inviteError } = await supabaseClient
         .from("workspace_invite")
@@ -113,7 +109,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const actionType = formData.get("actionType");
-
+  
   if (actionType === "updateUser") {
     try {
       const { email, password, firstName, lastName } =
@@ -206,10 +202,11 @@ export default function AcceptInvite() {
   const navigate = useNavigate();
   const { state } = useNavigation();
   const submit = useSubmit();
+  
   useEffect(() => {
-    if (state === "idle" && actionData?.status === "updated") {
+    if (state === "idle" && actionData?.success) {
       toast.success("Successfully signed up and accepted invitation");
-      const timeout = setTimeout(() => navigate("/workspaces"), 3000);
+      const timeout = setTimeout(() => null, 3000);
       return () => clearTimeout(timeout);
     }
   }, [actionData, navigate, state]);
@@ -227,7 +224,6 @@ export default function AcceptInvite() {
         <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           Accept your invitations
         </h1>
-        {/* <ErrorAlert error={loaderData.error || actionData?.error} /> */}
         {loaderData.status === "verified" && (
           <VerifiedNewUser
             email={loaderData.email}
