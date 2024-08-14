@@ -73,7 +73,6 @@ export const useSupabaseRealtime = ({
             recentAttempt,
             setNextRecipient,
             setQuestionContact,
-            setUpdate,
             setRecentAttempt
           );
           break;

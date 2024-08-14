@@ -19,12 +19,12 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
             navigate: false,
             action: `/api/questions`,
             encType: 'application/json'
-        });
+        })
     }, [submit, update, recentAttempt?.id, workspaceId, nextRecipient?.contact?.id, campaign?.id, disposition]);
 
     useEffect(() => {
         const shouldUpdate = !deepEqual(update, previousUpdateRef.current);
-        
+
         if (shouldUpdate) {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
@@ -61,5 +61,6 @@ export const handleQuestionsSave = (update, setUpdate, recentAttempt, submit, ne
         action: `/api/questions`,
         encType: 'application/json'
     });
+
     setUpdate(update);
 };

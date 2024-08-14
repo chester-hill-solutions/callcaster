@@ -146,8 +146,6 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 background: "#d60000",
                 borderRadius: "20px",
                 color: "white",
-                opacity:
-                  state !== "connected" && state !== "dialing" ? ".6" : "unset",
               }}
               disabled={ state !== "connected" && state !== "dialing"}
             >
@@ -155,8 +153,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
             </button>
               <button
                 onClick={handleDialNext}
-                disabled={
-                  isBusy || state === "connected" || state === "dialing" || !nextRecipient
+                disabled={displayState === "dialing" || displayState === "connected" || isBusy || !nextRecipient
                 }
                 style={{
                   flex: "1",
@@ -164,12 +161,6 @@ export const CallArea: React.FC<CallAreaProps> = ({
                   background: "#4CA83D",
                   borderRadius: "20px",
                   color: "white",
-                  opacity:
-                    state === "connected" ||
-                    state === "dialing" ||
-                    !nextRecipient
-                      ? ".6"
-                      : "unset",
                 }}
                 title={
                   state === "connected" || state === "dialing" || !nextRecipient
