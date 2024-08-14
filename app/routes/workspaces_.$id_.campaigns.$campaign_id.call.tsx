@@ -243,10 +243,9 @@ const Campaign: React.FC = () => {
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
     initialNextRecipient,
   );
+  
   const [groupByHousehold] = useState<boolean>(true);
-  const [update, setUpdate] = useState<Record<string, any>>(
-    initialRecentAttempt?.result || null,
-  );
+  const [update, setUpdate] = useState<object | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const { state, context, send } = useCallState();
@@ -260,8 +259,8 @@ const Campaign: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-    setIsBusy,
-  } = useTwilioDevice(token, workspaceId);
+    setIsBusy
+  } = useTwilioDevice(token, workspaceId, send);
 
   const {
     queue,
@@ -348,6 +347,7 @@ const Campaign: React.FC = () => {
 
   const handleResponse = useCallback(
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
+      
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
     [],
@@ -497,6 +497,7 @@ const Campaign: React.FC = () => {
     disposition: AttemptDisposition | undefined,
     activeCall: object | null,
   ): string => {
+    
     if (state === "failed" || disposition === "failed") return "failed";
     if (
       disposition === "ringing" ||

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Device } from '@twilio/voice-sdk';
 
-export function useTwilioDevice(token, workspaceId) {
+export function useTwilioDevice(token, workspaceId, send) {
     const deviceRef = useRef(null);
     const [status, setStatus] = useState('disconnected');
     const [error, setError] = useState(null);
@@ -17,6 +17,7 @@ export function useTwilioDevice(token, workspaceId) {
             call.accept();
             setStatus('connected');
             setCallState('connected');
+            send("CONNECT")
             setIncomingCall(null);
         }
 
@@ -128,6 +129,7 @@ export function useTwilioDevice(token, workspaceId) {
             disconnected: () => {
                 setStatus('Disconnected');
                 setIsBusy(false);
+                console.log('Call ended')
                 device.disconnectAll();
                 setActiveCall(null);
                 setCallState('completed');
@@ -174,7 +176,7 @@ export function useTwilioDevice(token, workspaceId) {
 
     useEffect(() => {
         const eventHandlers = {
-            accept: () => { setCallState('connected') },
+            accept: (call) => { setCallState('connected') },
             audio: (e) => { console.log(e) },
             disconnect: () => {
                 console.log('Call ended')
