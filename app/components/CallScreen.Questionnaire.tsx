@@ -56,7 +56,6 @@ const CallQuestionnaire = ({
   const [currentPageId, setCurrentPageId] = useState(
     Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
   );
-  
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
   useEffect(() => {

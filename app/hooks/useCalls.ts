@@ -23,7 +23,6 @@ export const useCalls = (
     setNextRecipient: (recipient: QueueItem | null) => void, 
     setQuestionContact: (contact: QueueItem | null) => void,
     setRecentAttempt: (attempt: Attempt | null) => void,
-    setUpdate: (update: any) => void
   ) => {
     const attemptId = payload.new.outreach_attempt_id;
     let updatedCall = payload.new;
@@ -32,7 +31,6 @@ export const useCalls = (
       setCalls((currentCalls) => [...currentCalls, updatedCall]);
       setRecentCall(updatedCall);
       setRecentAttempt(null);
-      setUpdate({});
       
       const newRecipient = currentQueue.find((item) => updatedCall.contact_id === item.contact_id);
       if (newRecipient) {
