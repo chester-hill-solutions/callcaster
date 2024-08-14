@@ -151,7 +151,7 @@ const WhyPhoneCalls = () => (
       Why CallCaster Phone Calls?
     </h2>
     <div className="flex flex-wrap-reverse">
-      <div className="min-w-[300px]">
+      <div className="min-w-[300px] flex-1">
         <div className="hidden sm:flex">
           <PersonImage />
         </div>
