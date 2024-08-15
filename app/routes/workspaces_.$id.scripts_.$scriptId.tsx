@@ -6,11 +6,7 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
-import {
-  getUserRole,
-  listMedia,
-} from "~/lib/database.server";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
+import { getUserRole, listMedia } from "~/lib/database.server";
 
 export const loader = async ({ request, params }) => {
   const { id: workspace_id, scriptId: selected_id } = params;
@@ -27,7 +23,7 @@ export const loader = async ({ request, params }) => {
     .single();
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
-  const {data: script} = await supabaseClient
+  const { data: script } = await supabaseClient
     .from("script")
     .select()
     .eq("id", selected_id)
@@ -35,7 +31,7 @@ export const loader = async ({ request, params }) => {
   const mediaNames = await listMedia(supabaseClient, workspace_id);
 
   return json({
-    workspace:workspaceData,
+    workspace: workspaceData,
     workspace_id,
     selected_id,
     script,
@@ -80,16 +76,23 @@ export const action = async ({ request, params }) => {
 };
 
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, script:initScript, mediaNames, userRole, workspace } = useLoaderData();
-    const [isChanged, setChanged] = useState(false)
-    const [script, setScript] = useState(initScript);
+  const {
+    workspace_id,
+    selected_id,
+    script: initScript,
+    mediaNames,
+    userRole,
+    workspace,
+  } = useLoaderData();
+  const [isChanged, setChanged] = useState(false);
+  const [script, setScript] = useState(initScript);
 
   const handleSaveUpdate = async () => {
     try {
       const response = await fetch("/api/scripts", {
         method: "PATCH",
         body: JSON.stringify({
-          ...script
+          ...script,
         }),
         headers: { "Content-Type": "application/json" },
       });
@@ -98,7 +101,7 @@ export default function ScriptEditor() {
       if (result.error) {
         throw new Error(result.error);
       }
-      setScript(script)
+      setScript(script);
       setChanged(false);
     } catch (error) {
       console.error("Error saving update:", error);
@@ -127,37 +130,36 @@ export default function ScriptEditor() {
   }, [initScript, script]);
 
   return (
-      <div className="relative flex h-full flex-col overflow-visible">
-        {isChanged && (
-          <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
-            <Button
-              onClick={handleReset}
-              className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
-            >
-              Reset
-            </Button>
-            <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
-              You have unsaved changes
-            </div>
-            <Button
-              onClick={() => handleSaveUpdate(true)}
-              className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
-            >
-              Save Changes
-            </Button>
+    <div className="relative flex h-full flex-col overflow-visible">
+      {isChanged && (
+        <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
+          <Button
+            onClick={handleReset}
+            className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
+          >
+            Reset
+          </Button>
+          <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
+            You have unsaved changes
           </div>
-        )}
-        <div className="h-full flex-grow p-4">
-            <CampaignSettingsScript
-              pageData={{campaignDetails:
-                {script}
-              }}
-              onPageDataChange={(newData) => {
-                handlePageDataChange(newData);
-              }}
-              scripts={[]}
-            />
+          <Button
+            onClick={() => handleSaveUpdate(true)}
+            className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
+          >
+            Save Changes
+          </Button>
         </div>
+      )}
+      <div className="h-full flex-grow p-4">
+        <CampaignSettingsScript
+          pageData={{ campaignDetails: { script } }}
+          onPageDataChange={(newData) => {
+            handlePageDataChange(newData);
+          }}
+          mediaNames={mediaNames}
+          scripts={[]}
+        />
       </div>
+    </div>
   );
 }

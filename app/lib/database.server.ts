@@ -308,8 +308,12 @@ export async function handleExistingUserSession(
     .from("workspace_invite")
     .select()
     .eq("user_id", serverSession.user.id);
-  if (inviteError) return json({ error: inviteError, newSession:null, invites:[] }, { headers });
-  return json({ newSession: serverSession, invites, error:null }, { headers });
+  if (inviteError)
+    return json(
+      { error: inviteError, newSession: null, invites: [] },
+      { headers },
+    );
+  return json({ newSession: serverSession, invites, error: null }, { headers });
 }
 
 export async function handleNewUserOTPVerification(
@@ -577,63 +581,153 @@ export async function acceptWorkspaceInvitations(
     return { error: null };
   }
 }
+type CampaignType =
+  | "live_call"
+  | "message"
+  | "robocall"
+  | "simple_ivr"
+  | "complex_ivr";
+interface CampaignData {
+  id?: string;
+  workspace: string;
+  title: string;
+  type: CampaignType;
+  script_id?: number;
+  audiences?: Array<{ audience_id: string; campaign_id: string }>;
+  [key: string]: any;
+}
+
+interface CampaignDetails {
+  campaign_id: string;
+  script_id?: string;
+  [key: string]: any;
+}
+function getCampaignTableKey(type: CampaignType): string {
+  switch (type) {
+    case "live_call":
+      return "live_campaign";
+    case "message":
+      return "message_campaign";
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      return "ivr_campaign";
+    default:
+      throw new Error("Invalid campaign type");
+  }
+}
+
+function cleanObject<T extends object>(obj: T): Partial<T> {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key as keyof T] = value;
+    }
+    return acc;
+  }, {} as Partial<T>);
+}
 
 export async function updateCampaign({
   supabase,
-  campaignData = {},
-  campaignDetails = {},
+  campaignData,
+  campaignDetails,
+}: {
+  supabase: SupabaseClient;
+  campaignData: CampaignData;
+  campaignDetails: CampaignDetails;
 }) {
-  if (campaignData.script_id && !campaignDetails.script_id) {
-    campaignDetails.script_id = campaignData.script_id;
-    delete campaignData.script_id;
-  }
-  const updateData = campaignData;
-  delete updateData.campaign_audience;
-  delete updateData.campaignDetails;
-  delete updateData.mediaLinks;
-  delete updateData.script;
-  const id = campaignDetails.campaign_id;
-  delete updateData.campaign_id;
-  delete updateData.questions;
-  delete updateData.created_at;
-  delete updateData.disposition_options;
-  delete updateData.script_id;
-  const { data: campaign, error: campaignError } = await supabase
-    .from("campaign")
-    .update(updateData)
-    .eq("id", id)
-    .eq("workspace", updateData.workspace)
-    .select();
-  if (campaignError) {
-    if (campaignError.code === "23505") {
-      throw new Error(
-        "A campaign with this title already exists in the workspace",
-      );
-    }
-    throw campaignError;
+  const {
+    campaign_id: id,
+    workspace,
+    audiences,
+    ...restCampaignData
+  } = campaignData;
+
+  if (!id) throw new Error("Campaign ID is required");
+  campaignDetails.script_id = parseInt(campaignData.script_id) || null;
+  campaignDetails.body_text = campaignData.body_text || "";
+  campaignDetails.message_media = campaignData.message_media || [];
+  const cleanCampaignData = cleanObject({
+    ...restCampaignData,
+    campaign_audience: undefined,
+    campaignDetails: undefined,
+    mediaLinks: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    disposition_options: undefined,
+    audience: undefined,
+    script_id: undefined,
+    start_date: undefined,
+    end_date: undefined,
+    body_text: undefined,
+    message_media: undefined
+  });
+  const tableKey = getCampaignTableKey(cleanCampaignData.type);
+  console.log(campaignDetails, tableKey)
+  const cleanCampaignDetails = tableKey !== "message_campaign" ? cleanObject({
+    ...campaignDetails,
+    mediaLinks: undefined,
+    disposition_options: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    body_text: undefined,
+    message_media: undefined
+  }) : cleanObject({
+    ...campaignDetails,
+    mediaLinks: undefined,
+    disposition_options: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    script_id:undefined
+  });
+
+  if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
+    cleanCampaignDetails.script_id = cleanCampaignData.script_id;
+    delete cleanCampaignData.script_id;
   }
 
-  let tableKey: "live_campaign" | "message_campaign" | "ivr_campaign";
-  if (campaignData?.type === "live_call" || !campaignData?.type)
-    tableKey = "live_campaign";
-  else if (campaignData.type === "message") tableKey = "message_campaign";
-  else if (
-    ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
+  const campaign = await handleDatabaseOperation(
+    () =>
+      supabase
+        .from("campaign")
+        .update(cleanCampaignData)
+        .eq("id", id)
+        .eq("workspace", workspace)
+        .select()
+        .single(),
+    "Error updating campaign",
+  );
+
+  //tableKey === "message_campaign" 
+  const updatedCampaignDetails =  await handleDatabaseOperation(
+    () =>
+      supabase
+        .from(tableKey)
+        .update(cleanCampaignDetails)
+        .eq("campaign_id", id)
+        .select()
+        .single(),
+    "Error updating campaign details",
   )
-    tableKey = "ivr_campaign";
-  else throw new Error("Invalid campaign type");
-  delete campaignDetails.mediaLinks;
-  delete campaignDetails.script;
-  const { data: updatedCampaignDetails, error: campaignDetailsError } =
-    await supabase
-      .from(tableKey)
-      .update(campaignDetails)
-      .eq("campaign_id", id)
-      .select();
 
-  if (campaignDetailsError) throw campaignDetailsError;
+  let audienceUpdateResult = null;
+  if (audiences) {
+    audienceUpdateResult = await updateCampaignAudiences(
+      supabase,
+      id,
+      audiences,
+    );
+    console.log(audienceUpdateResult)
 
-  return { campaign: campaign[0], campaignDetails: updatedCampaignDetails[0] };
+  }
+
+  return {
+    campaign,
+    campaignDetails: updatedCampaignDetails,
+    audienceChanges: audienceUpdateResult,
+  };
 }
 
 export async function updateOrCopyScript({
@@ -775,7 +869,6 @@ export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
     .select(`*, campaign_audience(*)`)
     .eq("id", campaignId)
     .single();
-
   if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
   return data;
 };
@@ -1117,3 +1210,73 @@ export const bulkCreateContacts = async (
 
   return { insert, audience_insert };
 };
+
+export async function getCampaignQueueById({ supabaseClient, campaign_id }) {
+  const { data, error } = await supabaseClient
+    .from("campaign_queue")
+    .select("*, contact(*)")
+    .eq("campaign_id", campaign_id);
+  if (error) throw error;
+  return data;
+}
+
+async function handleDatabaseOperation<T>(
+  operation: () => Promise<{ data: T; error: any }>,
+  errorMessage: string,
+): Promise<T> {
+  const { data, error } = await operation();
+  if (error) throw new Error(`${errorMessage}: ${error.message}`);
+  return data;
+}
+
+async function updateCampaignAudiences(
+  supabase: SupabaseClient,
+  campaignId: string,
+  newAudiences: Array<{ audience_id: string; campaign_id: string }>,
+) {
+  const existing = await handleDatabaseOperation(
+    () =>
+      supabase.from("campaign_audience").select().eq("campaign_id", campaignId),
+    "Error fetching existing campaign audience",
+  );
+  const toDelete = existing.filter(
+    (row) =>
+      !newAudiences.some((newRow) => newRow.audience_id === row.audience_id),
+  );
+  const toAdd = newAudiences.filter(
+    (newRow) => !existing.some((row) => row.audience_id === newRow.audience_id),
+  );
+
+  const addPromise =
+    toAdd.length > 0
+      ? handleDatabaseOperation(
+          () =>
+            supabase
+              .from("campaign_audience")
+              .upsert(toAdd, { onConflict: ["audience_id", "campaign_id"] })
+              .select(),
+          "Error adding campaign audience",
+        )
+      : Promise.resolve([]);
+
+  const deletePromise =
+    toDelete.length > 0
+      ? handleDatabaseOperation(
+          () =>
+            supabase
+              .from("campaign_audience")
+              .delete()
+              .in(
+                "audience_id",
+                toDelete.map((row) => row.audience_id),
+              )
+              .eq("campaign_id", campaignId)
+              .select(),
+          "Error deleting campaign audience",
+        )
+      : Promise.resolve([]);
+
+  const [added, deleted] = await Promise.all([addPromise, deletePromise]);
+
+  return { added, deleted };
+}

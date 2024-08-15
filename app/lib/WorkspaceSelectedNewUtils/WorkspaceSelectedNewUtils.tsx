@@ -105,7 +105,8 @@ export async function handleNewCampaign({
     .insert({
       title: newCampaignName,
       workspace: workspaceId,
-      status: "draft"
+      status: "draft",
+      type: newCampaignType
     })
     .select()
     .single();
@@ -117,10 +118,13 @@ export async function handleNewCampaign({
     );
   }
 
-  //ADD CAMPAIGN DETAILS
+  const tableKey = newCampaignType === "live_call" ? "live_campaign" : 
+  newCampaignType === "message" ? "message_campaign" :
+  newCampaignType === "robocall"? "ivr_campaign": null;
+
   const { error: detailsError } = await supabaseClient
-    .from("live_campaign")
-    .insert({ campaign_id: campaignData.id, workspace: workspaceId });
+    .from(tableKey)
+    .insert({ campaign_id: campaignData.id, workspace: workspaceId,  });
 
   if (detailsError) {
     return json(

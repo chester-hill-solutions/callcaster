@@ -19,7 +19,6 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
     const firstPage = Object.values(scriptData?.pages || {}).length > 0 ? Object.values(scriptData.pages)[0].id : null;
     const [currentPage, setCurrentPage] = useState(firstPage);
     const [openBlock, setOpenBlock] = useState(null);
-
     const navigate = useNavigate();
 
     const changeType = useCallback((newType) => {
