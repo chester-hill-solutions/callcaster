@@ -57,7 +57,11 @@ const QuestionBlockOption = ({
           <TextInput
             value={option.content}
             onChange={(e) =>
-              onChange(index, { ...option, content: e.target.value, value: e.target.value.replace(" ", "-").toLowerCase() })
+              onChange(index, {
+                ...option,
+                content: e.target.value,
+                value: e.target.value.replace(" ", "-").toLowerCase(),
+              })
             }
             placeholder="Option content"
           />
@@ -110,11 +114,10 @@ const MergedQuestionBlock = ({
   blocks,
   type,
   mediaNames,
- openBlock,
- setOpenBlock,
+  openBlock,
+  setOpenBlock,
 }) => {
   const [localBlock, setLocalBlock] = useState(block);
-
   const questionTypes =
     type === "script"
       ? [
@@ -140,7 +143,6 @@ const MergedQuestionBlock = ({
       [field]: value,
       ...(field === "content" && { value: value.toLowerCase() }),
     };
-    console.log(updatedBlock)
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
@@ -221,7 +223,7 @@ const MergedQuestionBlock = ({
             </SelectContent>
           </Select>
           <Button size="icon" asChild>
-            <NavLink to={"../../../../audios"} relative="path">
+            <NavLink to={"../../audios"} relative="path">
               <MdAdd size={24} />
             </NavLink>
           </Button>
@@ -237,7 +239,9 @@ const MergedQuestionBlock = ({
         <div className="flex items-center justify-between">
           <CardTitle
             className="w-full cursor-pointer"
-            onClick={() => setOpenBlock((curr) => curr !== block.id ? block.id : null)}
+            onClick={() =>
+              setOpenBlock((curr) => (curr !== block.id ? block.id : null))
+            }
           >
             {localBlock?.title || `Block ${localBlock?.id}`}
           </CardTitle>

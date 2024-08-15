@@ -22,7 +22,7 @@ export const action = async ({ request }) => {
             .eq('id', data.id)
             .select();
         response = update;
-        console.log(update, error)
+
     }
     if (method === "DELETE") {
         const formData = await request.formData();

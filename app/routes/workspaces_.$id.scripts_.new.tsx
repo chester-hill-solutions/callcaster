@@ -19,7 +19,9 @@ import { Card, CardActions, CardTitle } from "~/components/CustomCard";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-
+  const url = new URL(request.url);
+  const search = new URLSearchParams(url.search);
+  const ref = search.get("ref") || null;
   const workspaceId = params.id;
   if (workspaceId == null) {
     return json(
@@ -27,7 +29,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-
+  let campaignType;
+  if (ref) {
+    const { data: campaign } = await supabaseClient
+      .from("campaign")
+      .select("type")
+      .eq("id", ref)
+      .single();
+    campaignType = campaign.type;
+  }
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()
@@ -37,7 +47,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return json({ workspace: null, error: workspaceError }, { headers });
   }
 
-  return json({ workspace: workspaceData, error: null }, { headers });
+  return json(
+    { workspace: workspaceData, error: null, ref, campaignType },
+    { headers },
+  );
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -56,6 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const name = formData.get("script-name");
   const type = formData.get("type") || "ivr";
   const stepsFile = formData.get("steps") as File;
+  const ref = formData.get("ref") as string;
 
   if (!name) {
     return json(
@@ -88,6 +102,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
       workspace: workspaceId,
     })
     .select();
+  if (ref) {
+    const tableKey = type === "script" ? "live_campaign" : "ivr_campaign";
+    const { data: update, error: updateError } = await supabaseClient
+      .from(tableKey)
+      .update({ script_id: data[0].id })
+      .eq("campaign_id", ref)
+      .select();
+    if (updateError) console.error(updateError);
+    console.log(update)
+  }
 
   if (error) {
     return json({ success: false, error: error }, { headers });
@@ -97,7 +121,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function NewScript() {
-  const { workspace, error } = useLoaderData<typeof loader>();
+  const { workspace, error, ref, campaignType } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [pendingFileName, setPendingFileName] = useState("");
   const navigate = useNavigate();
@@ -153,6 +178,7 @@ export default function NewScript() {
             className="space-y-6"
             encType="multipart/form-data"
           >
+            <input hidden value={ref} id="ref" name="ref" />
             <label
               htmlFor="script-name"
               className="block text-sm font-medium text-gray-700 dark:text-gray-200"
@@ -175,6 +201,7 @@ export default function NewScript() {
                 name="type"
                 id="type"
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
+                defaultValue={campaignType === "live_call" ? "script" : "ivr"}
               >
                 <option value="ivr">IVR</option>
                 <option value="script">Script</option>

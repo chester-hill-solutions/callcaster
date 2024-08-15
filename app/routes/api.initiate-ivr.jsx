@@ -16,11 +16,10 @@ export const action = async ({ request, params }) => {
         formData.append('queue_id', contact.id);
         formData.append('contact_id', contact.contact_id);
         formData.append('caller_id', contact.caller_id);
-
         await fetch(`${process.env.BASE_URL}/api/ivr`, {
             body: formData,
             method: "POST",
-        }).catch((e) => console.log(e))
+        }).then(() => console.log(`Calling ${contact.phone}`)).catch((e) => console.log(e))
     }
     return data;
 }
