@@ -50,13 +50,13 @@ const triggerAutoDialer = async (userId, campaignId, workspaceId) => {
     });
 };
 
-const handleAnsweringMachine = async (call, dbCall, campaign, signedUrl, outreachStatus) => {
+const handleAnsweringMachine = async (call, twilio, dbCall, campaign, signedUrl, outreachStatus) => {
     const twiml = new Twilio.twiml.VoiceResponse();
 
     await dequeueContact(dbCall.contact_id, campaign.group_household_queue);
     await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: 'voicemail' });
 
-    const conferences = await call.conferences.list({ friendlyName: outreachStatus[0].user_id, status: 'in-progress' });
+    const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id, status: 'in-progress' });
 
     if (conferences.length) {
         await triggerAutoDialer(outreachStatus[0].user_id, outreachStatus[0].campaign_id, dbCall.workspace);
@@ -97,7 +97,7 @@ const handleHumanAnswer = async (dbCall, conferenceName, called) => {
 
 export const action = async ({ request, params }) => {
     const conferenceName = params.roomId;
-    const realtime = supabase.realtime.channel(conferenceName).subscribe()
+    const realtime = supabase.realtime.channel(conferenceName)
     const formData = await request.formData();
     const callSid = formData.get('CallSid');
     const answeredBy = formData.get('AnsweredBy');
@@ -108,12 +108,12 @@ export const action = async ({ request, params }) => {
         const dbCall = await fetchCallData(callSid);
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
         const call = twilio.calls(callSid);
-        realtime.send("broadcast", { contact: dbCall.contact_id, status: callStatus})
-        if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
+        realtime.send({ type: "broadcast", event: "message", payload: { contact_id: dbCall.contact_id, status: callStatus } }); if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
             const campaign = await fetchCampaignData(dbCall.campaign_id);
             const signedUrl = await getVoicemailSignedUrl(dbCall.workspace, campaign.voicemail_file);
             const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: 'voicemail' });
-            return await handleAnsweringMachine(call, dbCall, campaign, signedUrl, outreachStatus);
+            supabase.removeChannel(realtime);
+            return await handleAnsweringMachine(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
         } else {
             return await handleHumanAnswer(dbCall, conferenceName, called);
         }
