@@ -243,15 +243,17 @@ const Campaign: React.FC = () => {
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
     initialNextRecipient,
   );
-  
+
   const [groupByHousehold] = useState<boolean>(true);
   const [update, setUpdate] = useState<object | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const { state, context, send } = useCallState();
+  const [currentContact, setCurrentContact] = useState(null);
+
   const {
     device,
-    status,
+    status: deviceStatus,
     activeCall,
     incomingCall,
     hangUp,
@@ -259,8 +261,19 @@ const Campaign: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-    setIsBusy
+    setIsBusy,
   } = useTwilioDevice(token, workspaceId, send);
+
+  const {
+    status: liveStatus,
+    users: onlineUsers,
+    predictiveState,
+  } = useSupabaseRoom({
+    supabase,
+    workspace: workspaceId,
+    campaign: campaign.id,
+    userId: user.id,
+  });
 
   const {
     queue,
@@ -296,6 +309,7 @@ const Campaign: React.FC = () => {
     setCallDuration,
     setUpdate,
   });
+
   const [isErrorDialogOpen, setErrorDialog] = useState(
     !Object.keys(campaignDetails?.script || {}).length,
   );
@@ -303,13 +317,6 @@ const Campaign: React.FC = () => {
     (!(queue.length > 0) || campaign.dial_type === "predictive") &&
       !isErrorDialogOpen,
   );
-
-  const { status: liveStatus, users: onlineUsers } = useSupabaseRoom({
-    supabase,
-    workspace: workspaceId,
-    campaign: campaign.id,
-    userId: user.id,
-  });
 
   const { begin, conference, setConference } = useStartConferenceAndDial(
     user.id,
@@ -347,26 +354,19 @@ const Campaign: React.FC = () => {
 
   const handleResponse = useCallback(
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
-      
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
     [],
   );
 
   const handleDialButton = useCallback(() => {
-    setIsBusy(true);
-    if (
-      activeCall?.parameters?.CallSid ||
-      incomingCall ||
-      status !== "Registered" ||
-      device?.calls.length > 0
-    ) {
-      console.log("Device Busy", status, device.calls.length);
-      return;
-    }
-    send({ type: "START_DIALING" });
-    if (campaign.dial_type === "predictive") handleConferenceStart();
-    if (campaign.dial_type === "call")
+    if (campaign.dial_type === "predictive") {
+      if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
+        console.log("Device Busy", deviceStatus, device.calls.length);
+        return;
+      }
+      begin()
+    } else if (campaign.dial_type === "call") {
       startCall({
         contact: nextRecipient?.contact,
         campaign,
@@ -375,20 +375,30 @@ const Campaign: React.FC = () => {
         nextRecipient,
         recentAttempt,
       });
+    }
   }, [
-    activeCall,
     campaign,
-    device,
-    handleConferenceStart,
+    deviceIsBusy,
     incomingCall,
-    nextRecipient,
-    recentAttempt,
-    send,
-    startCall,
-    status,
+    deviceStatus,
+    device,
     user,
     workspaceId,
+    nextRecipient,
+    recentAttempt,
+    startCall,
   ]);
+  const handleQuickSave = useCallback(() => {
+    handleQuestionsSave(
+      update,
+      setUpdate,
+      recentAttempt,
+      submit,
+      questionContact,
+      campaign,
+      workspaceId,
+    );
+  }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   const handleNextNumber = useCallback(
     (skipHousehold = false) => {
@@ -412,28 +422,13 @@ const Campaign: React.FC = () => {
     ],
   );
 
-  const handleQuickSave = useCallback(() => {
-    handleQuestionsSave(
-      update,
-      setUpdate,
-      recentAttempt,
-      submit,
-      questionContact,
-      campaign,
-      workspaceId,
-    );
-  }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
-
   const handleDequeueNext = useCallback(() => {
-    if (campaign.dial_type === "predictive" && nextRecipient) {
-      dequeue({ contact: nextRecipient });
+    if (campaign.dial_type === "predictive") {
+      setCurrentContact(null);
       send({ type: "HANG_UP" });
-      setRecentAttempt(null);
-      setUpdate({});
-      setDisposition("idle");
       setCallDuration(0);
       handleDialButton();
-    } else if (campaign.dial_type === "call" && nextRecipient) {
+    } else if (campaign.dial_type === "call") {
       handleQuickSave();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
@@ -446,17 +441,17 @@ const Campaign: React.FC = () => {
     }
   }, [
     campaign.dial_type,
-    dequeue,
-    fetchMore,
-    handleDialButton,
-    handleNextNumber,
-    handleQuickSave,
-    householdMap,
-    nextRecipient,
     send,
+    setCallDuration,
+    handleDialButton,
+    handleQuickSave,
+    dequeue,
+    nextRecipient,
+    fetchMore,
+    householdMap,
+    handleNextNumber,
     setRecentAttempt,
     setDisposition,
-    setCallDuration,
   ]);
 
   const requestMicrophoneAccess = useCallback(async () => {
@@ -497,7 +492,6 @@ const Campaign: React.FC = () => {
     disposition: AttemptDisposition | undefined,
     activeCall: object | null,
   ): string => {
-    
     if (state === "failed" || disposition === "failed") return "failed";
     if (
       disposition === "ringing" ||
@@ -511,11 +505,15 @@ const Campaign: React.FC = () => {
     if (!activeCall && !disposition) return "idle";
     return "idle";
   };
-  const displayState = getDisplayState(
-    state,
-    recentAttempt?.disposition as AttemptDisposition,
-    activeCall,
-  );
+
+  const displayState =
+    campaign.dial_type === "predictive"
+      ? predictiveState.status
+      : getDisplayState(
+          state,
+          recentAttempt?.disposition as AttemptDisposition,
+          activeCall,
+        );
 
   const house =
     householdMap[
@@ -569,6 +567,29 @@ const Campaign: React.FC = () => {
     }
   }, [nextRecipient, send, setCallDuration]);
 
+  useEffect(() => {
+    if (predictiveState.contact_id && predictiveState.status) {
+      const contact = contacts.find((c) => c.id === predictiveState.contact_id);
+      setCurrentContact(contact);
+
+      switch (predictiveState.status) {
+        case "dialing":
+          send({ type: "START_DIALING" });
+          break;
+        case "connected":
+          send({ type: "CALL_CONNECTED" });
+          break;
+        case "completed":
+        case "failed":
+        case "no-answer":
+          send({ type: "HANG_UP" });
+          break;
+        default:
+          send({ type: "IDLE" });
+      }
+    }
+  }, [predictiveState, contacts, send]);
+
   useDebouncedSave(
     update,
     recentAttempt,
@@ -578,6 +599,7 @@ const Campaign: React.FC = () => {
     workspaceId,
     disposition,
   );
+
   return (
     <main className="container mx-auto p-6">
       <div

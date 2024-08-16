@@ -1,11 +1,14 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+
+const PRESENCE_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
 const useSupabaseRoom = ({ supabase, workspace, campaign, userId }) => {
     const [status, setStatus] = useState('offline');
-    const [channel, setChannel] = useState(null);
     const [users, setUsers] = useState([]);
+    const [predictiveState, setPredictiveState] = useState({ contact_id: null, status: "idle" });
+    const channelRef = useRef(null);
 
-    const updatePresence = useCallback(async (status) => {
+    const updatePresence = useCallback(async (newStatus) => {
         const currentTime = new Date().toISOString();
         const activityUpdate = {
             workspace_id: workspace,
@@ -13,72 +16,62 @@ const useSupabaseRoom = ({ supabase, workspace, campaign, userId }) => {
                 [campaign]: {
                     campaign_id: campaign,
                     last_online: currentTime,
-                    status: status,
+                    status: newStatus,
                 },
             },
         };
 
-        const { error } = await supabase
-            .from('user')
-            .update({ activity: activityUpdate })
-            .eq('id', userId);
-
-        if (error) {
+        try {
+            await supabase
+                .from('user')
+                .update({ activity: activityUpdate })
+                .eq('id', userId);
+        } catch (error) {
             console.error('Error updating presence:', error);
         }
     }, [supabase, workspace, campaign, userId]);
 
     useEffect(() => {
-        const roomName = `${workspace}-${campaign}`;
+        const roomName = `${userId}`;
         const room = supabase.channel(roomName);
-        setChannel(room);
+        channelRef.current = room;
 
-        const handleConnect = async () => {
+        const handleConnect = () => {
             setStatus('online');
             console.log(`Connected to ${roomName}`);
-            await updatePresence('online');
+            updatePresence('online');
         };
 
-        const handleDisconnect = async () => {
+        const handleDisconnect = () => {
             setStatus('offline');
             console.log(`Disconnected from ${roomName}`);
-            await updatePresence('offline');
-        };
-
-        const handleError = (error) => {
-            setStatus('error');
-            console.error(`Error in ${roomName}:`, error);
-        };
-
-        const handleMessage = (payload) => {
-            console.log(`Message in ${roomName}:`, payload);
-        };
-
-        const handlePresence = (presenceEvent) => {
-            setUsers(presenceEvent);
+            updatePresence('offline');
         };
 
         room.on('connect', handleConnect)
             .on('disconnect', handleDisconnect)
-            .on('error', handleError)
-            .on('broadcast', { event: 'message' }, handleMessage)
-            .on('presence', handlePresence)
+            .on('error', (error) => {
+                setStatus('error');
+                console.error(`Error in ${roomName}:`, error);
+            })
+            .on('broadcast', { event: 'message' }, (e) => {console.log(e); setPredictiveState(e)})
+            .on('presence', setUsers)
             .subscribe();
 
         const presenceInterval = setInterval(() => {
             if (status === 'online') {
                 updatePresence('online');
             }
-        }, 5 * 60 * 1000);
+        }, PRESENCE_UPDATE_INTERVAL);
 
         return () => {
             supabase.removeChannel(room);
-            handleDisconnect(); // Ensure presence is updated on cleanup
-            clearInterval(presenceInterval); // Clear the interval on cleanup
+            handleDisconnect();
+            clearInterval(presenceInterval);
         };
-    }, [supabase, workspace, campaign, userId, updatePresence, status]);
+    }, [supabase, userId, updatePresence, status]);
 
-    return { status, users };
+    return { status, users, predictiveState };
 };
 
 export default useSupabaseRoom;

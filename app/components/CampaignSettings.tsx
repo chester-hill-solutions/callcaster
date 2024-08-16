@@ -133,7 +133,7 @@ export const CampaignSettings = ({
   const handleActivateButton = () => {
     if (campaignData.type === "live_call") {
       handleInputChange("status", "running");
-      navigate("call");
+      navigate("../call");
     } else if (campaignData.type === "robocall") {
       fetcher.submit(
         { campaign_id, user_id: user },
