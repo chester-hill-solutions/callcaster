@@ -365,7 +365,7 @@ const Campaign: React.FC = () => {
         console.log("Device Busy", deviceStatus, device.calls.length);
         return;
       }
-      begin()
+      begin();
     } else if (campaign.dial_type === "call") {
       startCall({
         contact: nextRecipient?.contact,
@@ -508,12 +508,15 @@ const Campaign: React.FC = () => {
 
   const displayState =
     campaign.dial_type === "predictive"
-      ? predictiveState.status
-      : getDisplayState(
+      ? predictiveState.status === "dialing" ? "dialing"
+        : predictiveState.status ===  "connected" ? "connected"
+        : predictiveState.status === "completed" ? "completed"
+        : predictiveState.status === "idle" ? "idle"
+        : getDisplayState(
           state,
           recentAttempt?.disposition as AttemptDisposition,
           activeCall,
-        );
+        ):null;
 
   const house =
     householdMap[

@@ -44,20 +44,18 @@ const handleCallStatus = async (parsedBody, dbCall, twilio, realtime, status) =>
     const callUpdate = await updateCall(parsedBody.CallSid, { end_time: new Date(parsedBody.Timestamp), status });
     const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: status });
     await updateCampaignQueue(outreachStatus[0].contact_id, { status: 'dequeued' });
-    realtime.send("broadcast", { contact_id: outreachStatus[0].contact_id, status });
-
+    realtime.send({ type: "broadcast", event: "message", payload: { contact_id: outreachStatus[0].contact_id, status } });
     const conferences = await twilio.conferences.list({ friendlyName: callUpdate[0].conference_id, status: ['in-progress'] });
     if (conferences.length) {
         await triggerAutoDialer(dbCall);
     }
 };
 
-const handleParticipantLeave = async (parsedBody, dbCall, twilio, realtime) => {
-    await updateCall(parsedBody.CallSid, { end_time: new Date(parsedBody.Timestamp) });
-    const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: 'completed', ended_at: new Date() });
+const handleParticipantLeave = async (parsedBody, twilio, realtime) => {
+    const dbCall = await updateCall(parsedBody.CallSid, { end_time: new Date(parsedBody.Timestamp) });
+    const outreachStatus = await updateOutreachAttempt(dbCall[0].outreach_attempt_id, { disposition: 'completed', ended_at: new Date() });
     await updateCampaignQueue(outreachStatus[0].contact_id, { status: 'dequeued' });
-    realtime.send("broadcast", { contact_id: outreachStatus[0].contact_id, status: "completed" });
-
+    realtime.send({ type: "broadcast", event: "message", payload: { contact_id: outreachStatus[0].contact_id, status: "completed" } });
     const conferences = await twilio.conferences.list({ friendlyName: parsedBody.FriendlyName, status: ['in-progress'] });
     await Promise.all(conferences.map(({ sid }) => twilio.conferences(sid).update({ status: "completed" })));
 };
@@ -69,7 +67,7 @@ const handleParticipantJoin = async (parsedBody, dbCall, realtime) => {
     if (dbCall.outreach_attempt_id) {
         const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: "in-progress", answered_at: new Date() });
         await updateCampaignQueue(outreachStatus[0].contact_id, { status: parsedBody.FriendlyName });
-        realtime.send("broadcast", { contact_id: outreachStatus.contact_id, status: "connected" });
+        realtime.send({ type: "broadcast", event: "message", payload: { contact_id: outreachStatus[0].contact_id, status: "connected" } });
     }
 };
 export const action = async ({ request }) => {
@@ -83,7 +81,7 @@ export const action = async ({ request }) => {
     }
 
     const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
-    const realtime = supabase.realtime.channel(parsedBody.ConferenceSid).subscribe();
+    const realtime = supabase.channel(parsedBody.ConferenceSid);
 
     try {
         switch (parsedBody.CallStatus) {
@@ -96,11 +94,12 @@ export const action = async ({ request }) => {
                 if (parsedBody.StatusCallbackEvent === 'participant-leave' &&
                     (parsedBody.ReasonParticipantLeft === 'participant_updated_via_api' ||
                         parsedBody.ReasonParticipantLeft === 'participant_hung_up')) {
-                    await handleParticipantLeave(parsedBody, dbCall, twilio, realtime);
+                    await handleParticipantLeave(parsedBody, twilio, realtime);
                 } else if (parsedBody.StatusCallbackEvent === 'participant-join') {
                     await handleParticipantJoin(parsedBody, dbCall, realtime);
                 }
         }
+        supabase.removeChannel(realtime)
         return json({ success: true });
     } catch (error) {
         console.error('Error processing action:', error);
