@@ -90,7 +90,7 @@ export default function ChatHeader({
   }, [contacts, potentialContacts]);
 
   return (
-    <div className="sticky top-0 z-10 flex bg-white p-4 shadow">
+    <div className="sticky top-0 z-10 flex p-4 shadow">
       <div className="flex flex-auto items-end justify-between gap-2">
         <h2 className="text-xl font-semibold">
           Chat{" "}
@@ -125,7 +125,7 @@ export default function ChatHeader({
             </div>
 
             {existingConversation && (
-              <div className="absolute right-0 top-0 z-10 mt-2 w-56 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="absolute right-0 top-0 z-10 mt-2 w-56 rounded-md bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 <button
                   onClick={() =>
                     handleExistingConversationClick(
@@ -136,7 +136,7 @@ export default function ChatHeader({
                 >
                   View Existing Conversation
                 </button>
-                <div className="mt-2 rounded-md bg-gray-100 p-2 text-sm">
+                <div className="mt-2 rounded-md bg-gray-100 dark:bg-zinc-700 p-2 text-sm">
                   <p>
                     <strong>Latest message:</strong>{" "}
                     {existingConversation.latestMessage}
@@ -154,7 +154,7 @@ export default function ChatHeader({
               >
                 <button
                   type="button"
-                  className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
+                  className="inline-flex justify-center rounded-md border border-gray-300 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
                   onClick={toggleContactMenu}
                 >
                   {selectedContact
@@ -166,7 +166,7 @@ export default function ChatHeader({
                   />
                 </button>
                 {isContactMenuOpen && (
-                  <div className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-auto rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-auto rounded-md bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div
                       className="py-1"
                       role="menu"
@@ -194,14 +194,14 @@ export default function ChatHeader({
           <div className="relative inline-block text-left">
             <button
               type="button"
-              className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
+              className="inline-flex justify-center rounded-md border border-gray-300 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
               onClick={() => setIsContactListOpen(!isContactListOpen)}
             >
               Edit Contacts
               <MdExpandMore className="-mr-1 ml-2 h-5 w-5" aria-hidden="true" />
             </button>
             {isContactListOpen && (
-              <div className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-md bg-white dark:bg-zinc-800 text-gray-300 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                 <div
                   className="py-1"
                   role="menu"
@@ -211,13 +211,13 @@ export default function ChatHeader({
                   {allContacts.map((contact) => (
                     <div
                       key={contact.id || contact.phone}
-                      className="flex items-center justify-between px-4 py-2 hover:bg-gray-100"
+                      className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-900"
                     >
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-300">
                           {getDisplayName(contact)}
                         </p>
-                        <p className="text-sm text-gray-600">{contact.phone}</p>
+                        <p className="text-sm text-gray-600 ">{contact.phone}</p>
                       </div>
                       <button
                         onClick={() => setDialog(contact)}

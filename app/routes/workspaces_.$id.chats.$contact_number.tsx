@@ -29,9 +29,9 @@ const getMessageMedia = async ({ messages, supabaseClient }) => {
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
+  const {id, contact_number} = params;
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  const contact_number = params.contact_number;
   let messages = [];
 
   if (contact_number !== "new") {
@@ -39,6 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .from("message")
       .select()
       .or(`from.eq.${contact_number}, to.eq.${contact_number}`)
+      .eq('workspace', id)
       .order("date_created", { ascending: true });
     messages.push(
       ...(await getMessageMedia({
@@ -114,7 +115,7 @@ export default function ChatScreen() {
   }, [messages]);
 
   return (
-    <div className="flex h-full flex-col bg-gray-100">
+    <div className="flex h-full flex-col">
       <MessageList messages={messages} messagesEndRef={messagesEndRef} />
     </div>
   );

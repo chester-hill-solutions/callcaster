@@ -243,7 +243,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                 setScriptData(newScript.steps);
                 setCurrentPage(newScript.steps?.startPage || Object.values(scriptData.pages)[0].id || null);
                 setOpenBlock(null);
-                
+
                 const newPageData = {
                     ...pageData,
                     campaignDetails: {
@@ -285,12 +285,48 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
         }
     }, [currentPage, scriptData, pageData, onPageDataChange]);
 
+    const handleReorder = (draggedId, targetId, dropPosition) => {
+        const currentPageBlocks = scriptData.pages[currentPage].blocks;
+        const draggedIndex = currentPageBlocks.indexOf(draggedId);
+        const targetIndex = currentPageBlocks.indexOf(targetId);
+    
+        if (draggedIndex === -1 || targetIndex === -1) return;
+    
+        const newBlocksOrder = [...currentPageBlocks];
+        newBlocksOrder.splice(draggedIndex, 1);
+        const newTargetIndex = dropPosition === "top" ? targetIndex : targetIndex + 1;
+        newBlocksOrder.splice(newTargetIndex, 0, draggedId);
+    
+        const updatedScriptData = {
+          ...scriptData,
+          pages: {
+            ...scriptData.pages,
+            [currentPage]: {
+              ...scriptData.pages[currentPage],
+              blocks: newBlocksOrder,
+            },
+          },
+        };
+    
+        setScriptData(updatedScriptData);
+        onPageDataChange({
+          ...pageData,
+          campaignDetails: {
+            ...pageData.campaignDetails,
+            script: {
+              ...pageData.campaignDetails.script,
+              steps: updatedScriptData,
+            },
+          },
+        });
+      };
+    
     useEffect(() => {
-        if (!script?.type){
+        if (!script?.type) {
             console.log(script, scriptDefault, scriptData)
             changeType(scriptDefault === "live_call" ? "script" : "ivr")
         }
-    },[])
+    }, [])
 
     const ScriptSelector = () => (
         <div className="flex flex-col">
@@ -386,7 +422,7 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                                 rightLabel="Live Script"
                                 onChange={(val) => changeType(!val ? 'ivr' : 'script')}
                             />
-                           
+
                         </div>
                     </div>
                     {currentPage && (
@@ -408,50 +444,55 @@ export default function CampaignSettingsScript({ pageData, onPageDataChange, scr
                             </div>
                         </>
                     )}
-                    {((scriptData.type === 'script') ?
-                        (scriptData?.pages?.[currentPage]?.blocks || []).map((blockId) => (
-                            <MergedQuestionBlock
-                                type={scriptData.type}
-                                key={blockId}
-                                blocks={scriptData.blocks}
-                                question={scriptData.blocks[blockId] || {}}
-                                removeQuestion={() => removeBlock(blockId)}
-                                moveUp={() => moveBlock(blockId, -1)}
-                                moveDown={() => moveBlock(blockId, 1)}
-                                onUpdate={(newState) => updateBlock(blockId, newState)}
-                                openBlock={openBlock}
-                                setOpenBlock={setOpenBlock}
-                                dispatchState={(newState) => updateBlock(blockId, newState)}
-                                scriptData={scriptData}
-                                addNewBlock={addBlock}
-                                handleNextChange={(optionIndex, nextValue) => {
-                                    const updatedOptions = [...(scriptData.blocks[blockId]?.options || [])];
-                                    if (updatedOptions[optionIndex]) {
-                                        updatedOptions[optionIndex].next = nextValue;
-                                        updateBlock(blockId, { options: updatedOptions });
-                                    }
-                                }}
-                            />
-                        ))
-                        :
-                        (currentPage && scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
-                            <MergedQuestionBlock
-                                type={script.type}
-                                key={blockId}
-                                blocks={scriptData.blocks}
-                                block={scriptData.blocks[blockId] || {}}
-                                onRemove={() => removeBlock(blockId)}
-                                onUpdate={(newState) => updateBlock(blockId, newState)}
-                                onMoveDown={() => moveBlock(blockId, 1)}
-                                onMoveUp={() => moveBlock(blockId, -1)}
-                                openBlock={openBlock}
-                                setOpenBlock={setOpenBlock}
-                                pages={scriptData.pages || {}}
-                                onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
-                                mediaNames={mediaNames}
-                            />
-                        ))
-                    )}
+                    <div className="flex flex-col gap-2">
+                        {((scriptData.type === 'script') ?
+                            (scriptData?.pages?.[currentPage]?.blocks || []).map((blockId) => (
+                                <MergedQuestionBlock
+                                    type={scriptData.type}
+                                    key={blockId}
+                                    blocks={scriptData.blocks}
+                                    question={scriptData.blocks[blockId] || {}}
+                                    removeQuestion={() => removeBlock(blockId)}
+                                    moveUp={() => moveBlock(blockId, -1)}
+                                    moveDown={() => moveBlock(blockId, 1)}
+                                    onMoveUp={(blockId, newOrder) => moveBlock(blockId, newOrder)}
+                                    onReorder={handleReorder}                                                                    
+                                    onUpdate={(newState) => updateBlock(blockId, newState)}
+                                    openBlock={openBlock}
+                                    setOpenBlock={setOpenBlock}
+                                    dispatchState={(newState) => updateBlock(blockId, newState)}
+                                    scriptData={scriptData}
+                                    addNewBlock={addBlock}
+                                    handleNextChange={(optionIndex, nextValue) => {
+                                        const updatedOptions = [...(scriptData.blocks[blockId]?.options || [])];
+                                        if (updatedOptions[optionIndex]) {
+                                            updatedOptions[optionIndex].next = nextValue;
+                                            updateBlock(blockId, { options: updatedOptions });
+                                        }
+                                    }}
+                                />
+                            ))
+                            :
+                            (currentPage && scriptData.pages[currentPage]?.blocks || []).map((blockId) => (
+                                <MergedQuestionBlock
+                                    type={script.type}
+                                    key={blockId}
+                                    blocks={scriptData.blocks}
+                                    block={scriptData.blocks[blockId] || {}}
+                                    onRemove={() => removeBlock(blockId)}
+                                    onUpdate={(newState) => updateBlock(blockId, newState)}
+                                    onMoveDown={() => moveBlock(blockId, 1)}
+                                    onMoveUp={() => moveBlock(blockId, -1)}
+                                    onReorder={handleReorder}                                                                            
+                                    openBlock={openBlock}
+                                    setOpenBlock={setOpenBlock}
+                                    pages={scriptData.pages || {}}
+                                    onToggle={() => setOpenBlock((curr) => curr === blockId ? null : blockId)}
+                                    mediaNames={mediaNames}
+                                />
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

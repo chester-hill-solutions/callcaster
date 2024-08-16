@@ -93,7 +93,7 @@ export default function Workspace() {
         isInChildRoute={false}
         userRole={userRole}
       />
-      <div className="flex flex-grow flex-col gap-8 sm:flex-row">
+      <div className="flex flex-grow flex-col gap-4 sm:flex-row">
         <div className="relative w-full flex-shrink-0 rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900 sm:w-[250px]">
           <Button
             variant="outline"

@@ -40,7 +40,8 @@ export const action = async ({ request }) => {
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
             statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
-            voiceUrl: `${process.env.BASE_URL}/api/inbound`
+            voiceUrl: `${process.env.BASE_URL}/api/inbound`,
+            smsUrl: `${process.env.BASE_URL}/api/inbound-sms`
         });
         const { data: newNumber, error: newNumberError } = await supabase
         .from('workspace_number')
