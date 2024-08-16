@@ -1,6 +1,7 @@
 import { Tables } from "~/lib/database.types";
 import { QueueItem } from "~/lib/types";
 import { formatTime } from "~/lib/utils";
+import { Button } from "./ui/button";
 
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
@@ -104,13 +105,13 @@ export const CallArea: React.FC<CallAreaProps> = ({
         </div>
         {!conference && predictive && state === "idle" && (
         <div className="flex h-full flex-1 justify-center align-middle">
-            <button
+            <Button
             disabled={isBusy}
               onClick={handleDialNext}
               className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white rounded-lg"
             >
               Start Dialing
-            </button>
+            </Button>
           </div>
         )}
         {nextRecipient &&  (
@@ -138,7 +139,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
             className="flex flex-1 gap-2 px-4 py-2"
             style={{ position: "relative" }}
           >
-            <button
+            <Button
               onClick={handleHangUp}
               style={{
                 flex: "1",
@@ -150,10 +151,10 @@ export const CallArea: React.FC<CallAreaProps> = ({
               disabled={ state !== "connected" && state !== "dialing"}
             >
               Hang Up
-            </button>
-              <button
+            </Button>
+              <Button
                 onClick={handleDialNext}
-                disabled={displayState === "dialing" || displayState === "connected" || isBusy || !nextRecipient
+                disabled={displayState === "dialing" || displayState === "connected" || isBusy || (!predictive && !nextRecipient)
                 }
                 style={{
                   flex: "1",
@@ -169,7 +170,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 }
               >
                 {!predictive ? "Dial" : "Start"}
-              </button>
+              </Button>
           </div>
           <div className="flex px-4 gap-2" style={{ paddingBottom: ".5rem" }}>
             <select

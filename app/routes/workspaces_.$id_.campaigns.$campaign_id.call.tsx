@@ -636,7 +636,7 @@ const Campaign: React.FC = () => {
               </Form>
             </div>
             {/* Inputs */}
-            <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px]">
+            <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px] hidden">
               {device && <InputSelector device={device} />}
               {device && <OutputSelector device={device} />}
             </div>
