@@ -35,6 +35,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .from("campaign")
       .select("type")
       .eq("id", ref)
+      .eq("workspace", workspaceId)
       .single();
     campaignType = campaign.type;
   }

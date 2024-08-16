@@ -15,7 +15,7 @@ export default function MessageList({ messages, messagesEndRef }) {
               className={`max-w-[70%] rounded-lg p-3 ${
                 message.direction !== "inbound"
                   ? "bg-secondary text-slate-900"
-                  : "bg-white"
+                  : "bg-white dark:bg-zinc-500"
               }`}
             >
               <p className="text-sm">{message.body}</p>

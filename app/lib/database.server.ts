@@ -660,29 +660,32 @@ export async function updateCampaign({
     start_date: undefined,
     end_date: undefined,
     body_text: undefined,
-    message_media: undefined
+    message_media: undefined,
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
-  console.log(campaignDetails, tableKey)
-  const cleanCampaignDetails = tableKey !== "message_campaign" ? cleanObject({
-    ...campaignDetails,
-    mediaLinks: undefined,
-    disposition_options: undefined,
-    script: undefined,
-    questions: undefined,
-    created_at: undefined,
-    body_text: undefined,
-    message_media: undefined,
-    step_data: undefined,
-  }) : cleanObject({
-    ...campaignDetails,
-    mediaLinks: undefined,
-    disposition_options: undefined,
-    script: undefined,
-    questions: undefined,
-    created_at: undefined,
-    script_id:undefined
-  });
+  console.log(campaignDetails, tableKey);
+  const cleanCampaignDetails =
+    tableKey !== "message_campaign"
+      ? cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+        })
+      : cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          script_id: undefined,
+        });
 
   if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
@@ -701,8 +704,8 @@ export async function updateCampaign({
     "Error updating campaign",
   );
 
-  //tableKey === "message_campaign" 
-  const updatedCampaignDetails =  await handleDatabaseOperation(
+  //tableKey === "message_campaign"
+  const updatedCampaignDetails = await handleDatabaseOperation(
     () =>
       supabase
         .from(tableKey)
@@ -711,7 +714,7 @@ export async function updateCampaign({
         .select()
         .single(),
     "Error updating campaign details",
-  )
+  );
 
   let audienceUpdateResult = null;
   if (audiences) {
@@ -720,8 +723,7 @@ export async function updateCampaign({
       id,
       audiences,
     );
-    console.log(audienceUpdateResult)
-
+    console.log(audienceUpdateResult);
   }
 
   return {
@@ -800,20 +802,20 @@ export async function updateCampaignScript({
 }
 
 export const fetchBasicResults = async (
-  supabaseClient,
-  campaignId,
-  headers,
+  supabaseClient: SupabaseClient,
+  campaignId: string,
 ) => {
-  const { data, error } = await supabaseClient.rpc(
-    "get_basic_results",
-    { campaign_id_param: campaignId },
-    { headers },
-  );
+  const { data, error } = await supabaseClient.rpc("get_basic_results", {
+    campaign_id_param: campaignId,
+  });
   if (error) console.error("Error fetching basic results:", error);
   return data || [];
 };
 
-export const fetchCampaignData = async (supabaseClient, campaignId) => {
+export const fetchCampaignData = async (
+  supabaseClient: SupabaseClient,
+  campaignId: string,
+) => {
   const { data, error } = await supabaseClient
     .from("campaign")
     .select(
@@ -832,10 +834,10 @@ export const fetchCampaignData = async (supabaseClient, campaignId) => {
 };
 
 export const fetchCampaignDetails = async (
-  supabaseClient,
-  campaignId,
-  workspaceId,
-  tableName,
+  supabaseClient: SupabaseClient,
+  campaignId: string | number,
+  workspaceId: string,
+  tableName: string,
 ) => {
   const { data, error } = await supabaseClient
     .from(tableName)
@@ -864,7 +866,10 @@ export const fetchCampaignDetails = async (
   return data;
 };
 
-export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
+export const fetchCampaignWithAudience = async (
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string,
+) => {
   const { data, error } = await supabaseClient
     .from("campaign")
     .select(`*, campaign_audience(*)`)
@@ -875,10 +880,10 @@ export const fetchCampaignWithAudience = async (supabaseClient, campaignId) => {
 };
 
 export const fetchAdvancedCampaignDetails = async (
-  supabaseClient,
-  campaignId,
-  campaignType,
-  workspaceId,
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string | number,
+  campaignType: "live_call" | "message" | "robocall",
+  workspaceId: string,
 ) => {
   let table,
     extraSelect = "";
@@ -892,8 +897,6 @@ export const fetchAdvancedCampaignDetails = async (
       table = "message_campaign";
       break;
     case "robocall":
-    case "simple_ivr":
-    case "complex_ivr":
       table = "ivr_campaign";
       extraSelect = ", script(*)";
       break;
@@ -922,9 +925,9 @@ export const fetchAdvancedCampaignDetails = async (
 };
 
 export const findPotentialContacts = async (
-  supabaseClient,
-  phoneNumber,
-  workspaceId,
+  supabaseClient: SupabaseClient<Database>,
+  phoneNumber: string,
+  workspaceId: string,
 ) => {
   const fullNumber = phoneNumber.replace(/\D/g, "");
   const last10 = fullNumber.slice(-10);
@@ -959,7 +962,10 @@ export const findPotentialContacts = async (
   return data;
 };
 
-export async function fetchWorkspaceData(supabaseClient, workspaceId) {
+export async function fetchWorkspaceData(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+) {
   const { data: workspace, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select(`*, workspace_number(*)`)
@@ -970,7 +976,10 @@ export async function fetchWorkspaceData(supabaseClient, workspaceId) {
   return { workspace, workspaceError };
 }
 
-export async function fetchConversationSummary(supabaseClient, workspaceId) {
+export async function fetchConversationSummary(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+) {
   const { data: chats, error: chatsError } = await supabaseClient.rpc(
     "get_conversation_summary",
     { p_workspace: workspaceId },
@@ -980,10 +989,10 @@ export async function fetchConversationSummary(supabaseClient, workspaceId) {
 }
 
 export async function fetchContactData(
-  supabaseClient,
-  workspaceId,
-  contact_id,
-  contact_number,
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+  contact_id: number | string,
+  contact_number: string,
 ) {
   let potentialContacts = [];
   let contact = null;
@@ -1016,7 +1025,10 @@ export async function fetchContactData(
   return { contact, potentialContacts, contactError };
 }
 
-export async function fetchOutreachData(supabaseClient, campaignId) {
+export async function fetchOutreachData(
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string | number,
+) {
   const { data, error } = await supabaseClient
     .from("outreach_attempt")
     .select(`*, contact(*)`)
@@ -1050,7 +1062,13 @@ export function processOutreachExportData(data, users) {
   return { csvHeaders, flattenedData };
 }
 
-export async function createStripeContact({ supabaseClient, workspace_id }) {
+export async function createStripeContact({
+  supabaseClient,
+  workspace_id,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspace_id: string;
+}) {
   const { data, error } = await supabaseClient
     .from("workspace")
     .select(

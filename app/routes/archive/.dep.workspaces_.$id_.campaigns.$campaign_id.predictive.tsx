@@ -7,16 +7,16 @@ import {
   redirect,
   useSubmit,
 } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
-import { QueueList } from "../components/CallScreen.QueueList";
-import { CallArea } from "../components/CallScreen.CallArea";
-import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
-import { useStartConferenceAndDial } from "../hooks/useStartConferenceAndDial";
+import { getSupabaseServerClientWithSession } from "../../lib/supabase.server";
+import { QueueList } from "../../components/CallScreen.QueueList";
+import { CallArea } from "../../components/CallScreen.CallArea";
+import { CallQuestionnaire } from "../../components/CallScreen.Questionnaire";
+import { useSupabaseRealtime } from "../../hooks/useSupabaseRealtime";
+import { useStartConferenceAndDial } from "../../hooks/useStartConferenceAndDial";
 import useDebouncedSave, {
   handleQuestionsSave,
-} from "../hooks/useDebouncedSave";
-import { useTwilioDevice } from "../hooks/useTwilioDevice";
+} from "../../hooks/useDebouncedSave";
+import { useTwilioDevice } from "../../hooks/useTwilioDevice";
 import { CheckCircleIcon } from "lucide-react";
 import { Tables, ScriptBlocksRoot } from "~/lib/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";

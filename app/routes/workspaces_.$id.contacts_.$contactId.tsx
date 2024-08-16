@@ -35,8 +35,8 @@ export const loader = async ({ request, params }) => {
     .from("contact")
     .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
     .eq("id", selected_id)
+    .filter("outreach_attempt.workspace", 'eq', workspace_id)
     .single();
-
   const { data: audiences, error: audiencesError } = await supabaseClient
     .from("audience")
     .select(`*`)

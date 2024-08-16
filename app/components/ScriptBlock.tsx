@@ -14,6 +14,7 @@ import { NavLink } from "@remix-run/react";
 import { MdAdd, MdDialpad } from "react-icons/md";
 import { EditResponseModal } from "./QuestionCard.ResponseTable.EditModal";
 import { SelectGroup, SelectLabel } from "@radix-ui/react-select";
+import { Block, Page } from "~/lib/database.types";
 
 const QuestionBlockOption = ({
   option,
@@ -116,8 +117,29 @@ const MergedQuestionBlock = ({
   mediaNames,
   openBlock,
   setOpenBlock,
+  onReorder,
+}: {
+  block: Block;
+  onUpdate: (state: Partial<Block>) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  pages: Page[];
+  blocks: Block[];
+  type: "script" | "ivr";
+  mediaNames: string[];
+  openBlock: string | number;
+  setOpenBlock: (id: string | number | null) => void;
+  onReorder: (
+    draggedId: string,
+    targetId: string,
+    dropPosition: "top" | "bottom",
+  ) => void;
 }) => {
   const [localBlock, setLocalBlock] = useState(block);
+  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
+    "none",
+  );
   const questionTypes =
     type === "script"
       ? [
@@ -233,88 +255,124 @@ const MergedQuestionBlock = ({
     return null;
   };
 
+  const handleDrop = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const droppedBlockData = JSON.parse(event.dataTransfer.getData("cardData"));
+
+    if (droppedBlockData.id !== localBlock.id) {
+      onReorder(droppedBlockData.id, localBlock.id, acceptDrop);
+    }
+
+    setAcceptDrop("none");
+  };
+
   return (
-    <Card className="mb-4">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle
-            className="w-full cursor-pointer"
-            onClick={() =>
-              setOpenBlock((curr) => (curr !== block.id ? block.id : null))
-            }
-          >
-            {localBlock?.title || `Block ${localBlock?.id}`}
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" onClick={onMoveUp}>
-              <ArrowUp className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onMoveDown}>
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={onRemove}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      {openBlock === block.id && (
-        <CardContent>
-          <div className="space-y-4">
-            <TextInput
-              value={localBlock?.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-              placeholder="Block Title"
-            />
-            <Select
-              value={localBlock?.type}
-              onValueChange={(value) => handleChange("type", value)}
+    <div
+      className={`border-2 border-x-0 py-1 ${acceptDrop === "top" ? "border-b-transparent border-t-brand-primary" : acceptDrop === "bottom" ? "border-b-brand-primary border-t-transparent" : "border-b-transparent border-t-transparent"}`}
+    >
+      <Card
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData(
+            "cardData",
+            JSON.stringify({ totle: localBlock.title, id: localBlock.id }),
+          );
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const rect = event.currentTarget.getBoundingClientRect();
+          const midpoint = (rect.top + rect.bottom) / 2;
+          setAcceptDrop(event.clientY <= midpoint ? "top" : "bottom");
+        }}
+        onDragLeave={() => {
+          setAcceptDrop("none");
+        }}
+        onDrop={handleDrop}
+      >
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle
+              className="w-full cursor-pointer"
+              onClick={() =>
+                setOpenBlock((curr) => (curr !== block.id ? block.id : null))
+              }
             >
-              <SelectTrigger className="bg-white dark:bg-transparent">
-                <SelectValue
-                  className="text-brand-primary"
-                  placeholder="Select block type"
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {questionTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {renderContentInput()}
-          </div>
-          {["radio", "dropdown", "multi", "synthetic", "recorded"].includes(
-            localBlock?.type,
-          ) && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Options</h3>
-                <Button variant="ghost" size="sm" onClick={handleAddOption}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Option
-                </Button>
-              </div>
-              {localBlock.options?.map((option, index) => (
-                <QuestionBlockOption
-                  key={index}
-                  option={option}
-                  index={index}
-                  onRemove={handleRemoveOption}
-                  onChange={handleOptionChange}
-                  onNextChange={handleNextChange}
-                  pages={pages}
-                  blocks={blocks}
-                  type={type}
-                />
-              ))}
+              {localBlock?.title || `Block ${localBlock?.id}`}
+            </CardTitle>
+            <div className="flex items-center space-x-2">
+              <Button variant="ghost" size="icon" onClick={onMoveUp}>
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onMoveDown}>
+                <ArrowDown className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onRemove}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
+          </div>
+        </CardHeader>
+        {openBlock === block.id && (
+          <CardContent>
+            <div className="space-y-4">
+              <TextInput
+                value={localBlock?.title}
+                onChange={(e) => handleChange("title", e.target.value)}
+                placeholder="Block Title"
+              />
+              <Select
+                value={localBlock?.type}
+                onValueChange={(value) => handleChange("type", value)}
+              >
+                <SelectTrigger className="bg-white dark:bg-transparent">
+                  <SelectValue
+                    className="text-brand-primary"
+                    placeholder="Select block type"
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {questionTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {renderContentInput()}
+            </div>
+            {["radio", "dropdown", "multi", "synthetic", "recorded"].includes(
+              localBlock?.type,
+            ) && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Options</h3>
+                  <Button variant="ghost" size="sm" onClick={handleAddOption}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Option
+                  </Button>
+                </div>
+                {localBlock.options?.map((option, index) => (
+                  <QuestionBlockOption
+                    key={index}
+                    option={option}
+                    index={index}
+                    onRemove={handleRemoveOption}
+                    onChange={handleOptionChange}
+                    onNextChange={handleNextChange}
+                    pages={pages}
+                    blocks={blocks}
+                    type={type}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+    </div>
   );
 };
 

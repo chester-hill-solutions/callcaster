@@ -26,6 +26,7 @@ export const loader = async ({ request, params }) => {
   const { data: script } = await supabaseClient
     .from("script")
     .select()
+    .eq("workspace", workspace_id)
     .eq("id", selected_id)
     .single();
   const mediaNames = await listMedia(supabaseClient, workspace_id);

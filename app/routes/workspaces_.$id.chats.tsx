@@ -244,15 +244,15 @@ export default function ChatsList() {
   
 
   return (
-    <main className="mx-auto flex h-full w-full gap-4">
+    <main className="flex h-full w-full gap-4 max-h-[80vh]">
       <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
         <Button
-          className="flex items-center justify-center rounded-none bg-primary p-4 text-lg font-semibold text-white hover:bg-primary/90"
+          className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
           asChild
         >
           <NavLink to=".">
-            <MdAdd size={24} className="mr-2" />
             New Chat
+            <MdAdd size={24} className="mr-2" />
           </NavLink>
         </Button>
         <div className="flex-1 overflow-y-auto">
@@ -262,7 +262,7 @@ export default function ChatsList() {
                 key={chat.contact_phone}
                 to={chat.contact_phone}
                 className={({ isActive }) => `
-                flex items-center border-b border-gray-200 p-3 transition-colors hover:bg-gray-100
+                flex items-center border-b border-gray-200 p-3 dark:bg-zinc-900 transition-colors hover:bg-gray-100
                 ${isActive ? "bg-primary/10 font-semibold" : ""}
                 ${chat.unread_count > 0 ? "border-l-4 border-l-primary" : ""}
               `}
@@ -301,7 +301,7 @@ export default function ChatsList() {
         </div>
       </Card>
 
-      <Card className="flex h-full w-full flex-1 flex-col rounded-sm">
+      <Card className="flex h-full w-full flex-1 flex-col rounded-sm justify-stretch">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -321,7 +321,7 @@ export default function ChatsList() {
           handleExistingConversationClick={handleExistingConversationClick}
           setDialog={setDialog}
         />
-        <div className="flex h-full flex-col max-h-[800px] overflow-y-scroll bg-gray-100">
+        <div className="flex h-full flex-col overflow-y-scroll bg-gray-100 dark:bg-zinc-900">
           <Outlet context={{ supabase, workspace }} />
         </div>
         <ChatInput
