@@ -4,18 +4,18 @@ import { Card, CardHeader } from "~/components/ui/card";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
 const handleNavlinkStyles = ({ isActive, isPending }) =>
-    `flex bg-gray-100 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
+    `flex bg-gray-100 dark:bg-zinc-900 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
       isActive
         ? "border-primary border-2 text-primary-accent bg-white dark:bg-slate-700"
         : isPending
           ? "bg-muted"
-          : "hover:bg-muted"
+          : "hover:bg-muted dark:hover:bg-zinc-500"
     }`;
 
 
 
 const CampaignsList = ({campaigns, userRole, setCampaignsListOpen}) => (
-    <Card className="flex flex-auto flex-col border-none bg-secondary">
+    <Card className="flex flex-auto flex-col border-none bg-secondary dark:bg-blue-950 ">
       <CardHeader className="p-0">
         <NavLink
           to={`campaigns/new`}
@@ -49,7 +49,7 @@ const CampaignsList = ({campaigns, userRole, setCampaignsListOpen}) => (
         </nav>
         <nav className="">
           <NavLink
-            className={`flex items-center justify-center rounded-b-md bg-gray-100 px-4 py-2 font-Zilla-Slab text-sm font-medium transition-colors hover:bg-white`}
+            className={`flex items-center justify-center rounded-b-md bg-gray-100 dark:bg-zinc-900 px-4 py-2 font-Zilla-Slab text-sm font-medium transition-colors hover:bg-white dark:hover:bg-zinc-500`}
             to={"#"}
           >
             {" "}

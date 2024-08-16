@@ -672,7 +672,8 @@ export async function updateCampaign({
     questions: undefined,
     created_at: undefined,
     body_text: undefined,
-    message_media: undefined
+    message_media: undefined,
+    step_data: undefined,
   }) : cleanObject({
     ...campaignDetails,
     mediaLinks: undefined,

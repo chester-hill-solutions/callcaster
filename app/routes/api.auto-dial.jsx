@@ -38,6 +38,7 @@ export const action = async ({ request }) => {
             workspace: workspace_id,
             conference_id: user_id
         };
+        
 
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
         const { error } = await supabase.from('call').upsert({ ...callData }).select();
