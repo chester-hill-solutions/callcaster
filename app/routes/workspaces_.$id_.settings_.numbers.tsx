@@ -10,7 +10,6 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -18,11 +17,11 @@ import {
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   removeWorkspacePhoneNumber,
+  updateWorkspacePhoneNumber,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { useSupabaseRealtime } from "~/hooks/useSupabaseRealtime";
-import { toast, Toaster } from "sonner";
-import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -33,12 +32,11 @@ import { NumbersTable } from "~/components/NumbersTable";
 import { NumberCallerId } from "~/components/NumberCallerId";
 import { NumberPurchase } from "~/components/NumberPurchase";
 
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  if (!serverSession.user){
-    return redirect('/signin')
+  if (!serverSession.user) {
+    return redirect("/signin");
   }
   const workspaceId = params.id;
   const { data: users, error } = await getWorkspaceUsers({
@@ -47,7 +45,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
   const { data: phoneNumbers, error: numbersError } =
     await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
-
+  const { data: mediaNames } = await supabaseClient.storage
+    .from("workspaceAudio")
+    .list(workspaceId);
   if (serverSession) {
     const userRole = getUserRole({ serverSession, workspaceId });
     const hasAccess = userRole !== MemberRole.Caller;
@@ -56,7 +56,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       {
         phoneNumbers,
         workspaceId,
-        users
+        mediaNames,
+        users,
       },
       { headers },
     );
@@ -67,7 +68,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       phoneNumbers,
       workspaceId,
       user: serverSession?.user,
-      users
+      users,
     },
     { headers },
   );
@@ -127,6 +128,27 @@ export const action = async ({ request, params }) => {
     });
     if (error) return { error };
     return null;
+  } else if (formName === "update-incoming-activity"){
+    const { numberId, incomingActivity } = data;
+    const { error: incomingActivityError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId,
+      workspaceId: workspace_id,
+      updates: { inbound_action: incomingActivity },
+    });
+    if (incomingActivityError) return { error: incomingActivityError };
+    return null;
+  } else if (formName === "update-incoming-voice-message"){
+    const { numberId: voiceNumberId, incomingVoiceMessage } = data;
+    const { error: incomingVoiceMessageError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: voiceNumberId,
+      workspaceId: workspace_id,
+      updates: { inbound_audio: incomingVoiceMessage },
+    });
+    if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
+    return null;
+
   }
   return { error: "An unknown error occured" };
 };
@@ -136,19 +158,35 @@ export default function WorkspaceSettings() {
     phoneNumbers: initNumbers,
     workspaceId,
     user,
-    users
+    users,
+    mediaNames
   } = useLoaderData<typeof loader>();
   const { supabase } = useOutletContext();
   const actionData = useActionData<typeof action>();
   const [isDialogOpen, setDialog] = useState(!!actionData?.data);
-  const fetcher = useFetcher("numbers");
+  const fetcher = useFetcher();
+  const updateFetcher = useFetcher();
   const { phoneNumbers } = useSupabaseRealtime({
     supabase,
     user,
     workspace: workspaceId,
-    init: { phoneNumbers: initNumbers, queue:[], callsList:[] },
-    setQuestionContact: () => null
+    init: { phoneNumbers: initNumbers, queue: [], callsList: [] },
+    setQuestionContact: () => null,
   });
+
+  const handleIncomingActivityChange = (numberId, value) => {
+    updateFetcher.submit(
+      { formName: "update-incoming-activity", numberId, incomingActivity: value },
+      { method: "POST" }
+    );
+  };
+
+  const handleIncomingVoiceMessageChange = (numberId, value) => {
+    updateFetcher.submit(
+      { formName: "update-incoming-voice-message", numberId, incomingVoiceMessage: value },
+      { method: "POST" }
+    );
+  };
 
   useEffect(() => {
     if (actionData?.error) {
@@ -194,9 +232,15 @@ export default function WorkspaceSettings() {
         </div>
 
         <div className="flex flex-wrap">
-        <NumbersTable phoneNumbers={phoneNumbers} users={users}/>
+        <NumbersTable
+            phoneNumbers={phoneNumbers}
+            users={users}
+            mediaNames={mediaNames}
+            onIncomingActivityChange={handleIncomingActivityChange}
+            onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
+          />
           <NumberCallerId />
-          <NumberPurchase fetcher={fetcher} workspaceId={workspaceId}/>
+          <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />
         </div>
       </div>
     </Dialog>

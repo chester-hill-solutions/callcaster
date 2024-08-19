@@ -1071,6 +1071,7 @@ export type Json =
             friendly_name: string | null
             id: number
             inbound_action: string | null
+            inbound_audio: string | null
             phone_number: string | null
             type: string
             workspace: string
@@ -1081,6 +1082,7 @@ export type Json =
             friendly_name?: string | null
             id?: number
             inbound_action?: string | null
+            inbound_audio?: string | null
             phone_number?: string | null
             type: string
             workspace: string
@@ -1089,6 +1091,7 @@ export type Json =
             capabilities?: Json | null
             created_at?: string
             friendly_name?: string | null
+            inbound_audio?: string | null
             id?: number
             inbound_action?: string | null
             phone_number?: string | null
