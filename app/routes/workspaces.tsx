@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useMemo } from "react";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData } from "@remix-run/react";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useNavigation,
+} from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "~/components/ui/button";
 import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
@@ -33,7 +39,6 @@ interface LoaderData {
   userId: string;
   error: string | null;
 }
-
 
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, serverSession } =
@@ -82,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { data: newWorkspaceId, error } = await createNewWorkspace({
     supabaseClient,
     workspaceName: newWorkspaceName,
-    user_id: serverSession?.user.id
+    user_id: serverSession?.user.id,
   });
   if (error) {
     console.log("Error: ", error);
@@ -103,27 +108,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return json({ ok: true, error: null }, { headers });
 };
 
-const WorkspaceCard = React.memo(({ workspace, role }: { workspace: Workspace; role: string }) => (
-  <Link
-    to={`/workspaces/${workspace.id}`}
-    className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
-  >
-    <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
-      {formatTableText(workspace.name)}
-    </h5>
-    <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
-      {role}
-    </p>
-  </Link>
-));
+// eslint-disable-next-line react/display-name
+const WorkspaceCard = React.memo(
+  ({ workspace, role }: { workspace: Workspace; role: string }) => (
+    <Link
+      to={`/workspaces/${workspace.id}`}
+      className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+    >
+      <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
+        {formatTableText(workspace.name)}
+      </h5>
+      <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
+        {role}
+      </p>
+    </Link>
+  ),
+);
 
-const NewWorkspaceDialog = ({ userId }: { userId: string }) => (
+const NewWorkspaceDialog = ({
+  userId,
+  isBusy,
+}: {
+  userId: string;
+  isBusy: boolean;
+}) => (
   <Dialog>
     <DialogTrigger asChild>
       <Button
         variant="outline"
         className="h-full w-full border-2 border-black px-4 py-8 dark:border-white"
         aria-label="Add new workspace"
+        disabled={isBusy}
       >
         <FaPlus size="72px" className="text-black dark:text-white" />
       </Button>
@@ -153,11 +168,21 @@ const NewWorkspaceDialog = ({ userId }: { userId: string }) => (
         </label>
         <input type="hidden" name="userId" value={userId} />
         <div className="flex gap-4">
-          <Button variant="default" className="w-full text-xl" type="submit">
+          <Button
+            variant="default"
+            className="w-full text-xl"
+            type="submit"
+            disabled={isBusy}
+          >
             Create New Workspace
           </Button>
           <DialogClose asChild>
-            <Button variant="ghost" className="w-full text-xl" type="button">
+            <Button
+              variant="ghost"
+              className="w-full text-xl"
+              type="button"
+              disabled={isBusy}
+            >
               Close
             </Button>
           </DialogClose>
@@ -170,7 +195,9 @@ const NewWorkspaceDialog = ({ userId }: { userId: string }) => (
 export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<LoaderData>();
   const actionData = useActionData<typeof action>();
-  
+  const { state } = useNavigation();
+  const isBusy = state !== "idle";
+
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error);
@@ -180,26 +207,27 @@ export default function Workspaces() {
     }
   }, [actionData, error]);
 
-  const workspaceCards = useMemo(() => 
-    workspaces?.map((workspaceUser) => (
-      <div key={workspaceUser.workspace.id} className="w-full sm:w-1/4">
-        <WorkspaceCard
-          workspace={workspaceUser.workspace}
-          role={workspaceUser.role}
-        />
-      </div>
-    )),
-    [workspaces]
+  const workspaceCards = useMemo(
+    () =>
+      workspaces?.map((workspaceUser) => (
+        <div key={workspaceUser.workspace.id} className="w-full sm:w-48">
+          <WorkspaceCard
+            workspace={workspaceUser.workspace}
+            role={workspaceUser.role}
+          />
+        </div>
+      )),
+    [workspaces],
   );
 
   return (
-    <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 py-8 px-4">
+    <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
       <h1 className="text-center font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
         Your Workspaces
       </h1>
-      <div className="flex w-full flex-wrap justify-center gap-4">
-        <div className="w-full sm:w-1/4">
-          <NewWorkspaceDialog userId={userId} />
+      <div className="flex flex-wrap justify-center gap-4 sm:justify-start">
+        <div className="w-full sm:w-48">
+          <NewWorkspaceDialog userId={userId} isBusy={isBusy} />
         </div>
         {workspaceCards}
       </div>

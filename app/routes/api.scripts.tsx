@@ -15,7 +15,7 @@ export const action = async ({ request }: { request: Request }) => {
     workspace,
     saveAsCopy
   } = data;
-
+  
   try {
     const scriptData = {
       name,

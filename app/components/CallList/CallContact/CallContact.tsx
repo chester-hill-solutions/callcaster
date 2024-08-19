@@ -22,7 +22,7 @@ const QueueContact = ({
 }: QueueContactProps) => {
   const borderTop =
     grouped && firstInHouse
-      ? "2px solid #C91D25"
+      ? "2px solid #CCC"
       : grouped
         ? "2px solid hsl(var(--muted-foreground))"
         : "unset";

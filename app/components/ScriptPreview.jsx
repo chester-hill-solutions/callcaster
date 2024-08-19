@@ -4,8 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { MdOutlineAddCircleOutline } from "react-icons/md";
 import Result from "./CallList/CallContact/Result";
 
-const PageBlock = ({ block, data }) => (
-    <li className="p-4" style={{ borderTop: "2px solid #ccc" }}>
+const PageBlock = ({ block, data, index }) => (
+    <li className="p-4" style={{ borderTop: index > 0 ? "2px solid #ccc" : 'unset' }}>
         <div className="flex justify-between">
             <div style={{ width: "50%" }}>
                 <div><h4>{block.title}</h4></div>
@@ -39,12 +39,12 @@ const NextSteps = ({ data, all }) => (
 );
 
 const Page = ({ page, data }) => (
-    <div className="flex items-center">
-        <div className="h-full bg-brand-secondary p-4 flex justify-center items-center" style={{ width: "25%" }}>
+    <div className="flex items-center m-4">
+        <div className="bg-brand-secondary p-4 flex justify-center items-center rounded-md" style={{ width: "250px", height:'95%' }}>
             <h3 className="text-lg font-Zilla-Slab">{page.title}</h3>
         </div>
-        <div className="w-3/4">
-            <ul className="flex flex-col w-full">
+        <div className="flex flex-1">
+            <ul className="flex flex-col flex-1">
                 {page.blocks.length > 0 ? (
                     page.blocks.map((blockId) => (
                         <div id={blockId} key={blockId}>
@@ -74,12 +74,12 @@ export const ScriptPreview = ({ pageData }) => {
     }, []);
 
     return (
-        <div className="relative w-full h-full overflow-auto">
-            <div className="relative flex flex-wrap">
+        <div className="relative flex flex-auto h-full overflow-auto">
+            <div className="relative flex flex-wrap flex-auto w-full">
                 <div className="flex flex-col w-full">
                     {data.campaignDetails?.script?.steps?.pages &&
-                        Object.values(data.campaignDetails.script.steps.pages || {}).map((page) => (
-                            <Page key={page.id} page={page} data={data} />
+                        Object.values(data.campaignDetails.script.steps.pages || {}).map((page, index) => (
+                            <Page key={page.id} page={page} data={data} index={index} />
                         ))}
                 </div>
             </div>

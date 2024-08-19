@@ -1,0 +1,253 @@
+import { FaPlus } from "react-icons/fa";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
+import { useState, useEffect, useCallback } from "react";
+import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { deepEqual } from "~/lib/utils";
+import { Button } from "~/components/ui/button";
+import { getUserRole } from "~/lib/database.server";
+import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
+import ContactDetails from "~/components/ContactDetails";
+import { Session, SupabaseClient } from "@supabase/supabase-js";
+import { ContactAudience } from "../lib/types";
+
+interface AudienceChanges {
+  additions: ContactAudience[];
+  deletions: ContactAudience[];
+}
+
+export const loader = async ({ request, params }) => {
+  const { id: workspace_id, contactId: selected_id } = params;
+
+  const { supabaseClient, headers, serverSession } =
+    await getSupabaseServerClientWithSession(request);
+  if (!serverSession?.user) {
+    return redirect("/signin");
+  }
+  const { data: workspaceData, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select()
+    .eq("id", workspace_id)
+    .single();
+
+  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const { data: contact, error: contactError } = await supabaseClient
+    .from("contact")
+    .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
+    .eq("id", selected_id)
+    .filter("outreach_attempt.workspace", 'eq', workspace_id)
+    .single();
+  const { data: audiences, error: audiencesError } = await supabaseClient
+    .from("audience")
+    .select(`*`)
+    .eq("workspace", workspace_id);
+
+  return json({
+    workspace: workspaceData,
+    workspace_id,
+    selected_id,
+    contact,
+    userRole,
+    audiences,
+  });
+};
+
+function compareContactAudiences(
+  contactId: string,
+  initialAudiences: ContactAudience[],
+  currentAudiences: ContactAudience[],
+): AudienceChanges {
+  const additions: ContactAudience[] = [];
+  const deletions: ContactAudience[] = [];
+  currentAudiences?.forEach((currentAudience) => {
+    if (
+      !initialAudiences.some(
+        (initialAudience) =>
+          initialAudience.audience_id === currentAudience.audience_id,
+      )
+    ) {
+      additions.push({
+        contact_id: contactId,
+        audience_id: currentAudience.audience_id,
+      });
+    }
+  });
+  initialAudiences.forEach((initialAudience) => {
+    if (
+      !currentAudiences.some(
+        (currentAudience) =>
+          currentAudience.audience_id === initialAudience.audience_id,
+      )
+    ) {
+      deletions.push({
+        contact_id: contactId,
+        audience_id: initialAudience.audience_id,
+      });
+    }
+  });
+
+  return { additions, deletions };
+}
+
+export const action = async ({ request, params }) => {
+  const { contactId } = params;
+  const contact = await request.json();
+  delete contact.outreach_attempt;
+  const {
+    supabaseClient,
+    headers,
+    serverSession,
+  }: {
+    supabaseClient: SupabaseClient;
+    headers: Headers;
+    serverSession: Session;
+  } = await getSupabaseServerClientWithSession(request);
+  const { additions, deletions } = compareContactAudiences(
+    contact.id,
+    contact.initial_audiences,
+    contact.contact_audience,
+  );
+
+  if (deletions.length > 0) {
+    const { error: deleteError } = await supabaseClient
+      .from("contact_audience")
+      .delete()
+      .in("contact_id", [contactId])
+      .in(
+        "audience_id",
+        deletions.map((d) => d.audience_id),
+      );
+    if (deleteError) {
+      console.error("Error deleting contact audiences:", deleteError);
+      return json(
+        { success: false, error: deleteError.message },
+        { status: 400 },
+      );
+    }
+  }
+  if (additions.length > 0) {
+    const { error: insertError } = await supabaseClient
+      .from("contact_audience")
+      .insert(additions);
+
+    if (insertError) {
+      console.error("Error inserting contact audiences:", insertError);
+      return json(
+        { success: false, error: insertError.message },
+        { status: 400 },
+      );
+    }
+  }
+
+  delete contact.initial_audiences;
+  delete contact.contact_audience;
+
+  const { data: contactUpdate, error: updateError } = await supabaseClient
+    .from("contact")
+    .update(contact)
+    .eq("id", contactId)
+    .select();
+
+  if (updateError) {
+    console.log(updateError);
+    return json({ success: false, error: updateError }, { headers });
+  }
+  return json({ success: false, error: updateError }, { headers });
+};
+
+export default function ContactScreen() {
+  const {
+    contact: initContact,
+    userRole,
+    workspace,
+    audiences,
+  } = useLoaderData();
+  const [isChanged, setChanged] = useState(false);
+  const [contact, setContact] = useState(initContact);
+  const submit = useSubmit();
+
+  const handleAudience = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { checked, value } = e.target;
+      const audienceId = parseInt(value);
+      setContact((prevContact) => {
+        if (!prevContact) return prevContact;
+
+        let updatedContactAudience: ContactAudience[];
+
+        if (checked) {
+          if (
+            !prevContact.contact_audience?.some(
+              (ca) => ca.audience_id === audienceId,
+            )
+          ) {
+            updatedContactAudience = [
+              ...prevContact.contact_audience,
+              { contact_id: prevContact.id, audience_id: audienceId },
+            ];
+          } else {
+            updatedContactAudience = prevContact.contact_audience;
+          }
+        } else {
+          updatedContactAudience = prevContact.contact_audience.filter(
+            (ca) => ca.audience_id !== audienceId,
+          );
+        }
+
+        return {
+          ...prevContact,
+          contact_audience: updatedContactAudience,
+        };
+      });
+    },
+    [setContact],
+  );
+
+  const handleSave = () => {
+    submit(
+      { ...contact, initial_audiences: initContact?.contact_audience || [] },
+      {
+        method: "PATCH",
+        encType: "application/json",
+      },
+    );
+  };
+
+  const handleReset = () => {
+    setContact(initContact);
+    setChanged(false);
+  };
+
+  return (
+    <div className="relative flex h-full flex-col overflow-visible">
+      {isChanged && (
+        <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
+          <Button
+            onClick={handleReset}
+            className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
+          >
+            Reset
+          </Button>
+          <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
+            You have unsaved changes
+          </div>
+          <Button
+            onClick={() => null}
+            className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
+          >
+            Save Changes
+          </Button>
+        </div>
+      )}
+      <div className="h-full flex-grow p-4">
+        <ContactDetails
+          contact={contact}
+          setContact={setContact}
+          onSave={handleSave}
+          audiences={audiences}
+          handleAudience={handleAudience}
+        />
+      </div>
+    </div>
+  );
+}

@@ -4,9 +4,7 @@ import { AudienceForm } from "./AudienceForm";
 import { ContactTable } from "./ContactTable";
 import { ImportIcon } from "lucide-react";
 import { useSubmit } from "@remix-run/react";
-import { parseCSVData, parseCSVHeaders } from "~/lib/utils";
-
-import { parse } from "csv-parse/sync";
+import { parseCSV } from "~/lib/utils";
 
 const AudienceTable = ({
   contacts: initialContacts,
@@ -100,19 +98,11 @@ const AudienceTable = ({
     }
   };
 
-  const testParser = (text) => {
-    const records = parse(text);
-    return records;
-  };
 
   const readCSVFile = (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const text = e.target.result;
-      const records = testParser(text);
-      const parsedHeaders = parseCSVHeaders(records[0]);
-
-      const contacts = parseCSVData(records, parsedHeaders);
+      const {headers, contacts}  = parseCSV(e.target.result);
       submit(
         { contacts, audience_id, workspace_id },
         {
@@ -141,7 +131,7 @@ const AudienceTable = ({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full overflow-scroll">
       <div id="audience-settings" className="flex justify-between items-center">
         <div className="p-4">
           <AudienceForm

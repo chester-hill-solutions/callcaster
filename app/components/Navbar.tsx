@@ -5,11 +5,9 @@ import {
   NavLink,
   Params,
   useLocation,
-  useNavigation,
 } from "@remix-run/react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
-import WorkspaceSelectorCombobox from "./WorkspaceSelectorCombobox";
 import { WorkspaceData } from "~/lib/types";
 import {
   DropdownMenu,
@@ -122,7 +120,9 @@ export default function Navbar({
     }
   }, [loc, location]);
 
-  return (
+  return loc.pathname.endsWith("call") ? (
+    <div></div>
+  ) : (
     <header className={`w-full ${className}`}>
       <nav className="relative flex w-full items-center justify-between px-4 py-4 sm:h-[80px] sm:px-8">
         <Link
@@ -137,25 +137,22 @@ export default function Navbar({
         >
           CC
         </Link>
-        {workspaces && (
-          <div className="absolute left-1/2 hidden -translate-x-1/2 sm:block">
-            <WorkspaceSelectorCombobox workspaces={workspaces} />
-          </div>
-        )}
         <div className="hidden items-center space-x-4 sm:flex">
-          <NavButton to="/">Home</NavButton>
-          <NavButton to="/services">Services</NavButton>
+          {/* <NavButton to="/">Home</NavButton> */}
+          {/*           <NavButton to="/services">Services</NavButton>
+           */}{" "}
           {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
               <NavButton to="/signup">Sign Up</NavButton>
             </>
           )}
+          {workspaces && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
           {user && (
             <UserDropdownMenu
-              user={user}
-              handleSignOut={handleSignOut}
-              workspaceId={workspaceId}
+            user={user}
+            handleSignOut={handleSignOut}
+            workspaceId={workspaceId}
             />
           )}
           <ModeToggle />
@@ -163,7 +160,7 @@ export default function Navbar({
         <button
           className="text-2xl sm:hidden"
           onClick={() => setMobileMenuOpen(true)}
-        >
+          >
           <FaBars />
         </button>
       </nav>

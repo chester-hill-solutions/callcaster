@@ -144,7 +144,7 @@ export default function WorkspaceContacts() {
         </h1>
         <div className="flex items-center gap-4">
           <Button asChild className="font-Zilla-Slab text-xl font-semibold">
-            <Link to={`./new`}>Add a Script</Link>
+            <Link to={`./new`}>Add Contact</Link>
           </Button>
           <Button
             asChild
@@ -164,7 +164,7 @@ export default function WorkspaceContacts() {
       )}
       {isWorkspaceAudioEmpty && (
         <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
+          Add Your Own Contacts to this Workspace!
         </h4>
       )}
 

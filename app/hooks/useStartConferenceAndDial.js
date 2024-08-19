@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 
 const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId, initialConference) => {
     const [conference, setConference] = useState(initialConference);
-
     const begin = useCallback(async () => {
         try {
             const startConferenceResponse = await fetch('/api/auto-dial', {

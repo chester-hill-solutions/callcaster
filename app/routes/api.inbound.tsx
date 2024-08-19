@@ -1,34 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-
-function isPhoneNumber(phone) {
-  const cleanPhone = phone.replace(/\D/g, "");
-  if (cleanPhone.length < 10 || cleanPhone.length > 15) {
-    return false;
-  }
-  const phoneRegex = /^(\+?1?)?(\d{10}|\d{3}[-.\s]?\d{3}[-.\s]?\d{4})$/;
-  return phoneRegex.test(phone);
-}
-
-function isEmail(email) {
-  const emailRegex =
-    /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-  if (!emailRegex.test(email) || email.length > 254) {
-    return false;
-  }
-  const [localPart, domain] = email.split("@");
-  if (localPart.length > 64 || domain.length > 255) {
-    return false;
-  }
-  if (!domain.includes(".")) {
-    return false;
-  }
-  const domainParts = domain.split(".");
-  if (domainParts[domainParts.length - 1].length < 2) {
-    return false;
-  }
-  return true;
-}
+import { isEmail, isPhoneNumber } from "~/lib/utils";
 
 export const action = async ({ request, params }) => {
   const twiml = new Twilio.twiml.VoiceResponse();

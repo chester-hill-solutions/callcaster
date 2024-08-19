@@ -10,34 +10,41 @@ export const useSupabaseRealtime = ({
   user,
   supabase,
   init,
-  contacts,
   campaign_id,
-  predictive = false,
+  predictive,
   setQuestionContact,
   workspace,
-  activeCall,
-}: UseSupabaseRealtimeProps): UseSupabaseRealtimeResult => {
-  const [disposition, setDisposition] = useState<string | null>(
-    init.recentAttempt?.disposition || init.recentAttempt?.result?.status || null
+  setCallDuration,
+  setUpdate
+}: UseSupabaseRealtimeProps) => {
+  const [disposition, setDisposition] = useState<string>(
+    init.recentAttempt?.disposition || "idle",
   );
-  const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(() => {
-    return init.nextRecipient || (init.queue.length > 0 ? init.queue[0] : null);
-  });
 
   const {
     queue,
     setQueue,
     predictiveQueue,
+    setPredictiveQueue,
     updateQueue,
-    householdMap
-  } = useQueue(init.queue, init.predictiveQueue, user, contacts, predictive, nextRecipient, setNextRecipient);
+    householdMap,
+    nextRecipient,
+    setNextRecipient,
+  } = useQueue({
+    initialQueue: init.queue,
+    initialPredictiveQueue: init.predictiveQueue,
+    user,
+    isPredictive: predictive,
+    campaign_id,
+    setCallDuration
+  });
 
   const {
     attemptList,
     setAttempts,
     recentAttempt,
     setRecentAttempt,
-    updateAttempts
+    updateAttempts,
   } = useAttempts(init.attempts, init.recentAttempt);
 
   const {
@@ -47,10 +54,11 @@ export const useSupabaseRealtime = ({
     setRecentCall,
     pendingCalls,
     setPendingCalls,
-    updateCalls
+    updateCalls,
   } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient);
 
-  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } = usePhoneNumbers(init.phoneNumbers, workspace);
+  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
+    usePhoneNumbers(init.phoneNumbers, workspace);
 
   useEffect(() => {
     const handleChange = (payload: any) => {
@@ -59,10 +67,17 @@ export const useSupabaseRealtime = ({
           updateAttempts(payload, user, campaign_id, callsList);
           break;
         case "call":
-          updateCalls(payload, queue, recentAttempt, setNextRecipient, setQuestionContact);
+          updateCalls(
+            payload,
+            queue,
+            recentAttempt,
+            setNextRecipient,
+            setQuestionContact,
+            setRecentAttempt
+          );
           break;
         case "campaign_queue":
-          updateQueue(payload, nextRecipient, setNextRecipient, predictive);
+          updateQueue(payload);
           break;
         case "workspace_number":
           updateWorkspaceNumbers(payload);
@@ -75,26 +90,35 @@ export const useSupabaseRealtime = ({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "*" },
-        handleChange
+        handleChange,
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setQuestionContact, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
+  }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, setRecentAttempt, setUpdate, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
 
   useEffect(() => {
     if (recentAttempt) {
-      setDisposition(recentAttempt.disposition || recentAttempt.result?.status || null);
+      setDisposition(
+        recentAttempt.disposition || recentAttempt.result?.status || "idle",
+      );
+    } else {
+      setDisposition("idle");
     }
   }, [recentAttempt]);
 
+  const handleSetDisposition = useCallback((value: string) => {
+    setRecentAttempt((cur) => ({
+      ...cur,
+      disposition: value,
+    }));
+  }, [setRecentAttempt]);
+
   useEffect(() => {
-    if (!nextRecipient && queue.length > 0) {
-      setNextRecipient(queue[0]);
-    }
-  }, [nextRecipient, queue]);
+    setQuestionContact(nextRecipient);
+  }, [nextRecipient, setQuestionContact]);
 
   return {
     queue,
@@ -107,7 +131,7 @@ export const useSupabaseRealtime = ({
     predictiveQueue,
     phoneNumbers,
     disposition,
-    setDisposition,
+    setDisposition: handleSetDisposition,
     nextRecipient,
     setNextRecipient,
     householdMap,

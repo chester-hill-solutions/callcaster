@@ -41,6 +41,7 @@ interface CallQuestionnaireProps {
   nextRecipient: QueueItem | null;
   handleQuickSave: () => void;
   disabled: boolean;
+  isBusy: boolean;
 }
 const CallQuestionnaire = ({
   handleResponse,
@@ -49,6 +50,7 @@ const CallQuestionnaire = ({
   nextRecipient: contact,
   handleQuickSave,
   disabled,
+  isBusy
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
   const [currentPageId, setCurrentPageId] = useState(
@@ -61,7 +63,6 @@ const CallQuestionnaire = ({
       }, [update]);
 
   const handleBlockResponse = (blockId: string, value: any) => {
-    console.log(blockId, value)
     const newUpdate = {
       ...localUpdate,
       [currentPageId]: {
@@ -77,6 +78,7 @@ const CallQuestionnaire = ({
     const block = campaignDetails.script?.steps.blocks[blockId];
     
     return (
+      <div>
       <Result
         disabled={disabled}
         action={(response) => handleBlockResponse(block.title, response.value)}
@@ -86,6 +88,7 @@ const CallQuestionnaire = ({
         initResult={localUpdate[block.title] || null}
         type={block.type}
       />
+      </div>
     );
   };
 
@@ -138,6 +141,7 @@ const CallQuestionnaire = ({
               }
             }}
             disabled={
+              isBusy ||
               currentPageId ===
               Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
             }
@@ -153,6 +157,7 @@ const CallQuestionnaire = ({
               }
             }}
             disabled={
+              isBusy ||
               currentPageId ===
               Object.keys(campaignDetails.script?.steps.pages || {})[
                 Object.keys(campaignDetails.script?.steps.pages || {}).length - 1
@@ -165,7 +170,7 @@ const CallQuestionnaire = ({
         <div className="flex justify-end p-2">
           <Button
             onClick={handleQuickSave}
-            disabled={navigation.state !== "idle"}
+            disabled={isBusy}
           >
             Save
           </Button>

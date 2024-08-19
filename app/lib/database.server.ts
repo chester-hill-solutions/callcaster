@@ -1,8 +1,11 @@
 import Twilio from "twilio";
+import Stripe from "stripe";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import { Audience, WorkspaceData } from "./types";
 import { jwtDecode } from "jwt-decode";
+import { json } from "@remix-run/node";
+import { extractKeys, flattenRow } from "./utils";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -50,6 +53,7 @@ export async function createNewWorkspaceDeprecated({
 
   return { data, error };
 }
+
 export async function createKeys({ workspace_id, sid, token }) {
   const twilio = new Twilio.Twilio(sid, token);
   try {
@@ -112,9 +116,20 @@ export async function createNewWorkspace({
     if (!newKey) {
       throw new Error("Failed to create Twilio API keys");
     }
+
+    const newStripeCustomer = await createStripeContact({
+      supabaseClient,
+      workspace_id: insertWorkspaceData,
+    });
+
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
-      .update({ twilio_data: account, key: newKey.sid, token: newKey.secret })
+      .update({
+        twilio_data: account,
+        key: newKey.sid,
+        token: newKey.secret,
+        stripe_id: newStripeCustomer.id,
+      })
       .eq("id", insertWorkspaceData);
     if (insertWorkspaceUsersError) {
       throw insertWorkspaceUsersError;
@@ -207,11 +222,24 @@ export async function getWorkspacePhoneNumbers({
 export async function addUserToWorkspace({
   supabaseClient,
   workspaceId,
+  userId,
+  role,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  userId: string;
+  role: "owner" | "admin" | "caller" | "member";
 }) {
-  return;
+  const { data, error } = await supabaseClient
+    .from("workspace_users")
+    .insert({ workspace_id: workspaceId, user_id: userId, role })
+    .select()
+    .single();
+  if (error) {
+    console.error("Failed to join workspace", error);
+    return { data: null, error };
+  }
+  return { data, error: null };
 }
 
 export async function testAuthorize({
@@ -271,6 +299,64 @@ export async function updateUserWorkspaceAccessDate({
 
   return;
 }
+export async function handleExistingUserSession(
+  supabaseClient: SupabaseClient,
+  serverSession: Session,
+  headers: Headers,
+) {
+  const { data: invites, error: inviteError } = await supabaseClient
+    .from("workspace_invite")
+    .select()
+    .eq("user_id", serverSession.user.id);
+  if (inviteError)
+    return json(
+      { error: inviteError, newSession: null, invites: [] },
+      { headers },
+    );
+  return json({ newSession: serverSession, invites, error: null }, { headers });
+}
+
+export async function handleNewUserOTPVerification(
+  supabaseClient: SupabaseClient,
+  token_hash: string,
+  type: "signup" | "invite" | "magiclink" | "recovery" | "email_change",
+  headers: Headers,
+) {
+  if (!token_hash) {
+    return json({ error: "Invalid invitation link" }, { headers });
+  }
+
+  const { data, error } = await supabaseClient.auth.verifyOtp({
+    token_hash,
+    type: type as
+      | "signup"
+      | "invite"
+      | "magiclink"
+      | "recovery"
+      | "email_change",
+  });
+
+  if (error) return json({ error }, { headers });
+
+  const newSession = data.session;
+
+  if (newSession) {
+    const { error: sessionError } =
+      await supabaseClient.auth.setSession(newSession);
+    if (sessionError) return json({ error: sessionError }, { headers });
+
+    const { data: invites, error: inviteError } = await supabaseClient
+      .from("workspace_invite")
+      .select()
+      .eq("user_id", newSession.user.id);
+
+    if (inviteError) return json({ error: inviteError }, { headers });
+
+    return json({ newSession, invites }, { headers });
+  } else {
+    return json({ error: "Failed to create session" }, { headers });
+  }
+}
 
 export async function forceTokenRefresh({
   supabaseClient,
@@ -291,6 +377,7 @@ export async function forceTokenRefresh({
   console.log("\nREFRESH");
   return { data: refreshData, error: null };
 }
+
 export async function removeWorkspacePhoneNumber({
   supabaseClient,
   workspaceId,
@@ -313,20 +400,21 @@ export async function removeWorkspacePhoneNumber({
       .eq("id", numberId)
       .single();
     if (numberError) throw numberError;
-    const twilio = new Twilio.Twilio(
-      data.twilio_data.sid,
-      data.twilio_data.authToken,
-    );
+    const twilio = await createWorkspaceTwilioInstance({
+      supabase: supabaseClient,
+      workspace_id: workspaceId,
+    });
     const outgoingIds = await twilio.outgoingCallerIds.list({
       friendlyName: number.friendly_name,
     });
     outgoingIds.map(async (id) => {
-      return await twilio.outgoingCallerIds(id).remove();
+      return await twilio.outgoingCallerIds(id.sid).remove();
     });
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
       .delete()
       .eq("id", numberId);
+
     if (deletionError) throw deletionError;
     return { error: null };
   } catch (error) {
@@ -422,6 +510,7 @@ export function getRecordingFileNames(stepData) {
     return fileNames;
   }, []);
 }
+
 export async function getMedia(
   fileNames: Array<string>,
   supabaseClient: SupabaseClient,
@@ -460,87 +549,230 @@ export async function getSignedUrls(supabaseClient, workspace_id, mediaNames) {
   );
 }
 
-export async function updateCampaign({
-  supabase,
-  campaignData = {},
-  campaignDetails = {},
-}) {
-  const updateData = campaignData;
-  delete updateData.campaign_audience;
-  delete updateData.campaignDetails;
-  delete updateData.mediaLinks;
-  delete updateData.script;
-  const id = campaignDetails.campaign_id
-  delete updateData.campaign_id;
-  delete updateData.questions;
+export async function acceptWorkspaceInvitations(
+  supabaseClient: SupabaseClient<any, "public", any>,
+  invitationIds: string[],
+  userId: string,
+) {
+  for (const invitationId of invitationIds) {
+    const { data: invite, error: inviteError } = await supabaseClient
+      .from("workspace_invite")
+      .select()
+      .eq("id", invitationId)
+      .single();
+    console.error(inviteError);
+    if (inviteError) return { error: inviteError };
 
-  const { data: campaign, error: campaignError } = await supabase
-    .from("campaign")
-    .update(updateData)
-    .eq("id", id)
-    .eq("workspace", updateData.workspace)
-    .select();
-  if (campaignError) {
-    if (campaignError.code === "23505") {
-      throw new Error(
-        "A campaign with this title already exists in the workspace",
-      );
-    }
-    throw campaignError;
+    const { error: workspaceError } = await addUserToWorkspace({
+      supabaseClient: supabaseClient,
+      workspaceId: invite.workspace,
+      userId: userId,
+      role: invite.role,
+    });
+    console.error(workspaceError);
+    if (workspaceError) return { error: workspaceError };
+
+    const { error: deletionError } = await supabaseClient
+      .from("workspace_invite")
+      .delete()
+      .eq("id", invitationId);
+
+    if (deletionError) return { error: deletionError };
+    return { error: null };
   }
-
-  let tableKey: "live_campaign" | "message_campaign" | "ivr_campaign";
-  if (campaignData?.type === "live_call" || !campaignData?.type)
-    tableKey = "live_campaign";
-  else if (campaignData.type === "message") tableKey = "message_campaign";
-  else if (
-    ["robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)
-  )
-    tableKey = "ivr_campaign";
-  else throw new Error("Invalid campaign type");
-  delete campaignDetails.mediaLinks;
-  delete campaignDetails.script;
-  const { data: updatedCampaignDetails, error: campaignDetailsError } =
-    await supabase
-      .from(tableKey)
-      .update(campaignDetails)
-      .eq("campaign_id", id)
-      .select();
-
-  if (campaignDetailsError) throw campaignDetailsError;
-
-  return { campaign: campaign[0], campaignDetails: updatedCampaignDetails[0] };
+}
+type CampaignType =
+  | "live_call"
+  | "message"
+  | "robocall"
+  | "simple_ivr"
+  | "complex_ivr";
+interface CampaignData {
+  id?: string;
+  workspace: string;
+  title: string;
+  type: CampaignType;
+  script_id?: number;
+  audiences?: Array<{ audience_id: string; campaign_id: string }>;
+  [key: string]: any;
 }
 
-export async function updateOrCopyScript({ supabase, scriptData, saveAsCopy, campaignData, created_by, created_at }) {
-  
+interface CampaignDetails {
+  campaign_id: string;
+  script_id?: string;
+  [key: string]: any;
+}
+function getCampaignTableKey(type: CampaignType): string {
+  switch (type) {
+    case "live_call":
+      return "live_campaign";
+    case "message":
+      return "message_campaign";
+    case "robocall":
+    case "simple_ivr":
+    case "complex_ivr":
+      return "ivr_campaign";
+    default:
+      throw new Error("Invalid campaign type");
+  }
+}
+
+function cleanObject<T extends object>(obj: T): Partial<T> {
+  return Object.entries(obj).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key as keyof T] = value;
+    }
+    return acc;
+  }, {} as Partial<T>);
+}
+
+export async function updateCampaign({
+  supabase,
+  campaignData,
+  campaignDetails,
+}: {
+  supabase: SupabaseClient;
+  campaignData: CampaignData;
+  campaignDetails: CampaignDetails;
+}) {
+  const {
+    campaign_id: id,
+    workspace,
+    audiences,
+    ...restCampaignData
+  } = campaignData;
+
+  if (!id) throw new Error("Campaign ID is required");
+  campaignDetails.script_id = parseInt(campaignData.script_id) || null;
+  campaignDetails.body_text = campaignData.body_text || "";
+  campaignDetails.message_media = campaignData.message_media || [];
+  const cleanCampaignData = cleanObject({
+    ...restCampaignData,
+    campaign_audience: undefined,
+    campaignDetails: undefined,
+    mediaLinks: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    disposition_options: undefined,
+    audience: undefined,
+    script_id: undefined,
+    start_date: undefined,
+    end_date: undefined,
+    body_text: undefined,
+    message_media: undefined,
+  });
+  const tableKey = getCampaignTableKey(cleanCampaignData.type);
+  console.log(campaignDetails, tableKey);
+  const cleanCampaignDetails =
+    tableKey !== "message_campaign"
+      ? cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+        })
+      : cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          script_id: undefined,
+        });
+
+  if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
+    cleanCampaignDetails.script_id = cleanCampaignData.script_id;
+    delete cleanCampaignData.script_id;
+  }
+
+  const campaign = await handleDatabaseOperation(
+    () =>
+      supabase
+        .from("campaign")
+        .update(cleanCampaignData)
+        .eq("id", id)
+        .eq("workspace", workspace)
+        .select()
+        .single(),
+    "Error updating campaign",
+  );
+
+  //tableKey === "message_campaign"
+  const updatedCampaignDetails = await handleDatabaseOperation(
+    () =>
+      supabase
+        .from(tableKey)
+        .update(cleanCampaignDetails)
+        .eq("campaign_id", id)
+        .select()
+        .single(),
+    "Error updating campaign details",
+  );
+
+  let audienceUpdateResult = null;
+  if (audiences) {
+    audienceUpdateResult = await updateCampaignAudiences(
+      supabase,
+      id,
+      audiences,
+    );
+    console.log(audienceUpdateResult);
+  }
+
+  return {
+    campaign,
+    campaignDetails: updatedCampaignDetails,
+    audienceChanges: audienceUpdateResult,
+  };
+}
+
+export async function updateOrCopyScript({
+  supabase,
+  scriptData,
+  saveAsCopy,
+  campaignData,
+  created_by,
+  created_at,
+}) {
   const { id, ...updateData } = scriptData;
-  const {data: originalScript, error: fetchScriptError} = id ? await supabase.from('script').select().eq('id', id) : {data: null, error: null};
+  const { data: originalScript, error: fetchScriptError } = id
+    ? await supabase.from("script").select().eq("id", id)
+    : { data: null, error: null };
   let scriptOperation;
+  const upsertData = {
+    ...scriptData,
+    name:
+      saveAsCopy && originalScript?.name === updateData.name
+        ? `${updateData.name} (Copy)`
+        : updateData.name,
+    ...(saveAsCopy || !id
+      ? { updated_by: created_by, updated_at: created_at }
+      : { created_by, created_at }),
+  };
+
   if (saveAsCopy || !id) {
-    scriptOperation = supabase
-      .from("script")
-      .insert({
-        ...scriptData,
-        name: saveAsCopy && originalScript?.name === updateData.name ? `${updateData.name} (Copy)` : updateData.name,
-        created_by,
-        created_at,
-        workspace: campaignData.workspace
-      })
-      .select();
-      
+    delete upsertData.id;
+    scriptOperation = supabase.from("script").insert(upsertData).select();
   } else {
     scriptOperation = supabase
       .from("script")
-      .update({...scriptData, updated_by: created_by, updated_at: created_at})
+      .update(upsertData)
       .eq("id", id)
       .select();
   }
   const { data: updatedScript, error: scriptError } = await scriptOperation;
   if (scriptError) {
     if (scriptError.code === "23505") {
+      console.log(scriptError);
       throw new Error(
-        "A script with this name already exists in the workspace",
+        `A script with this name (${upsertData.name}) already exists in the workspace`,
       );
     }
     throw scriptError;
@@ -553,12 +785,12 @@ export async function updateCampaignScript({
   supabase,
   campaignId,
   scriptId,
-  campaignType
+  campaignType,
 }) {
-  console.log(scriptId, campaignId)
   let tableKey: "live_campaign" | "ivr_campaign";
   if (campaignType === "live_call" || !campaignType) tableKey = "live_campaign";
-  else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)) tableKey = "ivr_campaign";
+  else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType))
+    tableKey = "ivr_campaign";
   else throw new Error("Invalid campaign type for script update");
 
   const { error: scriptIdUpdateError } = await supabase
@@ -567,4 +799,503 @@ export async function updateCampaignScript({
     .eq("campaign_id", campaignId);
 
   if (scriptIdUpdateError) throw scriptIdUpdateError;
+}
+
+export const fetchBasicResults = async (
+  supabaseClient: SupabaseClient,
+  campaignId: string,
+) => {
+  const { data, error } = await supabaseClient.rpc("get_basic_results", {
+    campaign_id_param: campaignId,
+  });
+  if (error) console.error("Error fetching basic results:", error);
+  return data || [];
+};
+
+export const fetchCampaignData = async (
+  supabaseClient: SupabaseClient,
+  campaignId: string,
+) => {
+  const { data, error } = await supabaseClient
+    .from("campaign")
+    .select(
+      `
+      type,
+      dial_type,
+      title,
+      campaign_audience(*),
+      status
+    `,
+    )
+    .eq("id", campaignId)
+    .single();
+  if (error) console.error("Error fetching campaign data:", error);
+  return data;
+};
+
+export const fetchCampaignDetails = async (
+  supabaseClient: SupabaseClient,
+  campaignId: string | number,
+  workspaceId: string,
+  tableName: string,
+) => {
+  const { data, error } = await supabaseClient
+    .from(tableName)
+    .select()
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      const { data: newCampaign, error: newCampaignError } =
+        await supabaseClient
+          .from(tableName)
+          .insert({ campaign_id: campaignId, workspace: workspaceId })
+          .select()
+          .single();
+
+      if (newCampaignError) {
+        console.error(`Error creating new ${tableName}:`, newCampaignError);
+        return null;
+      }
+      return newCampaign;
+    }
+    console.error(`Error fetching ${tableName}:`, error);
+    return null;
+  }
+  return data;
+};
+
+export const fetchCampaignWithAudience = async (
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string,
+) => {
+  const { data, error } = await supabaseClient
+    .from("campaign")
+    .select(`*, campaign_audience(*)`)
+    .eq("id", campaignId)
+    .single();
+  if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
+  return data;
+};
+
+export const fetchAdvancedCampaignDetails = async (
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string | number,
+  campaignType: "live_call" | "message" | "robocall",
+  workspaceId: string,
+) => {
+  let table,
+    extraSelect = "";
+  switch (campaignType) {
+    case "live_call":
+    case null:
+      table = "live_campaign";
+      extraSelect = ", script(*)";
+      break;
+    case "message":
+      table = "message_campaign";
+      break;
+    case "robocall":
+      table = "ivr_campaign";
+      extraSelect = ", script(*)";
+      break;
+    default:
+      throw new Error(`Invalid campaign type: ${campaignType}`);
+  }
+
+  const { data, error } = await supabaseClient
+    .from(table)
+    .select(`*${extraSelect}`)
+    .eq("campaign_id", campaignId)
+    .single();
+
+  if (error)
+    throw new Error(`Error fetching campaign details: ${error.message}`);
+
+  if (campaignType === "message" && data?.message_media?.length > 0) {
+    data.mediaLinks = await getSignedUrls(
+      supabaseClient,
+      workspaceId,
+      data.message_media,
+    );
+  }
+
+  return data;
+};
+
+export const findPotentialContacts = async (
+  supabaseClient: SupabaseClient<Database>,
+  phoneNumber: string,
+  workspaceId: string,
+) => {
+  const fullNumber = phoneNumber.replace(/\D/g, "");
+  const last10 = fullNumber.slice(-10);
+  const last7 = fullNumber.slice(-7);
+  const areaCode = last10.slice(0, 3);
+  const data = await supabaseClient
+    .from("contact")
+    .select()
+    .eq("workspace", workspaceId)
+    .or(
+      `phone.eq.${fullNumber},` +
+        `phone.eq.+${fullNumber},` +
+        `phone.eq.+1${fullNumber},` +
+        `phone.eq.1${fullNumber},` +
+        `phone.eq.(${areaCode}) ${last7},` +
+        `phone.eq.(${areaCode})${last7},` +
+        `phone.eq.${areaCode}-${last7},` +
+        `phone.eq.${areaCode}.${last7},` +
+        `phone.eq.(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)},` +
+        `phone.ilike.%${fullNumber},` +
+        `phone.ilike.%+${fullNumber},` +
+        `phone.ilike.%+1${fullNumber},` +
+        `phone.ilike.%1${fullNumber},` +
+        `phone.ilike.%(${areaCode})%${last7},` +
+        `phone.ilike.%${areaCode}-%${last7},` +
+        `phone.ilike.%${areaCode}.%${last7},` +
+        `phone.ilike.%(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)}%,` +
+        `phone.ilike.${last10}%`,
+    )
+    .not("phone", "is", null)
+    .neq("phone", "");
+  return data;
+};
+
+export async function fetchWorkspaceData(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+) {
+  const { data: workspace, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select(`*, workspace_number(*)`)
+    .eq("id", workspaceId)
+    .eq("workspace_number.type", "rented")
+    .single();
+
+  return { workspace, workspaceError };
+}
+
+export async function fetchConversationSummary(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+) {
+  const { data: chats, error: chatsError } = await supabaseClient.rpc(
+    "get_conversation_summary",
+    { p_workspace: workspaceId },
+  );
+
+  return { chats, chatsError };
+}
+
+export async function fetchContactData(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+  contact_id: number | string,
+  contact_number: string,
+) {
+  let potentialContacts = [];
+  let contact = null;
+  let contactError = null;
+
+  if (contact_number && !contact_id) {
+    const { data: contacts } = await findPotentialContacts(
+      supabaseClient,
+      contact_number,
+      workspaceId,
+    );
+    potentialContacts = contacts;
+  }
+
+  if (contact_id) {
+    const { data: findContact, error: findContactError } = await supabaseClient
+      .from("contact")
+      .select()
+      .eq("workspace", workspaceId)
+      .eq("id", contact_id)
+      .single();
+
+    if (findContactError) {
+      contactError = findContactError;
+    } else {
+      contact = findContact;
+    }
+  }
+
+  return { contact, potentialContacts, contactError };
+}
+
+export async function fetchOutreachData(
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string | number,
+) {
+  const { data, error } = await supabaseClient
+    .from("outreach_attempt")
+    .select(`*, contact(*)`)
+    .eq("campaign_id", campaignId);
+
+  if (error) {
+    console.error("Error fetching data:", error);
+    throw new Error("Error fetching data");
+  }
+
+  return data;
+}
+
+export function processOutreachExportData(data, users) {
+  const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
+  let csvHeaders = [...dynamicKeys, ...resultKeys, ...otherDataKeys].map(
+    (header) =>
+      header === "id"
+        ? "attempt_id"
+        : header === "contact_id"
+          ? "callcaster_id"
+          : header,
+  );
+
+  const flattenedData = data.map((row) => flattenRow(row, users));
+
+  csvHeaders = csvHeaders.filter((header) =>
+    flattenedData.some((row) => row[header] != null && row[header] !== ""),
+  );
+
+  return { csvHeaders, flattenedData };
+}
+
+export async function createStripeContact({
+  supabaseClient,
+  workspace_id,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspace_id: string;
+}) {
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select(
+      `
+      name,
+      workspace_users!inner(
+        role,
+        user:user_id(
+          id,
+          username
+        )
+      )
+    `,
+    )
+    .eq("id", workspace_id)
+    .eq("workspace_users.role", "owner")
+    .single();
+
+  if (error) {
+    console.error("Error fetching workspace data:", error);
+    throw error;
+  }
+
+  if (!data || !data.workspace_users || data.workspace_users.length === 0) {
+    throw new Error("No owner found for the workspace");
+  }
+
+  const ownerUser = data.workspace_users[0].user;
+
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
+    apiVersion: "2020-08-27",
+  });
+
+  console.log("Creating Stripe customer for:", data.name, ownerUser.username);
+
+  return await stripe.customers.create({
+    name: data.name,
+    email: ownerUser.username,
+  });
+}
+
+export async function meterEvent({
+  supabaseClient,
+  workspace_id,
+  amount,
+  type,
+}) {
+  const {
+    data: { stripe_id },
+    error,
+  } = await supabaseClient
+    .from("workspace")
+    .select("stripe_id")
+    .eq("id", workspace_id)
+    .single();
+  const stripe = new Stripe(process.env.STRIPE_API_KEY!);
+  return await stripe.billing.meterEvents.create({
+    event_name: type,
+    payload: {
+      value: amount,
+      stripe_customer_id: stripe_id,
+    },
+  });
+}
+
+export const parseRequestData = async (request) => {
+  const contentType = request.headers.get("Content-Type");
+  if (contentType === "application/json") {
+    return await request.json();
+  } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
+    const formData = await request.formData();
+    return Object.fromEntries(formData);
+  }
+  throw new Error("Unsupported content type");
+};
+
+export const handleError = (error, message, status = 500) => {
+  console.error(`${message}:`, error);
+  return json({ error: message }, { status });
+};
+
+export const updateContact = async (supabaseClient, data) => {
+  if (!data.id) {
+    throw new Error("Contact ID is required");
+  }
+  Object.keys(data).forEach(
+    (key) => data[key] === undefined && delete data[key],
+  );
+  delete data.audience_id;
+
+  const { data: update, error } = await supabaseClient
+    .from("contact")
+    .update(data)
+    .eq("id", data.id)
+    .select();
+
+  if (error) throw error;
+  if (!update || update.length === 0) throw new Error("Contact not found");
+
+  return update[0];
+};
+
+export const createContact = async (
+  supabaseClient,
+  contactData,
+  audience_id,
+) => {
+  const { workspace, firstname, surname, phone, email, address } = contactData;
+  const { data: insert, error } = await supabaseClient
+    .from("contact")
+    .insert({ workspace, firstname, surname, phone, email, address })
+    .select();
+
+  if (error) throw error;
+
+  if (audience_id && insert) {
+    const contactAudienceData = insert.map((contact) => ({
+      contact_id: contact.id,
+      audience_id,
+    }));
+    const { error: contactAudienceError } = await supabaseClient
+      .from("contact_audience")
+      .insert(contactAudienceData)
+      .select();
+    if (contactAudienceError) throw contactAudienceError;
+  }
+
+  return insert;
+};
+
+export const bulkCreateContacts = async (
+  supabaseClient,
+  contacts,
+  workspace_id,
+  audience_id,
+) => {
+  const contactsWithWorkspace = contacts.map((contact) => ({
+    ...contact,
+    workspace: workspace_id,
+  }));
+
+  const { data: insert, error } = await supabaseClient
+    .from("contact")
+    .insert(contactsWithWorkspace)
+    .select();
+
+  if (error) throw error;
+
+  const audienceMap = insert.map((contact) => ({
+    contact_id: contact.id,
+    audience_id,
+  }));
+
+  const { data: audience_insert, error: audience_insert_error } =
+    await supabaseClient.from("contact_audience").insert(audienceMap).select();
+
+  if (audience_insert_error) throw audience_insert_error;
+
+  return { insert, audience_insert };
+};
+
+export async function getCampaignQueueById({ supabaseClient, campaign_id }) {
+  const { data, error } = await supabaseClient
+    .from("campaign_queue")
+    .select("*, contact(*)")
+    .eq("campaign_id", campaign_id);
+  if (error) throw error;
+  return data;
+}
+
+async function handleDatabaseOperation<T>(
+  operation: () => Promise<{ data: T; error: any }>,
+  errorMessage: string,
+): Promise<T> {
+  const { data, error } = await operation();
+  if (error) throw new Error(`${errorMessage}: ${error.message}`);
+  return data;
+}
+
+async function updateCampaignAudiences(
+  supabase: SupabaseClient,
+  campaignId: string,
+  newAudiences: Array<{ audience_id: string; campaign_id: string }>,
+) {
+  const existing = await handleDatabaseOperation(
+    () =>
+      supabase.from("campaign_audience").select().eq("campaign_id", campaignId),
+    "Error fetching existing campaign audience",
+  );
+  const toDelete = existing.filter(
+    (row) =>
+      !newAudiences.some((newRow) => newRow.audience_id === row.audience_id),
+  );
+  const toAdd = newAudiences.filter(
+    (newRow) => !existing.some((row) => row.audience_id === newRow.audience_id),
+  );
+
+  const addPromise =
+    toAdd.length > 0
+      ? handleDatabaseOperation(
+          () =>
+            supabase
+              .from("campaign_audience")
+              .upsert(toAdd, { onConflict: ["audience_id", "campaign_id"] })
+              .select(),
+          "Error adding campaign audience",
+        )
+      : Promise.resolve([]);
+
+  const deletePromise =
+    toDelete.length > 0
+      ? handleDatabaseOperation(
+          () =>
+            supabase
+              .from("campaign_audience")
+              .delete()
+              .in(
+                "audience_id",
+                toDelete.map((row) => row.audience_id),
+              )
+              .eq("campaign_id", campaignId)
+              .select(),
+          "Error deleting campaign audience",
+        )
+      : Promise.resolve([]);
+
+  const [added, deleted] = await Promise.all([addPromise, deletePromise]);
+
+  return { added, deleted };
 }

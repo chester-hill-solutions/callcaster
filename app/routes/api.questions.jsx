@@ -3,13 +3,12 @@ import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 
 export const action = async ({ request }) => {
     const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-    const { callId, update, contact_id, campaign_id, workspace } = await request.json();
+    const { callId, update, contact_id, campaign_id, workspace, disposition } = await request.json();
     let response;
     if (callId) {
-        // Update the existing record
         const { data, error } = await supabaseClient
             .from('outreach_attempt')
-            .upsert({id: callId, result: update, contact_id, user_id: serverSession.user.id, campaign_id })
+            .upsert({id: callId, ...(update && {result: update}), contact_id, user_id: serverSession.user.id, campaign_id, disposition })
             
             .select();
 
@@ -21,7 +20,7 @@ export const action = async ({ request }) => {
     } else {
         const { data, error } = await supabaseClient
             .from('outreach_attempt')
-            .insert({ result: update, contact_id, user_id: serverSession.user.id, campaign_id })
+            .insert({ ...(update && {result: update}), contact_id, user_id: serverSession.user.id, campaign_id, disposition })
             .select();
         if (error) {
             console.error(error)

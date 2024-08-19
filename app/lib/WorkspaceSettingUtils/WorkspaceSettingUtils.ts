@@ -9,73 +9,30 @@ export async function handleAddUser(
   headers: Headers,
 ) {
   const username = formData.get("username") as string;
-  // if (!userId) {
-  //   // console.log("HERE no username");
-  //   return json({ error: "No username provided" }, { headers });
-  // }
-
   const newUserRole = formData.get("new_user_workspace_role") as string;
-
-  const { data: user, error: getUserError } = await supabaseClient
-    .from("user")
-    .select()
-    .eq("username", username)
-    .single();
-
-  if (user == null) {
-    // console.log(`User ${userName} not found - `, getUserError);
-    return json({ error: `User ${username} not found` }, { headers });
+  if (!username) {
+    return json({ user: null, error: "Must provide an email address" });
   }
-  console.log("Selected user: ", user);
-
-  const { data: newUser, error: errorAddingUser } = await supabaseClient
-    .from("workspace_users")
-    .insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      role: newUserRole,
-    })
-    .select()
-    .single();
-
-  if (newUser == null) {
-    if (errorAddingUser != null && errorAddingUser.code === "23505") {
-      return json(
-        { error: `User ${username} is already in this workspace!` },
-        { headers },
-      );
-    }
-    // console.log("Insert error on workspace_users: ", errorAddingUser);
-    return json(
-      { error: `Could not add ${username} to workspace!` },
-      { headers },
-    );
+  const { data: user, error: inviteUserError } =
+    await supabaseClient.functions.invoke("invite-user-by-email", {
+      body: {
+        workspaceId,
+        email: username,
+        role: newUserRole,
+      },
+    });
+  if (inviteUserError) {
+    return json({ user: null, error: inviteUserError.message }, { headers });
   }
-
-  return json({ data: newUser, error: errorAddingUser?.message }, { headers });
+  return json({ data: user, error: null, success: true }, { headers });
 }
-
 export async function handleUpdateUser(
   formData: FormData,
   workspaceId: string,
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  //   console.log("\nHERE");
   const userId = formData.get("user_id") as string;
-
-  // const { data: user, error: getUserError } = await supabaseClient
-  //   .from("user")
-  //   .select()
-  //   .eq("username", userName)
-  //   .single();
-
-  // if (user == null) {
-  //   // console.log(`User ${userName} not found - `, getUserError);
-  //   return json({ error: `User ${userName} not found` }, { headers });
-  // }
-  //   console.log("Selected user: ", user);
-
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
   const { data: updatedUser, error: errorUpdatingUser } = await supabaseClient
     .from("workspace_users")
@@ -98,19 +55,6 @@ export async function handleDeleteUser(
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
-
-  // const { data: user, error: getUserError } = await supabaseClient
-  //   .from("user")
-  //   .select()
-  //   .eq("username", userName)
-  //   .single();
-
-  // if (user == null) {
-  //   // console.log(`User ${userName} not found - `, getUserError);
-  //   return json({ error: `User ${userName} not found` }, { headers });
-  // }
-  // console.log("Selected user: ", user);
-
   const { data: deletedUser, error: errorDeletingUser } = await supabaseClient
     .from("workspace_users")
     .delete()
@@ -132,15 +76,7 @@ export async function handleDeleteSelf(
   headers: Headers,
 ) {
   const userId = formData.get("user_id") as string;
-
-  // const { data: user, error: getUserError } = await supabaseClient
-  //   .from("user")
-  //   .select()
-  //   .eq("username", userName)
-  //   .single();
-
   if (userId == null) {
-    // console.log(`User ${userName} not found - `, getUserError);
     return json({ error: `User ${userId} not found` }, { headers });
   }
 
@@ -151,68 +87,12 @@ export async function handleDeleteSelf(
     .eq("user_id", userId)
     .select()
     .single();
-
   if (errorDeletingSelf) {
     console.log(errorDeletingSelf);
     return json({ data: null, error: errorDeletingSelf.message });
   }
 
   return redirect("/workspaces", { headers });
-}
-
-export async function handleInviteCaller(
-  formData: FormData,
-  workspaceId: string,
-  supabaseClient: SupabaseClient<Database>,
-  headers: Headers,
-) {
-  const callerEmail = formData.get("callerEmail") as string;
-
-  const session = await supabaseClient.auth.getSession();
-  if (session == null) {
-    return json({ error: "No user session" }, { headers });
-  }
-
-  const { data: callerSignUpData, error: callerSignUpError } =
-    await supabaseClient.auth.admin.generateLink({
-      type: "signup",
-      email: callerEmail,
-      password: "password1234",
-      options: {
-        data: {
-          user_workspace_role: "caller",
-          add_to_workspace: workspaceId,
-          first_name: "New",
-          last_name: "Caller",
-        },
-        redirectTo: "http://localhost:3000/signin",
-      },
-    });
-
-  console.log(callerSignUpData);
-  // if (callerSignUpData?.user != null) {
-  //   const { data: addCallerToWorkspaceData, error: addCallerToWorkspaceError } =
-  //     await supabaseClient
-  //       .from("workspace_users")
-  //       .insert({
-  //         workspace_id: workspaceId,
-  //         user_id: callerSignUpData.user.id,
-  //         role: "caller",
-  //       })
-  //       .select()
-  //       .single();
-
-  //   if (addCallerToWorkspaceData != null) {
-  //     return json({ data: addCallerToWorkspaceData }, { headers });
-  //   } else if (addCallerToWorkspaceError) {
-  //     return json({ error: addCallerToWorkspaceError }, { headers });
-  //   }
-  // }
-
-  return json(
-    { data: callerSignUpData, error: callerSignUpError?.message },
-    { headers },
-  );
 }
 
 export async function handleTransferWorkspace(
@@ -223,29 +103,6 @@ export async function handleTransferWorkspace(
 ) {
   const currentOwnerUserId = formData.get("workspace_owner_id") as string;
   const newOwnerUserId = formData.get("user_id") as string;
-
-  // const { data: currentOwnerData, error: errorGettingCurrentOwner } =
-  //   await supabaseClient
-  //     .from("user")
-  //     .select()
-  //     .eq("username", currentOwnerUserName)
-  //     .single();
-
-  // const { data: newOwnerData, error: errorGettingNewOwner } =
-  //   await supabaseClient
-  //     .from("user")
-  //     .select()
-  //     .eq("username", newOwnerUserName)
-  //     .single();
-
-  // if (currentOwnerData == null) {
-  //   console.log("ERROR GETTING CURRENT OWNER");
-  //   return json({ error: errorGettingCurrentOwner.message }, { headers });
-  // } else if (newOwnerData == null) {
-  //   console.log("ERROR GETTING NEW OWNER");
-  //   return json({ error: errorGettingNewOwner.message }, { headers });
-  // }
-
   const { data: updatedNewOwner, error: errorUpdatingNewOwner } =
     await supabaseClient
       .from("workspace_users")
@@ -287,13 +144,6 @@ export async function handleDeleteWorkspace({
   supabaseClient: SupabaseClient<Database>;
   headers: Headers;
 }) {
-  // const response = await supabaseClient
-  //   .from("workspace")
-  //   .delete()
-  //   .eq("id", workspaceId);
-
-  // console.log("Delete Workspace: ", response);
-
   const { data: deleteWorkspaceData, error: deleteWorkspaceError } =
     await supabaseClient
       .from("workspace")
@@ -307,4 +157,28 @@ export async function handleDeleteWorkspace({
   }
 
   return redirect("/workspaces");
+}
+
+export async function removeInvite({
+  workspaceId,
+  supabaseClient,
+  formData,
+  headers,
+}: {
+  workspaceId: string;
+  supabaseClient: SupabaseClient<Database>;
+  formData: FormData;
+  headers: Headers;
+}) {
+  const userId = formData.get("userId");
+  const { data, error } = await supabaseClient
+    .from("workspace_invite")
+    .delete()
+    .eq("workspace", workspaceId)
+    .eq("user_id", userId);
+  if (error) {
+    console.log("Error removing invite: ", error);
+    return json({ data: null, error }, { headers });
+  }
+  return json({ data, error: null }, { headers });
 }

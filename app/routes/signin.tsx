@@ -1,8 +1,6 @@
 import { json, redirect } from "@remix-run/node";
-import { Form, Link, useActionData } from "@remix-run/react";
+import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
-import { FaGithub } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
 import {
@@ -12,6 +10,8 @@ import {
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const requestUrl = new URL(request.url);
+  const next = requestUrl.searchParams.get('next');
 
   const formData = await request.formData();
 
@@ -24,6 +24,7 @@ export const action = async ({ request }: { request: Request }) => {
   });
 
   if (!error) {
+    if (next) return redirect(next, {headers});
     return redirect("/workspaces", { headers });
   }
   console.log(error);
@@ -64,28 +65,6 @@ export default function SignIn() {
             {actionData.error}
           </p>
         )}
-        {/* <Button
-          variant={"outline"}
-          className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
-        >
-          <FcGoogle size={"2rem"} />
-          Sign in with Google
-        </Button>
-        <Button
-          variant={"outline"}
-          className="hidden min-h-[56px] w-full gap-2 border-2 border-black bg-transparent font-Zilla-Slab text-xl font-semibold text-black dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-black sm:flex"
-        >
-          <FaGithub size={"2rem"} />
-          Sign in with Github
-        </Button> */}
-
-        {/* <div className="flex w-full items-center justify-center gap-2">
-          <div className="w-full border border-brand-primary dark:border-brand-secondary" />
-          <p className="font-Zilla-Slab text-xl font-semibold text-brand-primary dark:text-brand-secondary">
-            OR
-          </p>
-          <div className="w-full border border-brand-primary dark:border-brand-secondary" />
-        </div> */}
 
         <Form
           method="POST"
@@ -127,22 +106,27 @@ export default function SignIn() {
         >
           Login
         </Button>
-        <Link
+        <NavLink
           to={"/signup"}
           className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all
           duration-150 hover:text-brand-primary hover:underline dark:text-brand-secondary dark:hover:text-brand-primary"
         >
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
-        </Link>
-        {/* <Link
+        </NavLink>
+        <NavLink
           to={"/remember"}
           className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-gray-500 hover:text-brand-primary hover:underline dark:text-brand-tertiary"
         >
           I forgot my password
-        </Link> */}
+        </NavLink>
       </div>
       <Toaster richColors visibleToasts={1} />
+      <img
+        alt="background"
+        src="/Hero-1.png"
+        className="absolute left-0 top-[10px] z-[-1] h-screen overflow-hidden object-cover opacity-10"
+      />
     </main>
   );
 }

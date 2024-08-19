@@ -329,7 +329,9 @@ export type Json =
           Row: {
             address: string | null
             address_id: string | null
+            carrier: string | null
             city: string | null
+            country: string | null
             created_at: string
             date_updated: string | null
             email: string | null
@@ -340,13 +342,17 @@ export type Json =
             other_data: Json[]
             phone: string | null
             postal: string | null
+            province: string | null
             surname: string | null
             workspace: string | null
+            fullname: string | null
           }
           Insert: {
             address?: string | null
             address_id?: string | null
+            carrier?: string | null
             city?: string | null
+            country?: string | null
             created_at?: string
             date_updated?: string | null
             email?: string | null
@@ -357,13 +363,16 @@ export type Json =
             other_data?: Json[]
             phone?: string | null
             postal?: string | null
+            province?: string | null
             surname?: string | null
             workspace?: string | null
           }
           Update: {
             address?: string | null
             address_id?: string | null
+            carrier?: string | null
             city?: string | null
+            country?: string | null
             created_at?: string
             date_updated?: string | null
             email?: string | null
@@ -374,6 +383,7 @@ export type Json =
             other_data?: Json[]
             phone?: string | null
             postal?: string | null
+            province?: string | null
             surname?: string | null
             workspace?: string | null
           }
@@ -420,11 +430,113 @@ export type Json =
             },
           ]
         }
+        email: {
+          Row: {
+            created_at: string
+            created_by: string | null
+            design: Json | null
+            id: number
+            name: string
+            updated_at: string | null
+            updated_by: string | null
+            workspace: string | null
+          }
+          Insert: {
+            created_at?: string
+            created_by?: string | null
+            design?: Json | null
+            id?: number
+            name?: string
+            updated_at?: string | null
+            updated_by?: string | null
+            workspace?: string | null
+          }
+          Update: {
+            created_at?: string
+            created_by?: string | null
+            design?: Json | null
+            id?: number
+            name?: string
+            updated_at?: string | null
+            updated_by?: string | null
+            workspace?: string | null
+          }
+          Relationships: [
+            {
+              foreignKeyName: "email_created_by_fkey"
+              columns: ["created_by"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "email_updated_by_fkey"
+              columns: ["updated_by"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "email_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+          ]
+        }
+        email_campaign: {
+          Row: {
+            campaign_id: number
+            created_at: string
+            email_id: number | null
+            id: number
+            workspace: string
+          }
+          Insert: {
+            campaign_id: number
+            created_at?: string
+            email_id?: number | null
+            id?: number
+            workspace: string
+          }
+          Update: {
+            campaign_id?: number
+            created_at?: string
+            email_id?: number | null
+            id?: number
+            workspace?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "email_campaign_campaign_id_fkey"
+              columns: ["campaign_id"]
+              isOneToOne: false
+              referencedRelation: "campaign"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "email_campaign_email_id_fkey"
+              columns: ["email_id"]
+              isOneToOne: false
+              referencedRelation: "email"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "email_campaign_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+          ]
+        }
         ivr_campaign: {
           Row: {
             campaign_id: number
             created_at: string
             id: number
+            script_id: number | null
             step_data: Json
             workspace: string
           }
@@ -432,6 +544,7 @@ export type Json =
             campaign_id: number
             created_at?: string
             id?: number
+            script_id?: number | null
             step_data?: Json
             workspace: string
           }
@@ -439,6 +552,7 @@ export type Json =
             campaign_id?: number
             created_at?: string
             id?: number
+            script_id?: number | null
             step_data?: Json
             workspace?: string
           }
@@ -448,6 +562,13 @@ export type Json =
               columns: ["campaign_id"]
               isOneToOne: false
               referencedRelation: "campaign"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "ivr_campaign_script_id_fkey"
+              columns: ["script_id"]
+              isOneToOne: false
+              referencedRelation: "script"
               referencedColumns: ["id"]
             },
             {
@@ -462,22 +583,31 @@ export type Json =
         live_campaign: {
           Row: {
             campaign_id: number | null
+            created_at: string
+            disposition_options: Json
             id: number
-            questions: ScriptBlocksRoot
+            questions: Json
+            script_id: number | null
             voicemail: string | null
             workspace: string
           }
           Insert: {
             campaign_id?: number | null
+            created_at?: string
+            disposition_options?: Json
             id?: number
-            questions?: ScriptBlocksRoot
+            questions?: Json
+            script_id?: number | null
             voicemail?: string | null
             workspace?: string
           }
           Update: {
             campaign_id?: number | null
+            created_at?: string
+            disposition_options?: Json
             id?: number
-            questions?: ScriptBlocksRoot
+            questions?: Json
+            script_id?: number | null
             voicemail?: string | null
             workspace?: string
           }
@@ -489,6 +619,13 @@ export type Json =
               referencedRelation: "campaign"
               referencedColumns: ["id"]
             },
+            {
+              foreignKeyName: "live_campaign_script_id_fkey"
+              columns: ["script_id"]
+              isOneToOne: false
+              referencedRelation: "script"
+              referencedColumns: ["id"]
+            },
           ]
         }
         message: {
@@ -497,7 +634,7 @@ export type Json =
             api_version: string | null
             body: string | null
             campaign_id: number | null
-            contact_id: number
+            contact_id: number | null
             date_created: string | null
             date_sent: string | null
             date_updated: string | null
@@ -505,10 +642,12 @@ export type Json =
             error_code: number | null
             error_message: string | null
             from: string | null
+            inbound_media: string[] | null
             messaging_service_sid: string | null
             num_media: string | null
             num_segments: string | null
-            outreach_attempt_id: number
+            outbound_media: string[] | null
+            outreach_attempt_id: number | null
             price: string | null
             price_unit: string | null
             sid: string
@@ -523,7 +662,7 @@ export type Json =
             api_version?: string | null
             body?: string | null
             campaign_id?: number | null
-            contact_id: number
+            contact_id?: number | null
             date_created?: string | null
             date_sent?: string | null
             date_updated?: string | null
@@ -531,10 +670,12 @@ export type Json =
             error_code?: number | null
             error_message?: string | null
             from?: string | null
+            inbound_media?: string[] | null
             messaging_service_sid?: string | null
             num_media?: string | null
             num_segments?: string | null
-            outreach_attempt_id: number
+            outbound_media?: string[] | null
+            outreach_attempt_id?: number | null
             price?: string | null
             price_unit?: string | null
             sid: string
@@ -549,7 +690,7 @@ export type Json =
             api_version?: string | null
             body?: string | null
             campaign_id?: number | null
-            contact_id?: number
+            contact_id?: number | null
             date_created?: string | null
             date_sent?: string | null
             date_updated?: string | null
@@ -557,10 +698,12 @@ export type Json =
             error_code?: number | null
             error_message?: string | null
             from?: string | null
+            inbound_media?: string[] | null
             messaging_service_sid?: string | null
             num_media?: string | null
             num_segments?: string | null
-            outreach_attempt_id?: number
+            outbound_media?: string[] | null
+            outreach_attempt_id?: number | null
             price?: string | null
             price_unit?: string | null
             sid?: string
@@ -608,6 +751,7 @@ export type Json =
             created_at: string
             id: number
             message_media: string[] | null
+            workspace: string
           }
           Insert: {
             body_text?: string | null
@@ -615,6 +759,7 @@ export type Json =
             created_at?: string
             id?: number
             message_media?: string[] | null
+            workspace: string
           }
           Update: {
             body_text?: string | null
@@ -622,6 +767,7 @@ export type Json =
             created_at?: string
             id?: number
             message_media?: string[] | null
+            workspace?: string
           }
           Relationships: [
             {
@@ -629,6 +775,13 @@ export type Json =
               columns: ["campaign_id"]
               isOneToOne: false
               referencedRelation: "campaign"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "message_campaign_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
               referencedColumns: ["id"]
             },
           ]
@@ -723,6 +876,64 @@ export type Json =
             },
           ]
         }
+        script: {
+          Row: {
+            created_at: string
+            created_by: string | null
+            id: number
+            name: string
+            steps: Json | null
+            type: string | null
+            updated_at: string | null
+            updated_by: string | null
+            workspace: string | null
+          }
+          Insert: {
+            created_at?: string
+            created_by?: string | null
+            id?: number
+            name?: string
+            steps?: Json | null
+            type?: string | null
+            updated_at?: string | null
+            updated_by?: string | null
+            workspace?: string | null
+          }
+          Update: {
+            created_at?: string
+            created_by?: string | null
+            id?: number
+            name?: string
+            steps?: Json | null
+            type?: string | null
+            updated_at?: string | null
+            updated_by?: string | null
+            workspace?: string | null
+          }
+          Relationships: [
+            {
+              foreignKeyName: "script_created_by_fkey"
+              columns: ["created_by"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "script_updated_by_fkey"
+              columns: ["updated_by"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "script_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+          ]
+        }
         user: {
           Row: {
             access_level: string | null
@@ -767,25 +978,37 @@ export type Json =
         workspace: {
           Row: {
             created_at: string
+            disabled: boolean
             id: string
+            key: string | null
             name: string
             owner: string | null
+            stripe_id: string | null
+            token: string | null
             twilio_data: Json
             users: string[] | null
           }
           Insert: {
             created_at?: string
+            disabled?: boolean
             id?: string
+            key?: string | null
             name?: string
             owner?: string | null
+            stripe_id?: string | null
+            token?: string | null
             twilio_data?: Json
             users?: string[] | null
           }
           Update: {
             created_at?: string
+            disabled?: boolean
             id?: string
+            key?: string | null
             name?: string
             owner?: string | null
+            stripe_id?: string | null
+            token?: string | null
             twilio_data?: Json
             users?: string[] | null
           }
@@ -803,22 +1026,43 @@ export type Json =
           Row: {
             created_at: string
             id: string
+            isNew: boolean
             role: Database["public"]["Enums"]["workspace_role"]
+            user_id: string
             workspace: string
           }
           Insert: {
             created_at?: string
-            id: string
+            id?: string
+            isNew?: boolean
             role?: Database["public"]["Enums"]["workspace_role"]
+            user_id: string
             workspace?: string
           }
           Update: {
             created_at?: string
             id?: string
+            isNew?: boolean
             role?: Database["public"]["Enums"]["workspace_role"]
+            user_id?: string
             workspace?: string
           }
-          Relationships: []
+          Relationships: [
+            {
+              foreignKeyName: "workspace_invite_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "workspace_invite_user_id_fkey1"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "users"
+              referencedColumns: ["id"]
+            },
+          ]
         }
         workspace_number: {
           Row: {
@@ -826,7 +1070,9 @@ export type Json =
             created_at: string
             friendly_name: string | null
             id: number
+            inbound_action: string | null
             phone_number: string | null
+            type: string
             workspace: string
           }
           Insert: {
@@ -834,7 +1080,9 @@ export type Json =
             created_at?: string
             friendly_name?: string | null
             id?: number
+            inbound_action?: string | null
             phone_number?: string | null
+            type: string
             workspace: string
           }
           Update: {
@@ -842,7 +1090,9 @@ export type Json =
             created_at?: string
             friendly_name?: string | null
             id?: number
+            inbound_action?: string | null
             phone_number?: string | null
+            type?: string
             workspace?: string
           }
           Relationships: [
@@ -946,12 +1196,24 @@ export type Json =
             contact_phone: string
           }[]
         }
-        create_new_workspace: {
-          Args: {
-            new_workspace_name: string
-          }
-          Returns: string
+        call_edge_function: {
+          Args: Record<PropertyKey, never>
+          Returns: undefined
         }
+        create_new_workspace:
+          | {
+              Args: {
+                new_workspace_name: string
+              }
+              Returns: string
+            }
+          | {
+              Args: {
+                new_workspace_name: string
+                user_id: string
+              }
+              Returns: string
+            }
         create_outreach_attempt: {
           Args: {
             con_id: number
@@ -980,6 +1242,38 @@ export type Json =
             contact_id_variable: number
           }
           Returns: undefined
+        }
+        find_contact_by_phone: {
+          Args: {
+            p_phone_number: string
+            p_workspace_id: string
+          }
+          Returns: {
+            address: string | null
+            address_id: string | null
+            carrier: string | null
+            city: string | null
+            country: string | null
+            created_at: string
+            date_updated: string | null
+            email: string | null
+            external_id: string | null
+            firstname: string | null
+            id: number
+            opt_out: boolean | null
+            other_data: Json[]
+            phone: string | null
+            postal: string | null
+            province: string | null
+            surname: string | null
+            workspace: string | null
+          }[]
+        }
+        fullname: {
+          Args: {
+            "": unknown
+          }
+          Returns: string
         }
         get_audiences_by_campaign: {
           Args: {
@@ -1052,6 +1346,18 @@ export type Json =
           }
           Returns: Database["public"]["CompositeTypes"]["campaigndata"][]
         }
+        get_campaign_queue: {
+          Args: {
+            campaign_id_pro: number
+          }
+          Returns: {
+            id: number
+            contact_id: number
+            phone: string
+            workspace: string
+            caller_id: string
+          }[]
+        }
         get_campaigns_by_workspace: {
           Args: {
             workspace_id: string
@@ -1080,7 +1386,9 @@ export type Json =
           Returns: {
             address: string | null
             address_id: string | null
+            carrier: string | null
             city: string | null
+            country: string | null
             created_at: string
             date_updated: string | null
             email: string | null
@@ -1091,6 +1399,7 @@ export type Json =
             other_data: Json[]
             phone: string | null
             postal: string | null
+            province: string | null
             surname: string | null
             workspace: string | null
           }[]
@@ -1102,7 +1411,9 @@ export type Json =
           Returns: {
             address: string | null
             address_id: string | null
+            carrier: string | null
             city: string | null
+            country: string | null
             created_at: string
             date_updated: string | null
             email: string | null
@@ -1113,6 +1424,7 @@ export type Json =
             other_data: Json[]
             phone: string | null
             postal: string | null
+            province: string | null
             surname: string | null
             workspace: string | null
           }[]
@@ -1139,6 +1451,21 @@ export type Json =
             attempts: number
           }[]
         }
+        get_conversation_summary: {
+          Args: {
+            p_workspace: string
+          }
+          Returns: {
+            contact_phone: string
+            user_phone: string
+            conversation_start: string
+            conversation_last_update: string
+            message_count: number
+            unread_count: number
+            contact_firstname: string
+            contact_surname: string
+          }[]
+        }
         get_dynamic_outreach_results: {
           Args: {
             campaign_id_param: number
@@ -1156,6 +1483,15 @@ export type Json =
             dynamic_columns: Json
           }[]
         }
+        get_last_online: {
+          Args: Record<PropertyKey, never>
+          Returns: {
+            campaign_id: number
+            status: string
+            dial_type: Database["public"]["Enums"]["dial_types"]
+            last_online: string
+          }[]
+        }
         get_outreach_attempts: {
           Args: {
             campaign_id_param: number
@@ -1171,6 +1507,24 @@ export type Json =
             sid: number
           }[]
         }
+        get_outreach_data_column_definitions: {
+          Args: {
+            campaign_id_param: number
+          }
+          Returns: string
+        }
+        get_outreach_data_column_names: {
+          Args: {
+            campaign_id_param: number
+          }
+          Returns: string
+        }
+        get_outreach_data_column_structure: {
+          Args: {
+            campaign_id_param: number
+          }
+          Returns: string
+        }
         get_outreach_results: {
           Args: {
             campaign_id_param: number
@@ -1185,6 +1539,12 @@ export type Json =
             full_result: Json
             dynamic_columns: Json
           }[]
+        }
+        get_pivoted_outreach_data: {
+          Args: {
+            campaign_id_param: number
+          }
+          Returns: Record<string, unknown>[]
         }
         get_queued_contacts: {
           Args: {
@@ -1223,6 +1583,16 @@ export type Json =
           Args: Record<PropertyKey, never>
           Returns: undefined
         }
+        select_and_update_campaign_contacts: {
+          Args: {
+            p_campaign_id: number
+            p_initial_limit: number
+          }
+          Returns: {
+            queue_id: number
+            contact_id: number
+          }[]
+        }
         test_authorize: {
           Args: Record<PropertyKey, never>
           Returns: boolean
@@ -1246,13 +1616,14 @@ export type Json =
           | "busy"
           | "no-answer"
           | "initiated"
-        campaign_status: "pending" | "running" | "complete" | "paused"
+        campaign_status: "pending" | "running" | "complete" | "paused" | "draft"
         campaign_type:
           | "message"
           | "robocall"
           | "simple_ivr"
           | "complex_ivr"
           | "live_call"
+          | "email"
         dial_types: "call" | "predictive"
         message_direction:
           | "inbound"
@@ -1446,5 +1817,6 @@ export interface ResultsScreenProps {
       totalCalls: number;
       results: DispositionResult[];
       expectedTotal: number;
+      isBusy:boolean;
     }
     

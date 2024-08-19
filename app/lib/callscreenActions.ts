@@ -15,13 +15,21 @@ export const handleConference = ({ submit, begin }) => {
 
   const handleConferenceEnd = ({ activeCall, setConference, workspaceId }) => {
     submit(
-      {workspaceId},
-      { method: "post", action: "/api/auto-dial/end", navigate: false, encType:'application/json' },
+      { workspaceId },
+      {
+        method: "post",
+        action: "/api/auto-dial/end",
+        navigate: false,
+        encType: "application/json",
+      },
     );
     if (activeCall?.parameters?.CallSid) {
       fetch(`/api/hangup`, {
         method: "POST",
-        body: JSON.stringify({ callSid: activeCall.parameters.CallSid, workspaceId }),
+        body: JSON.stringify({
+          callSid: activeCall.parameters.CallSid,
+          workspaceId,
+        }),
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -50,7 +58,7 @@ export const handleCall = ({ submit }) => {
         queue_id: nextRecipient?.id,
         caller_id: campaign.caller_id,
       };
-      
+
       submit(data, {
         action: "/api/dial",
         method: "POST",
@@ -99,30 +107,31 @@ export const handleContact = ({
       skipHousehold,
     );
     if (!nextContact) return;
+
     setNextRecipient(nextContact);
+    setRecentAttempt(null);
+    setUpdate({});
     const newRecentAttempt = getRecentAttempt({
       attempts,
       contact: nextContact,
     });
-    if (!isRecent(newRecentAttempt.created_at)) {
-      setRecentAttempt({});
-      setUpdate({});
-      return nextContact;
-    } else {
+
+    if (isRecent(newRecentAttempt.created_at)) {
       const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
       setRecentAttempt({ ...newRecentAttempt, call: recentCalls });
       setUpdate(newRecentAttempt.result || {});
-      }
+    }
   };
+
   return { switchQuestionContact, nextNumber };
 };
 
 export const handleQueue = ({
-  fetcher,
   submit,
   groupByHousehold,
   campaign,
   workspaceId,
+  setQueue,
 }) => {
   const dequeue = ({ contact }) => {
     submit(
@@ -138,16 +147,49 @@ export const handleQueue = ({
         fetcherKey: "dequeue",
       },
     );
+    setQueue((prevQueue) => {
+      console.log(prevQueue);
+      return prevQueue.filter(
+        (queueContact) => queueContact.contact.id !== contact.contact.id,
+      );
+    });
   };
-  const fetchMore = ({ householdMap }) => {
-    const map = {...householdMap};
-    const length = Math.max(0, 5 - Object.keys(map).length)
-    fetcher.load(
+
+  const updateQueue = (newContacts) => {
+    setQueue((prevQueue) => {
+      const existingHouseholds = new Map();
+      prevQueue.forEach((contact) => {
+        const address = contact.contact.address;
+        if (!existingHouseholds.has(address)) {
+          existingHouseholds.set(address, []);
+        }
+        existingHouseholds.get(address).push(contact);
+      });
+
+      newContacts.forEach((newContact) => {
+        const address = newContact.contact.address;
+        if (existingHouseholds.has(address)) {
+          const household = existingHouseholds.get(address);
+          if (!household.some((c) => c.queue_id === newContact.queue_id)) {
+            household.push(newContact);
+          }
+        } else {
+          existingHouseholds.set(address, [newContact]);
+        }
+      });
+      return Array.from(existingHouseholds.values()).flat();
+    });
+  };
+
+  const fetchMore = async ({ householdMap }) => {
+    const map = { ...householdMap };
+    const length = Math.max(0, 10 - Object.keys(map).length);
+    const res = await fetch(
       `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`,
-      {
-        navigate: false,
-      },
-    );
+    )
+      .then((res) => res.json())
+      .catch((error) => console.log("Unable to fetch queue: ", error));
+    updateQueue(res);
   };
   return { dequeue, fetchMore };
 };

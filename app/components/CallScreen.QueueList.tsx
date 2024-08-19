@@ -17,6 +17,9 @@ interface QueueListProps {
   nextRecipient: QueueItem | null;
   predictive: boolean;
   handleQueueButton: () => void;
+  isBusy: boolean;
+  count: number;
+  completed: number;
 }
 
 const QueueList = ({
@@ -27,6 +30,9 @@ const QueueList = ({
   nextRecipient,
   predictive = false,
   handleQueueButton,
+  isBusy,
+  count,
+  completed,
 }: QueueListProps) => {
   const renderQueueContacts = () => {
     if (groupByHousehold && Object.keys(householdMap).length) {
@@ -92,6 +98,7 @@ const QueueList = ({
                   color: "white",
                   fontSize: "small",
                 }}
+                disabled={isBusy}
               >
                 Skip Household
               </button>
@@ -104,6 +111,7 @@ const QueueList = ({
                   borderRadius: "5px",
                   fontSize: "small",
                 }}
+                disabled={isBusy}
               >
                 Skip Person
               </button>
@@ -152,7 +160,7 @@ const QueueList = ({
                   </td>
                 </tr>
               )}
-              {!queue.length && (
+              {!queue.length && count === 0 && completed === 0 && (
                 <tr>
                   <td
                     colSpan={3}
@@ -164,6 +172,20 @@ const QueueList = ({
                   >
                     Check with your administration to ensure your queue is set
                     up.
+                  </td>
+                </tr>
+              )}
+              {!queue.length && completed > 0 && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    style={{
+                      padding: "36px",
+                      textAlign: "center",
+                      opacity: ".5",
+                    }}
+                  >
+                    You're all done! Great work.
                   </td>
                 </tr>
               )}
