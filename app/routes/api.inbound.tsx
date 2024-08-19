@@ -15,13 +15,18 @@ export const action = async ({ request, params }) => {
     .select(
       `
       inbound_action,
+      inbound_audio,
       type,
       workspace,
       ...workspace!inner(twilio_data)`,
     )
     .eq("phone_number", data.Called)
     .single();
-
+  const { data: voicemail, error: voicemailError } = number.inbound_audio
+    ? await supabase.storage
+        .from(`workspaceAudio`)
+        .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
+    : { voicemail: null, error: null };
   const { data: call, error: callError } = await supabase
     .from("call")
     .insert({
@@ -45,9 +50,13 @@ export const action = async ({ request, params }) => {
     });
   } else if (isEmail(number?.inbound_action)) {
     const phoneNumber = data.Called;
-    twiml.say(
-      `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`,
-    );
+    if (voicemail.signedUrl) {
+      twiml.play(voicemail.signedUrl);
+    } else {
+      twiml.say(
+        `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`,
+      );
+    }
     twiml.pause({ length: 1 });
     twiml.record({
       transcribe: true,

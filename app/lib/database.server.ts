@@ -2,7 +2,7 @@ import Twilio from "twilio";
 import Stripe from "stripe";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
-import { Audience, WorkspaceData } from "./types";
+import { Audience, WorkspaceData, WorkspaceNumbers } from "./types";
 import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
@@ -218,7 +218,26 @@ export async function getWorkspacePhoneNumbers({
   }
   return { data, error };
 }
-
+export async function updateWorkspacePhoneNumber({
+  supabaseClient,
+  workspaceId,
+  numberId,
+  updates
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  numberId:string;
+  updates:Partial<WorkspaceNumbers>
+}) {
+  const {data, error} = await supabaseClient
+  .from("workspace_number")
+  .update(updates)
+  .eq("id", numberId)
+  .eq("workspace", workspaceId)
+  .select()
+  .single();
+  return {data, error}
+}
 export async function addUserToWorkspace({
   supabaseClient,
   workspaceId,
