@@ -41,6 +41,34 @@ export async function handleNewAudience({
   const newAudienceName = formData.get("audience-name") as string;
 
   try {
+    const {
+      data: checkNewAudienceNameUnique,
+      error: checkNewAudienceNameUniqueError,
+    } = await supabaseClient
+      .from("audience")
+      .select("workspace, name")
+      .eq("workspace", workspaceId)
+      .eq("name", newAudienceName);
+
+    if (checkNewAudienceNameUniqueError) {
+      throw checkNewAudienceNameUniqueError;
+    }
+
+    if (checkNewAudienceNameUnique.length > 0) {
+      const audienceNameNotUniqueError = `"${newAudienceName}" is already an Audience in your workspace! Please choose a unique Audience name`;
+
+      return json(
+        {
+          audienceData: null,
+          error: {
+            message:
+              audienceNameNotUniqueError || "An unexpected error occurred",
+          },
+        },
+        { status: 500, headers },
+      );
+    }
+
     const { data: createAudienceData, error: createAudienceError } =
       await supabaseClient
         .from("audience")
@@ -106,7 +134,7 @@ export async function handleNewCampaign({
       title: newCampaignName,
       workspace: workspaceId,
       status: "draft",
-      type: newCampaignType
+      type: newCampaignType,
     })
     .select()
     .single();
@@ -118,13 +146,18 @@ export async function handleNewCampaign({
     );
   }
 
-  const tableKey = newCampaignType === "live_call" ? "live_campaign" : 
-  newCampaignType === "message" ? "message_campaign" :
-  newCampaignType === "robocall"? "ivr_campaign": null;
+  const tableKey =
+    newCampaignType === "live_call"
+      ? "live_campaign"
+      : newCampaignType === "message"
+        ? "message_campaign"
+        : newCampaignType === "robocall"
+          ? "ivr_campaign"
+          : null;
 
   const { error: detailsError } = await supabaseClient
     .from(tableKey)
-    .insert({ campaign_id: campaignData.id, workspace: workspaceId,  });
+    .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
     return json(
