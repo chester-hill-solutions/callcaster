@@ -1,4 +1,3 @@
-import Twilio from "twilio";
 import { json } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
