@@ -3,7 +3,7 @@ import { bulkCreateContacts, createContact, handleError, parseRequestData, updat
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 
 export const action = async ({ request }) => {
-    const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
     const method = request.method;
   
     try {
@@ -16,10 +16,10 @@ export const action = async ({ request }) => {
   
         case 'POST':
           if (Array.isArray(data.contacts)) {
-            const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id);
+            const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id, serverSession.user.id);
             return json(bulkResult);
           } else {
-            const newContact = await createContact(supabaseClient, data, data.audience_id);
+            const newContact = await createContact(supabaseClient, data, data.audience_id, serverSession.user.id);
             return json(newContact);
           }
   
