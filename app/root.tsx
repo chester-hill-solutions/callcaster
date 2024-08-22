@@ -116,6 +116,9 @@ export default function App() {
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY"){
+        redirect("/reset")
+      }
       if (session?.access_token !== serverAccessToken) {
         supabase.auth.getSession();
       }
