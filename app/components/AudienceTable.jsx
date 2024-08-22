@@ -151,6 +151,7 @@ const AudienceTable = ({
             type="file"
             name="file"
             id="file"
+            accept=".csv"
             ref={inputRef}
             className="hidden"
             onChange={handleOnClick}
