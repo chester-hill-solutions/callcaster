@@ -1,16 +1,26 @@
 import { Checkbox } from "~/components/ui/checkbox";
 import { Label } from "~/components/ui/label";
-
 interface InviteCheckboxProps {
-  invite: any;
+  invite: {
+    created_at: string;
+    id: string;
+    isNew: boolean;
+    role: "admin" | "owner" | "caller" | "member";
+    user_id: string;
+    workspace: { name: string; id: string };
+  };
 }
 
 export function InviteCheckbox({ invite }: InviteCheckboxProps) {
   return (
     <div className="flex items-center space-x-2">
-      <Checkbox id={`invite-${invite.id}`} name="invitation_id" value={invite.id} />
+      <Checkbox
+        id={`invite-${invite.id}`}
+        name="invitation_id"
+        value={invite.id}
+      />
       <Label htmlFor={`invite-${invite.id}`}>
-        Invitation from {new Date(invite.created_at).toLocaleDateString()}
+        Invitation to {invite.workspace.name}
       </Label>
     </div>
   );
