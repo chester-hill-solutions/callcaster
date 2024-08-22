@@ -5,8 +5,6 @@ import {
   useNavigation,
   NavLink,
   useNavigate,
-  Form,
-  useLocation,
   useSubmit,
 } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
@@ -219,8 +217,9 @@ export default function AcceptInvite() {
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-      <div className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none">
-        <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+      <div className="flex flex-col items-center justify-center gap-5  dark:text-white rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+      >
+        <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary  dark:text-white">
           Accept your invitations
         </h1>
         {loaderData.status === "verified" && (
