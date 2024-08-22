@@ -2,7 +2,7 @@ import Twilio from "twilio";
 import Stripe from "stripe";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
-import { Audience, WorkspaceData, WorkspaceNumbers } from "./types";
+import { Audience, Contact, WorkspaceData, WorkspaceNumbers } from "./types";
 import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
@@ -222,21 +222,21 @@ export async function updateWorkspacePhoneNumber({
   supabaseClient,
   workspaceId,
   numberId,
-  updates
+  updates,
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
-  numberId:string;
-  updates:Partial<WorkspaceNumbers>
+  numberId: string;
+  updates: Partial<WorkspaceNumbers>;
 }) {
-  const {data, error} = await supabaseClient
-  .from("workspace_number")
-  .update(updates)
-  .eq("id", numberId)
-  .eq("workspace", workspaceId)
-  .select()
-  .single();
-  return {data, error}
+  const { data, error } = await supabaseClient
+    .from("workspace_number")
+    .update(updates)
+    .eq("id", numberId)
+    .eq("workspace", workspaceId)
+    .select()
+    .single();
+  return { data, error };
 }
 export async function addUserToWorkspace({
   supabaseClient,
@@ -1191,14 +1191,23 @@ export const updateContact = async (supabaseClient, data) => {
 };
 
 export const createContact = async (
-  supabaseClient,
-  contactData,
-  audience_id,
+  supabaseClient: SupabaseClient,
+  contactData: Partial<Contact>,
+  audience_id: string,
+  user_id: string,
 ) => {
   const { workspace, firstname, surname, phone, email, address } = contactData;
   const { data: insert, error } = await supabaseClient
     .from("contact")
-    .insert({ workspace, firstname, surname, phone, email, address })
+    .insert({
+      workspace,
+      firstname,
+      surname,
+      phone,
+      email,
+      address,
+      created_by: user_id,
+    })
     .select();
 
   if (error) throw error;
@@ -1219,14 +1228,17 @@ export const createContact = async (
 };
 
 export const bulkCreateContacts = async (
-  supabaseClient,
-  contacts,
-  workspace_id,
-  audience_id,
+  supabaseClient:SupabaseClient,
+  contacts:Partial<Contact[]>,
+  workspace_id:string,
+  audience_id:string,
+  user_id:string,
 ) => {
+  console.log(user_id)
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
+    created_by:user_id
   }));
 
   const { data: insert, error } = await supabaseClient
