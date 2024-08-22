@@ -243,8 +243,7 @@ export const action = async ({ request }: { request: Request }) => {
       default:
         if (
           parsedBody.StatusCallbackEvent === "participant-leave" &&
-          (parsedBody.ReasonParticipantLeft === "participant_updated_via_api" ||
-            parsedBody.ReasonParticipantLeft === "participant_hung_up")
+          parsedBody.ReasonParticipantLeft === "participant_hung_up"
         ) {
           await handleParticipantLeave(parsedBody, twilio, realtime);
         } else if (parsedBody.StatusCallbackEvent === "participant-join") {
