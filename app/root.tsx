@@ -62,7 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { data: userData, error: userError } = await supabase
     .from("user")
-    .select()
+    .select(`*, workspace_invite(workspace(id, name))`)
     .eq("id", session?.user.id ?? "")
     .single();
 

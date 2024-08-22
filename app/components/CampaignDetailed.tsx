@@ -12,7 +12,7 @@ export const CampaignTypeSpecificSettings = ({
   handleActivateButton,
   details,
   mediaLinks,
-  isChanged
+  isChanged,
 }) => {
   return (
     <>
@@ -60,13 +60,15 @@ export const CampaignTypeSpecificSettings = ({
               </NavLink>
             </Button>
           </div>
-          <Button
-            type="button"
-            disabled={!(campaignData.script_id && campaignData.caller_id)}
-            onClick={handleActivateButton}
-          >
-            Activate Campaign
-          </Button>
+          <div className="flex items-end">
+            <Button
+              type="button"
+              disabled={!(campaignData.script_id && campaignData.caller_id)}
+              onClick={handleActivateButton}
+            >
+              Activate Campaign
+            </Button>
+          </div>
         </div>
       )}
       {campaignData.type === "live_call" && (
@@ -103,7 +105,13 @@ export const CampaignTypeSpecificSettings = ({
           />
           <Button
             type="button"
-            disabled={isChanged || !((campaignData.body_text || campaignData.message_media) && campaignData.caller_id)}
+            disabled={
+              isChanged ||
+              !(
+                (campaignData.body_text || campaignData.message_media) &&
+                campaignData.caller_id
+              )
+            }
             onClick={handleActivateButton}
           >
             Send

@@ -10,14 +10,13 @@ import {
   useSubmit,
 } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { createClient, Session, SupabaseClient } from "@supabase/supabase-js";
+import { Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   createSupabaseServerClient,
   getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
 import { acceptWorkspaceInvitations } from "~/lib/database.server";
 import { Button } from "~/components/ui/button";
-import { ErrorAlert } from "~/components/AcceptInvite/ErrorAlert";
 import { NewUserSignup } from "~/components/AcceptInvite/NewUserSignUp";
 import { ExistingUserInvites } from "~/components/AcceptInvite/ExistingUserInvites";
 import { toast, Toaster } from "sonner";
@@ -37,7 +36,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (session) {
     const { data: invites, error: inviteError } = await supabaseClient
       .from("workspace_invite")
-      .select()
+      .select(`*, workspace(id, name)`)
       .eq("user_id", session.user.id);
     if (inviteError) return json({ error: inviteError }, { headers });
     

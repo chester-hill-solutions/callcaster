@@ -36,12 +36,12 @@ async function createWorkspaceInvite(
   workspaceId: string,
   role: string,
   userId: string,
-  isNew = false
+  isNew = false,
 ): Promise<any> {
   const { data, error } = await supabase
     .from("workspace_invite")
     .insert({ workspace: workspaceId, role, user_id: userId, isNew })
-    .select();
+    .select(`*`);
 
   if (error) throw error;
   return data;
@@ -49,7 +49,8 @@ async function createWorkspaceInvite(
 
 async function sendInviteEmail(
   email: string,
-  linkData?: { hashed_token: string }
+  workspaceName: string,
+  linkData?: { hashed_token: string },
 ): Promise<[any, any]> {
   const msg = {
     template_id: "d-7690cb26e5464c19a4a1c3f27c64c439",
@@ -58,6 +59,7 @@ async function sendInviteEmail(
       {
         to: [{ email, name: "" }],
         dynamic_template_data: {
+          workspace_name:workspaceName,
           signup_link: linkData?.hashed_token
             ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=invite&email=${encodeURI(email)}`
             : `${Deno.env.get("SITE_URL")}/accept-invite`,
@@ -68,7 +70,7 @@ async function sendInviteEmail(
   return await MailService.send(msg);
 }
 
-async function inviteNewUser(email: string, workspaceId: string, role: string): Promise<any> {
+async function inviteNewUser(email: string, workspaceId: string, role: string, workspaceName: string): Promise<any> {
   const { data, error } = await supabase.auth.admin.generateLink({
     type: "invite",
     email,
@@ -84,26 +86,30 @@ async function inviteNewUser(email: string, workspaceId: string, role: string): 
   
   if (error) throw error;
   
-  await sendInviteEmail(email, { hashed_token: data.properties.hashed_token });
+  await sendInviteEmail(email, workspaceName, { hashed_token: data.properties.hashed_token });
   return data;
 }
-
+async function getWorkspaceName(id:string){
+  const {data, error} = await supabase.from('workspace').select('name').eq("id", id).single();
+  if (error) throw error;
+  return data.name;
+}
 async function handleInvite({ workspaceId, email, role }: InviteData): Promise<Response> {
   try {
     if (!workspaceId || !email || !role) {
       throw new Error("Missing required fields");
     }
-
+    const workspaceName = await getWorkspaceName(workspaceId)
     const existingUser = await getExistingUser(email);
 
     if (existingUser) {
       await createWorkspaceInvite(workspaceId, role, existingUser.id, false);
-      const result = await sendInviteEmail(email);
+      const result = await sendInviteEmail(email, workspaceName);
       return new Response(JSON.stringify(result), {
         headers: { "Content-Type": "application/json" },
       });
     } else {
-      const newUserData = await inviteNewUser(email, workspaceId, role);
+      const newUserData = await inviteNewUser(email, workspaceId, role, workspaceName);
       await createWorkspaceInvite(workspaceId, role, newUserData.user.id, true);
       return new Response(JSON.stringify(newUserData), {
         headers: { "Content-Type": "application/json" },
