@@ -54,9 +54,7 @@ const useSupabaseRoom = ({ supabase, workspace, campaign, userId }) => {
                 setStatus('error');
                 console.error(`Error in ${roomName}:`, error);
             })
-            .on('broadcast', { event: 'message' }, (e) => {
-                setPredictiveState(e.payload)
-            })
+            .on('broadcast', { event: 'message' }, (e) => {setPredictiveState(e.payload)})
             .on('presence', setUsers)
             .subscribe();
 
