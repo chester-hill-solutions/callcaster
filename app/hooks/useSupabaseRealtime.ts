@@ -55,7 +55,7 @@ export const useSupabaseRealtime = ({
     pendingCalls,
     setPendingCalls,
     updateCalls,
-  } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient);
+  } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient, predictive);
 
   const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
     usePhoneNumbers(init.phoneNumbers, workspace);

@@ -579,8 +579,8 @@ const Campaign: React.FC = () => {
 
   useEffect(() => {
     if (predictiveState.contact_id && predictiveState.status) {
-      const contact = contacts.find((c) => c.id === predictiveState.contact_id);
-      setCurrentContact(contact);
+      const contact = queue.find((c) => c.contact_id === predictiveState.contact_id);
+      if (contact) setNextRecipient(contact);
 
       switch (predictiveState.status) {
         case "dialing":
@@ -597,10 +597,10 @@ const Campaign: React.FC = () => {
         default:
           send({ type: "IDLE" });
       }
-    } if (!predictiveState.contact_id && predictiveState.status === "dialing"){
+    } if ((predictiveState.contact_id !== nextRecipient?.contact_id) && predictiveState.status === "dialing"){
       setUpdate(null)
     }
-  }, [predictiveState, contacts, send]);
+  }, [predictiveState, contacts, send, queue, setNextRecipient, nextRecipient?.contact_id]);
 
   useDebouncedSave(
     update,
