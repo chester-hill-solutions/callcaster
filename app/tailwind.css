@@ -30,6 +30,10 @@
     --brand-secondary: 198 100% 87%;
     --brand-tertiary: 354 83% 88%;
 
+    --brand-bronze: 30 61% 48%;
+    --brand-silver: 30 2% 62%;
+    --brand-gold: 45 100% 48%;
+
     --background: white;
 
     --foreground: 240 10% 3.9%;
@@ -51,7 +55,7 @@
     --input: 240 5.9% 90%;
     --ring: 346.8 77.2% 49.8%;
     --radius: 0.5rem;
-    --contrast-text: #333,
+    --contrast-text: #333;
   }
 
   .dark,
@@ -75,11 +79,16 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 346.8 77.2% 49.8%;
-    --contrast-text: #f1f1f1,
+    --contrast-text: #f1f1f1;
+
+    --brand-bronze: 30 61% 48% 50%;
+    --brand-silver: 30 2% 62% 50%;
+    --brand-gold: 45 100% 48% 50%;
   }
 }
 
-input, textarea{
+input,
+textarea {
   border: 2px solid hsl(var(--border));
   padding: 4px 8px;
 }
