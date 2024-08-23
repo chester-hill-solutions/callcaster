@@ -4,13 +4,14 @@ import { Tables } from "~/lib/database.types";
 type Call = Tables<"call">
 type Attempt = Tables<"outreach_attempt">
 type Contact = Tables<"contact">
-type QueueItem = Tables<"campaign_queue"> & Contact
+type QueueItem = Tables<"campaign_queue"> & { contact: Contact }
 
 export const useCalls = (
   initialCalls: Call[], 
   initialRecentCall: Call | null,
   queue: QueueItem[],
-  setNextRecipient: (recipient: QueueItem | null) => void
+  setNextRecipient: (recipient: QueueItem | null) => void,
+  isPredictive: boolean
 ) => {
   const [callsList, setCalls] = useState<Call[]>(initialCalls);
   const [recentCall, setRecentCall] = useState<Call | null>(initialRecentCall);
@@ -32,18 +33,20 @@ export const useCalls = (
       setRecentCall(updatedCall);
       setRecentAttempt(null);
       
-      const newRecipient = currentQueue.find((item) => updatedCall.contact_id === item.contact_id);
-      if (newRecipient) {
-        setNextRecipient(newRecipient);
-        setQuestionContact(newRecipient);
-      } else if (currentQueue.length > 0) {
-        setNextRecipient(currentQueue[0]);
-        setQuestionContact(currentQueue[0]);
+      if (!isPredictive) {
+        const newRecipient = currentQueue.find((item) => updatedCall.contact_id === item.contact.id);
+        if (newRecipient) {
+          setNextRecipient(newRecipient);
+          setQuestionContact(newRecipient);
+        } else if (currentQueue.length > 0) {
+          setNextRecipient(currentQueue[0]);
+          setQuestionContact(currentQueue[0]);
+        }
       }
     } else if (payload.new.contact_id) {
       setPendingCalls((currentPendingCalls) => [...currentPendingCalls, updatedCall]);
     }
-  }, []);
+  }, [isPredictive]);
   
 
   useEffect(() => {

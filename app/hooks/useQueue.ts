@@ -41,7 +41,7 @@ export const useQueue = ({
     (payload: { new: Tables<"campaign_queue"> & { contact: Contact } }) => {
       const newStatus = payload.new.status;
       const isRemoval =
-        !isPredictive && newStatus !== "queued" && newStatus !== user.id;
+        !isPredictive && newStatus !== "queued" && newStatus !== user.id || newStatus === "dequeued";
 
       setQueue((currentQueue) => {
         let updatedQueue = isRemoval
@@ -51,36 +51,32 @@ export const useQueue = ({
         if (payload.new.contact?.phone) {
           const newQueueItem = payload.new;
 
-          if (
-            isPredictive &&
-            (newStatus === user.id || newStatus === "queued")
-          ) {
-            updatedQueue = updateQueue.length
-              ? sortQueue([...updatedQueue, newQueueItem])
-              : [];
-            if (newStatus === user.id) {
-              setNextRecipient(newQueueItem);
-              setCallDuration(0);
+          if (isPredictive) {
+            if (newStatus === user.id || newStatus === "queued") {
+              updatedQueue = updatedQueue.length
+                ? sortQueue([...updatedQueue, newQueueItem])
+                : [newQueueItem];
+              if (newStatus === user.id) {
+                setNextRecipient(newQueueItem);
+                setCallDuration(0);
+              }
+            } else {
+              updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
             }
-          } else if (!isPredictive && newStatus === user.id) {
-            updatedQueue = sortQueue([
-              ...updatedQueue.filter(
-                (item) => item.contact_id !== payload.new.contact_id,
-              ),
-              newQueueItem,
-            ]);
-            if (!nextRecipient) setNextRecipient(newQueueItem);
-          } else if (
-            isPredictive &&
-            !(newStatus === user.id || newStatus === "queued")
-          ) {
-            updatedQueue = [
-              ...currentQueue.filter((item) => item.id !== payload.new.id),
-            ];
+          } else {
+            if (newStatus === user.id) {
+              updatedQueue = sortQueue([
+                ...updatedQueue.filter(
+                  (item) => item.contact_id !== payload.new.contact_id,
+                ),
+                newQueueItem,
+              ]);
+              if (!nextRecipient) setNextRecipient(newQueueItem);
+            }
           }
         }
 
-        if (isRemoval && nextRecipient?.contact_id === payload.new.contact_id) {
+        if (!isPredictive && isRemoval && nextRecipient?.contact_id === payload.new.contact_id) {
           const nextUncontacted = updatedQueue.find(
             (item) => item.attempts === 0,
           );
@@ -96,7 +92,7 @@ export const useQueue = ({
         );
       }
     },
-    [user, isPredictive, nextRecipient],
+    [user, isPredictive, nextRecipient, setCallDuration],
   );
 
   useEffect(() => {
