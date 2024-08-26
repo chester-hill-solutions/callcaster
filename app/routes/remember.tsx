@@ -1,90 +1,42 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, useActionData } from "@remix-run/react";
+import { Form, json, useActionData, useOutletContext } from "@remix-run/react";
+import { useEffect } from "react";
+import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-
-export async function action({ request }: ActionFunctionArgs) {
+export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
-
   const formData = await request.formData();
-  const email = formData.get("email") as string;
-
-  const { data: emailExists, error: errorGettingEmail } = await supabaseClient
-    .from("user")
-    .select()
-    .eq("username", email)
-    .single();
-
-  if (emailExists) {
-    // const sendGridRequest = new Request(
-    //   "https://api.sendgrid.com/v3/mail/send",
-    //   {
-    //     method: "POST",
-    //     body: JSON.stringify({
-    //       personalizations: [{ to: [{ email: email }] }],
-    //       from: { email: "info@callcaster.ca" },
-    //       subject: "Testing Forgotten Password Confirmation",
-    //       content: [
-    //         {
-    //           type: "text/plain",
-    //           value: "This is a test email seeing if the SendGrid API works!",
-    //         },
-    //       ],
-    //     }),
-    //     headers: {
-    //       Authorization: `Bearer ${SENDGRID_API_KEY}`,
-    //       "Content-Type": "application/json",
-    //     },
-    //   },
-    // );
-    // const sendGridResponse = await fetch(sendGridRequest);
-
-    const { data: emailResetData, error: emailResetError } =
-      await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: "https://localhost:3000/reset-password",
-      });
-    console.log(emailResetError);
-    return json(
-      { message: `Reset request sent to ${email}`, error: null },
-      { headers },
-    );
-  }
-
-  return json(
-    { message: null, error: "There is no account associated with this email" },
-    { headers },
+  const email = formData.get("email");
+  const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
+    email,
+    { redirectTo: `${new URL(request.url).origin}/api/auth/callback` },
   );
-}
+  if (error) {
+    return json({ data: null, error });
+  }
+  return json({ data, error: null });
+};
 
 export default function Remember() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
 
+  useEffect(() => {
+    if (actionData?.data) {
+      toast.success("Reset email sent");
+    } else if (actionData?.error) {
+      toast.error(actionData.error.message);
+    }
+  }, [actionData]);
   return (
-    <main className="flex h-[calc(100vh-80px)] w-full grow flex-col items-center py-8 text-white">
+    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
       <div
         id="login-hero"
-        className="flex h-full flex-col items-center justify-center gap-4 rounded-md bg-brand-secondary px-20 pb-24 pt-16 shadow-lg dark:border-2 dark:border-white dark:bg-zinc-900 dark:bg-opacity-80 dark:shadow-none"
+        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
-        {/* {actionData?.error && (
-            <p style={{ color: "red" }}>{actionData.error}</p>
-          )} */}
-
-        <h1 className="mb-auto font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
-          Send Password Reset
+        <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+          Reset Password
         </h1>
-
-        {actionData && (
-          <div className="font-Zilla-Slab text-2xl font-bold">
-            {actionData.message ? (
-              <span className="text-green-500">{actionData.message}</span>
-            ) : (
-              <span className="text-red-500">{actionData?.error}</span>
-            )}
-          </div>
-        )}
-
         <Form
           id="forgot-password-form"
           method="POST"
@@ -92,7 +44,7 @@ export default function Remember() {
         >
           <label
             htmlFor="email"
-            className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
+            className="flex w-full flex-col font-Zilla-Slab text-xl font-semibold tracking-[1px] text-black dark:text-white"
           >
             Email
             <input
@@ -103,15 +55,15 @@ export default function Remember() {
             />
           </label>
           <Button
-            size={null}
-            className="w-full rounded-md bg-brand-primary py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-            transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+            className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-xl tracking-[1px] text-white
+          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
             type="submit"
           >
             Reset
           </Button>
         </Form>
       </div>
+      <Toaster richColors />
     </main>
   );
 }

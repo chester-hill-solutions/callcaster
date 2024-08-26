@@ -108,7 +108,13 @@ export const action = async ({ request, params }) => {
         const dbCall = await fetchCallData(callSid);
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
         const call = twilio.calls(callSid);
-        realtime.send({ type: "broadcast", event: "message", payload: { contact_id: dbCall.contact_id, status: callStatus } }); if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
+        realtime.send({
+            type: "broadcast", event: "message", payload: {
+                contact_id: dbCall.contact_id,
+                status: callStatus
+            }
+        });
+        if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
             const campaign = await fetchCampaignData(dbCall.campaign_id);
             const signedUrl = await getVoicemailSignedUrl(dbCall.workspace, campaign.voicemail_file);
             const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: 'voicemail' });

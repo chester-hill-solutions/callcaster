@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, FormEvent } from "react";
 import { useNavigate, useNavigation, useFetcher, Form } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
 import { Button } from "./ui/button";
@@ -94,7 +94,14 @@ export const CampaignSettings = ({
       body_text: details?.body_text || "",
       message_media: details?.message_media || [],
     });
-  }, [campaign_id, data, details?.body_text, details?.message_media, details?.script_id, workspace]);
+  }, [
+    campaign_id,
+    data,
+    details?.body_text,
+    details?.message_media,
+    details?.script_id,
+    workspace,
+  ]);
 
   useEffect(() => {
     setChanged(!deepEqual(campaignData, initialData));
@@ -130,20 +137,45 @@ export const CampaignSettings = ({
     }));
   };
 
-  const handleActivateButton = () => {
+  const handleActivateButton = (event) => {
     if (campaignData.type === "live_call") {
       handleInputChange("status", "running");
+      formFetcher.submit(
+        {
+          campaignData: JSON.stringify({ ...campaignData, status: "running" }),
+          campaignDetails: JSON.stringify(details),
+        },
+        {
+          method: "patch",
+          action: "/api/campaigns",
+        },
+      );
       navigate("../call");
     } else if (campaignData.type === "robocall") {
+      handleInputChange("status", "running");
       fetcher.submit(
         { campaign_id, user_id: user },
-        { method: "post", action: "/api/initiate-ivr", encType:"application/json" },
+        {
+          method: "post",
+          action: "/api/initiate-ivr",
+          encType: "application/json",
+        },
       );
+      navigate("..");
     } else if (campaignData.type === "message") {
-      fetcher.submit({campaign_id, workspace_id: details.workspace, caller_id: campaignData.caller_id}, { method: "post", action: "/api/sms", encType:"application/json" });
+      handleInputChange("status", "running");
+      fetcher.submit(
+        {
+          campaign_id,
+          workspace_id: details.workspace,
+          caller_id: campaignData.caller_id,
+        },
+        { method: "post", action: "/api/sms", encType: "application/json" },
+      );
+      navigate("../../chats");
     }
   };
-  
+
   return (
     <div
       id="campaignSettingsContainer"

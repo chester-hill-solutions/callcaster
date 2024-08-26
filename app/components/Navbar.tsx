@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { TypedResponse } from "@remix-run/node";
-import {
-  Link,
-  NavLink,
-  Params,
-  useLocation,
-} from "@remix-run/react";
+import { Link, NavLink, Params, useLocation } from "@remix-run/react";
 import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import { WorkspaceData } from "~/lib/types";
@@ -61,9 +56,12 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
     <DropdownMenuTrigger asChild>
       <Button
         variant="outline"
-        className="border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:text-black"
+        className="relative border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:text-black"
       >
         <FaUserAlt size="20px" />
+        {user.workspace_invite.length > 0 && (
+          <div className="absolute -right-1 -top-2 bg-primary rounded-full text-white w-5 h-5 items-center font-Zilla-Slab text-dd">{user.workspace_invite.length}</div>
+        )}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent className="w-56">
@@ -75,6 +73,13 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
       <DropdownMenuLabel className="font-normal">
         {user.username}
       </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
+        <NavLink to={"/accept-invite"} className={user.workspace_invite.length > 0 && "bg-primary text-white"}>
+          {user.workspace_invite.length} Pending Invitation
+          {user.workspace_invite.length !== 1 ? "s" : ""}
+        </NavLink>
+      </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
         <Button
@@ -112,7 +117,6 @@ export default function Navbar({
   const workspaceId = params.id;
   const location = useLocation();
   const [loc, setLoc] = useState(location);
-
   useEffect(() => {
     if (location.pathname !== loc.pathname) {
       setMobileMenuOpen(false);
@@ -150,9 +154,9 @@ export default function Navbar({
           {workspaces && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
           {user && (
             <UserDropdownMenu
-            user={user}
-            handleSignOut={handleSignOut}
-            workspaceId={workspaceId}
+              user={user}
+              handleSignOut={handleSignOut}
+              workspaceId={workspaceId}
             />
           )}
           <ModeToggle />
@@ -160,7 +164,7 @@ export default function Navbar({
         <button
           className="text-2xl sm:hidden"
           onClick={() => setMobileMenuOpen(true)}
-          >
+        >
           <FaBars />
         </button>
       </nav>

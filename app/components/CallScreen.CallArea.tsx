@@ -55,6 +55,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
+  
   return (
     <div
       style={{
@@ -100,7 +101,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
             {displayState === "no-answer" && <div>No Answer</div>}
             {displayState === "voicemail" && <div>Voicemail Left</div>}
             {displayState === "completed" && <div>Call Completed</div>}
-            {displayState === "idle" && <div>Pending</div>}
+            {(!displayState || displayState === "idle") && <div>Pending</div>}
           </div>
         </div>
         {!conference && predictive && state === "idle" && (

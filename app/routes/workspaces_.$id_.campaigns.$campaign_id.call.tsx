@@ -381,12 +381,13 @@ const Campaign: React.FC = () => {
     deviceIsBusy,
     incomingCall,
     deviceStatus,
-    device,
+    device?.calls.length,
+    begin,
+    startCall,
+    nextRecipient,
     user,
     workspaceId,
-    nextRecipient,
     recentAttempt,
-    startCall,
   ]);
   const handleQuickSave = useCallback(() => {
     handleQuestionsSave(
@@ -410,6 +411,7 @@ const Campaign: React.FC = () => {
         nextRecipient,
         groupByHousehold,
       });
+      setUpdate(null);
     },
     [
       activeCall,
@@ -508,15 +510,20 @@ const Campaign: React.FC = () => {
 
   const displayState =
     campaign.dial_type === "predictive"
-      ? predictiveState.status === "dialing" ? "dialing"
-        : predictiveState.status ===  "connected" ? "connected"
-        : predictiveState.status === "completed" ? "completed"
-        : predictiveState.status === "idle" ? "idle"
-        : getDisplayState(
-          state,
-          recentAttempt?.disposition as AttemptDisposition,
-          activeCall,
-        ):null;
+      ? predictiveState.status === "dialing"
+        ? "dialing"
+        : predictiveState.status === "connected"
+          ? "connected"
+          : predictiveState.status === "completed"
+            ? "completed"
+            : predictiveState.status === "idle"
+              ? "idle"
+              : getDisplayState(
+                  state,
+                  recentAttempt?.disposition as AttemptDisposition,
+                  activeCall,
+                )
+      : null;
 
   const house =
     householdMap[
@@ -572,8 +579,8 @@ const Campaign: React.FC = () => {
 
   useEffect(() => {
     if (predictiveState.contact_id && predictiveState.status) {
-      const contact = contacts.find((c) => c.id === predictiveState.contact_id);
-      setCurrentContact(contact);
+      const contact = queue.find((c) => c.contact_id === predictiveState.contact_id);
+      if (contact) setNextRecipient(contact);
 
       switch (predictiveState.status) {
         case "dialing":
@@ -590,8 +597,10 @@ const Campaign: React.FC = () => {
         default:
           send({ type: "IDLE" });
       }
+    } if ((predictiveState.contact_id !== nextRecipient?.contact_id) && predictiveState.status === "dialing"){
+      setUpdate(null)
     }
-  }, [predictiveState, contacts, send]);
+  }, [predictiveState, contacts, send, queue, setNextRecipient, nextRecipient?.contact_id]);
 
   useDebouncedSave(
     update,
@@ -636,10 +645,10 @@ const Campaign: React.FC = () => {
               </Form>
             </div>
             {/* Inputs */}
-            <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px] hidden">
+            {/* <div className="flex flex-wrap gap-2 space-y-2 sm:max-w-[500px]">
               {device && <InputSelector device={device} />}
               {device && <OutputSelector device={device} />}
-            </div>
+            </div> */}
           </div>
           {/* Phone with DTMF */}
           <div className={`my-4 border-2 border-[${displayColor}] rounded-lg`}>

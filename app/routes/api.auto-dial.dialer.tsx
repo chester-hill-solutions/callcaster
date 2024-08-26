@@ -119,10 +119,11 @@ export const action = async ({ request }) => {
         contactRecord.caller_id,
         user_id,
       );
+
       realtime.send({
         type: "broadcast",
         event: "message",
-        payload: { contact_id: contactRecord.id, status: "dialing" },
+        payload: { contact_id: contactRecord.contact_id, status: "dialing" },
       });
 
       console.log("Dialing: ", call);

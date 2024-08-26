@@ -4,7 +4,7 @@ import { Link, NavLink } from '@remix-run/react';
 import { FaTimes } from 'react-icons/fa';
 import { Button } from "./ui/button";
 
-export const MobileMenu = ({ isSignedIn, user, handleSignOut,onClose }) => {
+export const MobileMenu = ({ isSignedIn, user, handleSignOut, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
       <div className="flex justify-between items-center p-4">
@@ -33,6 +33,9 @@ export const MobileMenu = ({ isSignedIn, user, handleSignOut,onClose }) => {
               Log Out
             </Button>
             <Button className="font-Zilla-Slab text-lg"><NavLink to="/workspaces" onClick={onClose}>Workspaces</NavLink></Button>
+            <Button className="font-Zilla-Slab text-lg"><NavLink to="/accept-invite" onClick={onClose}>          {user.workspace_invite.length} Pending Invitation
+              {user.workspace_invite.length !== 1 ? "s" : ""}
+            </NavLink></Button>
           </>
         )}
         <Button className="font-Zilla-Slab text-lg"><NavLink to="/" onClick={onClose}>Home</NavLink></Button>

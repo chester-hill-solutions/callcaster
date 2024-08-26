@@ -184,7 +184,7 @@ const Result = ({
         return (
           <textarea
             rows={2}
-            placeholder="Notes/Key Issues"
+            placeholder=""
             onChange={(e) => handleChange(questions.id, e.target.value)}
             value={result}
             disabled={disabled}

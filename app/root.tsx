@@ -62,7 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { data: userData, error: userError } = await supabase
     .from("user")
-    .select()
+    .select(`*, workspace_invite(workspace(id, name))`)
     .eq("id", session?.user.id ?? "")
     .single();
 
@@ -116,6 +116,9 @@ export default function App() {
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY"){
+        redirect("/reset")
+      }
       if (session?.access_token !== serverAccessToken) {
         supabase.auth.getSession();
       }
