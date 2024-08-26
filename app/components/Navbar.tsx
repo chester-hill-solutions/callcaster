@@ -60,7 +60,9 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
       >
         <FaUserAlt size="20px" />
         {user.workspace_invite.length > 0 && (
-          <div className="absolute -right-1 -top-2 bg-primary rounded-full text-white w-5 h-5 items-center font-Zilla-Slab text-dd">{user.workspace_invite.length}</div>
+          <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
+            {user.workspace_invite.length}
+          </div>
         )}
       </Button>
     </DropdownMenuTrigger>
@@ -75,7 +77,12 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
-        <NavLink to={"/accept-invite"} className={user.workspace_invite.length > 0 && "bg-primary text-white"}>
+        <NavLink
+          to={"/accept-invite"}
+          className={
+            user.workspace_invite.length > 0 && "bg-primary text-white"
+          }
+        >
           {user.workspace_invite.length} Pending Invitation
           {user.workspace_invite.length !== 1 ? "s" : ""}
         </NavLink>
@@ -142,6 +149,7 @@ export default function Navbar({
           CC
         </Link>
         <div className="hidden items-center space-x-4 sm:flex">
+          <NavButton to="/pricing">Pricing</NavButton>
           {/* <NavButton to="/">Home</NavButton> */}
           {/*           <NavButton to="/services">Services</NavButton>
            */}{" "}

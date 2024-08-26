@@ -21,6 +21,9 @@ module.exports = {
         "Tabac-Slab": ["Tabac Slab", "serif"],
         "Tabac-Big-Slab": ["Tabac Big Slab", "serif"],
         "Zilla-Slab": ["Zilla Slab", "serif"],
+        "Josefin-Sans": ["Josefin Sans", "sans-serif"],
+        "Lilita-One": ["Lilita One", "sans-serif"],
+        Sarabun: ["Sarabun", "sans-serif"],
       },
       colors: {
         brand: {
