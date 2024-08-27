@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {generateToken} from "./api.token"
 
 type Contact = Tables<"contact">;
 type Attempt = Tables<"outreach_attempt">;
@@ -79,10 +80,20 @@ export const loader = async ({ request, params }) => {
     serverSession,
   } = await getSupabaseServerClientWithSession(request);
   if (!serverSession) return redirect("/signin");
+  const {id:workspace} = params
+  
+  const { data: workspaceData, error: workspaceError } = await supabase
+    .from("workspace")
+    .select("twilio_data, key, token")
+    .eq("id", workspace)
+    .single();
 
-  const { token } = await fetch(
-    `${process.env.BASE_URL}/api/token?id=${serverSession.user.id}&workspace=${workspaceId}`,
-  ).then((res) => res.json());
+  const token = generateToken({
+    twilioAccountSid: workspaceData.twilio_data.sid, 
+    twilioApiKey: workspaceData.key, 
+    twilioApiSecret: workspaceData.token, 
+    identity: serverSession.user.id
+  })
 
   const { data: campaign, error: campaignError } = await supabase
     .from("campaign")
@@ -579,8 +590,10 @@ const Campaign: React.FC = () => {
 
   useEffect(() => {
     if (predictiveState.contact_id && predictiveState.status) {
-      const contact = contacts.find((c) => c.id === predictiveState.contact_id);
-      setCurrentContact(contact);
+      const contact = queue.find(
+        (c) => c.contact_id === predictiveState.contact_id,
+      );
+      if (contact) setNextRecipient(contact);
 
       switch (predictiveState.status) {
         case "dialing":
@@ -600,7 +613,20 @@ const Campaign: React.FC = () => {
     } if (!predictiveState.contact_id && predictiveState.status === "dialing"){
       setUpdate(null)
     }
-  }, [predictiveState, contacts, send]);
+    if (
+      predictiveState.contact_id !== nextRecipient?.contact_id &&
+      predictiveState.status === "dialing"
+    ) {
+      setUpdate(null);
+    }
+  }, [
+    predictiveState,
+    contacts,
+    send,
+    queue,
+    setNextRecipient,
+    nextRecipient?.contact_id,
+  ]);
 
   useDebouncedSave(
     update,

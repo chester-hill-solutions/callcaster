@@ -38,9 +38,9 @@ export default function Remember() {
           Reset Password
         </h1>
         <Form
+          id="forgot-password-form"
           method="POST"
-          className="flex w-full flex-col gap-4"
-          id="remember-form"
+          className="mb-auto flex w-full flex-col gap-4"
         >
           <label
             htmlFor="email"
@@ -51,16 +51,15 @@ export default function Remember() {
               type="text"
               name="email"
               id="email"
-              className="w-full rounded-sm border-2 border-white bg-transparent px-4 py-2"
+              className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
             />
           </label>
-
           <Button
             className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-xl tracking-[1px] text-white
           transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
             type="submit"
           >
-            Send Password Reset
+            Reset
           </Button>
         </Form>
       </div>

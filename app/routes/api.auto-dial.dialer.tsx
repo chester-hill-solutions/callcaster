@@ -1,9 +1,5 @@
-import Twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
-import {
-  meterEvent,
-  createWorkspaceTwilioInstance,
-} from "../lib/database.server";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 function normalizePhoneNumber(input) {
   let cleaned = input.replace(/[^0-9+]/g, "");
@@ -105,7 +101,7 @@ export const action = async ({ request }) => {
 
     if (contactRecord) {
       const toNumber = normalizePhoneNumber(contactRecord.contact_phone);
-      
+
       const outreach_attempt_id = await createOutreachAttempt(
         supabase,
         contactRecord,
@@ -119,13 +115,12 @@ export const action = async ({ request }) => {
         contactRecord.caller_id,
         user_id,
       );
+
       realtime.send({
         type: "broadcast",
         event: "message",
-        payload: { contact_id: contactRecord.id, status: "dialing" },
+        payload: { contact_id: contactRecord.contact_id, status: "dialing" },
       });
-
-      console.log("Dialing: ", call);
 
       const callData = {
         sid: call.sid,
