@@ -155,8 +155,12 @@ const WhyPhoneCalls = () => (
         <div className="hidden sm:flex">
           <PersonImage />
         </div>
-        <div className="flex-1 flex justify-center">
-          <Button asChild className="flex-1 text-2xl mt-4 sm:flex-initial" size={"lg"}>
+        <div className="flex flex-1 justify-center">
+          <Button
+            asChild
+            className="mt-4 flex-1 text-2xl sm:flex-initial"
+            size={"lg"}
+          >
             <NavLink to={"./signup"}>Sign Up</NavLink>
           </Button>
         </div>
