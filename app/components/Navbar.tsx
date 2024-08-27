@@ -89,6 +89,13 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
+        <NavLink to={"/accept-invite"} className={user.workspace_invite.length > 0 && "bg-primary text-white"}>
+          {user.workspace_invite.length} Pending Invitation
+          {user.workspace_invite.length !== 1 ? "s" : ""}
+        </NavLink>
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem asChild>
         <Button
           id="logoutButton"
           variant="ghost"

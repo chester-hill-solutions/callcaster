@@ -610,6 +610,8 @@ const Campaign: React.FC = () => {
         default:
           send({ type: "IDLE" });
       }
+    } if (!predictiveState.contact_id && predictiveState.status === "dialing"){
+      setUpdate(null)
     }
     if (
       predictiveState.contact_id !== nextRecipient?.contact_id &&
