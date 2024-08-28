@@ -22,6 +22,9 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { formatTableText } from "~/lib/utils";
+import { ErrorBoundary } from "~/components/ErrorBoundary";
+
+export { ErrorBoundary };
 
 interface Workspace {
   id: string;
@@ -107,6 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   return json({ ok: true, error: null }, { headers });
 };
+
 
 // eslint-disable-next-line react/display-name
 const WorkspaceCard = React.memo(
