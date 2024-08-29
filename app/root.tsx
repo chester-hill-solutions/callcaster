@@ -139,12 +139,12 @@ export default function App() {
         <Links />
       </head>
       <body className={`min-h-screen bg-background`}>
-        <ThemeProvider
+        {/* <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
-        >
+        > */}
           <Navbar
             className="bg-brand-secondary"
             handleSignOut={signOut}
@@ -154,7 +154,7 @@ export default function App() {
             params={params}
           />
           <Outlet context={{ supabase, env }} />
-        </ThemeProvider>
+        {/* </ThemeProvider> */}
         <ScrollRestoration />
         <Scripts />
         <LiveReload />
