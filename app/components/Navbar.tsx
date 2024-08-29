@@ -167,7 +167,7 @@ export default function Navbar({
               workspaceId={workspaceId}
             />
           )}
-          <ModeToggle />
+          {/* <ModeToggle /> */}
         </div>
         <button
           className="text-2xl sm:hidden"
