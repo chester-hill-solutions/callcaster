@@ -30,35 +30,36 @@ const SectionText = ({ children }) => (
 );
 
 const PricingCard = ({ children, cardTitle, cardIcon }): ReactNode => (
-  <>
-    <div
-      id={`pricing-${cardTitle}`}
-      className="flex h-fit w-full flex-col items-center gap-4 rounded-xl bg-[hsl(198,100%,93%)] px-4 py-8 drop-shadow-[4px_8px_4px_rgba(0,0,0,0.33)]"
+  <div
+    id={`pricing-${cardTitle}`}
+    className="flex min-h-fit w-full flex-col items-center gap-4 rounded-xl bg-brand-secondary px-4 py-8 drop-shadow-[4px_8px_4px_rgba(0,0,0,0.33)] xl:h-fit"
+  >
+    <h3
+      className="flex items-baseline justify-center gap-4 text-center font-Zilla-Slab
+       text-4xl font-semibold uppercase leading-none text-brand-primary"
     >
-      <h3 className="font-Sarabun flex items-baseline justify-center gap-4 text-center text-4xl font-semibold uppercase leading-none text-brand-primary">
-        <span>{cardTitle}</span>
-        {cardIcon}
-      </h3>
-      <div
-        id="product-card"
-        className="flex w-full flex-col items-center justify-center gap-4 rounded-lg py-4"
-      >
-        {children}
-      </div>
+      <span>{cardTitle}</span>
+      {cardIcon}
+    </h3>
+    <div
+      id="product-card"
+      className="flex w-full flex-col items-center justify-center gap-4 rounded-lg py-4"
+    >
+      {children}
     </div>
-  </>
+  </div>
 );
 
 export default function Pricing() {
   return (
-    <main className="flex flex-col gap-4 rounded-sm p-8 dark:text-white md:mx-auto md:h-[calc(100vh-80px)] md:min-h-fit md:w-[90%] md:items-start">
+    <main className="flex flex-col items-center gap-8 rounded-sm p-8 dark:text-white md:h-[calc(100vh-80px)] md:min-h-fit md:items-start xl:mx-auto xl:w-[90%] xl:gap-8">
       <SectionTitle>Our Pricing Plan</SectionTitle>
       <section
         id="plans-container"
-        className="flex h-full w-full flex-col gap-8 md:flex-row"
+        className="flex h-fit w-full flex-col gap-8 md:flex-row xl:h-full"
       >
         <PricingCard
-          cardTitle={"Text Messaging"}
+          cardTitle={"Texting"}
           cardIcon={<BsChatLeftText size="28px" />}
         >
           <p className="font-Zilla-Slab text-3xl font-semibold">SMS</p>
@@ -74,8 +75,8 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Text Rate is charged per text (maximum 140 characters),
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Text Rate" is charged per text (maximum 140 characters),
                   and per Media SMS.
                 </p>
               </AccordionContent>
@@ -93,8 +94,8 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Text Rate is charged per text (maximum 140 characters),
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Text Rate" is charged per text (maximum 140 characters),
                   and per Media SMS.
                 </p>
               </AccordionContent>
@@ -119,9 +120,9 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Dial Rate is the cost per call attempt. The first minute
-                  of each call is covered by the dial rate.
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Dial Rate" is the cost per call attempt. The first minute
+                  of each call is covered by the "Dial Rate".
                 </p>
               </AccordionContent>
             </AccordionItem>
@@ -140,8 +141,8 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Minute Rate cost kicks in after the first minute of each
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Minute Rate" cost kicks in after the first minute of each
                   call and is the cost accrewed for each remaining minute of the
                   call.
                 </p>
@@ -167,9 +168,9 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Dial Rate is the cost per call attempt. The first minute
-                  of each call is covered by the dial rate.
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Dial Rate" is the cost per call attempt. The first minute
+                  of each call is covered by the "Dial Rate".
                 </p>
               </AccordionContent>
             </AccordionItem>
@@ -188,8 +189,8 @@ export default function Pricing() {
                 </div>
               </AccordionTrigger>
               <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl font-semibold">
-                  The Minute Rate cost kicks in after the first minute of each
+                <p className="w-full font-Zilla-Slab text-xl">
+                  The "Minute Rate" cost kicks in after the first minute of each
                   call and is the cost accrewed for each remaining minute of the
                   call.
                 </p>
@@ -201,13 +202,13 @@ export default function Pricing() {
 
       <p className="rounded-3xl border-4 border-brand-secondary bg-white p-4 font-Zilla-Slab text-2xl font-bold">
         For More Information Contact <br />
-        <span className="font-bold text-brand-primary">info@callcaster.ca</span>
+        <a
+          href="mailto: info@callcaster.ca"
+          className="font-bold text-brand-primary underline transition-colors hover:text-blue-600"
+        >
+          info@callcaster.ca
+        </a>
       </p>
-      <img
-        src="/Hero-1.png"
-        alt=""
-        className="fixed left-0 top-0 z-[-5] hidden opacity-10 md:block"
-      />
     </main>
   );
 }
