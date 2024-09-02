@@ -1,7 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import MailService from "@sendgrid/mail";
 import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 
 export const action = async ({ request, params }) => {
   try {
@@ -19,9 +17,9 @@ export const action = async ({ request, params }) => {
     };
 
     const result = await MailService.send(msg);
-    return json({ success: true, message: "Voicemail processed and email sent", result });
+    return json({ success: true, message: "Email sent", result });
   } catch (error) {
-    console.error('Error processing voicemail:', error);
-    return json({ error: 'Failed to process voicemail' }, { status: 500 });
+    console.error('Error processing contact form:', error);
+    return json({ error: 'Failed to process message' }, { status: 500 });
   }
 };

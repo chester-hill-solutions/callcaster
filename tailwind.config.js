@@ -21,12 +21,18 @@ module.exports = {
         "Tabac-Slab": ["Tabac Slab", "serif"],
         "Tabac-Big-Slab": ["Tabac Big Slab", "serif"],
         "Zilla-Slab": ["Zilla Slab", "serif"],
+        "Josefin-Sans": ["Josefin Sans", "sans-serif"],
+        "Lilita-One": ["Lilita One", "sans-serif"],
+        Sarabun: ["Sarabun", "sans-serif"],
       },
       colors: {
         brand: {
           primary: "hsl(var(--brand-primary))",
           secondary: "hsl(var(--brand-secondary))",
           tertiary: "hsl(var(--brand-tertiary))",
+          bronze: "hsl(var(--brand-bronze) / 50)",
+          silver: "hsl(var(--brand-silver) / 50)",
+          gold: "hsl(var(--brand-gold) / 50)",
         },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

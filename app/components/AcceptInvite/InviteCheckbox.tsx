@@ -20,7 +20,7 @@ export function InviteCheckbox({ invite }: InviteCheckboxProps) {
         value={invite.id}
       />
       <Label htmlFor={`invite-${invite.id}`}>
-        Invitation to {invite.workspace.name}
+        Invitation to {invite?.workspace?.name}
       </Label>
     </div>
   );

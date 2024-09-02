@@ -101,7 +101,7 @@ type CallerIDResponse = {
 };
 
 export const action = async ({ request, params }) => {
-  const { supabaseClient } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
 
   const data = Object.fromEntries(await request.formData());
   const formName = data.formName;
@@ -113,6 +113,7 @@ export const action = async ({ request, params }) => {
       body: JSON.stringify({ ...data, workspace_id }),
       headers: {
         "Content-Type": "application/json",
+        ...headers
       },
       method: "POST",
     });
