@@ -173,7 +173,7 @@ export const CampaignSettings = ({
         },
         { method: "post", action: "/api/sms", encType: "application/json" },
       );
-      navigate("../../../chats");
+      navigate(`../../../chats?campaign_id=${campaign_id}`);
     }
   };
 

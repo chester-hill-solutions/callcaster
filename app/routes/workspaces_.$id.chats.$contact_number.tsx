@@ -7,6 +7,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "~/hooks/useChatRealtime";
 import { useIntersectionObserver } from "~/hooks/useIntersectionOverserver";
 import MessageList from "~/components/Chat/ChatMessages";
+import { Message } from "~/lib/types";
 
 const getMessageMedia = async ({ messages, supabaseClient }) => {
   return Promise.all(
@@ -37,9 +38,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (contact_number !== "new") {
     const { data: messagesData, error: messagesError } = await supabaseClient
       .from("message")
-      .select()
+      .select(`*, outreach_attempt(campaign_id)`)
       .or(`from.eq.${contact_number}, to.eq.${contact_number}`)
       .eq('workspace', id)
+      .not('date_created', 'is', null)
+      .neq('status', 'failed')
       .order("date_created", { ascending: true });
     messages.push(
       ...(await getMessageMedia({
@@ -48,6 +51,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       })),
     );
   }
+
   return json(
     {
       messages,
@@ -58,14 +62,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function ChatScreen() {
   const { supabase, workspace } = useOutletContext<{ supabase: SupabaseClient }>();
-  const { messages: initialMessages,  } = useLoaderData();
+  const { messages: initialMessages,  } = useLoaderData<Message[]>();
 
   const messagesEndRef = useRef(null);
 
   const { messages, setMessages } = useChatRealTime({
     supabase,
     initial: initialMessages,
-    workspace: workspace.id,
+    workspace: workspace?.id,
   });
 
   const updateMessageStatus = async (messageId) => {
