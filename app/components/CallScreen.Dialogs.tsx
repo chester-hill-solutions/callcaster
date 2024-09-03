@@ -7,7 +7,6 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Form, NavLink, useSubmit } from "@remix-run/react";
-import { action } from "~/routes/reset-password";
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
