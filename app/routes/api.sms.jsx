@@ -32,14 +32,14 @@ const getCampaignData = async ({ supabase, campaign_id }) => {
 const sendMessage = async ({ body, to, from, media, supabase, campaign_id, workspace, contact_id }) => {
     try {
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: workspace });
+        let messageError;
         const message = await twilio.messages.create({
             body,
             to,
             from,
             statusCallback: `${process.env.BASE_URL}/api/sms/status`,
             ...(media && media.length > 0 && { mediaUrl: [...media] })
-        });
-
+        }).catch((e) => messageError = e);
         const {
             sid,
             body: sentBody,
@@ -56,7 +56,6 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
             status,
             messagingServiceSid: messaging_service_sid,
             dateSent: date_sent,
-            dateCreated: date_created,
             errorCode: error_code,
             priceUnit: price_unit,
             apiVersion: api_version,
@@ -64,7 +63,7 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
         } = message;
 
         const { data, error } = await supabase.from('message').insert({
-            sid,
+            sid: sid || `failed-${to}-${Date.now()}`,
             body: sentBody,
             num_segments,
             direction,
@@ -76,10 +75,9 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
             account_sid,
             uri,
             num_media,
-            status,
+            status: messageError ? 'failed' : status,
             messaging_service_sid,
             date_sent,
-            date_created,
             error_code,
             price_unit,
             api_version,
@@ -88,7 +86,7 @@ const sendMessage = async ({ body, to, from, media, supabase, campaign_id, works
             workspace,
             contact_id
         }).select();
-
+        console.log(data, error)
         if (error) throw new Error(`Failed to insert message data: ${error.message}`);
         return { message, data };
     } catch (error) {
@@ -127,7 +125,7 @@ export const action = async ({ request }) => {
                     supabase,
                     campaign_id,
                     workspace: workspace_id,
-                    contact_id: member.id
+                    contact_id: member.contact_id
                 });
                 return { [member.contact_id]: { success: true, message, data } };
             } catch (error) {
