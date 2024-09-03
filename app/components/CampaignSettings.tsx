@@ -169,6 +169,7 @@ export const CampaignSettings = ({
           campaign_id,
           workspace_id: details.workspace,
           caller_id: campaignData.caller_id,
+          user_id: user.id
         },
         { method: "post", action: "/api/sms", encType: "application/json" },
       );

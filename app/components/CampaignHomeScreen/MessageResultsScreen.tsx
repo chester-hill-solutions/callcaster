@@ -3,8 +3,7 @@ import { TotalMessages } from "./ResultsScreen.TotalCalls";
 import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
-import { NavLink } from "@remix-run/react";
-import { Button } from "../ui/button";
+import { NavLink, useNavigation } from "@remix-run/react";
 
 const MessageResultsScreen = ({
   totalCalls = 0,
@@ -15,6 +14,7 @@ const MessageResultsScreen = ({
   handleNavlinkStyles,
   hasAccess,
 }: ResultsScreenProps) => {
+  const {state} = useNavigation();
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -33,7 +33,7 @@ const MessageResultsScreen = ({
                   Join Campaign
                 </NavLink>
               ) : (
-                <Button>Start Campaign</Button>
+                <></>
               )}
             </div>
           )}
@@ -45,7 +45,7 @@ const MessageResultsScreen = ({
             totalMessages={totalCalls}
             expectedTotal={expectedTotal}
           />
-          <ExportButton />
+          <ExportButton isBusy={state !== "idle"}/>
         </div>
         <DispositionBreakdown
           results={results}
@@ -56,6 +56,7 @@ const MessageResultsScreen = ({
           results={results}
           totalCalls={totalCalls}
           expectedTotal={expectedTotal}
+          isBusy={state !== "idle"}
         />
       </div>
     </div>
