@@ -998,13 +998,44 @@ export async function fetchWorkspaceData(
 export async function fetchConversationSummary(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
+  campaign_id?: string | null,
 ) {
-  const { data: chats, error: chatsError } = await supabaseClient.rpc(
-    "get_conversation_summary",
-    { p_workspace: workspaceId },
-  );
-
+  let chats, chatsError;
+  if (campaign_id) {
+    const { data, error } = await supabaseClient.rpc(
+      "get_conversation_summary_by_campaign",
+      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
+    );
+    console.log(error)
+    chats = data;
+    chatsError = error;
+  } else {
+    const { data, error } = await supabaseClient.rpc(
+      "get_conversation_summary",
+      { p_workspace: workspaceId },
+    );
+    chats = data;
+    chatsError = error;
+  }
   return { chats, chatsError };
+}
+export async function fetchCampaignsByType({
+  supabaseClient,
+  workspaceId,
+  type,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  type: "message_campaign" | "ivr_campaign" | "live_campaign";
+}) {
+  const { data, error } = await supabaseClient
+    .from(type)
+    .select(`...campaign(title, id)`)
+    .eq("workspace", workspaceId);
+  if (error) {
+    console.error(error);
+  }
+  return data;
 }
 
 export async function fetchContactData(
@@ -1228,17 +1259,17 @@ export const createContact = async (
 };
 
 export const bulkCreateContacts = async (
-  supabaseClient:SupabaseClient,
-  contacts:Partial<Contact[]>,
-  workspace_id:string,
-  audience_id:string,
-  user_id:string,
+  supabaseClient: SupabaseClient,
+  contacts: Partial<Contact[]>,
+  workspace_id: string,
+  audience_id: string,
+  user_id: string,
 ) => {
-  console.log(user_id)
+  console.log(user_id);
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
-    created_by:user_id
+    created_by: user_id,
   }));
 
   const { data: insert, error } = await supabaseClient

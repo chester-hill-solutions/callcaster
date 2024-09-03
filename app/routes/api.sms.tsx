@@ -92,7 +92,7 @@ const sendMessage = async ({
       apiVersion: api_version,
       subresourceUris: subresource_uris,
     } = message;
-
+    
     const { data, error } = await supabase
       .from("message")
       .insert({
@@ -110,7 +110,7 @@ const sendMessage = async ({
         num_media,
         status: messageError ? "failed" : status,
         messaging_service_sid,
-        date_sent,
+        date_sent: date_sent || new Date(),
         error_code,
         price_unit,
         api_version,
@@ -120,6 +120,7 @@ const sendMessage = async ({
         contact_id,
       })
       .select();
+
     const outreachAttempt = await createOutreachAttempt({
       supabase,
       contact_id,
@@ -179,8 +180,8 @@ const createOutreachAttempt = async ({
 
 export const action = async ({ request }) => {
   const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY,
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!,
   );
   try {
     const { campaign_id, workspace_id, caller_id, user_id } =
