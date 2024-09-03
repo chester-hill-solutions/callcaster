@@ -11,6 +11,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
             callId: recentAttempt?.id,
             selected_workspace_id: workspaceId,
             contact_id: nextRecipient?.contact?.id,
+            queue_id: nextRecipient.id,
             campaign_id: campaign?.id,
             workspace: workspaceId,
             disposition
@@ -52,6 +53,7 @@ export const handleQuestionsSave = (update, setUpdate, recentAttempt, submit, ne
         callId: recentAttempt?.id,
         selected_workspace_id: workspaceId,
         contact_id: nextRecipient?.contact?.id,
+        queue_id: nextRecipient.id,
         campaign_id: campaign?.id,
         workspace: workspaceId,
         disposition
