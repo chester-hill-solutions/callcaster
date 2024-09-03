@@ -62,7 +62,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { workspace, workspaceError } = workspaceData;
   const { chats, chatsError } = chatsData;
   const { contact, potentialContacts, contactError } = contactData;
-
+  const chatNumbers = Array.from(new Set(chats?.filter((i) => Boolean(i.contact_phone)).map((chat) => chat.contact_phone)))
+  const shapedChats = chatNumbers.map((num) => chats?.find((chat) => chat.contact_phone === num))
   const errors = [workspaceError, chatsError, contactError].filter(Boolean);
   if (errors.length) {
     return json(
@@ -76,7 +77,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   return json(
     {
-      chats,
+      chats:shapedChats,
       potentialContacts,
       contact,
       workspace,
@@ -234,17 +235,19 @@ export default function ChatsList() {
     const date = new Date(dateString);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-  
+
     if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   }
-  
 
   return (
-    <main className="flex h-full w-full gap-4 max-h-[80vh]">
+    <main className="flex h-full max-h-[80vh] w-full gap-4">
       <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
         <Button
           className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
@@ -257,42 +260,44 @@ export default function ChatsList() {
         </Button>
         <div className="flex-1 overflow-y-auto">
           {conversations?.length > 0 ? (
-            conversations.map((chat) => (
-              <NavLink
-                key={chat.contact_phone}
-                to={chat.contact_phone}
-                className={({ isActive }) => `
-                flex items-center border-b border-gray-200 p-3 dark:bg-zinc-900 transition-colors hover:bg-gray-100
+            conversations
+              .filter((i) => Boolean(i.contact_phone))
+              .map((chat) => (
+                <NavLink
+                  key={chat.contact_phone}
+                  to={chat.contact_phone}
+                  className={({ isActive }) => `
+                flex items-center border-b border-gray-200 p-3 transition-colors hover:bg-gray-100 dark:bg-zinc-900
                 ${isActive ? "bg-primary/10 font-semibold" : ""}
                 ${chat.unread_count > 0 ? "border-l-4 border-l-primary" : ""}
               `}
-              >
-                <MdChat
-                  className="mr-3 flex-shrink-0 text-gray-500"
-                  size={20}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between">
-                    <span className="truncate font-medium">
-                      {chat.contact_firstname || chat.contact_surname
-                        ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
-                        : chat.contact_phone}
-                    </span>
-                    <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
-                      {formatDate(new Date(chat.conversation_last_update))}
-                    </span>
+                >
+                  <MdChat
+                    className="mr-3 flex-shrink-0 text-gray-500"
+                    size={20}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between">
+                      <span className="truncate font-medium">
+                        {chat.contact_firstname || chat.contact_surname
+                          ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
+                          : chat.contact_phone}
+                      </span>
+                      <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
+                        {formatDate(new Date(chat.conversation_last_update))}
+                      </span>
+                    </div>
+                    <p className="truncate text-sm text-gray-600">
+                      {chat.contact_phone}
+                    </p>
                   </div>
-                  <p className="truncate text-sm text-gray-600">
-                    {chat.contact_phone}
-                  </p>
-                </div>
-                {chat.unread_count > 0 && (
-                  <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
-                    {chat.unread_count}
-                  </span>
-                )}
-              </NavLink>
-            ))
+                  {chat.unread_count > 0 && (
+                    <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
+                      {chat.unread_count}
+                    </span>
+                  )}
+                </NavLink>
+              ))
           ) : (
             <div className="p-4 text-center text-gray-500">
               No conversations yet
@@ -301,7 +306,7 @@ export default function ChatsList() {
         </div>
       </Card>
 
-      <Card className="flex h-full w-full flex-1 flex-col rounded-sm justify-stretch">
+      <Card className="flex h-full w-full flex-1 flex-col justify-stretch rounded-sm">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
