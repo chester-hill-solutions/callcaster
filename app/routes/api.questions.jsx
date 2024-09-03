@@ -3,8 +3,8 @@ import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 
 export const action = async ({ request }) => {
     const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-    const { update, contact_id, campaign_id, workspace_id, disposition, queue_id } = await request.json();
-    
+    const { update, contact_id, campaign_id, workspace, disposition, queue_id } = await request.json();
+
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentOutreach, error: searchError } = await supabaseClient
         .from('outreach_attempt')
@@ -43,7 +43,7 @@ export const action = async ({ request }) => {
             con_id: contact_id,
             cam_id: campaign_id,
             queue_id,
-            wks_id: workspace_id,
+            wks_id: workspace,
             usr_id: serverSession.user.id
         });
 
