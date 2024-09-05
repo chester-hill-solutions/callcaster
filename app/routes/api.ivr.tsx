@@ -2,58 +2,103 @@ import { createClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
-    const formData = await request.formData();
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+  const baseUrl = process.env.BASE_URL;
 
-    const to_number = formData.get('to_number');
-    const campaign_id = formData.get('campaign_id');
-    const workspace_id = formData.get('workspace_id');
-    const contact_id = formData.get('contact_id');
-    const caller_id = formData.get('caller_id');
-    const queue_id = formData.get('queue_id');
-    const user_id = formData.get('user_id');
+  if (!supabaseUrl || !supabaseServiceKey || !baseUrl) {
+    throw new Error("Missing required environment variables");
+  }
 
-    try {
-        const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
-        
-        const outreachAttempt = await supabase.rpc('create_outreach_attempt', {
-            con_id: contact_id,
-            cam_id: campaign_id,
-            wks_id: workspace_id,
-            queue_id: queue_id,
-            usr_id: user_id
-        });
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const formData = await request.formData();
 
-        if (outreachAttempt.error) throw outreachAttempt.error;
+  const to_number = formData.get("to_number");
+  const campaign_id = formData.get("campaign_id");
+  const workspace_id = formData.get("workspace_id");
+  const contact_id = formData.get("contact_id");
+  const caller_id = formData.get("caller_id");
+  const queue_id = formData.get("queue_id");
+  const user_id = formData.get("user_id");
 
-        const call = await twilio.calls.create({
-            to: to_number,
-            from: caller_id,
-            url: `${process.env.BASE_URL}/api/ivr/${campaign_id}/page_1/`,
-            machineDetection: 'Enable',
-            statusCallbackEvent: ['answered', 'completed'],
-            statusCallback: `${process.env.BASE_URL}/api/ivr/status`
-        });
+  let outreachAttemptId;
+  let call;
+  const twilio = await createWorkspaceTwilioInstance({
+    supabase,
+    workspace_id,
+  });
 
-        await supabase.from('call').insert({
-            sid: call.sid,
-            to: to_number,
-            from: caller_id,
-            campaign_id,
-            contact_id,
-            workspace: workspace_id,
-            outreach_attempt_id: outreachAttempt.data
-        });
+  try {
+    // Create outreach attempt
+    const { data, error: outreachError } = await supabase.rpc(
+      "create_outreach_attempt",
+      {
+        con_id: contact_id,
+        cam_id: campaign_id,
+        wks_id: workspace_id,
+        queue_id: queue_id,
+        usr_id: user_id,
+      },
+    );
 
-        return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    } catch (error) {
-        console.error('Error processing call:', error);
-        return new Response(JSON.stringify({ error: 'There was an error processing your call.' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
+    if (outreachError) throw outreachError;
+    outreachAttemptId = data;
+
+    // Create Twilio call
+    call = await twilio.calls.create({
+      to: to_number,
+      from: caller_id,
+      url: `${baseUrl}/api/ivr/${campaign_id}/page_1/`,
+      machineDetection: "Enable",
+      statusCallbackEvent: ["answered", "completed"],
+      statusCallback: `${baseUrl}/api/ivr/status`,
+    });
+
+    // Insert call record
+    const { error: insertError } = await supabase.from("call").insert({
+      sid: call.sid,
+      to: to_number,
+      from: caller_id,
+      campaign_id,
+      contact_id,
+      workspace: workspace_id,
+      outreach_attempt_id: outreachAttemptId,
+    });
+
+    if (insertError) throw insertError;
+
+    return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Error processing call:", error);
+
+    // Update outreach attempt to failed if it was created
+    if (outreachAttemptId) {
+      const { error: outreachUpdateError } = await supabase
+        .from("outreach_attempt")
+        .update({ disposition: "failed" })
+        .eq("id", outreachAttemptId);
+      if (outreachUpdateError) throw outreachUpdateError;
     }
+    if (call && call.sid) {
+      try {
+        await twilio.calls(call.sid).update({ status: "canceled" });
+      } catch (cancelError) {
+        console.error("Error canceling Twilio call:", cancelError);
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        error: "There was an error processing your call.",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
 };
