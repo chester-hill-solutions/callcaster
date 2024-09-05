@@ -33,16 +33,16 @@ const handleVoicemail = async (twilio, callSid, dbCall, campaign, supabase) => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail' });
     const step = campaign.stepData.find((i) => i.step === 'voicemail');
-    if (!step) {
+    if (!step && !campaign.voicemail_file ) {
         await call.update({
             twiml: `<Response><Hangup/></Response>`
         });
     } else {
-        if (step.speechType === 'synthetic') {
+        if (step && step.speechType === 'synthetic') {
             await call.update({
                 twiml: `<Response><Pause length="1"/><Say>${step.say}</Say></Response>`
             });
-        } else {
+        } else if (campaign.voicemail_file) {
             const { data, error } = await supabase.storage
                 .from(`workspaceAudio`)
                 .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
