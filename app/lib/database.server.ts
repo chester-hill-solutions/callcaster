@@ -1361,3 +1361,163 @@ async function updateCampaignAudiences(
 
   return { added, deleted };
 }
+
+export interface Condition {
+  field: string;
+  operator: string;
+  value: any;
+}
+
+interface Rule {
+  conditions: Condition[];
+  logic: "AND" | "OR";
+}
+
+const evaluateCondition = (contact: any, condition: Condition): boolean => {
+  const { field, operator, value } = condition;
+  const contactValue = contact[field];
+
+  switch (operator) {
+    case "equals":
+      return contactValue === value;
+    case "notEquals":
+      return contactValue !== value;
+    case "contains":
+      return String(contactValue)
+        .toLowerCase()
+        .includes(String(value).toLowerCase());
+    case "notContains":
+      return !String(contactValue)
+        .toLowerCase()
+        .includes(String(value).toLowerCase());
+    case "startsWith":
+      return String(contactValue)
+        .toLowerCase()
+        .startsWith(String(value).toLowerCase());
+    case "endsWith":
+      return String(contactValue)
+        .toLowerCase()
+        .endsWith(String(value).toLowerCase());
+    case "greaterThan":
+      return contactValue > value;
+    case "lessThan":
+      return contactValue < value;
+    case "greaterThanOrEqual":
+      return contactValue >= value;
+    case "lessThanOrEqual":
+      return contactValue <= value;
+    case "in":
+      return Array.isArray(value) && value.includes(contactValue);
+    case "notIn":
+      return Array.isArray(value) && !value.includes(contactValue);
+    case "exists":
+      return contactValue !== undefined && contactValue !== null;
+    case "notExists":
+      return contactValue === undefined || contactValue === null;
+    case "regex":
+      try {
+        const regex = new RegExp(value, "i");
+        return regex.test(String(contactValue));
+      } catch (e) {
+        console.error("Invalid regex:", value);
+        return false;
+      }
+    default:
+      console.warn(`Unknown operator: ${operator}`);
+      return false;
+  }
+};
+
+export const evaluateRule = (contact: any, rule: Rule): boolean => {
+  const { conditions, logic } = rule;
+
+  if (logic === "AND") {
+    return conditions.every((condition) =>
+      evaluateCondition(contact, condition),
+    );
+  } else if (logic === "OR") {
+    return conditions.some((condition) =>
+      evaluateCondition(contact, condition),
+    );
+  } else {
+    console.warn(`Unknown logic operator: ${logic}`);
+    return false;
+  }
+};
+
+export const applyConditionToQuery = (query: any, condition: Condition) => {
+  const { field, operator, value } = condition;
+  
+  switch (operator) {
+    case "equals":
+      return query.eq(field, value);
+    case "notEquals":
+      return query.neq(field, value);
+    case "contains":
+      return query.ilike(field, `%${value}%`);
+    case "notContains":
+      return query.not('ilike', field, `%${value}%`);
+    case "startsWith":
+      return query.ilike(field, `${value}%`);
+    case "endsWith":
+      return query.ilike(field, `%${value}`);
+    case "greaterThan":
+      return query.gt(field, value);
+    case "lessThan":
+      return query.lt(field, value);
+    case "greaterThanOrEqual":
+      return query.gte(field, value);
+    case "lessThanOrEqual":
+      return query.lte(field, value);
+    case "in":
+      return query.in(field, value);
+    case "notIn":
+      return query.not('in', field, value);
+    case "exists":
+      return query.not('is', field, null);
+    case "notExists":
+      return query.is(field, null);
+    default:
+      console.warn(`Unsupported operator: ${operator}`);
+      return query;
+  }
+};
+
+
+export const applyRulesToQuery = (query: any, rule: Rule) => {
+  const { conditions, logic } = rule;
+  
+  if (logic === "AND") {
+    conditions.forEach(condition => {
+      query = applyConditionToQuery(query, condition);
+    });
+  } else if (logic === "OR") {
+    const orConditions = conditions.map(condition => {
+      let orQuery = query.clone();
+      return applyConditionToQuery(orQuery, condition);
+    });
+    query = query.or(...orConditions.map(q => q.filter));
+  }
+  
+  return query;
+};
+
+export const fetchAudienceContactsFromRules = async (supabase: SupabaseClient, rules: Rule[]) => {
+  try {
+    let query = supabase.from('contact').select('*', { count: 'exact' });
+    
+    rules.forEach((rule, index) => {
+      console.log(`Applying rule ${index + 1}:`, JSON.stringify(rule, null, 2));
+      query = applyRulesToQuery(query, rule);
+    });
+
+    const { data, count, error } = await query;
+    
+    if (error) throw error;
+    
+    return { data, count };
+  } catch (error) {
+    console.error('Error filtering contacts:', error);
+    throw error;
+  }
+};

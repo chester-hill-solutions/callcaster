@@ -30,6 +30,9 @@ export async function handleNewAudience({
   headers,
   contactsFile,
   campaignId,
+  isConditional,
+  rules,
+  userId
 }: {
   supabaseClient: SupabaseClient;
   formData: FormData;
@@ -37,6 +40,9 @@ export async function handleNewAudience({
   headers: Headers;
   contactsFile: File;
   campaignId?: string;
+  isConditional: boolean;
+  rules: any;
+  userId: string;
 }) {
   const newAudienceName = formData.get("audience-name") as string;
 
@@ -54,6 +60,36 @@ export async function handleNewAudience({
     if (createAudienceError) {
       throw createAudienceError;
     }
+    if (isConditional && rules) {
+      // Insert rules into audience_rule table
+      const { error: ruleInsertError } = await supabaseClient
+        .from("audience_rule")
+        .insert(
+          rules.map((rule) => ({
+            audience_id: createAudienceData.id,
+            conditions: rule.conditions,
+            logic: rule.logic,
+          }))
+        );
+
+      if (ruleInsertError) {
+        throw ruleInsertError;
+      }
+    }
+    if (!isConditional && contactsFile && contactsFile.size > 0) {
+      const fileContent = await contactsFile.text();
+      const { headers: csvHeaders, contacts } = parseCSV(fileContent);
+      await bulkCreateContacts(
+        supabaseClient,
+        contacts,
+        workspaceId,
+        createAudienceData.id,
+        userId
+      );
+    }
+
+
+
     if (campaignId) {
       const { error: campaignInsertError } = await insertCampaignAudience({
         campaignId,
@@ -62,16 +98,6 @@ export async function handleNewAudience({
       });
       if (campaignInsertError)
         removeCampaignAudience({ supabaseClient, id: createAudienceData.id });
-    }
-    if (contactsFile && contactsFile.size > 0) {
-      const fileContent = await contactsFile.text();
-      const { headers: csvHeaders, contacts } = parseCSV(fileContent);
-      await bulkCreateContacts(
-        supabaseClient,
-        contacts,
-        workspaceId,
-        createAudienceData.id,
-      );
     }
 
     return redirect(
