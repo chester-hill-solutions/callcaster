@@ -29,7 +29,6 @@ export const action = async ({ request }) => {
   });
 
   try {
-
     const { data, error: outreachError } = await supabase.rpc(
       "create_outreach_attempt",
       {
@@ -54,8 +53,8 @@ export const action = async ({ request }) => {
       statusCallback: `${baseUrl}/api/ivr/status`,
     });
 
-    // Insert call record
-    const { error: insertError } = await supabase.from("call").insert({
+    
+    const {data: insertData, error: insertError } = await supabase.from("call").insert({
       sid: call.sid,
       to: to_number,
       from: caller_id,
@@ -63,10 +62,10 @@ export const action = async ({ request }) => {
       contact_id,
       workspace: workspace_id,
       outreach_attempt_id: outreachAttemptId,
-    });
+    }).select();
 
     if (insertError) throw insertError;
-
+    console.log(insertData)
     return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
