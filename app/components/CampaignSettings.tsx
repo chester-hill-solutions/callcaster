@@ -75,7 +75,7 @@ export const CampaignSettings = ({
   const [initialData, setInitial] = useState(campaignData);
 
   const [isChanged, setChanged] = useState(false);
-
+  
   useEffect(() => {
     setInitial({
       campaign_id,
@@ -94,14 +94,7 @@ export const CampaignSettings = ({
       body_text: details?.body_text || "",
       message_media: details?.message_media || [],
     });
-  }, [
-    campaign_id,
-    data,
-    details?.body_text,
-    details?.message_media,
-    details?.script_id,
-    workspace,
-  ]);
+  }, [campaign_id, data, details, workspace]);
 
   useEffect(() => {
     setChanged(!deepEqual(campaignData, initialData));
