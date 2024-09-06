@@ -141,7 +141,11 @@ const handleCallStatusUpdate = async (
 ): Promise<void> => {
   await Promise.all([
     updateCallStatus(supabase, callSid, status, timestamp),
-    updateResult(supabase, outreach_attempt_id, { disposition, ...(disposition === 'in-progress' && {answered_at: new Date()}) }),
+    updateResult(supabase, outreach_attempt_id, {
+      disposition,
+      ...(disposition === "in-progress" && { answered_at: new Date() }),
+      ...(status === "completed" && { ended_at: new Date() }),
+    }),
   ]);
 };
 
