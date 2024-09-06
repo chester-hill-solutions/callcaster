@@ -29,7 +29,7 @@ export const action = async ({ request }) => {
   });
 
   try {
-    // Create outreach attempt
+
     const { data, error: outreachError } = await supabase.rpc(
       "create_outreach_attempt",
       {
@@ -74,7 +74,6 @@ export const action = async ({ request }) => {
   } catch (error) {
     console.error("Error processing call:", error);
 
-    // Update outreach attempt to failed if it was created
     if (outreachAttemptId) {
       const { error: outreachUpdateError } = await supabase
         .from("outreach_attempt")

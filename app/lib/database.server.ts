@@ -1361,3 +1361,66 @@ async function updateCampaignAudiences(
 
   return { added, deleted };
 }
+async function fetchQueuedCalls(twilio, batchSize) {
+  return await twilio.calls.list({
+    status: 'queued',
+    limit: batchSize,
+    pageSize: batchSize
+  });
+}
+async function cancelCallAndUpdateDB(twilio, supabase, call) {
+  try {
+    const canceledCall = await twilio.calls(call.sid).update({ status: 'canceled' });
+    await supabase.rpc('update_campaign_queue_by_call_sid', { in_call_sid: canceledCall.sid });
+    return canceledCall.sid;
+  } catch (error) {
+    throw new Error(`Error canceling call ${call.sid}: ${error.message}`);
+  }
+}
+async function processBatchCancellation(twilio, supabase, calls) {
+  const results = await Promise.allSettled(
+    calls.map(call => cancelCallAndUpdateDB(twilio, supabase, call))
+  );
+
+  return results.reduce((acc, result) => {
+    if (result.status === 'fulfilled') {
+      acc.canceledCalls.push(result.value);
+    } else {
+      acc.errors.push(result.reason.message);
+    }
+    return acc;
+  }, { canceledCalls: [], errors: [] });
+}
+
+
+export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
+  let allCanceledCalls = [];
+  let allErrors = [];
+  let hasMoreCalls = true;
+
+  while (hasMoreCalls) {
+    try {
+      const calls = await fetchQueuedCalls(twilio, batchSize);
+      
+      if (calls.length === 0) {
+        hasMoreCalls = false;
+        break;
+      }
+
+      const { canceledCalls, errors } = await processBatchCancellation(twilio, supabase, calls);
+      
+      allCanceledCalls = allCanceledCalls.concat(canceledCalls);
+      allErrors = allErrors.concat(errors);
+
+      hasMoreCalls = calls.length === batchSize;
+    } catch (error) {
+      allErrors.push(`Error retrieving calls: ${error.message}`);
+      hasMoreCalls = false;
+    }
+  }
+
+  return {
+    canceledCalls: allCanceledCalls,
+    errors: allErrors
+  };
+}
