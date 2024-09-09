@@ -65,7 +65,15 @@ export const action = async ({ request }) => {
     }).select();
 
     if (insertError) throw insertError;
-    console.log(insertData)
+
+    // Dequeue
+    const { error: dequeueError } = await supabase
+      .from("campaign_queue")
+      .update({ status: "dequeued" })
+      .eq("id", queue_id);
+      
+    if (dequeueError) throw dequeueError;
+
     return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
