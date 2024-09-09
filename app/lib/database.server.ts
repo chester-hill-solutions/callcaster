@@ -676,8 +676,6 @@ export async function updateCampaign({
     disposition_options: undefined,
     audience: undefined,
     script_id: undefined,
-    start_date: undefined,
-    end_date: undefined,
     body_text: undefined,
     message_media: undefined,
   });

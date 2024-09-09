@@ -1,8 +1,17 @@
-import { Dropdown, Toggle } from "./Inputs";
-import { Button } from "./ui/button";
+import React from "react";
+import { Button } from "~/components/ui/button";
 import { NavLink } from "@remix-run/react";
 import { MdAdd } from "react-icons/md";
 import { MessageSettings } from "./MessageSettings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -17,45 +26,53 @@ export const CampaignTypeSpecificSettings = ({
   return (
     <>
       {campaignData.type !== "message" && (
-        <div className="flex gap-2">
-          <div className="flex items-end gap-1">
-            <Dropdown
-              name="voicemail_file"
-              label="Voicemail File"
-              value={campaignData.voicemail_file}
-              onChange={(e) =>
-                handleInputChange("voicemail_file", e.target.value)
-              }
-              options={mediaData?.map((media) => ({
-                value: media.name,
-                label: media.name,
-              }))}
-              className="flex flex-col"
-            />
-            <Button variant="outline" asChild>
+        <div className="flex gap-4 flex-wrap">
+          <div className="flex items-end gap-2">
+            <div className="space-y-2">
+              <Label htmlFor="voicemail_file">Voicemail File</Label>
+              <Select
+                value={campaignData.voicemail_file}
+                onValueChange={(value) => handleInputChange("voicemail_file", value)}
+              >
+                <SelectTrigger id="voicemail_file" className="w-[200px]">
+                  <SelectValue placeholder="Select voicemail file" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mediaData?.map((media) => (
+                    <SelectItem key={media.name} value={media.name}>
+                      {media.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" asChild size="icon">
               <NavLink to="../../../audios/new">
                 <MdAdd />
               </NavLink>
             </Button>
           </div>
-          <div className="flex items-end gap-1">
-            <Dropdown
-              name="script_id"
-              label="Script"
-              value={campaignData.script_id}
-              onChange={(e) =>
-                handleInputChange("script_id", parseInt(e.target.value))
-              }
-              options={scripts?.map((script) => ({
-                value: script.id,
-                label: script.name,
-              }))}
-              className="flex flex-col"
-            />
-            <Button variant="outline" asChild>
-              <NavLink
-                to={`../../../scripts/new?ref=${campaignData.campaign_id}`}
+          <div className="flex items-end gap-2">
+            <div className="space-y-2">
+              <Label htmlFor="script_id">Script</Label>
+              <Select
+                value={campaignData.script_id?.toString()}
+                onValueChange={(value) => handleInputChange("script_id", parseInt(value))}
               >
+                <SelectTrigger id="script_id" className="w-[200px]">
+                  <SelectValue placeholder="Select script" />
+                </SelectTrigger>
+                <SelectContent>
+                  {scripts?.map((script) => (
+                    <SelectItem key={script.id} value={script.id.toString()}>
+                      {script.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" asChild size="icon">
+              <NavLink to={`../../../scripts/new?ref=${campaignData.campaign_id}`}>
                 <MdAdd />
               </NavLink>
             </Button>
@@ -73,25 +90,25 @@ export const CampaignTypeSpecificSettings = ({
       )}
       {campaignData.type === "live_call" && (
         <>
-          <div className="mb-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-          <div className="flex justify-start gap-8">
-            <Toggle
-              name="group_household_queue"
-              label="Group by household"
-              isChecked={campaignData.group_household_queue}
-              onChange={(e) => handleInputChange("group_household_queue", e)}
-              rightLabel="Yes"
-            />
-            <Toggle
-              name="dial_type"
-              label="Dial Type"
-              isChecked={campaignData.dial_type === "predictive"}
-              onChange={(e) =>
-                handleInputChange("dial_type", e ? "predictive" : "call")
-              }
-              leftLabel="Power Dialer"
-              rightLabel="Predictive Dialer"
-            />
+          <div className="my-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
+          <div className="flex justify-start gap-8 flex-wrap">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="group_household_queue"
+                checked={campaignData.group_household_queue}
+                onCheckedChange={(checked) => handleInputChange("group_household_queue", checked)}
+              />
+              <Label htmlFor="group_household_queue">Group by household</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="dial_type">Dial Type:</Label>
+              <Switch
+                id="dial_type"
+                checked={campaignData.dial_type === "predictive"}
+                onCheckedChange={(checked) => handleInputChange("dial_type", checked ? "predictive" : "call")}
+              />
+              <span>{campaignData.dial_type === "predictive" ? "Predictive Dialer" : "Power Dialer"}</span>
+            </div>
           </div>
         </>
       )}

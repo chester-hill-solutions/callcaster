@@ -1,76 +1,109 @@
-import React from "react";
-import { TextInput, Dropdown } from "./Inputs";
-import { Button } from "./ui/button";
+import { Button } from "~/components/ui/button";
 import { NavLink } from "@remix-run/react";
-import { DateTimePicker } from "./ui/datetime";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { DateTimePicker } from "~/components/ui/datetime";
 
 export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
   phoneNumbers,
 }) => (
-  <div className="flex flex-wrap justify-start gap-4">
-    <div className="flex flex-col gap-2">
-      <TextInput
-        name="title"
-        label="Campaign Title"
-        value={campaignData.title}
-        onChange={(e) => handleInputChange("title", e.target.value)}
-        className="flex flex-col"
-      />
-      <Dropdown
-        name="status"
-        label="Campaign Status"
-        value={campaignData.status}
-        onChange={(e) => handleInputChange("status", e.target.value)}
-        options={[
-          { value: "pending", label: "Pending" },
-          { value: "running", label: "Running" },
-          { value: "complete", label: "Complete" },
-          { value: "paused", label: "Paused" },
-          { value: "draft", label: "Draft" },
-        ]}
-        className="flex flex-col"
-      />
-    </div>
-    <div className="flex flex-col gap-2">
-      <Dropdown
-        name="type"
-        disabled
-        label="Campaign Type"
-        value={campaignData.type}
-        onChange={(e) => handleInputChange("type", e.target.value)}
-        options={[
-          { value: "message", label: "Message" },
-          { value: "robocall", label: "Interactive Voice Recording" },
-          { value: "live_call", label: "Live Call" },
-        ]}
-        className="flex flex-col"
-      />
-      {phoneNumbers.length ? (
-        <Dropdown
-          name="caller_id"
-          className="flex flex-col"
-          label="Phone Number"
-          value={campaignData.caller_id}
-          onChange={(e) => handleInputChange("caller_id", e.target.value)}
-          options={phoneNumbers.map((number) => ({
-            value: number.phone_number,
-            label: number.friendly_name,
-          }))}
+  <div className="flex flex-wrap gap-6">
+    <div className="flex-1 min-w-[250px] space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="title">Campaign Title</Label>
+        <Input
+          id="title"
+          name="title"
+          value={campaignData.title}
+          onChange={(e) => handleInputChange("title", e.target.value)}
         />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="status">Campaign Status</Label>
+        <Select
+          value={campaignData.status}
+          onValueChange={(value) => handleInputChange("status", value)}
+        >
+          <SelectTrigger id="status">
+            <SelectValue placeholder="Select status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="running">Running</SelectItem>
+            <SelectItem value="complete">Complete</SelectItem>
+            <SelectItem value="paused">Paused</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+    <div className="flex-1 min-w-[250px] space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="type">Campaign Type</Label>
+        <Select
+          value={campaignData.type}
+          onValueChange={(value) => handleInputChange("type", value)}
+        >
+          <SelectTrigger id="type">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="message">Message</SelectItem>
+            <SelectItem value="robocall">Interactive Voice Recording</SelectItem>
+            <SelectItem value="live_call">Live Call</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {phoneNumbers.length ? (
+        <div className="space-y-2">
+          <Label htmlFor="caller_id">Phone Number</Label>
+          <Select
+            value={campaignData.caller_id}
+            onValueChange={(value) => handleInputChange("caller_id", value)}
+          >
+            <SelectTrigger id="caller_id">
+              <SelectValue placeholder="Select phone number" />
+            </SelectTrigger>
+            <SelectContent>
+              {phoneNumbers.map((number) => (
+                <SelectItem key={number.phone_number} value={number.phone_number}>
+                  {number.friendly_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       ) : (
-        <div className="flex flex-col justify-end">
+        <div className="pt-6">
           <Button asChild>
             <NavLink to="../../../settings/numbers">Get a Number</NavLink>
           </Button>
         </div>
       )}
     </div>
-    <div className="flex flex-col gap-2">
+    <div className="flex-1 min-w-[250px] space-y-2">
+      <Label htmlFor="start_date">Start Date</Label>
       <DateTimePicker
-        value={campaignData?.start_date as unknown as Date}
-        onChange={(e) => handleInputChange("start_date", e)}
+        value={campaignData.start_date ? new Date(campaignData.start_date) : undefined}
+        onChange={(date) => handleInputChange("start_date", date?.toISOString())}
+        hourCycle={24}
+      />
+    </div>
+    <div className="flex-1 min-w-[250px] space-y-2">
+      <Label htmlFor="end_date">End Date</Label>
+      <DateTimePicker
+        value={campaignData.end_date ? new Date(campaignData.end_date) : undefined}
+        onChange={(date) => handleInputChange("end_date", date?.toISOString())}
+        hourCycle={24}
       />
     </div>
   </div>
