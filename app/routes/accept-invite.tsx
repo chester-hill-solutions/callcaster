@@ -37,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       .select(`*, workspace(id, name)`)
       .eq("user_id", session.user.id);
     if (inviteError) return json({ error: inviteError }, { headers });
-    
+
     if (
       session.user.user_metadata.first_name === "New" &&
       session.user.user_metadata.last_name === "Caller"
@@ -203,7 +203,8 @@ export default function AcceptInvite() {
   useEffect(() => {
     if (state === "idle" && actionData?.success) {
       toast.success("Successfully signed up and accepted invitation");
-      const timeout = setTimeout(() => null, 3000);
+      const timeout = setTimeout(() => navigate('/workspaces'), 3000);
+      
       return () => clearTimeout(timeout);
     }
   }, [actionData, navigate, state]);

@@ -579,7 +579,6 @@ export async function acceptWorkspaceInvitations(
       .select()
       .eq("id", invitationId)
       .single();
-    console.error(inviteError);
     if (inviteError) return { error: inviteError };
 
     const { error: workspaceError } = await addUserToWorkspace({
