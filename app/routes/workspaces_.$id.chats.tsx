@@ -15,9 +15,10 @@ import {
   useOutletContext,
   useSearchParams,
 } from "@remix-run/react";
-import { MdAdd, MdChat } from "react-icons/md";
+import { MdAdd, MdChat, MdExpandMore } from "react-icons/md";
 import { Button } from "~/components/ui/button";
 import {
+  fetchCampaignsByType,
   fetchContactData,
   fetchConversationSummary,
   fetchWorkspaceData,
@@ -32,6 +33,14 @@ import ChatHeader from "~/components/Chat/ChatHeader";
 import ChatInput from "~/components/Chat/ChatInput";
 import { useContactSearch } from "~/hooks/useContactSearch";
 import ChatAddContactDialog from "~/components/Chat/ChatAddContactDialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { X } from "lucide-react";
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
@@ -41,6 +50,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
+  const campaign_id = url.searchParams.get("campaign_id");
   const workspaceId = params.id;
   const contact_number = params.contact_number;
 
@@ -53,16 +63,31 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const userRole = getUserRole({ serverSession, workspaceId });
 
-  const [workspaceData, chatsData, contactData] = await Promise.all([
-    fetchWorkspaceData(supabaseClient, workspaceId),
-    fetchConversationSummary(supabaseClient, workspaceId),
-    fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
-  ]);
+  const [workspaceData, chatsData, contactData, smsCampaigns] =
+    await Promise.all([
+      fetchWorkspaceData(supabaseClient, workspaceId),
+      fetchConversationSummary(supabaseClient, workspaceId, campaign_id),
+      fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
+      fetchCampaignsByType({
+        supabaseClient,
+        workspaceId,
+        type: "message_campaign",
+      }),
+    ]);
 
   const { workspace, workspaceError } = workspaceData;
   const { chats, chatsError } = chatsData;
   const { contact, potentialContacts, contactError } = contactData;
-
+  const chatNumbers = Array.from(
+    new Set(
+      chats
+        ?.filter((i) => Boolean(i.contact_phone))
+        .map((chat) => chat.contact_phone),
+    ),
+  );
+  const shapedChats = chatNumbers.map((num) =>
+    chats?.find((chat) => chat.contact_phone === num),
+  );
   const errors = [workspaceError, chatsError, contactError].filter(Boolean);
   if (errors.length) {
     return json(
@@ -73,10 +98,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-
   return json(
     {
-      chats,
+      campaigns: smsCampaigns,
+      chats: shapedChats,
       potentialContacts,
       contact,
       workspace,
@@ -118,10 +143,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 export default function ChatsList() {
   const { supabase } = useOutletContext();
-  const { chats, workspace, userRole, potentialContacts, contact } =
+  const { chats, workspace, userRole, potentialContacts, contact, campaigns } =
     useLoaderData();
+  const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
   const imageFetcher = useFetcher({ key: "images" });
+  const filterFetcher = useFetcher({ key: "chat-filters" });
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const [dialogContact, setDialog] = useState({});
@@ -142,7 +169,7 @@ export default function ChatsList() {
     isValid,
   } = useContactSearch({
     supabase,
-    workspace_id: workspace.id,
+    workspace_id: workspace?.id,
     contact_number,
     potentialContacts,
     dropdownRef,
@@ -153,7 +180,7 @@ export default function ChatsList() {
   const { conversations } = useConversationSummaryRealTime({
     supabase: supabase,
     initial: chats,
-    workspace: workspace.id,
+    workspace: workspace?.id,
   });
 
   const handleImageSelect = useCallback(
@@ -161,7 +188,7 @@ export default function ChatsList() {
       const file = e.target.files[0];
       if (file) {
         const data = new FormData();
-        data.append("workspaceId", workspace.id);
+        data.append("workspaceId", workspace?.id);
         data.append("image", file);
         data.append("fileName", file.name);
         imageFetcher.submit(data, {
@@ -171,7 +198,7 @@ export default function ChatsList() {
         });
       }
     },
-    [workspace.id, imageFetcher],
+    [workspace?.id, imageFetcher],
   );
 
   const handleImageRemove = useCallback((imageUrl) => {
@@ -234,17 +261,19 @@ export default function ChatsList() {
     const date = new Date(dateString);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-  
+
     if (isToday) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   }
-  
 
   return (
-    <main className="flex h-full w-full gap-4 max-h-[80vh]">
+    <main className="flex h-full max-h-[80vh] w-full gap-4">
       <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
         <Button
           className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
@@ -255,44 +284,88 @@ export default function ChatsList() {
             <MdAdd size={24} className="mr-2" />
           </NavLink>
         </Button>
+        <filterFetcher.Form>
+          <div className="flex">
+            <Select
+              defaultValue={searchParams.get("campaign_id") || undefined}
+              onValueChange={(val) => {
+                setSearchParams((prev) => {
+                  console.log(Object.fromEntries(prev), val);
+                  prev.set("campaign_id", val);
+                  return prev;
+                });
+              }}
+            >
+              <SelectTrigger className="flex items-center p-2">
+                <SelectValue placeholder="Filter by Campaign" />
+              </SelectTrigger>
+              <SelectContent className="w-full bg-slate-50">
+                {campaigns &&
+                  campaigns?.map((campaign: { id: number; title: string }) => (
+                    <SelectItem
+                      value={`${campaign.id}`}
+                      key={campaign?.id}
+                      className="w-full p-4"
+                    >
+                      {campaign.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            <Button
+              type="reset"
+              variant={"ghost"}
+              onClick={() =>
+                setSearchParams((prev) => {
+                  prev.delete("campaign_id");
+                  return prev;
+                })
+              }
+            >
+              <X />
+            </Button>
+          </div>
+        </filterFetcher.Form>
         <div className="flex-1 overflow-y-auto">
           {conversations?.length > 0 ? (
-            conversations.map((chat) => (
-              <NavLink
-                key={chat.contact_phone}
-                to={chat.contact_phone}
-                className={({ isActive }) => `
-                flex items-center border-b border-gray-200 p-3 dark:bg-zinc-900 transition-colors hover:bg-gray-100
+            conversations
+              .filter((i) => Boolean(i.contact_phone))
+              .map((chat) => (
+                <NavLink
+                  key={chat.contact_phone}
+                  to={chat.contact_phone}
+                  className={({ isActive }) => `
+                flex items-center border-b border-gray-200 p-3 transition-colors hover:bg-gray-100 dark:bg-zinc-900
                 ${isActive ? "bg-primary/10 font-semibold" : ""}
                 ${chat.unread_count > 0 ? "border-l-4 border-l-primary" : ""}
               `}
-              >
-                <MdChat
-                  className="mr-3 flex-shrink-0 text-gray-500"
-                  size={20}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between">
-                    <span className="truncate font-medium">
-                      {chat.contact_firstname || chat.contact_surname
-                        ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
-                        : chat.contact_phone}
-                    </span>
-                    <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
-                      {formatDate(new Date(chat.conversation_last_update))}
-                    </span>
+                >
+                  <MdChat
+                    className="mr-3 flex-shrink-0 text-gray-500"
+                    size={20}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between">
+                      <span className="truncate font-medium">
+                        {chat.contact_firstname || chat.contact_surname
+                          ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
+                          : chat.contact_phone}
+                      </span>
+                      <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
+                        {formatDate(new Date(chat.conversation_last_update))}
+                      </span>
+                    </div>
+                    <p className="truncate text-sm text-gray-600">
+                      {chat.contact_phone}
+                    </p>
                   </div>
-                  <p className="truncate text-sm text-gray-600">
-                    {chat.contact_phone}
-                  </p>
-                </div>
-                {chat.unread_count > 0 && (
-                  <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
-                    {chat.unread_count}
-                  </span>
-                )}
-              </NavLink>
-            ))
+                  {chat.unread_count > 0 && (
+                    <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
+                      {chat.unread_count}
+                    </span>
+                  )}
+                </NavLink>
+              ))
           ) : (
             <div className="p-4 text-center text-gray-500">
               No conversations yet
@@ -301,7 +374,7 @@ export default function ChatsList() {
         </div>
       </Card>
 
-      <Card className="flex h-full w-full flex-1 flex-col rounded-sm justify-stretch">
+      <Card className="flex h-full w-full flex-1 flex-col justify-stretch rounded-sm">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -328,7 +401,7 @@ export default function ChatsList() {
           isValid={isValid}
           phoneNumber={phoneNumber}
           workspace={workspace}
-          initialFrom={workspace.workspace_number?.[0]}
+          initialFrom={workspace?.workspace_number?.[0]}
           handleSubmit={handleSubmit}
           handleImageSelect={handleImageSelect}
           handleImageRemove={handleImageRemove}
@@ -342,7 +415,7 @@ export default function ChatsList() {
         isDialogOpen={Boolean(dialogContact?.phone)}
         setDialog={setDialog}
         contact_number={contact_number}
-        workspace_id={workspace.id}
+        workspace_id={workspace?.id}
       />
     </main>
   );

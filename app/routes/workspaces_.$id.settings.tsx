@@ -24,17 +24,16 @@ import {
   handleDeleteWorkspace,
   handleTransferWorkspace,
   handleUpdateUser,
+  handleUpdateWebhook,
   removeInvite,
+  testWebhook,
 } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 import { toast, Toaster } from "sonner";
 import { capitalize } from "~/lib/utils";
-import {
-  MdCached,
-  MdCheckCircle,
-  MdError,
-} from "react-icons/md";
+import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "~/components/CustomCard";
+import WebhookEditor from "~/components/Workspace/WebhookEditor";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -51,6 +50,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .from("workspace_invite")
     .select(`*, user(*)`)
     .eq("workspace", workspaceId);
+    
+  const { data: webhook, error: webhookError } = await supabaseClient
+    .from("webhook")
+    .select("*")
+    .eq("workspace", workspaceId)
+    .single();
 
   if (serverSession) {
     const userRole = getUserRole({ serverSession, workspaceId });
@@ -64,6 +69,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         activeUserId: serverSession.user.id,
         phoneNumbers,
         pendingInvites,
+        webhook,
       },
       { headers },
     );
@@ -139,6 +145,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     case "cancelInvite": {
       return removeInvite({ workspaceId, supabaseClient, formData, headers });
     }
+    case "updateWebhook": {
+      return handleUpdateWebhook(
+        formData,
+        workspaceId,
+        supabaseClient,
+        headers,
+      );
+    }
     default: {
       break;
     }
@@ -174,6 +188,7 @@ export default function WorkspaceSettings() {
     activeUserId,
     phoneNumbers,
     pendingInvites,
+    webhook,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const workspaceOwner = users?.find(
@@ -411,6 +426,22 @@ export default function WorkspaceSettings() {
               </Button>
             </div>
           )}
+        </Card>
+        <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+          <div className="flex-1">
+            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+              Manage Webhook
+            </h3>
+            <div className="flex flex-col py-4">
+              {hasAccess ? (
+                <WebhookEditor initialWebhook={webhook} userId={activeUserId} />
+              ) : (
+                <p className="text-center text-gray-600">
+                  You don't have permission to manage webhooks.
+                </p>
+              )}
+            </div>
+          </div>
         </Card>
       </div>
       <Toaster richColors />

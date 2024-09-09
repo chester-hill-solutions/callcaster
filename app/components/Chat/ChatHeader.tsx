@@ -78,7 +78,8 @@ export default function ChatHeader({
   const [isContactListOpen, setIsContactListOpen] = useState(false);
 
   const allContacts = React.useMemo(() => {
-    const combinedContacts = [...contacts, ...potentialContacts];
+    const potenialFiltered = potentialContacts?.length > 0 ? [...potentialContacts] : [];
+    const combinedContacts = [...contacts, ...(potenialFiltered)];
     const uniqueContacts = Array.from(
       new Map(
         combinedContacts.map((contact) => [contact.id, contact]),

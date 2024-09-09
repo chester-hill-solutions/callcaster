@@ -11,6 +11,15 @@ const getCampaignData = async (supabase, campaign_id) => {
     return campaign;
 };
 
+const updateResult = async (supabase, outreach_attempt_id, update) => {
+    const { error } = await supabase
+        .from('outreach_attempt')
+        .update(update)
+        .eq('id', outreach_attempt_id);
+    if (error) throw error;
+};
+
+
 export const action = async ({ params, request }) => {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     const twiml = new Twilio.twiml.VoiceResponse();
@@ -20,8 +29,13 @@ export const action = async ({ params, request }) => {
     const callSid = url.searchParams.get('CallSid');
 
     try {
+        const { data: dbCall, error: callError } = await supabase
+        .from('call')
+        .select('campaign_id, outreach_attempt_id, workspace')
+        .eq('sid', callSid)
+        .single();
         const campaignData = await getCampaignData(supabase, campaignId);
-        
+        pageId === 'page_1' && dbCall ? await updateResult(supabase, dbCall?.outreach_attempt_id, {answered_at: new Date()}): null;
         const script = campaignData.ivr_campaign[0].script.steps;
         const currentPage = script.pages[pageId];
 

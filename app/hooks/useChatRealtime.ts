@@ -11,7 +11,7 @@ export const useChatRealTime = ({
   initial: Message[];
   workspace: string;
 }) => {
-  const [messages, setMessages] = useState(initial);
+  const [messages, setMessages] = useState<Message[]>(initial);
   useEffect(() => {
     setMessages(initial);
   }, [initial]);
@@ -22,8 +22,9 @@ export const useChatRealTime = ({
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "message" },
-        (payload) => {
-          if (payload.new.workspace === workspace) {
+        (payload: { old: { id: string }; new: Message }) => {
+          if (payload.new?.workspace === workspace) {
+            if (payload.new.status === "failed") return;
             setMessages((curr) => [...curr, payload.new]);
           }
         },

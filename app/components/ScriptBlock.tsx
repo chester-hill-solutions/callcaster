@@ -277,7 +277,7 @@ const MergedQuestionBlock = ({
           event.dataTransfer.effectAllowed = "move";
           event.dataTransfer.setData(
             "cardData",
-            JSON.stringify({ totle: localBlock.title, id: localBlock.id }),
+            JSON.stringify({ title: localBlock.title, id: localBlock.id }),
           );
         }}
         onDragOver={(event) => {
