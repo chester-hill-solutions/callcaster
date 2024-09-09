@@ -125,7 +125,7 @@ export const action = async ({ request }: { request: Request }) => {
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
         const now = new Date();
         if (dbCall?.campaign?.end_date && now > dbCall.campaign.end_date){
-            await cancelQueuedCalls(twilio)
+            await cancelQueuedCalls(twilio, supabase)
         }
         const callStatus = parsedBody.CallStatus;
         const timestamp = parsedBody.Timestamp;
