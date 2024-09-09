@@ -26,7 +26,7 @@ const normalizePhoneNumber = (input) => {
 const getCampaignData = async ({ supabase, campaign_id }) => {
   const { data: campaign, error } = await supabase
     .from("message_campaign")
-    .select()
+    .select(`*, campaign(end_time)`)
     .eq("campaign_id", campaign_id)
     .single();
   if (error) throw { campaignError: error };
@@ -92,7 +92,7 @@ const sendMessage = async ({
       apiVersion: api_version,
       subresourceUris: subresource_uris,
     } = message;
-    
+
     const { data, error } = await supabase
       .from("message")
       .insert({
@@ -129,7 +129,19 @@ const sendMessage = async ({
       queue_id,
       user_id,
     });
-    await updateOutreach({supabase, id: outreachAttempt, status: messageError ? "failed" : "completed"});
+    await updateOutreach({
+      supabase,
+      id: outreachAttempt,
+      status: messageError ? "failed" : "completed",
+    });
+
+    const { error: dequeueError } = await supabase
+      .from("campaign_queue")
+      .update({ status: "dequeued" })
+      .eq("id", queue_id);
+
+    if (dequeueError) throw dequeueError;
+
     if (error)
       throw new Error(`Failed to insert message data: ${error.message}`);
     return { message, data };
@@ -138,14 +150,17 @@ const sendMessage = async ({
     throw error;
   }
 };
-const updateOutreach = async ({supabase, id, status}) => {
-    const {data, error} = await supabase.from("outreach_attempt").update({disposition: status}).eq("id", id)
-    if (error) {
-        console.error("Error updating outreach attempt", error)
-        throw (error)
-    }
-    return data;
-}
+const updateOutreach = async ({ supabase, id, status }) => {
+  const { data, error } = await supabase
+    .from("outreach_attempt")
+    .update({ disposition: status })
+    .eq("id", id);
+  if (error) {
+    console.error("Error updating outreach attempt", error);
+    throw error;
+  }
+  return data;
+};
 const createOutreachAttempt = async ({
   supabase,
   contact_id,
@@ -235,7 +250,6 @@ export const action = async ({ request }) => {
         }
       }),
     );
-
     return new Response(JSON.stringify({ responses }), {
       headers: { "Content-Type": "application/json" },
       status: 200,

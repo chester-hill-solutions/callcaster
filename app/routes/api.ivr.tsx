@@ -29,7 +29,6 @@ export const action = async ({ request }) => {
   });
 
   try {
-
     const { data, error: outreachError } = await supabase.rpc(
       "create_outreach_attempt",
       {
@@ -66,6 +65,14 @@ export const action = async ({ request }) => {
     });
 
     if (insertError) throw insertError;
+
+    // Dequeue
+    const { error: dequeueError } = await supabase
+      .from("campaign_queue")
+      .update({ status: "dequeued" })
+      .eq("id", queue_id);
+      
+    if (dequeueError) throw dequeueError;
 
     return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
       status: 200,
