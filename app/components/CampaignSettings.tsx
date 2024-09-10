@@ -147,7 +147,7 @@ export const CampaignSettings = ({
     } else if (campaignData.type === "robocall") {
       handleInputChange("status", "running");
       fetcher.submit(
-        { campaign_id, user_id: user },
+        { campaign_id, user_id: user, workspace_id: workspace },
         {
           method: "post",
           action: "/api/initiate-ivr",
