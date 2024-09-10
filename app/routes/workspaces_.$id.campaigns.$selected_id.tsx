@@ -160,7 +160,6 @@ export default function CampaignScreen() {
   const campaign = data.length ? data : {};
   const submit = useSubmit();
   useCsvDownload(csvData);
-  console.log(data);
 
   const joinDisabled = !data?.campaignDetails?.script_id ? "No script selected" : !data.caller_id ? "No outbound phone number selected" : !data.campaign_audience?.length ? "No audiences selected" : false;
 
