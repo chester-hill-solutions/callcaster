@@ -18,7 +18,8 @@ function convertKeysToUnderCase(obj) {
 export const action = async ({ request }) => {
     const formData = await request.formData();
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-
+    const userId = formData.get('CalledVia').split(":")[1];
+    const realtime = supabase.realtime.channel(userId)
     const parsedBody = {};
 
     for (const pair of formData.entries()) {
@@ -60,14 +61,22 @@ export const action = async ({ request }) => {
     }
     const { data: currentAttempt, error: fetchError } = await supabase
         .from('outreach_attempt')
-        .select('disposition')
+        .select('disposition, contact_id')
         .eq('id', data[0].outreach_attempt_id)
         .single();
     if (fetchError) {
         console.error('Error fetching current attempt:', fetchError);
         return json({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
     }
-    if (currentAttempt.disposition !== 'no-answer' && currentAttempt.disposition !== 'voicemail') {
+    realtime.send({
+        type: "broadcast", event: "message", payload: {
+            contact_id: currentAttempt.contact_id,
+            status: underCaseData.call_status
+        }
+    });
+
+    if (["initiated", "ringing", "in-progress", "idle"].includes(currentAttempt.disposition)) {
+        console.log("updating", currentAttempt.disposition, underCaseData.call_status)
         const { data: updateAttempt, error: updateError } = await supabase
             .from('outreach_attempt')
             .update({ disposition: underCaseData.call_status })

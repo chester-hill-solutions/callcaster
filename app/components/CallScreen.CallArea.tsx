@@ -186,8 +186,8 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 color: "#333",
               }}
             >
-              <option defaultValue={disposition || 'idle'}>Select a disposition</option>
-             {dispositionOptions.map(({value, label}, i) => (<option value={value} key={i}>{label}</option>))}
+              <option defaultValue={disposition}>Select a disposition</option>
+             {dispositionOptions?.map(({value, label}, i) => (<option value={value} key={i}>{label}</option>))}
             </select>
             <button
             disabled={isBusy || disposition === 'idle'}

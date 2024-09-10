@@ -21,6 +21,8 @@ export const useSupabaseRealtime = ({
     init.recentAttempt?.disposition || "idle",
   );
 
+
+
   const {
     queue,
     setQueue,
@@ -100,14 +102,12 @@ export const useSupabaseRealtime = ({
   }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, setRecentAttempt, setUpdate, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
 
   useEffect(() => {
-    if (recentAttempt) {
-      setDisposition(
-        recentAttempt.disposition || recentAttempt.result?.status || "idle",
-      );
+    if (nextRecipient && recentAttempt) {
+      setDisposition(recentAttempt.disposition);
     } else {
-      setDisposition("idle");
+      setDisposition('idle')
     }
-  }, [recentAttempt]);
+  }, [nextRecipient, recentAttempt]);
 
   const handleSetDisposition = useCallback((value: string) => {
     setRecentAttempt((cur) => ({

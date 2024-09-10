@@ -4,7 +4,7 @@ import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 
 export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     const formData = await request.formData();
 
     const parsedBody = {};
