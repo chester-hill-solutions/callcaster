@@ -4,7 +4,6 @@ import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 export const action = async ({ request }) => {
     const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
     const { update, contact_id, campaign_id, workspace, disposition, queue_id } = await request.json();
-
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentOutreach, error: searchError } = await supabaseClient
         .from('outreach_attempt')
