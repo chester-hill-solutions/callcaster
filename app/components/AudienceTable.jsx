@@ -3,14 +3,16 @@ import { Button } from "./ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { ContactTable } from "./ContactTable";
 import { ImportIcon } from "lucide-react";
-import { useSubmit } from "@remix-run/react";
+import { useSearchParams, useSubmit } from "@remix-run/react";
 import { parseCSV } from "~/lib/utils";
+import TablePagination from "./TablePagination";
 
 const AudienceTable = ({
   contacts: initialContacts,
   workspace_id,
   selected_id: audience_id,
   audience: initialAudience,
+  pagination
 }) => {
   const [contacts, setContacts] = useState(initialContacts);
   const [audienceInfo, setAudienceInfo] = useState(initialAudience);
@@ -21,11 +23,20 @@ const AudienceTable = ({
     address: "",
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const submit = useSubmit();
+
   useEffect(() => {
     setContacts(initialContacts);
     setAudienceInfo(initialAudience);
   }, [initialContacts, initialAudience]);
+
+  const handlePageChange = (newPage) => {
+    setSearchParams({ page: newPage.toString(), pageSize: pagination.pageSize.toString() });
+  };
+
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -102,7 +113,7 @@ const AudienceTable = ({
   const readCSVFile = (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const {headers, contacts}  = parseCSV(e.target.result);
+      const { headers, contacts } = parseCSV(e.target.result);
       submit(
         { contacts, audience_id, workspace_id },
         {
@@ -124,11 +135,12 @@ const AudienceTable = ({
     formData.append('contact_id', id)
     formData.append('audience_id', audience_id);
     submit(formData, {
-      action:'/api/contact-audience',
-      method:"DELETE",
-      navigate:false
+      action: '/api/contact-audience',
+      method: "DELETE",
+      navigate: false
     })
   }
+  const totalPages = Math.ceil(pagination.totalCount / pagination.pageSize);
 
   return (
     <div className="w-full overflow-scroll">
@@ -179,6 +191,9 @@ const AudienceTable = ({
           }}
         />
       </div>
+     <div className="my-4 text-[#333]">
+     <TablePagination currentPage={pagination.currentPage} totalPages={totalPages} onPageChange={handlePageChange}/>
+     </div>
     </div>
   );
 };
