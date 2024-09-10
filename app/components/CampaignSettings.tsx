@@ -31,7 +31,8 @@ type CampaignSettingsProps = {
     | MessageCampaign;
   scripts: Script[];
   user: User;
-  mediaLinks: any[];
+  mediaLinks: string[];
+  joinDisabled: string | null;
   onPageDataChange: (
     data: Campaign & { campaign_audience: CampaignAudience },
   ) => void;
@@ -49,6 +50,7 @@ export const CampaignSettings = ({
   user,
   onPageDataChange,
   mediaLinks,
+  joinDisabled
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -206,6 +208,7 @@ export const CampaignSettings = ({
             mediaLinks={mediaLinks}
             isChanged={isChanged}
             isBusy={navigation.state !== "idle"}
+            joinDisabled={joinDisabled}
           />
           <AudienceSelection
             audiences={audiences}

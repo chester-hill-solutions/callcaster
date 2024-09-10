@@ -836,11 +836,7 @@ export const fetchCampaignData = async (
     .from("campaign")
     .select(
       `
-      type,
-      dial_type,
-      title,
-      campaign_audience(*),
-      status
+      *
     `,
     )
     .eq("id", campaignId)
