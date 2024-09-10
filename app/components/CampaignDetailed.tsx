@@ -18,6 +18,20 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "./ui/tooltip";
+import { Info } from "lucide-react";
+
+export const InfoHover = ({size = 18, tooltip = '', align = "center"}) => (
+  <TooltipProvider delayDuration={200}>
+    <Tooltip>
+    <TooltipTrigger>
+      <Info size={size}/>
+    </TooltipTrigger>
+    <TooltipContent align={align}>
+      <p>{tooltip}</p>
+    </TooltipContent>
+    </Tooltip>
+  </TooltipProvider>
+)
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -31,6 +45,7 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
 }) => {
+  console.log(campaignData)
   return (
     <>
       {campaignData.type !== "message" && (
@@ -122,39 +137,65 @@ export const CampaignTypeSpecificSettings = ({
         </div>
       )}
       {campaignData.type === "live_call" && (
-        <>
-          <div className="my-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-          <div className="flex flex-wrap justify-start gap-8">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="group_household_queue"
-                checked={campaignData.group_household_queue}
-                onCheckedChange={(checked) =>
-                  handleInputChange("group_household_queue", checked)
-                }
-              />
-              <Label htmlFor="group_household_queue">Group by household</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Label htmlFor="dial_type">Dial Type:</Label>
-              <Switch
-                id="dial_type"
-                checked={campaignData.dial_type === "predictive"}
-                onCheckedChange={(checked) =>
-                  handleInputChange(
-                    "dial_type",
-                    checked ? "predictive" : "call",
-                  )
-                }
-              />
-              <span>
-                {campaignData.dial_type === "predictive"
-                  ? "Predictive Dialer"
-                  : "Power Dialer"}
-              </span>
-            </div>
+    <>
+    <div className="my-4 w-full border-b-2 border-zinc-300 dark:border-zinc-600" />
+    <div className="flex flex-col space-y-6">
+      <div className="w-full max-w-xs">
+        <Label htmlFor="voicedrop_audio" className="mb-2 flex items-end">Live Voice Drop <InfoHover align="start" tooltip="Agents can diconnect and drop this message"/></Label>
+        <Select
+          value={campaignData.voicedrop_audio}
+          onValueChange={(value) => handleInputChange("voicedrop_audio", value)}
+        >
+          <SelectTrigger id="voicedrop_audio" className="w-full">
+            <SelectValue placeholder="Select voicemail file" />
+          </SelectTrigger>
+          <SelectContent>
+            {mediaData?.map((media) => (
+              <SelectItem key={media.name} value={media.name}>
+                {media.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="group_household_queue"
+            checked={campaignData.group_household_queue}
+            onCheckedChange={(checked) =>
+              handleInputChange("group_household_queue", checked)
+            }
+          />
+          <Label htmlFor="group_household_queue">
+            Group by household
+          </Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Label htmlFor="dial_type" className="whitespace-nowrap">Dial Type:</Label>
+          <div className="flex items-center space-x-2">
+            <span className={campaignData.dial_type !== "predictive" ? "font-semibold" : ""}>
+              Power
+            </span>
+            <Switch
+              id="dial_type"
+              checked={campaignData.dial_type === "predictive"}
+              onCheckedChange={(checked) =>
+                handleInputChange(
+                  "dial_type",
+                  checked ? "predictive" : "call",
+                )
+              }
+            />
+            <span className={campaignData.dial_type === "predictive" ? "font-semibold" : ""}>
+              Predictive
+            </span>
           </div>
-        </>
+        </div>
+      </div>
+    </div>
+  </>
+
       )}
       {campaignData.type === "message" && (
         <div>

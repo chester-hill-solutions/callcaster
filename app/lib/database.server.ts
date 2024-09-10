@@ -664,6 +664,7 @@ export async function updateCampaign({
   campaignDetails.script_id = parseInt(campaignData.script_id) || null;
   campaignDetails.body_text = campaignData.body_text || "";
   campaignDetails.message_media = campaignData.message_media || [];
+  campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
   const cleanCampaignData = cleanObject({
     ...restCampaignData,
     campaign_audience: undefined,
@@ -677,6 +678,7 @@ export async function updateCampaign({
     script_id: undefined,
     body_text: undefined,
     message_media: undefined,
+    voicedrop_audio: undefined,
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
   console.log(campaignDetails, tableKey);
