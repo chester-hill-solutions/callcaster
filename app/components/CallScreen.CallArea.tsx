@@ -6,7 +6,6 @@ import { Button } from "./ui/button";
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
 
-
 interface ActiveCall {
   parameters: {
     CallSid: string;
@@ -20,11 +19,12 @@ interface Conference {
 }
 
 interface CallAreaProps {
-  isBusy:boolean;
+  isBusy: boolean;
   nextRecipient: QueueItem | null;
   activeCall: ActiveCall | null;
   recentCall: Call | null;
   hangUp: () => void;
+  handleVoiceDrop: () => void;
   handleDialNext: () => void;
   handleDequeueNext: () => void;
   disposition: string;
@@ -32,6 +32,7 @@ interface CallAreaProps {
   recentAttempt: Attempt | null;
   predictive: boolean;
   conference: Conference | null;
+  voiceDrop:boolean;
 }
 
 export const CallArea: React.FC<CallAreaProps> = ({
@@ -39,6 +40,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   nextRecipient,
   displayState,
   hangUp,
+  handleVoiceDrop,
   handleDialNext,
   handleDequeueNext,
   setDisposition,
@@ -47,15 +49,16 @@ export const CallArea: React.FC<CallAreaProps> = ({
   conference = null,
   callState: state,
   callDuration,
-  dispositionOptions
-}) => {  
+  dispositionOptions,
+  voiceDrop
+}) => {
   const handleHangUp = () => {
     hangUp();
   };
   const handleSetDisposition = (newDisposition: string) => {
     setDisposition(newDisposition);
   };
-  
+
   return (
     <div
       style={{
@@ -105,17 +108,17 @@ export const CallArea: React.FC<CallAreaProps> = ({
           </div>
         </div>
         {!conference && predictive && state === "idle" && (
-        <div className="flex h-full flex-1 justify-center align-middle">
+          <div className="flex h-full flex-1 justify-center align-middle">
             <Button
-            disabled={isBusy}
+              disabled={isBusy}
               onClick={handleDialNext}
-              className="self-center bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white rounded-lg"
+              className="self-center rounded-lg bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
             >
               Start Dialing
             </Button>
           </div>
         )}
-        {nextRecipient &&  (
+        {nextRecipient && (
           <div className="flex justify-between p-4">
             <div className="flex flex-col">
               <div className="font-Zilla-Slab text-lg font-bold">
@@ -149,31 +152,48 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 borderRadius: "20px",
                 color: "white",
               }}
-              disabled={ state !== "connected" && state !== "dialing"}
+              disabled={state !== "connected" && state !== "dialing"}
             >
               Hang Up
             </Button>
-              <Button
-                onClick={handleDialNext}
-                disabled={displayState === "dialing" || displayState === "connected" || isBusy || (!predictive && !nextRecipient)
-                }
-                style={{
-                  flex: "1",
-                  padding: "4px 8px",
-                  background: "#4CA83D",
-                  borderRadius: "20px",
-                  color: "white",
-                }}
-                title={
-                  state === "connected" || state === "dialing" || !nextRecipient
-                    ? "Load your queue to get started"
-                    : `Dial ${nextRecipient?.contact?.phone}`
-                }
-              >
-                {!predictive ? "Dial" : "Start"}
-              </Button>
+           {voiceDrop && <Button
+              onClick={handleVoiceDrop}
+              style={{
+                flex: "1",
+                padding: "4px 8px",
+                background: "#2288d8",
+                borderRadius: "20px",
+                color: "white",
+              }}
+              disabled={state !== "connected" && state !== "dialing"}
+            >
+              Audio Drop
+            </Button>}
+            <Button
+              onClick={handleDialNext}
+              disabled={
+                displayState === "dialing" ||
+                displayState === "connected" ||
+                isBusy ||
+                (!predictive && !nextRecipient)
+              }
+              style={{
+                flex: "1",
+                padding: "4px 8px",
+                background: "#4CA83D",
+                borderRadius: "20px",
+                color: "white",
+              }}
+              title={
+                state === "connected" || state === "dialing" || !nextRecipient
+                  ? "Load your queue to get started"
+                  : `Dial ${nextRecipient?.contact?.phone}`
+              }
+            >
+              {!predictive ? "Dial" : "Start"}
+            </Button>
           </div>
-          <div className="flex px-4 gap-2" style={{ paddingBottom: ".5rem" }}>
+          <div className="flex gap-2 px-4" style={{ paddingBottom: ".5rem" }}>
             <select
               disabled={!nextRecipient}
               onChange={(e) => handleSetDisposition(e.currentTarget.value)}
@@ -187,16 +207,20 @@ export const CallArea: React.FC<CallAreaProps> = ({
               }}
             >
               <option defaultValue={disposition}>Select a disposition</option>
-             {dispositionOptions?.map(({value, label}, i) => (<option value={value} key={i}>{label}</option>))}
+              {dispositionOptions?.map(({ value, label }, i) => (
+                <option value={value} key={i}>
+                  {label}
+                </option>
+              ))}
             </select>
             <button
-            disabled={isBusy || disposition === 'idle'}
-            onClick={() => handleDequeueNext()}
+              disabled={isBusy || disposition === "idle"}
+              onClick={() => handleDequeueNext()}
               style={{
                 flex: "1 1 25%",
                 padding: "4px 8px",
                 border: "1px solid #4CA83D",
-                fontSize:"10px",
+                fontSize: "10px",
                 borderRadius: "20px",
                 color: "#333",
                 opacity:

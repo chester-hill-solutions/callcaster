@@ -681,9 +681,9 @@ export async function updateCampaign({
     voicedrop_audio: undefined,
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
-  console.log(campaignDetails, tableKey);
+
   const cleanCampaignDetails =
-    tableKey !== "message_campaign"
+    tableKey === "message_campaign"
       ? cleanObject({
           ...campaignDetails,
           mediaLinks: undefined,
@@ -691,19 +691,31 @@ export async function updateCampaign({
           script: undefined,
           questions: undefined,
           created_at: undefined,
-          body_text: undefined,
-          message_media: undefined,
-          step_data: undefined,
-        })
-      : cleanObject({
-          ...campaignDetails,
-          mediaLinks: undefined,
-          disposition_options: undefined,
-          script: undefined,
-          questions: undefined,
-          created_at: undefined,
           script_id: undefined,
-        });
+        })
+      : tableKey === "ivr_campaign"
+        ? cleanObject({
+            ...campaignDetails,
+            mediaLinks: undefined,
+            disposition_options: undefined,
+            script: undefined,
+            questions: undefined,
+            created_at: undefined,
+            body_text: undefined,
+            message_media: undefined,
+            step_data: undefined,
+            voicedrop_audio: undefined,
+
+          })
+        : cleanObject({
+            ...campaignDetails,
+            mediaLinks: undefined,
+            disposition_options: undefined,
+            script: undefined,
+            questions: undefined,
+            created_at: undefined,
+            script_id: undefined,
+          });
 
   if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
@@ -1002,7 +1014,7 @@ export async function fetchConversationSummary(
       "get_conversation_summary_by_campaign",
       { p_workspace: workspaceId, campaign_id_prop: campaign_id },
     );
-    console.log(error)
+    console.log(error);
     chats = data;
     chatsError = error;
   } else {
@@ -1359,23 +1371,27 @@ async function updateCampaignAudiences(
 }
 async function fetchQueuedCalls(twilio, batchSize) {
   return await twilio.calls.list({
-    status: 'queued',
+    status: "queued",
     limit: batchSize,
-    pageSize: batchSize
+    pageSize: batchSize,
   });
 }
 async function fetchQueuedMessages(twilio, batchSize) {
   return await twilio.messages.list({
-    status: 'queued',
+    status: "queued",
     limit: batchSize,
-    pageSize: batchSize
+    pageSize: batchSize,
   });
 }
 
 async function cancelCallAndUpdateDB(twilio, supabase, call) {
   try {
-    const canceledCall = await twilio.calls(call.sid).update({ status: 'canceled' });
-    await supabase.rpc('cancel_outreach_attempts', { in_call_sid: canceledCall.sid });
+    const canceledCall = await twilio
+      .calls(call.sid)
+      .update({ status: "canceled" });
+    await supabase.rpc("cancel_outreach_attempts", {
+      in_call_sid: canceledCall.sid,
+    });
     return canceledCall.sid;
   } catch (error) {
     throw new Error(`Error canceling call ${call.sid}: ${error.message}`);
@@ -1383,8 +1399,12 @@ async function cancelCallAndUpdateDB(twilio, supabase, call) {
 }
 async function cancelMessageAndUpdateDB(twilio, supabase, message) {
   try {
-    const cancelledMessage = await twilio.messages(camessagell.sid).update({ status: 'canceled' });
-    await supabase.rpc('cancel_messages', { message_ids: cancelledMessage.sid });
+    const cancelledMessage = await twilio
+      .messages(camessagell.sid)
+      .update({ status: "canceled" });
+    await supabase.rpc("cancel_messages", {
+      message_ids: cancelledMessage.sid,
+    });
     return cancelledMessage.sid;
   } catch (error) {
     throw new Error(`Error canceling call ${message.sid}: ${error.message}`);
@@ -1393,33 +1413,40 @@ async function cancelMessageAndUpdateDB(twilio, supabase, message) {
 
 async function processBatchCancellation(twilio, supabase, calls) {
   const results = await Promise.allSettled(
-    calls.map(call => cancelCallAndUpdateDB(twilio, supabase, call))
+    calls.map((call) => cancelCallAndUpdateDB(twilio, supabase, call)),
   );
 
-  return results.reduce((acc, result) => {
-    if (result.status === 'fulfilled') {
-      acc.canceledCalls.push(result.value);
-    } else {
-      acc.errors.push(result.reason.message);
-    }
-    return acc;
-  }, { canceledCalls: [], errors: [] });
+  return results.reduce(
+    (acc, result) => {
+      if (result.status === "fulfilled") {
+        acc.canceledCalls.push(result.value);
+      } else {
+        acc.errors.push(result.reason.message);
+      }
+      return acc;
+    },
+    { canceledCalls: [], errors: [] },
+  );
 }
 async function processBatchMessageCancellation(twilio, supabase, messages) {
   const results = await Promise.allSettled(
-    messages.map(message => cancelMessageAndUpdateDB(twilio, supabase, message))
+    messages.map((message) =>
+      cancelMessageAndUpdateDB(twilio, supabase, message),
+    ),
   );
 
-  return results.reduce((acc, result) => {
-    if (result.status === 'fulfilled') {
-      acc.cancelledMessages.push(result.value);
-    } else {
-      acc.errors.push(result.reason.message);
-    }
-    return acc;
-  }, { cancelledMessages: [], errors: [] });
+  return results.reduce(
+    (acc, result) => {
+      if (result.status === "fulfilled") {
+        acc.cancelledMessages.push(result.value);
+      } else {
+        acc.errors.push(result.reason.message);
+      }
+      return acc;
+    },
+    { cancelledMessages: [], errors: [] },
+  );
 }
-
 
 export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
   let allCanceledCalls = [];
@@ -1429,14 +1456,18 @@ export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
   while (hasMoreCalls) {
     try {
       const calls = await fetchQueuedCalls(twilio, batchSize);
-      
+
       if (calls.length === 0) {
         hasMoreCalls = false;
         break;
       }
 
-      const { canceledCalls, errors } = await processBatchCancellation(twilio, supabase, calls);
-      
+      const { canceledCalls, errors } = await processBatchCancellation(
+        twilio,
+        supabase,
+        calls,
+      );
+
       allCanceledCalls = allCanceledCalls.concat(canceledCalls);
       allErrors = allErrors.concat(errors);
 
@@ -1449,7 +1480,7 @@ export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
 
   return {
     canceledCalls: allCanceledCalls,
-    errors: allErrors
+    errors: allErrors,
   };
 }
 export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
@@ -1460,14 +1491,15 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
   while (hasMoreMessages) {
     try {
       const messages = await fetchQueuedMessages(twilio, batchSize);
-      
+
       if (messages.length === 0) {
         hasMoreMessages = false;
         break;
       }
 
-      const { canceledMessages, errors } = await processBatchMessageCancellation(twilio, supabase, messages);
-      
+      const { canceledMessages, errors } =
+        await processBatchMessageCancellation(twilio, supabase, messages);
+
       allCanceledMessages = allCanceledMessages.concat(canceledMessages);
       allErrors = allErrors.concat(errors);
 
@@ -1479,6 +1511,6 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
   }
   return {
     canceledMessages: allCanceledMessages,
-    errors: allErrors
+    errors: allErrors,
   };
 }
