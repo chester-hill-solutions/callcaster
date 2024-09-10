@@ -36,7 +36,16 @@ import { generateToken } from "./api.token";
 import { CampaignHeader } from "~/components/CallScreen.Header";
 import { PhoneKeypad } from "~/components/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "~/components/CallScreen.Dialogs";
-import { Audience, Call, Campaign as CampaignType, Contact, IVRCampaign, LiveCampaign, OutreachAttempt, QueueItem } from "~/lib/types";
+import {
+  Audience,
+  Call,
+  Campaign as CampaignType,
+  Contact,
+  IVRCampaign,
+  LiveCampaign,
+  OutreachAttempt,
+  QueueItem,
+} from "~/lib/types";
 interface LoaderData {
   campaign: CampaignType;
   attempts: OutreachAttempt[];
@@ -64,118 +73,107 @@ export const loader = async ({ request, params }) => {
     headers,
     serverSession,
   } = await getSupabaseServerClientWithSession(request);
-  if (!serverSession) return redirect("/signin");
-  const { id: workspace } = params;
 
-  const { data: workspaceData, error: workspaceError } = await supabase
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspace)
-    .single();
+  if (!serverSession) return redirect("/signin");
+
+  const [
+    workspaceData,
+    campaign,
+    campaignDetails,
+    audiences,
+    queueCount,
+    completedCount,
+    attempts,
+  ] = await Promise.all([
+    supabase.from("workspace").select("*").eq("id", workspaceId).single(),
+    supabase.from("campaign").select().eq("id", id).single(),
+    supabase
+      .from("live_campaign")
+      .select(`*, script:script(*)`)
+      .eq("campaign_id", id)
+      .single(),
+    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: id }),
+    supabase
+      .from("campaign_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", id),
+    supabase
+      .from("campaign_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", id)
+      .eq("status", "dequeued"),
+    supabase
+      .from("outreach_attempt")
+      .select(`*, call:call(*)`)
+      .eq("campaign_id", id)
+      .eq("user_id", serverSession.user.id),
+  ]);
+
+  const errors = [
+    workspaceData.error,
+    campaign.error,
+    campaignDetails.error,
+    audiences.error,
+    queueCount.error,
+    completedCount.error,
+    attempts.error,
+  ].filter(Boolean);
+  if (errors.length) {
+    console.error(errors);
+    throw "Error fetching campaign data";
+  }
 
   const token = generateToken({
-    twilioAccountSid: workspaceData.twilio_data.sid,
-    twilioApiKey: workspaceData.key,
-    twilioApiSecret: workspaceData.token,
+    twilioAccountSid: workspaceData.data.twilio_data.sid,
+    twilioApiKey: workspaceData.data.key,
+    twilioApiSecret: workspaceData.data.token,
     identity: serverSession.user.id,
   });
 
-  const { data: campaign, error: campaignError } = await supabase
-    .from("campaign")
-    .select()
-    .eq("id", id)
-
-    .single();
-
-  const { data: campaignDetails, error: detailsError } = await supabase
-    .from("live_campaign")
-    .select(`*, script(*)`)
-    .eq("campaign_id", id)
-    .single();
-
-  const { data: audiences, error: audiencesError } = await supabase.rpc(
-    "get_audiences_by_campaign",
-    { selected_campaign_id: id },
-  );
-
-  const { count, queueCountError } = await supabase
-    .from("campaign_queue")
-    .select("id", { count: "exact", head: true })
-    .eq("campaign_id", id);
-
-  const { count: completed, queueCompleteError } = await supabase
-    .from("campaign_queue")
-    .select("id", { count: "exact", head: true })
-    .eq("campaign_id", id)
-    .eq("status", "dequeued");
-
-  const { data: attempts, error: attemptError } = await supabase
-    .from("outreach_attempt")
-    .select(`*,call(*)`)
-    .eq("campaign_id", id)
-    .eq("user_id", serverSession.user.id);
-  let queue;
-  let queueError;
-  if (campaign.dial_type === "predictive") {
+  let queue = [];
+  if (campaign.data.dial_type === "predictive") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select(`*, contact(*)`)
+      .select(`*, contact:contact(*)`)
       .in("status", ["queued", serverSession.user.id])
       .eq("campaign_id", id)
       .order("attempts", { ascending: true })
       .order("queue_order", { ascending: true });
-    if (error) {
-      queueError = error;
-    } else {
-      queue = data;
-    }
-  } else if (campaign.dial_type === "call") {
+    if (error) "Error fetching queue data";
+    queue = data;
+  } else if (campaign.data.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select("*, contact(*)")
+      .select(`id, status, contact:contact(id, name, phone)`)
       .eq("status", serverSession.user.id)
       .eq("campaign_id", id);
-    if (error) {
-      queueError = error;
-    } else {
-      queue = data;
-    }
-  } else if (!campaign.dial_type) {
+
+    if (error)
+      throw json({ message: "Error fetching queue data" }, { status: 500 });
+    queue = data;
+  } else if (!campaign.data.dial_type) {
     return redirect("./../settings");
   }
 
-  const errors = [
-    campaignError,
-    detailsError,
-    audiencesError,
-    attemptError,
-    queueError,
-    queueCountError,
-    queueCompleteError,
-  ].filter(Boolean);
-  if (errors.length) {
-    console.error(errors);
-    throw json({ message: "Error fetching campaign data" }, { status: 500 });
-  }
-
   const nextRecipient =
-    queue && campaign.dial_type === "call" ? queue[0] : null;
-  const initalCallsList = attempts.flatMap((attempt) => attempt.call);
+    queue && campaign.data.dial_type === "call" ? queue[0] : null;
+  const initalCallsList = attempts.data.flatMap((attempt) => attempt.call);
   const initialRecentCall =
     nextRecipient?.contact &&
     initalCallsList.find(
       (call) => call.contact_id === nextRecipient?.contact.id,
     );
-  const initialRecentAttempt = attempts
-    .sort((a, b) => b.created_at - a.created_at)
+  const initialRecentAttempt = attempts.data
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
+
   return json(
     {
-      campaign,
-      attempts,
+      campaign: campaign.data,
+      attempts: attempts.data,
       user: serverSession.user,
-      audiences,
-      campaignDetails,
+      audiences: audiences.data,
+      campaignDetails: campaignDetails.data,
       workspaceId,
       queue,
       contacts: queue.map((queueItem) => queueItem.contact),
@@ -185,8 +183,8 @@ export const loader = async ({ request, params }) => {
       originalQueue: queue,
       initialRecentAttempt,
       token,
-      count,
-      completed,
+      count: queueCount.count,
+      completed: completedCount.count,
     },
     { headers },
   );
@@ -245,8 +243,8 @@ const Campaign: React.FC = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const { state, context, send } = useCallState();
-  const [currentContact, setCurrentContact] = useState(null);
-  const navigate = useNavigate()
+
+  const navigate = useNavigate();
   const {
     device,
     status: deviceStatus,
@@ -352,7 +350,7 @@ const Campaign: React.FC = () => {
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
-    [], 
+    [],
   );
 
   const handleDialButton = useCallback(() => {
@@ -394,7 +392,7 @@ const Campaign: React.FC = () => {
       questionContact,
       campaign,
       workspaceId,
-      toast
+      toast,
     );
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
@@ -423,7 +421,6 @@ const Campaign: React.FC = () => {
 
   const handleDequeueNext = useCallback(() => {
     if (campaign.dial_type === "predictive") {
-      setCurrentContact(null);
       send({ type: "HANG_UP" });
       setCallDuration(0);
       handleDialButton();
@@ -623,8 +620,9 @@ const Campaign: React.FC = () => {
     campaign,
     workspaceId,
     disposition,
-    toast
+    toast,
   );
+  
   const currentState = {
     callState,
     deviceStatus,
@@ -642,7 +640,7 @@ const Campaign: React.FC = () => {
           alignItems: "stretch",
           display: "flex",
           borderRadius: "20px",
-          justifyContent:'space-between'
+          justifyContent: "space-between",
         }}
         className="mb-6"
       >
@@ -653,7 +651,7 @@ const Campaign: React.FC = () => {
           onLeaveCampaign={() => {
             hangUp();
             device?.destroy();
-            navigate(-1)
+            navigate(-1);
           }}
           onReportError={() => setReportDialog(!isReportDialogOpen)}
         />
@@ -664,7 +662,7 @@ const Campaign: React.FC = () => {
             displayColor={displayColor}
             callDuration={callDuration}
           />
-          </div>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-6">
