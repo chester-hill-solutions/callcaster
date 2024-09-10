@@ -21,6 +21,7 @@ export type Message = Database["public"]["Tables"]["message"]["Row"] | null;
 export type OutreachAttempt = Database["public"]["Tables"]["outreach_attempt"]["Row"] | null;
 export type ContactAudience = Database["public"]["Tables"]["contact_audience"]["Row"] | null;
 export type CampaignAudience = Database["public"]["Tables"]["campaign_audience"]["Row"] | null;
+export type CampaignStatus = Database["public"]["Enums"]["campaign_status"]
 export type WorkspaceNumbers = Database["public"]["Tables"]["workspace_number"]["Row"] | null;
 export type LiveCampaign = Database["public"]["Tables"]["live_campaign"]["Row"] | null;
 export type IVRCampaign = Database["public"]["Tables"]["ivr_campaign"]["Row"] | null;

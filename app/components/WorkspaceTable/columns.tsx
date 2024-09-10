@@ -6,18 +6,29 @@ import { MdEdit, MdRemoveCircle } from "react-icons/md";
 import { Button } from "../ui/button";
 import { NavLink, useSubmit } from "@remix-run/react";
 
-export const audienceColumns: ColumnDef<Audience>[] = [
+type AudienceWithContactCount = Audience & {
+  contact_audience: [{ count: number }];
+};
+
+export const audienceColumns: ColumnDef<AudienceWithContactCount>[] = [
   {
     accessorKey: "name",
     header: "Name",
     cell: ({ row }) => {
       return (
-        <div className="flex flex-auto min-w-[250px]">
+        <div className="flex min-w-[250px] flex-auto">
           {row.original.name || `Unnamed audience`}
         </div>
       );
     },
     minSize: 270,
+  },
+  {
+    accessorKey: "count",
+    header: "Contacts",
+    cell: ({ row }) => {
+      return <div className="">{row.original.contact_audience[0].count}</div>;
+    },
   },
   {
     header: "Edit",
@@ -37,17 +48,20 @@ export const audienceColumns: ColumnDef<Audience>[] = [
     cell: ({ row }) => {
       const submit = useSubmit();
       return (
-          <Button
-            onClick={(e) => {
-              submit({id: row.original.id}, {
-                method:"DELETE",
-                action:"/api/audiences",
-                navigate:false
-              })
-            }}
-          >
-            <MdRemoveCircle />
-          </Button>
+        <Button
+          onClick={(e) => {
+            submit(
+              { id: row.original.id },
+              {
+                method: "DELETE",
+                action: "/api/audiences",
+                navigate: false,
+              },
+            );
+          }}
+        >
+          <MdRemoveCircle />
+        </Button>
       );
     },
     maxSize: 50,

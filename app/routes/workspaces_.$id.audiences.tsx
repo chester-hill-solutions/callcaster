@@ -28,8 +28,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { data: audienceData, error: audienceError } = await supabaseClient
     .from("audience")
-    .select()
+    .select("*, contact_audience(count)")
     .eq("workspace", workspaceId);
+
+  console.log(audienceData[0]);
 
   if (workspaceError) {
     return json(

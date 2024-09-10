@@ -50,7 +50,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .from("workspace_invite")
     .select(`*, user(*)`)
     .eq("workspace", workspaceId);
-    
+
   const { data: webhook, error: webhookError } = await supabaseClient
     .from("webhook")
     .select("*")
@@ -309,6 +309,12 @@ export default function WorkspaceSettings() {
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Team Members
             </h3>
+            <div className="flex flex-col pt-4">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+                {hasAccess && "Invite User"}
+              </p>
+              {hasAccess ? addUserTabs : callerSelfDeleteForm}
+            </div>
             <div className="flex flex-col py-4">
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
                 Owner
@@ -358,18 +364,25 @@ export default function WorkspaceSettings() {
               </ul>
             </div>
           </div>
-          <div className="flex flex-col pt-4">
-            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
-              {hasAccess && "Invite User"}
-            </p>
-            {hasAccess ? addUserTabs : callerSelfDeleteForm}
-          </div>
         </Card>
         <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
-            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-              Manage Phone Numbers
-            </h3>
+            {hasAccess ? (
+              <div className="">
+                <Button
+                  asChild
+                  className="h-full w-full font-Zilla-Slab text-xl font-semibold"
+                >
+                  <NavLink to={"./numbers"} relative="path">
+                    Manage Numbers
+                  </NavLink>
+                </Button>
+              </div>
+            ) : (
+              <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+                Active Phone Numbers
+              </h3>
+            )}
             <div className="flex flex-col py-4">
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
                 Phone Numbers
@@ -414,18 +427,6 @@ export default function WorkspaceSettings() {
               </ul>
             </div>
           </div>
-          {hasAccess && (
-            <div className="">
-              <Button
-                asChild
-                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
-              >
-                <NavLink to={"./numbers"} relative="path">
-                  Manage Numbers
-                </NavLink>
-              </Button>
-            </div>
-          )}
         </Card>
         <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">

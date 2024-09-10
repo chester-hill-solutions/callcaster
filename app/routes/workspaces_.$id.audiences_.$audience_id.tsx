@@ -1,5 +1,14 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { Form, Link, json, useActionData, useLoaderData, useLocation, useNavigate, useNavigation } from "@remix-run/react";
+import {
+  Form,
+  Link,
+  json,
+  useActionData,
+  useLoaderData,
+  useLocation,
+  useNavigate,
+  useNavigation,
+} from "@remix-run/react";
 import { useEffect } from "react";
 import { AudienceTable } from "~/components/AudienceTable";
 import { Button } from "~/components/ui/button";
@@ -33,15 +42,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id } =
     useLoaderData<typeof loader>();
-    const navigate = useNavigate();
+  const navigate = useNavigate();
   return (
     <main className="flex h-full flex-col gap-4 text-white">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+        <h1 className="flex items-center gap-2 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {audience?.name || `Unnamed Audience ${audience_id}`}
+          <span className="font-Sarabun text-xl font-normal text-gray-400">
+            | {contacts.length > 0 ? contacts.length : "No"} contacts
+          </span>
         </h1>
         <div className="flex gap-1">
-          <Form method="DELETE" action="/api/audiences" navigate={false} onSubmit={() => navigate('..', {relative:'path'})}>
+          <Form
+            method="DELETE"
+            action="/api/audiences"
+            navigate={false}
+            onSubmit={() => navigate("..", { relative: "path" })}
+          >
             <input hidden type="hidden" name="id" value={audience_id} />
             <Button
               type="submit"
