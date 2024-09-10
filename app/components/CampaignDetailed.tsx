@@ -22,17 +22,20 @@ export const CampaignTypeSpecificSettings = ({
   details,
   mediaLinks,
   isChanged,
+  isBusy,
 }) => {
   return (
     <>
       {campaignData.type !== "message" && (
-        <div className="flex gap-4 flex-wrap">
+        <div className="flex flex-wrap gap-4">
           <div className="flex items-end gap-2">
             <div className="space-y-2">
               <Label htmlFor="voicemail_file">Voicemail File</Label>
               <Select
                 value={campaignData.voicemail_file}
-                onValueChange={(value) => handleInputChange("voicemail_file", value)}
+                onValueChange={(value) =>
+                  handleInputChange("voicemail_file", value)
+                }
               >
                 <SelectTrigger id="voicemail_file" className="w-[200px]">
                   <SelectValue placeholder="Select voicemail file" />
@@ -46,7 +49,7 @@ export const CampaignTypeSpecificSettings = ({
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" asChild size="icon">
+            <Button variant="outline" asChild size="icon" disabled={isBusy}>
               <NavLink to="../../../audios/new">
                 <MdAdd />
               </NavLink>
@@ -57,7 +60,9 @@ export const CampaignTypeSpecificSettings = ({
               <Label htmlFor="script_id">Script</Label>
               <Select
                 value={campaignData.script_id?.toString()}
-                onValueChange={(value) => handleInputChange("script_id", parseInt(value))}
+                onValueChange={(value) =>
+                  handleInputChange("script_id", parseInt(value))
+                }
               >
                 <SelectTrigger id="script_id" className="w-[200px]">
                   <SelectValue placeholder="Select script" />
@@ -71,8 +76,10 @@ export const CampaignTypeSpecificSettings = ({
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" asChild size="icon">
-              <NavLink to={`../../../scripts/new?ref=${campaignData.campaign_id}`}>
+            <Button variant="outline" asChild size="icon" disabled={isBusy}>
+              <NavLink
+                to={`../../../scripts/new?ref=${campaignData.campaign_id}`}
+              >
                 <MdAdd />
               </NavLink>
             </Button>
@@ -80,7 +87,9 @@ export const CampaignTypeSpecificSettings = ({
           <div className="flex items-end">
             <Button
               type="button"
-              disabled={!(campaignData.script_id && campaignData.caller_id)}
+              disabled={
+                isBusy || !(campaignData.script_id && campaignData.caller_id)
+              }
               onClick={handleActivateButton}
             >
               Activate Campaign
@@ -91,12 +100,14 @@ export const CampaignTypeSpecificSettings = ({
       {campaignData.type === "live_call" && (
         <>
           <div className="my-4 w-full border-b-2 border-zinc-300 py-2 dark:border-zinc-600" />
-          <div className="flex justify-start gap-8 flex-wrap">
+          <div className="flex flex-wrap justify-start gap-8">
             <div className="flex items-center space-x-2">
               <Switch
                 id="group_household_queue"
                 checked={campaignData.group_household_queue}
-                onCheckedChange={(checked) => handleInputChange("group_household_queue", checked)}
+                onCheckedChange={(checked) =>
+                  handleInputChange("group_household_queue", checked)
+                }
               />
               <Label htmlFor="group_household_queue">Group by household</Label>
             </div>
@@ -105,9 +116,18 @@ export const CampaignTypeSpecificSettings = ({
               <Switch
                 id="dial_type"
                 checked={campaignData.dial_type === "predictive"}
-                onCheckedChange={(checked) => handleInputChange("dial_type", checked ? "predictive" : "call")}
+                onCheckedChange={(checked) =>
+                  handleInputChange(
+                    "dial_type",
+                    checked ? "predictive" : "call",
+                  )
+                }
               />
-              <span>{campaignData.dial_type === "predictive" ? "Predictive Dialer" : "Power Dialer"}</span>
+              <span>
+                {campaignData.dial_type === "predictive"
+                  ? "Predictive Dialer"
+                  : "Power Dialer"}
+              </span>
             </div>
           </div>
         </>
@@ -123,6 +143,7 @@ export const CampaignTypeSpecificSettings = ({
           <Button
             type="button"
             disabled={
+              isBusy ||
               isChanged ||
               !(
                 (campaignData.body_text || campaignData.message_media) &&
