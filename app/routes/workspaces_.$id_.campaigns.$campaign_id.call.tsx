@@ -28,7 +28,7 @@ import {
 } from "~/lib/callscreenActions";
 import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
 import { Household } from "~/components/CallScreen.Household";
-import { Toaster } from "sonner";
+import { toast, Toaster } from "sonner";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { useCallState } from "~/hooks/useCallState";
 import { formatTime, playTone } from "~/lib/utils";
@@ -394,6 +394,7 @@ const Campaign: React.FC = () => {
       questionContact,
       campaign,
       workspaceId,
+      toast
     );
   }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
@@ -622,6 +623,7 @@ const Campaign: React.FC = () => {
     campaign,
     workspaceId,
     disposition,
+    toast
   );
   const currentState = {
     callState,
