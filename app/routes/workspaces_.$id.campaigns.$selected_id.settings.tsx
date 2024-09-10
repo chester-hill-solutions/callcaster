@@ -50,7 +50,7 @@ export default function Settings() {
     joinDisabled
   }: {
     data: Campaign & {
-      campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
+      campaignDetails: LiveCampaign & {script: Script} | MessageCampaign | IVRCampaign & {script: Script};
     };
     phoneNumbers: WorkspaceNumbers[];
     mediaData: FileObject[];
