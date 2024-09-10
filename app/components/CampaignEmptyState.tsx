@@ -5,7 +5,7 @@ import { Card, CardHeader } from "./ui/card";
 
 const CampaignEmptyState = ({hasAccess = false, type}:{hasAcces:boolean; type: "number" | "campaign"}) => {
     const loc = useLocation();
-    let isCampaignsRoute = loc?.pathname?.split('/').pop() === 'campaigns';
+    const isCampaignsRoute = loc?.pathname?.split('/').pop() === 'campaigns';
     return (
     <BgImage
       opacity={0.1}
@@ -29,7 +29,7 @@ const CampaignEmptyState = ({hasAccess = false, type}:{hasAcces:boolean; type: "
               </NavLink>
             </Button>:
             <Button asChild>
-            <NavLink to={isCampaignsRoute ? "settings/numbers" : "./settings/numbers"}>
+            <NavLink to={isCampaignsRoute ? "../settings/numbers" : "./settings/numbers"}>
               Get a Number
               </NavLink>
             </Button>
