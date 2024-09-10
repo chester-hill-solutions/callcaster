@@ -131,6 +131,7 @@ export const loader = async ({ request, params }) => {
   });
 
   let queue = [];
+
   if (campaign.data.dial_type === "predictive") {
     const { data, error } = await supabase
       .from("campaign_queue")
@@ -139,17 +140,23 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", id)
       .order("attempts", { ascending: true })
       .order("queue_order", { ascending: true });
-    if (error) "Error fetching queue data";
+
+    if (error) {
+      console.error(error);
+      throw error.message || "Error fetching queue data";
+    }
     queue = data;
   } else if (campaign.data.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
-      .select(`id, status, contact:contact(id, name, phone)`)
+      .select(`id, status, contact:contact(*)`)
       .eq("status", serverSession.user.id)
       .eq("campaign_id", id);
 
-    if (error)
-      throw json({ message: "Error fetching queue data" }, { status: 500 });
+    if (error) {
+      console.error(error);
+      throw error.message || "Error fetching queue data";
+    }
     queue = data;
   } else if (!campaign.data.dial_type) {
     return redirect("./../settings");
@@ -319,7 +326,6 @@ const Campaign: React.FC = () => {
     campaign.caller_id,
   );
 
-  const fetcher = useFetcher();
   const submit = useSubmit();
 
   const { startCall } = handleCall({ submit });
@@ -432,7 +438,6 @@ const Campaign: React.FC = () => {
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
       setUpdate({});
-      setDisposition("idle");
       setCallDuration(0);
     }
   }, [
@@ -447,7 +452,6 @@ const Campaign: React.FC = () => {
     householdMap,
     handleNextNumber,
     setRecentAttempt,
-    setDisposition,
   ]);
 
   const requestMicrophoneAccess = useCallback(async () => {
@@ -503,21 +507,19 @@ const Campaign: React.FC = () => {
   };
 
   const displayState =
-    campaign.dial_type === "predictive"
-      ? predictiveState.status === "dialing"
-        ? "dialing"
-        : predictiveState.status === "connected"
-          ? "connected"
-          : predictiveState.status === "completed"
-            ? "completed"
-            : predictiveState.status === "idle"
-              ? "idle"
-              : getDisplayState(
-                  state,
-                  recentAttempt?.disposition as AttemptDisposition,
-                  activeCall,
-                )
-      : null;
+    predictiveState.status === "dialing"
+      ? "dialing"
+      : predictiveState.status === "connected"
+        ? "connected"
+        : predictiveState.status === "completed"
+          ? "completed"
+          : predictiveState.status === "idle"
+            ? "idle"
+            : getDisplayState(
+                state,
+                recentAttempt?.disposition as AttemptDisposition,
+                activeCall,
+              );
 
   const house =
     householdMap[
@@ -622,7 +624,7 @@ const Campaign: React.FC = () => {
     disposition,
     toast,
   );
-  
+
   const currentState = {
     callState,
     deviceStatus,
