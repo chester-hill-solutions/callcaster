@@ -12,6 +12,12 @@ import {
 } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
+import {
+  Tooltip,
+  TooltipProvider,
+  TooltipTrigger,
+  TooltipContent,
+} from "./ui/tooltip";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -23,6 +29,7 @@ export const CampaignTypeSpecificSettings = ({
   mediaLinks,
   isChanged,
   isBusy,
+  joinDisabled,
 }) => {
   return (
     <>
@@ -85,15 +92,32 @@ export const CampaignTypeSpecificSettings = ({
             </Button>
           </div>
           <div className="flex items-end">
-            <Button
-              type="button"
-              disabled={
-                isBusy || !(campaignData.script_id && campaignData.caller_id)
-              }
-              onClick={handleActivateButton}
-            >
-              Activate Campaign
-            </Button>
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className={`flex ${joinDisabled ? "cursor-not-allowed" : ""}`}
+                  >
+                    <Button
+                      type="button"
+                      disabled={
+                        joinDisabled ||
+                        isBusy ||
+                        !(campaignData.script_id && campaignData.caller_id)
+                      }
+                      onClick={handleActivateButton}
+                    >
+                      Activate Campaign
+                    </Button>
+                  </div>
+                </TooltipTrigger>
+                {joinDisabled && (
+                  <TooltipContent align="start">
+                    <p>{joinDisabled}</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       )}

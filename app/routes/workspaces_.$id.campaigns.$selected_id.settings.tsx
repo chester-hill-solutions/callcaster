@@ -1,21 +1,14 @@
-import { defer, json, redirect } from "@remix-run/node";
-import { Params, useLoaderData, useOutletContext } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
+import { useLoaderData, useOutletContext } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
 import { useState, useCallback, SetStateAction } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
-import {
-  fetchAdvancedCampaignDetails,
-  fetchCampaignWithAudience,
-  getMedia,
-  getRecordingFileNames,
-  getSignedUrls,
-  getWorkspacePhoneNumbers,
-  getWorkspaceScripts,
-} from "~/lib/database.server";
+import { fetchCampaignWithAudience } from "~/lib/database.server";
 import { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
   Audience,
+  Campaign,
   CampaignAudience,
   IVRCampaign,
   LiveCampaign,
@@ -23,16 +16,9 @@ import {
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
-import Campaign from "./workspaces_.$id_.campaigns.$campaign_id.call";
 import { Json, Database } from "~/lib/database.types";
 
-export const loader = async ({
-  request,
-  params,
-}: {
-  request: Request;
-  params: Params;
-}) => {
+export const loader = async ({ request, params }) => {
   const { id: workspace_id, selected_id } = params;
 
   const {
@@ -41,88 +27,53 @@ export const loader = async ({
   }: { supabaseClient: SupabaseClient; serverSession: Session } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) return redirect("/signin");
-
-  try {
-    const [campaignData, { data: phoneNumbers }, { data: mediaData }, scripts] =
-      await Promise.all([
-        fetchCampaignWithAudience(supabaseClient, selected_id),
-        getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
-        supabaseClient.storage.from("workspaceAudio").list(workspace_id),
-        getWorkspaceScripts({
-          workspace: workspace_id,
-          supabase: supabaseClient,
-        }),
-      ]);
-    const campaignDetails = await fetchAdvancedCampaignDetails(
-      supabaseClient,
-      selected_id,
-      campaignData.type,
-      workspace_id,
-    );
-    let mediaLinksPromise;
-
-    if (
-      campaignData.type === "message" &&
-      campaignDetails?.message_media?.length > 0
-    ) {
-      mediaLinksPromise = getSignedUrls(
-        supabaseClient,
-        workspace_id,
-        campaignDetails.message_media,
-      );
-    }
-    if (campaignData.type === "robocall") {
-      mediaLinksPromise = getMedia(
-        getRecordingFileNames(campaignDetails.step_data),
-        supabaseClient,
-        workspace_id,
-      );
-      
-    }
-    return defer({
-      workspace_id,
-      selected_id,
-      data: campaignData,
-      scripts,
-      mediaData,
-      mediaLinks: mediaLinksPromise,
-      phoneNumbers,
-      campaignDetails,
-      user: serverSession.user,
-    });
-  } catch (error) {
-    console.error("Error in campaign loader:", error);
-    throw new Response("Error loading campaign data", { status: 500 });
-  }
+  const campaignWithAudience = await fetchCampaignWithAudience(
+    supabaseClient,
+    selected_id,
+  );
+  return json({
+    workspace_id,
+    selected_id,
+    campaignAudience: campaignWithAudience.campaign_audience,
+  });
 };
 
 export default function Settings() {
-  const { audiences }: { audiences: Audience[] } = useOutletContext();
   const {
-    workspace_id,
-    selected_id,
     data,
-    mediaData,
     phoneNumbers,
-    campaignDetails,
+    mediaData,
     scripts,
     user,
     mediaLinks,
+    audiences,
+    joinDisabled
+  }: {
+    data: Campaign & {
+      campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
+    };
+    phoneNumbers: WorkspaceNumbers[];
+    mediaData: FileObject[];
+    scripts: Script[];
+    user: User;
+    mediaLinks: string[];
+    audiences: Audience[];
+    joinDisabled: string | null,
+  } = useOutletContext();
+  const {
+    workspace_id,
+    selected_id,
+    campaignAudience,
   }: {
     workspace_id: string;
     selected_id: string;
-    data: Campaign & { campaign_audience: CampaignAudience };
-    mediaData: FileObject[];
-    phoneNumbers: WorkspaceNumbers[];
-    campaignDetails:
-      | (LiveCampaign & { script: Script })
-      | (IVRCampaign & { script: Script })
-      | MessageCampaign;
-    scripts: Script[];
-    user: User;
-    mediaLinks: any[];
+    campaignAudience: Audience;
   } = useLoaderData();
-  const [pageData, setPageData] = useState(data);
+
+  const [pageData, setPageData] = useState({
+    ...data,
+    campaign_audience: campaignAudience,
+  });
   const handlePageDataChange = useCallback(
     (
       newData: SetStateAction<
@@ -158,9 +109,10 @@ export default function Settings() {
         mediaData={mediaData}
         campaign_id={selected_id}
         phoneNumbers={phoneNumbers}
-        campaignDetails={campaignDetails}
+        campaignDetails={data.campaignDetails}
         onPageDataChange={handlePageDataChange}
         user={user}
+        joinDisabled={joinDisabled}
         mediaLinks={mediaLinks}
       />
     </>
