@@ -63,8 +63,8 @@ export const CampaignSettings = ({
     type: data?.type || "live_call",
     dial_type: data?.dial_type || "call",
     group_household_queue: data?.group_household_queue || false,
-    start_date: data?.start_date || "",
-    end_date: data?.end_date || "",
+    start_date: data?.start_date || new Date().toISOString(),
+    end_date: data?.end_date || (new Date(Date.now() + (24*60*60*1000*30))).toISOString(),
     caller_id: data?.caller_id || "",
     voicemail_file: data?.voicemail_file || "",
     script_id: details?.script_id || null,
@@ -77,6 +77,10 @@ export const CampaignSettings = ({
   const [isChanged, setChanged] = useState(false);
   
   useEffect(() => {
+    const today = new Date();
+    const thirtyDaysLater = new Date(today);
+    thirtyDaysLater.setDate(today.getDate() + 30);
+
     setInitial({
       campaign_id,
       workspace,
@@ -85,8 +89,8 @@ export const CampaignSettings = ({
       type: data?.type || "live_call",
       dial_type: data?.dial_type || "call",
       group_household_queue: data?.group_household_queue || false,
-      start_date: data?.start_date || "",
-      end_date: data?.end_date || "",
+      start_date: data?.start_date || today.toISOString(),
+      end_date: data?.end_date || thirtyDaysLater.toISOString(),
       caller_id: data?.caller_id || "",
       voicemail_file: data?.voicemail_file || "",
       script_id: details?.script_id || null,
@@ -201,6 +205,7 @@ export const CampaignSettings = ({
             details={details}
             mediaLinks={mediaLinks}
             isChanged={isChanged}
+            isBusy={navigation.state !== "idle"}
           />
           <AudienceSelection
             audiences={audiences}
