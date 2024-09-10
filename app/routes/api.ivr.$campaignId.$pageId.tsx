@@ -1,36 +1,38 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
-const updateResult = async (supabase, outreach_attempt_id, update) => {
-  const { error } = await supabase
-    .from("outreach_attempt")
-    .update(update)
-    .eq("id", outreach_attempt_id);
-  if (error) throw error;
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 200; 
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const getCallWithRetry = async (supabase, callSid, retries = 0) => {
+  const { data, error } = await supabase
+    .from("call")
+    .select('*, campaign(*, ivr_campaign(*, script(*)))')
+    .eq("sid", callSid)
+    .single();
+
+  if (error || !data) {
+    if (retries < MAX_RETRIES) {
+      await sleep(RETRY_DELAY);
+      return getCallWithRetry(supabase, callSid, retries + 1);
+    }
+    throw new Error("Failed to retrieve call after multiple attempts");
+  }
+
+  return data;
 };
 
 export const action = async ({ params, request }) => {
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
-  );
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
   const twiml = new Twilio.twiml.VoiceResponse();
-
   const { pageId, campaignId } = params;
-  const url = new URL(request.url);
-  const callSid = url.searchParams.get("CallSid");
-
+  const formData = await request.formData();
+  const callSid = formData.get('CallSid')
   try {
-    const { data: dbCall, error: callError } = await supabase
-      .from("call")
-      .select('outreach_attempt_id, workspace, campaign(*, ivr_campaign(*, script(*)))')
-      .eq("sid", callSid)
-      .single();
-
-      await updateResult(supabase, dbCall?.outreach_attempt_id, {
-      answered_at: new Date(),
-    });
-    const script = dbCall?.campaign?.ivr_campaign.script.steps;
+    const callData = await getCallWithRetry(supabase, callSid);
+    const script = callData.campaign?.ivr_campaign[0].script.steps;
     const currentPage = script.pages[pageId];
     if (currentPage && currentPage.blocks.length > 0) {
       const firstBlockId = currentPage.blocks[0];

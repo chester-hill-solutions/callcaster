@@ -8,10 +8,8 @@ export const loader = async ({ request }) => {
   let url = new URL(request.url);
   let identity = url.searchParams.get('id');
   let workspace = url.searchParams.get('workspace');
-  console.log(serverSession)
   const baseUrl = process.env.BASE_URL;
   const { data, error } = await supabase.from('workspace').select('twilio_data, key, token').eq('id', workspace).single();
-  console.log(data, error, workspace, identity)
   const twilioAccountSid = data.twilio_data.sid;
   const twilioApiKey = data.key;
   const twilioApiSecret = data.token;

@@ -43,7 +43,6 @@ export const action = async ({ request }) => {
     if (outreachError) throw outreachError;
     outreachAttemptId = data;
 
-    // Create Twilio call
     call = await twilio.calls.create({
       to: to_number,
       from: caller_id,
