@@ -11,7 +11,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
             callId: recentAttempt?.id,
             selected_workspace_id: workspaceId,
             contact_id: nextRecipient?.contact?.id,
-            queue_id: nextRecipient.id,
+            queue_id: nextRecipient?.id,
             campaign_id: campaign?.id,
             workspace: workspaceId,
             disposition
@@ -21,7 +21,7 @@ const useDebouncedSave = (update, recentAttempt, submit, nextRecipient, campaign
             action: `/api/questions`,
             encType: 'application/json'
         })
-    }, [submit, update, recentAttempt?.id, workspaceId, nextRecipient?.contact?.id, nextRecipient.id, campaign?.id, disposition]);
+    }, [submit, update, recentAttempt?.id, workspaceId, nextRecipient?.contact?.id, nextRecipient?.id, campaign?.id, disposition]);
 
     useEffect(() => {
         const shouldUpdate = !deepEqual(update, previousUpdateRef.current);
