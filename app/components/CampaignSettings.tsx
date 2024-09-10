@@ -63,8 +63,9 @@ export const CampaignSettings = ({
     type: data?.type || "live_call",
     dial_type: data?.dial_type || "call",
     group_household_queue: data?.group_household_queue || false,
-    start_date: data?.start_date || "",
-    end_date: data?.end_date || "",
+    start_date: data?.start_date || null,
+    end_date: data?.end_date || null,
+    schedule: data.schedule || {},
     caller_id: data?.caller_id || "",
     voicemail_file: data?.voicemail_file || "",
     script_id: details?.script_id || null,
@@ -75,7 +76,7 @@ export const CampaignSettings = ({
   const [initialData, setInitial] = useState(campaignData);
 
   const [isChanged, setChanged] = useState(false);
-  
+
   useEffect(() => {
     setInitial({
       campaign_id,
@@ -87,6 +88,7 @@ export const CampaignSettings = ({
       group_household_queue: data?.group_household_queue || false,
       start_date: data?.start_date || "",
       end_date: data?.end_date || "",
+      schedule: data?.schedule || {},
       caller_id: data?.caller_id || "",
       voicemail_file: data?.voicemail_file || "",
       script_id: details?.script_id || null,
@@ -130,43 +132,76 @@ export const CampaignSettings = ({
     }));
   };
 
-  const handleActivateButton = (event) => {
-    if (campaignData.type === "live_call") {
-      handleInputChange("status", "running");
-      formFetcher.submit(
-        {
-          campaignData: JSON.stringify({ ...campaignData, status: "running" }),
-          campaignDetails: JSON.stringify(details),
-        },
-        {
-          method: "patch",
-          action: "/api/campaigns",
-        },
-      );
-      navigate("../call");
-    } else if (campaignData.type === "robocall") {
-      handleInputChange("status", "running");
-      fetcher.submit(
-        { campaign_id, user_id: user },
-        {
-          method: "post",
-          action: "/api/initiate-ivr",
-          encType: "application/json",
-        },
-      );
-      navigate("..");
-    } else if (campaignData.type === "message") {
-      handleInputChange("status", "running");
-      fetcher.submit(
-        {
-          campaign_id,
-          workspace_id: details.workspace,
-          caller_id: campaignData.caller_id,
-          user_id: user.id
-        },
-        { method: "post", action: "/api/sms", encType: "application/json" },
-      );
-      navigate(`../../../chats?campaign_id=${campaign_id}`);
+  const handleActivateButton = (queue: boolean) => {
+    if (queue) {
+      console.log(queue)
+    } else {
+      if (campaignData.type === "live_call") {
+        handleInputChange("status", "running");
+        formFetcher.submit(
+          {
+            campaignData: JSON.stringify({
+              ...campaignData,
+              status: "running",
+            }),
+            campaignDetails: JSON.stringify(details),
+          },
+          {
+            method: "patch",
+            action: "/api/campaigns",
+          },
+        );
+        navigate("../call");
+      } else if (campaignData.type === "robocall") {
+        handleInputChange("status", "running");
+        fetcher.submit(
+          { campaign_id, user_id: user },
+          {
+            method: "post",
+            action: "/api/initiate-ivr",
+            encType: "application/json",
+          },
+        );
+        formFetcher.submit(
+          {
+            campaignData: JSON.stringify({
+              ...campaignData,
+              status: "running",
+            }),
+            campaignDetails: JSON.stringify(details),
+          },
+          {
+            method: "patch",
+            action: "/api/campaigns",
+          },
+        );
+        navigate("..");
+      } else if (campaignData.type === "message") {
+        handleInputChange("status", "running");
+        fetcher.submit(
+          {
+            campaign_id,
+            workspace_id: details.workspace,
+            caller_id: campaignData.caller_id,
+            user_id: user.id,
+          },
+          { method: "post", action: "/api/sms", encType: "application/json" },
+        );
+        formFetcher.submit(
+          {
+            campaignData: JSON.stringify({
+              ...campaignData,
+              status: "running",
+            }),
+            campaignDetails: JSON.stringify(details),
+          },
+          {
+            method: "patch",
+            action: "/api/campaigns",
+          },
+        );
+        navigate(`../../../chats?campaign_id=${campaign_id}`);
+      }
     }
   };
 

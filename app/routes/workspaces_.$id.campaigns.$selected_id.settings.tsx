@@ -16,6 +16,7 @@ import {
 import { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import {
   Audience,
+  Campaign,
   CampaignAudience,
   IVRCampaign,
   LiveCampaign,
@@ -23,7 +24,6 @@ import {
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
-import Campaign from "./workspaces_.$id_.campaigns.$campaign_id.call";
 import { Json, Database } from "~/lib/database.types";
 
 export const loader = async ({

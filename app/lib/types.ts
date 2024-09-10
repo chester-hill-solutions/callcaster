@@ -46,3 +46,18 @@ export type WorkspaceData =
       users: string[] | null;
     }[]
   | null;
+  
+  export interface DaySchedule {
+    active: boolean;
+    start: string;
+    end: string;   
+  }
+  export interface CampaignSchedule {
+    Monday?: DaySchedule;
+    Tuesday?: DaySchedule;
+    Wednesday?: DaySchedule;
+    Thursday?: DaySchedule;
+    Friday?: DaySchedule;
+    Saturday?: DaySchedule;
+    Sunday?: DaySchedule;
+  }

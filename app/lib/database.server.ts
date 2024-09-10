@@ -680,7 +680,6 @@ export async function updateCampaign({
     message_media: undefined,
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
-  console.log(campaignDetails, tableKey);
   const cleanCampaignDetails =
     tableKey !== "message_campaign"
       ? cleanObject({
@@ -740,7 +739,6 @@ export async function updateCampaign({
       id,
       audiences,
     );
-    console.log(audienceUpdateResult);
   }
 
   return {
