@@ -675,6 +675,9 @@ const Campaign: React.FC = () => {
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
+            handleVoiceDrop={() => {
+              console.log(activeCall);
+            }}
             hangUp={() =>
               campaign.dial_type === "predictive"
                 ? handleConferenceEnd({
