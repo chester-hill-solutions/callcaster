@@ -573,13 +573,14 @@ export async function acceptWorkspaceInvitations(
   invitationIds: string[],
   userId: string,
 ) {
+  let errors = [];
   for (const invitationId of invitationIds) {
     const { data: invite, error: inviteError } = await supabaseClient
       .from("workspace_invite")
       .select()
       .eq("id", invitationId)
       .single();
-    if (inviteError) return { error: inviteError };
+    if (inviteError) errors.push({ invitationId: inviteError, type: "invite" });
 
     const { error: workspaceError } = await addUserToWorkspace({
       supabaseClient: supabaseClient,
@@ -587,16 +588,17 @@ export async function acceptWorkspaceInvitations(
       userId: userId,
       role: invite.role,
     });
-    console.error(workspaceError);
-    if (workspaceError) return { error: workspaceError };
+    if (workspaceError)
+      errors.push({ invitationId: inviteError, type: "workspace" });
 
     const { error: deletionError } = await supabaseClient
       .from("workspace_invite")
       .delete()
       .eq("id", invitationId);
 
-    if (deletionError) return { error: deletionError };
-    return { error: null };
+    if (deletionError)
+      errors.push({ invitationId: inviteError, type: "deletion" });
+    return { errors };
   }
 }
 type CampaignType =
@@ -705,7 +707,6 @@ export async function updateCampaign({
             message_media: undefined,
             step_data: undefined,
             voicedrop_audio: undefined,
-
           })
         : cleanObject({
             ...campaignDetails,
