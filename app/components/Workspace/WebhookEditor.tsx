@@ -47,16 +47,7 @@ const updateEvent = (workspace: string) => ({
     workspace,
   },
   old_record: {
-    id: 12345,
-    contact_id: 67890,
-    campaign_id: 246,
-    result: JSON.stringify({}),
-    disposition: "pending",
-    created_at: "2024-09-04T14:33:21.470Z",
-    user_id: "a656121d-17af-414c-97c7-71f2008f8f14",
-    ended_at: null,
-    answered_at: null,
-    workspace,
+    id: 12345
   },
 });
 

@@ -1,6 +1,7 @@
 import { json, redirect } from "@remix-run/react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../database.types";
+import { getWorkspaceUsers } from "../database.server";
 
 export async function handleAddUser(
   formData: FormData,
@@ -11,9 +12,14 @@ export async function handleAddUser(
   const username = formData.get("username") as string;
   const newUserRole = formData.get("new_user_workspace_role") as string;
   if (!username) {
-    return json({ user: null, error: "Must provide an email address" });
+    return json({ user: null, error: "Must provide an email address" }, 400);
   }
-  const { data: user, error: inviteUserError } =
+  const {data:users} = await getWorkspaceUsers({supabaseClient,workspaceId});
+  const match = users?.filter((user) => user.username === username);
+  if (match) {
+    return json({user:null, error: "This user already exists"}, 403)
+  }
+ const { data: user, error: inviteUserError } =
     await supabaseClient.functions.invoke("invite-user-by-email", {
       body: {
         workspaceId,
