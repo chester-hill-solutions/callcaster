@@ -49,7 +49,7 @@ export const DispositionBreakdown = ({
     <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
     {results?.map(
       (result) =>
-        result.disposition && result.disposition != "idle" && (
+        result.disposition && result.disposition != "idle" && result.disposition != "No Disposition" && (
           <DispositionBar
             key={result.disposition}
             {...result}
