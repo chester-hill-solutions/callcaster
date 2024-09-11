@@ -111,22 +111,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return json({ ok: true, error: null }, { headers });
 };
 
-
 // eslint-disable-next-line react/display-name
 const WorkspaceCard = React.memo(
-  ({ workspace, role }: { workspace: Workspace; role: string }) => (
-    <Link
-      to={`/workspaces/${workspace.id}`}
-      className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
-    >
-      <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
-        {formatTableText(workspace.name)}
-      </h5>
-      <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
-        {role}
-      </p>
-    </Link>
-  ),
+  ({ workspace, role }: { workspace: Workspace; role: string }) => {
+
+    return (
+      <Link
+        to={`/workspaces/${workspace.id}`}
+        className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+      >
+        <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
+          {workspace.name}
+        </h5>
+        <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
+          {role}
+        </p>
+      </Link>
+    );
+  },
 );
 
 const NewWorkspaceDialog = ({
