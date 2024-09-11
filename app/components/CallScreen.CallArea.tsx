@@ -50,7 +50,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   callState: state,
   callDuration,
   dispositionOptions,
-  voiceDrop
+  voiceDrop = false
 }) => {
   const handleHangUp = () => {
     hangUp();
@@ -165,7 +165,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 borderRadius: "20px",
                 color: "white",
               }}
-              disabled={state !== "connected" && state !== "dialing"}
+             disabled={state !== "connected" && state !== "dialing"}
             >
               Audio Drop
             </Button>}
