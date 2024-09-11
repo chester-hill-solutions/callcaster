@@ -753,7 +753,6 @@ export async function updateCampaign({
       id,
       audiences,
     );
-    console.log(audienceUpdateResult);
   }
 
   return {
@@ -1014,7 +1013,6 @@ export async function fetchConversationSummary(
       "get_conversation_summary_by_campaign",
       { p_workspace: workspaceId, campaign_id_prop: campaign_id },
     );
-    console.log(error);
     chats = data;
     chatsError = error;
   } else {
@@ -1160,7 +1158,7 @@ export async function createStripeContact({
     apiVersion: "2020-08-27",
   });
 
-  console.log("Creating Stripe customer for:", data.name, ownerUser.username);
+  //console.log("Creating Stripe customer for:", data.name, ownerUser.username);
 
   return await stripe.customers.create({
     name: data.name,

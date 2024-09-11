@@ -101,7 +101,6 @@ export const CampaignSettings = ({
       body_text: details?.body_text || "",
       message_media: details?.message_media || [],
       voicedrop_audio: details?.voicedrop_audio
-
     });
   }, [campaign_id, data, details, workspace]);
 
