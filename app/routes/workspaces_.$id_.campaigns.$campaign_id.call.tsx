@@ -614,6 +614,20 @@ const Campaign: React.FC = () => {
     nextRecipient?.contact_id,
   ]);
 
+  const handleVoiceDrop = () => {
+    if (!activeCall) return;
+    const formData = new FormData();
+    formData.append("callId", activeCall?.parameters?.CallSid);
+    formData.append("workspaceId", workspaceId);
+    formData.append("campaignId", campaign?.id);
+
+    submit(formData, {
+      method: "POST",
+      action: "/api/audiodrop",
+      navigate: false,
+    });
+  }
+
   useDebouncedSave(
     update,
     recentAttempt,
@@ -675,11 +689,7 @@ const Campaign: React.FC = () => {
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
-            handleVoiceDrop={() => {
-              submit({
-                callId: activeCall
-              })
-            }}
+            handleVoiceDrop={handleVoiceDrop}
             hangUp={() =>
               campaign.dial_type === "predictive"
                 ? handleConferenceEnd({
@@ -698,6 +708,7 @@ const Campaign: React.FC = () => {
             recentAttempt={recentAttempt}
             callState={callState}
             callDuration={callDuration}
+            voiceDrop={Boolean(campaignDetails?.voicedrop_audio)}
           />
           <Household
             isBusy={isBusy}
