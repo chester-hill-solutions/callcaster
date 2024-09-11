@@ -18,7 +18,7 @@ export const loader = async ({ request, params }) => {
 
 export default function SelectedType() {
   const outlet = useOutlet();
-  const { selectedTable, audiences, campaigns, phoneNumbers, userRole } =
+  const { selectedTable, audiences, campaigns, phoneNumbers, userRole, flags } =
     useOutletContext();
   return !outlet ? (
     <CampaignEmptyState
@@ -26,6 +26,6 @@ export default function SelectedType() {
       type={phoneNumbers?.length > 0 ? "campaign" : "number"}
     />
   ) : (
-    <Outlet context={{ selectedTable, audiences, campaigns }} />
+    <Outlet context={{ selectedTable, audiences, campaigns, flags }} />
   );
 }

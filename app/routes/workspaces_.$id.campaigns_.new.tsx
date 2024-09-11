@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, Link, useActionData } from "@remix-run/react";
+import { Form, Link, useActionData, useOutletContext } from "@remix-run/react";
 import { CardAction } from "twilio/lib/rest/content/v1/content";
 import {
   Card,
@@ -9,6 +9,7 @@ import {
 } from "~/components/CustomCard";
 import { Button } from "~/components/ui/button";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { Flags } from "~/lib/types";
 
 import { handleNewCampaign } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
 
@@ -49,6 +50,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function CampaignsNew() {
+  const { flags }:{flags:Flags} = useOutletContext();
+  const isLiveCallEnabled = flags?.call?.campaign === true;
+  const isMessageEnabled = flags?.sms?.campaign === true;
+  const isRobocallEnabled = flags?.ivr?.campaign === true;
+
   const actionData = useActionData<typeof action>();
   return (
     <section
@@ -89,16 +95,21 @@ export default function CampaignsNew() {
                 required
                 defaultValue={"live_call"}
               >
-                <option value="live_call" className="dark:bg-black">
-                  Live Call
-                </option>
-
-                <option value="message" className="dark:bg-black">
-                  Message
-                </option>
-                <option value="robocall" className="dark:bg-black">
-                  Interactive Voice Recording
-                </option>
+                {isLiveCallEnabled && (
+                  <option value="live_call" className="dark:bg-black">
+                    Live Call
+                  </option>
+                )}
+                {isMessageEnabled && (
+                  <option value="message" className="dark:bg-black">
+                    Message
+                  </option>
+                )}
+                {isRobocallEnabled && (
+                  <option value="robocall" className="dark:bg-black">
+                    Interactive Voice Recording
+                  </option>
+                )}
               </select>
             </label>
           </CardContent>

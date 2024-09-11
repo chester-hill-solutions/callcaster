@@ -7,6 +7,7 @@ import {
   Audience,
   Campaign,
   CampaignAudience,
+  Flags,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
@@ -33,6 +34,7 @@ type CampaignSettingsProps = {
   user: User;
   mediaLinks: string[];
   joinDisabled: string | null;
+  flags:Flags;
   onPageDataChange: (
     data: Campaign & { campaign_audience: CampaignAudience },
   ) => void;
@@ -50,7 +52,8 @@ export const CampaignSettings = ({
   user,
   onPageDataChange,
   mediaLinks,
-  joinDisabled
+  joinDisabled,
+  flags
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -199,6 +202,7 @@ export const CampaignSettings = ({
             campaignData={campaignData}
             handleInputChange={handleInputChange}
             phoneNumbers={phoneNumbers}
+            flags={flags}
           />
           <CampaignTypeSpecificSettings
             campaignData={campaignData}

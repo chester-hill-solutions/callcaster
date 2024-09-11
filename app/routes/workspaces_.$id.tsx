@@ -51,7 +51,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       supabaseClient,
     });
   }
-
+  const {data:flags, error: flagsError} = await supabaseClient.from("workspace").select("feature_flags").eq("id", workspaceId).single();
+  
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
       .from("audience")
@@ -71,7 +72,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     if (numbersError) throw { numbersError };
 
     return json(
-      { workspace, audiences, campaigns, userRole, phoneNumbers },
+      { workspace, audiences, campaigns, userRole, phoneNumbers, flags:flags.feature_flags },
       { headers },
     );
   } catch (error) {
@@ -81,7 +82,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, userRole, phoneNumbers } =
+  const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } =
     useLoaderData();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
@@ -89,6 +90,7 @@ export default function Workspace() {
   return (
     <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
       <WorkspaceNav
+        flags={flags}
         workspace={workspace}
         isInChildRoute={false}
         userRole={userRole}
@@ -120,7 +122,7 @@ export default function Workspace() {
               type={phoneNumbers?.length > 0 ? "campaign" : "number"}
             />
           ) : (
-            <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, ...context }} />
+            <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, flags, ...context }} />
           )}
         </div>
       </div>

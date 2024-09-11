@@ -141,7 +141,7 @@ export const loader = async ({ request, params }) => {
 };
 
 export default function CampaignScreen() {
-  const { audiences } = useOutletContext();
+  const { audiences, flags } = useOutletContext();
   const {
     data,
     hasAccess,
@@ -212,6 +212,7 @@ export default function CampaignScreen() {
           scripts,
           user,
           mediaLinks,
+          flags
         }}
       />
     </div>
