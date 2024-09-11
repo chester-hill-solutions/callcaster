@@ -46,3 +46,15 @@ export type WorkspaceData =
       users: string[] | null;
     }[]
   | null;
+
+  type FeatureFlag = boolean;
+
+  type NestedFlags = {
+    [key: string]: FeatureFlag | NestedFlags;
+  };
+  
+  export type Flags = {
+    [key: string]: NestedFlags;
+  };
+  
+  

@@ -8,6 +8,7 @@ import {
   NavLink,
   useActionData,
   useLoaderData,
+  useOutletContext,
 } from "@remix-run/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
@@ -190,6 +191,7 @@ export default function WorkspaceSettings() {
     pendingInvites,
     webhook,
   } = useLoaderData<typeof loader>();
+  const {flags} = useOutletContext();
   const actionData = useActionData<typeof action>();
   const workspaceOwner = users?.find(
     (user) => user.user_workspace_role === "owner",
@@ -427,7 +429,7 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
-        <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+       {flags && flags?.webhooks?.workspace && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Webhook
@@ -442,7 +444,7 @@ export default function WorkspaceSettings() {
               )}
             </div>
           </div>
-        </Card>
+        </Card>}
       </div>
       <Toaster richColors />
     </main>

@@ -10,6 +10,7 @@ import {
   Audience,
   Campaign,
   CampaignAudience,
+  Flags,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
@@ -47,7 +48,8 @@ export default function Settings() {
     user,
     mediaLinks,
     audiences,
-    joinDisabled
+    joinDisabled,
+    flags
   }: {
     data: Campaign & {
       campaignDetails: LiveCampaign & {script: Script} | MessageCampaign | IVRCampaign & {script: Script};
@@ -59,6 +61,7 @@ export default function Settings() {
     mediaLinks: string[];
     audiences: Audience[];
     joinDisabled: string | null,
+    flags:Flags;
   } = useOutletContext();
   const {
     workspace_id,
@@ -102,6 +105,7 @@ export default function Settings() {
   return (
     <>
       <CampaignSettings
+      flags={flags}
         workspace={workspace_id}
         data={pageData}
         scripts={scripts}
