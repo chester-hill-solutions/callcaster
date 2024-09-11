@@ -835,7 +835,7 @@ export const fetchBasicResults = async (
   supabaseClient: SupabaseClient,
   campaignId: string,
 ) => {
-  const { data, error } = await supabaseClient.rpc("get_basic_results", {
+  const { data, error } = await supabaseClient.rpc("get_campaign_stats", {
     campaign_id_param: campaignId,
   });
   if (error) console.error("Error fetching basic results:", error);
