@@ -146,12 +146,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const userId = serverSession?.user?.id;
     const invitationIds = formData.getAll("invitation_id") as string[];
 
-    const { error } = await acceptWorkspaceInvitations(
+    const { errors } = await acceptWorkspaceInvitations(
       supabaseClient,
       invitationIds,
       userId,
     );
-    if (error) return json({ error }, { headers });
+    if (errors) return json({ errors }, { headers });
     return json({ success: true }, { headers });
   }
 
