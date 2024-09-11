@@ -28,11 +28,15 @@ interface CallAreaProps {
   handleDialNext: () => void;
   handleDequeueNext: () => void;
   disposition: string;
+  dispositionOptions:any[];
   setDisposition: (disposition: string) => void;
   recentAttempt: Attempt | null;
   predictive: boolean;
   conference: Conference | null;
   voiceDrop:boolean;
+  displayState: string;
+  callState: string;
+  callDuration: number
 }
 
 export const CallArea: React.FC<CallAreaProps> = ({
@@ -51,7 +55,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   callDuration,
   dispositionOptions,
   voiceDrop = false
-}) => {
+}:CallAreaProps) => {
   const handleHangUp = () => {
     hangUp();
   };

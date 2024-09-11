@@ -45,7 +45,7 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
 }) => {
-  console.log(campaignData)
+
   return (
     <>
       {campaignData.type !== "message" && (
