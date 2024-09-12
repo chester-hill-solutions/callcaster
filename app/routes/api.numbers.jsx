@@ -53,7 +53,6 @@ export const action = async ({ request }) => {
             console.error(error);
             throw error;
         });
-        console.log(number)
         const { data: newNumber, error: newNumberError } = await supabase
             .from('workspace_number')
             .insert({

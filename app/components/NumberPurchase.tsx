@@ -1,5 +1,14 @@
+import { NumbersEmptyState } from "./NumbersPurchase.EmptyState";
 import { Button } from "./ui/button";
 import { Form } from "@remix-run/react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTrigger,
+} from "./ui/dialog";
 
 export const NumberPurchase = ({ fetcher, workspaceId }) => {
   return (
@@ -49,122 +58,84 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                   </thead>
                   <tbody>
                     {fetcher.data &&
-                      fetcher.data.map((number) => (
-                        <tr
-                          key={number.phoneNumber}
-                          className="border-b dark:border-gray-700"
-                        >
-                          <td className="px-2 py-1 text-sm">
-                            {number.friendlyName}
-                          </td>
-                          <td className="px-2 py-1 text-sm">
-                            {number.phoneNumber}
-                          </td>
-                          <td className="px-2 py-1 text-sm">{number.region}</td>
-                          <td className="px-2 py-1">
-                            <ul className="text-xs">
-                              {Object.entries(number.capabilities).map(
-                                ([capability, enabled]) => (
-                                  <li key={capability}>
-                                    {capability}: {enabled ? "Yes" : "No"}
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </td>
-                          <td className="px-2 py-1 text-sm">$3.00/mo</td>
-                          <td className="px-2 py-1">
-                            <Form
-                              method="POST"
-                              action="/api/numbers"
-                              navigate={false}
-                            >
-                              <input
-                                hidden
-                                readOnly
-                                name="phoneNumber"
-                                value={number.phoneNumber}
-                              />
-                              <input
-                                type="hidden"
-                                name="workspace_id"
-                                value={workspaceId}
-                              />
-
-                              <button
-                                className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600"
-                                type="submit"
-                              >
-                                Purchase
-                              </button>
-                            </Form>
-                          </td>
-                        </tr>
+                      fetcher.data.map((number: any) => (
+                        <Dialog key={number.phoneNumber}>
+                          <tr className="border-b dark:border-gray-700">
+                            <td className="px-2 py-1 text-sm">
+                              {number.friendlyName}
+                            </td>
+                            <td className="px-2 py-1 text-sm">
+                              {number.phoneNumber}
+                            </td>
+                            <td className="px-2 py-1 text-sm">
+                              {number.region}
+                            </td>
+                            <td className="px-2 py-1">
+                              <ul className="text-xs">
+                                {Object.entries(number.capabilities).map(
+                                  ([capability, enabled]) => (
+                                    <li key={capability}>
+                                      {capability}: {enabled ? "Yes" : "No"}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </td>
+                            <td className="px-2 py-1 text-sm">$3.00/mo</td>
+                            <td className="px-2 py-1">
+                              <DialogTrigger asChild>
+                                <button
+                                  className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600"
+                                  type="submit"
+                                >
+                                  Purchase
+                                </button>
+                              </DialogTrigger>
+                              <DialogContent className="flex flex-col items-center bg-card">
+                                <Form
+                                  method="POST"
+                                  action="/api/numbers"
+                                  navigate={false}
+                                >
+                                  <DialogHeader className="py-4">
+                                    <h2 className="mb-4 font-Zilla-Slab text-xl">
+                                      Confirm your purchase of{" "}
+                                      {number.friendlyName}
+                                    </h2>
+                                  </DialogHeader>
+                                  <div className="py-4">
+                                    <input
+                                      hidden
+                                      readOnly
+                                      name="phoneNumber"
+                                      value={number.phoneNumber}
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="workspace_id"
+                                      value={workspaceId}
+                                    />
+                                    <p>
+                                      The price of this number is $3.00 per 30
+                                      days rental. This rental may be cancelled
+                                      at any time, billing cycles are monthly.
+                                    </p>
+                                  </div>
+                                  <DialogFooter className="mt-4">
+                                    <DialogClose asChild>
+                                      <Button variant={"outline"} type="reset">
+                                        Cancel
+                                      </Button>
+                                    </DialogClose>
+                                    <Button type="submit">Purchase</Button>
+                                  </DialogFooter>
+                                </Form>
+                              </DialogContent>
+                            </td>
+                          </tr>
+                        </Dialog>
                       ))}
-                    {!fetcher.data && (
-                      <>
-                        <tr className="animate-pulse border-b dark:border-gray-700">
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                        </tr>
-                        <tr className="animate-pulse border-b dark:border-gray-700">
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                        </tr>
-                        <tr className="animate-pulse border-b dark:border-gray-700">
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                          <td className="px-2 py-1">
-                            <div className="h-4 rounded bg-gray-300 dark:bg-gray-600"></div>
-                          </td>
-                        </tr>
-                      </>
-                    )}
+                    {!fetcher.data && <NumbersEmptyState />}
                   </tbody>
                 </table>
               </div>
