@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Form, NavLink, useSubmit } from "@remix-run/react";
+import { Form, NavLink, useNavigate, useSubmit } from "@remix-run/react";
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
@@ -36,29 +38,53 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   fetchMore,
   householdMap,
   currentState,
+  isActive,
 }) => {
   const [errorDescription, setErrorDescription] = useState();
   const submit = useSubmit();
-
+  const navigate = useNavigate();
   const handleSubmitError = (e) => {
     e.preventDefault();
     submit(
       {
         errorDescription,
-        currentState
+        currentState,
       },
       {
         action: "/api/error-report",
         method: "POST",
         encType: "application/json",
-        navigate:false
+        navigate: false,
       },
     );
-
   };
+  const handleInactiveClose = (e) => {
+    e.preventDefault();
+    navigate(-1);
+  }
   return (
     <>
-      <Dialog onOpenChange={setDialog} open={isDialogOpen}>
+      <Dialog onOpenChange={handleInactiveClose} open={!isActive}>
+        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-center font-Zilla-Slab text-2xl">
+              This campaign is currently inactive.
+            </DialogTitle>
+            <div className="my-4 w-[400px]">
+                <p className="mb-2">
+                  It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
+                </p>
+            </div>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={handleInactiveClose}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setDialog} open={isDialogOpen && !!isActive}>
         <DialogContent className="flex w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
