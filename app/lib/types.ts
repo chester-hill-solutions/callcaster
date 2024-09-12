@@ -28,6 +28,7 @@ export type MessageCampaign = Database["public"]["Tables"]["message_campaign"]["
 export type Script = Database["public"]["Tables"]["script"]["Row"] | null;
 export type QueueItem = Queue & {contact: Contact}
 export type Call = Database["public"]["Tables"]["call"]["Row"] | null;
+export type User = Database["public"]["Tables"]["user"]["Row"] | null;
 
 export type WorkspaceTable = Audience | Campaign | Contact | null;
 

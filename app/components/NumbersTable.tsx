@@ -1,11 +1,21 @@
-import React from 'react';
 import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import { Form } from "@remix-run/react";
+import { useState } from "react";
+import { CheckCircleIcon, Edit } from "lucide-react";
+import { Button } from "./ui/button";
+import { User, WorkspaceNumbers } from "~/lib/types";
 
-export const NumbersTable = ({ phoneNumbers, users = [], mediaNames = [], onIncomingActivityChange, onIncomingVoiceMessageChange }) => {
+export const NumbersTable = ({
+  phoneNumbers,
+  users = [],
+  mediaNames = [],
+  onIncomingActivityChange,
+  onIncomingVoiceMessageChange,
+  onCallerIdChange
+}) => {
   const owners = users.filter((user) => user.user_workspace_role === "owner");
   const verifiedNumbers = phoneNumbers.filter(
-    (number) => number.type === "caller_id"
+    (number) => number.type === "caller_id",
   );
 
   return (
@@ -35,6 +45,7 @@ export const NumbersTable = ({ phoneNumbers, users = [], mediaNames = [], onInco
                 mediaNames={mediaNames}
                 handleIncomingActivityChange={onIncomingActivityChange}
                 handleIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
+                handleCallerIdChange={onCallerIdChange}
               />
             ))}
           </tbody>
@@ -44,7 +55,38 @@ export const NumbersTable = ({ phoneNumbers, users = [], mediaNames = [], onInco
   );
 };
 
-const NumberRow = ({ number, owners, verifiedNumbers,  mediaNames, handleIncomingActivityChange, handleIncomingVoiceMessageChange}) => {
+const NumberRow = ({
+  number,
+  owners,
+  verifiedNumbers,
+  mediaNames,
+  handleIncomingActivityChange,
+  handleIncomingVoiceMessageChange,
+  handleCallerIdChange
+}: {
+  number: WorkspaceNumbers;
+  owners: User[];
+  verifiedNumbers: WorkspaceNumbers[];
+  mediaNames: string[];
+  handleIncomingActivityChange: (activity: string) => void;
+  handleIncomingVoiceMessageChange: (activity: string) => void;
+  handleCallerIdChange: (number:number, name: string) => void;
+}) => {
+  const [isEditingNumber, setIsEditingNumber] = useState<number | null>(null);
+  const [callerId, setCallerId] = useState(number?.friendly_name || "");
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleCallerIdChange(number.id, callerId);
+      setIsEditingNumber(null); // Exit edit mode
+    } else if (e.key === "Escape") {
+      setCallerId(number.friendly_name || ""); // Revert changes
+      setIsEditingNumber(null); // Exit edit mode
+    }
+  };
+
+
+  if (!number) return <>No Number found</>;
   return (
     <tr className="border-b dark:border-gray-700">
       <td className="py-2">
@@ -62,12 +104,43 @@ const NumberRow = ({ number, owners, verifiedNumbers,  mediaNames, handleIncomin
           </button>
         </Form>
       </td>
-      <td className="px-2 py-2 text-left font-semibold">
-        {number.friendly_name}
+      <td className="px-2 py-2 text-left ">
+        <div className="flex items-center gap-4">
+          {isEditingNumber ? (
+            <>
+              <input
+                name="callerId"
+                id="callerId"
+                value={callerId}
+                onKeyDown={handleKeyPress} 
+                onChange={(e) => setCallerId(e.target.value)}
+                type="text"
+              />
+              <Button
+                variant={"ghost"}
+                className="rounded-full"
+                onClick={() => handleCallerIdChange(number.id, callerId)}
+              >
+                <CheckCircleIcon />
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">{number.friendly_name}</p>
+              <Button
+                variant={"ghost"}
+                className="rounded-full"
+                onClick={() => setIsEditingNumber(number.id)}
+              >
+                <Edit />
+              </Button>
+            </>
+          )}
+        </div>
       </td>
       <td className="px-2 py-2">{number.phone_number}</td>
       <td className="py-2">
-        <StatusIndicator status={number.capabilities.verification_status} />
+        <StatusIndicator status={number.capabilities?.verification_status} />
       </td>
       <td className="px-2 py-2">
         <IncomingActivitySelect
@@ -78,7 +151,11 @@ const NumberRow = ({ number, owners, verifiedNumbers,  mediaNames, handleIncomin
         />
       </td>
       <td className="px-2 py-2">
-        <IncomingVoiceMessageSelect number={number} mediaNames={mediaNames} onChange={handleIncomingVoiceMessageChange}/>
+        <IncomingVoiceMessageSelect
+          number={number}
+          mediaNames={mediaNames}
+          onChange={handleIncomingVoiceMessageChange}
+        />
       </td>
     </tr>
   );
@@ -104,7 +181,7 @@ const StatusIndicator = ({ status }) => {
       return (
         <div className="flex items-center gap-2">
           <p className="text-xs uppercase text-yellow-600">{status}</p>
-          <MdCached className="text-yellow-600 animate-spin" size={24} />
+          <MdCached className="animate-spin text-yellow-600" size={24} />
         </div>
       );
     default:
@@ -112,50 +189,58 @@ const StatusIndicator = ({ status }) => {
   }
 };
 
-const IncomingActivitySelect = ({ number, owners, verifiedNumbers, onChange }) => {
+const IncomingActivitySelect = ({
+  number,
+  owners,
+  verifiedNumbers,
+  onChange,
+}) => {
   return (
     <select
-      className="w-full p-2 border rounded"
+      className="w-full rounded border p-2"
       disabled={number.type === "caller_id"}
       defaultValue={number.inbound_action}
       onChange={(e) => onChange(number.id, e.target.value)}
     >
-        <option value="">Select how to handle incoming calls</option>
+      <option value="">Select how to handle incoming calls</option>
 
-        {number.type === "caller_id" ? (
-          <option>Outbound Only</option>
-        ) : (
-          <>
-            {owners.map((owner) => (
-              <option key={owner.id} value={owner.username}>
-                Email to Account Owner {owner.username && `- ${owner.username}`}
-              </option>
-            ))}
-            {verifiedNumbers.map((verifiedNumber) => (
-              <option key={verifiedNumber.id} value={`forward_${verifiedNumber.id}`}>
-                Forward to {verifiedNumber.friendly_name}
-              </option>
-            ))}
-          </>
-        )}
-      </select>
+      {number.type === "caller_id" ? (
+        <option>Outbound Only</option>
+      ) : (
+        <>
+          {owners.map((owner) => (
+            <option key={owner.id} value={owner.username}>
+              Email to Account Owner {owner.username && `- ${owner.username}`}
+            </option>
+          ))}
+          {verifiedNumbers.map((verifiedNumber) => (
+            <option
+              key={verifiedNumber.id}
+              value={`forward_${verifiedNumber.id}`}
+            >
+              Forward to {verifiedNumber.friendly_name}
+            </option>
+          ))}
+        </>
+      )}
+    </select>
   );
 };
 
 const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }) => {
   return (
     <select
-      className="w-full p-2 border rounded"
+      className="w-full rounded border p-2"
       defaultValue={number.inbound_audio}
       onChange={(e) => onChange(number.id, e.target.value)}
     >
-        <option value="">Select a voice message</option>
-        {mediaNames.map((mediaName, index) => (
-          <option key={index} value={mediaName.name}>
-            {mediaName.name}
-          </option>
-        ))}
-      </select>
+      <option value="">Select a voice message</option>
+      {mediaNames.map((mediaName, index) => (
+        <option key={index} value={mediaName.name}>
+          {mediaName.name}
+        </option>
+      ))}
+    </select>
   );
 };
 

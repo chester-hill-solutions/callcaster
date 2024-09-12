@@ -17,6 +17,7 @@ import {
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   removeWorkspacePhoneNumber,
+  updateCallerId,
   updateWorkspacePhoneNumber,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -101,19 +102,19 @@ type CallerIDResponse = {
 };
 
 export const action = async ({ request, params }) => {
-  const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers } =
+    await getSupabaseServerClientWithSession(request);
 
   const data = Object.fromEntries(await request.formData());
   const formName = data.formName;
   const workspace_id = params.id;
-
   if (formName === "caller-id") {
     delete data.formName;
     const res = await fetch(`${process.env.BASE_URL}/api/caller-id`, {
       body: JSON.stringify({ ...data, workspace_id }),
       headers: {
         "Content-Type": "application/json",
-        ...headers
+        ...headers,
       },
       method: "POST",
     });
@@ -129,7 +130,7 @@ export const action = async ({ request, params }) => {
     });
     if (error) return { error };
     return null;
-  } else if (formName === "update-incoming-activity"){
+  } else if (formName === "update-incoming-activity") {
     const { numberId, incomingActivity } = data;
     const { error: incomingActivityError } = await updateWorkspacePhoneNumber({
       supabaseClient,
@@ -139,17 +140,35 @@ export const action = async ({ request, params }) => {
     });
     if (incomingActivityError) return { error: incomingActivityError };
     return null;
-  } else if (formName === "update-incoming-voice-message"){
+  } else if (formName === "update-incoming-voice-message") {
     const { numberId: voiceNumberId, incomingVoiceMessage } = data;
-    const { error: incomingVoiceMessageError } = await updateWorkspacePhoneNumber({
-      supabaseClient,
-      numberId: voiceNumberId,
-      workspaceId: workspace_id,
-      updates: { inbound_audio: incomingVoiceMessage },
-    });
+    const { error: incomingVoiceMessageError } =
+      await updateWorkspacePhoneNumber({
+        supabaseClient,
+        numberId: voiceNumberId,
+        workspaceId: workspace_id,
+        updates: { inbound_audio: incomingVoiceMessage },
+      });
     if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
     return null;
-
+  } else if (formName === "update-caller-id") {
+    const { numberId: voiceNumberId, friendly_name } = data;
+    const { data: number, error: friendlyNameError } =
+      await updateWorkspacePhoneNumber({
+        supabaseClient,
+        numberId: voiceNumberId,
+        workspaceId: workspace_id,
+        updates: { friendly_name },
+      });
+    if (friendlyNameError) return { error: friendlyNameError };
+    const updateData = await updateCallerId({
+      supabaseClient,
+      workspaceId: workspace_id,
+      number,
+      friendly_name,
+    });
+    if (updateData?.error) return { error: updateData.error };
+    return null;
   }
   return { error: "An unknown error occured" };
 };
@@ -160,7 +179,7 @@ export default function WorkspaceSettings() {
     workspaceId,
     user,
     users,
-    mediaNames
+    mediaNames,
   } = useLoaderData<typeof loader>();
   const { supabase } = useOutletContext();
   const actionData = useActionData<typeof action>();
@@ -177,18 +196,32 @@ export default function WorkspaceSettings() {
 
   const handleIncomingActivityChange = (numberId, value) => {
     updateFetcher.submit(
-      { formName: "update-incoming-activity", numberId, incomingActivity: value },
-      { method: "POST" }
+      {
+        formName: "update-incoming-activity",
+        numberId,
+        incomingActivity: value,
+      },
+      { method: "POST" },
     );
   };
 
   const handleIncomingVoiceMessageChange = (numberId, value) => {
     updateFetcher.submit(
-      { formName: "update-incoming-voice-message", numberId, incomingVoiceMessage: value },
-      { method: "POST" }
+      {
+        formName: "update-incoming-voice-message",
+        numberId,
+        incomingVoiceMessage: value,
+      },
+      { method: "POST" },
     );
   };
-
+  const handleCallerIdChange = (numberId, value) => {
+    console.log(numberId, value);
+    updateFetcher.submit(
+      { formName: "update-caller-id", numberId, friendly_name: value },
+      { method: "POST" },
+    );
+  };
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error);
@@ -233,12 +266,13 @@ export default function WorkspaceSettings() {
         </div>
 
         <div className="flex flex-wrap">
-        <NumbersTable
+          <NumbersTable
             phoneNumbers={phoneNumbers}
             users={users}
             mediaNames={mediaNames}
             onIncomingActivityChange={handleIncomingActivityChange}
             onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
+            onCallerIdChange={handleCallerIdChange}
           />
           <NumberCallerId />
           <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />
