@@ -1,4 +1,5 @@
 import { getNextContact } from "./getNextContact";
+import { Contact } from "./types";
 import { isRecent } from "./utils";
 
 const getRecentAttempt = ({ attempts, contact }) => {
@@ -80,7 +81,7 @@ export const handleContact = ({
   attempts,
   calls,
 }) => {
-  const switchQuestionContact = ({ contact }) => {
+  const switchQuestionContact = ({ contact }:{contact:Contact}) => {
     setQuestionContact(contact);
     const newRecentAttempt = getRecentAttempt({ attempts, contact });
     if (!isRecent(newRecentAttempt.created_at)) {
@@ -148,7 +149,6 @@ export const handleQueue = ({
       },
     );
     setQueue((prevQueue) => {
-      console.log(prevQueue);
       return prevQueue.filter(
         (queueContact) => queueContact.contact.id !== contact.contact.id,
       );
