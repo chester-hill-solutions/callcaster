@@ -9,6 +9,7 @@ export const action = async ({ request }) => {
         .from('outreach_attempt')
         .select()
         .eq('contact_id', contact_id)
+        .eq("campaign_id", campaign_id)
         .gte('created_at', tenMinutesAgo)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -50,16 +51,15 @@ export const action = async ({ request }) => {
             console.error(error);
             return json({ error }, { status: 500, headers });
         }
-        outreachAttempt = data;
+        outreachAttempt = {id: data};
     }
-
     const { data: updatedOutreach, error: updateError } = await supabaseClient
         .from('outreach_attempt')
         .update({
             ...(update && { result: update }),
             disposition
         })
-        .eq('id', outreachAttempt.id)
+        .eq('id', (outreachAttempt.id))
         .select();
 
     if (updateError) {

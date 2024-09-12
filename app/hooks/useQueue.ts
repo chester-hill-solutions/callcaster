@@ -37,6 +37,10 @@ export const useQueue = ({
     return !isPredictive && queue.length > 0 ? queue[0] : null;
   });
 
+  const isDuplicate = useCallback((newItem: QueueItem, currentQueue: QueueItem[]) => {
+    return currentQueue.some(item => item.contact_id === newItem.contact_id);
+  }, []);
+
   const updateQueue = useCallback(
     (payload: { new: Tables<"campaign_queue"> & { contact: Contact } }) => {
       const newStatus = payload.new.status;
@@ -53,24 +57,24 @@ export const useQueue = ({
 
           if (isPredictive) {
             if (newStatus === user.id || newStatus === "queued") {
-              updatedQueue = updatedQueue.length
-                ? sortQueue([...updatedQueue, newQueueItem])
-                : [newQueueItem];
-              if (newStatus === user.id) {
-                setNextRecipient(newQueueItem);
-                setCallDuration(0);
+              if (!isDuplicate(newQueueItem, updatedQueue)) {
+                updatedQueue = updatedQueue.length
+                  ? sortQueue([...updatedQueue, newQueueItem])
+                  : [newQueueItem];
+                if (newStatus === user.id) {
+                  setNextRecipient(newQueueItem);
+                  setCallDuration(0);
+                }
               }
             } else {
               updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
             }
           } else {
             if (newStatus === user.id) {
-              updatedQueue = sortQueue([
-                ...updatedQueue.filter(
-                  (item) => item.contact_id !== payload.new.contact_id,
-                ),
-                newQueueItem,
-              ]);
+              updatedQueue = updatedQueue.filter(
+                (item) => item.contact_id !== payload.new.contact_id,
+              );
+              updatedQueue = sortQueue([...updatedQueue, newQueueItem]);
               if (!nextRecipient) setNextRecipient(newQueueItem);
             }
           }
@@ -92,7 +96,7 @@ export const useQueue = ({
         );
       }
     },
-    [user, isPredictive, nextRecipient, setCallDuration],
+    [isPredictive, user.id, nextRecipient, setCallDuration, isDuplicate],
   );
 
   useEffect(() => {

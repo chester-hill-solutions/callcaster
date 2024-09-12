@@ -709,14 +709,16 @@ export async function updateCampaign({
             voicedrop_audio: undefined,
           })
         : cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            script_id: undefined,
-          });
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+        });
 
   if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;

@@ -17,17 +17,11 @@ export const useSupabaseRealtime = ({
   setCallDuration,
   setUpdate
 }: UseSupabaseRealtimeProps) => {
-  const [disposition, setDisposition] = useState<string>(
-    init.recentAttempt?.disposition || "idle",
-  );
-
-
 
   const {
     queue,
     setQueue,
     predictiveQueue,
-    setPredictiveQueue,
     updateQueue,
     householdMap,
     nextRecipient,
@@ -43,19 +37,14 @@ export const useSupabaseRealtime = ({
 
   const {
     attemptList,
-    setAttempts,
     recentAttempt,
     setRecentAttempt,
     updateAttempts,
-  } = useAttempts(init.attempts, init.recentAttempt);
+  } = useAttempts(init.attempts, init.recentAttempt, nextRecipient);
 
   const {
     callsList,
-    setCalls,
     recentCall,
-    setRecentCall,
-    pendingCalls,
-    setPendingCalls,
     updateCalls,
   } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient, predictive);
 
@@ -101,14 +90,6 @@ export const useSupabaseRealtime = ({
     };
   }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, setRecentAttempt, setUpdate, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
 
-  useEffect(() => {
-    if (nextRecipient && recentAttempt) {
-      setDisposition(recentAttempt.disposition);
-    } else {
-      setDisposition('idle')
-    }
-  }, [nextRecipient, recentAttempt]);
-
   const handleSetDisposition = useCallback((value: string) => {
     setRecentAttempt((cur) => ({
       ...cur,
@@ -119,6 +100,7 @@ export const useSupabaseRealtime = ({
   useEffect(() => {
     setQuestionContact(nextRecipient);
   }, [nextRecipient, setQuestionContact]);
+  
 
   return {
     queue,
@@ -130,7 +112,7 @@ export const useSupabaseRealtime = ({
     setQueue,
     predictiveQueue,
     phoneNumbers,
-    disposition,
+    disposition: recentAttempt?.disposition || "idle",
     setDisposition: handleSetDisposition,
     nextRecipient,
     setNextRecipient,

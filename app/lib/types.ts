@@ -27,7 +27,7 @@ export type IVRCampaign = Database["public"]["Tables"]["ivr_campaign"]["Row"] | 
 export type MessageCampaign = Database["public"]["Tables"]["message_campaign"]["Row"] | null;
 export type Script = Database["public"]["Tables"]["script"]["Row"] | null;
 export type QueueItem = Queue & {contact: Contact}
-export type Call = Database["public"]["Tables"]["call"] | null;
+export type Call = Database["public"]["Tables"]["call"]["Row"] | null;
 
 export type WorkspaceTable = Audience | Campaign | Contact | null;
 

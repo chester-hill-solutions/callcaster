@@ -389,18 +389,6 @@ const Campaign: React.FC = () => {
     workspaceId,
     recentAttempt,
   ]);
-  const handleQuickSave = useCallback(() => {
-    handleQuestionsSave(
-      update,
-      setUpdate,
-      recentAttempt,
-      submit,
-      questionContact,
-      campaign,
-      workspaceId,
-      toast,
-    );
-  }, [update, recentAttempt, submit, questionContact, campaign, workspaceId]);
 
   const handleNextNumber = useCallback(
     (skipHousehold = false) => {
@@ -424,14 +412,24 @@ const Campaign: React.FC = () => {
       groupByHousehold,
     ],
   );
+  const { saveData, isSaving } = useDebouncedSave({
+    update,
+    recentAttempt,
+    nextRecipient,
+    campaign,
+    workspaceId,
+    disposition,
+    toast,
+  });
 
   const handleDequeueNext = useCallback(() => {
-    if (campaign.dial_type === "predictive") {
+    if (campaign?.dial_type === "predictive") {
       send({ type: "HANG_UP" });
       setCallDuration(0);
       handleDialButton();
-    } else if (campaign.dial_type === "call") {
-      handleQuickSave();
+      saveData();
+    } else if (campaign?.dial_type === "call") {
+      saveData();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
       handleNextNumber({ skipHousehold: true });
@@ -441,11 +439,11 @@ const Campaign: React.FC = () => {
       setCallDuration(0);
     }
   }, [
-    campaign.dial_type,
+    campaign?.dial_type,
     send,
     setCallDuration,
     handleDialButton,
-    handleQuickSave,
+    saveData,
     dequeue,
     nextRecipient,
     fetchMore,
@@ -626,18 +624,7 @@ const Campaign: React.FC = () => {
       action: "/api/audiodrop",
       navigate: false,
     });
-  }
-
-  useDebouncedSave(
-    update,
-    recentAttempt,
-    submit,
-    questionContact,
-    campaign,
-    workspaceId,
-    disposition,
-    toast,
-  );
+  };
 
   const currentState = {
     callState,
@@ -724,7 +711,7 @@ const Campaign: React.FC = () => {
           campaignDetails={campaignDetails}
           update={update}
           nextRecipient={questionContact}
-          handleQuickSave={handleQuickSave}
+          handleQuickSave={saveData}
           disabled={!questionContact}
         />
         <QueueList
