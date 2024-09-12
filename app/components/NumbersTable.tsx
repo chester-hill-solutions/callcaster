@@ -11,7 +11,7 @@ export const NumbersTable = ({
   mediaNames = [],
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
-  onCallerIdChange
+  onCallerIdChange,
 }) => {
   const owners = users.filter((user) => user.user_workspace_role === "owner");
   const verifiedNumbers = phoneNumbers.filter(
@@ -62,7 +62,7 @@ const NumberRow = ({
   mediaNames,
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
-  handleCallerIdChange
+  handleCallerIdChange,
 }: {
   number: WorkspaceNumbers;
   owners: User[];
@@ -70,7 +70,7 @@ const NumberRow = ({
   mediaNames: string[];
   handleIncomingActivityChange: (activity: string) => void;
   handleIncomingVoiceMessageChange: (activity: string) => void;
-  handleCallerIdChange: (number:number, name: string) => void;
+  handleCallerIdChange: (number: number, name: string) => void;
 }) => {
   const [isEditingNumber, setIsEditingNumber] = useState<number | null>(null);
   const [callerId, setCallerId] = useState(number?.friendly_name || "");
@@ -84,7 +84,6 @@ const NumberRow = ({
       setIsEditingNumber(null); // Exit edit mode
     }
   };
-
 
   if (!number) return <>No Number found</>;
   return (
@@ -112,7 +111,7 @@ const NumberRow = ({
                 name="callerId"
                 id="callerId"
                 value={callerId}
-                onKeyDown={handleKeyPress} 
+                onKeyDown={handleKeyPress}
                 onChange={(e) => setCallerId(e.target.value)}
                 type="text"
               />
@@ -202,17 +201,21 @@ const IncomingActivitySelect = ({
       defaultValue={number.inbound_action}
       onChange={(e) => onChange(number.id, e.target.value)}
     >
-      <option value="">Select how to handle incoming calls</option>
-
       {number.type === "caller_id" ? (
         <option>Outbound Only</option>
       ) : (
         <>
+          <option value="">Select how to handle incoming calls</option>
           {owners.map((owner) => (
             <option key={owner.id} value={owner.username}>
               Email to Account Owner {owner.username && `- ${owner.username}`}
             </option>
           ))}
+          {!verifiedNumbers.length && (
+            <option disabled>
+              Forward to your verified number
+            </option>
+          )}
           {verifiedNumbers.map((verifiedNumber) => (
             <option
               key={verifiedNumber.id}
