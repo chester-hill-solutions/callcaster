@@ -1570,12 +1570,11 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
   };
 }
 
-export async function checkSchedule(
+export function checkSchedule(
   campaign_id: string,
   campaignData: Campaign & { campaign_audience: CampaignAudience[] },
 ) {
   const {start_date, end_date, schedule} = campaignData;
   const now = new Date();
-
   return (now > new Date(start_date) && now < new Date(end_date));
 }

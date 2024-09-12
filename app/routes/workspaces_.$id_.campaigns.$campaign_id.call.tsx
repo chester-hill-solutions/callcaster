@@ -110,9 +110,6 @@ export const loader = async ({ request, params }) => {
       .eq("user_id", serverSession.user.id),
   ]);
   const isActive = checkSchedule(id, campaign);
-  if (!isActive){
-    redirect('..');
-  }
 
   const errors = [
     workspaceData.error,
@@ -197,6 +194,7 @@ export const loader = async ({ request, params }) => {
       token,
       count: queueCount.count,
       completed: completedCount.count,
+      isActive,
     },
     { headers },
   );
@@ -244,6 +242,7 @@ const Campaign: React.FC = () => {
     token,
     count,
     completed,
+    isActive
   } = useLoaderData<LoaderData>();
 
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(
@@ -744,6 +743,7 @@ const Campaign: React.FC = () => {
         fetchMore={fetchMore}
         householdMap={householdMap}
         currentState={currentState}
+        isActive={isActive}
       />
     </main>
   );
