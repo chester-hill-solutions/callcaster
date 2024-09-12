@@ -1,5 +1,6 @@
 import { json, ActionFunction } from '@remix-run/node';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { WorkspaceNumbers } from '~/lib/types';
 
 interface FormData {
   VerificationStatus: string;
@@ -13,11 +14,6 @@ interface Capabilities {
   sms: boolean;
   voice: boolean;
   verification_status: string;
-}
-
-interface WorkspaceNumber {
-  phone_number: string;
-  capabilities: Capabilities;
 }
 
 export const action: ActionFunction = async ({ request }) => {
@@ -40,7 +36,7 @@ export const action: ActionFunction = async ({ request }) => {
       };
 
       const { data: numberRequest, error: numberError } = await supabase
-        .from<WorkspaceNumber>('workspace_number')
+        .from<WorkspaceNumbers>('workspace_number')
         .update({ capabilities })
         .eq('phone_number', parsedBody.To)
         .select();

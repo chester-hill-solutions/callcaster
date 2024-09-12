@@ -42,20 +42,25 @@ export const action = async ({ request }) => {
         if (error) throw error;
         const owner = users.find((user) => user.user_workspace_role === "owner");
 
-        const twilio = createWorkspaceTwilioInstance({ supabase, workspace_id });
+        const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
             statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
+            statusCallbackMethod:"POST",
             voiceUrl: `${process.env.BASE_URL}/api/inbound`,
             smsUrl: `${process.env.BASE_URL}/api/inbound-sms`
+        }).catch((error) => {
+            console.error(error);
+            throw error;
         });
+        console.log(number)
         const { data: newNumber, error: newNumberError } = await supabase
             .from('workspace_number')
             .insert({
                 workspace: workspace_id,
                 friendly_name: number.friendlyName,
                 phone_number: number.phoneNumber,
-                capabilities: number.capabilities,
+                capabilities: {verification_status:((number.capabilities.mms && number.capabilities.sms && number.capabilities.voice) ? "success" : "pending") , ...number.capabilities},
                 inbound_action: owner.username,
                 type: "rented"
             })
