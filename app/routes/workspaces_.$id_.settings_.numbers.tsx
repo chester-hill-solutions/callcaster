@@ -216,12 +216,18 @@ export default function WorkspaceSettings() {
     );
   };
   const handleCallerIdChange = (numberId, value) => {
-    console.log(numberId, value);
     updateFetcher.submit(
       { formName: "update-caller-id", numberId, friendly_name: value },
       { method: "POST" },
     );
   };
+  const handleNumberRemoval = (numberId) => {
+    updateFetcher.submit(
+      { formName: "remove-number", numberId},
+      { method: "POST" },
+    );
+  }
+
   useEffect(() => {
     if (actionData?.error) {
       toast.error(actionData.error);
@@ -273,6 +279,7 @@ export default function WorkspaceSettings() {
             onIncomingActivityChange={handleIncomingActivityChange}
             onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
             onCallerIdChange={handleCallerIdChange}
+            onNumberRemoval={handleNumberRemoval}
           />
           <NumberCallerId />
           <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />

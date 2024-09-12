@@ -12,12 +12,12 @@ export const NumbersTable = ({
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
+  onNumberRemoval
 }:{
   phoneNumbers: WorkspaceNumbers[],
   users: User[],
   mediaNames: string[],
 }) => {
-  console.log(phoneNumbers)
   const verifiedNumbers = phoneNumbers.filter(
     (number) => number.type === "caller_id",
   );
@@ -50,6 +50,7 @@ export const NumbersTable = ({
                 handleIncomingActivityChange={onIncomingActivityChange}
                 handleIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
                 handleCallerIdChange={onCallerIdChange}
+                handleNumberRemoval={onNumberRemoval}
               />
             ))}
           </tbody>
@@ -67,6 +68,7 @@ const NumberRow = ({
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
+  handleNumberRemoval
 }: {
   number: WorkspaceNumbers;
   members: User[];
@@ -75,6 +77,7 @@ const NumberRow = ({
   handleIncomingActivityChange: (activity: string) => void;
   handleIncomingVoiceMessageChange: (activity: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
+  handleNumberRemoval: (numberId: number) => void;
 }) => {
   const [isEditingNumber, setIsEditingNumber] = useState<number | null>(null);
   const [callerId, setCallerId] = useState(number?.friendly_name || "");
@@ -92,20 +95,10 @@ const NumberRow = ({
   if (!number) return <>No Number found</>;
   return (
     <tr className="border-b dark:border-gray-700">
-      <td className="py-2">
-        <Form method="DELETE" name="remove-number">
-          <input type="hidden" name="formName" value="remove-number" />
-          <input
-            name="numberId"
-            hidden
-            value={number.id}
-            readOnly
-            id="numberId"
-          />
-          <button type="submit" className="text-red-500 hover:text-red-700">
+      <td className="py-2 mt-2">
+          <button className="text-red-500 hover:text-red-700" onClick={() => handleNumberRemoval(number.id)}>
             <MdClose />
           </button>
-        </Form>
       </td>
       <td className="px-2 py-2 text-left ">
         <div className="flex items-center gap-4">
