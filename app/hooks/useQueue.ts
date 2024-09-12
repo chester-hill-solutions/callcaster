@@ -96,7 +96,7 @@ export const useQueue = ({
         );
       }
     },
-    [isPredictive, user.id, nextRecipient, setCallDuration, isDuplicate],
+    [isPredictive, user?.id, nextRecipient, setCallDuration, isDuplicate],
   );
 
   useEffect(() => {

@@ -29,7 +29,7 @@ export async function getUserWorkspaces({
     await workspacesQuery;
 
   if (error) {
-    console.log("Error on function getUserWorkspaces: ", error);
+    console.error("Error on function getUserWorkspaces: ", error);
   }
 
   return { data, error };
@@ -161,7 +161,7 @@ export async function getWorkspaceInfo({
     .single();
 
   if (error) {
-    console.log(`Error on function getWorkspaceInfo: ${error.details}`);
+    console.error(`Error on function getWorkspaceInfo: ${error.details}`);
   }
 
   return { data, error };
@@ -179,7 +179,7 @@ export async function getWorkspaceCampaigns({
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.log("Error on function getWorkspaceCampaigns");
+    console.error("Error on function getWorkspaceCampaigns");
   }
 
   return { data, error };
@@ -197,7 +197,7 @@ export async function getWorkspaceUsers({
   });
   // console.log("INSIDE FUNC:", data);
   if (error) {
-    console.log("Error on function getWorkspaceUsers", error);
+    console.error("Error on function getWorkspaceUsers", error);
   }
 
   return { data, error };
@@ -214,7 +214,7 @@ export async function getWorkspacePhoneNumbers({
     .select()
     .eq(`workspace`, workspaceId);
   if (error) {
-    console.log("Error on function getWorkspacePhoneNumbers", error);
+    console.error("Error on function getWorkspacePhoneNumbers", error);
   }
   return { data, error };
 }
@@ -294,7 +294,7 @@ export function getUserRole({ serverSession, workspaceId }) {
 
   // console.log("USER ROLE: ", userRole);
   if (userRole == null) {
-    console.log("No User Role found on this workspace");
+    console.error("No User Role found on this workspace");
   }
 
   return userRole;
@@ -313,7 +313,7 @@ export async function updateUserWorkspaceAccessDate({
     });
 
   if (updatedTimeError) {
-    console.log("Error updating user access time: ", updatedTimeError);
+    console.error("Error updating user access time: ", updatedTimeError);
   }
 
   return;
@@ -389,7 +389,7 @@ export async function forceTokenRefresh({
     await supabaseClient.auth.refreshSession();
 
   if (refreshError) {
-    console.log("Error refreshing access token", refreshError);
+    console.error("Error refreshing access token", refreshError);
     return { data: null, error: refreshError };
   }
 
@@ -407,12 +407,6 @@ export async function removeWorkspacePhoneNumber({
   numberId: bigint;
 }) {
   try {
-    const { data, error } = await supabaseClient
-      .from("workspace")
-      .select("twilio_data")
-      .eq("id", workspaceId)
-      .single();
-    if (error) throw error;
     const { data: number, error: numberError } = await supabaseClient
       .from("workspace_number")
       .select()
@@ -426,8 +420,14 @@ export async function removeWorkspacePhoneNumber({
     const outgoingIds = await twilio.outgoingCallerIds.list({
       friendlyName: number.friendly_name,
     });
+    const incomingIds = await twilio.incomingPhoneNumbers.list({
+      friendlyName: number.friendly_name,
+    });
     outgoingIds.map(async (id) => {
       return await twilio.outgoingCallerIds(id.sid).remove();
+    });
+    incomingIds.map(async (id) => {
+      return await twilio.incomingPhoneNumbers(id.sid).remove();
     });
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
@@ -437,6 +437,51 @@ export async function removeWorkspacePhoneNumber({
     if (deletionError) throw deletionError;
     return { error: null };
   } catch (error) {
+    return { error };
+  }
+}
+
+export async function updateCallerId({
+  supabaseClient,
+  workspaceId,
+  number,
+  friendly_name,
+}: {
+  supabaseClient: SupabaseClient;
+  workspaceId: string;
+  number: WorkspaceNumbers;
+  friendly_name: string;
+}) {
+  if (!number) return;
+  try {
+    const twilio = await createWorkspaceTwilioInstance({
+      supabase: supabaseClient,
+      workspace_id: workspaceId,
+    });
+
+    const [outgoingIds, incomingIds] = await Promise.all([
+      twilio.outgoingCallerIds.list({ phoneNumber: number.phone_number }),
+      twilio.incomingPhoneNumbers.list({ phoneNumber: number.phone_number }),
+    ]);
+    const updatedOutgoing = Promise.all(
+      outgoingIds.map(id =>
+        twilio.outgoingCallerIds(id.sid).update({ friendlyName: friendly_name })
+      )
+    );
+
+    const updatedIncoming = Promise.all(
+      incomingIds.map(id =>
+        twilio.incomingPhoneNumbers(id.sid).update({ friendlyName: friendly_name })
+      )
+    );
+
+    const [updatedOutgoingResults, updatedIncomingResults] = await Promise.all([
+      updatedOutgoing,
+      updatedIncoming,
+    ]);
+
+  } catch (error) {
+    console.error(error);
     return { error };
   }
 }
@@ -709,16 +754,16 @@ export async function updateCampaign({
             voicedrop_audio: undefined,
           })
         : cleanObject({
-          ...campaignDetails,
-          mediaLinks: undefined,
-          disposition_options: undefined,
-          script: undefined,
-          questions: undefined,
-          created_at: undefined,
-          body_text: undefined,
-          message_media: undefined,
-          step_data: undefined,
-        });
+            ...campaignDetails,
+            mediaLinks: undefined,
+            disposition_options: undefined,
+            script: undefined,
+            questions: undefined,
+            created_at: undefined,
+            body_text: undefined,
+            message_media: undefined,
+            step_data: undefined,
+          });
 
   if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
@@ -802,7 +847,7 @@ export async function updateOrCopyScript({
   const { data: updatedScript, error: scriptError } = await scriptOperation;
   if (scriptError) {
     if (scriptError.code === "23505") {
-      console.log(scriptError);
+      console.error(scriptError);
       throw new Error(
         `A script with this name (${upsertData.name}) already exists in the workspace`,
       );
@@ -1274,7 +1319,7 @@ export const bulkCreateContacts = async (
   audience_id: string,
   user_id: string,
 ) => {
-  console.log(user_id);
+
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
