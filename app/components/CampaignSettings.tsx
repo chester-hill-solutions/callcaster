@@ -35,6 +35,7 @@ type CampaignSettingsProps = {
   mediaLinks: string[];
   joinDisabled: string | null;
   flags:Flags;
+  isActive: boolean;
   onPageDataChange: (
     data: Campaign & { campaign_audience: CampaignAudience },
   ) => void;
@@ -53,7 +54,8 @@ export const CampaignSettings = ({
   onPageDataChange,
   mediaLinks,
   joinDisabled,
-  flags
+  flags,
+  isActive
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -215,6 +217,7 @@ export const CampaignSettings = ({
             isChanged={isChanged}
             isBusy={navigation.state !== "idle"}
             joinDisabled={joinDisabled}
+            isActive={isActive}
           />
           <AudienceSelection
             audiences={audiences}
