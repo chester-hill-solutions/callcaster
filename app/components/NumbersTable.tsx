@@ -85,10 +85,10 @@ const NumberRow = ({
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleCallerIdChange(number.id, callerId);
-      setIsEditingNumber(null); // Exit edit mode
+      setIsEditingNumber(null); 
     } else if (e.key === "Escape") {
-      setCallerId(number.friendly_name || ""); // Revert changes
-      setIsEditingNumber(null); // Exit edit mode
+      setCallerId(number.friendly_name || ""); 
+      setIsEditingNumber(null);
     }
   };
 
