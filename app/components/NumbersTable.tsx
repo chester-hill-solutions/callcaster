@@ -12,8 +12,12 @@ export const NumbersTable = ({
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
+}:{
+  phoneNumbers: WorkspaceNumbers[],
+  users: User[],
+  mediaNames: string[],
 }) => {
-  const owners = users.filter((user) => user.user_workspace_role === "owner");
+  console.log(phoneNumbers)
   const verifiedNumbers = phoneNumbers.filter(
     (number) => number.type === "caller_id",
   );
@@ -40,7 +44,7 @@ export const NumbersTable = ({
               <NumberRow
                 key={number.id}
                 number={number}
-                owners={owners}
+                members={users}
                 verifiedNumbers={verifiedNumbers}
                 mediaNames={mediaNames}
                 handleIncomingActivityChange={onIncomingActivityChange}
@@ -57,7 +61,7 @@ export const NumbersTable = ({
 
 const NumberRow = ({
   number,
-  owners,
+  members,
   verifiedNumbers,
   mediaNames,
   handleIncomingActivityChange,
@@ -65,7 +69,7 @@ const NumberRow = ({
   handleCallerIdChange,
 }: {
   number: WorkspaceNumbers;
-  owners: User[];
+  members: User[];
   verifiedNumbers: WorkspaceNumbers[];
   mediaNames: string[];
   handleIncomingActivityChange: (activity: string) => void;
@@ -144,7 +148,7 @@ const NumberRow = ({
       <td className="px-2 py-2">
         <IncomingActivitySelect
           number={number}
-          owners={owners}
+          members={members}
           verifiedNumbers={verifiedNumbers}
           onChange={handleIncomingActivityChange}
         />
@@ -190,15 +194,20 @@ const StatusIndicator = ({ status }) => {
 
 const IncomingActivitySelect = ({
   number,
-  owners,
+  members,
   verifiedNumbers,
   onChange,
+}:{
+  number: WorkspaceNumbers;
+  members: User[],
+  verifiedNumbers:WorkspaceNumbers[],
+  onChange: (id: number, value: string) => void;
 }) => {
-  return (
+  return number && (
     <select
       className="w-full rounded border p-2"
       disabled={number.type === "caller_id"}
-      defaultValue={number.inbound_action}
+      defaultValue={number.inbound_action || ""}
       onChange={(e) => onChange(number.id, e.target.value)}
     >
       {number.type === "caller_id" ? (
@@ -206,9 +215,9 @@ const IncomingActivitySelect = ({
       ) : (
         <>
           <option value="">Select how to handle incoming calls</option>
-          {owners.map((owner) => (
-            <option key={owner.id} value={owner.username}>
-              Email to Account Owner {owner.username && `- ${owner.username}`}
+          {members.map((member:User) => member && (
+            <option key={member.id} value={member.username}>
+              Email to Workspace Member {member.username && `- ${member.username}`}
             </option>
           ))}
           {!verifiedNumbers.length && (
@@ -216,7 +225,7 @@ const IncomingActivitySelect = ({
               Forward to your verified number
             </option>
           )}
-          {verifiedNumbers.map((verifiedNumber) => (
+          {verifiedNumbers.length > 0 && verifiedNumbers.map((verifiedNumber) => (
             <option
               key={verifiedNumber.id}
               value={`forward_${verifiedNumber.id}`}
