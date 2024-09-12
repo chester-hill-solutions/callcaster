@@ -1,5 +1,6 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
+import { createWorkspaceTwilioInstance, getWorkspaceUsers } from '../lib/database.server';
 
 export const loader = async ({ request }) => {
     const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
@@ -34,9 +35,14 @@ export const action = async ({ request }) => {
     const formData = await request.formData();
     const { phoneNumber, workspace_id } = Object.fromEntries(formData);
     try {
-        const { data, error } = await supabase.from('workspace').select('twilio_data').eq('id', workspace_id).single();
+        const { data: users, error } = await getWorkspaceUsers({
+            supabaseClient: supabase,
+            workspaceId: workspace_id,
+        });
         if (error) throw error;
-        const twilio = new Twilio.Twilio(data.twilio_data.sid, data.twilio_data.authToken);
+        const owner = users.find((user) => user.user_workspace_role === "owner");
+
+        const twilio = createWorkspaceTwilioInstance({ supabase, workspace_id });
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
             statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
@@ -44,15 +50,16 @@ export const action = async ({ request }) => {
             smsUrl: `${process.env.BASE_URL}/api/inbound-sms`
         });
         const { data: newNumber, error: newNumberError } = await supabase
-        .from('workspace_number')
-        .insert({
-            workspace: workspace_id,
-            friendly_name: number.friendlyName,
-            phone_number: number.phoneNumber,
-            capabilities: number.capabilities,
-            type:"rented"
-        })
-        .select().single();
+            .from('workspace_number')
+            .insert({
+                workspace: workspace_id,
+                friendly_name: number.friendlyName,
+                phone_number: number.phoneNumber,
+                capabilities: number.capabilities,
+                inbound_action: owner.username,
+                type: "rented"
+            })
+            .select().single();
         if (newNumberError) throw newNumberError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {
