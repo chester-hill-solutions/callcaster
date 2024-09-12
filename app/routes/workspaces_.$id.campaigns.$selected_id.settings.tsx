@@ -49,7 +49,8 @@ export default function Settings() {
     mediaLinks,
     audiences,
     joinDisabled,
-    flags
+    flags,
+    isActive
   }: {
     data: Campaign & {
       campaignDetails: LiveCampaign & {script: Script} | MessageCampaign | IVRCampaign & {script: Script};
@@ -62,6 +63,7 @@ export default function Settings() {
     audiences: Audience[];
     joinDisabled: string | null,
     flags:Flags;
+    isActive:boolean;
   } = useOutletContext();
   const {
     workspace_id,
@@ -118,6 +120,7 @@ export default function Settings() {
         user={user}
         joinDisabled={joinDisabled}
         mediaLinks={mediaLinks}
+        isActive={isActive}
       />
     </>
   );
