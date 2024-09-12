@@ -46,6 +46,7 @@ import {
   OutreachAttempt,
   QueueItem,
 } from "~/lib/types";
+import { checkSchedule } from "~/lib/database.server";
 interface LoaderData {
   campaign: CampaignType;
   attempts: OutreachAttempt[];
@@ -108,6 +109,10 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", id)
       .eq("user_id", serverSession.user.id),
   ]);
+  const isActive = checkSchedule(id, campaign);
+  if (!isActive){
+    redirect('..');
+  }
 
   const errors = [
     workspaceData.error,

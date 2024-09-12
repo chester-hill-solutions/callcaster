@@ -2,7 +2,14 @@ import Twilio from "twilio";
 import Stripe from "stripe";
 import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
-import { Audience, Contact, WorkspaceData, WorkspaceNumbers } from "./types";
+import {
+  Audience,
+  Campaign,
+  CampaignAudience,
+  Contact,
+  WorkspaceData,
+  WorkspaceNumbers,
+} from "./types";
 import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
@@ -464,22 +471,25 @@ export async function updateCallerId({
       twilio.incomingPhoneNumbers.list({ phoneNumber: number.phone_number }),
     ]);
     const updatedOutgoing = Promise.all(
-      outgoingIds.map(id =>
-        twilio.outgoingCallerIds(id.sid).update({ friendlyName: friendly_name })
-      )
+      outgoingIds.map((id) =>
+        twilio
+          .outgoingCallerIds(id.sid)
+          .update({ friendlyName: friendly_name }),
+      ),
     );
 
     const updatedIncoming = Promise.all(
-      incomingIds.map(id =>
-        twilio.incomingPhoneNumbers(id.sid).update({ friendlyName: friendly_name })
-      )
+      incomingIds.map((id) =>
+        twilio
+          .incomingPhoneNumbers(id.sid)
+          .update({ friendlyName: friendly_name }),
+      ),
     );
 
     const [updatedOutgoingResults, updatedIncomingResults] = await Promise.all([
       updatedOutgoing,
       updatedIncoming,
     ]);
-
   } catch (error) {
     console.error(error);
     return { error };
@@ -1319,7 +1329,6 @@ export const bulkCreateContacts = async (
   audience_id: string,
   user_id: string,
 ) => {
-
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
@@ -1559,4 +1568,14 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
     canceledMessages: allCanceledMessages,
     errors: allErrors,
   };
+}
+
+export async function checkSchedule(
+  campaign_id: string,
+  campaignData: Campaign & { campaign_audience: CampaignAudience[] },
+) {
+  const {start_date, end_date, schedule} = campaignData;
+  const now = new Date();
+
+  return (now > new Date(start_date) && now < new Date(end_date));
 }

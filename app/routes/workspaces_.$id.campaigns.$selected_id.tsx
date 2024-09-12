@@ -12,6 +12,7 @@ import { Suspense } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 import {
+  checkSchedule,
   fetchBasicResults,
   fetchCampaignData,
   fetchCampaignDetails,
@@ -127,6 +128,7 @@ export const loader = async ({ request, params }) => {
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
+  const isActive = checkSchedule(selected_id, campaignData);
 
   return defer({
     data,
@@ -137,6 +139,7 @@ export const loader = async ({ request, params }) => {
     mediaData,
     scripts,
     mediaLinks: mediaLinksPromise,
+    isActive
   });
 };
 
@@ -153,6 +156,7 @@ export default function CampaignScreen() {
     mediaData,
     scripts,
     mediaLinks,
+    isActive
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
@@ -171,7 +175,7 @@ export default function CampaignScreen() {
         <NavigationLinks
           hasAccess={hasAccess}
           data={data}
-          joinDisabled={joinDisabled}
+          joinDisabled={(!isActive ? "This campaign is currently deactivated" : false) || joinDisabled}
         />
       </div>
       {hasAccess && isCampaignParentRoute && (
@@ -200,6 +204,8 @@ export default function CampaignScreen() {
             data={data}
             totalCalls={totalCalls}
             expectedTotal={expectedTotal}
+            isActive={isActive}
+            joinDisabled={joinDisabled}
           />
         )}
       <Outlet
@@ -212,7 +218,8 @@ export default function CampaignScreen() {
           scripts,
           user,
           mediaLinks,
-          flags
+          flags,
+          isActive
         }}
       />
     </div>

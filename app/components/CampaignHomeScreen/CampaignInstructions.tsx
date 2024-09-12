@@ -1,8 +1,9 @@
 import React from "react";
 import { NavLink } from "@remix-run/react";
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
+import { Button } from "../ui/button";
 
-export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal }) => (
+export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal, isActive, joinDisabled }) => (
   <div className="flex">
     <div className="flex min-w-[200px] flex-auto p-4">
       <TotalCalls totalCalls={totalCalls} expectedTotal={expectedTotal} />
@@ -13,13 +14,14 @@ export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal
           {campaign.instructions?.join || "Join the campaign and start dialing!"}
         </h3>
         <div>
+          <Button asChild disabled={(!isActive) || joinDisabled}>
           <NavLink
-            className="rounded-md border-2 border-brand-primary bg-brand-primary px-2 py-1 font-Zilla-Slab text-xl font-semibold text-white transition-colors duration-150 ease-in-out dark:text-white"
             to={`${"call"}`}
             relative="path"
           >
             Join Campaign
           </NavLink>
+          </Button>
         </div>
       </div>
       <div className="my-4 flex flex-col">
