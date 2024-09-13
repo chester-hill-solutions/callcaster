@@ -548,3 +548,13 @@ export function escapeCSV(field) {
   }
   return stringField;
 }
+
+export const days = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
