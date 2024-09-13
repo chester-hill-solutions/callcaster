@@ -19,7 +19,7 @@ export const CampaignBasicInfo = ({
 }) => {
   return (
     <div className="flex flex-wrap gap-6">
-      <div className="flex flex-grow flex-col min-w-48 gap-1">
+      <div className="flex min-w-48 flex-grow flex-col gap-1">
         <Label htmlFor="title">Campaign Title</Label>
         <Input
           id="title"
@@ -46,6 +46,7 @@ export const CampaignBasicInfo = ({
         campaignData={campaignData}
         handleInputChange={handleInputChange}
       />
+      
     </div>
   );
 };
