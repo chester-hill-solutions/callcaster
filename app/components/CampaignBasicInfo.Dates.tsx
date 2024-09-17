@@ -15,7 +15,7 @@ import { days } from "~/lib/utils";
 export default function SelectDates({ campaignData, handleInputChange }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState(
-    campaignData.schedule ||
+    campaignData?.schedule ||
       Object.fromEntries(
         days.map((day) => [
           day.toLowerCase(),
@@ -56,8 +56,8 @@ export default function SelectDates({ campaignData, handleInputChange }) {
     setCurrentSchedule((prev) => ({
       ...prev,
       [day.toLowerCase()]: {
-        active: !prev[day.toLowerCase()].active,
-        intervals: prev[day.toLowerCase()].active
+        active: !prev[day.toLowerCase()]?.active,
+        intervals: prev[day.toLowerCase()]?.active
           ? []
           : [{ start: localMidnightUTC, end: localEndOfDayUTC }],
       },

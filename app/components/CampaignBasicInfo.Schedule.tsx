@@ -26,7 +26,7 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
             <TableCell>{day}</TableCell>
             <TableCell>
               <Checkbox 
-                checked={schedule[day.toLowerCase()].active}
+                checked={schedule[day.toLowerCase()]?.active}
                 onCheckedChange={() => handleCheckboxChange(day)}
               />
             </TableCell>
@@ -36,9 +36,9 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
                 id={`${day.toLowerCase()}-start`}
                 type="time"
                 className="rounded border p-1"
-                value={schedule[day.toLowerCase()].intervals[0]?.start || ""}
+                value={schedule[day.toLowerCase()]?.intervals[0]?.start || ""}
                 onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
-                disabled={!schedule[day.toLowerCase()].active}
+                disabled={!schedule[day.toLowerCase()]?.active}
               />
             </TableCell>
             <TableCell>
@@ -47,9 +47,9 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
                 id={`${day.toLowerCase()}-end`}
                 type="time"
                 className="rounded border p-1"
-                value={schedule[day.toLowerCase()].intervals[0]?.end || ""}
+                value={schedule[day.toLowerCase()]?.intervals[0]?.end || ""}
                 onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
-                disabled={!schedule[day.toLowerCase()].active}
+                disabled={!schedule[day.toLowerCase()]?.active}
               />
             </TableCell>
           </TableRow>
