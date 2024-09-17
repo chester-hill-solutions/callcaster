@@ -26,9 +26,9 @@ export default function ActivateButtons({joinDisabled, isActive, isBusy, campaig
                 </Button>
               </div>
             </TooltipTrigger>
-            {joinDisabled && (
+            {(joinDisabled || !isScheduleActive) && (
               <TooltipContent align="start">
-                <p>{joinDisabled}</p>
+                <p>{joinDisabled || (!isScheduleActive && "Ensure your schedule & calling hours are set up.")}</p>
               </TooltipContent>
             )}
           </Tooltip>
