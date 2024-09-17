@@ -20,12 +20,10 @@ export async function handleAddUser(
     workspaceId,
   });
   const match = users?.filter((user) => {
-    console.log(user);
     return user.username === cleanedName;
   });
-  console.log(match, cleanedName);
   if (match?.length) {
-    return json({ user: null, error: "This user already exists" }, 403);
+    return json({ user: null, error: "This user is already an agent in the workspace." }, 403);
   }
   const { data: user, error: inviteUserError } =
     await supabaseClient.functions.invoke("invite-user-by-email", {
@@ -36,7 +34,6 @@ export async function handleAddUser(
       },
     });
   if (inviteUserError) {
-    console.error(inviteUserError);
     return json({ user: null, error: inviteUserError.message }, { headers });
   }
   return json({ data: user, error: null, success: true }, { headers });
