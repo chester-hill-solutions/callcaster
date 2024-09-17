@@ -169,7 +169,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
                 borderRadius: "20px",
                 color: "white",
               }}
-             disabled={state !== "connected" && state !== "dialing"}
+             disabled={state !== "connected"}
             >
               Audio Drop
             </Button>}
