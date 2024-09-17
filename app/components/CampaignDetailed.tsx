@@ -1,14 +1,7 @@
-import React from "react";
 import { Button } from "~/components/ui/button";
 import { NavLink } from "@remix-run/react";
 import { MdAdd } from "react-icons/md";
 import { MessageSettings } from "./MessageSettings";
-import {
-  Tooltip,
-  TooltipProvider,
-  TooltipTrigger,
-  TooltipContent,
-} from "./ui/tooltip";
 
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";
@@ -25,13 +18,16 @@ export const CampaignTypeSpecificSettings = ({
   mediaData,
   scripts,
   handleActivateButton,
+  handleScheduleButton,
   details,
   mediaLinks,
   isChanged,
   isBusy,
   joinDisabled,
   isActive,
+  isScheduleActive
 }) => {
+  
   return (
     <>
       {campaignData.type !== "message" && (
@@ -65,10 +61,11 @@ export const CampaignTypeSpecificSettings = ({
           <ActivateButtons
             joinDisabled={joinDisabled}
             isActive={isActive}
+            isScheduleActive={isScheduleActive}
             isBusy={isBusy}
             campaignData={campaignData}
             handleActivateButton={handleActivateButton}
-            handleScheduleButton={() => null}
+            handleScheduleButton={handleScheduleButton}
           />
         </div>
       )}

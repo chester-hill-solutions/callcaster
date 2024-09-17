@@ -1,10 +1,8 @@
 import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
 import { TooltipContent } from "@radix-ui/react-tooltip";
-import { format } from "date-fns";
-import { enUS } from "date-fns/locale";
 
-export default function ActivateButtons({joinDisabled, isActive, isBusy, campaignData, handleActivateButton, handleScheduleButton}) {
+export default function ActivateButtons({joinDisabled, isActive, isBusy, campaignData, handleActivateButton, handleScheduleButton, isScheduleActive}) {
   return (
     <>
       <div className="flex items-end">
@@ -24,13 +22,13 @@ export default function ActivateButtons({joinDisabled, isActive, isBusy, campaig
                   }
                   onClick={handleActivateButton}
                 >
-                  Activate Campaign
+                  Join Campaign
                 </Button>
               </div>
             </TooltipTrigger>
             {joinDisabled && (
               <TooltipContent align="start">
-                <p>{!isActive || joinDisabled}</p>
+                <p>{joinDisabled}</p>
               </TooltipContent>
             )}
           </Tooltip>
@@ -46,22 +44,20 @@ export default function ActivateButtons({joinDisabled, isActive, isBusy, campaig
                 <Button
                   type="button"
                   disabled={
+                    !isScheduleActive ||
                     joinDisabled ||
                     isBusy ||
                     !(campaignData.script_id && campaignData.caller_id)
                   }
                   onClick={handleScheduleButton}
                 >
-                  Schedule for{" "}
-                  {format(campaignData.start_date, "PP hh:mm b", {
-                    locale: enUS,
-                  })}
+                  Schedule Campaign
                 </Button>
               </div>
             </TooltipTrigger>
-            {joinDisabled && (
-              <TooltipContent align="start">
-                <p>{!isActive || joinDisabled}</p>
+            {(joinDisabled || !isScheduleActive) && (
+              <TooltipContent align="end">
+                <p>{joinDisabled || (!isScheduleActive && "Ensure your schedule & calling hours are set up.")}</p>
               </TooltipContent>
             )}
           </Tooltip>

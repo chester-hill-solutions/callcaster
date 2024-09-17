@@ -34,7 +34,7 @@ type CampaignSettingsProps = {
   user: User;
   mediaLinks: string[];
   joinDisabled: string | null;
-  flags:Flags;
+  flags: Flags;
   isActive: boolean;
   onPageDataChange: (
     data: Campaign & { campaign_audience: CampaignAudience },
@@ -55,7 +55,7 @@ export const CampaignSettings = ({
   mediaLinks,
   joinDisabled,
   flags,
-  isActive
+  isActive,
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -71,7 +71,9 @@ export const CampaignSettings = ({
     dial_type: data?.dial_type || "call",
     group_household_queue: data?.group_household_queue || false,
     start_date: data?.start_date || new Date().toISOString(),
-    end_date: data?.end_date || (new Date(Date.now() + (24*60*60*1000*30))).toISOString(),
+    end_date:
+      data?.end_date ||
+      new Date(Date.now() + 24 * 60 * 60 * 1000 * 30).toISOString(),
     caller_id: data?.caller_id || "",
     voicemail_file: data?.voicemail_file || "",
     script_id: details?.script_id || null,
@@ -79,12 +81,12 @@ export const CampaignSettings = ({
     body_text: details?.body_text || "",
     message_media: details?.message_media || [],
     voicedrop_audio: details?.voicedrop_audio,
-    schedule: data?.schedule || {}
+    schedule: data?.schedule || {},
   }));
   const [initialData, setInitial] = useState(campaignData);
 
   const [isChanged, setChanged] = useState(false);
-  
+
   useEffect(() => {
     const today = new Date();
     const thirtyDaysLater = new Date(today);
@@ -107,7 +109,7 @@ export const CampaignSettings = ({
       body_text: details?.body_text || "",
       message_media: details?.message_media || [],
       voicedrop_audio: details?.voicedrop_audio,
-      schedule: data?.schedule || {}
+      schedule: data?.schedule || {},
     });
   }, [campaign_id, data, details, workspace]);
 
@@ -147,7 +149,6 @@ export const CampaignSettings = ({
 
   const handleActivateButton = (event) => {
     if (campaignData.type === "live_call") {
-      handleInputChange("status", "running");
       formFetcher.submit(
         {
           campaignData: JSON.stringify({ ...campaignData, status: "running" }),
@@ -177,12 +178,26 @@ export const CampaignSettings = ({
           campaign_id,
           workspace_id: details.workspace,
           caller_id: campaignData.caller_id,
-          user_id: user.id
+          user_id: user.id,
         },
         { method: "post", action: "/api/sms", encType: "application/json" },
       );
       navigate(`../../../chats?campaign_id=${campaign_id}`);
     }
+  };
+
+  const handleScheduleButton = (event) => {
+    formFetcher.submit(
+      {
+        campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
+        campaignDetails: JSON.stringify(details),
+      },
+      {
+        method: "patch",
+        action: "/api/campaigns",
+      },
+    );
+    navigate("..");
   };
 
   return (
@@ -214,12 +229,20 @@ export const CampaignSettings = ({
             mediaData={mediaData}
             scripts={scripts}
             handleActivateButton={handleActivateButton}
+            handleScheduleButton={handleScheduleButton}
             details={details}
             mediaLinks={mediaLinks}
             isChanged={isChanged}
             isBusy={navigation.state !== "idle"}
             joinDisabled={joinDisabled}
             isActive={isActive}
+            isScheduleActive={
+              campaignData.start_date &&
+              campaignData.end_date &&
+              Object.entries(campaignData.schedule).some(
+                ([day, val]) => val.active === true,
+              )
+            }
           />
           <AudienceSelection
             audiences={audiences}

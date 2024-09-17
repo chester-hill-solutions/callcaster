@@ -1571,10 +1571,33 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
 }
 
 export function checkSchedule(
-  campaign_id: string,
   campaignData: Campaign & { campaign_audience: CampaignAudience[] },
 ) {
-  const {start_date, end_date, schedule} = campaignData;
+  const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
-  return (now > new Date(start_date) && now < new Date(end_date));
+  if (!(now > new Date(start_date) && now < new Date(end_date))) {
+    return false;
+  }
+
+  const currentDay = now.getDay();
+  const daysOfWeek = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+  const todaySchedule = schedule[daysOfWeek[currentDay]];
+  if (!todaySchedule.active) {
+    return false;
+  }
+  const currentTime = now.toTimeString().slice(0, 5);
+  return todaySchedule.intervals.some((interval) => {
+    if (interval.end < interval.start) {
+      return currentTime >= interval.start || currentTime < interval.end;
+    }
+    return currentTime >= interval.start && currentTime < interval.end;
+  });
 }
