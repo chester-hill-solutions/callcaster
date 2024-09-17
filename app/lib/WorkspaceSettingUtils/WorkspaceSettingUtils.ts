@@ -9,25 +9,34 @@ export async function handleAddUser(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const username = formData.get("username").trim() as string;
+  const username = formData.get("username") as string;
   const newUserRole = formData.get("new_user_workspace_role") as string;
   if (!username) {
     return json({ user: null, error: "Must provide an email address" }, 400);
   }
-  const {data:users} = await getWorkspaceUsers({supabaseClient,workspaceId});
-  const match = users?.filter((user) => user.username === username);
+  const cleanedName = username.toLowerCase().trim();
+  const { data: users } = await getWorkspaceUsers({
+    supabaseClient,
+    workspaceId,
+  });
+  const match = users?.filter((user) => {
+    console.log(user);
+    return user.username === cleanedName;
+  });
+  console.log(match, cleanedName);
   if (match?.length) {
-    return json({user:null, error: "This user already exists"}, 403)
+    return json({ user: null, error: "This user already exists" }, 403);
   }
- const { data: user, error: inviteUserError } =
+  const { data: user, error: inviteUserError } =
     await supabaseClient.functions.invoke("invite-user-by-email", {
       body: {
         workspaceId,
-        email: username,
+        email: cleanedName,
         role: newUserRole,
       },
     });
   if (inviteUserError) {
+    console.error(inviteUserError);
     return json({ user: null, error: inviteUserError.message }, { headers });
   }
   return json({ data: user, error: null, success: true }, { headers });
