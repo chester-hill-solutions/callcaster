@@ -78,7 +78,8 @@ export const CampaignSettings = ({
     audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
     body_text: details?.body_text || "",
     message_media: details?.message_media || [],
-    voicedrop_audio: details?.voicedrop_audio
+    voicedrop_audio: details?.voicedrop_audio,
+    schedule: data?.schedule || {}
   }));
   const [initialData, setInitial] = useState(campaignData);
 
@@ -105,7 +106,8 @@ export const CampaignSettings = ({
       audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
       body_text: details?.body_text || "",
       message_media: details?.message_media || [],
-      voicedrop_audio: details?.voicedrop_audio
+      voicedrop_audio: details?.voicedrop_audio,
+      schedule: data?.schedule || {}
     });
   }, [campaign_id, data, details, workspace]);
 
