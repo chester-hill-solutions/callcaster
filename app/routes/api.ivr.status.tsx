@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Twilio } from "twilio";
 import { json } from "@remix-run/react";
-import { cancelQueuedCalls, createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "~/lib/types"
 
 export interface CallEvent {
@@ -123,10 +123,7 @@ export const action = async ({ request }: { request: Request }) => {
         if (!dbCall) throw new Error("Call not found");
 
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
-        const now = new Date();
-        if (dbCall?.campaign?.end_date && now > dbCall.campaign.end_date){
-            await cancelQueuedCalls(twilio, supabase)
-        }
+        
         const callStatus = parsedBody.CallStatus;
         const timestamp = parsedBody.Timestamp;
 

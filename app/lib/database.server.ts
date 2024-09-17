@@ -1455,7 +1455,7 @@ async function cancelCallAndUpdateDB(twilio, supabase, call) {
 async function cancelMessageAndUpdateDB(twilio, supabase, message) {
   try {
     const cancelledMessage = await twilio
-      .messages(camessagell.sid)
+      .messages(message.sid)
       .update({ status: "canceled" });
     await supabase.rpc("cancel_messages", {
       message_ids: cancelledMessage.sid,
