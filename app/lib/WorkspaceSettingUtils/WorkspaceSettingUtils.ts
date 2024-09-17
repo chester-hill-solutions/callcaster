@@ -9,7 +9,7 @@ export async function handleAddUser(
   supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const username = formData.get("username") as string;
+  const username = formData.get("username").trim() as string;
   const newUserRole = formData.get("new_user_workspace_role") as string;
   if (!username) {
     return json({ user: null, error: "Must provide an email address" }, 400);
