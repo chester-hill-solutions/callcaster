@@ -110,8 +110,8 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", id)
       .eq("user_id", serverSession.user.id),
   ]);
-  const isActive = checkSchedule(campaign);
 
+  const isActive = checkSchedule(campaign.data);
   const errors = [
     workspaceData.error,
     campaign.error,
