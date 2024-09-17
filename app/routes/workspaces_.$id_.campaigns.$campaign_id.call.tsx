@@ -63,6 +63,7 @@ interface LoaderData {
   token: string;
   count: number;
   completed: number;
+  isActive:boolean;
 }
 
 export { ErrorBoundary };
@@ -109,7 +110,7 @@ export const loader = async ({ request, params }) => {
       .eq("campaign_id", id)
       .eq("user_id", serverSession.user.id),
   ]);
-  const isActive = checkSchedule(id, campaign);
+  const isActive = checkSchedule(campaign);
 
   const errors = [
     workspaceData.error,
