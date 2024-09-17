@@ -1,4 +1,4 @@
-import { defer, json, redirect } from "@remix-run/node";
+import { defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import {
   Await,
   Outlet,
@@ -68,7 +68,7 @@ export const action = async ({ request, params }) => {
     filename: `outreach_results_${campaign_id}.csv`,
   });
 };
-export const loader = async ({ request, params }) => {
+export const loader = async ({ request, params }:LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
 
   const { supabaseClient, headers, serverSession } =
@@ -103,7 +103,7 @@ export const loader = async ({ request, params }) => {
         ? "message_campaign"
         : ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
           ? "ivr_campaign"
-          : null,
+          : "",
   );
 
   let mediaLinksPromise;
@@ -128,7 +128,7 @@ export const loader = async ({ request, params }) => {
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
-  const isActive = checkSchedule(selected_id, campaignData);
+  const isActive = checkSchedule(campaignData);
 
   return defer({
     data,
