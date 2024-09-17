@@ -16,7 +16,7 @@ export async function handleAddUser(
   }
   const {data:users} = await getWorkspaceUsers({supabaseClient,workspaceId});
   const match = users?.filter((user) => user.username === username);
-  if (match) {
+  if (match?.length) {
     return json({user:null, error: "This user already exists"}, 403)
   }
  const { data: user, error: inviteUserError } =
