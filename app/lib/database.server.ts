@@ -1589,6 +1589,7 @@ export function checkSchedule(
     "friday",
     "saturday",
   ];
+  if (!schedule) return false;
   const todaySchedule = schedule[daysOfWeek[currentDay]];
   if (!todaySchedule.active) {
     return false;
