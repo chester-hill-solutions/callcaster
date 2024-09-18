@@ -1,7 +1,6 @@
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Flags, WorkspaceNumbers } from "~/lib/types";
-import SelectStatus from "./CampaignBasicInfo.SelectStatus";
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
@@ -19,34 +18,33 @@ export const CampaignBasicInfo = ({
 }) => {
   return (
     <div className="flex flex-wrap gap-6">
-      <div className="flex min-w-48 flex-grow flex-col gap-1">
-        <Label htmlFor="title">Campaign Title</Label>
-        <Input
-          id="title"
-          name="title"
-          value={campaignData.title}
-          onChange={(e) => handleInputChange("title", e.target.value)}
+      <div className="flex flex-wrap gap-6">
+        <div className="flex min-w-48 flex-grow flex-col gap-1">
+          <Label htmlFor="title">Campaign Title</Label>
+          <Input
+            id="title"
+            name="title"
+            value={campaignData.title}
+            onChange={(e) => handleInputChange("title", e.target.value)}
+          />
+        </div>
+        <SelectType
+          handleInputChange={handleInputChange}
+          campaignData={campaignData}
+          flags={flags}
         />
+        <SelectNumber
+          handleInputChange={handleInputChange}
+          campaignData={campaignData}
+          phoneNumbers={phoneNumbers}
+        />
+        <div className="flex flex-wrap gap-6">
+          <SelectDates
+            campaignData={campaignData}
+            handleInputChange={handleInputChange}
+          />
+        </div>
       </div>
-      <SelectStatus
-        handleInputChange={handleInputChange}
-        campaignData={campaignData}
-      />
-      <SelectType
-        handleInputChange={handleInputChange}
-        campaignData={campaignData}
-        flags={flags}
-      />
-      <SelectNumber
-        handleInputChange={handleInputChange}
-        campaignData={campaignData}
-        phoneNumbers={phoneNumbers}
-      />
-      <SelectDates
-        campaignData={campaignData}
-        handleInputChange={handleInputChange}
-      />
-      
     </div>
   );
 };
