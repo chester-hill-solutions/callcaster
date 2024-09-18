@@ -22,6 +22,17 @@ import {
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
+import { Audience, Campaign, Flags, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { MemberRole } from "~/components/Workspace/TeamMember";
+
+type LoaderData = {
+  workspace:WorkspaceData;
+  audiences:Audience[];
+  campaigns:Campaign[];
+  userRole:MemberRole;
+  phoneNumbers: WorkspaceNumbers[];
+  flags:Flags;
+}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -82,8 +93,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } =
-    useLoaderData();
+  const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } = useLoaderData<LoaderData>();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
   const context = useOutletContext();
