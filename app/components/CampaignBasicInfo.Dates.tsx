@@ -2,19 +2,29 @@ import { useState } from "react";
 import WeeklyScheduleTable from "./CampaignBasicInfo.Schedule";
 import { Button } from "./ui/button";
 import { DateTimePicker } from "./ui/datetime";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
 import { Label } from "./ui/label";
 import { days } from "~/lib/utils";
+import { Clock } from "lucide-react";
+import { CampaignSettingsProps } from "./CampaignSettings";
 
-export default function SelectDates({ campaignData, handleInputChange }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [currentSchedule, setCurrentSchedule] = useState(
+type ScheduleInterval = {
+  start: string;
+  end: string;
+}
+
+type Schedule = {
+  "sunday": {active: boolean, intervals: ScheduleInterval[]}
+  "monday": {active: boolean, intervals: ScheduleInterval[]}
+  "tuesday": {active: boolean, intervals: ScheduleInterval[]}
+  "wednesday": {active: boolean, intervals: ScheduleInterval[]}
+  "thursday": {active: boolean, intervals: ScheduleInterval[]}
+  "friday": {active: boolean, intervals: ScheduleInterval[]}
+  "saturday": {active: boolean, intervals: ScheduleInterval[]}
+}
+
+export default function SelectDates({ campaignData, handleInputChange }:{campaignData: CampaignSettingsProps, handleInputChange:() => void}) {
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [currentSchedule, setCurrentSchedule] = useState<Schedule>(
     campaignData?.schedule ||
       Object.fromEntries(
         days.map((day) => [
@@ -77,10 +87,9 @@ export default function SelectDates({ campaignData, handleInputChange }) {
       },
     }));
   };
-
   const handleSave = () => {
     handleInputChange("schedule", currentSchedule);
-    setDialogOpen(false);
+    setShowSchedule(false);
   };
 
   const scheduleForDisplay = Object.fromEntries(
@@ -96,64 +105,82 @@ export default function SelectDates({ campaignData, handleInputChange }) {
     ]) || {}
   );
 
+  const getScheduleSummary = () => {
+    const activeDays = Object.entries(currentSchedule)
+      .filter(([, { active }]) => active)
+      .map(([day, schedule]) => ({
+        day: day.charAt(0).toUpperCase() + day.slice(1),
+        time: schedule.intervals[0] ? 
+          `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}` : 
+          'All day'
+      }));
+    
+    if (activeDays.length === 0) return "No calling hours set";
+    if (activeDays.length === 7 && activeDays.every(day => day.time === 'All day')) return "24/7";
+    
+    return activeDays.map(({ day, time }) => `${day} ${time}`).join(', ');
+  };
+
   return (
-    <>
-      <div className="flex min-w-48 flex-grow flex-col gap-1">
-        <Label htmlFor="start_date">Start Date</Label>
-        <DateTimePicker
-          value={
-            campaignData.start_date
-              ? new Date(campaignData.start_date)
-              : undefined
-          }
-          onChange={(date) =>
-            handleInputChange("start_date", date?.toISOString())
-          }
-          hourCycle={24}
-        />
-      </div>
-      <div className="flex min-w-48 flex-grow flex-col gap-1">
-        <Label htmlFor="end_date">End Date</Label>
-        <DateTimePicker
-          value={
-            campaignData.end_date ? new Date(campaignData.end_date) : undefined
-          }
-          onChange={(date) =>
-            handleInputChange("end_date", date?.toISOString())
-          }
-          hourCycle={24}
-        />
-      </div>
-      <div className="flex flex-grow flex-col justify-end gap-1">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="">
+          <Label htmlFor="start_date">Start Date</Label>
+          <DateTimePicker
+            value={
+              campaignData.start_date
+                ? new Date(campaignData.start_date)
+                : undefined
+            }
+            onChange={(date) =>
+              handleInputChange("start_date", date?.toISOString())
+            }
+            hourCycle={24}
+          />
+        </div>
+        <div className="">
+          <Label htmlFor="end_date">End Date</Label>
+          <DateTimePicker
+            value={
+              campaignData.end_date ? new Date(campaignData.end_date) : undefined
+            }
+            onChange={(date) =>
+              handleInputChange("end_date", date?.toISOString())
+            }
+            hourCycle={24}
+          />
+        </div>
+        <div className="flex items-end">
           <Button
-            variant={"outline"}
-            onClick={() => setDialogOpen(true)}
+            variant="outline"
+            onClick={() => setShowSchedule(!showSchedule)}
+            className="border-primary border-2"
           >
-            <p>Set Calling Hours</p>
+            {showSchedule ? "Hide Calling Hours" : "Set Calling Hours"}
           </Button>
-          <DialogContent className="flex flex-col items-center bg-card">
-            <DialogHeader>
-              <DialogTitle className="text-center font-Zilla-Slab text-2xl">
-                Set Calling Hours
-              </DialogTitle>
-            </DialogHeader>
-            <div>
-              <WeeklyScheduleTable
-                schedule={scheduleForDisplay}
-                handleCheckboxChange={handleCheckboxChange}
-                handleTimeChange={handleTimeChange}
-              />
-            </div>
-            <DialogFooter className="flex w-full justify-end gap-4 px-4">
-              <Button variant={"outline"} className="border-[#333]" onClick={() => setDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave}>Save</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        </div>
       </div>
-    </>
+      
+      <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-md">
+        <Clock className="text-gray-500" size={20} />
+        <Label className="font-semibold">Calling Hours:</Label>
+        <div className="text-sm text-gray-600 flex-grow">{getScheduleSummary()}</div>
+      </div>
+      
+      <div className="space-y-4">
+        {showSchedule && (
+          <div className="border p-4 rounded-md">
+            <WeeklyScheduleTable
+              schedule={scheduleForDisplay}
+              handleCheckboxChange={handleCheckboxChange}
+              handleTimeChange={handleTimeChange}
+            />
+            <div className="mt-4 flex justify-end">
+              <Button onClick={handleSave}>Save</Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
