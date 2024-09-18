@@ -24,8 +24,6 @@ export const CampaignTypeSpecificSettings = ({
   isChanged,
   isBusy,
   joinDisabled,
-  isActive,
-  isScheduleActive
 }) => {
   
   return (
@@ -60,8 +58,6 @@ export const CampaignTypeSpecificSettings = ({
           </div>
           <ActivateButtons
             joinDisabled={joinDisabled}
-            isActive={isActive}
-            isScheduleActive={isScheduleActive}
             isBusy={isBusy}
             campaignData={campaignData}
             handleActivateButton={handleActivateButton}

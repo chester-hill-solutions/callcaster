@@ -129,7 +129,7 @@ export const loader = async ({ request, params }:LoaderFunctionArgs) => {
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
   const isActive = checkSchedule(campaignData);
-
+  
   return defer({
     data,
     hasAccess,
@@ -165,7 +165,8 @@ export default function CampaignScreen() {
   const submit = useSubmit();
   useCsvDownload(csvData);
 
-  const joinDisabled = !data?.campaignDetails?.script_id ? "No script selected" : !data.caller_id ? "No outbound phone number selected" : !data.campaign_audience?.length ? "No audiences selected" : false;
+  const joinDisabled = !data?.campaignDetails?.script_id ? "No script selected" : !data.caller_id ? "No outbound phone number selected" : !data.campaign_audience?.length ? "No audiences selected" : !isActive ? "It is currently outside of the Campaign's calling hours": null;
+  
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -204,7 +205,6 @@ export default function CampaignScreen() {
             data={data}
             totalCalls={totalCalls}
             expectedTotal={expectedTotal}
-            isActive={isActive}
             joinDisabled={joinDisabled}
           />
         )}
@@ -219,7 +219,6 @@ export default function CampaignScreen() {
           user,
           mediaLinks,
           flags,
-          isActive
         }}
       />
     </div>

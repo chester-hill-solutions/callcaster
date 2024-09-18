@@ -2,7 +2,8 @@ import { Tooltip, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { Button } from "./ui/button";
 import { TooltipContent } from "@radix-ui/react-tooltip";
 
-export default function ActivateButtons({joinDisabled, isActive, isBusy, campaignData, handleActivateButton, handleScheduleButton, isScheduleActive}) {
+export default function ActivateButtons({joinDisabled, isBusy, campaignData, handleActivateButton, handleScheduleButton,}) {
+  const scheduleDisabled = !campaignData?.script_id ? "No script selected" : !campaignData.caller_id ? "No outbound phone number selected" : !campaignData.audiences?.length ? "No audiences selected" : null;
   return (
     <>
       <div className="flex items-end">
@@ -10,25 +11,20 @@ export default function ActivateButtons({joinDisabled, isActive, isBusy, campaig
           <Tooltip>
             <TooltipTrigger asChild>
               <div
-                className={`flex ${joinDisabled || !isActive ? "cursor-not-allowed" : ""}`}
+                className={`flex ${joinDisabled ? "cursor-not-allowed" : ""}`}
               >
                 <Button
                   type="button"
-                  disabled={
-                    !isActive ||
-                    joinDisabled ||
-                    isBusy ||
-                    !(campaignData.script_id && campaignData.caller_id)
-                  }
+                  disabled={joinDisabled || isBusy}
                   onClick={handleActivateButton}
                 >
                   Join Campaign
                 </Button>
               </div>
             </TooltipTrigger>
-            {(joinDisabled || !isScheduleActive) && (
+            {joinDisabled && (
               <TooltipContent align="start">
-                <p>{joinDisabled || (!isScheduleActive && "Ensure your schedule & calling hours are set up.")}</p>
+                <p>{joinDisabled}</p>
               </TooltipContent>
             )}
           </Tooltip>
@@ -43,21 +39,16 @@ export default function ActivateButtons({joinDisabled, isActive, isBusy, campaig
               >
                 <Button
                   type="button"
-                  disabled={
-                    !isScheduleActive ||
-                    joinDisabled ||
-                    isBusy ||
-                    !(campaignData.script_id && campaignData.caller_id)
-                  }
+                  disabled={!!scheduleDisabled || isBusy}
                   onClick={handleScheduleButton}
                 >
                   Schedule Campaign
                 </Button>
               </div>
             </TooltipTrigger>
-            {(joinDisabled || !isScheduleActive) && (
+            {scheduleDisabled && (
               <TooltipContent align="end">
-                <p>{joinDisabled || (!isScheduleActive && "Ensure your schedule & calling hours are set up.")}</p>
+                <p>{scheduleDisabled}</p>
               </TooltipContent>
             )}
           </Tooltip>
