@@ -33,7 +33,7 @@ const CampaignsList = ({campaigns, userRole, setCampaignsListOpen}) => (
                 userRole === MemberRole.Member) &&
               row.status === "draft";
             return (
-              row.status !== "complete" &&
+              row.status !== "archived" &&
               !draftNotAllowed && (
                 <NavLink
                   to={`campaigns/${row.id}`}
@@ -55,7 +55,7 @@ const CampaignsList = ({campaigns, userRole, setCampaignsListOpen}) => (
             {" "}
             {/* Todo: build "campaigns/archive" to display completed campaigns */}
             Archived Campaigns (
-            {campaigns.filter((i) => i.status === "complete").length})
+            {campaigns.filter((i) => i.status === "archived").length})
           </NavLink>
         </nav>
       </div>
