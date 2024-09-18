@@ -7,6 +7,7 @@ import {
   useSubmit,
   useNavigation,
   useNavigate,
+  useNavigate,
 } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { QueueList } from "../components/CallScreen.QueueList";
@@ -19,6 +20,7 @@ import useDebouncedSave, {
 } from "../hooks/useDebouncedSave";
 import useSupabaseRoom from "../hooks/useSupabaseRoom";
 import { useTwilioDevice } from "../hooks/useTwilioDevice";
+import { SupabaseClient, User } from "@supabase/supabase-js";
 import { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   handleCall,
@@ -54,17 +56,21 @@ interface LoaderData {
   audiences: Audience[];
   workspaceId: string;
   campaignDetails: LiveCampaign | IVRCampaign;
+  campaignDetails: LiveCampaign | IVRCampaign;
   contacts: Contact[];
   queue: QueueItem[];
   nextRecipient: QueueItem | null;
   initalCallsList: Call[];
   initialRecentCall: Call | null;
   initialRecentAttempt: OutreachAttempt | null;
+  initialRecentAttempt: OutreachAttempt | null;
   token: string;
   count: number;
   completed: number;
   isActive:boolean;
 }
+
+export { ErrorBoundary };
 
 export { ErrorBoundary };
 
@@ -324,6 +330,7 @@ const Campaign: React.FC = () => {
       !isErrorDialogOpen,
   );
   const [isReportDialogOpen, setReportDialog] = useState(false);
+  const [isReportDialogOpen, setReportDialog] = useState(false);
   const { begin, conference, setConference } = useStartConferenceAndDial(
     user.id,
     campaign.id,
@@ -361,7 +368,7 @@ const Campaign: React.FC = () => {
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
-    [],
+    [], 
   );
 
   const handleDialButton = useCallback(() => {
@@ -589,6 +596,7 @@ const Campaign: React.FC = () => {
           break;
         case "connected":
           send({ type: "CONNECT" });
+          send({ type: "CONNECT" });
           break;
         case "completed":
         case "failed":
@@ -597,7 +605,11 @@ const Campaign: React.FC = () => {
           break;
         default:
           send({ type: "NEXT" });
+          send({ type: "NEXT" });
       }
+    }
+    if (!predictiveState.contact_id && predictiveState.status === "dialing") {
+      setUpdate(null);
     }
     if (!predictiveState.contact_id && predictiveState.status === "dialing") {
       setUpdate(null);
