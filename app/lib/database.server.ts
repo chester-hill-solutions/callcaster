@@ -749,6 +749,7 @@ export async function updateCampaign({
           questions: undefined,
           created_at: undefined,
           script_id: undefined,
+          voicedrop_audio: undefined
         })
       : tableKey === "ivr_campaign"
         ? cleanObject({
