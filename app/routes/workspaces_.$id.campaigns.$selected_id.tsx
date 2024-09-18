@@ -68,7 +68,7 @@ export const action = async ({ request, params }) => {
     filename: `outreach_results_${campaign_id}.csv`,
   });
 };
-export const loader = async ({ request, params }:LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
 
   const { supabaseClient, headers, serverSession } =
@@ -129,7 +129,7 @@ export const loader = async ({ request, params }:LoaderFunctionArgs) => {
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
   const isActive = checkSchedule(campaignData);
-  
+
   return defer({
     data,
     hasAccess,
@@ -139,7 +139,7 @@ export const loader = async ({ request, params }:LoaderFunctionArgs) => {
     mediaData,
     scripts,
     mediaLinks: mediaLinksPromise,
-    isActive
+    isActive,
   });
 };
 
@@ -156,7 +156,7 @@ export default function CampaignScreen() {
     mediaData,
     scripts,
     mediaLinks,
-    isActive
+    isActive,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
@@ -165,18 +165,28 @@ export default function CampaignScreen() {
   const submit = useSubmit();
   useCsvDownload(csvData);
 
-  const joinDisabled = !data?.campaignDetails?.script_id ? "No script selected" : !data.caller_id ? "No outbound phone number selected" : !data.campaign_audience?.length ? "No audiences selected" : !isActive ? "It is currently outside of the Campaign's calling hours": null;
-  
+  const joinDisabled = (!data?.campaignDetails?.script_id && !data?.campaignDetails.body_text)
+    ? "No script selected"
+    : !data.caller_id
+      ? "No outbound phone number selected"
+      : !data.campaign_audience?.length
+        ? "No audiences selected"
+        : !isActive
+          ? "It is currently outside of the Campaign's calling hours"
+          : null;
 
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={data?.title} status={data.status}/>
+      <CampaignHeader title={data?.title} status={data.status} />
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
         <CampaignHeader title={data?.title} isDesktop status={data.status} />
         <NavigationLinks
           hasAccess={hasAccess}
           data={data}
-          joinDisabled={(!isActive ? "This campaign is currently deactivated" : false) || joinDisabled}
+          joinDisabled={
+            (!isActive ? "This campaign is currently deactivated" : false) ||
+            joinDisabled
+          }
         />
       </div>
       {hasAccess && isCampaignParentRoute && (

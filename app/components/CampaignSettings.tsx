@@ -219,55 +219,88 @@ export const CampaignSettings = ({
     );
     navigate("..");
   };
-  const handleStatusButtons = (type: "play" | "pause" | "archive") => {
-    const status = campaignData.status;
-    console.log(`Current status: ${status}, Action: ${type}`);
+  const handleActiveChange = (isActive:boolean, status: string | null) =>{
+    formFetcher.submit(
+      {
+        campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && {status}) }),
+        campaignDetails: JSON.stringify(details),
+      },
+      {
+        method: "patch",
+        action: "/api/campaigns",
+      },
+    );
+  }
 
+  const clearSchedule = () => {
+    handleInputChange("schedule", {
+      sunday: { is_active: false, intervals: [] },
+      monday: { is_active: false, intervals: [] },
+      tuesday: { is_active: false, intervals: [] },
+      wednesday: { is_active: false, intervals: [] },
+      thursday: { is_active: false, intervals: [] },
+      friday: { is_active: false, intervals: [] },
+      saturday: { is_active: false, intervals: [] },
+    });
+  };
+
+  const handleStatusButtons = (
+    type: "play" | "pause" | "archive" | "schedule",
+  ) => {
+    const status = campaignData.status;
     switch (status) {
       case "draft":
         if (type === "play") {
           handleInputChange("status", "running");
-          // TODO: Set is_active === true
+          handleActiveChange(true, "running");
+        } else if (type === "schedule") {
+          handleInputChange("status", "scheduled");
         } else if (type === "archive") {
-          // TODO: clear schedule
+          clearSchedule();
           handleInputChange("status", "archived");
         }
         break;
       case "scheduled":
         if (type === "archive") {
-          // TODO: clear schedule
+          clearSchedule();
           handleInputChange("status", "archived");
         }
         break;
       case "running":
         if (type === "pause") {
-          // TODO: Set is_active === false
+          handleActiveChange(false, "paused");
+          handleInputChange("status", "paused");
         } else if (type === "archive") {
-          // TODO: Set is_active === false & clear the schedule
+          handleActiveChange(false, "archived");
+          clearSchedule();
           handleInputChange("status", "archived");
+        } else if (type === "schedule") {
+          handleActiveChange(false, "scheduled")
+          handleInputChange("status", "scheduled");
         }
-        break
+        break;
       case "paused":
         if (type === "play") {
-          handleInputChange("status", "running")
-          // TODO: Set is_active === true
+          handleInputChange("status", "running");
+          handleActiveChange(true, "running")
         } else if (type === "archive") {
-          console.log("Archiving paused campaign");
-          // TODO: clear schedule
+          clearSchedule()
+          handleInputChange("status", "archived")
         }
         break;
 
       case "complete":
         if (type === "archive") {
-          handleInputChange("status", "running")
-          // TODO: clear schedule
+          handleInputChange("status", "archived");
+          clearSchedule();
         }
         break;
 
       case "pending":
         if (type === "archive") {
-          handleInputChange("status", "archive")
-          // TODO: Set is_active === false
+          handleInputChange("status", "archive");
+          handleActiveChange(false, "archived");
+          clearSchedule();
         }
         break;
 

@@ -30,7 +30,6 @@ export const CampaignBasicInfo = ({
 }) => {
   const isRunning = campaignData.status === "running";
   const isPaused = campaignData.status === "paused";
-  const isScheduled = campaignData.status === "scheduled";
   const isArchivable = [
     "running",
     "paused",
@@ -39,14 +38,15 @@ export const CampaignBasicInfo = ({
     "pending",
     "scheduled",
   ].includes(campaignData.status);
-  const joinDisabled = !campaignData?.script_id
-    ? "No script selected"
-    : !campaignData.caller_id
-      ? "No outbound phone number selected"
-      : !campaignData.audiences?.length
-        ? "No audiences selected"
-        : null;
 
+  const joinDisabled =
+    !campaignData?.script_id && !campaignData.body_text
+      ? "No script selected"
+      : !campaignData.caller_id || campaignData.caller_id === "+15064364568"
+        ? "No outbound phone number selected"
+        : !campaignData.audiences?.length
+          ? "No audiences selected"
+          : null;
   return (
     <div className="flex flex-wrap gap-6">
       <div className="flex flex-wrap gap-6">
@@ -77,12 +77,15 @@ export const CampaignBasicInfo = ({
                   <Button
                     type="button"
                     variant={isRunning ? "default" : "outline"}
-                    className={`${joinDisabled || isRunning ? "pointer-events-none" : ""}`}
+                    className={`${joinDisabled || isRunning ? "pointer-events-none bg-green-600" : ""}`}
                     size="icon"
                     onClick={(e) => handleButton("play")}
                     disabled={isRunning || joinDisabled}
                   >
-                    <Play className="h-4 w-4" />
+                    <Play
+                      className="h-4 w-4"
+                      color={isRunning ? "#333" : "#7cb342"}
+                    />
                   </Button>
                 </TooltipTrigger>
                 {joinDisabled && (
@@ -90,24 +93,43 @@ export const CampaignBasicInfo = ({
                 )}
               </Tooltip>
             </TooltipProvider>
-            <Button
-              type="button"
-              variant={isPaused ? "default" : "outline"}
-              size="icon"
-              onClick={() => handleButton("pause")}
-              disabled={!isRunning}
-            >
-              <Pause className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => handleButton("archive")}
-              disabled={!isArchivable}
-            >
-              <Archive className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    type="button"
+                    variant={isPaused ? "default" : "outline"}
+                    size="icon"
+                    onClick={() => handleButton("pause")}
+                    disabled={!isRunning}
+                  >
+                    <Pause className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                {!isPaused && (
+                  <TooltipContent align="end">This will pause your campaign and stop any ongoing outgoing {`${campaignData.type === "message" ? "messages" : "calls"}`}.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className={`border-red-400`}
+                    onClick={() => handleButton("archive")}
+                    disabled={!isArchivable}
+                  >
+                    <Archive className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                {isArchivable && (
+                  <TooltipContent className="bg-red-50"  align="end">This will stop your campaign and hide it from campaign view. Any ongoing {`${campaignData.type === "message" ? "messages" : "calls"}`} will be ended.</TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         <div className="flex flex-wrap gap-6">
