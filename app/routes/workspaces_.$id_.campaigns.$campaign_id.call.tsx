@@ -7,7 +7,6 @@ import {
   useSubmit,
   useNavigation,
   useNavigate,
-  useNavigate,
 } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { QueueList } from "../components/CallScreen.QueueList";
@@ -15,12 +14,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
 import { CallArea } from "../components/CallScreen.CallArea";
 import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import useDebouncedSave, {
-  handleQuestionsSave,
-} from "../hooks/useDebouncedSave";
+import useDebouncedSave from "../hooks/useDebouncedSave";
 import useSupabaseRoom from "../hooks/useSupabaseRoom";
 import { useTwilioDevice } from "../hooks/useTwilioDevice";
-import { SupabaseClient, User } from "@supabase/supabase-js";
 import { SupabaseClient, User } from "@supabase/supabase-js";
 import {
   handleCall,
@@ -56,13 +52,11 @@ interface LoaderData {
   audiences: Audience[];
   workspaceId: string;
   campaignDetails: LiveCampaign | IVRCampaign;
-  campaignDetails: LiveCampaign | IVRCampaign;
   contacts: Contact[];
   queue: QueueItem[];
   nextRecipient: QueueItem | null;
   initalCallsList: Call[];
   initialRecentCall: Call | null;
-  initialRecentAttempt: OutreachAttempt | null;
   initialRecentAttempt: OutreachAttempt | null;
   token: string;
   count: number;
@@ -72,7 +66,6 @@ interface LoaderData {
 
 export { ErrorBoundary };
 
-export { ErrorBoundary };
 
 export const loader = async ({ request, params }) => {
   const { campaign_id: id, id: workspaceId } = params;
@@ -329,7 +322,6 @@ const Campaign: React.FC = () => {
     (!(queue.length > 0) || campaign.dial_type === "predictive") &&
       !isErrorDialogOpen,
   );
-  const [isReportDialogOpen, setReportDialog] = useState(false);
   const [isReportDialogOpen, setReportDialog] = useState(false);
   const { begin, conference, setConference } = useStartConferenceAndDial(
     user.id,
