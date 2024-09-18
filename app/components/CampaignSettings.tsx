@@ -19,7 +19,7 @@ import { CampaignBasicInfo } from "./CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./CampaignDetailed";
 import { AudienceSelection } from "./CampaignAudienceSelection";
 
-type CampaignSettingsProps = {
+export type CampaignSettingsProps = {
   campaign_id: string;
   data: Campaign & { campaign_audience: CampaignAudience };
   audiences: Audience[];
