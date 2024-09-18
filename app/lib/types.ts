@@ -58,4 +58,17 @@ export type WorkspaceData =
     [key: string]: NestedFlags;
   };
   
+  type ScheduleInterval = {
+    start: string;
+    end: string;
+  }
   
+  export type Schedule = {
+    "sunday": {active: boolean, intervals: ScheduleInterval[]}
+    "monday": {active: boolean, intervals: ScheduleInterval[]}
+    "tuesday": {active: boolean, intervals: ScheduleInterval[]}
+    "wednesday": {active: boolean, intervals: ScheduleInterval[]}
+    "thursday": {active: boolean, intervals: ScheduleInterval[]}
+    "friday": {active: boolean, intervals: ScheduleInterval[]}
+    "saturday": {active: boolean, intervals: ScheduleInterval[]}
+  }
