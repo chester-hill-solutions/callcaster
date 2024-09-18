@@ -1575,11 +1575,14 @@ export function checkSchedule(
 ) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
-  if (!(now > new Date(start_date) && now < new Date(end_date))) {
+  const utcNow = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 
+                          now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+  
+  if (!(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
     return false;
   }
-
-  const currentDay = now.getDay();
+  
+  const currentDay = utcNow.getUTCDay();
   const daysOfWeek = [
     "sunday",
     "monday",
@@ -1589,12 +1592,16 @@ export function checkSchedule(
     "friday",
     "saturday",
   ];
+  
   if (!schedule || !Object.keys(schedule).length) return false;
+  
   const todaySchedule = schedule[daysOfWeek[currentDay]];
   if (!todaySchedule.active) {
     return false;
   }
-  const currentTime = now.toTimeString().slice(0, 5);
+  
+  const currentTime = utcNow.toISOString().slice(11, 16); // Get time in HH:MM format
+  
   return todaySchedule.intervals.some((interval) => {
     if (interval.end < interval.start) {
       return currentTime >= interval.start || currentTime < interval.end;

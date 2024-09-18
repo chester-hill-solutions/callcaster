@@ -55,7 +55,6 @@ export const CampaignSettings = ({
   mediaLinks,
   joinDisabled,
   flags,
-  isActive,
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -235,7 +234,6 @@ export const CampaignSettings = ({
             isChanged={isChanged}
             isBusy={navigation.state !== "idle"}
             joinDisabled={joinDisabled}
-            isActive={isActive}
             isScheduleActive={
               campaignData.start_date &&
               campaignData.end_date &&
