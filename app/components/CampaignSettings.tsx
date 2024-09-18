@@ -11,6 +11,7 @@ import {
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
+  Schedule,
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
@@ -39,6 +40,26 @@ export type CampaignSettingsProps = {
   onPageDataChange: (
     data: Campaign & { campaign_audience: CampaignAudience },
   ) => void;
+};
+
+export type CampaignSettingsData = {
+  campaign_id: string;
+  workspace: string;
+  title: string;
+  status: string;
+  type: "live_call" | "message" | "robocall";
+  dial_type: "call" | "predictive";
+  group_household_queue: boolean;
+  start_date: string;
+  end_date: string;
+  caller_id: string | null;
+  voicemail_file: string | null;
+  script_id: number | string | null;
+  audiences: CampaignAudience[];
+  body_text: string;
+  message_media: string[];
+  voicedrop_audio: string | null;
+  schedule: Schedule;
 };
 
 export const CampaignSettings = ({
@@ -198,6 +219,62 @@ export const CampaignSettings = ({
     );
     navigate("..");
   };
+  const handleStatusButtons = (type: "play" | "pause" | "archive") => {
+    const status = campaignData.status;
+    console.log(`Current status: ${status}, Action: ${type}`);
+
+    switch (status) {
+      case "draft":
+        if (type === "play") {
+          handleInputChange("status", "running");
+          // TODO: Set is_active === true
+        } else if (type === "archive") {
+          // TODO: clear schedule
+          handleInputChange("status", "archived");
+        }
+        break;
+      case "scheduled":
+        if (type === "archive") {
+          // TODO: clear schedule
+          handleInputChange("status", "archived");
+        }
+        break;
+      case "running":
+        if (type === "pause") {
+          // TODO: Set is_active === false
+        } else if (type === "archive") {
+          // TODO: Set is_active === false & clear the schedule
+          handleInputChange("status", "archived");
+        }
+        break
+      case "paused":
+        if (type === "play") {
+          handleInputChange("status", "running")
+          // TODO: Set is_active === true
+        } else if (type === "archive") {
+          console.log("Archiving paused campaign");
+          // TODO: clear schedule
+        }
+        break;
+
+      case "complete":
+        if (type === "archive") {
+          handleInputChange("status", "running")
+          // TODO: clear schedule
+        }
+        break;
+
+      case "pending":
+        if (type === "archive") {
+          handleInputChange("status", "archive")
+          // TODO: Set is_active === false
+        }
+        break;
+
+      default:
+        console.log(`Unhandled status: ${status}`);
+    }
+  };
 
   return (
     <div
@@ -219,8 +296,10 @@ export const CampaignSettings = ({
           <CampaignBasicInfo
             campaignData={campaignData}
             handleInputChange={handleInputChange}
+            handleButton={handleStatusButtons}
             phoneNumbers={phoneNumbers}
             flags={flags}
+            joinDisabled={joinDisabled}
           />
           <CampaignTypeSpecificSettings
             campaignData={campaignData}
@@ -234,13 +313,6 @@ export const CampaignSettings = ({
             isChanged={isChanged}
             isBusy={navigation.state !== "idle"}
             joinDisabled={joinDisabled}
-            isScheduleActive={
-              campaignData.start_date &&
-              campaignData.end_date &&
-              Object.entries(campaignData.schedule).some(
-                ([day, val]) => val.active === true,
-              )
-            }
           />
           <AudienceSelection
             audiences={audiences}

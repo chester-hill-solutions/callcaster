@@ -2,7 +2,7 @@ import { Button } from "~/components/ui/button";
 import { NavLink } from "@remix-run/react";
 import { MdAdd } from "react-icons/md";
 import { MessageSettings } from "./MessageSettings";
-
+import { FileObject } from "@supabase/storage-js";
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";
 import ActivateButtons from "./CampaignDetailed.ActivateButtons";
@@ -11,6 +11,8 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
+import { CampaignSettingsData } from "./CampaignSettings";
+import { IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -24,6 +26,18 @@ export const CampaignTypeSpecificSettings = ({
   isChanged,
   isBusy,
   joinDisabled,
+}:{
+  campaignData:CampaignSettingsData,
+  handleInputChange:(name: string, value: any) => void,
+  mediaData: FileObject[],
+  scripts: Script[],
+  handleActivateButton: (e) => void,
+  handleScheduleButton: (e) => void,
+  details: LiveCampaign | MessageCampaign | IVRCampaign,
+  mediaLinks: string[],
+  isChanged: boolean,
+  isBusy: boolean,
+  joinDisabled: string | null,
 }) => {
   
   return (
@@ -60,7 +74,6 @@ export const CampaignTypeSpecificSettings = ({
             joinDisabled={joinDisabled}
             isBusy={isBusy}
             campaignData={campaignData}
-            handleActivateButton={handleActivateButton}
             handleScheduleButton={handleScheduleButton}
           />
         </div>

@@ -6,21 +6,7 @@ import { Label } from "./ui/label";
 import { days } from "~/lib/utils";
 import { Clock } from "lucide-react";
 import { CampaignSettingsProps } from "./CampaignSettings";
-
-type ScheduleInterval = {
-  start: string;
-  end: string;
-}
-
-type Schedule = {
-  "sunday": {active: boolean, intervals: ScheduleInterval[]}
-  "monday": {active: boolean, intervals: ScheduleInterval[]}
-  "tuesday": {active: boolean, intervals: ScheduleInterval[]}
-  "wednesday": {active: boolean, intervals: ScheduleInterval[]}
-  "thursday": {active: boolean, intervals: ScheduleInterval[]}
-  "friday": {active: boolean, intervals: ScheduleInterval[]}
-  "saturday": {active: boolean, intervals: ScheduleInterval[]}
-}
+import { Schedule } from "~/lib/types";
 
 export default function SelectDates({ campaignData, handleInputChange }:{campaignData: CampaignSettingsProps, handleInputChange:() => void}) {
   const [showSchedule, setShowSchedule] = useState(false);
