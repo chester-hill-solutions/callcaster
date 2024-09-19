@@ -13,7 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
-import { Fetcher, FetcherWithComponents } from "@remix-run/react";
+import { FetcherWithComponents } from "@remix-run/react";
 import { CampaignSettingsData } from "./CampaignSettings";
 
 export const CampaignBasicInfo = ({
