@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Context, useState } from "react";
 import { LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
@@ -12,6 +12,7 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
+  checkSchedule,
   forceTokenRefresh,
   getUserRole,
   getWorkspaceCampaigns,
@@ -22,19 +23,19 @@ import {
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
-import { Audience, Campaign, Flags, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { Audience, Campaign, ContextType, Flags, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
-type LoaderData = {
+type LoaderData = Promise<{
   workspace:WorkspaceData;
   audiences:Audience[];
   campaigns:Campaign[];
   userRole:MemberRole;
   phoneNumbers: WorkspaceNumbers[];
   flags:Flags;
-}
+}| typeof redirect> 
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession) {
@@ -42,6 +43,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const workspaceId = params.id;
+  if (!workspaceId) throw new Error("No workspace found");
   const { data: workspace, error } = await getWorkspaceInfo({
     supabaseClient,
     workspaceId,
@@ -57,13 +59,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
   const userRole = getUserRole({ serverSession, workspaceId });
   if (userRole == null) {
-    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
+    const {error: refreshError } = await forceTokenRefresh({
       serverSession,
       supabaseClient,
     });
+    if (refreshError) throw refreshError
   }
   const {data:flags, error: flagsError} = await supabaseClient.from("workspace").select("feature_flags").eq("id", workspaceId).single();
-  
+  if (flagsError) throw (flagsError)
   try {
     const { data: audiences, error: audiencesError } = await supabaseClient
       .from("audience")
@@ -71,13 +74,18 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       .eq("workspace", workspaceId);
     if (audiencesError) throw { audiencesError };
 
-    const { data: campaigns, error: campaignsError } =
+    const { data: campaignsList, error: campaignsError } =
       await getWorkspaceCampaigns({
         supabaseClient,
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-
+    const campaigns = campaignsList?.map((campaign) => {
+      if (campaign.status !== "running") return campaign;
+      const isActive = checkSchedule(campaign);
+      if (!isActive) return {...campaign, status:"paused"};
+      return campaign;
+    })
     const { data: phoneNumbers, error: numbersError } =
       await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
     if (numbersError) throw { numbersError };
@@ -96,13 +104,12 @@ export default function Workspace() {
   const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } = useLoaderData<LoaderData>();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
-  const context = useOutletContext();
+  const context = useOutletContext<Context<ContextType>>();
   return (
     <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
       <WorkspaceNav
         flags={flags}
         workspace={workspace}
-        isInChildRoute={false}
         userRole={userRole}
       />
       <div className="flex flex-grow flex-col gap-4 sm:flex-row">
@@ -128,7 +135,7 @@ export default function Workspace() {
         <div className="flex flex-auto flex-col overflow-x-auto contain-content">
           {!outlet ? (
             <CampaignEmptyState
-              hasAccess={userRole === "admin" || userRole === "owner"}
+              hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
               type={phoneNumbers?.length > 0 ? "campaign" : "number"}
             />
           ) : (
