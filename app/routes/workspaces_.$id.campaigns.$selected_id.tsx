@@ -183,10 +183,7 @@ export default function CampaignScreen() {
         <NavigationLinks
           hasAccess={hasAccess}
           data={data}
-          joinDisabled={
-            (!isActive ? "This campaign is currently deactivated" : false) ||
-            joinDisabled
-          }
+          joinDisabled={joinDisabled}
         />
       </div>
       {hasAccess && isCampaignParentRoute && (
