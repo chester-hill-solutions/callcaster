@@ -3,7 +3,7 @@ import BgImage from "./TransparentBGImage";
 import { Button } from "./ui/button";
 import { Card, CardHeader } from "./ui/card";
 
-const CampaignEmptyState = ({hasAccess = false, type}:{hasAcces:boolean; type: "number" | "campaign"}) => {
+const CampaignEmptyState = ({hasAccess = false, type}:{hasAccess:boolean; type: "number" | "campaign"}) => {
     const loc = useLocation();
     const isCampaignsRoute = loc?.pathname?.split('/').pop() === 'campaigns';
     return (
