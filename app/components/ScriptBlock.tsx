@@ -137,9 +137,7 @@ const MergedQuestionBlock = ({
   ) => void;
 }) => {
   const [localBlock, setLocalBlock] = useState(block);
-  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
-    "none",
-  );
+  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">("none");
   const questionTypes =
     type === "script"
       ? [
@@ -267,7 +265,7 @@ const MergedQuestionBlock = ({
     setAcceptDrop("none");
   };
 
-  return (
+  return block && (
     <div
       className={`border-2 border-x-0 py-1 ${acceptDrop === "top" ? "border-b-transparent border-t-brand-primary" : acceptDrop === "bottom" ? "border-b-brand-primary border-t-transparent" : "border-b-transparent border-t-transparent"}`}
     >
@@ -297,7 +295,7 @@ const MergedQuestionBlock = ({
             <CardTitle
               className="w-full cursor-pointer"
               onClick={() =>
-                setOpenBlock((curr) => (curr !== block.id ? block.id : null))
+                setOpenBlock((curr) => (curr !== block?.id ? block?.id : null))
               }
             >
               {localBlock?.title || `Block ${localBlock?.id}`}
