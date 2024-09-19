@@ -1619,7 +1619,7 @@ export type Json =
           | "busy"
           | "no-answer"
           | "initiated"
-        campaign_status: "pending" | "running" | "complete" | "paused" | "draft"
+        campaign_status: "pending" | "running" | "complete" | "paused" | "draft" | "scheduled"
         campaign_type:
           | "message"
           | "robocall"
