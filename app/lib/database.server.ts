@@ -1572,7 +1572,7 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
 }
 
 export function checkSchedule(
-  campaignData: Campaign & { campaign_audience: CampaignAudience[] },
+  campaignData: Campaign,
 ) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
