@@ -19,7 +19,7 @@ export const action = async ({ request, params }) => {
         await fetch(`${process.env.BASE_URL}/api/ivr`, {
             body: formData,
             method: "POST",
-        }).then(() => console.log(`Calling ${contact.phone}`)).catch((e) => console.log(e))
+        }).catch((e) => console.log(e))
     }
     return data;
 }
