@@ -28,8 +28,7 @@ export type CampaignSettingsProps = {
   workspace: string;
   phoneNumbers: WorkspaceNumbers[];
   campaignDetails:
-    | (LiveCampaign & { script: Script })
-    | (IVRCampaign & { script: Script })
+    | (LiveCampaign | IVRCampaign) & { script: Script }
     | MessageCampaign;
   scripts: Script[];
   user: User;
@@ -333,6 +332,8 @@ export const CampaignSettings = ({
             phoneNumbers={phoneNumbers}
             flags={flags}
             joinDisabled={joinDisabled}
+            formFetcher={formFetcher}
+            details={details}
           />
           <CampaignTypeSpecificSettings
             campaignData={campaignData}

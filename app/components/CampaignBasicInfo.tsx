@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
-import { Flags, WorkspaceNumbers } from "~/lib/types";
+import { Flags, IVRCampaign, LiveCampaign, MessageCampaign, Script, WorkspaceNumbers } from "~/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
@@ -13,6 +13,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { Fetcher, FetcherWithComponents } from "@remix-run/react";
+import { CampaignSettingsData } from "./CampaignSettings";
 
 export const CampaignBasicInfo = ({
   campaignData,
@@ -20,6 +22,8 @@ export const CampaignBasicInfo = ({
   phoneNumbers,
   flags,
   handleButton,
+  formFetcher,
+  details
 }: {
   campaignData: any;
   handleInputChange: (name: string, value: string | number) => void;
@@ -27,6 +31,9 @@ export const CampaignBasicInfo = ({
   flags: Flags;
   handleButton: (type: "play" | "pause" | "archive") => void;
   joinDisabled: string | null;
+  formFetcher:FetcherWithComponents<CampaignSettingsData>
+  details: | (LiveCampaign | IVRCampaign) & { script: Script }
+  | MessageCampaign;
 }) => {
   const isRunning = campaignData.status === "running";
   const isPaused = campaignData.status === "paused";
@@ -136,6 +143,8 @@ export const CampaignBasicInfo = ({
           <SelectDates
             campaignData={campaignData}
             handleInputChange={handleInputChange}
+            formFetcher={formFetcher}
+            details={details}
           />
         </div>
       </div>

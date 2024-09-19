@@ -8,6 +8,7 @@ import {
 } from "./ui/table";
 import { Checkbox } from "./ui/checkbox";
 import { days } from "~/lib/utils";
+import InfoHover from "./InfoPopover";
 
 const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange }) => {
   return (
@@ -17,7 +18,7 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
           <TableHead>Day</TableHead>
           <TableHead>Active</TableHead>
           <TableHead>Start</TableHead>
-          <TableHead>End</TableHead>
+          <TableHead>End{" "}<InfoHover tooltip="The latest time to begin dialing."/></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
