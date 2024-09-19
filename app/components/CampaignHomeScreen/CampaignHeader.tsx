@@ -1,9 +1,16 @@
-import React from "react";
 import { NavLink } from "@remix-run/react";
 import { MdCampaign } from "react-icons/md";
 import { Badge } from "~/components/ui/badge";
+import { Enums } from "~/lib/database.types";
 
-const getStatusColor = (status) => {
+type HeaderProps = {
+  title: string;
+  isDesktop:boolean;
+  status: Enums<"campaign_status">
+}
+
+
+const getStatusColor = (status:Enums<"campaign_status">) => {
   switch (status) {
     case "pending":
       return "bg-yellow-200 text-yellow-800";
@@ -22,7 +29,8 @@ const getStatusColor = (status) => {
   }
 };
 
-export const CampaignHeader = ({ title, isDesktop = false, status }) => (
+export const CampaignHeader = ({ title, isDesktop = false, status }:HeaderProps) => {
+  return (
   <div className={`mt-2 ${isDesktop ? 'hidden sm:flex' : 'flex sm:hidden'} justify-center gap-2 ${isDesktop ? 'rounded-xl border-2 border-zinc-900 p-2 hover:border-brand-primary' : ''}`}>
     <NavLink
       className={`${isDesktop ? 'flex items-center gap-2' : ''} text-zinc-800 hover:text-brand-primary`}
@@ -37,4 +45,4 @@ export const CampaignHeader = ({ title, isDesktop = false, status }) => (
       </Badge>
     </NavLink>
   </div>
-);
+)};
