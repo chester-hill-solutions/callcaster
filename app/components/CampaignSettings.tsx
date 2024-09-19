@@ -304,7 +304,7 @@ export const CampaignSettings = ({
         break;
 
       default:
-        console.log(`Unhandled status: ${status}`);
+        console.error(`Unhandled status: ${status}`);
     }
   };
 
