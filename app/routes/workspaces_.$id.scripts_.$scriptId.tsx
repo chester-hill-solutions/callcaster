@@ -1,16 +1,26 @@
-import { FaPlus } from "react-icons/fa";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole, listMedia } from "~/lib/database.server";
+import { ErrorBoundary } from "~/components/ErrorBoundary";
+import { Script, WorkspaceData } from "~/lib/types";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
-export const loader = async ({ request, params }) => {
+type LoaderDataProps = Promise<{
+  workspace: WorkspaceData;
+  workspace_id: string;
+  selected_id: string;
+  script: Script;
+  mediaNames: string[];
+  userRole: MemberRole;
+}>;
+
+export const loader = async ({ request, params }): LoaderDataProps => {
   const { id: workspace_id, scriptId: selected_id } = params;
-
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) {
@@ -21,7 +31,7 @@ export const loader = async ({ request, params }) => {
     .select()
     .eq("id", workspace_id)
     .single();
-
+  if (workspaceError) throw workspaceError;
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const { data: script } = await supabaseClient
     .from("script")
@@ -29,8 +39,8 @@ export const loader = async ({ request, params }) => {
     .eq("workspace", workspace_id)
     .eq("id", selected_id)
     .single();
-  const mediaNames = await listMedia(supabaseClient, workspace_id);
 
+  const mediaNames = await listMedia(supabaseClient, workspace_id);
   return json({
     workspace: workspaceData,
     workspace_id,
@@ -40,6 +50,7 @@ export const loader = async ({ request, params }) => {
     userRole,
   });
 };
+export { ErrorBoundary };
 
 export const action = async ({ request, params }) => {
   const campaignId = params.selected_id;
@@ -84,7 +95,7 @@ export default function ScriptEditor() {
     mediaNames,
     userRole,
     workspace,
-  } = useLoaderData();
+  } = useLoaderData<typeof loader>();
   const [isChanged, setChanged] = useState(false);
   const [script, setScript] = useState(initScript);
 
@@ -115,16 +126,16 @@ export default function ScriptEditor() {
 
   const handlePageDataChange = (newPageData) => {
     setScript(newPageData.campaignDetails.script);
-    let obj1 = script;
-    let obj2 = newPageData;
+    const obj1 = script;
+    const obj2 = newPageData;
     delete obj1.campaignDetails?.script?.updated_at;
     delete obj2.campaignDetails?.script?.updated_at;
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
-    let obj1 = script;
-    let obj2 = initScript;
+    const obj1 = script;
+    const obj2 = initScript;
     delete obj1.updated_at;
     delete obj2.updated_at;
     setChanged(!deepEqual(obj1, obj2));

@@ -883,7 +883,7 @@ export type Json =
             id: number
             name: string
             steps: Json | null
-            type: string | null
+            type: "script" | "ivr" | null
             updated_at: string | null
             updated_by: string | null
             workspace: string | null
