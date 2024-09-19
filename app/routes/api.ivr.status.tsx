@@ -38,6 +38,7 @@ export interface CallEvent {
     AnsweredBy: string;
     FromState: string;
   }
+
   const updateResult = async (supabase: SupabaseClient, outreach_attempt_id: string | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
     if (!outreach_attempt_id) {
         throw new Error("outreach_attempt_id is undefined");

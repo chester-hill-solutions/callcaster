@@ -5,11 +5,31 @@ import { DateTimePicker } from "./ui/datetime";
 import { Label } from "./ui/label";
 import { days } from "~/lib/utils";
 import { Clock } from "lucide-react";
-import { CampaignSettingsProps } from "./CampaignSettings";
-import { Schedule } from "~/lib/types";
+import { CampaignSettingsData } from "./CampaignSettings";
+import {
+  IVRCampaign,
+  LiveCampaign,
+  MessageCampaign,
+  Schedule,
+  Script,
+  Weekday,
+} from "~/lib/types";
 import InfoHover from "./InfoPopover";
+import { FetcherWithComponents } from "@remix-run/react";
 
-export default function SelectDates({ campaignData, handleInputChange }:{campaignData: CampaignSettingsProps, handleInputChange:() => void}) {
+export default function SelectDates({
+  campaignData,
+  handleInputChange,
+  formFetcher,
+  details,
+}: {
+  campaignData: CampaignSettingsData;
+  handleInputChange: (name: string, value: any) => void;
+  formFetcher: FetcherWithComponents<CampaignSettingsData>;
+  details:
+    | ((LiveCampaign | IVRCampaign) & { script: Script })
+    | MessageCampaign;
+}) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState<Schedule>(
     campaignData?.schedule ||
@@ -20,8 +40,9 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
             active: false,
             intervals: [],
           },
-        ])
-      ) || {}
+        ]),
+      ) ||
+      {},
   );
 
   const utcToLocal = (utcTime) => {
@@ -46,11 +67,12 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
     return date.toUTCString().slice(17, 22);
   };
 
-  const handleCheckboxChange = (day) => {
-    const localMidnightUTC = localToUTC('00:00');
-    const localEndOfDayUTC = localToUTC('23:59');
-  
-    setCurrentSchedule((prev) => ({
+  const handleCheckboxChange = (day:Weekday) => {
+    console.log(day)
+    const localMidnightUTC = localToUTC("00:00");
+    const localEndOfDayUTC = localToUTC("23:59");
+
+    setCurrentSchedule((prev:Schedule) => ({
       ...prev,
       [day.toLowerCase()]: {
         active: !prev[day.toLowerCase()]?.active,
@@ -61,21 +83,33 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
     }));
   };
 
-  const handleTimeChange = (day, field, localValue, index = 0) => {
+  const handleTimeChange = (day:Weekday, field, localValue, index = 0) => {
     const utcValue = localToUTC(localValue);
     setCurrentSchedule((prev) => ({
       ...prev,
       [day.toLowerCase()]: {
         ...prev[day.toLowerCase()],
-        intervals: prev[day.toLowerCase()].intervals.map(
-          (interval, i) =>
-            i === index ? { ...interval, [field]: utcValue } : interval
+        intervals: prev[day.toLowerCase()].intervals.map((interval, i) =>
+          i === index ? { ...interval, [field]: utcValue } : interval,
         ),
       },
     }));
   };
   const handleSave = () => {
     handleInputChange("schedule", currentSchedule);
+    formFetcher.submit(
+      {
+        campaignData: JSON.stringify({
+          ...campaignData,
+          schedule: currentSchedule,
+        }),
+        campaignDetails: JSON.stringify(details),
+      },
+      {
+        method: "patch",
+        action: "/api/campaigns",
+      },
+    );
     setShowSchedule(false);
   };
 
@@ -89,7 +123,7 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
           end: utcToLocal(interval.end),
         })),
       },
-    ]) || {}
+    ]) || {},
   );
 
   const getScheduleSummary = () => {
@@ -97,20 +131,24 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
       .filter(([, { active }]) => active)
       .map(([day, schedule]) => ({
         day: day.charAt(0).toUpperCase() + day.slice(1),
-        time: schedule.intervals[0] ? 
-          `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}` : 
-          'All day'
+        time: schedule.intervals[0]
+          ? `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}`
+          : "All day",
       }));
-    
+
     if (activeDays.length === 0) return "No calling hours set";
-    if (activeDays.length === 7 && activeDays.every(day => day.time === 'All day')) return "24/7";
-    
-    return activeDays.map(({ day, time }) => `${day} ${time}`).join(', ');
+    if (
+      activeDays.length === 7 &&
+      activeDays.every((day) => day.time === "All day")
+    )
+      return "24/7";
+
+    return activeDays.map(({ day, time }) => `${day} ${time}`).join(", ");
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col gap-4 md:flex-row">
         <div className="">
           <Label htmlFor="start_date">Start Date</Label>
           <DateTimePicker
@@ -126,10 +164,15 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
           />
         </div>
         <div className="">
-          <Label htmlFor="end_date">End Date<InfoHover tooltip="Your campaign will run until your designated end time on this date."/></Label>
+          <Label htmlFor="end_date">
+            End Date
+            <InfoHover tooltip="Your campaign will run until your designated end time on this date." />
+          </Label>
           <DateTimePicker
             value={
-              campaignData.end_date ? new Date(campaignData.end_date) : undefined
+              campaignData.end_date
+                ? new Date(campaignData.end_date)
+                : undefined
             }
             onChange={(date) =>
               handleInputChange("end_date", date?.toISOString())
@@ -141,22 +184,24 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
           <Button
             variant="outline"
             onClick={() => setShowSchedule(!showSchedule)}
-            className="border-primary border-2"
+            className="border-2 border-primary"
           >
             {showSchedule ? "Hide Calling Hours" : "Set Calling Hours"}
           </Button>
         </div>
       </div>
-      
-      <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-md">
+
+      <div className="flex items-center gap-2 rounded-md bg-gray-100 p-3">
         <Clock className="text-gray-500" size={20} />
         <Label className="font-semibold">Calling Hours:</Label>
-        <div className="text-sm text-gray-600 flex-grow">{getScheduleSummary()}</div>
+        <div className="flex-grow text-sm text-gray-600">
+          {getScheduleSummary()}
+        </div>
       </div>
-      
+
       <div className="space-y-4">
         {showSchedule && (
-          <div className="border p-4 rounded-md">
+          <div className="rounded-md border p-4">
             <WeeklyScheduleTable
               schedule={scheduleForDisplay}
               handleCheckboxChange={handleCheckboxChange}
