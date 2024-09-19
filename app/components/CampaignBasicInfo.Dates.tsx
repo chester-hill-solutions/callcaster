@@ -68,7 +68,6 @@ export default function SelectDates({
   };
 
   const handleCheckboxChange = (day:Weekday) => {
-    console.log(day)
     const localMidnightUTC = localToUTC("00:00");
     const localEndOfDayUTC = localToUTC("23:59");
 
@@ -190,7 +189,6 @@ export default function SelectDates({
           </Button>
         </div>
       </div>
-
       <div className="flex items-center gap-2 rounded-md bg-gray-100 p-3">
         <Clock className="text-gray-500" size={20} />
         <Label className="font-semibold">Calling Hours:</Label>
@@ -198,7 +196,6 @@ export default function SelectDates({
           {getScheduleSummary()}
         </div>
       </div>
-
       <div className="space-y-4">
         {showSchedule && (
           <div className="rounded-md border p-4">
