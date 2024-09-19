@@ -1,18 +1,31 @@
 import { useState, useCallback } from "react";
+import { WorkspaceNumbers } from "~/lib/types";
 
-export const usePhoneNumbers = (initialPhoneNumbers: PhoneNumber[], workspace: string) => {
-  const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>(initialPhoneNumbers);
+export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspace: string) => {
+  const [phoneNumbers, setPhoneNumbers] = useState<WorkspaceNumbers[]>(initialPhoneNumbers);
 
-  const updateWorkspaceNumbers = useCallback((payload: { eventType: string; old: PhoneNumber; new: PhoneNumber }) => {
-    if (payload.eventType === "DELETE") {
-      setPhoneNumbers((currentNumbers) => currentNumbers.filter((item) => item.id !== payload.old.id));
-    }
-    if (payload.new.workspace !== workspace) return;
+  const updateWorkspaceNumbers = useCallback((payload: { eventType: string; old: WorkspaceNumbers | null; new: WorkspaceNumbers | null }) => {
     setPhoneNumbers((currentNumbers) => {
-      const index = currentNumbers.findIndex((item) => item.id === payload.new.id);
-      return index > -1
-        ? currentNumbers.map((item) => (item.id === payload.new.id ? payload.new : item))
-        : [...currentNumbers, payload.new];
+      switch (payload.eventType) {
+        case "INSERT":
+          if (payload.new && payload.new.workspace === workspace) {
+            return [...currentNumbers, payload.new];
+          }
+          break;
+        case "UPDATE":
+          if (payload.new && payload.new.workspace === workspace) {
+            return currentNumbers.map((item) => 
+              item.id === payload.new?.id ? payload.new : item
+            );
+          }
+          break;
+        case "DELETE":
+          if (payload.old) {
+            return currentNumbers.filter((item) => item.id !== payload.old?.id);
+          }
+          break;
+      }
+      return currentNumbers;
     });
   }, [workspace]);
 

@@ -10,7 +10,7 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   getUserRole,
@@ -32,8 +32,18 @@ import {
 import { NumbersTable } from "~/components/NumbersTable";
 import { NumberCallerId } from "~/components/NumberCallerId";
 import { NumberPurchase } from "~/components/NumberPurchase";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "~/lib/database.types";
+import { User, WorkspaceNumbers } from "~/lib/types";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+type LoaderData = {
+  phoneNumbers: WorkspaceNumbers;
+  workspaceId: string;
+  mediaNames: string[];
+  users: User[];
+};
+
+export const loader = async ({ request, params }): Promise<LoaderData> => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession.user) {
@@ -173,60 +183,27 @@ export const action = async ({ request, params }) => {
   return { error: "An unknown error occured" };
 };
 
-export default function WorkspaceSettings() {
+const WorkspaceSettings = () => {
   const {
     phoneNumbers: initNumbers,
     workspaceId,
     user,
     users,
     mediaNames,
-  } = useLoaderData<typeof loader>();
+  } = useLoaderData();
   const { supabase } = useOutletContext();
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const [isDialogOpen, setDialog] = useState(!!actionData?.data);
   const fetcher = useFetcher();
   const updateFetcher = useFetcher();
-  const { phoneNumbers } = useSupabaseRealtime({
+
+  const { phoneNumbers, setPhoneNumbers } = useSupabaseRealtime({
     supabase,
     user,
     workspace: workspaceId,
     init: { phoneNumbers: initNumbers, queue: [], callsList: [] },
     setQuestionContact: () => null,
   });
-
-  const handleIncomingActivityChange = (numberId, value) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-activity",
-        numberId,
-        incomingActivity: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleIncomingVoiceMessageChange = (numberId, value) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-voice-message",
-        numberId,
-        incomingVoiceMessage: value,
-      },
-      { method: "POST" },
-    );
-  };
-  const handleCallerIdChange = (numberId, value) => {
-    updateFetcher.submit(
-      { formName: "update-caller-id", numberId, friendly_name: value },
-      { method: "POST" },
-    );
-  };
-  const handleNumberRemoval = (numberId) => {
-    updateFetcher.submit(
-      { formName: "remove-number", numberId},
-      { method: "POST" },
-    );
-  }
 
   useEffect(() => {
     if (actionData?.error) {
@@ -237,54 +214,110 @@ export default function WorkspaceSettings() {
     }
   }, [actionData]);
 
-  return (
-    <Dialog open={isDialogOpen} onOpenChange={setDialog}>
-      <DialogContent className="flex w-[450px] flex-col items-center bg-card">
-        <DialogHeader>
-          <DialogTitle className="text-center font-Zilla-Slab text-4xl text-primary">
-            Your verification code
-          </DialogTitle>
-          <div className="w-[400px]">
-            <p className="text-center">
-              You will receive a call at{" "}
-              {actionData?.validationRequest?.phoneNumber}.
-            </p>
-            <div className="flex justify-center">
-              <div className="my-4 rounded-md border-2 border-secondary bg-slate-50 p-4 text-5xl shadow-lg">
-                {actionData?.validationRequest?.validationCode}
-              </div>
-            </div>
-            <p className="text-center">Enter this code when prompted</p>
-          </div>
-        </DialogHeader>
-      </DialogContent>
-      <div className="flex flex-col">
-        <div className="flex justify-end pr-4 pt-4">
-          <Button
-            asChild
-            variant="outline"
-            className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
-          </Button>
-        </div>
+  const handleIncomingActivityChange = (numberId, value) => {
+    updateFetcher.submit(
+      { formName: "update-incoming-activity", numberId, incomingActivity: value },
+      { method: "POST" }
+    );
+  };
 
-        <div className="flex flex-wrap">
-          <NumbersTable
-            phoneNumbers={phoneNumbers}
-            users={users}
-            mediaNames={mediaNames}
-            onIncomingActivityChange={handleIncomingActivityChange}
-            onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
-            onCallerIdChange={handleCallerIdChange}
-            onNumberRemoval={handleNumberRemoval}
-          />
-          <NumberCallerId />
-          <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />
+  const handleIncomingVoiceMessageChange = (numberId, value) => {
+    updateFetcher.submit(
+      { formName: "update-incoming-voice-message", numberId, incomingVoiceMessage: value },
+      { method: "POST" }
+    );
+  };
+
+  const handleCallerIdChange = (numberId, value) => {
+    updateFetcher.submit(
+      { formName: "update-caller-id", numberId, friendly_name: value },
+      { method: "POST" }
+    );
+  };
+
+  const handleNumberRemoval = (numberId) => {
+    updateFetcher.submit(
+      { formName: "remove-number", numberId },
+      { method: "POST" }
+    );
+  };
+
+  return (
+    <>
+      <VerificationDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setDialog}
+        validationRequest={actionData?.validationRequest}
+      />
+      <div className="flex flex-col min-h-screen">
+        <BackButton disabled={updateFetcher.state !== "idle"} />
+        <div className="flex flex-wrap p-4 gap-4">
+          <Panel className="flex-grow flex-shrink-0 basis-full lg:basis-[calc(66.666%-1rem)]">
+            <NumbersTable
+              phoneNumbers={phoneNumbers}
+              users={users}
+              mediaNames={mediaNames}
+              onIncomingActivityChange={handleIncomingActivityChange}
+              onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
+              onCallerIdChange={handleCallerIdChange}
+              onNumberRemoval={handleNumberRemoval}
+              isBusy={updateFetcher.state !== "idle"}
+            />
+          </Panel>
+          <div className="flex flex-col flex-grow flex-shrink-0 basis-full lg:basis-[calc(33.333%-1rem)] gap-4">
+            <Panel>
+              <NumberCallerId />
+            </Panel>
+            <Panel>
+              <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />
+            </Panel>
+          </div>
         </div>
       </div>
-    </Dialog>
+    </>
   );
-}
+};
+
+const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }) => (
+  <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+      <DialogHeader>
+        <DialogTitle className="text-center font-Zilla-Slab text-4xl text-primary">
+          Your verification code
+        </DialogTitle>
+        <div className="w-[400px]">
+          <p className="text-center">
+            You will receive a call at {validationRequest?.phoneNumber}.
+          </p>
+          <div className="flex justify-center">
+            <div className="my-4 rounded-md border-2 border-secondary bg-slate-50 p-4 text-5xl shadow-lg">
+              {validationRequest?.validationCode}
+            </div>
+          </div>
+          <p className="text-center">Enter this code when prompted</p>
+        </div>
+      </DialogHeader>
+    </DialogContent>
+  </Dialog>
+);
+
+const BackButton = ({ disabled }) => (
+  <div className="flex justify-end pr-4 pt-4">
+    <Button
+      asChild
+      disabled={disabled}
+      variant="outline"
+      className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+    >
+      <Link to=".." relative="path">
+        Back
+      </Link>
+    </Button>
+  </div>
+);
+
+const Panel = ({ children, className }) => (
+  <div className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}>
+    {children}
+  </div>
+);
