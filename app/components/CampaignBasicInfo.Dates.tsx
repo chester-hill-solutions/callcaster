@@ -7,6 +7,7 @@ import { days } from "~/lib/utils";
 import { Clock } from "lucide-react";
 import { CampaignSettingsProps } from "./CampaignSettings";
 import { Schedule } from "~/lib/types";
+import InfoHover from "./InfoPopover";
 
 export default function SelectDates({ campaignData, handleInputChange }:{campaignData: CampaignSettingsProps, handleInputChange:() => void}) {
   const [showSchedule, setShowSchedule] = useState(false);
@@ -125,7 +126,7 @@ export default function SelectDates({ campaignData, handleInputChange }:{campaig
           />
         </div>
         <div className="">
-          <Label htmlFor="end_date">End Date</Label>
+          <Label htmlFor="end_date">End Date<InfoHover tooltip="Your campaign will run until your designated end time on this date."/></Label>
           <DateTimePicker
             value={
               campaignData.end_date ? new Date(campaignData.end_date) : undefined
