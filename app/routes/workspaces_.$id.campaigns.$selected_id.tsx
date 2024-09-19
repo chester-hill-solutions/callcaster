@@ -177,7 +177,7 @@ export default function CampaignScreen() {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={data?.title} status={data.status} />
+      <CampaignHeader title={data?.title} status={!isActive ? "paused" : data.status} />
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
         <CampaignHeader title={data?.title} isDesktop status={data.status} />
         <NavigationLinks
