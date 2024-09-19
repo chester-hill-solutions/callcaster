@@ -3,7 +3,6 @@ import { Button } from "./ui/button";
 
 export const NumberCallerId = () => {
   return (
-    <div className="m-4 flex w-fit flex-auto flex-col justify-between gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
       <div>
         <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
           Add your number
@@ -54,6 +53,5 @@ export const NumberCallerId = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };

@@ -5,6 +5,20 @@ import { useAttempts } from "./useAttempts";
 import { useCalls } from "./useCalls";
 import { usePhoneNumbers } from "./usePhoneNumbers";
 import { isRecent } from "~/lib/utils";
+import { QueueItem, User, WorkspaceData } from "~/lib/types";
+import { Database } from "~/lib/database.types";
+
+type UseSupabaseRealtimeProps = {
+  user:User;
+  supabase:SupabaseClient<Database>;
+  init:any;
+  campaign_id:string;
+  predictive:boolean;
+  setQuestionContact:(contact:QueueItem) => void;
+  workspace:string;
+  setCallDuration:(duration:number) => void;
+  setUpdate:(update:any) => void;
+}
 
 export const useSupabaseRealtime = ({
   user,
@@ -48,8 +62,7 @@ export const useSupabaseRealtime = ({
     updateCalls,
   } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient, predictive);
 
-  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
-    usePhoneNumbers(init.phoneNumbers, workspace);
+  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } = usePhoneNumbers(init.phoneNumbers, workspace);
 
   useEffect(() => {
     const handleChange = (payload: any) => {
@@ -117,5 +130,6 @@ export const useSupabaseRealtime = ({
     nextRecipient,
     setNextRecipient,
     householdMap,
+    setPhoneNumbers
   };
 };

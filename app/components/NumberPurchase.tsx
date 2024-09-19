@@ -1,18 +1,27 @@
 import { NumbersEmptyState } from "./NumbersPurchase.EmptyState";
 import { Button } from "./ui/button";
-import { Form } from "@remix-run/react";
+import { useFetcher } from "@remix-run/react";
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
-  DialogTrigger,
 } from "./ui/dialog";
+import { useEffect, useState } from "react";
 
 export const NumberPurchase = ({ fetcher, workspaceId }) => {
+  const purchaseFetcher = useFetcher();
+  const complete = purchaseFetcher.state === "idle" && Boolean(purchaseFetcher.data?.newNumber);
+  const [openNumber, setOpenNumber] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (complete){
+      setOpenNumber(null);
+    }
+  },[purchaseFetcher])
+
   return (
-    <div className="m-4 flex w-fit flex-auto flex-col justify-between gap-4 rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white">
       <div>
         <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
           Purchase a Number
@@ -59,7 +68,7 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                   <tbody>
                     {fetcher.data &&
                       fetcher.data.map((number: any) => (
-                        <Dialog key={number.phoneNumber}>
+                        <Dialog key={number.phoneNumber} open={openNumber === number.phoneNumber} onOpenChange={(open) => setOpenNumber((curr) => open ? curr : null)}>
                           <tr className="border-b dark:border-gray-700">
                             <td className="px-2 py-1 text-sm">
                               {number.friendlyName}
@@ -83,19 +92,18 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                             </td>
                             <td className="px-2 py-1 text-sm">$3.00/mo</td>
                             <td className="px-2 py-1">
-                              <DialogTrigger asChild>
-                                <button
+                                <Button
                                   className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600"
                                   type="submit"
+                                  onClick={() => setOpenNumber(number.phoneNumber)}
+                                  disabled={purchaseFetcher.state !== "idle"}
                                 >
                                   Purchase
-                                </button>
-                              </DialogTrigger>
+                                </Button>
                               <DialogContent className="flex flex-col items-center bg-card">
-                                <Form
+                                <purchaseFetcher.Form
                                   method="POST"
                                   action="/api/numbers"
-                                  navigate={false}
                                 >
                                   <DialogHeader className="py-4">
                                     <h2 className="mb-4 font-Zilla-Slab text-xl">
@@ -129,7 +137,7 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                                     </DialogClose>
                                     <Button type="submit">Purchase</Button>
                                   </DialogFooter>
-                                </Form>
+                                </purchaseFetcher.Form>
                               </DialogContent>
                             </td>
                           </tr>
@@ -142,7 +150,6 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };
