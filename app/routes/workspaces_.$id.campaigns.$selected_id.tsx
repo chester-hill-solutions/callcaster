@@ -175,11 +175,12 @@ export default function CampaignScreen() {
           ? "It is currently outside of the Campaign's calling hours"
           : null;
 
+  const headerStatus = data.status === "running" && !isActive ? "paused" : data.status;
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={data?.title} status={!isActive ? "paused" : data.status} />
+      <CampaignHeader title={data?.title} status={headerStatus} isDesktop={false}/>
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
-        <CampaignHeader title={data?.title} isDesktop status={data.status} />
+        <CampaignHeader title={data?.title} isDesktop status={headerStatus} />
         <NavigationLinks
           hasAccess={hasAccess}
           data={data}
