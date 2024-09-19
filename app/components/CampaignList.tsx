@@ -6,12 +6,12 @@ import { MemberRole } from "~/components/Workspace/TeamMember";
 import { Badge } from "~/components/ui/badge";
 
 const handleNavlinkStyles = ({ isActive, isPending }) =>
-  `flex bg-gray-100 dark:bg-zinc-900 items-center px-4 py-2 text-sm font-medium transition-colors font-Zilla-Slab ${
+  `flex justify-between bg-gray-100 border-2 dark:bg-zinc-900 items-center py-2 text-sm font-medium transition-colors transition-borders font-Zilla-Slab ${
     isActive
-      ? "border-primary border-2 text-primary-accent bg-white dark:bg-slate-700"
+      ? "border-primary border-b-2 text-primary-accent bg-white dark:bg-slate-700"
       : isPending
-      ? "bg-muted"
-      : "hover:bg-muted dark:hover:bg-zinc-500"
+      ? "bg-muted border-b-0"
+      : "hover:bg-muted dark:hover:bg-zinc-500 border-b-0"
   }`;
 
 const StatusBadge = ({ status }) => {
@@ -26,7 +26,7 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <Badge className={`ml-auto text-xxs scale-75 ${badgeStyles[status] || ""}`}>
+    <Badge className={`text-xxs mx-2 ${badgeStyles[status] || ""}`}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );
@@ -58,7 +58,7 @@ const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }) => (
                 className={handleNavlinkStyles}
                 onClick={() => setCampaignsListOpen(false)}
               >
-                <span>{row.title || `Unnamed campaign ${i + 1}`}</span>
+                <span className="px-2">{row.title || `Unnamed campaign ${i + 1}`}</span>
                 <StatusBadge status={row.status} />
               </NavLink>
             )
