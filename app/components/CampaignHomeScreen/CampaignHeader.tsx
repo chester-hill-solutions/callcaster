@@ -19,7 +19,7 @@ const getStatusColor = (status:Enums<"campaign_status">) => {
     case "running":
       return "bg-green-200 text-green-800";
     case "complete":
-      return "bg-purple-200 text-purple-800";
+      return "bg-teal-100 text-teal-800";
     case "paused":
       return "bg-orange-200 text-orange-800";
     case "draft":
