@@ -95,6 +95,7 @@ export default function ScriptMainContent({
                 <MergedQuestionBlock
                   key={blockId}
                   type={script.type}
+                  pages={scriptData.pages}
                   blocks={scriptData.blocks}
                   block={scriptData.blocks[blockId] || {}}
                   onRemove={() => removeBlock(blockId)}
