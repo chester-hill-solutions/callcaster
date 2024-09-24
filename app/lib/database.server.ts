@@ -1160,7 +1160,8 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data, users) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-  let csvHeaders = [...dynamicKeys, ...resultKeys, ...otherDataKeys].map(
+  console.log(dynamicKeys, resultKeys, otherDataKeys)
+  let csvHeaders = [...dynamicKeys, ...otherDataKeys].map(
     (header) =>
       header === "id"
         ? "attempt_id"
@@ -1169,13 +1170,42 @@ export function processOutreachExportData(data, users) {
           : header,
   );
 
-  const flattenedData = data.map((row) => flattenRow(row, users));
+  let flattenedData = data.map((row) => flattenRow(row, users));
+
+  flattenedData.sort((a, b) => {
+    if (a.callcaster_id < b.callcaster_id) return -1;
+    if (a.callcaster_id > b.callcaster_id) return 1;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+
+  const mergedData = [];
+  let currentGroup = null;
+
+  flattenedData.forEach((row) => {
+    if (!currentGroup || row.callcaster_id !== currentGroup.callcaster_id || 
+        (new Date(row.created_at) - new Date(currentGroup.created_at)) > 12 * 60 * 60 * 1000) {
+      if (currentGroup) {
+        mergedData.push(currentGroup);
+      }
+      currentGroup = { ...row };
+    } else {
+      Object.keys(row).forEach((key) => {
+        if (row[key] != null && row[key] !== "") {
+          currentGroup[key] = row[key];
+        }
+      });
+    }
+  });
+
+  if (currentGroup) {
+    mergedData.push(currentGroup);
+  }
 
   csvHeaders = csvHeaders.filter((header) =>
-    flattenedData.some((row) => row[header] != null && row[header] !== ""),
+    mergedData.some((row) => row[header] != null && row[header] !== ""),
   );
 
-  return { csvHeaders, flattenedData };
+  return { csvHeaders, flattenedData: mergedData };
 }
 
 export async function createStripeContact({
