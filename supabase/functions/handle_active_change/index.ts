@@ -1,6 +1,8 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import * as crypto from "node:crypto";
+import { Buffer } from 'node:buffer';
 
 const initSupabaseClient = () => {
   return createClient(
@@ -8,6 +10,37 @@ const initSupabaseClient = () => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 };
+function toFormUrlEncodedParam(
+  paramName: string,
+  paramValue: string | Array<string>,
+): string {
+  if (paramValue instanceof Array) {
+    return Array.from(new Set(paramValue))
+      .sort()
+      .map((val) => toFormUrlEncodedParam(paramName, val))
+      .reduce((acc, val) => acc + val, "");
+  }
+  return paramName + paramValue;
+}
+
+export function getExpectedTwilioSignature(
+  authToken: string,
+  url: string,
+  params: Record<string, any>,
+): string {
+  if (url.indexOf("bodySHA256") !== -1 && params === null) {
+    params = {};
+  }
+
+  const data = Object.keys(params)
+    .sort()
+    .reduce((acc, key) => acc + toFormUrlEncodedParam(key, params[key]), url);
+
+  return crypto
+    .createHmac("sha1", authToken)
+    .update(Buffer.from(data, "utf-8"))
+    .digest("base64");
+}
 
 export async function createWorkspaceTwilioInstance(
   supabase: SupabaseClient,
@@ -33,17 +66,24 @@ const handleTriggerStart = async (
 ) => {
   for (let i = 0; i < contacts?.length; i++) {
     const contact = contacts[i];
-    const formData = new FormData();
-    formData.append("to_number", contact.phone);
-    formData.append("user_id", user_id);
-    formData.append("campaign_id", campaign_id);
-    formData.append("workspace_id", contact.workspace);
-    formData.append("queue_id", contact.id);
-    formData.append("contact_id", contact.contact_id);
-    formData.append("caller_id", contact.caller_id);
-    await fetch(`${Deno.env.get("SITE_URL")}/api/ivr`, {
-      body: formData,
+    const data = {
+      to_number: contact.phone,
+      user_id: user_id,
+      campaign_id: campaign_id,
+      workspace_id: contact.workspace,
+      queue_id: contact.id,
+      contact_id: contact.contact_id,
+      caller_id: contact.caller_id,
+    };
+    const twilioSignature = getExpectedTwilioSignature(Deno.env.get('TWILIO_AUTH_TOKEN'), 'https://ivr-2916.twil.io/ivr', {});
+    console.log(twilioSignature)
+    await fetch(`https://ivr-2916.twil.io/ivr`, {
+      body: JSON.stringify(data),
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Twilio-Signature": `${twilioSignature}`
+      },
     }).catch((e) => console.log(e));
   }
 };
@@ -67,7 +107,10 @@ const getWorkspaceOwner = async (
   return data.find((contact) => contact.user_workspace_role === "owner");
 };
 
-const handleInitiateCampaign = async (supabase: SupabaseClient, id: string) => {
+const handleInitiateCampaign = async (
+  supabase: SupabaseClient,
+  id: string,
+) => {
   const { data, error } = await supabase.rpc("get_campaign_queue", {
     campaign_id_pro: id,
   });
@@ -198,14 +241,17 @@ const handleBatch = async (
   return { cancelled, errors };
 };
 
-const handlePauseCampaign = async (supabase: SupabaseClient, id: string) => {
+const handlePauseCampaign = async (
+  supabase: SupabaseClient,
+  id: string,
+  twilio: any,
+) => {
   const { data, error } = await supabase
     .from("campaign")
     .select("type, workspace")
     .eq("id", id)
     .single();
   if (error) throw error;
-  const twilio = await createWorkspaceTwilioInstance(supabase, data.workspace);
   try {
     handleBatch(supabase, twilio, data.type, id);
   } catch (error) {
@@ -218,11 +264,17 @@ Deno.serve(async (req) => {
   const { record } = await req.json();
   const supabase = initSupabaseClient();
   const now = new Date();
+  const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
+
   try {
-    if (record.is_active && record.end_date > now && record.start_date < now) {
+    if (
+      record.is_active &&
+      new Date(record.end_date) > now &&
+      new Date(record.start_date) < now
+    ) {
       handleInitiateCampaign(supabase, record.id);
     } else if (!record.is_active) {
-      handlePauseCampaign(supabase, record.id);
+      handlePauseCampaign(supabase, record.id, twilio);
     }
   } catch (error) {
     console.error("Error:", error);
