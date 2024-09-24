@@ -2,7 +2,14 @@ import React, { useState, useEffect } from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
-import { Flags, IVRCampaign, LiveCampaign, MessageCampaign, Script, WorkspaceNumbers } from "~/lib/types";
+import {
+  Flags,
+  IVRCampaign,
+  LiveCampaign,
+  MessageCampaign,
+  Script,
+  WorkspaceNumbers,
+} from "~/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
@@ -16,6 +23,55 @@ import {
 import { FetcherWithComponents } from "@remix-run/react";
 import { CampaignSettingsData } from "./CampaignSettings";
 
+type ButtonState = "Active" | "Inactive" | "Disabled";
+
+type CampaignState =
+  | "running"
+  | "paused"
+  | "archived"
+  | "draft"
+  | "pending"
+  | "scheduled"
+  | "complete";
+
+const getButtonStates = (
+  campaignState: CampaignState,
+  isJoinDisabled: boolean,
+): Record<string, ButtonState> => {
+  const states: Record<string, ButtonState> = {
+    play: "Disabled",
+    pause: "Disabled",
+    archive: "Disabled",
+  };
+
+  switch (campaignState) {
+    case "running":
+      states.pause = "Inactive";
+      states.play = "Active";
+      states.archive = "Inactive";
+      break;
+    case "paused":
+      states.play = isJoinDisabled ? "Disabled" : "Inactive";
+      states.archive = "Inactive";
+      states.pause = "Active"
+      break;
+    case "draft":
+    case "pending":
+    case "scheduled":
+      states.play = isJoinDisabled ? "Disabled" : "Inactive";
+      states.archive = "Inactive";
+      break;
+    case "complete":
+      states.archive = "Inactive";
+      break;
+    case "archived":
+      break;
+  }
+
+  return states;
+};
+
+
 export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
@@ -23,7 +79,7 @@ export const CampaignBasicInfo = ({
   flags,
   handleButton,
   formFetcher,
-  details
+  details,
 }: {
   campaignData: any;
   handleInputChange: (name: string, value: string | number) => void;
@@ -31,20 +87,11 @@ export const CampaignBasicInfo = ({
   flags: Flags;
   handleButton: (type: "play" | "pause" | "archive") => void;
   joinDisabled: string | null;
-  formFetcher:FetcherWithComponents<CampaignSettingsData>
-  details: | (LiveCampaign | IVRCampaign) & { script: Script }
-  | MessageCampaign;
+  formFetcher: FetcherWithComponents<CampaignSettingsData>;
+  details:
+    | ((LiveCampaign | IVRCampaign) & { script: Script })
+    | MessageCampaign;
 }) => {
-  const isRunning = campaignData.status === "running";
-  const isPaused = campaignData.status === "paused";
-  const isArchivable = [
-    "running",
-    "paused",
-    "complete",
-    "draft",
-    "pending",
-    "scheduled",
-  ].includes(campaignData.status);
 
   const joinDisabled =
     !campaignData?.script_id && !campaignData.body_text
@@ -54,6 +101,40 @@ export const CampaignBasicInfo = ({
         : !campaignData.audiences?.length
           ? "No audiences selected"
           : null;
+  const buttonStates = getButtonStates(
+    campaignData.status as CampaignState,
+    !!joinDisabled,
+  );
+
+  const renderButton = (type: "play" | "pause" | "archive", icon: React.ReactNode, tooltip: string) => {
+    const state = buttonStates[type];
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger>
+            <Button
+              type="button"
+              variant={state === "Active" ? "default" : "outline"}
+              size="icon"
+              onClick={() => handleButton(type)}
+              disabled={state === "Disabled"}
+              className={`
+                ${state === "Active" ? "bg-primary text-primary-foreground shadow-sm" : ""}
+                ${state === "Inactive" ? "border-primary" : ""}
+                ${state === "Disabled" ? "opacity-50 cursor-not-allowed" : ""}
+              `}
+            >
+              {icon}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent align="end">
+            {state === "Active" ? `Currently ${type === "play" ? "running" : type}ed` : tooltip}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   return (
     <div className="flex flex-wrap gap-6">
       <div className="flex flex-wrap gap-6">
@@ -78,65 +159,9 @@ export const CampaignBasicInfo = ({
         />
         <div className="flex items-end">
           <div className="flex gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger disabled={isRunning || joinDisabled}>
-                  <Button
-                    type="button"
-                    variant={isRunning ? "default" : "outline"}
-                    className={`${joinDisabled || isRunning ? "pointer-events-none bg-green-600" : ""}`}
-                    size="icon"
-                    onClick={(e) => handleButton("play")}
-                    disabled={isRunning || joinDisabled}
-                  >
-                    <Play
-                      className="h-4 w-4"
-                      color={isRunning ? "#333" : "#7cb342"}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                {joinDisabled && (
-                  <TooltipContent align="end">{joinDisabled}</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    type="button"
-                    variant={isPaused ? "default" : "outline"}
-                    size="icon"
-                    onClick={() => handleButton("pause")}
-                    disabled={!isRunning}
-                  >
-                    <Pause className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                {!isPaused && (
-                  <TooltipContent align="end">This will pause your campaign and stop any ongoing outgoing {`${campaignData.type === "message" ? "messages" : "calls"}`}.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className={`border-red-400`}
-                    onClick={() => handleButton("archive")}
-                    disabled={!isArchivable}
-                  >
-                    <Archive className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                {isArchivable && (
-                  <TooltipContent className="bg-red-50"  align="end">This will stop your campaign and hide it from campaign view. Any ongoing {`${campaignData.type === "message" ? "messages" : "calls"}`} will be ended.</TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
+            {renderButton("play", <Play className="h-4 w-4" />, joinDisabled || "Start the campaign")}
+            {renderButton("pause", <Pause className="h-4 w-4" />, "Pause the campaign")}
+            {renderButton("archive", <Archive className="h-4 w-4" />, "Archive the campaign")}
           </div>
         </div>
         <div className="flex flex-wrap gap-6">
