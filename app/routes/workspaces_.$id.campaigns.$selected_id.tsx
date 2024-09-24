@@ -128,7 +128,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
-  const isActive = checkSchedule(campaignData);
+  const isActive = (campaignData.is_active) && checkSchedule(campaignData);
 
   return defer({
     data,
