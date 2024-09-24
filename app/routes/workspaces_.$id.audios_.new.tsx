@@ -6,6 +6,7 @@ import {
   useActionData,
   useLoaderData,
   useNavigate,
+  useNavigation,
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
@@ -74,8 +75,8 @@ export default function Media() {
   const { workspace } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [pendingFileName, setPendingFileName] = useState("");
-
   const navigate = useNavigate();
+  const {state} = useNavigation();
 
   useEffect(() => {
     if (actionData?.success) {
@@ -145,6 +146,7 @@ export default function Media() {
                   className="h-fit min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
             transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black w-full"
                   type="submit"
+                  disabled={state !== "idle"}
                 >
                   Upload Audio
                 </Button>
