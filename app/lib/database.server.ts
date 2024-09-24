@@ -736,6 +736,7 @@ export async function updateCampaign({
     body_text: undefined,
     message_media: undefined,
     voicedrop_audio: undefined,
+    is_active: Boolean(restCampaignData.is_active)
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
 

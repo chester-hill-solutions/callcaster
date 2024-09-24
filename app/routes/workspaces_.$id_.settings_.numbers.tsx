@@ -1,6 +1,6 @@
 import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
 
-import { ActionFunctionArgs, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "@remix-run/node";
 import {
   Form,
   json,
@@ -32,8 +32,6 @@ import {
 import { NumbersTable } from "~/components/NumbersTable";
 import { NumberCallerId } from "~/components/NumberCallerId";
 import { NumberPurchase } from "~/components/NumberPurchase";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
 import { User, WorkspaceNumbers } from "~/lib/types";
 
 type LoaderData = {
@@ -43,7 +41,7 @@ type LoaderData = {
   users: User[];
 };
 
-export const loader = async ({ request, params }): Promise<LoaderData> => {
+export const loader = async ({ request, params }:LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession.user) {
@@ -54,7 +52,7 @@ export const loader = async ({ request, params }): Promise<LoaderData> => {
     supabaseClient,
     workspaceId,
   });
-  const { data: phoneNumbers, error: numbersError } =
+  const { data: phoneNumbers, error: numbersError }=
     await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
   const { data: mediaNames } = await supabaseClient.storage
     .from("workspaceAudio")
@@ -321,3 +319,4 @@ const Panel = ({ children, className }) => (
     {children}
   </div>
 );
+export default WorkspaceSettings;

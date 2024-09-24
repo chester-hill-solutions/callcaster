@@ -32,7 +32,6 @@ const QuestionBlockOption = ({
     onChange(index, { ...option, value: input });
     setIsModalOpen(false);
   };
-
   return (
     <div className="mb-2 flex items-center space-x-2">
       {type === "ivr" ? (
