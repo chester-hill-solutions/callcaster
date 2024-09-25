@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
@@ -106,7 +106,11 @@ export const CampaignBasicInfo = ({
     !!joinDisabled,
   );
 
-  const renderButton = (type: "play" | "pause" | "archive", icon: React.ReactNode, tooltip: string) => {
+  const renderButton = (
+    type: "play" | "pause" | "archive",
+    icon: React.ReactNode,
+    tooltip: string,
+  ) => {
     const state = buttonStates[type];
     return (
       <TooltipProvider>
@@ -116,19 +120,24 @@ export const CampaignBasicInfo = ({
               type="button"
               variant={state === "Active" ? "default" : "outline"}
               size="icon"
-              onClick={() => handleButton(type)}
+              onClick={(e) => {
+                e.preventDefault();
+                handleButton(type);
+              }}
               disabled={state === "Disabled"}
               className={`
                 ${state === "Active" ? "bg-primary text-primary-foreground shadow-sm" : ""}
                 ${state === "Inactive" ? "border-primary" : ""}
-                ${state === "Disabled" ? "opacity-50 cursor-not-allowed" : ""}
+                ${state === "Disabled" ? "cursor-not-allowed opacity-50" : ""}
               `}
             >
               {icon}
             </Button>
           </TooltipTrigger>
           <TooltipContent align="end">
-            {state === "Active" ? `Currently ${type === "play" ? "running" : type}ed` : tooltip}
+            {state === "Active"
+              ? `Currently ${type === "play" ? "running" : type}ed`
+              : tooltip}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -159,9 +168,21 @@ export const CampaignBasicInfo = ({
         />
         <div className="flex items-end">
           <div className="flex gap-2">
-            {renderButton("play", <Play className="h-4 w-4" />, joinDisabled || "Start the campaign")}
-            {renderButton("pause", <Pause className="h-4 w-4" />, "Pause the campaign")}
-            {renderButton("archive", <Archive className="h-4 w-4" />, "Archive the campaign")}
+            {renderButton(
+              "play",
+              <Play className="h-4 w-4" />,
+              joinDisabled || "Start the campaign",
+            )}
+            {renderButton(
+              "pause",
+              <Pause className="h-4 w-4" />,
+              "Pause the campaign",
+            )}
+            {renderButton(
+              "archive",
+              <Archive className="h-4 w-4" />,
+              "Archive the campaign",
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-6">

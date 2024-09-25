@@ -167,10 +167,12 @@ export const CampaignSettings = ({
   };
 
   const handleActivateButton = (event) => {
+    event.preventDefault();
+
     if (campaignData.type === "live_call") {
       formFetcher.submit(
         {
-          campaignData: JSON.stringify({ ...campaignData, status: "running" }),
+          campaignData: JSON.stringify({ ...campaignData, status: "running", is_active: true }),
           campaignDetails: JSON.stringify(details),
         },
         {
@@ -206,6 +208,7 @@ export const CampaignSettings = ({
   };
 
   const handleScheduleButton = (event) => {
+    event.preventDefault();
     formFetcher.submit(
       {
         campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
