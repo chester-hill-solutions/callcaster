@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
@@ -7,14 +7,16 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "~/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { TextInput } from "./Inputs";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { NavLink } from "@remix-run/react";
-import { MdAdd, MdDialpad } from "react-icons/md";
-import { EditResponseModal } from "./QuestionCard.ResponseTable.EditModal";
-import { SelectGroup, SelectLabel } from "@radix-ui/react-select";
-import { Block, Page } from "~/lib/database.types";
+import { Block, BlockOption, Page } from "~/lib/database.types";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { MdDialpad } from "react-icons/md";
 
 const QuestionBlockOption = ({
   option,
@@ -25,36 +27,60 @@ const QuestionBlockOption = ({
   pages,
   blocks,
   type,
+}:{
+  option: BlockOption,
+  index: number;
+  onRemove: (index:number) => void;
+  onChange: (index: number, value:BlockOption) => void;
+  onNextChange: (index: number, value: string) => void;
+  pages: Page[];
+  blocks: Block[];
+  type: "ivr" | "script";
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  const handleSave = (input) => {
+  const handleSave = (input: string) => {
     onChange(index, { ...option, value: input });
-    setIsModalOpen(false);
+    setIsPopoverOpen(false);
   };
+  const inputOptions = [...Array(10).keys(), 'Voice - Any'];
+
   return (
     <div className="mb-2 flex items-center space-x-2">
       {type === "ivr" ? (
         <div className="flex flex-col">
-          <p>Input</p>
-          <div
-            className="flex h-10 w-[100px] items-center justify-between rounded-md border border-input bg-background bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent [&>span]:line-clamp-1"
-            onClick={() => setIsModalOpen(!isModalOpen)}
-          >
-            {option.value === "vx-any" ? "Voice - Any" : option.value}
-            <MdDialpad />
-          </div>
-          <EditResponseModal
-            isOpen={isModalOpen}
-            onClose={() => setIsModalOpen(false)}
-            onSave={handleSave}
-            initialInput={option.value}
-          />
+          <p className="mb-1 text-sm font-medium">Input</p>
+          <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[130px] justify-between bg-white">
+                {option.value === "vx-any" ? "Voice - Any" : option.value}
+                <MdDialpad/>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0">
+              <div className="grid grid-cols-3 gap-2 p-4">
+                {inputOptions.map((opt, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    className={`h-12 ${opt === "Voice - Any" ? "col-span-2" : ""}`}
+                    onClick={() =>
+                      handleSave(
+                        opt === "Voice - Any" ? "vx-any" : opt.toString(),
+                      )
+                    }
+                  >
+                    {opt}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       ) : (
         <div className="flex flex-col">
-          <p>Input</p>
-          <TextInput
+          <p className="mb-1 text-sm font-medium">Input</p>
+          <Input
             value={option.content}
             onChange={(e) =>
               onChange(index, {
@@ -67,14 +93,14 @@ const QuestionBlockOption = ({
           />
         </div>
       )}
-      <div className="flex flex-col">
-        <p>Input</p>
+      <div className="flex flex-col flex-1">
+        <p className="mb-1 text-sm font-medium">Next Step</p>
         <div className="flex">
           <Select
             value={option.next}
             onValueChange={(value) => onNextChange(index, value)}
           >
-            <SelectTrigger className="w-[300px]">
+            <SelectTrigger className="w-full bg-white">
               <SelectValue placeholder="Select next step" />
             </SelectTrigger>
             <SelectContent>
@@ -94,7 +120,7 @@ const QuestionBlockOption = ({
                 <SelectItem value="hangup">Hang Up</SelectItem>
               </SelectGroup>
             </SelectContent>
-          </Select>{" "}
+          </Select>
           <Button variant="ghost" size="icon" onClick={() => onRemove(index)}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -136,7 +162,9 @@ const MergedQuestionBlock = ({
   ) => void;
 }) => {
   const [localBlock, setLocalBlock] = useState(block);
-  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">("none");
+  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
+    "none",
+  );
   const questionTypes =
     type === "script"
       ? [
@@ -196,7 +224,7 @@ const MergedQuestionBlock = ({
   const renderContentInput = () => {
     if (type === "script" || localBlock?.type === "synthetic") {
       return (
-        <textarea
+        <Textarea
           value={localBlock.content || localBlock.audioFile}
           onChange={(e) =>
             handleChange(
@@ -209,15 +237,7 @@ const MergedQuestionBlock = ({
               ? "Your script or question"
               : "Your synthetic greeting"
           }
-          rows={Math.max(
-            3,
-            Math.ceil(
-              (localBlock?.content?.length ||
-                localBlock?.audioFile?.length ||
-                1) / 40,
-            ),
-          )}
-          className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100"
+          className="min-h-[100px] bg-white"
         />
       );
     } else if (localBlock?.type === "recorded") {
@@ -227,11 +247,8 @@ const MergedQuestionBlock = ({
             value={localBlock.audioFile}
             onValueChange={(value) => handleChange("audioFile", value)}
           >
-            <SelectTrigger className="bg-white dark:bg-transparent">
-              <SelectValue
-                className="text-brand-primary"
-                placeholder="Select an audio file"
-              />
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select an audio file" />
             </SelectTrigger>
             <SelectContent>
               {mediaNames.map((media) => (
@@ -243,7 +260,7 @@ const MergedQuestionBlock = ({
           </Select>
           <Button size="icon" asChild>
             <NavLink to={"../../audios"} relative="path">
-              <MdAdd size={24} />
+              <Plus className="h-4 w-4" />
             </NavLink>
           </Button>
         </div>
@@ -264,9 +281,15 @@ const MergedQuestionBlock = ({
     setAcceptDrop("none");
   };
 
-  return block && (
+  return (
     <div
-      className={`border-2 border-x-0 py-1 ${acceptDrop === "top" ? "border-b-transparent border-t-brand-primary" : acceptDrop === "bottom" ? "border-b-brand-primary border-t-transparent" : "border-b-transparent border-t-transparent"}`}
+      className={`border-2 border-x-0 py-1 ${
+        acceptDrop === "top"
+          ? "border-b-transparent border-t-primary"
+          : acceptDrop === "bottom"
+            ? "border-b-primary border-t-transparent"
+            : "border-b-transparent border-t-transparent"
+      }`}
     >
       <Card
         draggable
@@ -315,20 +338,18 @@ const MergedQuestionBlock = ({
         {openBlock === block.id && (
           <CardContent>
             <div className="space-y-4">
-              <TextInput
+              <Input
                 value={localBlock?.title}
                 onChange={(e) => handleChange("title", e.target.value)}
                 placeholder="Block Title"
+                className="bg-white"
               />
               <Select
                 value={localBlock?.type}
                 onValueChange={(value) => handleChange("type", value)}
               >
-                <SelectTrigger className="bg-white dark:bg-transparent">
-                  <SelectValue
-                    className="text-brand-primary"
-                    placeholder="Select block type"
-                  />
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select block type" />
                 </SelectTrigger>
                 <SelectContent>
                   {questionTypes.map((type) => (
@@ -346,7 +367,7 @@ const MergedQuestionBlock = ({
               <div className="mt-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold">Options</h3>
-                  <Button variant="ghost" size="sm" onClick={handleAddOption}>
+                  <Button variant="outline" size="sm" className="border-primary" onClick={handleAddOption}>
                     <Plus className="mr-2 h-4 w-4" />
                     Add Option
                   </Button>
