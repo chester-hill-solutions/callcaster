@@ -19,7 +19,7 @@ export default function SelectVoiceDrop({campaignData, handleInputChange, mediaD
         />
       </Label>
       <Select
-        value={campaignData.voicedrop_audio}
+        value={campaignData.voicedrop_audio || campaignData.voicemail_file}
         onValueChange={(value) => handleInputChange("voicedrop_audio", value)}
       >
         <SelectTrigger id="voicedrop_audio">
