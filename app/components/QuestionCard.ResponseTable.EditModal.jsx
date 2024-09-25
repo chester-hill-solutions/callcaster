@@ -1,49 +1,53 @@
 import React, { useState } from 'react';
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "~/components/ui/card";
 
 export const EditResponseModal = ({ isOpen, onClose, onSave, initialInput }) => {
-    const [input, setInput] = useState(initialInput || '');
+  const [input, setInput] = useState(initialInput || '');
 
-    const handleSave = () => {
-        onSave(input);
-    };
+  const handleSave = () => {
+    onSave(input);
+  };
 
-    const inputOptions = [...Array(10).keys(), 'Voice - Any'];
-    return (
-        isOpen && (
-            <div className="absolute rounded-lg shadow-lg bg-white dark:bg-slate-900" style={{ zIndex: 20, transform:"translateY(40px)" }}>
-                <div className="p-6 flex flex-col">
-                    <h2 className="text-xl font-bold mb-4">Response</h2>
-                    <div className='flex justify-between'>
-                        <div className="mb-4">
-                            <h3 className="font-medium mb-2">Input</h3>
-                            <div className="flex flex-wrap gap-2"
-                                style={{ width: "180px" }}>
-                                {inputOptions.map((option) => (
-                                    <button
-                                        key={option}
-                                        style={{
-                                            border:"2px solid #333",
-                                            height:"50px",
-                                            minWidth:"50px",
-                                            borderRadius:'100px',
-                                            padding:"0 16px"
-                                        }}
+  const inputOptions = [...Array(10).keys(), 'Voice - Any'];
 
-                                        onClick={() => setInput(option == 'Voice - Any' ? 'vx-any' : option.toString())}
-                                        className={`${input === (option == 'Voice - Any' ? 'vx-any' : option.toString()) ? 'bg-blue-500 text-white' : ''}`}
-                                    >
-                                        {option}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex justify-end">
-                        <button onClick={onClose} className="mr-2 px-4 py-2 border rounded">Cancel</button>
-                        <button onClick={handleSave} className="px-4 py-2 bg-primary text-white rounded">Save</button>
-                    </div>
-                </div>
-            </div>
-        )
-    );
+  if (!isOpen) return null;
+
+  return (
+    <Card className="absolute z-20 transform translate-y-10 w-[280px] bg-background">
+      <CardHeader>
+        <CardTitle>Response</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <h3 className="font-medium mb-2">Input</h3>
+          <div className="flex flex-wrap gap-2">
+            {inputOptions.map((option) => (
+              <Button
+                key={option}
+                variant="outline"
+                size="sm"
+                onClick={() => setInput(option === 'Voice - Any' ? 'vx-any' : option.toString())}
+                className={`h-[50px] min-w-[50px] rounded-full px-4 ${
+                  input === (option === 'Voice - Any' ? 'vx-any' : option.toString())
+                    ? 'bg-primary text-primary-foreground'
+                    : ''
+                }`}
+              >
+                {option}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-end space-x-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave}>
+          Save
+        </Button>
+      </CardFooter>
+    </Card>
+  );
 };
