@@ -162,9 +162,7 @@ const MergedQuestionBlock = ({
   ) => void;
 }) => {
   const [localBlock, setLocalBlock] = useState(block);
-  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
-    "none",
-  );
+  const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">("none");
   const questionTypes =
     type === "script"
       ? [
@@ -281,7 +279,7 @@ const MergedQuestionBlock = ({
     setAcceptDrop("none");
   };
 
-  return (
+  return block && (
     <div
       className={`border-2 border-x-0 py-1 ${
         acceptDrop === "top"
