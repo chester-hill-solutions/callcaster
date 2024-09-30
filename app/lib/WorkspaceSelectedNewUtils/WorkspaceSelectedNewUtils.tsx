@@ -112,8 +112,14 @@ export async function handleNewCampaign({
     .single();
 
   if (campaignError) {
+    if (campaignError.code === '23505'){
+      return json(
+        { campaignData: null, error: {message: "There is already a campaign with that name. Please use a unique campaign name."} },
+        { headers },
+      );  
+    }
     return json(
-      { campaignData: null, error: campaignError.message },
+      { campaignData: null, error: campaignError },
       { headers },
     );
   }
