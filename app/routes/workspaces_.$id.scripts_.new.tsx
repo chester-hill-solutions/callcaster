@@ -202,10 +202,10 @@ export default function NewScript() {
                 name="type"
                 id="type"
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                defaultValue={campaignType === "live_call" ? "script" : "ivr"}
+                defaultValue={campaignType ? campaignType === "live_call" ? "script" : "ivr" : "script"}
               >
-                <option value="ivr">IVR</option>
-                <option value="script">Script</option>
+                <option value="script">Live Caller Script</option>
+                <option value="ivr">Interactive Voice Recording (IVR)</option>
               </select>
             </label>
             <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">
