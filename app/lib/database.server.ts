@@ -7,6 +7,7 @@ import {
   Campaign,
   CampaignAudience,
   Contact,
+  User,
   WorkspaceData,
   WorkspaceNumbers,
 } from "./types";
@@ -389,11 +390,11 @@ export async function forceTokenRefresh({
   serverSession,
 }: {
   supabaseClient: SupabaseClient<Database>;
-  serverSession: Session;
+  serverSession?: Session;
 }) {
-  // const refreshToken = serverSession.refresh_token;
-  const { data: refreshData, error: refreshError } =
-    await supabaseClient.auth.refreshSession();
+  const { data: refreshData, error: refreshError } = serverSession
+    ? await supabaseClient.auth.refreshSession(serverSession)
+    : await supabaseClient.auth.refreshSession();
 
   if (refreshError) {
     console.error("Error refreshing access token", refreshError);
@@ -736,7 +737,7 @@ export async function updateCampaign({
     body_text: undefined,
     message_media: undefined,
     voicedrop_audio: undefined,
-    is_active: Boolean(restCampaignData.is_active)
+    is_active: Boolean(restCampaignData.is_active),
   });
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
 
@@ -750,7 +751,7 @@ export async function updateCampaign({
           questions: undefined,
           created_at: undefined,
           script_id: undefined,
-          voicedrop_audio: undefined
+          voicedrop_audio: undefined,
         })
       : tableKey === "ivr_campaign"
         ? cleanObject({
@@ -1160,14 +1161,13 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data, users) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-  console.log(dynamicKeys, resultKeys, otherDataKeys)
-  let csvHeaders = [...dynamicKeys, ...otherDataKeys].map(
-    (header) =>
-      header === "id"
-        ? "attempt_id"
-        : header === "contact_id"
-          ? "callcaster_id"
-          : header,
+  console.log(dynamicKeys, resultKeys, otherDataKeys);
+  let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
+    header === "id"
+      ? "attempt_id"
+      : header === "contact_id"
+        ? "callcaster_id"
+        : header,
   );
 
   let flattenedData = data.map((row) => flattenRow(row, users));
@@ -1182,8 +1182,12 @@ export function processOutreachExportData(data, users) {
   let currentGroup = null;
 
   flattenedData.forEach((row) => {
-    if (!currentGroup || row.callcaster_id !== currentGroup.callcaster_id || 
-        (new Date(row.created_at) - new Date(currentGroup.created_at)) > 12 * 60 * 60 * 1000) {
+    if (
+      !currentGroup ||
+      row.callcaster_id !== currentGroup.callcaster_id ||
+      new Date(row.created_at) - new Date(currentGroup.created_at) >
+        12 * 60 * 60 * 1000
+    ) {
       if (currentGroup) {
         mergedData.push(currentGroup);
       }
@@ -1602,18 +1606,22 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
   };
 }
 
-export function checkSchedule(
-  campaignData: Campaign,
-) {
+export function checkSchedule(campaignData: Campaign) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
-  const utcNow = new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 
-                          now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
-  
+  const utcNow = new Date(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    now.getUTCSeconds(),
+  );
+
   if (!(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
     return false;
   }
-  
+
   const currentDay = utcNow.getUTCDay();
   const daysOfWeek = [
     "sunday",
@@ -1624,20 +1632,29 @@ export function checkSchedule(
     "friday",
     "saturday",
   ];
-  
+
   if (!schedule || !Object.keys(schedule).length) return false;
-  
+
   const todaySchedule = schedule[daysOfWeek[currentDay]];
   if (!todaySchedule.active) {
     return false;
   }
-  
+
   const currentTime = utcNow.toISOString().slice(11, 16); // Get time in HH:MM format
-  
+
   return todaySchedule.intervals.some((interval) => {
     if (interval.end < interval.start) {
       return currentTime >= interval.start || currentTime < interval.end;
     }
     return currentTime >= interval.start && currentTime < interval.end;
   });
+}
+
+export async function getInvitesByUserId (supabase:SupabaseClient, user_id:User["id"]){
+  const {data, error} = await supabase
+  .from("workspace_invite")
+  .select()
+  .eq("user_id", user_id);
+  if (error) throw error;
+  return data;
 }

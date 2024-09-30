@@ -10,6 +10,7 @@ import {
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import {
   AuthSession,
+  EmailOtpType,
   Session,
   SupabaseClient,
   VerifyTokenHashParams,
@@ -18,7 +19,10 @@ import {
   createSupabaseServerClient,
   getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
-import { acceptWorkspaceInvitations } from "~/lib/database.server";
+import {
+  acceptWorkspaceInvitations,
+  getInvitesByUserId,
+} from "~/lib/database.server";
 import { Button } from "~/components/ui/button";
 import { NewUserSignup } from "~/components/AcceptInvite/NewUserSignUp";
 import { ExistingUserInvites } from "~/components/AcceptInvite/ExistingUserInvites";
@@ -34,6 +38,10 @@ async function handleAuthenticatedUser(
     .from("workspace_invite")
     .select(`*, workspace(id, name)`)
     .eq("user_id", session.user.id);
+    console.log(invites)
+  if (inviteError) {
+    throw inviteError.message;
+  }
   if (
     session.user.user_metadata.first_name === "New" &&
     session.user.user_metadata.last_name === "Caller"
@@ -47,9 +55,18 @@ async function handleAuthenticatedUser(
       },
       { headers },
     );
-  } if (inviteError){
-    throw inviteError.message
-  }
+  } else
+    return json(
+      {
+        status: "existing_user",
+        session,
+        invites,
+        email: session.user.email,
+      },
+      {
+        headers,
+      },
+    );
 }
 
 async function handleTokenVerification(
@@ -62,9 +79,13 @@ async function handleTokenVerification(
   try {
     const { data: verifyData, error: verifyError } =
       await client.auth.verifyOtp({ token_hash, type });
-    if (verifyError) {
+    if (verifyError || !verifyData.session) {
       if (
-        verifyError.message.includes("Email link is invalid or has expired")
+        (verifyError &&
+          verifyError.message.includes(
+            "Email link is invalid or has expired",
+          )) ||
+        !verifyData.session
       ) {
         return json(
           {
@@ -77,26 +98,23 @@ async function handleTokenVerification(
       }
       throw verifyError;
     }
-    if (!verifyData.session) {
-      throw new Error("Failed to verify OTP: No session returned");
+    const { data: sessionData, error: setSessionError } =
+      await client.auth.setSession({
+        access_token: verifyData.session.access_token,
+        refresh_token: verifyData.session.refresh_token,
+      });
+    if (setSessionError || !sessionData.session || !sessionData.user) {
+      console.error("Set session error:", setSessionError);
+      throw setSessionError;
     }
-    const { error: setSessionError } = await client.auth.setSession(
-      verifyData.session,
-    );
-    if (setSessionError) throw setSessionError;
-
-    const { data: invites, error: inviteError } = await client
-      .from("workspace_invite")
-      .select()
-      .eq("user_id", verifyData.session.user.id);
-    if (inviteError) throw inviteError;
-
+    await client.auth.refreshSession(sessionData.session);
+    const invites = await getInvitesByUserId(client, sessionData.user.id);
     return json(
       {
         status: "verified",
         session: verifyData.session,
-        invites,
         email,
+        invites,
       },
       { headers },
     );
@@ -110,22 +128,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();
-
   const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const email = url.searchParams.get("email");
-
-  if (token_hash && type) {
+  if (!email) throw new Error("No email address found.");
+  if (session) {
+    return handleAuthenticatedUser(supabaseClient, session, headers);
+  } else if (token_hash && type) {
     return handleTokenVerification(
       supabaseClient,
       token_hash,
-      type,
+      type as EmailOtpType,
       email,
       headers,
     );
-  } else if (session) {
-    return handleAuthenticatedUser(supabaseClient, session, headers);
   } else {
     return json({ status: "not_signed_in" }, { headers });
   }
@@ -222,7 +239,7 @@ export default function AcceptInvite() {
   const navigate = useNavigate();
   const { state } = useNavigation();
   const submit = useSubmit();
-  
+
   useEffect(() => {
     if (state === "idle" && actionData?.success) {
       toast.success("Successfully signed up and accepted invitation");
