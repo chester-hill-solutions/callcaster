@@ -635,6 +635,19 @@ const Campaign: React.FC = () => {
     });
   };
 
+  const requeueContacts = () => {
+    const formData = new FormData();
+    const userId = user.id;
+    const campaignId = campaign?.id
+    submit({userId, campaignId}, {
+      method: "DELETE",
+      action: "/api/queues",
+      encType:"application/json",
+      navigate: false,
+    });
+
+  }
+
   const currentState = {
     callState,
     deviceStatus,
@@ -663,6 +676,7 @@ const Campaign: React.FC = () => {
           onLeaveCampaign={() => {
             hangUp();
             device?.destroy();
+            requeueContacts();
             navigate(-1);
           }}
           onReportError={() => setReportDialog(!isReportDialogOpen)}

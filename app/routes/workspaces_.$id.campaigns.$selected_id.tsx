@@ -88,7 +88,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.storage.from("workspaceAudio").list(workspace_id),
     getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient }),
   ]);
-
   if (!campaignData)
     return json({ error: "Campaign not found" }, { status: 404 });
 

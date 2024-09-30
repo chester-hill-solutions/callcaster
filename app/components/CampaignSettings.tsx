@@ -80,7 +80,6 @@ export const CampaignSettings = ({
   const navigation = useNavigation();
   const fetcher = useFetcher();
   const formFetcher = useFetcher();
-
   const [campaignData, setCampaignData] = useState(() => ({
     campaign_id,
     workspace,
@@ -101,6 +100,7 @@ export const CampaignSettings = ({
     message_media: details?.message_media || [],
     voicedrop_audio: details?.voicedrop_audio,
     schedule: data?.schedule || {},
+    is_active: data?.is_active || false
   }));
   const [initialData, setInitial] = useState(campaignData);
 
@@ -129,6 +129,7 @@ export const CampaignSettings = ({
       message_media: details?.message_media || [],
       voicedrop_audio: details?.voicedrop_audio,
       schedule: data?.schedule || {},
+      is_active: data?.is_active || false
     });
   }, [campaign_id, data, details, workspace]);
 
@@ -167,10 +168,12 @@ export const CampaignSettings = ({
   };
 
   const handleActivateButton = (event) => {
+    event.preventDefault();
+
     if (campaignData.type === "live_call") {
       formFetcher.submit(
         {
-          campaignData: JSON.stringify({ ...campaignData, status: "running" }),
+          campaignData: JSON.stringify({ ...campaignData, status: "running", is_active: true }),
           campaignDetails: JSON.stringify(details),
         },
         {
@@ -206,6 +209,7 @@ export const CampaignSettings = ({
   };
 
   const handleScheduleButton = (event) => {
+    event.preventDefault();
     formFetcher.submit(
       {
         campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
@@ -317,7 +321,7 @@ export const CampaignSettings = ({
         <input
           type="hidden"
           name="campaignData"
-          value={JSON.stringify(campaignData)}
+          value={JSON.stringify({...campaignData, is_active:data.is_active})}
         />
         <input
           type="hidden"

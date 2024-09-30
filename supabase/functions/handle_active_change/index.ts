@@ -265,7 +265,7 @@ Deno.serve(async (req) => {
   const supabase = initSupabaseClient();
   const now = new Date();
   const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
-
+  if (record.type === "live_call") return;
   try {
     if (
       record.is_active &&

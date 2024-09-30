@@ -206,7 +206,8 @@ export type Json =
             title: string
             type: Database["public"]["Enums"]["campaign_type"] | null
             voicemail_file: string | null
-            workspace: string | null
+            workspace: string | null,
+            is_active: boolean;
           }
           Insert: {
             call_questions?: Json | null

@@ -19,11 +19,31 @@ export const loader = async ({ request, params }) => {
 
 export const action = async ({ request, params }) => {
     const { supabaseClient: supabase } = createSupabaseServerClient(request);
-    const { contact_id, household } = await request.json();
-    const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contact_id, group_on_household: household })
-    if (error) {
-        console.error('Error updating campaign queue:', error);
-        return json({ error: error.message }, { status: 500 });
+
+    if (request.method === 'POST') {
+        const { contact_id, household } = await request.json();
+        const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contact_id, group_on_household: household })
+        if (error) {
+            console.error('Error updating campaign queue:', error);
+            return json({ error: error.message }, { status: 500 });
+        }
+        return json(data);
+    } 
+    else if (request.method === 'DELETE') {
+        const { userId, campaignId } = await request.json();
+        const { data, error } = await supabase
+            .from('campaign_queue')
+            .update({ status: 'queued' })
+            .eq('status', userId)
+            .eq('campaign_id', campaignId)
+            .select();
+
+        if (error) {
+            console.error('Error resetting campaign queue items:', error);
+            return json({ error: error.message }, { status: 500 });
+        }
+        return json({ message: 'Campaign queue items reset successfully', affected_rows: data.length });
     }
-    return json(data);
-}
+
+    return json({ error: 'Method not allowed' }, { status: 405 });
+};
