@@ -265,15 +265,20 @@ Deno.serve(async (req) => {
   const supabase = initSupabaseClient();
   const now = new Date();
   const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
-  if (record.type === "live_call") return;
+  
   try {
     if (
       record.is_active &&
       new Date(record.end_date) > now &&
       new Date(record.start_date) < now
     ) {
+      const {error} = await supabase.from("campaign").update({status:"running"}).eq("id", record.id);
+      if (error) throw error;
+      if (record.type === "live_call") return;
       handleInitiateCampaign(supabase, record.id);
     } else if (!record.is_active) {
+      const {error} = await supabase.from("campaign").update({status:"paused"}).eq("id", record.id);
+      if (error) throw error;
       handlePauseCampaign(supabase, record.id, twilio);
     }
   } catch (error) {
