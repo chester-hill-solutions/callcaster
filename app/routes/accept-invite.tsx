@@ -8,105 +8,151 @@ import {
   useSubmit,
 } from "@remix-run/react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
-import { Session, SupabaseClient } from "@supabase/supabase-js";
+import {
+  AuthSession,
+  EmailOtpType,
+  Session,
+  SupabaseClient,
+  VerifyTokenHashParams,
+} from "@supabase/supabase-js";
 import {
   createSupabaseServerClient,
   getSupabaseServerClientWithSession,
 } from "~/lib/supabase.server";
-import { acceptWorkspaceInvitations } from "~/lib/database.server";
+import {
+  acceptWorkspaceInvitations,
+  getInvitesByUserId,
+} from "~/lib/database.server";
 import { Button } from "~/components/ui/button";
 import { NewUserSignup } from "~/components/AcceptInvite/NewUserSignUp";
 import { ExistingUserInvites } from "~/components/AcceptInvite/ExistingUserInvites";
 import { toast, Toaster } from "sonner";
 import { useEffect } from "react";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+async function handleAuthenticatedUser(
+  client: SupabaseClient,
+  session: AuthSession,
+  headers: Headers,
+) {
+  const { data: invites, error: inviteError } = await client
+    .from("workspace_invite")
+    .select(`*, workspace(id, name)`)
+    .eq("user_id", session.user.id);
+    console.log(invites)
+  if (inviteError) {
+    throw inviteError.message;
+  }
+  if (
+    session.user.user_metadata.first_name === "New" &&
+    session.user.user_metadata.last_name === "Caller"
+  ) {
+    return json(
+      {
+        status: "verified",
+        session,
+        invites,
+        email: session.user.email,
+      },
+      { headers },
+    );
+  } else
+    return json(
+      {
+        status: "existing_user",
+        session,
+        invites,
+        email: session.user.email,
+      },
+      {
+        headers,
+      },
+    );
+}
+
+async function handleTokenVerification(
+  client: SupabaseClient,
+  token_hash: VerifyTokenHashParams["token_hash"],
+  type: VerifyTokenHashParams["type"],
+  email: string,
+  headers: Headers,
+) {
+  try {
+    const { data: verifyData, error: verifyError } =
+      await client.auth.verifyOtp({ token_hash, type });
+    if (verifyError || !verifyData.session) {
+      if (
+        (verifyError &&
+          verifyError.message.includes(
+            "Email link is invalid or has expired",
+          )) ||
+        !verifyData.session
+      ) {
+        return json(
+          {
+            status: "invalid_link",
+            error:
+              "The invitation link is invalid or has expired. Please request a new invitation.",
+          },
+          { headers },
+        );
+      }
+      throw verifyError;
+    }
+    const { data: sessionData, error: setSessionError } =
+      await client.auth.setSession({
+        access_token: verifyData.session.access_token,
+        refresh_token: verifyData.session.refresh_token,
+      });
+    if (setSessionError || !sessionData.session || !sessionData.user) {
+      console.error("Set session error:", setSessionError);
+      throw setSessionError;
+    }
+    await client.auth.refreshSession(sessionData.session);
+    const invites = await getInvitesByUserId(client, sessionData.user.id);
+    return json(
+      {
+        status: "verified",
+        session: verifyData.session,
+        email,
+        invites,
+      },
+      { headers },
+    );
+  } catch (error) {
+    console.error("Unhandled error", error);
+  }
+}
+
+export async function loader({ request }: LoaderFunctionArgs) {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();
-
   const url = new URL(request.url);
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const email = url.searchParams.get("email");
-
+  if (!email) throw new Error("No email address found.");
   if (session) {
-    const { data: invites, error: inviteError } = await supabaseClient
-      .from("workspace_invite")
-      .select(`*, workspace(id, name)`)
-      .eq("user_id", session.user.id);
-    if (inviteError) return json({ error: inviteError }, { headers });
-
-    if (
-      session.user.user_metadata.first_name === "New" &&
-      session.user.user_metadata.last_name === "Caller"
-    ) {
-      return json({ 
-        status: "verified", 
-        session, 
-        invites, 
-        email: email || session.user.email,
-      }, { headers });
-    } else {
-      return json({ status: "existing_user", session, invites }, { headers });
-    }
+    return handleAuthenticatedUser(supabaseClient, session, headers);
   } else if (token_hash && type) {
-    try {
-      const { data: verifyData, error: verifyError } =
-        await supabaseClient.auth.verifyOtp({
-          token_hash,
-          type: type as "signup" | "invite" | "magiclink" | "recovery" | "email_change",
-        });
-
-      if (verifyError) {
-        if (verifyError.message.includes("Email link is invalid or has expired")) {
-          return json({ 
-            status: "invalid_link", 
-            error: "The invitation link is invalid or has expired. Please request a new invitation."
-          }, { headers });
-        }
-        throw verifyError;
-      }
-
-      if (!verifyData.session) {
-        throw new Error("Failed to verify OTP: No session returned");
-      }
-      const { error: setSessionError } = await supabaseClient.auth.setSession(verifyData.session);
-      if (setSessionError) throw setSessionError;
-
-      const { data: invites, error: inviteError } = await supabaseClient
-        .from("workspace_invite")
-        .select()
-        .eq("user_id", verifyData.session.user.id);
-      if (inviteError) throw inviteError;
-
-      return json(
-        { 
-          status: "verified", 
-          session: verifyData.session, 
-          invites, 
-          email
-        },
-        { headers },
-      );
-    } catch (error) {
-      console.error("Error in verifyOtp:", error);
-      return json(
-        { status: "error", error: error.message || "An unexpected error occurred" },
-        { headers },
-      );
-    }
+    return handleTokenVerification(
+      supabaseClient,
+      token_hash,
+      type as EmailOtpType,
+      email,
+      headers,
+    );
   } else {
     return json({ status: "not_signed_in" }, { headers });
   }
-};
+}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const actionType = formData.get("actionType");
-  
+
   if (actionType === "updateUser") {
     try {
       const { email, password, firstName, lastName } =
@@ -159,13 +205,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 function VerifiedNewUser({ email, state, onSubmit }) {
-  return (
-    <NewUserSignup
-      email={email}
-      state={state}
-      onSubmit={onSubmit}
-    />
-  );
+  return <NewUserSignup email={email} state={state} onSubmit={onSubmit} />;
 }
 
 function ExistingUser({ invites, state }) {
@@ -199,12 +239,12 @@ export default function AcceptInvite() {
   const navigate = useNavigate();
   const { state } = useNavigation();
   const submit = useSubmit();
-  
+
   useEffect(() => {
     if (state === "idle" && actionData?.success) {
       toast.success("Successfully signed up and accepted invitation");
-      const timeout = setTimeout(() => navigate('/workspaces'), 3000);
-      
+      const timeout = setTimeout(() => navigate("/workspaces"), 3000);
+
       return () => clearTimeout(timeout);
     }
   }, [actionData, navigate, state]);
@@ -218,8 +258,7 @@ export default function AcceptInvite() {
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-      <div className="flex flex-col items-center justify-center gap-5  dark:text-white rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
-      >
+      <div className="flex flex-col items-center justify-center gap-5  rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:text-white dark:shadow-none">
         <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary  dark:text-white">
           Accept your invitations
         </h1>
@@ -234,6 +273,7 @@ export default function AcceptInvite() {
           <ExistingUser invites={loaderData.invites} state={state} />
         )}
         {loaderData.status === "not_signed_in" && <NotSignedIn />}
+        {Boolean(loaderData.error) && <div>{loaderData.error}</div>}
       </div>
       <Toaster richColors />
     </main>
