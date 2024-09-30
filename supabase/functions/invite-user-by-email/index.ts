@@ -61,7 +61,7 @@ async function sendInviteEmail(
         dynamic_template_data: {
           workspace_name:workspaceName,
           signup_link: linkData?.hashed_token
-            ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=invite&email=${encodeURI(email)}`
+            ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=invite&email=${encodeURIComponent(email)}`
             : `${Deno.env.get("SITE_URL")}/accept-invite`,
         },
       },
