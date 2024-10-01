@@ -48,7 +48,7 @@ export default function Reset() {
     if (actionData?.data) {
       toast.success("New password set!");
       const redirectTimer = setTimeout(() => {
-        navigate("/workspace");
+        navigate("/workspaces");
       }, 2000);
       return () => clearTimeout(redirectTimer);
     } else if (actionData?.error) {
