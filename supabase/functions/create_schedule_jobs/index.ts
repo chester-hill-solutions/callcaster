@@ -7,7 +7,7 @@ const initSupabaseClient = () => {
   );
 };
 
-const createCronJobsStructure = async (schedule, supabase) => {
+const generateCronExpressions = async (schedule, supabase) => {
   const { data, error } = await supabase.rpc('generate_cron_expressions', { schedule });
   if (error) throw error;
   return data;
@@ -22,9 +22,6 @@ const createCronJob = async (supabase, jobName, schedule, command) => {
   if (error) {
     console.error('Error creating cron job:', error);
     throw error;
-  }
-  if (!data || data.length === 0) {
-    throw new Error('Failed to create cron job: No data returned');
   }
   return data[0].job_id;
 };
@@ -41,33 +38,42 @@ const storeJobIds = async (supabase, campaignId, startJobIds, endJobIds) => {
   return data;
 };
 
+const splitCronExpressions = (cronString: string): string[] => {
+  return cronString.split('|').map(expr => expr.trim());
+};
+
 Deno.serve(async (req) => {
   const { record } = await req.json();
   const supabase = initSupabaseClient();
   try {
-    const structures = await createCronJobsStructure(record.schedule, supabase);
-    if (structures && structures.length > 0) {
+    const cronExpressions = await generateCronExpressions(record.schedule, supabase);
+    if (cronExpressions && cronExpressions.length > 0) {
       const startJobIds = [];
       const endJobIds = [];
 
-      for (let i = 0; i < structures.length; i++) {
-        const { start_cron, end_cron } = structures[i];
+      for (const { start_cron, end_cron } of cronExpressions) {
+        const startSchedules = splitCronExpressions(start_cron);
+        const endSchedules = splitCronExpressions(end_cron);
 
-        const startJobId = await createCronJob(
-          supabase,
-          `campaign_start_${record.id}_${i}`,
-          start_cron,
-          `UPDATE public.campaign SET is_active = true WHERE id = ${record.id}`
-        );
-        startJobIds.push(startJobId);
+        for (let i = 0; i < startSchedules.length; i++) {
+          const startJobId = await createCronJob(
+            supabase,
+            `campaign_start_${record.id}_${i}`,
+            startSchedules[i],
+            `UPDATE public.campaign SET is_active = true WHERE id = ${record.id}`
+          );
+          startJobIds.push(startJobId);
+        }
 
-        const endJobId = await createCronJob(
-          supabase,
-          `campaign_end_${record.id}_${i}`,
-          end_cron,
-          `UPDATE public.campaign SET is_active = false WHERE id = ${record.id}`
-        );
-        endJobIds.push(endJobId);
+        for (let i = 0; i < endSchedules.length; i++) {
+          const endJobId = await createCronJob(
+            supabase,
+            `campaign_end_${record.id}_${i}`,
+            endSchedules[i],
+            `UPDATE public.campaign SET is_active = false WHERE id = ${record.id}`
+          );
+          endJobIds.push(endJobId);
+        }
       }
 
       await storeJobIds(supabase, record.id, startJobIds, endJobIds);
@@ -77,12 +83,12 @@ Deno.serve(async (req) => {
         { headers: { "Content-Type": "application/json" } }
       );
     } else {
-      throw new Error("No cron structures generated");
+      throw new Error("No cron expressions generated");
     }
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: error.message, details: error.details }),
+      JSON.stringify({ error: error.message }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
