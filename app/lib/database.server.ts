@@ -1,6 +1,11 @@
 import Twilio from "twilio";
 import Stripe from "stripe";
-import { PostgrestError, Session, SupabaseClient } from "@supabase/supabase-js";
+import {
+  AuthSession,
+  PostgrestError,
+  Session,
+  SupabaseClient,
+} from "@supabase/supabase-js";
 import type { Database } from "./database.types";
 import {
   Audience,
@@ -14,6 +19,7 @@ import {
 import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
+import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -62,7 +68,15 @@ export async function createNewWorkspaceDeprecated({
   return { data, error };
 }
 
-export async function createKeys({ workspace_id, sid, token }) {
+export async function createKeys({
+  workspace_id,
+  sid,
+  token,
+}: {
+  workspace_id: string;
+  sid: string;
+  token: string;
+}): Promise<NewKeyInstance> {
   const twilio = new Twilio.Twilio(sid, token);
   try {
     const newKey = await twilio.newKeys.create({ friendlyName: workspace_id });
@@ -73,7 +87,11 @@ export async function createKeys({ workspace_id, sid, token }) {
   }
 }
 
-export async function createSubaccount({ workspace_id }) {
+export async function createSubaccount({
+  workspace_id,
+}: {
+  workspace_id: string;
+}) {
   const twilio = new Twilio.Twilio(
     process.env.TWILIO_SID,
     process.env.TWILIO_AUTH_TOKEN,
@@ -109,7 +127,7 @@ export async function createNewWorkspace({
     }
 
     const account = await createSubaccount({
-      workspace_id: insertWorkspaceData,
+      workspace_id: insertWorkspaceData!,
     });
 
     if (!account) {
@@ -117,7 +135,7 @@ export async function createNewWorkspace({
     }
 
     const newKey = await createKeys({
-      workspace_id: insertWorkspaceData,
+      workspace_id: insertWorkspaceData!,
       sid: account.sid,
       token: account.authToken,
     });
@@ -127,18 +145,18 @@ export async function createNewWorkspace({
 
     const newStripeCustomer = await createStripeContact({
       supabaseClient,
-      workspace_id: insertWorkspaceData,
+      workspace_id: insertWorkspaceData!,
     });
 
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
       .update({
-        twilio_data: account,
+        twilio_data: Object(account),
         key: newKey.sid,
         token: newKey.secret,
         stripe_id: newStripeCustomer.id,
       })
-      .eq("id", insertWorkspaceData);
+      .eq("id", insertWorkspaceData!);
     if (insertWorkspaceUsersError) {
       throw insertWorkspaceUsersError;
     }
@@ -290,7 +308,13 @@ export async function testAuthorize({
   return { data, error };
 }
 
-export function getUserRole({ serverSession, workspaceId }) {
+export function getUserRole({
+  serverSession,
+  workspaceId,
+}: {
+  serverSession: AuthSession;
+  workspaceId: string;
+}) {
   if (serverSession == null || serverSession.access_token == null) {
     return null;
   }
@@ -500,6 +524,9 @@ export async function updateCallerId({
 export async function createWorkspaceTwilioInstance({
   supabase,
   workspace_id,
+}: {
+  supabase: SupabaseClient;
+  workspace_id: string;
 }) {
   const { data, error } = await supabase
     .from("workspace")
@@ -514,12 +541,16 @@ export async function createWorkspaceTwilioInstance({
   return twilio;
 }
 
-export async function endConferenceByUser({ user_id, supabaseClient }) {
-  const { data, error } = await supabase
+// Marked for deprecation
+export async function endConferenceByUser({ user_id, supabaseClient, workspace_id }:{ workspace_id:string, user_id:string, supabaseClient:SupabaseClient }) {
+  const { data, error } = await supabaseClient
     .from("workspace")
     .select("twilio_data, key, token")
     .eq("id", workspace_id)
     .single();
+    if (error || !data){
+      throw error || new Error("No workspace found")
+    }
   const twilio = new Twilio.Twilio(
     data.twilio_data.sid,
     data.twilio_data.authToken,
@@ -559,7 +590,7 @@ export async function endConferenceByUser({ user_id, supabaseClient }) {
   );
 }
 
-export async function getWorkspaceScripts({ workspace, supabase }) {
+export async function getWorkspaceScripts({ workspace, supabase }:{ workspace:string, supabase:SupabaseClient}) {
   const { data, error } = await supabase
     .from("script")
     .select()
@@ -604,7 +635,7 @@ export async function getMedia(
   return media;
 }
 
-export async function listMedia(supabaseClient, workspace) {
+export async function listMedia(supabaseClient:SupabaseClient, workspace:string) {
   const { data, error } = await supabaseClient.storage
     .from(`workspaceAudio`)
     .list(workspace);
@@ -612,7 +643,7 @@ export async function listMedia(supabaseClient, workspace) {
   return data;
 }
 
-export async function getSignedUrls(supabaseClient, workspace_id, mediaNames) {
+export async function getSignedUrls(supabaseClient:SupabaseClient, workspace_id:string, mediaNames:string[]) {
   return Promise.all(
     mediaNames.map(async (mediaName) => {
       const { data, error } = await supabaseClient.storage
@@ -1650,11 +1681,14 @@ export function checkSchedule(campaignData: Campaign) {
   });
 }
 
-export async function getInvitesByUserId (supabase:SupabaseClient, user_id:User["id"]){
-  const {data, error} = await supabase
-  .from("workspace_invite")
-  .select()
-  .eq("user_id", user_id);
+export async function getInvitesByUserId(
+  supabase: SupabaseClient,
+  user_id: string,
+) {
+  const { data, error } = await supabase
+    .from("workspace_invite")
+    .select()
+    .eq("user_id", user_id);
   if (error) throw error;
   return data;
 }

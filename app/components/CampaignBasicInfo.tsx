@@ -136,7 +136,7 @@ export const CampaignBasicInfo = ({
           </TooltipTrigger>
           <TooltipContent align="end">
             {state === "Active"
-              ? `Currently ${type === "play" ? "running" : type}ed`
+              ? `Currently ${type === "play" ? "running" : `${type}ed`}`
               : tooltip}
           </TooltipContent>
         </Tooltip>

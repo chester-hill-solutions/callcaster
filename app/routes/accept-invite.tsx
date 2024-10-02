@@ -38,7 +38,6 @@ async function handleAuthenticatedUser(
     .from("workspace_invite")
     .select(`*, workspace(id, name)`)
     .eq("user_id", session.user.id);
-    console.log(invites)
   if (inviteError) {
     throw inviteError.message;
   }
@@ -132,10 +131,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const token_hash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type");
   const email = url.searchParams.get("email");
-  if (!email) throw new Error("No email address found.");
   if (session) {
     return handleAuthenticatedUser(supabaseClient, session, headers);
+    
   } else if (token_hash && type) {
+    if (!email) throw new Error("No email address found.");
     return handleTokenVerification(
       supabaseClient,
       token_hash,
