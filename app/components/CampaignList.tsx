@@ -27,7 +27,7 @@ const StatusBadge = ({ status }) => {
 
   return (
     <Badge className={`text-xxs mx-2 ${badgeStyles[status] || ""}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {status ? status?.charAt(0)?.toUpperCase() + status?.slice(1) : 'ERROR'}
     </Badge>
   );
 };
