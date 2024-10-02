@@ -158,7 +158,7 @@ export const handleQueue = ({
   const updateQueue = (newContacts) => {
     setQueue((prevQueue) => {
       const existingHouseholds = new Map();
-      prevQueue.forEach((contact) => {
+      prevQueue?.forEach((contact) => {
         const address = contact.contact.address;
         if (!existingHouseholds.has(address)) {
           existingHouseholds.set(address, []);
@@ -166,8 +166,8 @@ export const handleQueue = ({
         existingHouseholds.get(address).push(contact);
       });
 
-      newContacts.forEach((newContact) => {
-        const address = newContact.contact.address;
+      newContacts?.forEach((newContact) => {
+        const address = newContact.contact.address || `ADDRESS_${newContact.contact.id}`;
         if (existingHouseholds.has(address)) {
           const household = existingHouseholds.get(address);
           if (!household.some((c) => c.queue_id === newContact.queue_id)) {
@@ -176,7 +176,7 @@ export const handleQueue = ({
         } else {
           existingHouseholds.set(address, [newContact]);
         }
-      });
+      }); 
       return Array.from(existingHouseholds.values()).flat();
     });
   };
@@ -188,8 +188,8 @@ export const handleQueue = ({
       `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`,
     )
       .then((res) => res.json())
+      .then((json) => updateQueue(json))
       .catch((error) => console.log("Unable to fetch queue: ", error));
-    updateQueue(res);
   };
   return { dequeue, fetchMore };
 };
