@@ -16,7 +16,7 @@ const getCallWithRetry = async (supabase, callSid, retries = 0) => {
     .select('*, outreach_attempt(id, result, current_step), campaign(*,ivr_campaign(*, script(*)))')
     .eq("sid", callSid)
     .single();
-  console.log
+
   if (error || !data) {
     log('warn', `Failed to retrieve call data`, { callSid, error, retryAttempt: retries });
     if (retries < MAX_RETRIES) {
@@ -30,7 +30,7 @@ const getCallWithRetry = async (supabase, callSid, retries = 0) => {
 };
 
 const findNextStep = (currentBlock, userInput, script, pageId) => {
-  //log('debug', `Finding next step`, { currentBlockId: currentBlock.id, userInput, pageId });
+  log('debug', `Finding next step`, { currentBlockId: currentBlock.id, userInput, pageId });
 
   if (currentBlock.options && currentBlock.options.length > 0) {
     const matchedOption = currentBlock.options.find((option) => {
@@ -107,18 +107,19 @@ const handleAudio = async (supabase, twiml, block, workspace) => {
       log('error', `Failed to create signed URL`, { error: signedUrlError });
       throw signedUrlError;
     }
-    return signedUrlData;
+    log('info', 'Audio URL', signedUrlData)
+    return signedUrlData.signedURL;
   } else {
     return audioFile
   }
 };
 
 const handleOptions = async (twiml, block, page_id, script, outreach_id, supabase, workspace) => {
-  //log('debug', `Handling options`, { blockId: block.id, hasOptions: !!(block.options && block.options.length > 0) });
+  log('debug', `Handling options`, { blockId: block.id, hasOptions: !!(block.options && block.options.length > 0) });
   const audio = await handleAudio(supabase, twiml, block, workspace)
   if (block.options && block.options.length > 0) {
     const gather = twiml.gather({
-      action: `ivr-2916.twil.io/flow`,
+      action: `https://ivr-2916.twil.io/flow`,
       input: "dtmf speech",
       speechTimeout: "auto",
       speechModel: "phone_call",
@@ -143,7 +144,7 @@ const processResult = async (supabase, script, currentStep, result, userInput, c
   let [currentPageId, currentBlockId] = step.split(':');
   const currentBlock = script.blocks[currentBlockId];
 
-  //log('debug', `Processing step`, { step, userInput });
+  log('debug', `Processing step`, { step, userInput });
 
   if (userInput !== undefined) {
     result = {
@@ -172,14 +173,13 @@ exports.handler = async function (context, event, callback) {
     context.SUPABASE_SERVICE_KEY
   );
   const twiml = new Twilio.twiml.VoiceResponse();
-
   try {
+    //log('log', 'Event Data', event)
     const callSid = event.CallSid;
     if (!callSid) {
       log('error', `Missing CallSid`);
       throw new Error("Missing CallSid");
     }
-
     const userInput = event.Digits || event.SpeechResult;
     const callData = await getCallWithRetry(supabase, callSid);
     if (event.AnsweredBy && event.AnsweredBy.includes('machine') && !event.AnsweredBy.includes('other')) {
@@ -210,7 +210,6 @@ exports.handler = async function (context, event, callback) {
     const script = callData.campaign.ivr_campaign[0].script.steps;
     let result = callData.outreach_attempt?.result || {};
     let currentStep = callData.outreach_attempt?.current_step;
-
     const processedStep = await processResult(supabase, script, currentStep, result, userInput, callData.outreach_attempt.id);
     currentStep = processedStep.step;
     result = processedStep.result;
@@ -219,7 +218,7 @@ exports.handler = async function (context, event, callback) {
       //log('info', `Ending call`, { callSid });
       twiml.hangup();
     } else {
-      //log('info', `Processing step`, { callSid, currentStep });
+      log('info', `Processing step`, { callSid, currentStep });
       const [currentPageId, currentBlockId] = currentStep.split(':');
       const currentBlock = script.blocks[currentBlockId];
       await handleOptions(twiml, currentBlock, currentPageId, script, callData.outreach_attempt.id, supabase, callData.workspace);
