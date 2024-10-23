@@ -201,7 +201,7 @@ const parseOptOut = (value) => {
   return Boolean(value);
 };
 
-const parseCSVData = (data, parsedHeaders) => {
+const parseCSVData = (data: Record<string, string>[], parsedHeaders: string[]) => {
   return data.slice(1).map((row) => {
     const contact = {
       firstname: null,
