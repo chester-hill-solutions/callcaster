@@ -1,6 +1,7 @@
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { Database } from "./database.types";
-import { redirect } from "@remix-run/node";
+import { redirect, TypedResponse } from "@remix-run/node";
+import { Session, SupabaseClient } from "@supabase/supabase-js";
 
 export const createSupabaseServerClient = (request: Request) => {
   const cookies = parse(request.headers.get("Cookie") ?? "");
@@ -34,5 +35,5 @@ export async function getSupabaseServerClientWithSession(request: Request) {
   if (!serverSession) {
     return redirect('/signin')
   }
-  return { supabaseClient, headers, serverSession };
+  return { supabaseClient: supabaseClient, headers: headers, serverSession: serverSession };
 }

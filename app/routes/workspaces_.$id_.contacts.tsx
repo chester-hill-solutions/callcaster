@@ -14,6 +14,17 @@ import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { formatDateToLocale } from "~/lib/utils";
+import { Contact, ContactAudience, Audience, WorkspaceData } from "~/lib/types";
+import { PostgrestError } from "@supabase/supabase-js";
+
+type ContactWithAudiences = Contact & { audiences: (Partial<ContactAudience> & { audience_name: Partial<Audience> })[] }
+
+type LoaderData = {
+  contacts: ContactWithAudiences[],
+  workspace: WorkspaceData,
+  error: string | null,
+  userRole: string | null,
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
@@ -39,11 +50,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", workspaceId)
     .single();
 
-  const { data: contacts, error: contactError } = await supabaseClient
+  const { data: contacts, error: contactError }: {
+    data: ContactWithAudiences[],
+    error: PostgrestError
+  } = await supabaseClient
     .from("contact")
-    .select()
-    .eq("workspace", workspaceId);
-
+    .select(`
+      *,
+      audiences:contact_audience!inner(
+        audience_id,
+        audience_name:audience!inner(name)
+      )
+    `)
+    .eq("workspace", workspaceId)
+    .eq("audiences.audience.workspace", workspaceId);
+      console.log(contacts[0].audiences)
+  const flattenedContacts = contacts?.map(contact => ({
+    ...contact,
+    audience_names: contact.audiences.map(a => a.audience_name.name)
+  }));
+  //console.log(flattenedContacts)
   if ([contactError, workspaceError].filter(Boolean).length) {
     return json(
       {
@@ -58,75 +84,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  return json({ contacts, workspace, error: null, userRole }, { headers });
+  return json({ contacts: flattenedContacts, workspace, error: null, userRole }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData.entries());
-
-  if (!data.id) {
-    return json({ error: "Script ID is required" }, { status: 400 });
-  }
-
-  const { data: script, error: scriptError } = await supabaseClient
-    .from("script")
-    .select("name, steps")
-    .eq("id", data.id)
-    .single();
-
-  if (scriptError) {
-    console.error("Error fetching script:", scriptError);
-    return json({ error: "Error fetching script" }, { status: 500 });
-  }
-
-  if (!script) {
-    return json({ error: "Script not found" }, { status: 404 });
-  }
-
-  const scriptJson = JSON.stringify(script.steps, null, 2);
-
-  const fileName = script.name
-    ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
-    : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
-
-  return json(
-    {
-      fileContent: scriptJson,
-      fileName: fileName,
-      contentType: "application/json",
-    },
-    {
-      headers: {
-        ...headers,
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
+  return null;
 }
 
 export default function WorkspaceContacts() {
   const { contacts, error, userRole, workspace } =
     useLoaderData<typeof loader>();
-  /*     const actionData = useActionData<typeof action>();
-  
-    useEffect(() => {
-      if (actionData) {
-          console.log(actionData)
-        const blob = new Blob([actionData.fileContent], { type: actionData.contentType });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", actionData.fileName);
-        document.body.appendChild(link);
-        link.click();
-        link.parentNode.removeChild(link);
-      }
-    }, [actionData]); */
 
   const isWorkspaceAudioEmpty = !contacts?.length > 0;
   return (
@@ -139,7 +109,7 @@ export default function WorkspaceContacts() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
           {workspace != null
-            ? `${workspace?.name} Audio Library`
+            ? `${workspace?.name} Contacts`
             : "No Workspace"}
         </h1>
         <div className="flex items-center gap-4">
@@ -196,6 +166,22 @@ export default function WorkspaceContacts() {
             {
               accessorKey: "city",
               header: "City",
+            },
+            {
+              header: "Audiences",
+              cell: ({ row }) => {
+                const audienceIds = row.original.audience_ids || [];
+                const audienceNames = row.original.audience_names || [];
+                return (
+                  <div>
+                    {audienceNames.map((name, index) => (
+                      <span key={audienceIds[index]} className="inline-block bg-gray-200 rounded-full px-2 py-1 text-xs font-semibold text-gray-700 mr-1 mb-1">
+                        {name}
+                        </span>
+                      ))}
+                  </div>
+                );
+              },
             },
             {
               header: "Other Data",

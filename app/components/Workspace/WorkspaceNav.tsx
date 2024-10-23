@@ -18,7 +18,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { name: "Campaigns", path: "", end: true },
-  { name: "Chats", path: "chats", flag: { parent: "sms", child: "chat" } },
+  { name: "Chats", path: "chats", /* flag: { parent: "sms", child: "chat" } */ },
   { name: "Scripts", path: "scripts", callerHidden: true },
   { name: "Audio", path: "audios", callerHidden: true },
   { name: "Audiences", path: "audiences", callerHidden: true },
