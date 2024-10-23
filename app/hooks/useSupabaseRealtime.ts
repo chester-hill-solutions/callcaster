@@ -9,16 +9,16 @@ import { QueueItem, User, WorkspaceData } from "~/lib/types";
 import { Database } from "~/lib/database.types";
 
 type UseSupabaseRealtimeProps = {
-  user:User;
-  supabase:SupabaseClient<Database>;
-  init:any;
-  campaign_id:string;
-  predictive:boolean;
-  setQuestionContact:(contact:QueueItem) => void;
-  workspace:string;
-  setCallDuration:(duration:number) => void;
-  setUpdate:(update:any) => void;
-}
+  user: User;
+  supabase: SupabaseClient<Database>;
+  init: any;
+  campaign_id: string;
+  predictive: boolean;
+  setQuestionContact: (contact: QueueItem) => void;
+  workspace: string;
+  setCallDuration: (duration: number) => void;
+  setUpdate: (update: any) => void;
+};
 
 export const useSupabaseRealtime = ({
   user,
@@ -29,9 +29,8 @@ export const useSupabaseRealtime = ({
   setQuestionContact,
   workspace,
   setCallDuration,
-  setUpdate
+  setUpdate,
 }: UseSupabaseRealtimeProps) => {
-
   const {
     queue,
     setQueue,
@@ -46,23 +45,22 @@ export const useSupabaseRealtime = ({
     user,
     isPredictive: predictive,
     campaign_id,
-    setCallDuration
+    setCallDuration,
   });
 
-  const {
-    attemptList,
-    recentAttempt,
-    setRecentAttempt,
-    updateAttempts,
-  } = useAttempts(init.attempts, init.recentAttempt, nextRecipient);
+  const { attemptList, recentAttempt, setRecentAttempt, updateAttempts } =
+    useAttempts(init.attempts, init.recentAttempt, nextRecipient);
 
-  const {
-    callsList,
-    recentCall,
-    updateCalls,
-  } = useCalls(init.callsList, init.recentCall, queue, setNextRecipient, predictive);
+  const { callsList, recentCall, updateCalls } = useCalls(
+    init.callsList,
+    init.recentCall,
+    queue,
+    setNextRecipient,
+    predictive,
+  );
 
-  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } = usePhoneNumbers(init.phoneNumbers, workspace);
+  const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
+    usePhoneNumbers(init.phoneNumbers, workspace);
 
   useEffect(() => {
     const handleChange = (payload: any) => {
@@ -77,7 +75,7 @@ export const useSupabaseRealtime = ({
             recentAttempt,
             setNextRecipient,
             setQuestionContact,
-            setRecentAttempt
+            setRecentAttempt,
           );
           break;
         case "campaign_queue":
@@ -101,19 +99,38 @@ export const useSupabaseRealtime = ({
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [callsList, campaign_id, nextRecipient, predictive, queue, recentAttempt, setNextRecipient, setQuestionContact, setRecentAttempt, setUpdate, supabase, updateAttempts, updateCalls, updateQueue, updateWorkspaceNumbers, user]);
+  }, [
+    callsList,
+    campaign_id,
+    nextRecipient,
+    predictive,
+    queue,
+    recentAttempt,
+    setNextRecipient,
+    setQuestionContact,
+    setRecentAttempt,
+    setUpdate,
+    supabase,
+    updateAttempts,
+    updateCalls,
+    updateQueue,
+    updateWorkspaceNumbers,
+    user,
+  ]);
 
-  const handleSetDisposition = useCallback((value: string) => {
-    setRecentAttempt((cur) => ({
-      ...cur,
-      disposition: value,
-    }));
-  }, [setRecentAttempt]);
+  const handleSetDisposition = useCallback(
+    (value: string) => {
+      setRecentAttempt((cur) => ({
+        ...cur,
+        disposition: value,
+      }));
+    },
+    [setRecentAttempt],
+  );
 
   useEffect(() => {
     setQuestionContact(nextRecipient);
   }, [nextRecipient, setQuestionContact]);
-  
 
   return {
     queue,
@@ -130,6 +147,6 @@ export const useSupabaseRealtime = ({
     nextRecipient,
     setNextRecipient,
     householdMap,
-    setPhoneNumbers
+    setPhoneNumbers,
   };
 };

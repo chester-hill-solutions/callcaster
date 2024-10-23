@@ -74,9 +74,10 @@ const handleTriggerStart = async (
       queue_id: contact.id,
       contact_id: contact.contact_id,
       caller_id: contact.caller_id,
+      index: i,
+      total: contacts.length,
     };
     const twilioSignature = getExpectedTwilioSignature(Deno.env.get('TWILIO_AUTH_TOKEN'), 'https://ivr-2916.twil.io/ivr', {});
-    console.log(twilioSignature)
     await fetch(`https://ivr-2916.twil.io/ivr`, {
       body: JSON.stringify(data),
       method: "POST",
@@ -114,7 +115,7 @@ const handleInitiateCampaign = async (
   const { data, error } = await supabase.rpc("get_campaign_queue", {
     campaign_id_pro: id,
   });
-  if (error) throw error;
+  if (error || !data.length) throw error || new Error("No queue found");
   const owner = await getWorkspaceOwner(supabase, data[0].workspace);
   await handleTriggerStart(data, id, owner.id);
 };

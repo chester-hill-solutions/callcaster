@@ -21,6 +21,7 @@ exports.handler = async function (context, event, callback) {
     .eq("id", workspace_id)
     .single();
   if (error) throw error;
+
   const twilio = new Twilio.Twilio(
     data.twilio_data.sid,
     data.twilio_data.authToken,
@@ -49,7 +50,7 @@ exports.handler = async function (context, event, callback) {
       statusCallbackEvent: ["initiated", "answered", "completed"],
       statusCallback: `${baseUrl}/status`,
     });
-
+    console.log(call)
 
     const { data: insertData, error: insertError } = await supabase.from("call").insert({
       sid: call.sid,

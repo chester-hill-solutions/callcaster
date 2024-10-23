@@ -636,7 +636,6 @@ const Campaign: React.FC = () => {
   };
 
   const requeueContacts = () => {
-    const formData = new FormData();
     const userId = user.id;
     const campaignId = campaign?.id
     submit({userId, campaignId}, {

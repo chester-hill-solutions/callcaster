@@ -1640,19 +1640,20 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
 export function checkSchedule(campaignData: Campaign) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
-  const utcNow = new Date(
+  const utcNow = new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
     now.getUTCDate(),
     now.getUTCHours(),
     now.getUTCMinutes(),
-    now.getUTCSeconds(),
-  );
-
+    now.getUTCSeconds()
+  ));  
+  
+  
   if (!(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
     return false;
   }
-
+  
   const currentDay = utcNow.getUTCDay();
   const daysOfWeek = [
     "sunday",
@@ -1663,16 +1664,14 @@ export function checkSchedule(campaignData: Campaign) {
     "friday",
     "saturday",
   ];
-
   if (!schedule || !Object.keys(schedule).length) return false;
 
   const todaySchedule = schedule[daysOfWeek[currentDay]];
   if (!todaySchedule.active) {
     return false;
   }
-
-  const currentTime = utcNow.toISOString().slice(11, 16); // Get time in HH:MM format
-
+  
+  const currentTime = utcNow.toISOString().slice(11, 16);
   return todaySchedule.intervals.some((interval) => {
     if (interval.end < interval.start) {
       return currentTime >= interval.start || currentTime < interval.end;

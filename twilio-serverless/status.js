@@ -19,12 +19,11 @@ const updateCallStatus = async (supabase, callSid, status, timestamp) => {
     if (error) throw error;
 };
 
-
 const handleVoicemail = async (dbCall, supabase) => {
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date() });
-}
+};
 
-const handleCallStatusUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
+const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
     await Promise.all([
         updateCallStatus(supabase, callSid, status, timestamp),
         updateResult(supabase, outreach_attempt_id, { disposition })
@@ -34,38 +33,58 @@ const handleCallStatusUpdate = async (supabase, callSid, status, timestamp, outr
 const fetchCall = async ({ supabase, callSid }) => {
     const { data: dbCall, error: callError } = await supabase
         .from('call')
-        .select('outreach_attempt_id, queue_id, workspace(id, twilio_data), campaign(*, ivr_campaign(*, script(*)))')
+        .select('outreach_attempt_id, queue_id')
         .eq('sid', callSid)
         .single();
     if (callError) throw callError;
     if (!dbCall) throw new Error("Call not found");
-    return dbCall
-}
+    return dbCall;
+};
+
+const isAnsweringMachine = (answeredBy) => 
+    answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other');
+
+const handleQueueUpdate = async (supabase, queueId) => {
+    const { error: dequeueError } = await supabase
+        .from("campaign_queue")
+        .update({ status: "dequeued" })
+        .eq("id", queueId);
+    if (dequeueError) throw dequeueError;
+};
 
 exports.handler = async function (context, event, callback) {
     const supabase = createClient(context.SUPABASE_URL, context.SUPABASE_SERVICE_KEY);
-    const callSid = event.CallSid;
-    const callStatus = event.CallStatus;
-    const timestamp = event.Timestamp;
+    const { CallSid: callSid, CallStatus: callStatus, Timestamp: timestamp, AnsweredBy: answeredBy } = event;
+
     try {
-        const dbCall = await fetchCall(supabase, callSid)
-        if (callStatus === 'failed' || callStatus === 'no-answer') {
-            const disposition = callStatus === 'failed' ? 'failed' : 'no-answer';
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, disposition);
-        } else if (event.AnsweredBy && event.AnsweredBy.includes('machine') && !event.AnsweredBy.includes('other') && callStatus !== 'completed') {
-            await handleVoicemail(dbCall, supabase);
-        } else if (callStatus === 'completed') {
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed');
-        } else if (callStatus === "initiatiated" || callStatus === "in-progress") {
-            const { error: dequeueError } = await supabase
-                .from("campaign_queue")
-                .update({ status: "dequeued" })
-                .eq("id", dbCall.queue_id);
-            if (dequeueError) throw dequeueError;
+        const dbCall = await fetchCall({ supabase, callSid });
+        console.log(callStatus)
+        switch (callStatus) {
+            case 'failed':
+            case 'no-answer':
+                await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, callStatus);
+                break;
+            case 'completed':
+                await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed');
+                break;
+            case 'initiated':
+            case 'in-progress':
+                await handleQueueUpdate(supabase, dbCall.queue_id);
+                break;
+            case 'ringing':
+                // Handle ringing status if needed
+                break;
+            default:
+                console.log(`Unhandled call status: ${callStatus}`);
         }
+
+        if (isAnsweringMachine(answeredBy) && callStatus !== 'completed') {
+            await handleVoicemail(dbCall, supabase);
+        }
+
+        callback(null, { success: true });
     } catch (error) {
-        console.error(error);
-        return callback(error, null)
+        console.error('Error in call handler:', error);
+        callback(error);
     }
-    return callback(null, { success: true });
 };

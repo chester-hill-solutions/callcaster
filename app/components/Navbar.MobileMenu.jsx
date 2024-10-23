@@ -39,7 +39,7 @@ export const MobileMenu = ({ isSignedIn, user, handleSignOut, onClose }) => {
           </>
         )}
         <Button className="font-Zilla-Slab text-lg"><NavLink to="/" onClick={onClose}>Home</NavLink></Button>
-        <Button className="font-Zilla-Slab text-lg"><NavLink to="/services" onClick={onClose}>Services</NavLink></Button>
+        <Button className="font-Zilla-Slab text-lg"><NavLink to="/pricing" onClick={onClose}>Pricing</NavLink></Button>
         {!isSignedIn && (
           <>
             <Button className="font-Zilla-Slab text-lg"><NavLink to="/signin" onClick={onClose}>Sign In</NavLink></Button>
