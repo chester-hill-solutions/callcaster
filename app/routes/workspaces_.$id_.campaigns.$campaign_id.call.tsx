@@ -45,6 +45,8 @@ import {
   QueueItem,
 } from "~/lib/types";
 import { checkSchedule } from "~/lib/database.server";
+import { LoaderFunction, ActionFunction } from "@remix-run/node";
+
 interface LoaderData {
   campaign: CampaignType;
   attempts: OutreachAttempt[];
@@ -61,13 +63,12 @@ interface LoaderData {
   token: string;
   count: number;
   completed: number;
-  isActive:boolean;
+  isActive: boolean;
 }
 
 export { ErrorBoundary };
 
-
-export const loader = async ({ request, params }) => {
+export const loader: LoaderFunction = async ({ request, params }) => {
   const { campaign_id: id, id: workspaceId } = params;
   const {
     supabaseClient: supabase,
@@ -189,7 +190,6 @@ export const loader = async ({ request, params }) => {
       nextRecipient,
       initalCallsList,
       initialRecentCall,
-      originalQueue: queue,
       initialRecentAttempt,
       token,
       count: queueCount.count,
@@ -200,7 +200,7 @@ export const loader = async ({ request, params }) => {
   );
 };
 
-export const action = async ({ request, params }) => {
+export const action: ActionFunction = async ({ request, params }) => {
   const { campaign_id } = params;
 
   const { supabaseClient, headers, serverSession } =
@@ -223,10 +223,8 @@ export const action = async ({ request, params }) => {
 
 const Campaign: React.FC = () => {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
-  const audioContextRef = useRef<AudioContext | null>(null);
   const { state: navState } = useNavigation();
   const isBusy = navState !== "idle";
-
   const {
     campaign,
     attempts: initialAttempts,
@@ -250,11 +248,19 @@ const Campaign: React.FC = () => {
   );
 
   const [groupByHousehold] = useState<boolean>(true);
-  const [update, setUpdate] = useState<object | null>(null);
+  const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [microphone, setMicrophone] = useState<string | null>(null);
+  const [output, setOutput] = useState<string | null>(null);
+  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState<boolean>(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState<boolean>(false);
+  const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  
+  const gainNodeRef = useRef<GainNode | null>(null);
   const { state, context, send } = useCallState();
-
   const navigate = useNavigate();
   const {
     device,
@@ -320,7 +326,7 @@ const Campaign: React.FC = () => {
   );
   const [isDialogOpen, setDialog] = useState(
     (!(queue.length > 0) || campaign.dial_type === "predictive") &&
-      !isErrorDialogOpen,
+    !isErrorDialogOpen,
   );
   const [isReportDialogOpen, setReportDialog] = useState(false);
   const { begin, conference, setConference } = useStartConferenceAndDial(
@@ -360,7 +366,7 @@ const Campaign: React.FC = () => {
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
     },
-    [], 
+    [],
   );
 
   const handleDialButton = useCallback(() => {
@@ -458,10 +464,18 @@ const Campaign: React.FC = () => {
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAvailableMicrophones(devices.filter((device) => device.kind === "audioinput"));
+      setAvailableSpeakers(devices.filter((device) => device.kind === "audiooutput"));
+      const audioContext = new window.AudioContext();
+      audioContextRef.current = audioContext; 
+      const gainNode = audioContext.createGain();
+      gainNodeRef.current = gainNode;
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
       });
+
       setStream(mediaStream);
       setPermissionError(null);
     } catch (error) {
@@ -470,13 +484,71 @@ const Campaign: React.FC = () => {
         setPermissionError(
           "Microphone access was denied. Please grant permission to use this feature.",
         );
+        alert("Microphone access was denied. Please grant permission to use this feature.");
       } else {
+
         setPermissionError(
           "An error occurred while trying to access the microphone.",
         );
       }
     }
   }, []);
+
+  const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    if (!device) { console.error('No device'); return };
+    const selectedMicrophone = event.target.value;
+    let audio = device.audio;
+    audio?.setInputDevice(selectedMicrophone).then(() => {
+      setIsMicrophoneMuted(false);
+      setMicrophone(selectedMicrophone);
+      console.log("Microphone set to", selectedMicrophone);
+
+      navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedMicrophone } })
+        .then((newStream) => {
+          if (activeCall) {
+            activeCall._setInputTracksFromStream(newStream).then(() => {
+              console.log("Active call input tracks updated with new microphone");
+            }).catch((error) => {
+              console.error("Error updating active call input tracks:", error);
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("Error getting stream from new microphone:", error);
+        });
+    }).catch((error) => {
+      console.error("Error setting microphone:", error);
+    });
+  }, [device, activeCall]);
+
+  const handleSpeakerChange = useCallback((event) => {
+    if (!device) { console.error('No device'); return };
+    const selectedSpeaker = event.target.value;
+    setOutput(selectedSpeaker);
+    device.audio.speakerDevices.set(selectedSpeaker).then(() => {
+      setIsSpeakerMuted(false);
+      console.log("Speaker set to", selectedSpeaker);
+    }).catch((error) => {
+      console.error("Error setting speaker:", error);
+    });
+  }, [device]);
+
+  const handleMuteMicrophone = useCallback(() => {
+    if (!device) return;
+    device.audio.mute = !device.audio.mute;
+    setIsMicrophoneMuted(!device.audio.mute);
+    if (activeCall) {
+      activeCall.mute(device.audio.mute);
+    }
+  }, [device, activeCall]);
+
+  const handleMuteSpeaker = useCallback(() => {
+    if (!device) return;
+    setIsSpeakerMuted(!isSpeakerMuted);
+    device.audio?.incoming(isSpeakerMuted);
+    if (activeCall) {
+      activeCall.
+  }, [device, activeCall]);
 
   const handleDTMF = useCallback(
     (key) => {
@@ -489,9 +561,9 @@ const Campaign: React.FC = () => {
     [activeCall],
   );
 
-  const getDisplayState = (
-    state: CallState,
-    disposition: AttemptDisposition | undefined,
+  const getDisplayState = useCallback((
+    state: string,
+    disposition: string | undefined,
     activeCall: object | null,
   ): string => {
     if (state === "failed" || disposition === "failed") return "failed";
@@ -506,7 +578,7 @@ const Campaign: React.FC = () => {
     if (state === "completed" && disposition) return "completed";
     if (!activeCall && !disposition) return "idle";
     return "idle";
-  };
+  }, [state, disposition, activeCall]);
 
   const displayState =
     predictiveState.status === "dialing"
@@ -518,16 +590,16 @@ const Campaign: React.FC = () => {
           : predictiveState.status === "idle"
             ? "idle"
             : getDisplayState(
-                state,
-                recentAttempt?.disposition as AttemptDisposition,
-                activeCall,
-              );
+              state,
+              recentAttempt?.disposition,
+              activeCall,
+            );
 
   const house =
     householdMap[
-      Object.keys(householdMap).find(
-        (house) => house === nextRecipient?.contact?.address,
-      ) || ""
+    Object.keys(householdMap).find(
+      (house) => house === nextRecipient?.contact?.address,
+    ) || ""
     ];
 
   const displayColor =
@@ -638,10 +710,10 @@ const Campaign: React.FC = () => {
   const requeueContacts = () => {
     const userId = user.id;
     const campaignId = campaign?.id
-    submit({userId, campaignId}, {
+    submit({ userId, campaignId }, {
       method: "DELETE",
       action: "/api/queues",
-      encType:"application/json",
+      encType: "application/json",
       navigate: false,
     });
 
@@ -669,7 +741,7 @@ const Campaign: React.FC = () => {
         className="mb-6"
       >
         <CampaignHeader
-          campaign={campaign}
+          campaign={campaign!}
           count={count}
           completed={completed}
           onLeaveCampaign={() => {
@@ -679,6 +751,15 @@ const Campaign: React.FC = () => {
             navigate(-1);
           }}
           onReportError={() => setReportDialog(!isReportDialogOpen)}
+          mediaStream={stream}
+          availableMicrophones={availableMicrophones}
+          availableSpeakers={availableSpeakers}
+          handleMicrophoneChange={handleMicrophoneChange}
+          handleSpeakerChange={handleSpeakerChange}
+          handleMuteMicrophone={handleMuteMicrophone}
+          handleMuteSpeaker={handleMuteSpeaker}
+          isMicrophoneMuted={isMicrophoneMuted}
+          isSpeakerMuted={isSpeakerMuted}
         />
         <div className="m-4">
           <PhoneKeypad
@@ -702,10 +783,10 @@ const Campaign: React.FC = () => {
             hangUp={() =>
               campaign.dial_type === "predictive"
                 ? handleConferenceEnd({
-                    activeCall,
-                    setConference,
-                    workspaceId,
-                  })
+                  activeCall,
+                  setConference,
+                  workspaceId,
+                })
                 : hangUp()
             }
             displayState={displayState}
