@@ -1,27 +1,43 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Device } from '@twilio/voice-sdk';
+import { Device, Call } from '@twilio/voice-sdk';
 
-export function useTwilioDevice(token, workspaceId, send) {
-    const deviceRef = useRef(null);
-    const [status, setStatus] = useState('disconnected');
-    const [error, setError] = useState(null);
-    const [activeCall, setActiveCall] = useState(null);
-    const [incomingCall, setIncomingCall] = useState(null);
-    const [callState, setCallState] = useState('idle');
-    const [callDuration, setCallDuration] = useState(0);
-    const [deviceIsBusy, setIsBusy] = useState(false);
+interface TwilioDeviceHook {
+  device: Device | null;
+  status: string;
+  error: Error | null;
+  activeCall: Call | null;
+  incomingCall: Call | null;
+  makeCall: (params: any) => void;
+  hangUp: () => void;
+  answer: () => void;
+  callState: string;
+  callDuration: number;
+  setCallDuration: React.Dispatch<React.SetStateAction<number>>;
+  setIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
+  deviceIsBusy: boolean;
+}
 
-    const handleIncomingCall = useCallback((call) => {
+export function useTwilioDevice(token: string, workspaceId: string, send: (action: { type: string }) => void): TwilioDeviceHook {
+    const deviceRef = useRef<Device | null>(null);
+    const [status, setStatus] = useState<string>('disconnected');
+    const [error, setError] = useState<Error | null>(null);
+    const [activeCall, setActiveCall] = useState<Call | null>(null);
+    const [incomingCall, setIncomingCall] = useState<Call | null>(null);
+    const [callState, setCallState] = useState<string>('idle');
+    const [callDuration, setCallDuration] = useState<number>(0);
+    const [deviceIsBusy, setIsBusy] = useState<boolean>(false);
+
+    const handleIncomingCall = useCallback((call: Call) => {
         setIncomingCall(call);
         if (call.parameters.To.includes('client')) {
             call.accept();
             setStatus('connected');
             setCallState('connected');
-            send("CONNECT")
+            send({ type: "CONNECT" });
             setIncomingCall(null);
         }
 
-        const callEventHandlers = {
+        const callEventHandlers: { [key: string]: () => void } = {
             accept: () => {
                 setActiveCall(call);
                 setStatus('connected');
@@ -39,11 +55,11 @@ export function useTwilioDevice(token, workspaceId, send) {
         };
 
         Object.entries(callEventHandlers).forEach(([event, handler]) => {
-            call.on(event, handler);
+            call.on(event as any, handler);
         });
-    }, []);
+    }, [send]);
 
-    const makeCall = useCallback((params) => {
+    const makeCall = useCallback((params: any) => {
         if (!deviceRef.current) {
             console.error('Device is not ready');
             return;
@@ -51,7 +67,6 @@ export function useTwilioDevice(token, workspaceId, send) {
         const connection = deviceRef.current.connect(params);
         setActiveCall(connection);
         setCallState('dialing');
-
     }, []);
 
     const hangUp = useCallback(() => {
@@ -79,11 +94,11 @@ export function useTwilioDevice(token, workspaceId, send) {
                 setStatus('Registered');
                 activeCall.disconnect();
                 setActiveCall(null);
-                deviceRef.current.disconnectAll();
+                deviceRef.current?.disconnectAll();
                 setCallState('completed');
                 setCallDuration(0);
             })
-            .catch((error) => {
+            .catch((error: Error) => {
                 console.error('Error hanging up call:', error);
                 if (error.message === 'Call is not in-progress. Cannot redirect.') {
                     console.log('Call was already disconnected');
@@ -118,7 +133,7 @@ export function useTwilioDevice(token, workspaceId, send) {
         });
         deviceRef.current = device;
 
-        const eventHandlers = {
+        const eventHandlers: { [key: string]: (...args: any[]) => void } = {
             registered: () => { setStatus('Registered'); setIsBusy(false) },
             unregistered: () => setStatus('Unregistered'),
             connecting: () => setStatus('Connecting'),
@@ -142,7 +157,7 @@ export function useTwilioDevice(token, workspaceId, send) {
                 setCallState('completed');
                 setCallDuration(0);
             },
-            error: (error) => {
+            error: (error: Error) => {
                 console.error('Twilio Device Error:', error);
                 setIsBusy(false);
                 setStatus('Error');
@@ -153,11 +168,11 @@ export function useTwilioDevice(token, workspaceId, send) {
         };
 
         Object.entries(eventHandlers).forEach(([event, handler]) => {
-            device.on(event, handler);
+            device.on(event as any, handler);
         });
 
         device.register()
-            .catch(error => {
+            .catch((error: Error) => {
                 console.error('Failed to register device:', error);
                 setError(error);
                 setStatus('RegistrationFailed');
@@ -168,16 +183,16 @@ export function useTwilioDevice(token, workspaceId, send) {
                 device.unregister().catch(console.error);
             }
             Object.keys(eventHandlers).forEach(event => {
-                device.removeAllListeners(event);
+                device.removeAllListeners(event as any);
             });
             deviceRef.current = null;
         };
     }, [handleIncomingCall, token]);
 
     useEffect(() => {
-        const eventHandlers = {
-            accept: (call) => { setCallState('connected') },
-            audio: (e) => { console.log(e) },
+        const eventHandlers: { [key: string]: (...args: any[]) => void } = {
+            accept: (call: Call) => { setCallState('connected') },
+            audio: (e: any) => { console.log(e) },
             disconnect: () => {
                 console.log('Call ended')
                 setActiveCall(null);
@@ -186,7 +201,7 @@ export function useTwilioDevice(token, workspaceId, send) {
                 setIsBusy(false);
                 setCallDuration(0);
             },
-            error: (error) => {
+            error: (error: Error) => {
                 setIsBusy(false);
                 setError(error);
                 setStatus('error');
@@ -196,19 +211,18 @@ export function useTwilioDevice(token, workspaceId, send) {
         }
         if (activeCall) {
             Object.entries(eventHandlers).forEach(([event, handler]) => {
-                activeCall.on(event, handler);
+                activeCall.on(event as any, handler);
             });
         }
         return () => {
             Object.keys(eventHandlers).forEach(event => {
-                activeCall?.removeAllListeners(event);
+                activeCall?.removeAllListeners(event as any);
             });
-
         }
     }, [activeCall])
 
     useEffect(() => {
-        let interval;
+        let interval: NodeJS.Timeout;
         if (callState === 'connected') {
             interval = setInterval(() => {
                 setCallDuration(prev => prev + 1);
