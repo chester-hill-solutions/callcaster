@@ -7,7 +7,7 @@ interface CallContext {
   disposition: string;
 }
 
-type CallAction =
+export type CallAction =
   | { type: 'START_DIALING' }
   | { type: 'CONNECT' }
   | { type: 'FAIL' }
@@ -79,10 +79,6 @@ export function useCallState() {
     }
     return () => clearInterval(interval);
   }, [state, send]);
-/* 
-  useEffect(() => {
-    console.log('Current state:', state);
-  }, [state]);
- */
+
   return { state, context, send };
 }
