@@ -19,6 +19,7 @@ import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./CampaignDetailed";
 import { AudienceSelection } from "./CampaignAudienceSelection";
+import { SaveBar } from "./SaveBar";
 
 export type CampaignSettingsProps = {
   campaign_id: string;
@@ -317,6 +318,26 @@ export const CampaignSettings = ({
       id="campaignSettingsContainer"
       className="flex h-full flex-col gap-4 p-4"
     >
+      <SaveBar
+        isChanged={isChanged}
+        isSaving={formFetcher.state === 'submitting'}
+        onSave={() => {
+          formFetcher.submit(
+            {
+              campaignData: JSON.stringify({...campaignData, is_active:data.is_active}),
+              campaignDetails: JSON.stringify(details),
+            },
+            {
+              method: "patch",
+              action: "/api/campaigns",
+            }
+          );
+        }}
+        onReset={() => {
+          setCampaignData(initialData);
+          setChanged(false);
+        }}
+      />
       <formFetcher.Form method="patch" action="/api/campaigns">
         <input
           type="hidden"
@@ -357,15 +378,6 @@ export const CampaignSettings = ({
             campaignData={campaignData}
             handleAudience={handleAudience}
           />
-          <div className="mt-2 flex justify-end">
-            <Button
-              type="submit"
-              className="text-xl font-semibold uppercase disabled:bg-zinc-400"
-              disabled={navigation.state !== "idle" || !isChanged}
-            >
-              Save Settings
-            </Button>
-          </div>
         </div>
       </formFetcher.Form>
     </div>

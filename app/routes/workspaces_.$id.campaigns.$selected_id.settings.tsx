@@ -1,7 +1,7 @@
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext } from "@remix-run/react";
+import { Await, useLoaderData, useOutletContext } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
-import { useState, useCallback, SetStateAction } from "react";
+import { useState, useCallback, SetStateAction, Suspense } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { fetchCampaignWithAudience } from "~/lib/database.server";
@@ -14,6 +14,7 @@ import {
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
+  QueueItem,
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
@@ -32,10 +33,14 @@ export const loader = async ({ request, params }) => {
     supabaseClient,
     selected_id,
   );
+  const { data: queuePromise, error: queueError } = await supabaseClient.from("campaign_queue").select("*, contact(*)").eq("campaign_id", selected_id);
+
+  if (queueError) throw new Error(`Error fetching queue: ${queueError.message}`);
   return json({
     workspace_id,
     selected_id,
     campaignAudience: campaignWithAudience.campaign_audience,
+    queuePromise,
   });
 };
 
@@ -52,7 +57,7 @@ export default function Settings() {
     flags,
   }: {
     data: Campaign & {
-      campaignDetails: LiveCampaign & {script: Script} | MessageCampaign | IVRCampaign & {script: Script};
+      campaignDetails: LiveCampaign & { script: Script } | MessageCampaign | IVRCampaign & { script: Script };
     };
     phoneNumbers: WorkspaceNumbers[];
     mediaData: FileObject[];
@@ -61,16 +66,18 @@ export default function Settings() {
     mediaLinks: string[];
     audiences: Audience[];
     joinDisabled: string | null,
-    flags:Flags;
+    flags: Flags;
   } = useOutletContext();
   const {
     workspace_id,
     selected_id,
     campaignAudience,
+    queuePromise,
   }: {
     workspace_id: string;
     selected_id: string;
     campaignAudience: Audience;
+    queuePromise: Promise<QueueItem[]>;
   } = useLoaderData();
 
   const [pageData, setPageData] = useState({
@@ -105,7 +112,7 @@ export default function Settings() {
   return (
     <>
       <CampaignSettings
-      flags={flags}
+        flags={flags}
         workspace={workspace_id}
         data={pageData}
         scripts={scripts}
@@ -119,6 +126,16 @@ export default function Settings() {
         joinDisabled={joinDisabled}
         mediaLinks={mediaLinks}
       />
-    </>
+{/*       <Suspense fallback={<div>Loading queue...</div>}>
+        <Await resolve={queuePromise}>
+          {(queue) => {
+            console.log(queue);
+            return (<div>
+              {queue.map((item) => <div key={item.id}>{item.contact?.firstname} {item.contact?.surname} {item.contact?.phone} {item.status}</div>)}
+            </div>);
+          }}
+        </Await>
+      </Suspense>
+ */}    </>
   );
 }

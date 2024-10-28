@@ -4,21 +4,31 @@ import { useQueue } from "./useQueue";
 import { useAttempts } from "./useAttempts";
 import { useCalls } from "./useCalls";
 import { usePhoneNumbers } from "./usePhoneNumbers";
-import { isRecent } from "~/lib/utils";
-import { QueueItem, User, WorkspaceData } from "~/lib/types";
+import { QueueItem, User, OutreachAttempt, Call } from "~/lib/types";
 import { Database } from "~/lib/database.types";
 
-type UseSupabaseRealtimeProps = {
+interface InitialState {
+  queue: QueueItem[];
+  predictiveQueue: QueueItem[];
+  callsList: Call[];
+  attempts: OutreachAttempt[];
+  recentCall: Call | null;
+  recentAttempt: OutreachAttempt | null;
+  nextRecipient: QueueItem | null;
+  phoneNumbers?: any;
+}
+
+interface UseSupabaseRealtimeProps {
   user: User;
   supabase: SupabaseClient<Database>;
-  init: any;
+  init: InitialState;
   campaign_id: string;
   predictive: boolean;
-  setQuestionContact: (contact: QueueItem) => void;
-  workspace: string;
+  setQuestionContact: (contact: QueueItem | null) => void;
+  workspace?: string;
   setCallDuration: (duration: number) => void;
-  setUpdate: (update: any) => void;
-};
+  setUpdate: (update: Record<string, unknown> | null) => void;
+}
 
 export const useSupabaseRealtime = ({
   user,
@@ -27,7 +37,7 @@ export const useSupabaseRealtime = ({
   campaign_id,
   predictive,
   setQuestionContact,
-  workspace,
+  workspace = '',
   setCallDuration,
   setUpdate,
 }: UseSupabaseRealtimeProps) => {
@@ -49,7 +59,7 @@ export const useSupabaseRealtime = ({
   });
 
   const { attemptList, recentAttempt, setRecentAttempt, updateAttempts } =
-    useAttempts(init.attempts, init.recentAttempt, nextRecipient);
+    useAttempts(init.attempts as OutreachAttempt[], init.recentAttempt as OutreachAttempt | null, nextRecipient as QueueItem | null);
 
   const { callsList, recentCall, updateCalls } = useCalls(
     init.callsList,
@@ -120,8 +130,8 @@ export const useSupabaseRealtime = ({
 
   const handleSetDisposition = useCallback(
     (value: string) => {
-      setRecentAttempt((cur) => ({
-        ...cur,
+      setRecentAttempt((cur: OutreachAttempt) => ({
+        ...cur!,
         disposition: value,
       }));
     },

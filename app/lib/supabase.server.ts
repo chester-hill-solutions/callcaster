@@ -32,7 +32,7 @@ export async function getSupabaseServerClientWithSession(request: Request) {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();
   if (!serverSession) {
-    return redirect('/signin')
+    throw redirect('/signin')
   }
   return { supabaseClient, headers, serverSession };
 }

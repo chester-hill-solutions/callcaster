@@ -1,6 +1,6 @@
+// Core imports
 import {
   json,
-  useFetcher,
   useLoaderData,
   useOutletContext,
   redirect,
@@ -8,32 +8,42 @@ import {
   useNavigation,
   useNavigate,
 } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
-import { QueueList } from "../components/CallScreen.QueueList";
+import { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
-import { CallArea } from "../components/CallScreen.CallArea";
-import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import useDebouncedSave from "../hooks/useDebouncedSave";
-import useSupabaseRoom from "../hooks/useSupabaseRoom";
-import { useTwilioDevice } from "../hooks/useTwilioDevice";
 import { SupabaseClient, User } from "@supabase/supabase-js";
+import { toast, Toaster } from "sonner";
+
+// Lib imports
+import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import {
   handleCall,
   handleConference,
   handleContact,
   handleQueue,
 } from "~/lib/callscreenActions";
-import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
-import { Household } from "~/components/CallScreen.Household";
-import { toast, Toaster } from "sonner";
-import { ErrorBoundary } from "~/components/ErrorBoundary";
-import { useCallState } from "~/hooks/useCallState";
-import { formatTime, playTone } from "~/lib/utils";
+import { checkSchedule } from "~/lib/database.server";
+import { playTone } from "~/lib/utils";
 import { generateToken } from "./api.token";
+
+// Component imports
+import { QueueList } from "../components/CallScreen.QueueList";
+import { CallArea } from "../components/CallScreen.CallArea";
+import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
+import { Household } from "~/components/CallScreen.Household";
+import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { CampaignHeader } from "~/components/CallScreen.Header";
 import { PhoneKeypad } from "~/components/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "~/components/CallScreen.Dialogs";
+
+// Hook imports
+import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
+import useDebouncedSave from "../hooks/useDebouncedSave";
+import useSupabaseRoom from "../hooks/useSupabaseRoom";
+import { useTwilioDevice } from "../hooks/useTwilioDevice";
+import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
+import { useCallState } from "~/hooks/useCallState";
+
+// Type imports
 import {
   Audience,
   Call,
@@ -44,8 +54,6 @@ import {
   OutreachAttempt,
   QueueItem,
 } from "~/lib/types";
-import { checkSchedule } from "~/lib/database.server";
-import { LoaderFunction, ActionFunction } from "@remix-run/node";
 
 interface LoaderData {
   campaign: CampaignType;
@@ -53,7 +61,7 @@ interface LoaderData {
   user: User;
   audiences: Audience[];
   workspaceId: string;
-  campaignDetails: LiveCampaign | IVRCampaign;
+  campaignDetails: LiveCampaign;
   contacts: Contact[];
   queue: QueueItem[];
   nextRecipient: QueueItem | null;
@@ -76,7 +84,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     serverSession,
   } = await getSupabaseServerClientWithSession(request);
 
-  if (!serverSession) return redirect("/signin");
+  if (!serverSession || !workspaceId || !id) throw redirect("/signin");
 
   const [
     workspaceData,
@@ -94,7 +102,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       .select(`*, script:script(*)`)
       .eq("campaign_id", id)
       .single(),
-    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: id }),
+    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: parseInt(id) }),
     supabase
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
@@ -122,20 +130,22 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     attempts.error,
   ].filter(Boolean);
   if (errors.length) {
-    console.error(errors);
     throw "Error fetching campaign data";
   }
-
+  if (!workspaceData.data || !workspaceData.data.twilio_data) {
+    throw "Error fetching workspace data";
+  }
+  const twilioData = workspaceData.data.twilio_data as { sid: string };
   const token = generateToken({
-    twilioAccountSid: workspaceData.data.twilio_data.sid,
-    twilioApiKey: workspaceData.data.key,
-    twilioApiSecret: workspaceData.data.token,
+    twilioAccountSid: twilioData.sid,
+    twilioApiKey: workspaceData.data.key as string,
+    twilioApiSecret: workspaceData.data.token as string,
     identity: serverSession.user.id,
   });
 
-  let queue = [];
+  let queue = [] as QueueItem[];
 
-  if (campaign.data.dial_type === "predictive") {
+  if (campaign.data?.dial_type === "predictive") {
     const { data, error } = await supabase
       .from("campaign_queue")
       .select(`*, contact:contact(*)`)
@@ -148,8 +158,8 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       console.error(error);
       throw error.message || "Error fetching queue data";
     }
-    queue = data;
-  } else if (campaign.data.dial_type === "call") {
+    queue = data as unknown as QueueItem[];
+  } else if (campaign.data?.dial_type === "call") {
     const { data, error } = await supabase
       .from("campaign_queue")
       .select(`id, status, contact:contact(*)`)
@@ -160,21 +170,20 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       console.error(error);
       throw error.message || "Error fetching queue data";
     }
-    queue = data;
-  } else if (!campaign.data.dial_type) {
+    queue = data as unknown as QueueItem[];
+  } else if (!campaign.data?.dial_type) {
     return redirect("./../settings");
   }
-
   const nextRecipient =
     queue && campaign.data.dial_type === "call" ? queue[0] : null;
-  const initalCallsList = attempts.data.flatMap((attempt) => attempt.call);
+  const initalCallsList = attempts.data?.flatMap((attempt) => attempt.call) || [];
   const initialRecentCall =
     nextRecipient?.contact &&
     initalCallsList.find(
-      (call) => call.contact_id === nextRecipient?.contact.id,
+      (call) => call.contact_id === nextRecipient?.contact?.id,
     );
   const initialRecentAttempt = attempts.data
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
 
   return json(
@@ -205,8 +214,8 @@ export const action: ActionFunction = async ({ request, params }) => {
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) {
-    return redirect("/signin");
+  if (!serverSession?.user || !campaign_id) {
+    throw redirect("/signin");
   }
   const update = await supabaseClient
     .from("campaign_queue")
@@ -243,10 +252,8 @@ const Campaign: React.FC = () => {
     isActive
   } = useLoaderData<LoaderData>();
 
-  const [questionContact, setQuestionContact] = useState<QueueItem | null>(
-    initialNextRecipient,
-  );
-
+  // State management
+  const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [groupByHousehold] = useState<boolean>(true);
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -256,9 +263,15 @@ const Campaign: React.FC = () => {
   const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [isErrorDialogOpen, setErrorDialog] = useState(!campaignDetails?.script_id);
+  const [isDialogOpen, setDialog] = useState(campaign?.dial_type === "predictive" && !isErrorDialogOpen);
+  const [isReportDialogOpen, setReportDialog] = useState(false);
+
+  // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
-  
   const gainNodeRef = useRef<GainNode | null>(null);
+
+  // Hooks
   const { state, context, send } = useCallState();
   const navigate = useNavigate();
   const {
@@ -271,8 +284,7 @@ const Campaign: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-    setIsBusy,
-  } = useTwilioDevice(token, workspaceId, send);
+  } = useTwilioDevice(token, workspaceId, send as (action: { type: string }) => void);
 
   const {
     status: liveStatus,
@@ -281,7 +293,7 @@ const Campaign: React.FC = () => {
   } = useSupabaseRoom({
     supabase,
     workspace: workspaceId,
-    campaign: campaign.id,
+    campaign: campaign?.id,
     userId: user.id,
   });
 
@@ -303,8 +315,8 @@ const Campaign: React.FC = () => {
     user,
     supabase,
     init: {
-      predictiveQueue: campaign.dial_type === "predictive" ? initialQueue : [],
-      queue: campaign.dial_type === "call" ? initialQueue : [],
+      predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
+      queue: campaign?.dial_type === "call" ? initialQueue : [],
       callsList: initalCallsList,
       attempts: initialAttempts,
       recentCall: initialRecentCall || null,
@@ -312,38 +324,29 @@ const Campaign: React.FC = () => {
       nextRecipient: initialNextRecipient || null,
     },
     contacts,
-    campaign_id: campaign.id,
+    campaign_id: campaign?.id! as unknown as string,
     activeCall,
     setQuestionContact,
-    predictive: campaign.dial_type === "predictive",
+    predictive: campaign?.dial_type === "predictive",
     setCallDuration,
     setUpdate,
   });
 
-  const [isErrorDialogOpen, setErrorDialog] = useState(
-    !Object.keys(campaignDetails?.script || {}).length,
-  );
-  const [isDialogOpen, setDialog] = useState(
-    (!(queue.length > 0) || campaign.dial_type === "predictive") &&
-    !isErrorDialogOpen,
-  );
-  const [isReportDialogOpen, setReportDialog] = useState(false);
   const { begin, conference, setConference } = useStartConferenceAndDial(
     user.id,
-    campaign.id,
+    campaign?.id! as unknown as string,
     workspaceId,
-    campaign.caller_id,
+    campaign?.caller_id,
   );
 
   const submit = useSubmit();
 
+  // Action handlers
   const { startCall } = handleCall({ submit });
-
-  const { handleConferenceStart, handleConferenceEnd } = handleConference({
+  const { handleConferenceEnd } = handleConference({
     submit,
     begin,
   });
-
   const { switchQuestionContact, nextNumber } = handleContact({
     setQuestionContact,
     setRecentAttempt,
@@ -352,7 +355,6 @@ const Campaign: React.FC = () => {
     attempts: attemptList,
     calls: callsList,
   });
-
   const { dequeue, fetchMore } = handleQueue({
     submit,
     groupByHousehold,
@@ -360,7 +362,17 @@ const Campaign: React.FC = () => {
     workspaceId,
     setQueue,
   });
+  const { saveData, isSaving } = useDebouncedSave({
+    update,
+    recentAttempt,
+    nextRecipient,
+    campaign,
+    workspaceId,
+    disposition,
+    toast,
+  });
 
+  // Callback handlers
   const handleResponse = useCallback(
     ({ blockId, value }: { blockId: string; value: string | string[] }) => {
       setUpdate((curr) => ({ ...curr, [blockId]: value }));
@@ -369,13 +381,13 @@ const Campaign: React.FC = () => {
   );
 
   const handleDialButton = useCallback(() => {
-    if (campaign.dial_type === "predictive") {
+    if (campaign?.dial_type === "predictive") {
       if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
-        console.log("Device Busy", deviceStatus, device.calls.length);
+        console.log("Device Busy", deviceStatus, device?.calls.length);
         return;
       }
       begin();
-    } else if (campaign.dial_type === "call") {
+    } else if (campaign?.dial_type === "call") {
       startCall({
         contact: nextRecipient?.contact,
         campaign,
@@ -421,15 +433,6 @@ const Campaign: React.FC = () => {
       groupByHousehold,
     ],
   );
-  const { saveData, isSaving } = useDebouncedSave({
-    update,
-    recentAttempt,
-    nextRecipient,
-    campaign,
-    workspaceId,
-    disposition,
-    toast,
-  });
 
   const handleDequeueNext = useCallback(() => {
     if (campaign?.dial_type === "predictive") {
@@ -461,6 +464,7 @@ const Campaign: React.FC = () => {
     setRecentAttempt,
   ]);
 
+  // Audio handlers
   const requestMicrophoneAccess = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -477,7 +481,7 @@ const Campaign: React.FC = () => {
 
       setStream(mediaStream);
       setPermissionError(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error accessing microphone:", error);
       if (error.name === "NotAllowedError") {
         setPermissionError(
@@ -485,7 +489,6 @@ const Campaign: React.FC = () => {
         );
         alert("Microphone access was denied. Please grant permission to use this feature.");
       } else {
-
         setPermissionError(
           "An error occurred while trying to access the microphone.",
         );
@@ -553,6 +556,32 @@ const Campaign: React.FC = () => {
     [activeCall],
   );
 
+  const handleVoiceDrop = () => {
+    if (!activeCall) return;
+    const formData = new FormData();
+    formData.append("callId", activeCall?.parameters?.CallSid);
+    formData.append("workspaceId", workspaceId);
+    formData.append("campaignId", campaign?.id?.toString() || "");
+
+    submit(formData, {
+      method: "POST",
+      action: "/api/audiodrop",
+      navigate: false,
+    });
+  };
+
+  const requeueContacts = () => {
+    const userId = user.id;
+    const campaignId = campaign?.id?.toString() || "";
+    submit({ userId, campaignId }, {
+      method: "DELETE",
+      action: "/api/queues",
+      encType: "application/json",
+      navigate: false,
+    });
+  }
+
+  // Helper functions
   const getDisplayState = useCallback((
     state: string,
     disposition: string | undefined,
@@ -583,7 +612,7 @@ const Campaign: React.FC = () => {
             ? "idle"
             : getDisplayState(
               state,
-              recentAttempt?.disposition,
+              recentAttempt?.disposition || undefined,
               activeCall,
             );
 
@@ -601,8 +630,9 @@ const Campaign: React.FC = () => {
         ? "#4CA83D"
         : "#333333";
 
+  // Effects
   useEffect(() => {
-    const handleKeypress = (e) => {
+    const handleKeypress = (e: KeyboardEvent) => {
       ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(
         e.key,
       )
@@ -685,32 +715,6 @@ const Campaign: React.FC = () => {
     nextRecipient?.contact_id,
   ]);
 
-  const handleVoiceDrop = () => {
-    if (!activeCall) return;
-    const formData = new FormData();
-    formData.append("callId", activeCall?.parameters?.CallSid);
-    formData.append("workspaceId", workspaceId);
-    formData.append("campaignId", campaign?.id);
-
-    submit(formData, {
-      method: "POST",
-      action: "/api/audiodrop",
-      navigate: false,
-    });
-  };
-
-  const requeueContacts = () => {
-    const userId = user.id;
-    const campaignId = campaign?.id
-    submit({ userId, campaignId }, {
-      method: "DELETE",
-      action: "/api/queues",
-      encType: "application/json",
-      navigate: false,
-    });
-
-  }
-
   const currentState = {
     callState,
     deviceStatus,
@@ -765,7 +769,7 @@ const Campaign: React.FC = () => {
           <CallArea
             conference={conference}
             isBusy={isBusy || deviceIsBusy}
-            predictive={campaign.dial_type === "predictive"}
+            predictive={campaign?.dial_type === "predictive"}
             nextRecipient={nextRecipient}
             activeCall={activeCall}
             recentCall={recentCall}
@@ -780,7 +784,7 @@ const Campaign: React.FC = () => {
                 : hangUp()
             }
             displayState={displayState}
-            dispositionOptions={campaignDetails.disposition_options}
+            dispositionOptions={campaignDetails?.disposition_options}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}

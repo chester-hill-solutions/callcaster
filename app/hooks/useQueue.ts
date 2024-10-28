@@ -2,9 +2,7 @@ import { User } from "@supabase/supabase-js";
 import { useState, useCallback, useEffect } from "react";
 import { Tables } from "~/lib/database.types";
 import { sortQueue, createHouseholdMap } from "~/lib/utils";
-
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+import { QueueItem } from "~/lib/types";
 
 interface UseQueueProps {
   initialQueue: QueueItem[];
@@ -12,7 +10,7 @@ interface UseQueueProps {
   user: User;
   isPredictive: boolean;
   campaign_id: string;
-  setCallDuration: (time: number) => void,
+  setCallDuration: (time: number) => void;
 }
 
 export const useQueue = ({
