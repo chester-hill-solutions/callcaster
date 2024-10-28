@@ -253,7 +253,6 @@ const Campaign: React.FC = () => {
   const [microphone, setMicrophone] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
   const [isMicrophoneMuted, setIsMicrophoneMuted] = useState<boolean>(false);
-  const [isSpeakerMuted, setIsSpeakerMuted] = useState<boolean>(false);
   const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
@@ -521,12 +520,11 @@ const Campaign: React.FC = () => {
     });
   }, [device, activeCall]);
 
-  const handleSpeakerChange = useCallback((event) => {
+  const handleSpeakerChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
     if (!device) { console.error('No device'); return };
     const selectedSpeaker = event.target.value;
     setOutput(selectedSpeaker);
-    device.audio.speakerDevices.set(selectedSpeaker).then(() => {
-      setIsSpeakerMuted(false);
+    device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
       console.log("Speaker set to", selectedSpeaker);
     }).catch((error) => {
       console.error("Error setting speaker:", error);
@@ -534,24 +532,18 @@ const Campaign: React.FC = () => {
   }, [device]);
 
   const handleMuteMicrophone = useCallback(() => {
-    if (!device) return;
-    device.audio.mute = !device.audio.mute;
-    setIsMicrophoneMuted(!device.audio.mute);
+    if (!device || !device.audio) return;
+    const newMuteState = !isMicrophoneMuted;
+    setIsMicrophoneMuted(newMuteState);
+    device.audio.incoming(newMuteState);
     if (activeCall) {
-      activeCall.mute(device.audio.mute);
+      console.log("Mute active call", newMuteState);
+      activeCall.mute(newMuteState);
     }
-  }, [device, activeCall]);
-
-  const handleMuteSpeaker = useCallback(() => {
-    if (!device) return;
-    setIsSpeakerMuted(!isSpeakerMuted);
-    device.audio?.incoming(isSpeakerMuted);
-    if (activeCall) {
-      activeCall.
-  }, [device, activeCall]);
+  }, [device, activeCall, isMicrophoneMuted]);
 
   const handleDTMF = useCallback(
-    (key) => {
+    (key: string) => {
       if (audioContextRef.current) playTone(key, audioContextRef?.current);
       if (!activeCall) return;
       else {
@@ -757,9 +749,7 @@ const Campaign: React.FC = () => {
           handleMicrophoneChange={handleMicrophoneChange}
           handleSpeakerChange={handleSpeakerChange}
           handleMuteMicrophone={handleMuteMicrophone}
-          handleMuteSpeaker={handleMuteSpeaker}
           isMicrophoneMuted={isMicrophoneMuted}
-          isSpeakerMuted={isSpeakerMuted}
         />
         <div className="m-4">
           <PhoneKeypad
