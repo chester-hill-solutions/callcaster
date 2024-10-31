@@ -32,7 +32,14 @@ export async function getSupabaseServerClientWithSession(request: Request) {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();
   if (!serverSession) {
-    throw redirect('/signin')
+    throw redirect("/signin");
   }
-  return { supabaseClient, headers, serverSession };
+  const {
+    data: { user },
+    error,
+  } = await supabaseClient.auth.getUser();
+  if (!user || error){
+    throw redirect("/signin");
+  }
+  return { supabaseClient, headers, serverSession, user };
 }
