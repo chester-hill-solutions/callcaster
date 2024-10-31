@@ -33,7 +33,7 @@ export const action = async ({ request }: { request: Request }) => {
 
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
-  const { data: user } = await supabaseClient.auth.getUser();
+  const { data: {user} } = await supabaseClient.auth.getUser();
   if (user) {
     return redirect("/workspaces", { headers });
   }
