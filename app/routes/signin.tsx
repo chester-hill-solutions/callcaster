@@ -11,7 +11,7 @@ import {
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const requestUrl = new URL(request.url);
-  const next = requestUrl.searchParams.get("next");
+  const next = requestUrl.searchParams.get('next');
 
   const formData = await request.formData();
 
@@ -24,7 +24,7 @@ export const action = async ({ request }: { request: Request }) => {
   });
 
   if (!error) {
-    if (next) return redirect(next, { headers });
+    if (next) return redirect(next, {headers});
     return redirect("/workspaces", { headers });
   }
   console.log(error);
