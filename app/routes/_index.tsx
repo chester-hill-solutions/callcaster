@@ -1,5 +1,6 @@
 import {
   Form,
+  json,
   Link,
   NavLink,
   useLoaderData,
@@ -17,15 +18,15 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const loader = async ({ request }) => {
   const {
     supabaseClient: supabase,
     headers,
-    serverSession,
-  } = await getSupabaseServerClientWithSession(request);
-  return { user: serverSession?.user };
+  } = createSupabaseServerClient(request);
+  const user = await supabase.auth.getUser();
+  return json({ user });
 };
 
 const ContactForm = ({ isBusy }) => (
