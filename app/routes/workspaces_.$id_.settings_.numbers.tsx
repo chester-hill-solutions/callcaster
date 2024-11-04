@@ -33,6 +33,7 @@ import { NumbersTable } from "~/components/NumbersTable";
 import { NumberCallerId } from "~/components/NumberCallerId";
 import { NumberPurchase } from "~/components/NumberPurchase";
 import { User, WorkspaceNumbers } from "~/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 type LoaderData = {
   phoneNumbers: WorkspaceNumbers;
@@ -188,10 +189,10 @@ const WorkspaceSettings = () => {
     user,
     users,
     mediaNames,
-  } = useLoaderData();
-  const { supabase } = useOutletContext();
+  } = useLoaderData<typeof loader>();
+  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const actionData = useActionData();
-  const [isDialogOpen, setDialog] = useState(!!actionData?.data);
+  const [isDialogOpen, setDialog] = useState<boolean>(!!actionData?.data);
   const fetcher = useFetcher();
   const updateFetcher = useFetcher();
 
@@ -212,28 +213,28 @@ const WorkspaceSettings = () => {
     }
   }, [actionData]);
 
-  const handleIncomingActivityChange = (numberId, value) => {
+  const handleIncomingActivityChange = (numberId: string, value: string) => {
     updateFetcher.submit(
       { formName: "update-incoming-activity", numberId, incomingActivity: value },
       { method: "POST" }
     );
   };
 
-  const handleIncomingVoiceMessageChange = (numberId, value) => {
+  const handleIncomingVoiceMessageChange = (numberId: string, value: string) => {
     updateFetcher.submit(
       { formName: "update-incoming-voice-message", numberId, incomingVoiceMessage: value },
       { method: "POST" }
     );
   };
 
-  const handleCallerIdChange = (numberId, value) => {
+  const handleCallerIdChange = (numberId: string, value: string) => {
     updateFetcher.submit(
       { formName: "update-caller-id", numberId, friendly_name: value },
       { method: "POST" }
     );
   };
 
-  const handleNumberRemoval = (numberId) => {
+  const handleNumberRemoval = (numberId: string) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId },
       { method: "POST" }
@@ -276,7 +277,7 @@ const WorkspaceSettings = () => {
   );
 };
 
-const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }) => (
+const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }: { isOpen: boolean, onOpenChange: (open: boolean) => void, validationRequest: ValidationRequest } ) => (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="flex w-[450px] flex-col items-center bg-card">
       <DialogHeader>
@@ -299,7 +300,7 @@ const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }) => (
   </Dialog>
 );
 
-const BackButton = ({ disabled }) => (
+const BackButton = ({ disabled }: { disabled: boolean }) => (
   <div className="flex justify-end pr-4 pt-4">
     <Button
       asChild
@@ -314,7 +315,7 @@ const BackButton = ({ disabled }) => (
   </div>
 );
 
-const Panel = ({ children, className }) => (
+const Panel = ({ children, className }: { children: React.ReactNode, className: string }) => (
   <div className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}>
     {children}
   </div>

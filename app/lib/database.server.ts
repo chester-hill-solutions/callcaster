@@ -990,7 +990,7 @@ export const fetchCampaignWithAudience = async (
 ) => {
   const { data, error } = await supabaseClient
     .from("campaign")
-    .select(`*, campaign_audience(*)`)
+    .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
     .eq("id", campaignId)
     .single();
   if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
