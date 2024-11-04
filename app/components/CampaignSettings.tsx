@@ -61,6 +61,7 @@ export type CampaignSettingsData = {
   audiences: CampaignAudience[];
   body_text: string;
   message_media: string[];
+  queue_count: number;
   voicedrop_audio: string | null;
   schedule: Schedule;
 };
@@ -78,6 +79,8 @@ export const CampaignSettings = ({
   onPageDataChange,
   mediaLinks,
   joinDisabled,
+  queueCount,
+  totalCount,
   flags,
   campaignQueue
 }: CampaignSettingsProps) => {
@@ -105,6 +108,8 @@ export const CampaignSettings = ({
     message_media: details?.message_media || [],
     voicedrop_audio: details?.voicedrop_audio,
     schedule: data?.schedule || {},
+    queue_count: queueCount,
+    total_count: totalCount,
     is_active: data?.is_active || false
   }));
   const [initialData, setInitial] = useState(campaignData);
@@ -119,6 +124,7 @@ export const CampaignSettings = ({
     setInitial({
       campaign_id,
       workspace,
+      queue_count: queueCount,
       title: data?.title || "",
       status: data?.status || "",
       type: data?.type || "live_call",
@@ -134,7 +140,8 @@ export const CampaignSettings = ({
       message_media: details?.message_media || [],
       voicedrop_audio: details?.voicedrop_audio,
       schedule: data?.schedule || {},
-      is_active: data?.is_active || false
+      is_active: data?.is_active || false,
+      total_count: totalCount 
     });
   }, [campaign_id, data, details, workspace]);
 
@@ -147,6 +154,8 @@ export const CampaignSettings = ({
       onPageDataChange({
         ...campaignData,
         campaign_audience: campaignData.audiences[0],
+        queue_count: queueCount,
+        total_count: totalCount 
       });
       setChanged(!deepEqual(campaignData, initialData));
     }
@@ -395,13 +404,13 @@ export const CampaignSettings = ({
                     <div>
                       <span className="text-sm text-muted-foreground">Queued</span>
                       <p className="text-xl font-semibold">
-                        {campaignQueue?.filter(q => q.status === "queued").length || 0}
+                        {queueCount}
                       </p>
                     </div>
                     <div>
-                      <span className="text-sm text-muted-foreground">Dequeued</span>
+                      <span className="text-sm text-muted-foreground">Total</span>
                       <p className="text-xl font-semibold">
-                        {campaignQueue?.filter(q => q.status === "dequeued").length || 0}
+                        {totalCount}
                       </p>
                     </div>
                   </div>
@@ -430,9 +439,9 @@ export const CampaignSettings = ({
                       ))}
                     </tbody>
                   </table>
-                  {campaignQueue?.length > 15 && (
+                  {queueCount > 15 && (
                     <div className="p-2 text-center text-sm text-muted-foreground">
-                      + {campaignQueue.length - 15} more contacts
+                      + {queueCount - 15} more contacts
                     </div>
                   )}
                 </div>
