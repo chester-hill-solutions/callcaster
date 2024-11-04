@@ -21,7 +21,7 @@ import {
 } from "./ui/dropdown-menu";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Input } from "./ui/input";
-import { 
+import {
     Pagination,
     PaginationContent,
     PaginationItem,
@@ -53,7 +53,7 @@ export function QueueTable({
     currentPage,
     pageSize,
     defaultFilters,
-    onStatusChange, 
+    onStatusChange,
     onSelectAllFiltered,
     isAllFilteredSelected,
 }: QueueTableProps) {
@@ -67,27 +67,28 @@ export function QueueTable({
 
     const selectAllVisible = useCallback(() => {
         const newSelection: RowSelectionState = {};
-        queue.forEach((_, index) => {
-            newSelection[index] = true;
+        queue.forEach((item) => {
+            newSelection[item.id] = true;
         });
         setRowSelection(newSelection);
-    }, [queue]);
 
+
+    }, [queue, onSelectAllFiltered]);
     const clearSelection = useCallback(() => {
         onSelectAllFiltered(false);
         setRowSelection({});
     }, [onSelectAllFiltered]);
 
     const totalPages = Math.ceil((totalCount || 0) / pageSize);
-    
+
     const getVisiblePages = useCallback(() => {
         const delta = 2;
         const range: (number | 'ellipsis')[] = [];
-        
+
         for (let i = 1; i <= totalPages; i++) {
             if (
-                i === 1 || 
-                i === totalPages || 
+                i === 1 ||
+                i === totalPages ||
                 (i >= currentPage - delta && i <= currentPage + delta)
             ) {
                 range.push(i);
@@ -95,15 +96,15 @@ export function QueueTable({
                 range.push('ellipsis');
             }
         }
-        
+
         return range;
     }, [currentPage, totalPages]);
 
     const selectAllFiltered = useCallback(() => {
         onSelectAllFiltered(true);
         const newSelection: RowSelectionState = {};
-        queue.forEach((_, index) => {
-            newSelection[index] = true;
+        queue.forEach((item) => {
+            newSelection[item.id] = true;
         });
         setRowSelection(newSelection);
     }, [queue, onSelectAllFiltered]);
@@ -115,8 +116,13 @@ export function QueueTable({
             header: ({ table }) => (
                 <div className="px-1">
                     <Checkbox
-                        checked={table.getIsAllRowsSelected()}
-                        onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
+                        checked={isAllFilteredSelected || table.getIsAllPageRowsSelected()}
+                        onCheckedChange={(value) => {
+                            table.toggleAllRowsSelected(!!value);
+                            if (!value) {
+                                onSelectAllFiltered(false);
+                            }
+                        }}
                         aria-label="Select all"
                     />
                 </div>
@@ -124,8 +130,13 @@ export function QueueTable({
             cell: ({ row }) => (
                 <div className="px-1">
                     <Checkbox
-                        checked={row.getIsSelected()}
-                        onCheckedChange={(value) => row.toggleSelected(!!value)}
+                        checked={isAllFilteredSelected || row.getIsSelected()}
+                        onCheckedChange={(value) => {
+                            row.toggleSelected(!!value);
+                            if (!value) {
+                                onSelectAllFiltered(false);
+                            }
+                        }}
                         aria-label="Select row"
                     />
                 </div>
@@ -135,33 +146,40 @@ export function QueueTable({
             accessorFn: (row) => `${row.contact?.firstname || ''} ${row.contact?.surname || ''}`.trim() || '-',
             id: 'name',
             header: ({ column }) => (
-                <div>
-                    <Button
-                        variant="ghost"
-                        onClick={() => {
-                            column.toggleSorting();
-                            const sort = column.getIsSorted();
-                            submit(
-                                { sort: sort ? `name.${sort}` : '' },
-                                { method: 'get' }
-                            );
-                        }}
-                        className="flex items-center gap-2"
-                    >
-                        Name
-                        {column.getIsSorted() === "asc" ? (
-                            <ChevronUp className="h-4 w-4" />
-                        ) : column.getIsSorted() === "desc" ? (
-                            <ChevronDown className="h-4 w-4" />
-                        ) : null}
-                    </Button>
-                    <Input
-                        name="name"
-                        placeholder="Filter names..."
-                        defaultValue={defaultFilters.name}
-                        onChange={(e) => submit(e.currentTarget.form!)}
-                        className="h-8 w-full mt-2"
-                    />
+                <div className="space-y-2">
+                    <div className="flex items-center px-2 justify-between">
+                        <span className="font-medium">Name</span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                column.toggleSorting();
+                                const sort = column.getIsSorted();
+                                submit(
+                                    { sort: sort ? `name.${sort}` : '' },
+                                    { method: 'get' }
+                                );
+                            }}
+                            className="h-8 px-2"
+                        >
+                            {column.getIsSorted() === "asc" ? (
+                                <ChevronUp className="h-4 w-4" />
+                            ) : column.getIsSorted() === "desc" ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronUp className="h-4 w-4 opacity-30" />
+                            )}
+                        </Button>
+                    </div>
+                    <div className="relative">
+                        <Input
+                            name="name"
+                            placeholder="Filter names..."
+                            defaultValue={defaultFilters.name}
+                            onChange={(e) => submit(e.currentTarget.form!)}
+                            className="h-8 w-full bg-white/50"
+                        />
+                    </div>
                 </div>
             ),
         },
@@ -169,56 +187,58 @@ export function QueueTable({
             accessorFn: (row) => row.contact?.phone || '-',
             id: 'phone',
             header: ({ column }) => (
-                <div>
-                    <Button
-                        variant="ghost"
-                        onClick={() => {
-                            column.toggleSorting();
-                            const sort = column.getIsSorted();
-                            submit(
-                                { sort: sort ? `phone.${sort}` : '' },
-                                { method: 'get' }
-                            );
-                        }}
-                        className="flex items-center gap-2"
-                    >
-                        Phone
-                        {column.getIsSorted() === "asc" ? (
-                            <ChevronUp className="h-4 w-4" />
-                        ) : column.getIsSorted() === "desc" ? (
-                            <ChevronDown className="h-4 w-4" />
-                        ) : null}
-                    </Button>
-                    <Input
-                        name="phone"
-                        placeholder="Filter phone..."
-                        defaultValue={defaultFilters.phone}
-                        onChange={(e) => submit(e.currentTarget.form!)}
-                        className="h-8 w-full mt-2"
-                    />
+                <div className="space-y-2">
+                    <div className="flex items-center px-2 justify-between">
+                        <span className="font-medium">Phone</span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                column.toggleSorting();
+                                const sort = column.getIsSorted();
+                                submit(
+                                    { sort: sort ? `phone.${sort}` : '' },
+                                    { method: 'get' }
+                                );
+                            }}
+                            className="h-8 px-2"
+                        >
+                            {column.getIsSorted() === "asc" ? (
+                                <ChevronUp className="h-4 w-4" />
+                            ) : column.getIsSorted() === "desc" ? (
+                                <ChevronDown className="h-4 w-4" />
+                            ) : (
+                                <ChevronUp className="h-4 w-4 opacity-30" />
+                            )}
+                        </Button>
+                    </div>
+                    <div className="relative">
+                        <Input
+                            name="phone"
+                            placeholder="Filter phone..."
+                            defaultValue={defaultFilters.phone}
+                            onChange={(e) => submit(e.currentTarget.form!)}
+                            className="h-8 w-full bg-white/50"
+                        />
+                    </div>
                 </div>
             ),
         },
         {
             accessorKey: 'status',
-            header: ({ table, column }) => {
-                const selectedRows = Object.keys(rowSelection);
-                console.log(selectedRows);
+            header: ({ column, table }) => {
+
+                const rows = rowSelection;
+                const selectedRows = Object.keys(rows).map(String);
                 return (
-                    <div className="flex flex-col items-start">
-                        {selectedRows.length > 0 ? (
-                            <StatusDropdown 
-                                onSelect={(status) => {
-                                    onStatusChange?.(
-                                        selectedRows.map((row) => table.getRow(row).original.id.toString()),
-                                        status
-                                    );
-                                    setRowSelection({});
-                                }}
-                            />
-                        ) : (
+                    <div className="space-y-2 pb-2">
+                        <div className="flex items-center px-2 justify-between">
+                            <span className="font-medium">
+                                {selectedRows.length > 0 || isAllFilteredSelected ? "Set Status" : "Status"}
+                            </span>
                             <Button
                                 variant="ghost"
+                                size="sm"
                                 onClick={() => {
                                     column.toggleSorting();
                                     const sort = column.getIsSorted();
@@ -227,37 +247,56 @@ export function QueueTable({
                                         { method: 'get' }
                                     );
                                 }}
+                                className="h-8 px-2"
                             >
-                                Status
                                 {column.getIsSorted() === "asc" ? (
-                                    <ChevronUp className="ml-2 h-4 w-4" />
+                                    <ChevronUp className="h-4 w-4" />
                                 ) : column.getIsSorted() === "desc" ? (
-                                    <ChevronDown className="ml-2 h-4 w-4" />
-                                ) : null}
+                                    <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                    <ChevronUp className="h-4 w-4 opacity-30" />
+                                )}
                             </Button>
-                        )}
+                        </div>
                         <select
                             name="status"
                             defaultValue={defaultFilters.status}
-                            onChange={(e) => submit(e.currentTarget.form!)}
-                            className="h-8 max-w-24 mt-2 rounded border border-input bg-background px-3"
+                            onChange={(e) => {
+                                if (selectedRows.length > 0 || isAllFilteredSelected) {
+                                    onStatusChange?.(selectedRows, e.target.value as typeof STATUS_OPTIONS[number]);
+                                } else {
+                                    submit(e.currentTarget.form!);
+                                }
+                            }}
+                            className="h-8 w-full rounded border border-input bg-gray-100/50 px-3 text-xm"
                         >
-                            <option value="">All statuses</option>
-                            {STATUS_OPTIONS.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                            ))}
+                            {selectedRows.length > 0 || isAllFilteredSelected ? (
+                                <>
+                                    <option value="">Set status...</option>
+                                    {STATUS_OPTIONS.map((status) => (
+                                        <option key={status} value={status}>{status}</option>
+                                    ))}
+                                </>
+                            ) : (
+                                <>
+                                    <option value="">All statuses</option>
+                                    {STATUS_OPTIONS.map((status) => (
+                                        <option key={status} value={status}>{status}</option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                     </div>
                 );
             },
             cell: ({ row }) => (
-                <StatusDropdown 
+                <StatusDropdown
                     currentStatus={row.original.status}
                     onSelect={(status) => onStatusChange?.([row.original.id.toString()], status)}
                 />
             ),
         },
-    ], []);
+    ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection]);
 
     const table = useReactTable({
         data: queue,
@@ -273,23 +312,24 @@ export function QueueTable({
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
+        getRowId: (row) => row.id.toString(),
     });
     return (
-        <Form method="get" className="space-y-4">
+        <Form method="get" className="space-y-4 py-4">
             {/* Selection Controls */}
             <div className="flex items-center gap-2 px-4">
-                <Button 
+                <Button
                     type="button"
-                    variant="outline" 
+                    variant="outline"
                     size="sm"
                     onClick={selectAllVisible}
                 >
                     Select Visible ({queue.length})
                 </Button>
                 {totalCount && totalCount > pageSize && (
-                    <Button 
+                    <Button
                         type="button"
-                        variant="outline" 
+                        variant="outline"
                         size="sm"
                         onClick={selectAllFiltered}
                     >
@@ -297,9 +337,9 @@ export function QueueTable({
                     </Button>
                 )}
                 {(Object.keys(rowSelection).length > 0 || isAllFilteredSelected) && (
-                    <Button 
+                    <Button
                         type="button"
-                        variant="outline" 
+                        variant="outline"
                         size="sm"
                         onClick={clearSelection}
                     >
@@ -335,7 +375,7 @@ export function QueueTable({
                                 {table.getRowModel().rows.map(row => (
                                     <tr key={row.id} className="border-b hover:bg-muted/50 text-gray-500">
                                         {row.getVisibleCells().map(cell => (
-                                            <td key={cell.id} className="p-4">
+                                            <td key={cell.id} className="p-2 px-4 text-xs">
                                                 {flexRender(
                                                     cell.column.columnDef.cell,
                                                     cell.getContext()
@@ -346,9 +386,11 @@ export function QueueTable({
                                 ))}
                                 <tr className="sticky bottom-0 bg-gray-200">
                                     <td colSpan={columns.length} className="p-4">
-                                        { Object.keys(rowSelection).length > 0 ? 
-                                            `Selected: ${Object.keys(rowSelection).length}` :
-                                            `Total: ${totalCount}`
+                                        {isAllFilteredSelected ?
+                                            `Selected: ${totalCount}` :
+                                            Object.keys(rowSelection).length > 0 ?
+                                                `Selected: ${Object.keys(rowSelection).length}` :
+                                                `Total: ${totalCount}`
                                         }
                                     </td>
                                 </tr>
@@ -410,9 +452,9 @@ export function QueueTable({
     );
 }
 
-function StatusDropdown({ currentStatus, onSelect }: { 
-    currentStatus?: string; 
-    onSelect: (status: typeof STATUS_OPTIONS[number]) => void; 
+function StatusDropdown({ currentStatus, onSelect }: {
+    currentStatus?: string;
+    onSelect: (status: typeof STATUS_OPTIONS[number]) => void;
 }) {
     return (
         <DropdownMenu>

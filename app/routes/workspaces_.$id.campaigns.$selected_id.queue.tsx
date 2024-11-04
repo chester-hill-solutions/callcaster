@@ -80,6 +80,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const nameFilter = searchParams.get("name") || "";
         const phoneFilter = searchParams.get("phone") || "";
         const statusFilter = searchParams.get("status") || "";
+        if (!ids || !newStatus) return { error: "Missing ids or newStatus" };
+        let updateIds = ids;
+        if (ids === 'all') {
+            updateIds = [];
+        }
 
         let updateQuery = supabaseClient
             .from("campaign_queue")
@@ -87,19 +92,27 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq('campaign_id', Number(params.selected_id));
 
         if (ids === 'all') {
+            let searchQuery = supabaseClient
+                .from("campaign_queue")
+                .select('id, contact!inner(*)')
+                .eq('campaign_id', Number(params.selected_id));
             if (nameFilter) {
-                updateQuery = updateQuery.or(`firstname.ilike.%${nameFilter}%,surname.ilike.%${nameFilter}%`);
+                searchQuery = searchQuery.or(`firstname.ilike.%${nameFilter}%,surname.ilike.%${nameFilter}%`, { foreignTable: 'contact' });
             }
             if (phoneFilter) {
-                updateQuery = updateQuery.ilike('contact.phone', `%${phoneFilter}%`);
+                searchQuery = searchQuery.ilike('contact.phone', `%${phoneFilter}%`);
             }
             if (statusFilter) {
-                updateQuery = updateQuery.eq('status', statusFilter);
+                searchQuery = searchQuery.eq('status', statusFilter);
             }
+            const { data: ids, error: searchError } = await searchQuery;
+            if (searchError) return { error: searchError.message };
+            updateIds = ids?.map((item: any) => item.id) || [];
+            updateQuery = updateQuery.in('id', updateIds);
         } else {
             updateQuery = updateQuery.in('id', ids);
         }
-
+        
         const { error } = await updateQuery;
 
         if (error) {
@@ -119,7 +132,7 @@ export default function Queue() {
             ids: isAllFilteredSelected ? 'all' : ids,
             newStatus,
         };
-
+        console.log(queueData);
         submit(queueData, { method: "POST", encType: "application/json" });
     };
 
