@@ -96,7 +96,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
     );
   } catch (error) {
     console.log(error);
-    return json({ userRole, error }, 500);
+    return json({ userRole, error }, 500);  
   }
 };
 
@@ -132,7 +132,7 @@ export default function Workspace() {
             />
           </div>
         </div>
-        <div className="flex flex-auto flex-col overflow-x-auto contain-content">
+        <div className="flex flex-auto flex-col contain-content overflow-hidden">
           {!outlet ? (
             <CampaignEmptyState
               hasAccess={Boolean(userRole === "admin" || userRole === "owner")}

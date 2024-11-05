@@ -1,4 +1,4 @@
-import { defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import {
   Await,
   Outlet,
@@ -38,8 +38,10 @@ import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
 import { useCsvDownload } from "~/hooks/useCsvDownload";
 import { generateCSVContent } from "~/lib/utils";
+import { Audience, Flags } from "~/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) {
@@ -73,23 +75,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) return redirect("/signin");
-
+  if (!serverSession?.user) throw redirect("/signin");
+  if (!workspace_id || !selected_id) throw redirect("../../");
   const [
     campaignData,
     resultsPromise,
     { data: phoneNumbers },
-    { data: mediaData },
+    { data: mediaData } = { data: [] },
     scripts,
   ] = await Promise.all([
     fetchCampaignData(supabaseClient, selected_id),
-    fetchBasicResults(supabaseClient, selected_id, headers),
+    fetchBasicResults(supabaseClient, selected_id),
     getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
     supabaseClient.storage.from("workspaceAudio").list(workspace_id),
     getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient }),
   ]);
   if (!campaignData)
-    return json({ error: "Campaign not found" }, { status: 404 });
+    throw json({ error: "Campaign not found" }, { status: 404 });
 
   const campaignType = campaignData.type;
   const campaignDetails = await fetchCampaignDetails(
@@ -134,15 +136,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     user: serverSession?.user,
     results: resultsPromise,
     phoneNumbers,
-    mediaData,
+    mediaData: mediaData ?? [],
     scripts,
     mediaLinks: mediaLinksPromise,
     isActive,
+    totalCalls: 0,
+    expectedTotal: 0,
   });
 };
 
 export default function CampaignScreen() {
-  const { audiences, flags } = useOutletContext();
+  const { audiences, flags, supabase } = useOutletContext<{ audiences: Audience[], flags: Flags, supabase: SupabaseClient }>();
   const {
     data,
     hasAccess,
@@ -157,8 +161,8 @@ export default function CampaignScreen() {
     isActive,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
-  const route = useLocation().pathname.split("/");
-  const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1)));
+  const route = useLocation().pathname.split("/");  
+  const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1) ?? ''));
   const campaign = data.length ? data : {};
   const submit = useSubmit();
   useCsvDownload(csvData);
@@ -197,7 +201,7 @@ export default function CampaignScreen() {
                   campaign={data}
                   hasAccess={hasAccess}
                   user={user}
-                />
+                />  
               )
             }
           </Await>
@@ -216,6 +220,7 @@ export default function CampaignScreen() {
         )}
       <Outlet
         context={{
+          supabase,
           joinDisabled,
           audiences,
           data,

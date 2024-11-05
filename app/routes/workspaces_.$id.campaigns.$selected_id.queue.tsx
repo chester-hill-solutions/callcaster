@@ -1,33 +1,20 @@
-import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Await, useFetcher, useLoaderData, useSearchParams, useSubmit } from "@remix-run/react";
+import { ActionFunctionArgs, defer, json, LoaderFunction, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { Await, useFetcher, useLoaderData, useOutletContext, useSearchParams } from "@remix-run/react";
 import { Suspense, useState } from "react";
 import { QueueTable } from "~/components/QueueTable";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Spinner } from "~/components/ui/spinner";
-import { Database } from "~/lib/database.types";
+import { Audience, Campaign, CampaignAudience, Contact, QueueItem } from "~/lib/types";
+import { QueueHeader } from "~/components/queue/QueueHeader";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
-import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "~/components/ui/select";
+import { Search } from "lucide-react";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { QueueContent } from "~/components/queue/QueueContent";
 
-type LoaderData = {
-    queuePromise: Promise<QueueResponse>;
-    audiences: Promise<{
-        id: number;
-        name: string;
-    }[]>;
-}
-
-type QueueResponse = {
-    queueData: Array<{
-        id: number;
-        status: string;
-        contact: {
-            firstname: string | null;
-            surname: string | null;
-            phone: string | null;
-            [key: string]: any;
-        } | null;
-        [key: string]: any;
-    }> | null;
+interface QueueResponse {
+    queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
     queueError: any;
     totalCount: number | null;
     currentPage: number;
@@ -35,8 +22,42 @@ type QueueResponse = {
     filters: {
         name: string;
         phone: string;
+        email: string;
+        address: string;
+        audiences: string;
         status: string;
     }
+}
+
+export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, status: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
+    let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
+    if (query) {
+        searchQuery = searchQuery.or(`firstname.ilike.%${query}%,surname.ilike.%${query}%`, { foreignTable: 'contact' });
+    }
+    if (filters.name) {
+        searchQuery = searchQuery.or(`firstname.ilike.%${filters.name}%,surname.ilike.%${filters.name}%`, { foreignTable: 'contact' });
+    }
+    if (filters.phone) {
+        searchQuery = searchQuery.ilike('contact.phone', `%${filters.phone}%`);
+    }
+    if (filters.status) {
+        if (filters.status === 'unknown') {
+            searchQuery = searchQuery.is('contact.outreach_attempt.disposition', null);
+        } else {
+            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.status);
+        }
+    }
+    if (filters.audiences) {
+        const audienceId = Number(filters.audiences);
+        searchQuery = searchQuery.in('contact.contact_audience.audience_id', [audienceId]);
+    }
+    if (filters.email) {
+        searchQuery = searchQuery.ilike('contact.email', `%${filters.email}%`);
+    }
+    if (filters.address) {
+        searchQuery = searchQuery.ilike('contact.address', `%${filters.address}%`);
+    }
+    return searchQuery;
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -48,69 +69,46 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const pageSize = 50;
     const offset = (page - 1) * pageSize;
 
-    const nameFilter = searchParams.get("name") || "";
-    const phoneFilter = searchParams.get("phone") || "";
-    const statusFilter = searchParams.get("status") || "";
-    const sortParam = searchParams.get("sort");
-
     const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
 
-    if (!serverSession?.user) return redirect("/signin");
-    if (!workspace_id || !selected_id) return redirect("../../");
+    if (!serverSession?.user) throw redirect("/signin");
+    if (!workspace_id || !selected_id) throw redirect("../../");
 
-    const audiencesPromise = (async () => {
-        const { data: audiences, error: audiencesError } = await supabaseClient
-            .from("audience")
-            .select("id, name")
-            .eq("workspace", workspace_id);  
-        if (audiencesError) throw new Error(audiencesError.message);
-        return audiences || [];
-    })();
+    const filters = {
+        name: searchParams.get("name") || "",
+        phone: searchParams.get("phone") || "",
+        status: searchParams.get("status") || "",
+        audiences: searchParams.get("audiences") || "",
+        email: searchParams.get("email") || "",
+        address: searchParams.get("address") || ""
+    };
 
-    const queuePromise = (async () => {
-        let query = supabaseClient
+    const sortParam = searchParams.get("sort");
+
+    // Run queries in parallel
+    const [queueData, unfilteredCount] = await Promise.all([
+        // Main queue data query
+        filteredSearch("", filters, supabaseClient, ['*', 'contact!inner(*, outreach_attempt!inner(id, disposition), contact_audience!inner(...audience!inner(name)))'], selected_id)
+            .range(offset, offset + pageSize - 1)
+            .then(({ data, error, count }) => ({ data, error, count })),
+
+        // Unfiltered count query  
+        supabaseClient
             .from("campaign_queue")
-            .select('*, contact!inner(*)', { count: 'exact' })
-            .eq("campaign_id", Number(selected_id));
-
-        if (nameFilter) {
-            query = query.or(`firstname.ilike.%${nameFilter}%,surname.ilike.%${nameFilter}%`, { foreignTable: 'contact' });
-        }
-        if (phoneFilter) {
-            query = query.ilike('contact.phone', `%${phoneFilter}%`);
-        }
-        if (statusFilter) {
-            query = query.eq('status', statusFilter);
-        }   
-        // Apply sorting
-        if (sortParam) {
-            const [field, direction] = sortParam.split('.');
-            query = query.order(field, { ascending: direction === 'asc' });
-        } else {
-            query = query.order('id', { ascending: true });
-        }
-
-        // Apply pagination
-        const { data: queueData, error: queueError, count: qcount } = await query
-            .range(offset, offset + pageSize - 1);
-
-        return {
-            queueData,
-            queueError,
-            totalCount: qcount,
+            .select('id', { count: 'exact' })
+            .eq('campaign_id', Number(selected_id))
+            .then(({ count, error }) => ({ count, error }))
+    ]);
+    return defer({
+        queuePromise: Promise.resolve({
+            queueData: queueData.data,
+            queueError: queueData.error,
+            totalCount: queueData.count,
+            unfilteredCount: unfilteredCount.count,
             currentPage: page,
             pageSize,
-            filters: {
-                name: nameFilter,
-                phone: phoneFilter,
-                status: statusFilter,
-            }
-        };
-    })();
-
-    return defer({ 
-        audiences: audiencesPromise,
-        queuePromise,
+            filters
+        }),
         campaignId: selected_id
     });
 };
@@ -118,7 +116,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
     if (!serverSession?.user) return redirect("/signin");
-
+    const { id: workspace_id, selected_id } = params;
+    if (!selected_id) return redirect("../../");
     if (request.method === "POST") {
         const { ids, newStatus } = await request.json();
         const url = new URL(request.url);
@@ -126,6 +125,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const nameFilter = searchParams.get("name") || "";
         const phoneFilter = searchParams.get("phone") || "";
         const statusFilter = searchParams.get("status") || "";
+        const audiencesFilter = searchParams.get("audiences") || "";
+        const emailFilter = searchParams.get("email") || "";
+        const addressFilter = searchParams.get("address") || "";
         if (!ids || !newStatus) return json({ error: "Missing ids or newStatus" });
         let updateIds = ids;
         if (ids === 'all') {
@@ -135,22 +137,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         let updateQuery = supabaseClient
             .from("campaign_queue")
             .update({ status: newStatus })
-            .eq('campaign_id', Number(params.selected_id));
+            .eq('campaign_id', Number(selected_id));
 
         if (ids === 'all') {
-            let searchQuery = supabaseClient
-                .from("campaign_queue")
-                .select('id, contact!inner(*)')
-                .eq('campaign_id', Number(params.selected_id));
-            if (nameFilter) {
-                searchQuery = searchQuery.or(`firstname.ilike.%${nameFilter}%,surname.ilike.%${nameFilter}%`, { foreignTable: 'contact' });
-            }
-            if (phoneFilter) {
-                searchQuery = searchQuery.ilike('contact.phone', `%${phoneFilter}%`);
-            }
-            if (statusFilter) {
-                searchQuery = searchQuery.eq('status', statusFilter);
-            }
+            let searchQuery = filteredSearch(nameFilter, {
+                name: nameFilter,
+                phone: phoneFilter,
+                status: statusFilter,
+                audiences: audiencesFilter,
+                email: emailFilter,
+                address: addressFilter
+            }, supabaseClient, ['id', 'contact!inner(*)'], selected_id);
             const { data: ids, error: searchError } = await searchQuery;
             if (searchError) return json({ error: searchError.message });
             updateIds = ids?.map((item: any) => item.id) || [];
@@ -168,11 +165,46 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return json({ success: true });
 };
 
+export function ErrorBoundary() {
+    return (
+        <div className="flex flex-col items-center justify-center p-8">
+            <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
+            <p className="text-gray-600 mb-4">There was a problem loading the queue data. Please try again.</p>
+            <Button onClick={() => window.location.reload()}>
+                Retry
+            </Button>
+        </div>
+    );
+}
+
 export default function Queue() {
-    const { queuePromise, audiences, campaignId } = useLoaderData<typeof loader>();
+    const { data, audiences, supabase } = useOutletContext<{ data: Campaign & { campaign_audience: CampaignAudience[] }, audiences: Audience[], supabase: SupabaseClient }>();
+    const { queuePromise, campaignId } = useLoaderData<typeof loader>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
+    const [selectedAudience, setSelectedAudience] = useState<number | null>(null);
+    const [searchModalOpen, setSearchModalOpen] = useState(false);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchQuery, setSearchQuery] = useState("");
     const fetcher = useFetcher();
+    const contactFetcher = useFetcher<{ contacts: (Contact & { contact_audience: { audience_id: number }[], queued: boolean })[] }>({ key: 'contact-search' });
+
+    const handleNameChange = (value: string) => {
+        setSearchParams((prev) => ({ ...prev, name: value }));
+    }
+    const clearFilter = () => {
+
+        setSearchParams(prev => {
+            prev.delete('name');
+            prev.delete('phone');
+            prev.delete('status');
+            prev.delete('audiences');
+            prev.delete('email');
+            prev.delete('address');
+            prev.delete('status');
+            return prev;
+        });
+    }
 
     const onStatusChange = async (ids: string[], newStatus: string) => {
         const queueData = {
@@ -181,65 +213,129 @@ export default function Queue() {
         };
         fetcher.submit(queueData, { method: "POST", encType: "application/json" });
     };
-    
+
     const handleAddFromAudience = (value: number) => {
         fetcher.submit({ audience_id: value, campaign_id: Number(campaignId) }, { action: "/api/campaign_audience", method: "POST", encType: "application/json", navigate: false });
     }
 
     const handleAddContact = () => {
-        console.log("Add Contact");
+        setSearchModalOpen(true);
     }
-    console.log(fetcher.data);
+
+    const handleSearch = (query: string) => {
+        contactFetcher.load(`/api/contacts?q=${query}&workspace_id=${data.workspace}&campaign_id=${campaignId}`);
+    }
+
+    const handleAddContactToQueue = (contacts: (Contact & { contact_audience: { audience_id: number }[] })[], unfilteredCount: number) => {
+        fetcher.submit(
+            { ids: contacts.map((contact) => contact.id), campaign_id: Number(campaignId), startOrder: unfilteredCount },
+            { action: "/api/campaign_queue", method: "POST", encType: "application/json", navigate: false }
+        );
+    }
+
+    const handleRemoveContactsFromQueue = (ids: string[] | 'all') => {
+        if (ids === 'all') {
+            fetcher.submit({ campaign_id: Number(campaignId), filters: Object.fromEntries(searchParams.entries()) }, { method: "DELETE", encType: "application/json", navigate: false, action: "/api/campaign_queue" });
+        } else {
+            fetcher.submit({ ids, campaign_id: Number(campaignId) }, { method: "DELETE", encType: "application/json", navigate: false, action: "/api/campaign_queue" });
+        }
+    }
+
+    const selectedCampaignAudienceIds = data.campaign_audience?.map((audience) => audience?.audience_id).filter((id): id is number => id !== null);
+
+    const handleFilterChange = (key: string, value: string) => {
+        setSearchParams(prev => {
+            if (value) {
+                prev.set(key, value);
+            } else {
+                prev.delete(key);
+            }
+            return prev;
+        });
+    };
+
     return (
         <Suspense fallback={
             <div className="flex justify-center items-center p-8">
                 <Spinner className="h-8 w-8" />
             </div>
         }>
-            <Await resolve={queuePromise} errorElement={<div>Error loading queue</div>}>
-                {(queueValue: QueueResponse) => (
-                    <Await resolve={audiences} errorElement={<div>Error loading audiences</div>}>
-                        {(audienceValue: Array<{ id: number; name: string | null }>) => (
-                            queueValue?.queueError ? <div>{queueValue.queueError.message}</div> :
-                            <div className="p-2">
-                                <div className="flex justify-between items-center">
-                                    <div className="text-sm text-gray-500">
-                                        {queueValue.totalCount} contacts
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {!isSelectingAudience ? <Button variant="outline" size="sm" onClick={() => {
-                                            setIsSelectingAudience(true);
-                                        }}>
-                                            Add from Audience
-                                        </Button> : 
-                                        <Select onValueChange={handleAddFromAudience}>     
-                                            <SelectTrigger> 
-                                                <SelectValue placeholder="Select Audience" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {audienceValue.map((audience) => (
-                                                    <SelectItem key={audience.id} value={audience.id}>{audience.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>}
-                                        <Button variant="outline" size="sm" onClick={() => handleAddContact()}>
-                                            Search/Add Contact
-                                        </Button>
-                                    </div>
+            <Await resolve={queuePromise}>
+                {(queueValue) => (
+                    <><Dialog open={searchModalOpen} onOpenChange={setSearchModalOpen}>
+                        <DialogContent className="bg-white">
+                            <DialogHeader>
+                                <DialogTitle>Search Contacts</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Search by name or phone..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)} />
+                                    <Button size="icon" onClick={() => handleSearch(searchQuery)}>
+                                        <Search className="h-4 w-4" />
+                                    </Button>
                                 </div>
-                                <QueueTable
-                                    queue={queueValue.queueData}
-                                    totalCount={queueValue.totalCount}
-                                    currentPage={queueValue.currentPage}
-                                    pageSize={queueValue.pageSize}
-                                    defaultFilters={queueValue.filters}
-                                    onStatusChange={onStatusChange}
-                                    isAllFilteredSelected={isAllFilteredSelected}
-                                    onSelectAllFiltered={setIsAllFilteredSelected}
-                                />
+                                <div className="min-h-[200px]">
+                                    {contactFetcher.data?.contacts?.length ? (
+                                        <div className="space-y-2">
+                                            {contactFetcher.data.contacts.map((contact) => contact && (
+                                                <div
+                                                    key={contact.id}
+                                                    className="grid grid-cols-[2fr,2fr,2fr,1fr] gap-2 p-2 border rounded-md hover:bg-gray-50 transition-colors text-sm"
+                                                >
+                                                    <div className="truncate">
+                                                        {contact.firstname} {contact.surname}
+                                                    </div>
+                                                    <div className="truncate text-gray-600">
+                                                        {contact.phone && <div>{contact.phone}</div>}
+                                                        {contact.email && <div>{contact.email}</div>}
+                                                    </div>
+                                                    <div className="truncate text-gray-600">
+
+                                                        {contact.address}
+                                                    </div>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className={`text-xs w-full ${contact.queued ? "bg-green-500/20 border-green-500/60 hover:bg-green-500/30" : ""}`}
+                                                        disabled={contact.queued}
+                                                        onClick={() => handleAddContactToQueue([contact], queueValue.unfilteredCount ?? 0)}
+                                                    >
+                                                        {contact.queued ? "Added" : "Add"}
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-gray-500 py-4">
+                                            No results found
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                    </Await>
+                        </DialogContent>
+                    </Dialog>
+                        <QueueContent
+                            queueValue={queueValue as QueueResponse}
+                            handleFilterChange={handleFilterChange}
+                            clearFilter={clearFilter}
+                            audiences={audiences}
+                            selectedCampaignAudienceIds={selectedCampaignAudienceIds}
+                            isSelectingAudience={isSelectingAudience}
+                            selectedAudience={selectedAudience}
+                            setIsSelectingAudience={setIsSelectingAudience}
+                            setSelectedAudience={setSelectedAudience}
+                            handleAddFromAudience={handleAddFromAudience}
+                            handleAddContact={handleAddContact}
+                            onStatusChange={onStatusChange}
+                            isAllFilteredSelected={isAllFilteredSelected}
+                            setIsAllFilteredSelected={setIsAllFilteredSelected}
+                            supabase={supabase}
+                            addContactToQueue={handleAddContactToQueue}
+                            removeContactsFromQueue={handleRemoveContactsFromQueue} />
+                    </>
                 )}
             </Await>
         </Suspense>

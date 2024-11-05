@@ -84,8 +84,6 @@ export default function Settings() {
     ...data,
     campaign_audience: campaignAudience,
     campaign_queue: campaignQueue,
-    queue_count: queueCount,
-    total_count: totalCount,
   });
   const handlePageDataChange = useCallback(
     (
