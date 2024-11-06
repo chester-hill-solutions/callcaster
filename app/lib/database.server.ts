@@ -989,7 +989,7 @@ export const fetchCampaignWithAudience = async (
 ) => {
   const campaignPromise = supabaseClient
     .from("campaign")
-    .select(`*, campaign_audience(*)`)
+    .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
     .eq("id", campaignId)
     .single();
 

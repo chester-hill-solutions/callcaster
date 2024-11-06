@@ -403,13 +403,13 @@ export const CampaignSettings = ({
                     <div>
                       <span className="text-sm text-muted-foreground">Queued</span>
                       <p className="text-xl font-semibold">
-                        {queueCount}
+                        {campaignQueue?.filter(q => q.status === "queued").length || 0}
                       </p>
                     </div>
                     <div>
-                      <span className="text-sm text-muted-foreground">Total</span>
+                      <span className="text-sm text-muted-foreground">Dequeued</span>
                       <p className="text-xl font-semibold">
-                        {totalCount}
+                        {campaignQueue?.filter(q => q.status === "dequeued").length || 0}
                       </p>
                     </div>
                   </div>
@@ -438,9 +438,9 @@ export const CampaignSettings = ({
                       ))}
                     </tbody>
                   </table>
-                  {queueCount > 15 && (
+                  {campaignQueue?.length > 15 && (
                     <div className="p-2 text-center text-sm text-muted-foreground">
-                      + {queueCount - 15} more contacts
+                      + {campaignQueue.length - 15} more contacts
                     </div>
                   )}
                 </div>
