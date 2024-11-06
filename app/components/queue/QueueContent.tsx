@@ -80,7 +80,7 @@ export function QueueContent({
             })
             setQueueData(curr => {
                 if (payload.eventType === 'DELETE') {
-                    return curr.filter(item => item.id !== payload.new.id);
+                    return curr.filter(item => item.id !== payload.old.id);
                 }
                 return curr;
             })

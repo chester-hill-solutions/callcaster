@@ -34,7 +34,6 @@ interface QueueTableProps {
         address: string;
         audiences: string;
         status: string;
-        recent_attempt: string;
     };
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
@@ -67,10 +66,10 @@ export function QueueTable({
     const isFiltered = defaultFilters.name !== '' || defaultFilters.phone !== '' || defaultFilters.status !== '' || defaultFilters.audiences !== '' || defaultFilters.address !== '' || defaultFilters.email !== '';
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [sorting, setSorting] = useState<SortingState>([]);
-    
+
     // Optimistic state for queue items
     const [optimisticQueue, setOptimisticQueue] = useState(queue);
-    
+
     // Add these state hooks at the top of your component
     const [optimisticStatus, setOptimisticStatus] = useState(defaultFilters.status || "");
     const [optimisticAudience, setOptimisticAudience] = useState(defaultFilters.audiences || "");
@@ -139,9 +138,9 @@ export function QueueTable({
 
     // Optimistic update handlers
     const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: typeof STATUS_OPTIONS[number]) => {
-        setOptimisticQueue(prev => 
-            prev?.map(item => 
-                selectedIds.includes(item.id.toString()) 
+        setOptimisticQueue(prev =>
+            prev?.map(item =>
+                selectedIds.includes(item.id.toString())
                     ? { ...item, status: newStatus }
                     : item
             ) || []
@@ -153,7 +152,7 @@ export function QueueTable({
         if (ids === 'all') {
             setOptimisticQueue([]);
         } else {
-            setOptimisticQueue(prev => 
+            setOptimisticQueue(prev =>
                 prev?.filter(item => !ids.includes(item.id.toString())) || []
             );
         }
@@ -401,7 +400,7 @@ export function QueueTable({
             header: ({ column, table }) => {
                 const rows = rowSelection;
                 const selectedRows = Object.keys(rows).map(String);
-                
+
                 return (
                     <div className="space-y-1">
                         <div className="flex items-center px-1 justify-between">

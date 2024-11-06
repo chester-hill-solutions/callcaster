@@ -18,7 +18,6 @@ interface QueueHeaderProps {
 
 export function QueueHeader({
     unfilteredCount,
-    totalCount,
     isSelectingAudience,
     selectedAudience,
     audiences,
