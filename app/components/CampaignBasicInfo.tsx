@@ -56,6 +56,7 @@ const getButtonStates = (
       break;
     case "paused":
       states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.schedule = "Inactive";
       states.archive = "Inactive";
       states.pause = "Active"
       break;
@@ -67,6 +68,7 @@ const getButtonStates = (
       break;
     case "scheduled":
       states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.pause = "Inactive";
       states.archive = "Inactive";
       states.schedule = "Active";
       break;
@@ -138,7 +140,6 @@ export const CampaignBasicInfo = ({
     const tooltipText = type === "schedule" ? (scheduleDisabled || tooltip) :
       (state === "Active" ? `Currently ${type === "play" ? "running" : `${type}ed`}` :
         tooltip);
-
     return (
       <TooltipProvider>
         <Tooltip>
@@ -152,7 +153,7 @@ export const CampaignBasicInfo = ({
                 if (type === "duplicate") {
                   handleDuplicateButton();
                 } else {
-                  handleButton(type as "play" | "pause" | "archive");
+                  handleButton(type as "play" | "pause" | "archive" | "schedule");
                 }
               }}
               disabled={getButtonStates(campaignData.status as CampaignState, Boolean(isPlayDisabled))[type] === "Disabled"}

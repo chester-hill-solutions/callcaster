@@ -145,6 +145,10 @@ export default function useCampaignSettings(
                     handleInputChange("status", "running");
                     handleInputChange("is_active", true);
                 }
+                if (type === "pause") {
+                    handleInputChange("status", "paused");
+                    handleInputChange("is_active", false);
+                }
                 break;
             case "running":
                 if (type === "pause") {
