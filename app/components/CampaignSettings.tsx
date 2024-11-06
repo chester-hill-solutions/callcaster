@@ -41,8 +41,10 @@ export type CampaignSettingsProps = {
   flags: Flags;
   isActive: boolean;
   onPageDataChange: (
-    data: Campaign & { campaign_audience: CampaignAudience },
+    data: CampaignSettingsData,
   ) => void;
+  queueCount: number;
+  totalCount: number;
 };
 
 export type CampaignSettingsData = {
@@ -63,6 +65,7 @@ export type CampaignSettingsData = {
   message_media: string[];
   voicedrop_audio: string | null;
   schedule: Schedule;
+  campaign_audience?: CampaignAudience | null;
 };
 
 export const CampaignSettings = ({
@@ -78,6 +81,8 @@ export const CampaignSettings = ({
   onPageDataChange,
   mediaLinks,
   joinDisabled,
+  queueCount,
+  totalCount,
   flags,
   campaignQueue
 }: CampaignSettingsProps) => {
@@ -101,11 +106,12 @@ export const CampaignSettings = ({
     voicemail_file: data?.voicemail_file || "",
     script_id: details && 'script_id' in details ? details.script_id : null,
     audiences: data?.campaign_audience ? [data.campaign_audience].flat() : [],
-    body_text: details?.body_text || "",
-    message_media: details?.message_media || [],
-    voicedrop_audio: details?.voicedrop_audio,
+    body_text: details && 'body_text' in details ? details.body_text : "",
+    message_media: details && 'message_media' in details ? details.message_media : [],
+    voicedrop_audio: details && 'voicedrop_audio' in details ? details.voicedrop_audio : null,
     schedule: data?.schedule || {},
-    is_active: data?.is_active || false
+    is_active: data?.is_active || false,
+    campaign_audience: data?.campaign_audience || null,
   }));
   const [initialData, setInitial] = useState(campaignData);
 
@@ -130,11 +136,12 @@ export const CampaignSettings = ({
       voicemail_file: data?.voicemail_file || "",
       script_id: details && 'script_id' in details ? details.script_id : null,
       audiences: data?.campaign_audience ? [data.campaign_audience].flat() : [],
-      body_text: details?.body_text || "",
-      message_media: details?.message_media || [],
-      voicedrop_audio: details?.voicedrop_audio,
+      body_text: details && 'body_text' in details ? details.body_text : "",
+      message_media: details && 'message_media' in details ? details.message_media : [],
+      voicedrop_audio: details && 'voicedrop_audio' in details ? details.voicedrop_audio : null,
       schedule: data?.schedule || {},
-      is_active: data?.is_active || false
+      is_active: data?.is_active || false,
+      campaign_audience: data?.campaign_audience || null,
     });
   }, [campaign_id, data, details, workspace]);
 
@@ -144,13 +151,14 @@ export const CampaignSettings = ({
 
   useEffect(() => {
     if (formFetcher.data) {
-      onPageDataChange({
+      const updatedData = {
         ...campaignData,
-        campaign_audience: campaignData.audiences[0],
-      });
-      setChanged(!deepEqual(campaignData, initialData));
+        campaign_audience: campaignData.audiences[0]
+      };
+      onPageDataChange(updatedData);
+      setChanged(!deepEqual(updatedData, initialData));
     }
-  }, [formFetcher.data]);
+  }, [formFetcher.data, campaignData, initialData]);
 
   const handleInputChange = (name: string, value: string | boolean | number | null | Schedule) => {
     setCampaignData((prev) => ({ ...prev, [name]: value }));

@@ -42,6 +42,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     selected_id,
     campaignAudience: campaignWithAudience.campaign_audience,
     campaignQueue: campaignWithAudience.campaign_queue,
+    queueCount: campaignWithAudience.queue_count,
+    totalCount: campaignWithAudience.total_count,
   });
 };
 
@@ -74,6 +76,8 @@ export default function Settings() {
     selected_id,
     campaignAudience,
     campaignQueue,
+    queueCount,
+    totalCount,
   } = useLoaderData<typeof loader>();
 
   const [pageData, setPageData] = useState({
@@ -123,6 +127,8 @@ export default function Settings() {
       user={user}
       joinDisabled={joinDisabled}
       campaignQueue={campaignQueue} 
+      queueCount={queueCount}
+      totalCount={totalCount}
       mediaLinks={mediaLinks}
     />
   );

@@ -72,7 +72,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
     if (!serverSession?.user) return redirect("/signin");
-
     if (request.method === "POST") {
         const { ids, newStatus } = await request.json();
         const url = new URL(request.url);
@@ -132,7 +131,6 @@ export default function Queue() {
             ids: isAllFilteredSelected ? 'all' : ids,
             newStatus,
         };
-        console.log(queueData);
         submit(queueData, { method: "POST", encType: "application/json" });
     };
 
