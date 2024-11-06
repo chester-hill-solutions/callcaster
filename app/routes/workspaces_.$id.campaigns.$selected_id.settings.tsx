@@ -1,7 +1,8 @@
-import { json, redirect } from "@remix-run/node";
-import { Await, useLoaderData, useOutletContext } from "@remix-run/react";
+import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { useLoaderData, useOutletContext } from "@remix-run/react";
+import { Suspense } from "react";
 import { FileObject } from "@supabase/storage-js";
-import { useState, useCallback, SetStateAction, Suspense } from "react";
+import { useState, useCallback, SetStateAction, useEffect } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { fetchCampaignWithAudience } from "~/lib/database.server";
@@ -18,29 +19,31 @@ import {
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
-import { Json, Database } from "~/lib/database.types";
+import { Spinner } from "~/components/ui/spinner";  
+import { Json } from "~/lib/database.types";
+import { Database } from "~/lib/database.types";
 
-export const loader = async ({ request, params }) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-
+  
   const {
     supabaseClient,
     serverSession,
-  }: { supabaseClient: SupabaseClient; serverSession: Session } =
-    await getSupabaseServerClientWithSession(request);
+  } = await getSupabaseServerClientWithSession(request);
+  
   if (!serverSession?.user) return redirect("/signin");
+  if (!selected_id) return redirect("../../");
   const campaignWithAudience = await fetchCampaignWithAudience(
     supabaseClient,
     selected_id,
   );
-  const { data: queuePromise, error: queueError } = await supabaseClient.from("campaign_queue").select("*, contact(*)").eq("campaign_id", selected_id);
-
-  if (queueError) throw new Error(`Error fetching queue: ${queueError.message}`);
   return json({
     workspace_id,
     selected_id,
     campaignAudience: campaignWithAudience.campaign_audience,
-    queuePromise,
+    campaignQueue: campaignWithAudience.campaign_queue,
+    queueCount: campaignWithAudience.queue_count,
+    totalCount: campaignWithAudience.total_count,
   });
 };
 
@@ -72,17 +75,15 @@ export default function Settings() {
     workspace_id,
     selected_id,
     campaignAudience,
-    queuePromise,
-  }: {
-    workspace_id: string;
-    selected_id: string;
-    campaignAudience: Audience;
-    queuePromise: Promise<QueueItem[]>;
-  } = useLoaderData();
+    campaignQueue,
+    queueCount,
+    totalCount,
+  } = useLoaderData<typeof loader>();
 
   const [pageData, setPageData] = useState({
     ...data,
     campaign_audience: campaignAudience,
+    campaign_queue: campaignQueue,
   });
   const handlePageDataChange = useCallback(
     (
@@ -105,37 +106,30 @@ export default function Settings() {
         } & { campaign_audience: CampaignAudience }
       >,
     ) => {
-      setPageData(newData);
+      setPageData(newData as any); 
     },
     [],
   );
+
   return (
-    <>
-      <CampaignSettings
-        flags={flags}
-        workspace={workspace_id}
-        data={pageData}
-        scripts={scripts}
-        audiences={audiences}
-        mediaData={mediaData}
-        campaign_id={selected_id}
-        phoneNumbers={phoneNumbers}
-        campaignDetails={data.campaignDetails}
-        onPageDataChange={handlePageDataChange}
-        user={user}
-        joinDisabled={joinDisabled}
-        mediaLinks={mediaLinks}
-      />
-{/*       <Suspense fallback={<div>Loading queue...</div>}>
-        <Await resolve={queuePromise}>
-          {(queue) => {
-            console.log(queue);
-            return (<div>
-              {queue.map((item) => <div key={item.id}>{item.contact?.firstname} {item.contact?.surname} {item.contact?.phone} {item.status}</div>)}
-            </div>);
-          }}
-        </Await>
-      </Suspense>
- */}    </>
+    <CampaignSettings
+      flags={flags}
+      workspace={workspace_id || ''}
+      data={pageData as any}
+      isActive={data.status === 'running'} 
+      scripts={scripts}
+      audiences={audiences}
+      mediaData={mediaData}
+      campaign_id={selected_id || ''}
+      phoneNumbers={phoneNumbers}
+      campaignDetails={data.campaignDetails}
+      onPageDataChange={handlePageDataChange}
+      user={user}
+      joinDisabled={joinDisabled}
+      campaignQueue={campaignQueue} 
+      queueCount={queueCount}
+      totalCount={totalCount}
+      mediaLinks={mediaLinks}
+    />
   );
 }

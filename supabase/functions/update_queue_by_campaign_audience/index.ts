@@ -24,7 +24,6 @@ const handleQueueInsert = async (supabase, contactIds, campaignId) => {
     status: "queued",
     campaign_id: campaignId,
   }));
-  console.log(update)
   const { data, error } = await supabase
     .from("campaign_queue")
     .insert(update)

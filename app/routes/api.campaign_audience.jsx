@@ -58,11 +58,18 @@ const handlePutOperation = async (supabaseClient, data) => {
 
 const handlePostOperation = async (supabaseClient, data) => {
   //console.log('POST request data:', data);
-  return handleDatabaseOperation(
-    () => supabaseClient.from('campaign_audience').insert(data).select(),
-    'Error creating campaign audience'
-  );
+  try {
+    const {data: result, error} = await handleDatabaseOperation(
+      () => supabaseClient.from('campaign_audience').insert(data).select(`*`),
+      'Error creating campaign audience'
+    );
+    if (error) throw new Error(`${error.message}`);
+    return { success: true};
+  } catch (error) {
+    throw new Error(`${error.message}`);
+  }
 };
+
 
 const handleDeleteOperation = async (supabaseClient, data) => {
   //console.log('DELETE request data:', data);
