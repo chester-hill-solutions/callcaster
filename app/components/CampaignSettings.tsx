@@ -90,6 +90,7 @@ export const CampaignSettings = ({
   const navigation = useNavigation();
   const fetcher = useFetcher();
   const formFetcher = useFetcher();
+  const duplicateFetcher = useFetcher();
   const [campaignData, setCampaignData] = useState(() => ({
     campaign_id,
     workspace,
@@ -252,13 +253,19 @@ export const CampaignSettings = ({
   }
 
   const handleDuplicateButton = () => {
-    delete campaignData.id;
-    formFetcher.submit(
-      { campaignData: JSON.stringify(campaignData), campaignDetails: JSON.stringify(details) },
+    const { id, campaign_id, ...dataToDuplicate } = campaignData;
+    duplicateFetcher.submit(
+      { campaignData: JSON.stringify(dataToDuplicate)},
       { method: "post", action: "/api/campaigns" }
     );
   }
+  useEffect(() => {
+    if (duplicateFetcher.data?.campaign) {
+      navigate(`/workspaces/${workspace}/campaigns/${duplicateFetcher.data.campaign.id}/settings`);
+    }
+  }, [duplicateFetcher.data]);
 
+  
   const clearSchedule = () => {
     handleInputChange("schedule", {
       sunday: { active: false, intervals: [] },
@@ -377,6 +384,7 @@ export const CampaignSettings = ({
             campaignData={campaignData}
             handleInputChange={handleInputChange}
             handleButton={handleStatusButtons}
+            handleDuplicateButton={handleDuplicateButton}
             phoneNumbers={phoneNumbers}
             flags={flags}
             joinDisabled={joinDisabled}

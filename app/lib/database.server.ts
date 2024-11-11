@@ -543,15 +543,15 @@ export async function createWorkspaceTwilioInstance({
 }
 
 // Marked for deprecation
-export async function endConferenceByUser({ user_id, supabaseClient, workspace_id }:{ workspace_id:string, user_id:string, supabaseClient:SupabaseClient }) {
+export async function endConferenceByUser({ user_id, supabaseClient, workspace_id }: { workspace_id: string, user_id: string, supabaseClient: SupabaseClient }) {
   const { data, error } = await supabaseClient
     .from("workspace")
     .select("twilio_data, key, token")
     .eq("id", workspace_id)
     .single();
-    if (error || !data){
-      throw error || new Error("No workspace found")
-    }
+  if (error || !data) {
+    throw error || new Error("No workspace found")
+  }
   const twilio = new Twilio.Twilio(
     data.twilio_data.sid,
     data.twilio_data.authToken,
@@ -591,7 +591,7 @@ export async function endConferenceByUser({ user_id, supabaseClient, workspace_i
   );
 }
 
-export async function getWorkspaceScripts({ workspace, supabase }:{ workspace:string, supabase:SupabaseClient}) {
+export async function getWorkspaceScripts({ workspace, supabase }: { workspace: string, supabase: SupabaseClient }) {
   const { data, error } = await supabase
     .from("script")
     .select()
@@ -636,7 +636,7 @@ export async function getMedia(
   return media;
 }
 
-export async function listMedia(supabaseClient:SupabaseClient, workspace:string) {
+export async function listMedia(supabaseClient: SupabaseClient, workspace: string) {
   const { data, error } = await supabaseClient.storage
     .from(`workspaceAudio`)
     .list(workspace);
@@ -644,7 +644,7 @@ export async function listMedia(supabaseClient:SupabaseClient, workspace:string)
   return data;
 }
 
-export async function getSignedUrls(supabaseClient:SupabaseClient, workspace_id:string, mediaNames:string[]) {
+export async function getSignedUrls(supabaseClient: SupabaseClient, workspace_id: string, mediaNames: string[]) {
   return Promise.all(
     mediaNames.map(async (mediaName) => {
       const { data, error } = await supabaseClient.storage
@@ -776,39 +776,39 @@ export async function updateCampaign({
   const cleanCampaignDetails =
     tableKey === "message_campaign"
       ? cleanObject({
+        ...campaignDetails,
+        mediaLinks: undefined,
+        disposition_options: undefined,
+        script: undefined,
+        questions: undefined,
+        created_at: undefined,
+        script_id: undefined,
+        voicedrop_audio: undefined,
+      })
+      : tableKey === "ivr_campaign"
+        ? cleanObject({
           ...campaignDetails,
           mediaLinks: undefined,
           disposition_options: undefined,
           script: undefined,
           questions: undefined,
           created_at: undefined,
-          script_id: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
           voicedrop_audio: undefined,
         })
-      : tableKey === "ivr_campaign"
-        ? cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-            voicedrop_audio: undefined,
-          })
         : cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-          });
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+        });
 
   if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
@@ -851,16 +851,13 @@ export async function updateCampaign({
 export async function deleteCampaign({ supabase, campaignId }: { supabase: SupabaseClient, campaignId: string }) {
   const { error } = await supabase.from("campaign").delete().eq("id", campaignId);
   if (error) throw error;
-}   
-
-export async function createCampaign({ 
-  supabase, 
+}
+export async function createCampaign({
+  supabase,
   campaignData,
-  campaignDetails,
-}: { 
-  supabase: SupabaseClient, 
+}: {
+  supabase: SupabaseClient,
   campaignData: CampaignData,
-  campaignDetails: CampaignDetails,
 }) {
   const { audiences, ...restCampaignData } = campaignData;
 
@@ -881,15 +878,55 @@ export async function createCampaign({
     is_active: Boolean(restCampaignData.is_active),
   });
 
-  const campaign = await handleDatabaseOperation(
-    async () => await supabase.from("campaign").insert(cleanCampaignData).select().single(),
-    "Error creating campaign"
-  );
-  if (!cleanCampaignData.type) throw new Error("Campaign type is required");
+  let campaign;
+  try {
+    const { data, error } = await supabase
+      .from("campaign")
+      .insert(cleanCampaignData)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        // Handle duplicate campaign name
+        const newCampaignName = `${campaignData.title} (Copy)`;
+        const { data: retryData, error: retryError } = await supabase
+          .from("campaign")
+          .insert({ ...cleanCampaignData, title: newCampaignName, status: "draft" })
+          .select()
+          .single();
+
+        if (retryError) throw retryError;
+        campaign = retryData;
+      } else {
+        throw error;
+      }
+    } else {
+      campaign = data;
+    }
+  } catch (error: any) {
+    throw new Error(`Error creating campaign: ${error.message}`);
+  }
+
+  if (!cleanCampaignData.type) {
+    throw new Error("Campaign type is required");
+  }
+
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
-  
-  const cleanCampaignDetails = tableKey === "message_campaign" 
-    ? cleanObject({
+  console.log("Creating campaign details in table:", tableKey);
+
+  const campaignDetails = {
+    campaign_id: campaign.id,
+    script_id: campaignData.script_id ? Number(campaignData.script_id) : null,
+    body_text: campaignData.body_text || "",
+    message_media: campaignData.message_media || [],
+    voicedrop_audio: campaignData.voicedrop_audio || null,
+    workspace: campaignData.workspace,
+  };
+
+  const cleanCampaignDetails =
+    tableKey === "message_campaign"
+      ? cleanObject({
         ...campaignDetails,
         mediaLinks: undefined,
         disposition_options: undefined,
@@ -897,34 +934,49 @@ export async function createCampaign({
         questions: undefined,
         created_at: undefined,
         script_id: undefined,
+        voicedrop_audio: undefined,
       })
-    : cleanObject({
-        ...campaignDetails,
-        mediaLinks: undefined,
-        disposition_options: undefined,
-        script: undefined,
-        questions: undefined,
-        created_at: undefined
-      });
-      
-  const createdCampaignDetails = await handleDatabaseOperation(
-    async () => await supabase.from(tableKey).insert(cleanCampaignDetails).select().single(),
-    "Error creating campaign details"
-  );
+      : tableKey === "ivr_campaign"
+        ? cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+          voicedrop_audio: undefined,
+        })
+        : cleanObject({
+          ...campaignDetails,
+          mediaLinks: undefined,
+          disposition_options: undefined,
+          script: undefined,
+          questions: undefined,
+          created_at: undefined,
+          body_text: undefined,
+          message_media: undefined,
+          step_data: undefined,
+        });
+  console.log("Inserting campaign details:", cleanCampaignDetails);
+  
+  const { data: createdCampaignDetails, error: detailsError } = await supabase
+    .from(tableKey)
+    .insert(cleanCampaignDetails)
+    .select()
+    .single();
 
-  let audienceUpdateResult = null;
-  if (audiences) {
-    audienceUpdateResult = await updateCampaignAudiences(
-      supabase,
-      campaign.id,
-      audiences
-    );
+  if (detailsError) {
+    console.error("Error creating campaign details:", detailsError);
+    await supabase.from("campaign").delete().eq("id", campaign.id);
+    throw new Error(`Error creating campaign details: ${detailsError.message}`);
   }
 
   return {
     campaign,
     campaignDetails: createdCampaignDetails,
-    audienceChanges: audienceUpdateResult
   };
 }
 
@@ -1164,23 +1216,23 @@ export const findPotentialContacts = async (
     .eq("workspace", workspaceId)
     .or(
       `phone.eq.${fullNumber},` +
-        `phone.eq.+${fullNumber},` +
-        `phone.eq.+1${fullNumber},` +
-        `phone.eq.1${fullNumber},` +
-        `phone.eq.(${areaCode}) ${last7},` +
-        `phone.eq.(${areaCode})${last7},` +
-        `phone.eq.${areaCode}-${last7},` +
-        `phone.eq.${areaCode}.${last7},` +
-        `phone.eq.(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)},` +
-        `phone.ilike.%${fullNumber},` +
-        `phone.ilike.%+${fullNumber},` +
-        `phone.ilike.%+1${fullNumber},` +
-        `phone.ilike.%1${fullNumber},` +
-        `phone.ilike.%(${areaCode})%${last7},` +
-        `phone.ilike.%${areaCode}-%${last7},` +
-        `phone.ilike.%${areaCode}.%${last7},` +
-        `phone.ilike.%(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)}%,` +
-        `phone.ilike.${last10}%`,
+      `phone.eq.+${fullNumber},` +
+      `phone.eq.+1${fullNumber},` +
+      `phone.eq.1${fullNumber},` +
+      `phone.eq.(${areaCode}) ${last7},` +
+      `phone.eq.(${areaCode})${last7},` +
+      `phone.eq.${areaCode}-${last7},` +
+      `phone.eq.${areaCode}.${last7},` +
+      `phone.eq.(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)},` +
+      `phone.ilike.%${fullNumber},` +
+      `phone.ilike.%+${fullNumber},` +
+      `phone.ilike.%+1${fullNumber},` +
+      `phone.ilike.%1${fullNumber},` +
+      `phone.ilike.%(${areaCode})%${last7},` +
+      `phone.ilike.%${areaCode}-%${last7},` +
+      `phone.ilike.%${areaCode}.%${last7},` +
+      `phone.ilike.%(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)}%,` +
+      `phone.ilike.${last10}%`,
     )
     .not("phone", "is", null)
     .neq("phone", "");
@@ -1324,7 +1376,7 @@ export function processOutreachExportData(data, users) {
       !currentGroup ||
       row.callcaster_id !== currentGroup.callcaster_id ||
       new Date(row.created_at) - new Date(currentGroup.created_at) >
-        12 * 60 * 60 * 1000
+      12 * 60 * 60 * 1000
     ) {
       if (currentGroup) {
         mergedData.push(currentGroup);
@@ -1543,7 +1595,7 @@ async function handleDatabaseOperation<T>(
   errorMessage: string,
 ): Promise<T> {
   const { data, error } = await operation();
-  if (error) throw new Error(`${errorMessage}: ${error.message}`);
+  if (error) { throw new Error(`${errorMessage}: ${error.message}`); }
   return data;
 }
 
@@ -1568,30 +1620,30 @@ async function updateCampaignAudiences(
   const addPromise =
     toAdd.length > 0
       ? handleDatabaseOperation(
-          () =>
-            supabase
-              .from("campaign_audience")
-              .upsert(toAdd, { onConflict: ["audience_id", "campaign_id"] })
-              .select(),
-          "Error adding campaign audience",
-        )
+        () =>
+          supabase
+            .from("campaign_audience")
+            .upsert(toAdd, { onConflict: ["audience_id", "campaign_id"] })
+            .select(),
+        "Error adding campaign audience",
+      )
       : Promise.resolve([]);
 
   const deletePromise =
     toDelete.length > 0
       ? handleDatabaseOperation(
-          () =>
-            supabase
-              .from("campaign_audience")
-              .delete()
-              .in(
-                "audience_id",
-                toDelete.map((row) => row.audience_id),
-              )
-              .eq("campaign_id", campaignId)
-              .select(),
-          "Error deleting campaign audience",
-        )
+        () =>
+          supabase
+            .from("campaign_audience")
+            .delete()
+            .in(
+              "audience_id",
+              toDelete.map((row) => row.audience_id),
+            )
+            .eq("campaign_id", campaignId)
+            .select(),
+        "Error deleting campaign audience",
+      )
       : Promise.resolve([]);
 
   const [added, deleted] = await Promise.all([addPromise, deletePromise]);
@@ -1754,13 +1806,13 @@ export function checkSchedule(campaignData: Campaign) {
     now.getUTCHours(),
     now.getUTCMinutes(),
     now.getUTCSeconds()
-  ));  
-  
-  
+  ));
+
+
   if (!(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
     return false;
   }
-  
+
   const currentDay = utcNow.getUTCDay();
   const daysOfWeek = [
     "sunday",
@@ -1777,7 +1829,7 @@ export function checkSchedule(campaignData: Campaign) {
   if (!todaySchedule.active) {
     return false;
   }
-  
+
   const currentTime = utcNow.toISOString().slice(11, 16);
   return todaySchedule.intervals.some((interval) => {
     if (interval.end < interval.start) {
