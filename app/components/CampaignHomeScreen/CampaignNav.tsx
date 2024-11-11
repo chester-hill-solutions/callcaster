@@ -4,17 +4,21 @@ import { handleNavlinkStyles } from "~/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip';
 
 export const NavigationLinks = ({ hasAccess, data, joinDisabled }) => (
-  <div className="flex gap-2 h-full py-4 max-w-[200px]">
-    {hasAccess && (
-      <NavLink
-        className={({ isActive, isPending }) =>
-          `flex items-center ${handleNavlinkStyles(isActive, isPending)}`
-        }
+  <div className="flex gap-2 h-full py-4 max-w-[280px]">
+  {hasAccess && (
+      <><NavLink
+        className={({ isActive, isPending }) => `flex items-center ${handleNavlinkStyles(isActive, isPending)}`}
         to="settings"
         relative="path"
       >
         Settings
-      </NavLink>
+      </NavLink><NavLink
+        className={({ isActive, isPending }) => `flex items-center ${handleNavlinkStyles(isActive, isPending)}`}
+        to="queue"
+        relative="path"
+      >
+          Queue
+        </NavLink></>
     )}
     {data.type === "live_call" && (
       <TooltipProvider delayDuration={200}>

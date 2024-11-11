@@ -15,7 +15,7 @@ export type ContextType = {
 export type Audience = Database["public"]["Tables"]["audience"]["Row"] | null;
 export type Campaign = Database["public"]["Tables"]["campaign"]["Row"] | null;
 export type Contact = Database["public"]["Tables"]["contact"]["Row"] | null;
-export type Queue = Database["public"]["Tables"]["contact"]["Row"] | null;
+export type Queue = Database["public"]["Tables"]["campaign_queue"]["Row"] | null;
 export type Message = Database["public"]["Tables"]["message"]["Row"] | null;
 export type OutreachAttempt =
   | Database["public"]["Tables"]["outreach_attempt"]["Row"]
@@ -40,6 +40,7 @@ export type MessageCampaign =
   | null;
 export type Script = Database["public"]["Tables"]["script"]["Row"] | null;
 export type QueueItem = Queue & { contact: Contact };
+export type CampaignQueue = Database["public"]["Tables"]["campaign_queue"]["Row"] | null;
 export type Call = Database["public"]["Tables"]["call"]["Row"] | null;
 export type User = Database["public"]["Tables"]["user"]["Row"] | null;
 

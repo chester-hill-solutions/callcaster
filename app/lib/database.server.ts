@@ -1109,18 +1109,51 @@ export const fetchCampaignDetails = async (
   }
   return data;
 };
-
 export const fetchCampaignWithAudience = async (
   supabaseClient: SupabaseClient<Database>,
   campaignId: string,
 ) => {
-  const { data, error } = await supabaseClient
+  const campaignPromise = supabaseClient
     .from("campaign")
-    .select(`*, campaign_audience(*)`)
+    .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
     .eq("id", campaignId)
     .single();
-  if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
-  return data;
+
+  const queuePromise = supabaseClient
+    .from("campaign_queue")
+    .select(`*, contact(*)`, { count: "exact" })
+    .eq("campaign_id", campaignId)
+    .limit(25);
+
+  const isQueuedCountPromise = supabaseClient 
+    .from("campaign_queue")
+    .select(`count`, { count: "exact" })
+    .eq("campaign_id", campaignId)
+    .eq("status", "queued");
+
+  const totalCountPromise = supabaseClient
+    .from("campaign_queue")
+    .select(`count`, { count: "exact" })
+    .eq("campaign_id", campaignId);
+
+  const [campaign, queueResult, isQueuedCount, totalCount] = await Promise.all([
+    campaignPromise,
+    queuePromise,
+    isQueuedCountPromise,
+    totalCountPromise
+  ]);
+
+  if (campaign.error) throw new Error(`Error fetching campaign data: ${campaign.error.message}`);
+  if (queueResult.error) throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
+  if (isQueuedCount.error) throw new Error(`Error fetching queued count: ${isQueuedCount.error.message}`);
+  if (totalCount.error) throw new Error(`Error fetching total count: ${totalCount.error.message}`);
+
+  return {
+    ...campaign.data,
+    campaign_queue: queueResult.data,
+    queue_count: isQueuedCount.count,
+    total_count: totalCount.count
+  };
 };
 
 export const fetchAdvancedCampaignDetails = async (

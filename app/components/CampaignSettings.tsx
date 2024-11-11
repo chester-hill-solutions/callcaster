@@ -7,6 +7,7 @@ import {
   Audience,
   Campaign,
   CampaignAudience,
+  Contact,
   Flags,
   IVRCampaign,
   LiveCampaign,
@@ -14,6 +15,7 @@ import {
   Schedule,
   Script,
   WorkspaceNumbers,
+  Queue,
 } from "~/lib/types";
 import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./CampaignBasicInfo";
@@ -29,17 +31,20 @@ export type CampaignSettingsProps = {
   workspace: string;
   phoneNumbers: WorkspaceNumbers[];
   campaignDetails:
-    | (LiveCampaign | IVRCampaign) & { script: Script }
-    | MessageCampaign;
+  | (LiveCampaign | IVRCampaign) & { script: Script }
+  | MessageCampaign;
   scripts: Script[];
   user: User;
   mediaLinks: string[];
+  campaignQueue: (Queue & { contact: Contact })[];
   joinDisabled: string | null;
   flags: Flags;
   isActive: boolean;
   onPageDataChange: (
-    data: Campaign & { campaign_audience: CampaignAudience },
+    data: CampaignSettingsData,
   ) => void;
+  queueCount: number;
+  totalCount: number;
 };
 
 export type CampaignSettingsData = {
@@ -60,6 +65,7 @@ export type CampaignSettingsData = {
   message_media: string[];
   voicedrop_audio: string | null;
   schedule: Schedule;
+  campaign_audience?: CampaignAudience | null;
 };
 
 export const CampaignSettings = ({
@@ -75,7 +81,10 @@ export const CampaignSettings = ({
   onPageDataChange,
   mediaLinks,
   joinDisabled,
+  queueCount,
+  totalCount,
   flags,
+  campaignQueue
 }: CampaignSettingsProps) => {
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -96,13 +105,14 @@ export const CampaignSettings = ({
       new Date(Date.now() + 24 * 60 * 60 * 1000 * 30).toISOString(),
     caller_id: data?.caller_id || "",
     voicemail_file: data?.voicemail_file || "",
-    script_id: details?.script_id || null,
-    audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
-    body_text: details?.body_text || "",
-    message_media: details?.message_media || [],
-    voicedrop_audio: details?.voicedrop_audio,
+    script_id: details && 'script_id' in details ? details.script_id : null,
+    audiences: data?.campaign_audience ? [data.campaign_audience].flat() : [],
+    body_text: details && 'body_text' in details ? details.body_text : "",
+    message_media: details && 'message_media' in details ? details.message_media : [],
+    voicedrop_audio: details && 'voicedrop_audio' in details ? details.voicedrop_audio : null,
     schedule: data?.schedule || {},
-    is_active: data?.is_active || false
+    is_active: data?.is_active || false,
+    campaign_audience: data?.campaign_audience || null,
   }));
   const [initialData, setInitial] = useState(campaignData);
 
@@ -125,13 +135,14 @@ export const CampaignSettings = ({
       end_date: data?.end_date || thirtyDaysLater.toISOString(),
       caller_id: data?.caller_id || "",
       voicemail_file: data?.voicemail_file || "",
-      script_id: details?.script_id || null,
-      audiences: data?.campaign_audience ? [...data.campaign_audience] : [],
-      body_text: details?.body_text || "",
-      message_media: details?.message_media || [],
-      voicedrop_audio: details?.voicedrop_audio,
+      script_id: details && 'script_id' in details ? details.script_id : null,
+      audiences: data?.campaign_audience ? [data.campaign_audience].flat() : [],
+      body_text: details && 'body_text' in details ? details.body_text : "",
+      message_media: details && 'message_media' in details ? details.message_media : [],
+      voicedrop_audio: details && 'voicedrop_audio' in details ? details.voicedrop_audio : null,
       schedule: data?.schedule || {},
-      is_active: data?.is_active || false
+      is_active: data?.is_active || false,
+      campaign_audience: data?.campaign_audience || null,
     });
   }, [campaign_id, data, details, workspace]);
 
@@ -141,35 +152,38 @@ export const CampaignSettings = ({
 
   useEffect(() => {
     if (formFetcher.data) {
-      onPageDataChange({
+      const updatedData = {
         ...campaignData,
-        campaign_audience: campaignData.audiences,
-      });
-      setChanged(!deepEqual(campaignData, initialData));
+        campaign_audience: campaignData.audiences[0]
+      };
+      onPageDataChange(updatedData);
+      setChanged(!deepEqual(updatedData, initialData));
     }
-  }, [formFetcher.data]);
+  }, [formFetcher.data, campaignData, initialData]);
 
-  const handleInputChange = (name, value) => {
+  const handleInputChange = (name: string, value: string | boolean | number | null | Schedule) => {
     setCampaignData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAudience = (audience, isChecked) => {
+  const handleAudience = (audience: Audience | null, isChecked: boolean) => {
+    if (!audience) return;
+    
     setCampaignData((prev) => ({
       ...prev,
       audiences: isChecked
         ? [
-            ...prev.audiences,
-            {
-              audience_id: audience.id,
-              campaign_id: parseInt(campaign_id),
-              created_at: audience.created_at,
-            },
-          ]
+          ...prev.audiences,
+          {
+            audience_id: audience.id,
+            campaign_id: parseInt(campaign_id),
+            created_at: audience.created_at,
+          },
+        ]
         : prev.audiences.filter((aud) => aud.audience_id !== audience.id),
     }));
   };
 
-  const handleActivateButton = (event) => {
+  const handleActivateButton = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (campaignData.type === "live_call") {
@@ -187,7 +201,7 @@ export const CampaignSettings = ({
     } else if (campaignData.type === "robocall") {
       handleInputChange("status", "running");
       fetcher.submit(
-        { campaign_id, user_id: user, workspace_id: workspace },
+        { campaign_id, user_id: user.id, workspace_id: workspace },
         {
           method: "post",
           action: "/api/initiate-ivr",
@@ -195,7 +209,7 @@ export const CampaignSettings = ({
         },
       );
       navigate("..");
-    } else if (campaignData.type === "message") {
+    } else if (campaignData.type === "message" && details) {
       handleInputChange("status", "running");
       fetcher.submit(
         {
@@ -210,7 +224,7 @@ export const CampaignSettings = ({
     }
   };
 
-  const handleScheduleButton = (event) => {
+  const handleScheduleButton = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     formFetcher.submit(
       {
@@ -224,10 +238,11 @@ export const CampaignSettings = ({
     );
     navigate("..");
   };
-  const handleActiveChange = (isActive:boolean, status: string | null) =>{
+
+  const handleActiveChange = (isActive: boolean, status: string | null) => {
     formFetcher.submit(
       {
-        campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && {status}) }),
+        campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && { status }) }),
         campaignDetails: JSON.stringify(details),
       },
       {
@@ -339,7 +354,7 @@ export const CampaignSettings = ({
         onSave={() => {
           formFetcher.submit(
             {
-              campaignData: JSON.stringify({...campaignData, is_active:data.is_active}),
+              campaignData: JSON.stringify({ ...campaignData, is_active: data.is_active }),
               campaignDetails: JSON.stringify(details),
             },
             {
@@ -357,7 +372,7 @@ export const CampaignSettings = ({
         <input
           type="hidden"
           name="campaignData"
-          value={JSON.stringify({...campaignData, is_active:data.is_active})}
+          value={JSON.stringify({ ...campaignData, is_active: data.is_active })}
         />
         <input
           type="hidden"
@@ -389,11 +404,65 @@ export const CampaignSettings = ({
             isBusy={navigation.state !== "idle"}
             joinDisabled={joinDisabled}
           />
-          <AudienceSelection
-            audiences={audiences}
-            campaignData={campaignData}
-            handleAudience={handleAudience}
-          />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 flex flex-col gap-2">
+            <AudienceSelection
+              audiences={audiences}
+              campaignData={campaignData}
+              handleAudience={handleAudience}
+            />
+            </div>
+            <div>
+              <div className="mt-4 border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex gap-4">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Queued</span>
+                      <p className="text-xl font-semibold">
+                        {campaignQueue?.filter(q => q.status === "queued").length || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-muted-foreground">Dequeued</span>
+                      <p className="text-xl font-semibold">
+                        {campaignQueue?.filter(q => q.status === "dequeued").length || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("../queue")}
+                  >
+                    Manage Queue
+                  </Button>
+                </div>
+
+                <div className="rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="py-2 px-4 text-left">Name</th>
+                        <th className="py-2 px-4 text-left">Phone</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaignQueue?.slice(0, 15).map((item) => (
+                        <tr key={item.id} className="border-t">
+                          <td className="py-2 px-4">{`${item.contact?.firstname} ${item.contact?.surname}` || '-'}</td>
+                          <td className="py-2 px-4">{item.contact?.phone}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {campaignQueue?.length > 15 && (
+                    <div className="p-2 text-center text-sm text-muted-foreground">
+                      + {campaignQueue.length - 15} more contacts
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </formFetcher.Form>
     </div>
