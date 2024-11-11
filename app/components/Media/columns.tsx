@@ -20,7 +20,6 @@ export const mediaColumns: ColumnDef<Media>[] = [
     header: "Audio",
     cell: ({ row }) => {
       const audioUrl = row.getValue("signedUrl");
-      console.log(audioUrl);
       return (
         <div className="">
           <audio src={audioUrl} controls>

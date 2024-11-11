@@ -39,7 +39,6 @@ export const audienceColumns: ColumnDef<Audience>[] = [
       const fetcher = useFetcher();
       useEffect(() => {
         if (fetcher.data) {
-          console.log(fetcher.data);
           const blob = new Blob([fetcher.data], { 
             type: "text/csv;charset=utf-8",
           });
