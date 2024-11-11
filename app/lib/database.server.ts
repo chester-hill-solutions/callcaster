@@ -20,6 +20,7 @@ import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
+import { ca } from "date-fns/locale";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -815,15 +816,8 @@ export async function updateCampaign({
   }
 
   const campaign = await handleDatabaseOperation(
-    () =>
-      supabase
-        .from("campaign")
-        .update(cleanCampaignData)
-        .eq("id", id)
-        .eq("workspace", workspace)
-        .select()
-        .single(),
-    "Error updating campaign",
+    async () => await supabase.from("campaign").insert(cleanCampaignData).select().single(),
+    "Error updating campaign"
   );
 
   //tableKey === "message_campaign"
@@ -851,6 +845,86 @@ export async function updateCampaign({
     campaign,
     campaignDetails: updatedCampaignDetails,
     audienceChanges: audienceUpdateResult,
+  };
+}
+
+export async function deleteCampaign({ supabase, campaignId }: { supabase: SupabaseClient, campaignId: string }) {
+  const { error } = await supabase.from("campaign").delete().eq("id", campaignId);
+  if (error) throw error;
+}   
+
+export async function createCampaign({ 
+  supabase, 
+  campaignData,
+  campaignDetails,
+}: { 
+  supabase: SupabaseClient, 
+  campaignData: CampaignData,
+  campaignDetails: CampaignDetails,
+}) {
+  const { audiences, ...restCampaignData } = campaignData;
+
+  const cleanCampaignData = cleanObject({
+    ...restCampaignData,
+    campaign_audience: undefined,
+    campaignDetails: undefined,
+    mediaLinks: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    disposition_options: undefined,
+    audience: undefined,
+    script_id: undefined,
+    body_text: undefined,
+    message_media: undefined,
+    voicedrop_audio: undefined,
+    is_active: Boolean(restCampaignData.is_active),
+  });
+
+  const campaign = await handleDatabaseOperation(
+    async () => await supabase.from("campaign").insert(cleanCampaignData).select().single(),
+    "Error creating campaign"
+  );
+  if (!cleanCampaignData.type) throw new Error("Campaign type is required");
+  const tableKey = getCampaignTableKey(cleanCampaignData.type);
+  
+  const cleanCampaignDetails = tableKey === "message_campaign" 
+    ? cleanObject({
+        ...campaignDetails,
+        mediaLinks: undefined,
+        disposition_options: undefined,
+        script: undefined,
+        questions: undefined,
+        created_at: undefined,
+        script_id: undefined,
+      })
+    : cleanObject({
+        ...campaignDetails,
+        mediaLinks: undefined,
+        disposition_options: undefined,
+        script: undefined,
+        questions: undefined,
+        created_at: undefined
+      });
+      
+  const createdCampaignDetails = await handleDatabaseOperation(
+    async () => await supabase.from(tableKey).insert(cleanCampaignDetails).select().single(),
+    "Error creating campaign details"
+  );
+
+  let audienceUpdateResult = null;
+  if (audiences) {
+    audienceUpdateResult = await updateCampaignAudiences(
+      supabase,
+      campaign.id,
+      audiences
+    );
+  }
+
+  return {
+    campaign,
+    campaignDetails: createdCampaignDetails,
+    audienceChanges: audienceUpdateResult
   };
 }
 

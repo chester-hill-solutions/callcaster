@@ -251,6 +251,14 @@ export const CampaignSettings = ({
     );
   }
 
+  const handleDuplicateButton = () => {
+    delete campaignData.id;
+    formFetcher.submit(
+      { campaignData: JSON.stringify(campaignData), campaignDetails: JSON.stringify(details) },
+      { method: "post", action: "/api/campaigns" }
+    );
+  }
+
   const clearSchedule = () => {
     handleInputChange("schedule", {
       sunday: { active: false, intervals: [] },
