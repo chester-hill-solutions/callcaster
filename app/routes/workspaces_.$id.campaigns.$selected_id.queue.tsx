@@ -102,8 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             .select('id', { count: 'exact' })
             .eq('campaign_id', Number(selected_id))
             .then(({ count, error }) => ({ count, error })),
-            
-       
+                   
     ]);
 
     return defer({
