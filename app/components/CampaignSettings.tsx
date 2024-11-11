@@ -81,6 +81,7 @@ export const CampaignSettings = ({
   const navigation = useNavigation();
   const fetcher = useFetcher();
   const formFetcher = useFetcher();
+  const duplicateFetcher = useFetcher();
   const [campaignData, setCampaignData] = useState(() => ({
     campaign_id,
     workspace,
@@ -237,22 +238,28 @@ export const CampaignSettings = ({
   }
 
   const handleDuplicateButton = () => {
-    delete campaignData.id;
-    formFetcher.submit(
-      { campaignData: JSON.stringify(campaignData), campaignDetails: JSON.stringify(details) },
+    const { id, campaign_id, ...dataToDuplicate } = campaignData;
+    duplicateFetcher.submit(
+      { campaignData: JSON.stringify(dataToDuplicate)},
       { method: "post", action: "/api/campaigns" }
     );
   }
+  useEffect(() => {
+    if (duplicateFetcher.data?.campaign) {
+      navigate(`/workspaces/${workspace}/campaigns/${duplicateFetcher.data.campaign.id}/settings`);
+    }
+  }, [duplicateFetcher.data]);
 
+  
   const clearSchedule = () => {
     handleInputChange("schedule", {
-      sunday: { is_active: false, intervals: [] },
-      monday: { is_active: false, intervals: [] },
-      tuesday: { is_active: false, intervals: [] },
-      wednesday: { is_active: false, intervals: [] },
-      thursday: { is_active: false, intervals: [] },
-      friday: { is_active: false, intervals: [] },
-      saturday: { is_active: false, intervals: [] },
+      sunday: { active: false, intervals: [] },
+      monday: { active: false, intervals: [] },
+      tuesday: { active: false, intervals: [] },
+      wednesday: { active: false, intervals: [] },
+      thursday: { active: false, intervals: [] },
+      friday: { active: false, intervals: [] },
+      saturday: { active: false, intervals: [] },
     });
   };
 
@@ -362,6 +369,7 @@ export const CampaignSettings = ({
             campaignData={campaignData}
             handleInputChange={handleInputChange}
             handleButton={handleStatusButtons}
+            handleDuplicateButton={handleDuplicateButton}
             phoneNumbers={phoneNumbers}
             flags={flags}
             joinDisabled={joinDisabled}
