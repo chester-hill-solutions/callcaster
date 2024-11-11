@@ -751,7 +751,7 @@ export async function updateCampaign({
   } = campaignData;
 
   if (!id) throw new Error("Campaign ID is required");
-  campaignDetails.script_id = parseInt(campaignData.script_id) || null;
+  campaignDetails.script_id = Number(campaignData.script_id) || null;
   campaignDetails.body_text = campaignData.body_text || "";
   campaignDetails.message_media = campaignData.message_media || [];
   campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
@@ -822,8 +822,8 @@ export async function updateCampaign({
 
   //tableKey === "message_campaign"
   const updatedCampaignDetails = await handleDatabaseOperation(
-    () =>
-      supabase
+    async () =>
+      await supabase
         .from(tableKey)
         .update(cleanCampaignDetails)
         .eq("campaign_id", id)
@@ -913,7 +913,6 @@ export async function createCampaign({
   }
 
   const tableKey = getCampaignTableKey(cleanCampaignData.type);
-  console.log("Creating campaign details in table:", tableKey);
 
   const campaignDetails = {
     campaign_id: campaign.id,
@@ -1057,6 +1056,23 @@ export const fetchBasicResults = async (
   });
   if (error) console.error("Error fetching basic results:", error);
   return data || [];
+};
+
+export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campaignId: string) => {
+  const { count, error } = await supabaseClient.from("campaign_queue")
+    .select("count", { count: "exact" })
+    .eq("campaign_id", campaignId);   
+
+  const { count: callCount, error: callCountError } = await supabaseClient
+    .from("outreach_attempt")
+    .select("contact_id", { count: "exact", head: true })
+    .eq("campaign_id", campaignId);
+  if (error) console.error("Error fetching campaign counts:", error);
+  if (callCountError) console.error("Error fetching call counts:", callCountError); 
+  return {
+    callCount: count,
+    completedCount: callCount,
+  };
 };
 
 export const fetchCampaignData = async (
