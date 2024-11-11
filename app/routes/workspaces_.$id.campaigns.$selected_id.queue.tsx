@@ -93,17 +93,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Run queries in parallel
     const [queueData, unfilteredCount] = await Promise.all([
         // Main queue data query
-        filteredSearch("", filters, supabaseClient, ['*', 'contact!inner(*, outreach_attempt!inner(id, disposition), contact_audience!inner(...audience!inner(name)))'], selected_id)
+        filteredSearch("", filters, supabaseClient, ['*', 'contact!left(*, outreach_attempt!left(id, disposition), contact_audience!left(...audience!left(name)))'], selected_id)
             .range(offset, offset + pageSize - 1)
             .then(({ data, error, count }) => ({ data, error, count })),
-
         // Unfiltered count query  
         supabaseClient
             .from("campaign_queue")
             .select('id', { count: 'exact' })
             .eq('campaign_id', Number(selected_id))
-            .then(({ count, error }) => ({ count, error }))
+            .then(({ count, error }) => ({ count, error })),
+            
+       
     ]);
+
     return defer({
         queuePromise: Promise.resolve({
             queueData: queueData.data,

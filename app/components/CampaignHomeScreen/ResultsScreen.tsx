@@ -8,7 +8,8 @@ const ResultsScreen = ({
   totalCalls = 0,
   results = [],
   expectedTotal = 0,
-  isBusy
+  isBusy,
+  campaignCounts
 }: ResultsScreenProps) => {
 
   return (
@@ -23,13 +24,13 @@ const ResultsScreen = ({
         </div>
         <DispositionBreakdown
           results={results}
-          totalCalls={totalCalls}
-          expectedTotal={expectedTotal}
+          totalCalls={campaignCounts.completedCount}
+          expectedTotal={campaignCounts.callCount}
         />
         <KeyMetrics
           results={results}
-          totalCalls={totalCalls}
-          expectedTotal={expectedTotal}
+          totalCalls={campaignCounts.completedCount}
+          expectedTotal={campaignCounts.callCount}
         />
       </div>
     </div>
