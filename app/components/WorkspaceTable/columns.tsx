@@ -2,9 +2,10 @@ import type { ColumnDef } from "@tanstack/react-table";
 import type { Audience, Campaign, Contact } from "~/lib/types";
 import { formatDateToLocale, formatTableText } from "~/lib/utils";
 import { Progress } from "~/components/ui/progress";
-import { MdEdit, MdRemoveCircle } from "react-icons/md";
+import { MdDownload, MdEdit, MdRemoveCircle } from "react-icons/md";
 import { Button } from "../ui/button";
-import { NavLink, useSubmit } from "@remix-run/react";
+import { NavLink, useFetcher, useSubmit } from "@remix-run/react";
+import { useEffect } from "react";
 
 export const audienceColumns: ColumnDef<Audience>[] = [
   {
@@ -31,6 +32,44 @@ export const audienceColumns: ColumnDef<Audience>[] = [
       );
     },
     maxSize: 50,
+  },
+  {
+    header: "Download",
+    cell: ({ row }) => {
+      const fetcher = useFetcher();
+      useEffect(() => {
+        if (fetcher.data) {
+          const blob = new Blob([fetcher.data], { 
+            type: "text/csv;charset=utf-8",
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.setAttribute("download", "audiences.csv");
+          document.body.appendChild(link);
+          link.click();
+          link.parentNode?.removeChild(link);
+        }
+      }, [fetcher.data]);
+      return (
+        <fetcher.Form method="GET" action="/api/audiences">
+          <input type="hidden" name="audienceId" value={row.original?.id} />
+          <input type="hidden" name="returnType" value="csv" />
+          <Button 
+            type="submit"
+            variant="ghost"
+            disabled={fetcher.state === "submitting"}
+          >
+            {fetcher.state === "submitting" ? (
+              "Downloading..."
+            ) : (
+              <MdDownload className="text-brand-primary dark:text-white" />
+            )}
+          </Button>
+        </fetcher.Form>
+      );
+    },
+    maxSize: 50,  
   },
   {
     header: "Delete",

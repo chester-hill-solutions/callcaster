@@ -4,9 +4,10 @@ import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
 import { handleNavlinkStyles } from "~/lib/utils";
 
-export const ResultsDisplay = ({ results, campaign, hasAccess, user }) => {
-  const totalCalls = results.reduce((sum, item) => sum + item.count, 0);
-  const expectedTotal = results[0]?.expected_total || 0;
+export const ResultsDisplay = ({ results, campaign, hasAccess, user, campaignCounts }) => {
+  
+  const totalCalls = campaignCounts?.completedCount;
+  const expectedTotal = campaignCounts?.callCount || 0;
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
 
@@ -22,6 +23,7 @@ export const ResultsDisplay = ({ results, campaign, hasAccess, user }) => {
     />
   ) : (
     <ResultsScreen
+      campaignCounts={campaignCounts}
       isBusy={isBusy}
       totalCalls={totalCalls}
       results={results}

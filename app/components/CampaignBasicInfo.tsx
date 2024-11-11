@@ -13,7 +13,7 @@ import {
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
-import { Archive, Pause, Play, Calendar } from "lucide-react";
+import { Archive, Pause, Play, Calendar, Copy } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -78,6 +78,7 @@ export const CampaignBasicInfo = ({
   phoneNumbers,
   flags,
   handleButton,
+  handleDuplicateButton,
   formFetcher,
   details,
 }: {
@@ -86,11 +87,12 @@ export const CampaignBasicInfo = ({
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
   handleButton: (type: "play" | "pause" | "archive") => void;
+  handleDuplicateButton: () => void;
   joinDisabled: string | null;
   formFetcher: FetcherWithComponents<CampaignSettingsData>;
   details:
-    | ((LiveCampaign | IVRCampaign) & { script: Script })
-    | MessageCampaign;
+  | ((LiveCampaign | IVRCampaign) & { script: Script })
+  | MessageCampaign;
 }) => {
 
   const joinDisabled =
@@ -107,7 +109,7 @@ export const CampaignBasicInfo = ({
   );
 
   const renderButton = (
-    type: "play" | "pause" | "archive",
+    type: "play" | "pause" | "archive" | "duplicate",
     icon: React.ReactNode,
     tooltip: string,
   ) => {
@@ -122,7 +124,11 @@ export const CampaignBasicInfo = ({
               size="icon"
               onClick={(e) => {
                 e.preventDefault();
-                handleButton(type);
+                if (type === "duplicate") {
+                  handleDuplicateButton();
+                } else {
+                  handleButton(type);
+                }
               }}
               disabled={state === "Disabled"}
               className={`
@@ -179,10 +185,16 @@ export const CampaignBasicInfo = ({
               "Pause the campaign",
             )}
             {renderButton(
+              "duplicate",
+              <Copy className="h-4 w-4" />,
+              "Duplicate the campaign",
+            )}
+            {renderButton(
               "archive",
               <Archive className="h-4 w-4" />,
               "Archive the campaign",
             )}
+
           </div>
         </div>
         <div className="flex flex-wrap gap-6">

@@ -14,6 +14,7 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import {
   checkSchedule,
   fetchBasicResults,
+  fetchCampaignCounts,
   fetchCampaignData,
   fetchCampaignDetails,
   fetchOutreachData,
@@ -80,12 +81,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const [
     campaignData,
     resultsPromise,
+    campaignCounts, 
     { data: phoneNumbers },
     { data: mediaData } = { data: [] },
     scripts,
   ] = await Promise.all([
     fetchCampaignData(supabaseClient, selected_id),
     fetchBasicResults(supabaseClient, selected_id),
+    fetchCampaignCounts(supabaseClient, selected_id),
     getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
     supabaseClient.storage.from("workspaceAudio").list(workspace_id),
     getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient }),
@@ -135,6 +138,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     hasAccess,
     user: serverSession?.user,
     results: resultsPromise,
+    campaignCounts,
     phoneNumbers,
     mediaData: mediaData ?? [],
     scripts,
@@ -151,6 +155,7 @@ export default function CampaignScreen() {
     data,
     hasAccess,
     results,
+    campaignCounts,
     totalCalls = 0,
     expectedTotal = 0,
     user,
@@ -201,6 +206,7 @@ export default function CampaignScreen() {
                   campaign={data}
                   hasAccess={hasAccess}
                   user={user}
+                  campaignCounts={campaignCounts}
                 />  
               )
             }

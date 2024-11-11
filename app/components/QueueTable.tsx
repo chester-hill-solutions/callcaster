@@ -66,7 +66,6 @@ export function QueueTable({
     const isFiltered = defaultFilters.name !== '' || defaultFilters.phone !== '' || defaultFilters.status !== '' || defaultFilters.audiences !== '' || defaultFilters.address !== '' || defaultFilters.email !== '';
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [sorting, setSorting] = useState<SortingState>([]);
-
     // Optimistic state for queue items
     const [optimisticQueue, setOptimisticQueue] = useState(queue);
 
