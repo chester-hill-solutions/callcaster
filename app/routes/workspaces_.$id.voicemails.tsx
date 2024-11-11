@@ -93,7 +93,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   for (const media of mediaData) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
-    ).signedUrl;
+    )?.signedUrl;
     media["signedUrl"] = url;
   }
 
@@ -108,20 +108,18 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter((media) => !media.name.includes("voicemail-undefined"));
+  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-undefined"));
+  
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">
         <div className="flex">
           <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
             {workspace != null
-              ? `${workspace?.name} Audio Library`
+              ? `${workspace?.name} Voicemails`
               : "No Workspace"}
           </h1>
         </div>
-        <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-          <Link to={`./new`}>Add Audio</Link>
-        </Button>
       </div>
       {error && !isWorkspaceAudioEmpty && (
         <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
@@ -133,13 +131,11 @@ export default function WorkspaceAudio() {
           Add Your Own Audio to this Workspace!
         </h4>
       )}
-
-      {workspaceAudios != null && (
+      {voicemails != null && (
         <DataTable
           className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
           columns={mediaColumns}
-          data={workspaceAudios}
-          //   onRowClick={(item) => navigate(`./${item?.id}`)}
+          data={voicemails}
         />
       )}
     </main>

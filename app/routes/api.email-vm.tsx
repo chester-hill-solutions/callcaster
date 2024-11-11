@@ -46,7 +46,7 @@ export const action = async ({ request, params }) => {
 
     const recording = await recordingResponse.blob();
 
-    const fileName = `${number.workspace.id}/voicemail-${data.From}-${now.toISOString()}.mp3`;
+    const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("workspaceAudio")
       .upload(fileName, recording, {
