@@ -52,7 +52,7 @@ const PricingCard = ({ children, cardTitle, cardIcon }): ReactNode => (
 
 export default function Pricing() {
   return (
-    <main className="flex flex-col items-center gap-8 rounded-sm p-8 dark:text-white md:h-[calc(100vh-80px)] md:min-h-fit md:items-start xl:mx-auto xl:w-[90%] xl:gap-8">
+    <main className="flex flex-col max-w-6xl items-center gap-8 rounded-sm p-8 dark:text-white md:h-[calc(100vh-80px)] md:min-h-fit md:items-start xl:mx-auto xl:w-[90%] xl:gap-8">
       <SectionTitle>Our Pricing Plan</SectionTitle>
       <section
         id="plans-container"
