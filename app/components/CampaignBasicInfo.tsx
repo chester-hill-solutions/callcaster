@@ -1,18 +1,6 @@
-
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
-import {
-  Flags,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
-  Script,
-  WorkspaceNumbers,
-} from "~/lib/types";
-import SelectType from "./CampaignBasicInfo.SelectType";
-import SelectNumber from "./CampaignBasicInfo.SelectNumber";
-import SelectDates from "./CampaignBasicInfo.Dates";
 import { Archive, Pause, Play, Calendar, Copy } from "lucide-react";
 import {
   Tooltip,
@@ -21,26 +9,39 @@ import {
   TooltipTrigger,
 } from "./ui/tooltip";
 import { FetcherWithComponents } from "@remix-run/react";
-import { CampaignSettingsData } from "./CampaignSettings";
+import {
+  Campaign,
+  Flags, 
+  IVRCampaign,
+  LiveCampaign,
+  MessageCampaign,
+  Script,
+  WorkspaceNumbers,
+} from "~/lib/types";
+import SelectType from "./CampaignBasicInfo.SelectType";
+import SelectNumber from "./CampaignBasicInfo.SelectNumber"; 
+import SelectDates from "./CampaignBasicInfo.Dates";
 
+// Types
 type ButtonState = "Active" | "Inactive" | "Disabled";
 
 type CampaignState =
   | "running"
-  | "paused"
+  | "paused" 
   | "archived"
   | "draft"
   | "pending"
   | "scheduled"
   | "complete";
 
+// Helper Functions
 const getButtonStates = (
   campaignState: CampaignState,
   isJoinDisabled: boolean,
 ): Record<string, ButtonState> => {
   const states: Record<string, ButtonState> = {
     play: "Disabled",
-    pause: "Disabled",
+    pause: "Disabled", 
     archive: "Disabled",
   };
 
@@ -71,7 +72,23 @@ const getButtonStates = (
   return states;
 };
 
+// Component Props Interface
+interface CampaignBasicInfoProps {
+  campaignData: any;
+  handleInputChange: (name: string, value: string | number) => void;
+  phoneNumbers: WorkspaceNumbers[];
+  flags: Flags;
+  handleButton: (type: "play" | "pause" | "archive") => void;
+  handleDuplicateButton: () => void;
+  joinDisabled: string | null;
+  formFetcher: FetcherWithComponents<{
+    campaign: Campaign;
+    campaignDetails: LiveCampaign | IVRCampaign | MessageCampaign;
+  }>;
+  details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign;
+}
 
+// Main Component
 export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
@@ -81,20 +98,8 @@ export const CampaignBasicInfo = ({
   handleDuplicateButton,
   formFetcher,
   details,
-}: {
-  campaignData: any;
-  handleInputChange: (name: string, value: string | number) => void;
-  phoneNumbers: WorkspaceNumbers[];
-  flags: Flags;
-  handleButton: (type: "play" | "pause" | "archive") => void;
-  handleDuplicateButton: () => void;
-  joinDisabled: string | null;
-  formFetcher: FetcherWithComponents<CampaignSettingsData>;
-  details:
-  | ((LiveCampaign | IVRCampaign) & { script: Script })
-  | MessageCampaign;
-}) => {
-
+}: CampaignBasicInfoProps) => {
+  // Compute disabled state
   const joinDisabled =
     !campaignData?.script_id && !campaignData.body_text
       ? "No script selected"
@@ -103,11 +108,13 @@ export const CampaignBasicInfo = ({
         : !campaignData.audiences?.length
           ? "No audiences selected"
           : null;
+
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
     !!joinDisabled,
   );
 
+  // Button renderer
   const renderButton = (
     type: "play" | "pause" | "archive" | "duplicate",
     icon: React.ReactNode,
@@ -117,7 +124,7 @@ export const CampaignBasicInfo = ({
     return (
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger>
+          <TooltipTrigger asChild>
             <Button
               type="button"
               variant={state === "Active" ? "default" : "outline"}
@@ -152,29 +159,11 @@ export const CampaignBasicInfo = ({
 
   return (
     <div className="flex flex-wrap gap-6">
-      <div className="flex flex-wrap gap-6">
-        <div className="flex min-w-48 flex-grow flex-col gap-1">
-          <Label htmlFor="title">Campaign Title</Label>
-          <Input
-            id="title"
-            name="title"
-            value={campaignData.title}
-            onChange={(e) => handleInputChange("title", e.target.value)}
-          />
-        </div>
-        <SelectType
-          handleInputChange={handleInputChange}
-          campaignData={campaignData}
-          flags={flags}
-        />
-        <SelectNumber
-          handleInputChange={handleInputChange}
-          campaignData={campaignData}
-          phoneNumbers={phoneNumbers}
-        />
-        <div className="flex items-end">
-          <div className="flex gap-2">
-            {renderButton(
+
+      {/* Control Buttons */}
+      <div className="flex justify-end">
+        <div className="flex gap-2">
+          {renderButton(
               "play",
               <Play className="h-4 w-4" />,
               joinDisabled || "Start the campaign",
@@ -194,9 +183,36 @@ export const CampaignBasicInfo = ({
               <Archive className="h-4 w-4" />,
               "Archive the campaign",
             )}
-
           </div>
         </div>
+      <div className="flex flex-wrap gap-6">
+        {/* Campaign Title */}
+        <div className="flex min-w-48 flex-grow flex-col gap-1">
+          <Label htmlFor="title">Campaign Title</Label>
+          <Input
+            id="title"
+            name="title"
+            value={campaignData.title}
+            onChange={(e) => handleInputChange("title", e.target.value)}
+          />
+        </div>
+
+        {/* Campaign Type Selection */}
+        <SelectType
+          handleInputChange={handleInputChange}
+          campaignData={campaignData}
+          flags={flags}
+        />
+
+        {/* Phone Number Selection */}
+        <SelectNumber
+          handleInputChange={handleInputChange}
+          campaignData={campaignData}
+          phoneNumbers={phoneNumbers}
+        />
+
+
+        {/* Date Selection */}
         <div className="flex flex-wrap gap-6">
           <SelectDates
             campaignData={campaignData}

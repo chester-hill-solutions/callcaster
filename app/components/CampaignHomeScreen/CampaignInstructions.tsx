@@ -2,8 +2,9 @@ import React from "react";
 import { NavLink } from "@remix-run/react";
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { Button } from "../ui/button";
+import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
 
-export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal, joinDisabled }) => (
+export const CampaignInstructions = ({ campaignData, totalCalls, expectedTotal, joinDisabled }: { campaignData: CampaignSettingsData, totalCalls: number, expectedTotal: number, joinDisabled: string | null }) => (
   <div className="flex">
     <div className="flex min-w-[200px] flex-auto p-4">
       <TotalCalls totalCalls={totalCalls} expectedTotal={expectedTotal} />
@@ -11,10 +12,10 @@ export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal
     <div className="p-4">
       <div className="max-w-50 flex flex-col">
         <h3 className="my-4 font-Zilla-Slab text-xl">
-          {campaign.instructions?.join || "Join the campaign and start dialing!"}
+          {campaignData?.instructions?.join || "Join the campaign and start dialing!"}
         </h3>
         <div>
-          <Button asChild disabled={joinDisabled}>
+          <Button asChild disabled={joinDisabled ? true : false}>
           <NavLink
             to={`${"call"}`}
             relative="path"
@@ -26,7 +27,7 @@ export const CampaignInstructions = ({ campaign, data, totalCalls, expectedTotal
       </div>
       <div className="my-4 flex flex-col">
         <h3 className="my-4 font-Zilla-Slab text-xl">
-          {campaign.instructions?.script || "Preview the Script and familiarize yourself before dialing."}
+          {campaignData?.instructions?.script || "Preview the Script and familiarize yourself before dialing."}
         </h3>
         <div>
           <NavLink

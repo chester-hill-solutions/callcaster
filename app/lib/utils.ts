@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
+import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,12 +39,13 @@ export function deepEqual(
   seen = new WeakMap(),
 ): boolean {
   function log(message: string) {
-     //console.log(`[${path}] ${message}`);
+    //console.log(`[${path}] ${message}`);
   }
 
   if (obj1 === obj2) return true;
   if (obj1 == null || obj2 == null) {
-    log(`One value is null or undefined: ${obj1} !== ${obj2}`);
+    if (!obj1 && !obj2) return true;
+    //log(`One value is null or undefined: ${obj1 === null ? 'null' : 'undefined'} !== ${obj2 === null ? 'null' : 'undefined'}`);
     return false;
   }
   if (typeof obj1 !== "object" && typeof obj2 !== "object") {
