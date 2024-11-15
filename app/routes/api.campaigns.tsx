@@ -4,7 +4,7 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
-
+  
   try {
     const formData = await request.formData();
     if (request.method === "PATCH") {

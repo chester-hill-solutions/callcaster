@@ -750,7 +750,7 @@ export async function updateCampaign({
     details,
     ...restCampaignData
   } = campaignData;
-  
+
   if (!id) throw new Error("Campaign ID is required");
   campaignDetails.script_id = Number(campaignData.script_id) || null;
   campaignDetails.body_text = campaignData.body_text || "";
