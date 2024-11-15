@@ -11,8 +11,8 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
-import { CampaignSettingsData } from "./CampaignSettings";
 import { IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
+import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -27,12 +27,12 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
 }:{
-  campaignData:CampaignSettingsData,
+  campaignData: CampaignSettingsData,
   handleInputChange:(name: string, value: any) => void,
   mediaData: FileObject[],
   scripts: Script[],
-  handleActivateButton: (e) => void,
-  handleScheduleButton: (e) => void,
+  handleActivateButton: (e: string) => void,
+  handleScheduleButton: (e: string) => void,
   details: LiveCampaign | MessageCampaign | IVRCampaign,
   mediaLinks: string[],
   isChanged: boolean,

@@ -747,6 +747,7 @@ export async function updateCampaign({
     campaign_id: id,
     workspace,
     audiences,
+    details,
     ...restCampaignData
   } = campaignData;
 
@@ -755,6 +756,7 @@ export async function updateCampaign({
   campaignDetails.body_text = campaignData.body_text || "";
   campaignDetails.message_media = campaignData.message_media || [];
   campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
+  
   const cleanCampaignData = cleanObject({
     ...restCampaignData,
     campaign_audience: undefined,
@@ -816,7 +818,7 @@ export async function updateCampaign({
   }
 
   const campaign = await handleDatabaseOperation(
-    async () => await supabase.from("campaign").insert(cleanCampaignData).select().single(),
+    async () => await supabase.from("campaign").update(cleanCampaignData).eq("id", id).select().single(),
     "Error updating campaign"
   );
 

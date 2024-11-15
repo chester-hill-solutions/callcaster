@@ -1,12 +1,10 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Await, useFetcher, useLoaderData, useOutletContext, useSearchParams, useSubmit } from "@remix-run/react";
+import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
 import { Suspense, useState } from "react";
-import { QueueTable } from "~/components/QueueTable";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Spinner } from "~/components/ui/spinner";
-import { Database } from "~/lib/database.types";
 import { Button } from "~/components/ui/button";
-import { CampaignAudience, Audience, Campaign, QueueItem } from "~/lib/types";
+import { CampaignAudience, Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign } from "~/lib/types";
 import { Contact } from "~/lib/types";
 import { DialogTitle } from "~/components/ui/dialog";
 import { Dialog, DialogHeader } from "~/components/ui/dialog";
@@ -15,6 +13,7 @@ import { Search } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { QueueContent } from "~/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -31,7 +30,6 @@ interface QueueResponse {
         status: string;
     }
 }
-
 
 export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, status: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
     let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
@@ -64,7 +62,6 @@ export const filteredSearch = (query: string, filters: { name: string, phone: st
     return searchQuery;
 }
 
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { selected_id } = params;
     const url = new URL(request.url);
@@ -91,9 +88,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const sortParam = searchParams.get("sort");
 
     // Run queries in parallel
-    const [queueData, unfilteredCount] = await Promise.all([
-        // Main queue data query
-        filteredSearch("", filters, supabaseClient, ['*', 'contact!left(*, outreach_attempt!left(id, disposition), contact_audience!left(...audience!left(name)))'], selected_id)
+    const selectFields = [
+        '*',
+        `contact!left(
+            *,
+            outreach_attempt!left(id, disposition, campaign_id),
+            contact_audience!left(...audience!left(name))
+        )`
+    ];
+
+    const [queueData, unfilteredCount, totalCount, queuedCount] = await Promise.all([
+
+        filteredSearch("", filters, supabaseClient, selectFields, selected_id)
+            .eq('contact.outreach_attempt.campaign_id', selected_id)
             .range(offset, offset + pageSize - 1)
             .then(({ data, error, count }) => ({ data, error, count })),
         // Unfiltered count query  
@@ -102,14 +109,27 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             .select('id', { count: 'exact' })
             .eq('campaign_id', Number(selected_id))
             .then(({ count, error }) => ({ count, error })),
-                   
+        // Total count query
+        supabaseClient
+            .from("campaign_queue")
+            .select('id', { count: 'exact' })
+            .eq('campaign_id', Number(selected_id))
+            .then(({ count, error }) => ({ count, error })),
+        // Queued count query
+        supabaseClient
+            .from("campaign_queue")
+            .select('id', { count: 'exact' })
+            .eq('campaign_id', Number(selected_id))
+            .eq('status', 'queued')
+            .then(({ count, error }) => ({ count, error })),
     ]);
 
     return defer({
         queuePromise: Promise.resolve({
             queueData: queueData.data,
             queueError: queueData.error,
-            totalCount: queueData.count,
+            totalCount: totalCount.count,
+            queuedCount: queuedCount.count,
             unfilteredCount: unfilteredCount.count,
             currentPage: page,
             pageSize,
@@ -177,10 +197,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 
 export function ErrorBoundary() {
+    const error = useRouteError();
     return (
         <div className="flex flex-col items-center justify-center p-8">
             <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
             <p className="text-gray-600 mb-4">There was a problem loading the queue data. Please try again.</p>
+            <div>{error.message || "An unknown error occurred"}</div>
             <Button onClick={() => window.location.reload()}>
                 Retry
             </Button>
@@ -189,7 +211,7 @@ export function ErrorBoundary() {
 }
 
 export default function Queue() {
-    const { data, audiences, supabase } = useOutletContext<{ data: Campaign & { campaign_audience: CampaignAudience[] }, audiences: Audience[], supabase: SupabaseClient }>();
+    const { campaignData, campaignDetails, audiences, supabase } = useOutletContext<{ campaignData: CampaignSettingsData, campaignDetails: IVRCampaign | MessageCampaign | LiveCampaign, audiences: Audience[], supabase: SupabaseClient }>();
     const { queuePromise, campaignId } = useLoaderData<typeof loader>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
@@ -236,7 +258,7 @@ export default function Queue() {
         setSearchModalOpen(true);
     }
     const handleSearch = (query: string) => {
-        contactFetcher.load(`/api/contacts?q=${query}&workspace_id=${data.workspace}&campaign_id=${campaignId}`);
+        contactFetcher.load(`/api/contacts?q=${query}&workspace_id=${campaignData.workspace}&campaign_id=${campaignId}`);
     }
 
     const handleAddContactToQueue = (contacts: (Contact & { contact_audience: { audience_id: number }[] })[], unfilteredCount: number) => {
@@ -254,7 +276,7 @@ export default function Queue() {
         }
     }
 
-    const selectedCampaignAudienceIds = data.campaign_audience?.map((audience) => audience?.audience_id).filter((id): id is number => id !== null);
+    const selectedCampaignAudienceIds = campaignData.campaign_audience?.map((audience: CampaignAudience) => audience?.audience_id).filter((id: number): id is number => id !== null);
 
     const handleFilterChange = (key: string, value: string) => {
         setSearchParams(prev => {
