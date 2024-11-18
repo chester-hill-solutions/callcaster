@@ -1,6 +1,7 @@
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
+
 import { Archive, Pause, Play, Calendar, Copy, TimerIcon, Clock } from "lucide-react";
 import {
   Tooltip,
@@ -19,7 +20,7 @@ import {
   WorkspaceNumbers,
 } from "~/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
-import SelectNumber from "./CampaignBasicInfo.SelectNumber";
+import SelectNumber from "./CampaignBasicInfo.SelectNumber"; 
 import SelectDates from "./CampaignBasicInfo.Dates";
 
 // Types
@@ -27,7 +28,7 @@ type ButtonState = "Active" | "Inactive" | "Disabled";
 
 type CampaignState =
   | "running"
-  | "paused"
+  | "paused" 
   | "archived"
   | "draft"
   | "pending"
@@ -41,7 +42,7 @@ const getButtonStates = (
 ): Record<string, ButtonState> => {
   const states: Record<string, ButtonState> = {
     play: "Disabled",
-    pause: "Disabled",
+    pause: "Disabled", 
     archive: "Disabled",
     schedule: "Disabled",
   };
@@ -85,7 +86,9 @@ interface CampaignBasicInfoProps {
   handleInputChange: (name: string, value: string | number) => void;
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
+
   handleButton: (type: "play" | "pause" | "archive" | "schedule") => void;
+
   handleDuplicateButton: () => void;
   joinDisabled: string | null;
   formFetcher: FetcherWithComponents<{
@@ -93,6 +96,7 @@ interface CampaignBasicInfoProps {
     campaignDetails: LiveCampaign | IVRCampaign | MessageCampaign;
   }>;
   details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign;
+
   scheduleDisabled: string | boolean;
 }
 
@@ -107,6 +111,7 @@ export const CampaignBasicInfo = ({
   handleDuplicateButton,
   formFetcher,
   details,
+
   scheduleDisabled,
 }: CampaignBasicInfoProps) => {
 

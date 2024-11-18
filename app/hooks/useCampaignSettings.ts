@@ -79,7 +79,6 @@ export default function useCampaignSettings(
         setCampaignData(initial);
     }
 
-
     const handleInputChange = (name: string, value: string | boolean | number | null | Schedule) => {
         setCampaignData((prev) => ({ ...prev, [name]: value }));
     };

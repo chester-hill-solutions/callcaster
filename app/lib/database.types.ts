@@ -1858,6 +1858,7 @@ export type Database = {
         }
         Returns: number
       }
+
       process_existing_contacts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
