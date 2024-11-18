@@ -170,6 +170,8 @@ export default function CampaignScreen() {
       ? "No outbound phone number selected"
       : !campaignData.campaign_audience?.length
         ? "No audiences selected"
+        : campaignData.status === "scheduled" ? 
+        `Campaign scheduled.`
         : !isActive
           ? "It is currently outside of the Campaign's calling hours"
           : null;

@@ -278,7 +278,7 @@ Deno.serve(async (req) => {
       if (record.type === "live_call") return;
       handleInitiateCampaign(supabase, record.id);
     } else if (!record.is_active) {
-      const {error} = await supabase.from("campaign").update({status:"paused"}).eq("id", record.id);
+      const {error} = await supabase.from("campaign").update({status:"scheduled"}).eq("id", record.id);
       if (error) throw error;
       handlePauseCampaign(supabase, record.id, twilio);
     }

@@ -104,8 +104,10 @@ export default function useCampaignSettings(
         );
     }
 
-    const handleScheduleButton = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+    const handleScheduleButton = (event: React.FormEvent<HTMLFormElement> | null = null) => {
+        if (event) {
+            event.preventDefault();
+        }
         formFetcher.submit(
             {
                 campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
@@ -152,8 +154,9 @@ export default function useCampaignSettings(
             case "draft":
                 if (type === "play") {
                     handleInputChange("status", "running");
-                    handleActiveChange(true, "running");
+                    handleActiveChange(true, "running");    
                 } else if (type === "schedule") {
+                    handleScheduleButton();
                     handleInputChange("status", "scheduled");
                 } else if (type === "archive") {
                     clearSchedule();

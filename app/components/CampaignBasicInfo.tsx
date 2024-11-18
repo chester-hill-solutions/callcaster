@@ -1,7 +1,7 @@
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
-import { Archive, Pause, Play, Calendar, Copy } from "lucide-react";
+import { Archive, Pause, Play, Calendar, Copy, TimerIcon, Clock } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +43,7 @@ const getButtonStates = (
     play: "Disabled",
     pause: "Disabled", 
     archive: "Disabled",
+    schedule: "Disabled",
   };
 
   switch (campaignState) {
@@ -68,7 +69,7 @@ const getButtonStates = (
     case "archived":
       break;
   }
-
+  
   return states;
 };
 
@@ -116,7 +117,7 @@ export const CampaignBasicInfo = ({
 
   // Button renderer
   const renderButton = (
-    type: "play" | "pause" | "archive" | "duplicate",
+    type: "play" | "pause" | "archive" | "duplicate" | "schedule",
     icon: React.ReactNode,
     tooltip: string,
   ) => {
@@ -147,7 +148,7 @@ export const CampaignBasicInfo = ({
               {icon}
             </Button>
           </TooltipTrigger>
-          <TooltipContent align="end">
+          <TooltipContent align="center">
             {state === "Active"
               ? `Currently ${type === "play" ? "running" : `${type}ed`}`
               : tooltip}
@@ -167,6 +168,11 @@ export const CampaignBasicInfo = ({
               "play",
               <Play className="h-4 w-4" />,
               joinDisabled || "Start the campaign",
+            )}
+          {renderButton(
+              "schedule",
+              <Clock className="h-4 w-4" />,
+              "Schedule the campaign",
             )}
             {renderButton(
               "pause",
