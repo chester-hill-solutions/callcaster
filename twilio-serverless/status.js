@@ -35,7 +35,7 @@ const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_a
     if (!currentAttempt?.disposition || currentAttempt.disposition !== 'voicemail') {
         await Promise.all([
             updateCallStatus(supabase, callSid, status, timestamp),
-            updateResult(supabase, outreach_attempt_id, { disposition })
+            updateResult(supabase, outreach_attempt_id, { disposition, ended_at: new Date(timestamp) })
         ]);
     } else {
         // Just update call status if disposition is voicemail
