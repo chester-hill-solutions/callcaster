@@ -1,5 +1,5 @@
 import { FaPlus } from "react-icons/fa";
-import { json, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -9,15 +9,27 @@ import { getUserRole } from "~/lib/database.server";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import ContactDetails from "~/components/ContactDetails";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
-import { ContactAudience } from "../lib/types";
+import { Audience, Contact, ContactAudience, WorkspaceData } from "../lib/types";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 interface AudienceChanges {
   additions: ContactAudience[];
   deletions: ContactAudience[];
 }
 
-export const loader = async ({ request, params }) => {
+type LoaderData = {
+  workspace: WorkspaceData;
+  workspace_id: string;
+  selected_id: string;
+  contact: Contact;
+  userRole: MemberRole;
+  audiences: Audience[];
+}
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, contactId: selected_id } = params;
+  if (!workspace_id) return redirect("/workspaces");
+  if (!selected_id) return redirect(`/workspaces/${workspace_id}`);
 
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
@@ -29,14 +41,27 @@ export const loader = async ({ request, params }) => {
     .select()
     .eq("id", workspace_id)
     .single();
-
+  if (workspaceError) throw workspaceError;
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
-  const { data: contact, error: contactError } = await supabaseClient
-    .from("contact")
-    .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
-    .eq("id", selected_id)
-    .filter("outreach_attempt.workspace", 'eq', workspace_id)
-    .single();
+
+  let contact = null;
+  if (selected_id !== 'new') {
+    const { data, error: contactError } = await supabaseClient
+      .from("contact")
+      .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
+      .eq("id", selected_id)
+      .filter("outreach_attempt.workspace", 'eq', workspace_id)
+      .single();
+    if (contactError) throw contactError;
+    contact = data;
+  } else {
+    contact = {
+      id: 'new',
+      contact_audience: [],
+      outreach_attempt: [],
+    };
+  }
+
   const { data: audiences, error: audiencesError } = await supabaseClient
     .from("audience")
     .select(`*`)
@@ -89,23 +114,34 @@ function compareContactAudiences(
   return { additions, deletions };
 }
 
-export const action = async ({ request, params }) => {
-  const { contactId } = params;
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { contactId, id: workspaceId } = params;
   const contact = await request.json();
-  delete contact.outreach_attempt;
-  const {
-    supabaseClient,
-    headers,
-    serverSession,
-  }: {
-    supabaseClient: SupabaseClient;
-    headers: Headers;
-    serverSession: Session;
-  } = await getSupabaseServerClientWithSession(request);
+  
+  const { supabaseClient, headers, serverSession } = 
+    await getSupabaseServerClientWithSession(request);
+
+  const {id, initial_audiences, contact_audience, ...contactData} = contact;
+
+  let savedContact = null;
+  if (contactId === 'new') {
+    const { data: newContact, error: createError } = await supabaseClient
+      .from("contact")
+      .insert({ ...contactData, workspace: workspaceId })
+      .select()
+      .single();
+    if (createError) {
+      return json({ success: false, error: createError }, { headers });
+    }
+    savedContact = newContact;
+  }
+  if (!savedContact) {
+    return json({ success: false, error: "Failed to create contact" }, { headers });
+  }
   const { additions, deletions } = compareContactAudiences(
-    contact.id,
-    contact.initial_audiences,
-    contact.contact_audience,
+    savedContact.id.toString(),
+    initial_audiences,
+    contact_audience,
   );
 
   if (deletions.length > 0) {
@@ -128,7 +164,10 @@ export const action = async ({ request, params }) => {
   if (additions.length > 0) {
     const { error: insertError } = await supabaseClient
       .from("contact_audience")
-      .insert(additions);
+      .insert(additions.map(a => ({
+        audience_id: Number(a?.audience_id),
+        contact_id: Number(a?.contact_id)
+      })));
 
     if (insertError) {
       console.error("Error inserting contact audiences:", insertError);
@@ -139,20 +178,20 @@ export const action = async ({ request, params }) => {
     }
   }
 
-  delete contact.initial_audiences;
-  delete contact.contact_audience;
-
+  if (contactId !== 'new') {
+    return redirect(`/workspaces/${workspaceId}/contacts/${contactId}`);
+  }
   const { data: contactUpdate, error: updateError } = await supabaseClient
     .from("contact")
-    .update(contact)
-    .eq("id", contactId)
+    .update(contactData)
+    .eq("id", Number(contactId))
     .select();
 
   if (updateError) {
     console.log(updateError);
     return json({ success: false, error: updateError }, { headers });
   }
-  return json({ success: false, error: updateError }, { headers });
+  return json({ success: true, contact: contactUpdate }, { headers });
 };
 
 export default function ContactScreen() {
@@ -161,7 +200,7 @@ export default function ContactScreen() {
     userRole,
     workspace,
     audiences,
-  } = useLoaderData();
+  } = useLoaderData<LoaderData>();
   const [isChanged, setChanged] = useState(false);
   const [contact, setContact] = useState(initContact);
   const submit = useSubmit();

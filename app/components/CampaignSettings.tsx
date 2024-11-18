@@ -21,10 +21,10 @@ import { SaveBar } from "./SaveBar";
 import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
 
 export type CampaignSettingsProps = {
+  campaignData: CampaignSettingsData;
+  campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;  
   flags: Flags;
   workspace: string;
-  campaignData: CampaignSettingsData;
-  campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
   isActive: boolean;
   scripts: Script[];
   audiences: Audience[];
@@ -36,10 +36,10 @@ export type CampaignSettingsProps = {
   handleDuplicateButton: () => void;
   handleSave: () => void;
   handleResetData: () => void;
-  handleActiveChange: (isActive: boolean) => void;
+  handleActiveChange: (isActive: boolean, status: string | null) => void;
   handleAudienceChange: (audience: CampaignAudience | null, isChecked: boolean) => void;
-  handleScheduleButton: (event: React.FormEvent<HTMLFormElement>) => void;
-  handleStatusButtons: (event: React.FormEvent<HTMLFormElement>) => void;
+  handleScheduleButton: (e: null) => void;
+  handleStatusButtons: (type: "play" | "pause" | "archive" | "schedule") => void;
   formFetcher: FetcherWithComponents<{ campaign: Campaign, campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign }>;
   user: User;
   joinDisabled: string | null;
@@ -47,7 +47,8 @@ export type CampaignSettingsProps = {
   queueCount: number;
   totalCount: number;
   mediaLinks: string[];
-  handleNavigate: (to: string) => void;
+  handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  scheduleDisabled: string | boolean;
 };
 
 export const CampaignSettings = ({
@@ -70,7 +71,8 @@ export const CampaignSettings = ({
   campaignQueue,
   queueCount,
   totalCount,
-  handleNavigate
+  handleNavigate,
+  scheduleDisabled,
 }: CampaignSettingsProps) => {
 
   return (
@@ -106,9 +108,10 @@ export const CampaignSettings = ({
               handleDuplicateButton={handleDuplicateButton}
               phoneNumbers={phoneNumbers}
               flags={flags}
-              joinDisabled={joinDisabled}
+              joinDisabled={joinDisabled} 
               formFetcher={formFetcher}
               details={campaignDetails}
+              scheduleDisabled={scheduleDisabled}
             />
           </section>
           <section className="rounded-lg border p-4">
@@ -124,6 +127,7 @@ export const CampaignSettings = ({
               isChanged={isChanged}
               isBusy={formFetcher.state !== "idle"}
               joinDisabled={joinDisabled}
+              scheduleDisabled={scheduleDisabled}
             />
           </section>
 

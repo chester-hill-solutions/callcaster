@@ -44,7 +44,6 @@ export function deepEqual(
 
   if (obj1 === obj2) return true;
   if (obj1 == null || obj2 == null) {
-    if (!obj1 && !obj2) return true;
     //log(`One value is null or undefined: ${obj1 === null ? 'null' : 'undefined'} !== ${obj2 === null ? 'null' : 'undefined'}`);
     return false;
   }

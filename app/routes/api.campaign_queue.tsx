@@ -1,5 +1,4 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { PostgrestError } from "@supabase/supabase-js";
 import { parseRequestData } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { CampaignQueue } from "~/lib/types";
@@ -11,29 +10,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const data = await parseRequestData(request);
 
     if (request.method === "POST") {
-        const { ids, campaign_id, startOrder = 0 } = data;
+        const { ids, campaign_id, startOrder = 0, requeue = false } = data;
         const BATCH_SIZE = 100;
         const results = [];
-
         for (let i = 0; i < ids.length; i += BATCH_SIZE) {
             const batch = ids.slice(i, i + BATCH_SIZE);
             const { data: newContacts, error } = await supabaseClient
-                .from("campaign_queue")
-                .insert(batch.map((id: string, index: number) => ({
-                    contact_id: id,
-                    campaign_id: Number(campaign_id),
-                    queue_order: startOrder + i + index,
-                    status: "queued"
+                .rpc('handle_campaign_queue_entry', batch.map((contactId: string, index: number) => ({
+                    p_contact_id: contactId,
+                    p_campaign_id: Number(campaign_id),
+                    p_queue_order: startOrder + i + index,
+                    p_requeue: requeue
                 })))
                 .select();
-
             if (error) throw error;
-            results.push(...(newContacts as CampaignQueue[]));
+            results.push((newContacts as CampaignQueue[]));
         }
 
         return json({ data: results });
     }
-
     if (request.method === "DELETE") {
         const { ids, campaign_id, filters } = data;
         const BATCH_SIZE = 100;

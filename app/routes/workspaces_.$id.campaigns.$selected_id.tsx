@@ -168,13 +168,16 @@ export default function CampaignScreen() {
     ? "No script selected"
     : !campaignData.caller_id
       ? "No outbound phone number selected"
-      : !campaignData.campaign_audience?.length
-        ? "No audiences selected"
         : campaignData.status === "scheduled" ? 
         `Campaign scheduled.`
         : !isActive
           ? "It is currently outside of the Campaign's calling hours"
           : null;
+  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text )
+    ? "No script selected"
+    : !campaignData.caller_id
+      ? "No outbound phone number selected"
+      : null;
 
   const headerStatus = campaignData.status === "running" && !isActive ? "paused" : campaignData.status;
   return (
@@ -230,6 +233,7 @@ export default function CampaignScreen() {
           user,
           mediaLinks,
           flags,
+          scheduleDisabled,
         }}
       />
     </div>

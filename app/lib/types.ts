@@ -40,7 +40,7 @@ export type MessageCampaign =
   | null;
 export type Script = Database["public"]["Tables"]["script"]["Row"] | null;
 export type QueueItem = Queue & { contact: Contact };
-export type CampaignQueue = Database["public"]["Tables"]["campaign_queue"]["Row"] | null;
+export type CampaignQueue = Database["public"]["Tables"]["campaign_queue"]["Row"];
 export type Call = Database["public"]["Tables"]["call"]["Row"] | null;
 export type User = Database["public"]["Tables"]["user"]["Row"] | null;
 

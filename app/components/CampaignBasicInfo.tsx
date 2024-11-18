@@ -11,7 +11,7 @@ import {
 import { FetcherWithComponents } from "@remix-run/react";
 import {
   Campaign,
-  Flags, 
+  Flags,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
@@ -19,7 +19,7 @@ import {
   WorkspaceNumbers,
 } from "~/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
-import SelectNumber from "./CampaignBasicInfo.SelectNumber"; 
+import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
 
 // Types
@@ -27,7 +27,7 @@ type ButtonState = "Active" | "Inactive" | "Disabled";
 
 type CampaignState =
   | "running"
-  | "paused" 
+  | "paused"
   | "archived"
   | "draft"
   | "pending"
@@ -37,11 +37,11 @@ type CampaignState =
 // Helper Functions
 const getButtonStates = (
   campaignState: CampaignState,
-  isJoinDisabled: boolean,
+  isPlayDisabled: string | boolean,
 ): Record<string, ButtonState> => {
   const states: Record<string, ButtonState> = {
     play: "Disabled",
-    pause: "Disabled", 
+    pause: "Disabled",
     archive: "Disabled",
     schedule: "Disabled",
   };
@@ -50,18 +50,24 @@ const getButtonStates = (
     case "running":
       states.pause = "Inactive";
       states.play = "Active";
+      states.schedule = "Disabled";
       states.archive = "Inactive";
       break;
     case "paused":
-      states.play = isJoinDisabled ? "Disabled" : "Inactive";
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
       states.archive = "Inactive";
       states.pause = "Active"
       break;
     case "draft":
     case "pending":
-    case "scheduled":
-      states.play = isJoinDisabled ? "Disabled" : "Inactive";
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
       states.archive = "Inactive";
+      states.schedule = "Inactive";
+      break;
+    case "scheduled":
+      states.play = isPlayDisabled ? "Disabled" : "Inactive";
+      states.archive = "Inactive";
+      states.schedule = "Active";
       break;
     case "complete":
       states.archive = "Inactive";
@@ -69,7 +75,7 @@ const getButtonStates = (
     case "archived":
       break;
   }
-  
+
   return states;
 };
 
@@ -79,7 +85,7 @@ interface CampaignBasicInfoProps {
   handleInputChange: (name: string, value: string | number) => void;
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
-  handleButton: (type: "play" | "pause" | "archive") => void;
+  handleButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   handleDuplicateButton: () => void;
   joinDisabled: string | null;
   formFetcher: FetcherWithComponents<{
@@ -87,6 +93,7 @@ interface CampaignBasicInfoProps {
     campaignDetails: LiveCampaign | IVRCampaign | MessageCampaign;
   }>;
   details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign;
+  scheduleDisabled: string | boolean;
 }
 
 // Main Component
@@ -94,25 +101,24 @@ export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
   phoneNumbers,
+  joinDisabled,
   flags,
   handleButton,
   handleDuplicateButton,
   formFetcher,
   details,
+  scheduleDisabled,
 }: CampaignBasicInfoProps) => {
-  // Compute disabled state
-  const joinDisabled =
-    !campaignData?.script_id && !campaignData.body_text
-      ? "No script selected"
-      : !campaignData.caller_id || campaignData.caller_id === "+15064364568"
-        ? "No outbound phone number selected"
-        : !campaignData.audiences?.length
-          ? "No audiences selected"
-          : null;
+
+  const isPlayDisabled = (!campaignData?.script_id && !campaignData.body_text) ?
+    "No script selected" :
+    !campaignData.caller_id || campaignData.caller_id === "+15064364568" ?
+      "No outbound phone number selected" :
+      null;
 
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
-    !!joinDisabled,
+    !!isPlayDisabled,
   );
 
   // Button renderer
@@ -122,6 +128,12 @@ export const CampaignBasicInfo = ({
     tooltip: string,
   ) => {
     const state = buttonStates[type];
+
+    const isDisabled = type === "schedule" ? scheduleDisabled : state === "Disabled";
+    const tooltipText = type === "schedule" ? (scheduleDisabled || tooltip) :
+      (state === "Active" ? `Currently ${type === "play" ? "running" : `${type}ed`}` :
+        tooltip);
+
     return (
       <TooltipProvider>
         <Tooltip>
@@ -135,23 +147,21 @@ export const CampaignBasicInfo = ({
                 if (type === "duplicate") {
                   handleDuplicateButton();
                 } else {
-                  handleButton(type);
+                  handleButton(type as "play" | "pause" | "archive");
                 }
               }}
-              disabled={state === "Disabled"}
+              disabled={getButtonStates(campaignData.status as CampaignState, Boolean(isPlayDisabled))[type] === "Disabled"}
               className={`
                 ${state === "Active" ? "bg-primary text-primary-foreground shadow-sm" : ""}
                 ${state === "Inactive" ? "border-primary" : ""}
-                ${state === "Disabled" ? "cursor-not-allowed opacity-50" : ""}
+                ${isDisabled ? "cursor-not-allowed opacity-50" : ""}
               `}
             >
               {icon}
             </Button>
           </TooltipTrigger>
           <TooltipContent align="center">
-            {state === "Active"
-              ? `Currently ${type === "play" ? "running" : `${type}ed`}`
-              : tooltip}
+            {tooltipText}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -165,33 +175,33 @@ export const CampaignBasicInfo = ({
       <div className="flex justify-end">
         <div className="flex gap-2">
           {renderButton(
-              "play",
-              <Play className="h-4 w-4" />,
-              joinDisabled || "Start the campaign",
-            )}
+            "play",
+            <Play className="h-4 w-4" />,
+            isPlayDisabled || "Start the campaign",
+          )}
           {renderButton(
-              "schedule",
-              <Clock className="h-4 w-4" />,
-              "Schedule the campaign",
-            )}
-            {renderButton(
-              "pause",
-              <Pause className="h-4 w-4" />,
-              "Pause the campaign",
-            )}
-            {renderButton(
-              "duplicate",
-              <Copy className="h-4 w-4" />,
-              "Duplicate the campaign",
-            )}
-            {renderButton(
-              "archive",
-              <Archive className="h-4 w-4" />,
-              "Archive the campaign",
-            )}
+            "schedule",
+            <Clock className="h-4 w-4" />,
+            "Schedule the campaign",
+          )}
+          {renderButton(
+            "pause",
+            <Pause className="h-4 w-4" />,
+            "Pause the campaign",
+          )}
+          {renderButton(
+            "duplicate",
+            <Copy className="h-4 w-4" />,
+            "Duplicate the campaign",
+          )}
+          {renderButton(
+            "archive",
+            <Archive className="h-4 w-4" />,
+            "Archive the campaign",
+          )}
 
-          </div>
         </div>
+      </div>
       <div className="flex flex-wrap gap-6">
         {/* Campaign Title */}
         <div className="flex min-w-48 flex-grow flex-col gap-1">

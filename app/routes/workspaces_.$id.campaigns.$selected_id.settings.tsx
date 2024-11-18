@@ -1,5 +1,5 @@
 import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
+import { FetcherWithComponents, useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
 import { Suspense } from "react";
 import { FileObject } from "@supabase/storage-js";
 import { useState, useCallback, SetStateAction, useEffect } from "react";
@@ -35,6 +35,7 @@ type Context = {
   user: User;
   mediaLinks: string[];
   flags: Flags;
+  scheduleDisabled: string | boolean;
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -71,6 +72,7 @@ export default function Settings() {
     audiences,
     joinDisabled,
     flags,
+    scheduleDisabled,
   } = useOutletContext<Context>();
 
   const {
@@ -83,19 +85,19 @@ export default function Settings() {
   } = useLoaderData<typeof loader>();
 
   const duplicateFetcher = useFetcher<{ campaign: { id: string } }>();
-  const formFetcher = useFetcher<{ campaign: Campaign, campaignDetails: CampaignDetails }>();
+  const formFetcher: FetcherWithComponents<{ campaign: Campaign, campaignDetails: CampaignDetails }> = useFetcher<{ campaign: Campaign, campaignDetails: CampaignDetails }>();
   const navigate = useNavigate();
 
   const {
     campaignData: campaignSettingsData,
     isChanged,
     handleInputChange,
-    handleActiveChange,
     handleAudienceChange,
-    handleScheduleButton,
     handleStatusButtons,
     handleResetData,
-    handleUpdateData
+    handleUpdateData,
+    getScheduleData,
+    getActiveChangeData
   } = useCampaignSettings({
     campaign_id: selected_id || '',
     workspace: workspace_id || '',
@@ -108,16 +110,36 @@ export default function Settings() {
     end_date: campaignData?.end_date || new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     caller_id: campaignData?.caller_id || null,
     voicemail_file: campaignData?.voicemail_file || null,
-    script_id: campaignData?.script_id || null,
+    script_id: campaignDetails?.script_id || null,
     audiences: campaignData?.audiences || [],
-    body_text: campaignData?.body_text || null,
-    message_media: campaignData?.message_media || null,
-    voicedrop_audio: campaignData?.voicedrop_audio || null,
+    body_text: campaignDetails?.body_text || null,
+    message_media: campaignDetails?.message_media || null,
+    voicedrop_audio: campaignDetails?.voicedrop_audio || null,
     schedule: campaignData?.schedule || null,
     is_active: campaignData?.is_active || false,
     campaign_audience: campaignAudience || null,
-    details: campaignDetails
+    details: campaignDetails,
   });
+
+  const handleScheduleButton = (event: React.FormEvent<HTMLFormElement> | null = null) => {
+    if (event) {
+      event.preventDefault();
+    }
+    const data = getScheduleData();
+    formFetcher.submit(data, {
+      method: "patch",
+      action: "/api/campaigns",
+    });
+    navigate("..");
+  };
+
+  const handleActiveChange = (isActive: boolean, status: string | null) => {
+    const data = getActiveChangeData(isActive, status);
+    formFetcher.submit(data, {
+      method: "patch",
+      action: "/api/campaigns",
+    });
+  };
 
   const handleSave = () => {
     formFetcher.submit(
@@ -188,6 +210,7 @@ export default function Settings() {
       totalCount={totalCount || 0}
       mediaLinks={mediaLinks}
       handleNavigate={handleNavigate}
+      scheduleDisabled={scheduleDisabled}
     />
   );
 }

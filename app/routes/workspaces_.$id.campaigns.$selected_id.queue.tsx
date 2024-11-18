@@ -254,7 +254,6 @@ export default function Queue() {
     }
 
     const handleAddContact = () => {
-        console.log("Add Contact");
         setSearchModalOpen(true);
     }
     const handleSearch = (query: string) => {
