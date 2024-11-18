@@ -24,10 +24,23 @@ const handleVoicemail = async (dbCall, supabase) => {
 };
 
 const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
-    await Promise.all([
-        updateCallStatus(supabase, callSid, status, timestamp),
-        updateResult(supabase, outreach_attempt_id, { disposition })
-    ]);
+    // First check if there's already a voicemail disposition
+    const { data: currentAttempt } = await supabase
+        .from('outreach_attempt')
+        .select('disposition')
+        .eq('id', outreach_attempt_id)
+        .single();
+
+    // Only update disposition if it's not already set to voicemail
+    if (!currentAttempt?.disposition || currentAttempt.disposition !== 'voicemail') {
+        await Promise.all([
+            updateCallStatus(supabase, callSid, status, timestamp),
+            updateResult(supabase, outreach_attempt_id, { disposition })
+        ]);
+    } else {
+        // Just update call status if disposition is voicemail
+        await updateCallStatus(supabase, callSid, status, timestamp);
+    }
 };
 
 const fetchCall = async ({ supabase, callSid }) => {

@@ -8,6 +8,36 @@ const log = (level, message, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
 
+const updateResult = async (supabase, outreach_attempt_id, update) => {
+  if (!outreach_attempt_id) {
+      throw new Error("outreach_attempt_id is undefined");
+  }
+  const { error } = await supabase
+      .from('outreach_attempt')
+      .update(update)
+      .eq('id', outreach_attempt_id);
+  if (error) throw error;
+};
+
+
+
+const updateCallStatus = async (supabase, callSid, status, timestamp) => {
+  const { error } = await supabase
+      .from('call')
+      .update({ end_time: new Date(timestamp), status })
+      .eq('sid', callSid);
+  if (error) throw error;
+};
+
+
+const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
+  await Promise.all([
+      updateCallStatus(supabase, callSid, status, timestamp),
+      updateResult(supabase, outreach_attempt_id, { disposition })
+  ]);
+};
+
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 const getCallWithRetry = async (supabase, callSid, retries = 0) => {
@@ -167,6 +197,7 @@ const processResult = async (supabase, script, currentStep, result, userInput, c
   return { step, result };
 };
 
+
 exports.handler = async function (context, event, callback) {
   const supabase = createClient(
     context.SUPABASE_URL,
@@ -183,6 +214,7 @@ exports.handler = async function (context, event, callback) {
     const userInput = event.Digits || event.SpeechResult;
     const callData = await getCallWithRetry(supabase, callSid);
     if (event.AnsweredBy && event.AnsweredBy.includes('machine') && !event.AnsweredBy.includes('other')) {
+      await handleCallUpdate(supabase, callSid, 'voicemail', event.Timestamp, callData.outreach_attempt.id, 'voicemail');
       if (!callData.campaign.voicemail_file) {
         log('info', 'No voicemail file specified, hanging up');
         twiml.hangup();
