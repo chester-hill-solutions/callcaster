@@ -12,7 +12,9 @@ exports.handler = async function (context, event, callback) {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const {to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id} = event;
+  const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id, index, total, isLastContact
+  } = event;
+  
   let outreachAttemptId;
   let call;
   const { data, error } = await supabase
@@ -46,11 +48,10 @@ exports.handler = async function (context, event, callback) {
       to: to_number,
       from: caller_id,
       url: `${baseUrl}/flow`,
-      machineDetection: "Enable",
+      machineDetection: "DetectMessageEnd",
       statusCallbackEvent: ["initiated", "answered", "completed"],
       statusCallback: `${baseUrl}/status`,
     });
-    console.log(call)
 
     const { data: insertData, error: insertError } = await supabase.from("call").insert({
       sid: call.sid,
@@ -60,7 +61,8 @@ exports.handler = async function (context, event, callback) {
       contact_id,
       workspace: workspace_id,
       outreach_attempt_id: outreachAttemptId,
-      queue_id
+      queue_id,
+      is_last: isLastContact
     }).select();
 
     if (insertError || !insertData) throw insertError || new Error("Record not retrieved");

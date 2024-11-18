@@ -674,7 +674,6 @@ export type Database = {
           created_at: string
           id: number
           script_id: number | null
-          step_data: Json
           workspace: string
         }
         Insert: {
@@ -682,7 +681,6 @@ export type Database = {
           created_at?: string
           id?: number
           script_id?: number | null
-          step_data?: Json
           workspace: string
         }
         Update: {
@@ -690,7 +688,6 @@ export type Database = {
           created_at?: string
           id?: number
           script_id?: number | null
-          step_data?: Json
           workspace?: string
         }
         Relationships: [
@@ -1852,6 +1849,16 @@ export type Database = {
           user_workspace_role: Database["public"]["Enums"]["workspace_role"]
         }[]
       }
+      handle_campaign_queue_entry: {
+        Args: {
+          p_contact_id: number
+          p_campaign_id: number
+          p_queue_order?: number
+          p_requeue?: boolean
+        }
+        Returns: number
+      }
+
       process_existing_contacts: {
         Args: Record<PropertyKey, never>
         Returns: undefined

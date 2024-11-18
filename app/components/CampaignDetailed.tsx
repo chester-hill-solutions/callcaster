@@ -26,20 +26,22 @@ export const CampaignTypeSpecificSettings = ({
   isChanged,
   isBusy,
   joinDisabled,
+  scheduleDisabled,
 }:{
   campaignData: CampaignSettingsData,
   handleInputChange:(name: string, value: any) => void,
   mediaData: FileObject[],
   scripts: Script[],
-  handleActivateButton: (e: string) => void,
-  handleScheduleButton: (e: string) => void,
+  handleActivateButton: (type: "play" | "pause" | "archive" | "schedule") => void,
+  handleScheduleButton: (e: React.MouseEvent<HTMLButtonElement>) => void,
+
   details: LiveCampaign | MessageCampaign | IVRCampaign,
   mediaLinks: string[],
   isChanged: boolean,
   isBusy: boolean,
   joinDisabled: string | null,
+  scheduleDisabled: string | boolean,
 }) => {
-  
   return (
     <>
       {campaignData.type !== "message" && (
@@ -72,8 +74,8 @@ export const CampaignTypeSpecificSettings = ({
           </div>
           <ActivateButtons
             joinDisabled={joinDisabled}
+            scheduleDisabled={scheduleDisabled}
             isBusy={isBusy}
-            campaignData={campaignData}
             handleScheduleButton={handleScheduleButton}
           />
         </div>

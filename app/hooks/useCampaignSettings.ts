@@ -27,14 +27,6 @@ export type CampaignSettingsData = {
     details: LiveCampaign | MessageCampaign | IVRCampaign;
 };
 
-function isMessageCampaign(campaign: any): campaign is MessageCampaign {
-    return campaign.type === 'message';
-}
-
-function isScriptBasedCampaign(campaign: any): campaign is LiveCampaign | IVRCampaign {
-    return campaign.type === 'live_call' || campaign.type === 'robocall';
-}
-
 export default function useCampaignSettings(
     {
         campaign_id,
@@ -56,11 +48,8 @@ export default function useCampaignSettings(
         schedule,
         is_active,
         campaign_audience,
-        fetcher,
-        formFetcher,
-        navigate,
-        details
-    }: CampaignSettingsData & { fetcher: Fetcher, formFetcher: Fetcher, navigate: NavigateFunction }
+        details,
+    }: Omit<CampaignSettingsData, 'handleScheduleButton' | 'handleActiveChange'>
 ) {
     const [isChanged, setChanged] = useState(false);
     const [campaignData, setCampaignData] = useState<CampaignSettingsData>({
@@ -83,41 +72,12 @@ export default function useCampaignSettings(
         schedule,
         is_active,
         campaign_audience,
-        details
+        details,
     });
     const [initial, setInitial] = useState<CampaignSettingsData>(campaignData);
-
     const handleResetData = () => {
         setCampaignData(initial);
     }
-
-    const handleActiveChange = (isActive: boolean, status: string | null) => {
-        formFetcher.submit(
-            {
-                campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && { status }) }),
-                campaignDetails: JSON.stringify(details),
-            },
-            {
-                method: "patch",
-                action: "/api/campaigns",
-            },
-        );
-    }
-
-    const handleScheduleButton = (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        formFetcher.submit(
-            {
-                campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
-                campaignDetails: JSON.stringify(details),
-            },
-            {
-                method: "patch",
-                action: "/api/campaigns",
-            },
-        );
-        navigate("..");
-    };
 
     const handleInputChange = (name: string, value: string | boolean | number | null | Schedule) => {
         setCampaignData((prev) => ({ ...prev, [name]: value }));
@@ -144,6 +104,20 @@ export default function useCampaignSettings(
         });
     };
 
+    const getScheduleData = () => {
+        return {
+            campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
+            campaignDetails: JSON.stringify(details),
+        };
+    };
+
+    const getActiveChangeData = (isActive: boolean, status: string | null) => {
+        return {
+            campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && { status }) }),
+            campaignDetails: JSON.stringify(details),
+        };
+    };
+
     const handleStatusButtons = (
         type: "play" | "pause" | "archive" | "schedule",
     ) => {
@@ -152,40 +126,46 @@ export default function useCampaignSettings(
             case "draft":
                 if (type === "play") {
                     handleInputChange("status", "running");
-                    handleActiveChange(true, "running");
+                    handleInputChange("is_active", true);
                 } else if (type === "schedule") {
                     handleInputChange("status", "scheduled");
                 } else if (type === "archive") {
                     clearSchedule();
                     handleInputChange("status", "archived");
+                    handleInputChange("is_active", false);
                 }
                 break;
             case "scheduled":
                 if (type === "archive") {
                     clearSchedule();
                     handleInputChange("status", "archived");
+                    handleInputChange("is_active", false);
+                }
+                if (type === "play") {
+                    handleInputChange("status", "running");
+                    handleInputChange("is_active", true);
                 }
                 break;
             case "running":
                 if (type === "pause") {
-                    handleActiveChange(false, "paused");
                     handleInputChange("status", "paused");
+                    handleInputChange("is_active", false);
                 } else if (type === "archive") {
-                    handleActiveChange(false, "archived");
-                    clearSchedule();
                     handleInputChange("status", "archived");
+                    clearSchedule();
                 } else if (type === "schedule") {
-                    handleActiveChange(false, "scheduled")
                     handleInputChange("status", "scheduled");
+                    handleInputChange("is_active", false);
                 }
                 break;
             case "paused":
                 if (type === "play") {
                     handleInputChange("status", "running");
-                    handleActiveChange(true, "running")
+                    handleInputChange("is_active", true);
                 } else if (type === "archive") {
                     clearSchedule()
                     handleInputChange("status", "archived")
+                    handleInputChange("is_active", false);
                 }
                 break;
 
@@ -199,7 +179,7 @@ export default function useCampaignSettings(
             case "pending":
                 if (type === "archive") {
                     handleInputChange("status", "archive");
-                    handleActiveChange(false, "archived");
+                    handleInputChange("is_active", false);
                     clearSchedule();
                 }
                 break;
@@ -212,7 +192,6 @@ export default function useCampaignSettings(
     const handleUpdateData = (campaignData: CampaignSettingsData) => {
         setCampaignData(campaignData);
         setInitial(campaignData);
-        setChanged(!deepEqual(campaignData, initial));
     }
 
     useEffect(() => {
@@ -227,10 +206,10 @@ export default function useCampaignSettings(
         setCampaignData,
         handleInputChange,
         handleAudienceChange,
-        handleActiveChange,
-        handleScheduleButton,
         handleStatusButtons,
         handleResetData,
-        handleUpdateData
+        handleUpdateData,
+        getScheduleData,
+        getActiveChangeData
     };
 }

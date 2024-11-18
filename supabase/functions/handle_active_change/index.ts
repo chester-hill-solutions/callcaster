@@ -64,6 +64,7 @@ const handleTriggerStart = async (
   campaign_id: string,
   user_id: string,
 ) => {
+  const lastContactIndex = contacts.length - 1;
   for (let i = 0; i < contacts?.length; i++) {
     const contact = contacts[i];
     const data = {
@@ -76,6 +77,7 @@ const handleTriggerStart = async (
       caller_id: contact.caller_id,
       index: i,
       total: contacts.length,
+      isLastContact: i === lastContactIndex
     };
     const twilioSignature = getExpectedTwilioSignature(Deno.env.get('TWILIO_AUTH_TOKEN'), 'https://ivr-2916.twil.io/ivr', {});
     await fetch(`https://ivr-2916.twil.io/ivr`, {
@@ -262,10 +264,16 @@ const handlePauseCampaign = async (
 };
 
 Deno.serve(async (req) => {
+  console.log("Request received");
   const { record } = await req.json();
+  console.log("Parsed record:", record);
+  
   const supabase = initSupabaseClient();
   const now = new Date();
+  console.log("Current time:", now);
+  
   const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
+  console.log("Twilio instance created");
   
   try {
     if (
@@ -273,14 +281,22 @@ Deno.serve(async (req) => {
       new Date(record.end_date) > now &&
       new Date(record.start_date) < now
     ) {
+      console.log("Campaign is active and within date range");
       const {error} = await supabase.from("campaign").update({status:"running"}).eq("id", record.id);
       if (error) throw error;
-      if (record.type === "live_call") return;
-      handleInitiateCampaign(supabase, record.id);
+      
+      if (record.type === "live_call") {
+        console.log("Skipping live call campaign");
+        return;
+      }
+      console.log("Initiating campaign:", record.id);
+      await handleInitiateCampaign(supabase, record.id);
+      
     } else if (!record.is_active) {
-      const {error} = await supabase.from("campaign").update({status:"paused"}).eq("id", record.id);
+      console.log("Pausing campaign:", record.id);
+      const {error} = await supabase.from("campaign").update({status:"scheduled"}).eq("id", record.id);
       if (error) throw error;
-      handlePauseCampaign(supabase, record.id, twilio);
+      await handlePauseCampaign(supabase, record.id, twilio);
     }
   } catch (error) {
     console.error("Error:", error);

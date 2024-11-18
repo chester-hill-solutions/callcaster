@@ -573,9 +573,9 @@ export function QueueTable({
                             <thead className="sticky top-0 bg-gray-100 border-b">
                                 {table.getHeaderGroups().map(headerGroup => (
                                     <tr key={headerGroup.id}>
-                                        {headerGroup.headers.map(header => (
+                                        {headerGroup.headers.map((header, i) => (
                                             <th
-                                                key={header.id}
+                                                key={`${i}-${header.id}`}
                                                 className="h-10 px-2 text-left align-middle font-medium text-primary text-xs"
                                                 style={{ width: header.getSize() }}
                                             >
@@ -591,8 +591,8 @@ export function QueueTable({
                             <tbody>
                                 {table.getRowModel().rows.map(row => (
                                     <tr key={row.id} className="border-b hover:bg-muted/50 text-gray-500">
-                                        {row.getVisibleCells().map(cell => (
-                                            <td key={cell.id} className="p-1 px-2 text-xs">
+                                        {row.getVisibleCells().map((cell, i) => (
+                                            <td key={`${i}-${cell.id}`} className="p-1 px-2 text-xs">
                                                 {flexRender(
                                                     cell.column.columnDef.cell,
                                                     cell.getContext()

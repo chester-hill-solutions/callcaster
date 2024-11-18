@@ -38,6 +38,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .select()
     .eq("id", workspaceId)
     .single();
+  const { data: flags, error: flagsError } = await supabaseClient
+    .from("workspace")
+    .select("feature_flags")
+    .eq("id", workspaceId)
+    .single();
 
   const { data: contacts, error: contactError } = await supabaseClient
     .from("contact")
@@ -53,12 +58,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           .map((error) => error.message)
           .join(", "),
         userRole,
+        flags: null
+
       },
       { headers },
     );
-  }
+  } 
 
-  return json({ contacts, workspace, error: null, userRole }, { headers });
+  return json({ contacts, workspace, error: null, userRole, flags }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -110,7 +117,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function WorkspaceContacts() {
-  const { contacts, error, userRole, workspace } =
+  const { contacts, error, userRole, workspace, flags } =
     useLoaderData<typeof loader>();
   /*     const actionData = useActionData<typeof action>();
   
@@ -133,8 +140,8 @@ export default function WorkspaceContacts() {
     <main className="mx-auto mt-8 flex h-full w-[80%] flex-col gap-4 rounded-sm text-white">
       <WorkspaceNav
         workspace={workspace}
-        isInChildRoute={true}
         userRole={userRole}
+        flags={flags}
       />
       <div className="flex items-center justify-between gap-4">
         <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">

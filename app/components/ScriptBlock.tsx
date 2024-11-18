@@ -14,9 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { NavLink } from "@remix-run/react";
-import { Block, BlockOption, Page } from "~/lib/database.types";
+import { Block, BlockOption, IVRBlock, IVROption, Page } from "~/lib/database.types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { MdDialpad } from "react-icons/md";
+
+type ResponseType = "speech" | "dtmf" | "dtmf-speech";
 
 const QuestionBlockOption = ({
   option,
@@ -28,10 +30,10 @@ const QuestionBlockOption = ({
   blocks,
   type,
 }:{
-  option: BlockOption,
+  option: BlockOption | IVROption,
   index: number;
   onRemove: (index:number) => void;
-  onChange: (index: number, value:BlockOption) => void;
+  onChange: (index: number, value:BlockOption | IVROption) => void;
   onNextChange: (index: number, value: string) => void;
   pages: Page[];
   blocks: Block[];
@@ -161,7 +163,7 @@ const MergedQuestionBlock = ({
     dropPosition: "top" | "bottom",
   ) => void;
 }) => {
-  const [localBlock, setLocalBlock] = useState(block);
+  const [localBlock, setLocalBlock] = useState<Block | IVRBlock>(block);
   const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">("none");
   const questionTypes =
     type === "script"
@@ -178,27 +180,36 @@ const MergedQuestionBlock = ({
           { value: "recorded", label: "Audio File" },
         ];
 
+  const responseTypes = [
+    { value: "speech", label: "Speech Only (Best for recording messages)" },
+    { value: "dtmf", label: "DTMF Only (Best for simple IVR)" },
+    { value: "dtmf-speech", label: "DTMF and Speech (Best for complex IVR)" },
+  ];
+
   useEffect(() => {
     setLocalBlock(block);
   }, [block]);
 
-  const handleChange = (field, value) => {
+  const handleChange = (
+    field: keyof Block | keyof IVRBlock,
+    value: string | string[] | BlockOption[] | IVROption[] | (BlockOption | IVROption)[]
+  ) => {
     const updatedBlock = {
       ...localBlock,
       [field]: value,
-      ...(field === "content" && { value: value.toLowerCase() }),
+      ...(field === "content" && typeof value === "string" && { value: value.toLowerCase() }),
     };
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
 
-  const handleOptionChange = (index, newOption) => {
+  const handleOptionChange = (index: number, newOption: BlockOption | IVROption) => {
     const newOptions = [...(localBlock.options || [])];
     newOptions[index] = newOption;
     handleChange("options", newOptions);
   };
 
-  const handleNextChange = (index, value) => {
+  const handleNextChange = (index: number, value: string) => {
     const newOptions = (localBlock.options || []).map((opt, i) => {
       if (i !== index) return opt;
       return { ...opt, next: value };
@@ -214,13 +225,13 @@ const MergedQuestionBlock = ({
     handleChange("options", newOptions);
   };
 
-  const handleRemoveOption = (index) => {
+  const handleRemoveOption = (index: number) => {
     const newOptions = (localBlock.options || []).filter((_, i) => i !== index);
     handleChange("options", newOptions);
   };
 
   const renderContentInput = () => {
-    if (type === "script" || localBlock?.type === "synthetic") {
+    if (type === "script" || (type === "ivr" && localBlock?.type === "synthetic")) {
       return (
         <Textarea
           value={localBlock.content || localBlock.audioFile}
@@ -245,10 +256,10 @@ const MergedQuestionBlock = ({
             value={localBlock.audioFile}
             onValueChange={(value) => handleChange("audioFile", value)}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full bg-white">
               <SelectValue placeholder="Select an audio file" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white">
               {mediaNames.map((media) => (
                 <SelectItem key={media.id} value={media.name}>
                   {media.name}
@@ -267,13 +278,13 @@ const MergedQuestionBlock = ({
     return null;
   };
 
-  const handleDrop = (event) => {
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
     const droppedBlockData = JSON.parse(event.dataTransfer.getData("cardData"));
 
     if (droppedBlockData.id !== localBlock.id) {
-      onReorder(droppedBlockData.id, localBlock.id, acceptDrop);
+      onReorder(droppedBlockData.id, localBlock.id, acceptDrop as "top" | "bottom");
     }
 
     setAcceptDrop("none");
@@ -315,7 +326,7 @@ const MergedQuestionBlock = ({
             <CardTitle
               className="w-full cursor-pointer"
               onClick={() =>
-                setOpenBlock((curr) => (curr !== block?.id ? block?.id : null))
+                setOpenBlock(openBlock === block.id ? null : block.id)
               }
             >
               {localBlock?.title || `Block ${localBlock?.id}`}
@@ -358,31 +369,65 @@ const MergedQuestionBlock = ({
                 </SelectContent>
               </Select>
               {renderContentInput()}
+              {type === "ivr" && (
+                <Select
+                  defaultValue={localBlock?.responseType}
+                  onValueChange={(value) => handleChange("responseType", value)}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select response type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {responseTypes.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             {["radio", "dropdown", "multi", "synthetic", "recorded"].includes(
               localBlock?.type,
             ) && (
               <div className="mt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Options</h3>
-                  <Button variant="outline" size="sm" className="border-primary" onClick={handleAddOption}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Option
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Options</h3>
+                    {(!type || type === "script" || (type === "ivr" && localBlock?.responseType && localBlock.responseType !== "speech")) && (
+                      <Button variant="outline" size="sm" className="border-primary" onClick={handleAddOption}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Option
+                      </Button>
+                    )}
+                  </div>
+                  {type === "ivr" && !localBlock?.responseType && (
+                    <p className="text-sm text-muted-foreground">Please select a response type first</p>
+                  )}
+                  {type === "ivr" && localBlock?.responseType === "speech" && (
+                    <p className="text-sm text-muted-foreground">Speech response type does not support options - will record response and continue to next block</p>
+                  )}
+                  {(!type || type === "script" || (type === "ivr" && localBlock?.responseType && localBlock.responseType !== "speech")) && (
+                    <>
+                      {localBlock.options?.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No options added - will continue to next block</p>
+                      )}
+                      {localBlock.options?.map((option, index) => (
+                        <QuestionBlockOption
+                          key={index}
+                          option={option}
+                          index={index}
+                          onRemove={handleRemoveOption}
+                          onChange={handleOptionChange}
+                          onNextChange={handleNextChange}
+                          pages={pages}
+                          blocks={blocks}
+                          type={type}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
-                {localBlock.options?.map((option, index) => (
-                  <QuestionBlockOption
-                    key={index}
-                    option={option}
-                    index={index}
-                    onRemove={handleRemoveOption}
-                    onChange={handleOptionChange}
-                    onNextChange={handleNextChange}
-                    pages={pages}
-                    blocks={blocks}
-                    type={type}
-                  />
-                ))}
               </div>
             )}
           </CardContent>

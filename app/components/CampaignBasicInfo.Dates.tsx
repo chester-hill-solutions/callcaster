@@ -44,7 +44,6 @@ export default function SelectDates({
       ) ||
       {},
   );
-
   const utcToLocal = (utcTime) => {
     if (!utcTime) return "";
     const [hours, minutes] = utcTime.split(":");

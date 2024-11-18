@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
             supabase,
             `campaign_start_${record.id}_${i}`,
             startSchedules[i],
-            `UPDATE public.campaign SET is_active = true WHERE id = ${record.id}`
+            `UPDATE public.campaign SET is_active = true WHERE id = ${record.id} AND status = 'scheduled'`
           );
           startJobIds.push(startJobId);
         }
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
             supabase,
             `campaign_end_${record.id}_${i}`,
             endSchedules[i],
-            `UPDATE public.campaign SET is_active = false WHERE id = ${record.id}`
+            `UPDATE public.campaign SET is_active = false WHERE id = ${record.id} AND status = 'scheduled'`
           );
           endJobIds.push(endJobId);
         }
@@ -87,9 +87,16 @@ Deno.serve(async (req) => {
     }
   } catch (error) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    if (error instanceof Error) {
+      return new Response(
+        JSON.stringify({ error: error.message }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({ error: "An unknown error occurred" }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 });
