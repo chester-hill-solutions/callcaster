@@ -1,8 +1,9 @@
+import { LoaderFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "~/lib/utils";
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request }: LoaderFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
   const supabase = createClient(
     process.env.SUPABASE_URL!,
@@ -21,13 +22,33 @@ export const action = async ({ request, params }) => {
       ...workspace!inner(twilio_data)`,
     )
     .eq("phone_number", data.Called)
-    .single();
-  const { data: voicemail, error: voicemailError } = number.inbound_audio
+    .single() as {
+      data: {
+        inbound_action: string | null;
+        inbound_audio: string | null;
+        type: string | null;
+        workspace: string | null;
+        twilio_data: {
+          account_sid: string;
+          auth_token: string;
+        } | null;
+      } | null;
+      error: Error | null;
+    };
+  if (!number) {
+    throw { status: 404, statusText: "Not Found" };
+  }
+  if (numberError) {
+    console.error("Error on function getWorkspacePhoneNumbers", numberError);
+    throw { status: 500, statusText: "Internal Server Error" };
+  }
+
+  const { data: voicemail, error: voicemailError } = number?.inbound_audio
     ? await supabase.storage
-        .from(`workspaceAudio`)
-        .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
-    : { voicemail: null, error: null };
-  const { data: call, error: callError } = await supabase
+      .from(`workspaceAudio`)
+      .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
+    : { data: null, error: null };
+  const { error: callError } = await supabase
     .from("call")
     .insert({
       sid: data.CallSid,
@@ -40,9 +61,12 @@ export const action = async ({ request, params }) => {
       api_version: data.ApiVersion,
       workspace: number.workspace,
     })
-    .select();
+    if (callError){
+      console.error("Error on function insert call", callError);
+      throw { status: 500, statusText: "Internal Server Error" };
+    }
   if (isPhoneNumber(number?.inbound_action)) {
-    twiml.dial(number.inbound_action);
+    twiml.dial(number.inbound_action || '');
     return new Response(twiml.toString(), {
       headers: {
         "Content-Type": "text/xml",
@@ -50,7 +74,7 @@ export const action = async ({ request, params }) => {
     });
   } else if (isEmail(number?.inbound_action)) {
     const phoneNumber = data.Called;
-    if (voicemail.signedUrl) {
+    if (voicemail?.signedUrl) {
       twiml.play(voicemail.signedUrl);
     } else {
       twiml.say(
@@ -61,7 +85,7 @@ export const action = async ({ request, params }) => {
     twiml.record({
       transcribe: true,
       timeout: 10,
-      beep: true,
+      playBeep: true,
       recordingStatusCallback: "/api/email-vm",
     });
     return new Response(twiml.toString(), {
