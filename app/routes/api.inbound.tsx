@@ -66,6 +66,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       throw { status: 500, statusText: "Internal Server Error" };
     }
   if (isPhoneNumber(number?.inbound_action)) {
+    twiml.pause({ length: 1 });
     twiml.dial(number.inbound_action || '');
     return new Response(twiml.toString(), {
       headers: {
