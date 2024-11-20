@@ -202,7 +202,9 @@ export async function getWorkspaceCampaigns({
   workspaceId: string;
 }) {
   const { data, error } = await supabaseClient
-    .rpc("get_campaigns_by_workspace", { workspace_id: workspaceId })
+    .from("campaign")
+    .select("*")
+    .eq("workspace", workspaceId)
     .order("created_at", { ascending: false });
 
   if (error) {

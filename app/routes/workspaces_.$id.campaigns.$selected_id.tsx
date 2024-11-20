@@ -48,7 +48,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!serverSession?.user) {
     return redirect("/signin");
   }
-
   const { id: workspace_id, selected_id: campaign_id } = params;
   if (!workspace_id || !campaign_id) throw redirect("../");
   const { data: users } = await getWorkspaceUsers({supabaseClient, workspaceId: workspace_id});
@@ -69,6 +68,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     filename: `outreach_results_${campaign_id}.csv`,
   });
 };
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
   if (!workspace_id || !selected_id) throw redirect("../../");
@@ -178,13 +178,11 @@ export default function CampaignScreen() {
     : !campaignData.caller_id
       ? "No outbound phone number selected"
       : null;
-
-  const headerStatus = campaignData.status === "running" && !isActive ? "paused" : campaignData.status;
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={campaignData.title} status={headerStatus} isDesktop={false}/>
+      <CampaignHeader title={campaignData.title} status={campaignData.status} isDesktop={false}/>
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
-        <CampaignHeader title={campaignData.title} isDesktop status={headerStatus} />
+        <CampaignHeader title={campaignData.title} isDesktop status={campaignData.status} />
         <NavigationLinks
           hasAccess={hasAccess}
           data={campaignData}

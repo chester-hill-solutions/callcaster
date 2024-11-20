@@ -39,7 +39,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession) {
-    return redirect("/signin", { headers });
+    throw redirect("/signin", { headers });
   }
 
   const workspaceId = params.id;
@@ -52,7 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
   if (error) {
     console.log(error);
     if (error.code === "PGRST116") {
-      return redirect("/workspaces", { headers });
+      throw redirect("/workspaces", { headers });
     }
   }
 
@@ -80,18 +80,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
         workspaceId,
       });
     if (campaignsError) throw { campaignsError };
-    const campaigns = campaignsList?.map((campaign) => {
-      if (campaign.status !== "running") return campaign;
-      const isActive = checkSchedule(campaign);
-      if (!isActive) return {...campaign, status:"paused"};
-      return campaign;
-    })
     const { data: phoneNumbers, error: numbersError } =
       await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
     if (numbersError) throw { numbersError };
 
     return json(
-      { workspace, audiences, campaigns, userRole, phoneNumbers, flags:flags.feature_flags },
+      { workspace, audiences, campaigns:campaignsList, userRole, phoneNumbers, flags:flags.feature_flags },
       { headers },
     );
   } catch (error) {

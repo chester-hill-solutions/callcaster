@@ -292,7 +292,7 @@ const IncomingActivitySelect = ({
               verifiedNumbers.map((verifiedNumber) => (
                 <option
                   key={verifiedNumber.id}
-                  value={`forward_${verifiedNumber.id}`}
+                  value={`${verifiedNumber.phone_number}`}
                 >
                   Forward to {verifiedNumber.friendly_name}
                 </option>
