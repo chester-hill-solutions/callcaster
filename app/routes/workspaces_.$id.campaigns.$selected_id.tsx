@@ -178,7 +178,6 @@ export default function CampaignScreen() {
     : !campaignData.caller_id
       ? "No outbound phone number selected"
       : null;
-  
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData.title} status={campaignData.status} isDesktop={false}/>
