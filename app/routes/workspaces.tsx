@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import {
   Form,
@@ -12,7 +12,7 @@ import { Button } from "~/components/ui/button";
 import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Toaster, toast } from "sonner";
-import { handleRoleTextStyles } from "~/components/Workspace/TeamMember";
+import { handleRoleTextStyles, MemberRole } from "~/components/Workspace/TeamMember";
 import {
   Dialog,
   DialogClose,
@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-import { formatTableText } from "~/lib/utils";
+
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 
 export { ErrorBoundary };
@@ -114,8 +114,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 // eslint-disable-next-line react/display-name
 const WorkspaceCard = React.memo(
-  ({ workspace, role }: { workspace: Workspace; role: string }) => {
-
+  ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {
     return (
       <Link
         to={`/workspaces/${workspace.id}`}
@@ -220,7 +219,7 @@ export default function Workspaces() {
         <div key={workspaceUser.workspace.id} className="w-full sm:w-48">
           <WorkspaceCard
             workspace={workspaceUser.workspace}
-            role={workspaceUser.role}
+            role={workspaceUser.role as MemberRole}
           />
         </div>
       )),

@@ -76,6 +76,7 @@ export default function SignIn() {
           >
             Email
             <input
+              autoComplete="email"
               type="text"
               name="email"
               id="email"
@@ -89,6 +90,7 @@ export default function SignIn() {
           >
             Password
             <input
+              autoComplete="current-password"
               type="password"
               name="password"
               id="password"
