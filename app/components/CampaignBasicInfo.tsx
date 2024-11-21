@@ -57,7 +57,8 @@ const getButtonStates = (
     case "paused":
       states.play = isPlayDisabled ? "Disabled" : "Inactive";
       states.archive = "Inactive";
-      states.pause = "Active"
+      states.pause = "Active";
+      states.schedule = "Inactive";
       break;
     case "draft":
     case "pending":
@@ -69,6 +70,7 @@ const getButtonStates = (
       states.play = isPlayDisabled ? "Disabled" : "Inactive";
       states.archive = "Inactive";
       states.schedule = "Active";
+      states.pause = "Inactive";
       break;
     case "complete":
       states.archive = "Inactive";

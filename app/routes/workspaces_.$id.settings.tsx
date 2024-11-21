@@ -1,6 +1,6 @@
 import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
 
-import { ActionFunctionArgs } from "@remix-run/node";
+import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Form,
   json,
@@ -10,7 +10,7 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { useEffect, useRef, useState } from "react";
+import { ContextType, useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   getUserRole,
@@ -35,81 +35,70 @@ import { capitalize } from "~/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "~/components/CustomCard";
 import WebhookEditor from "~/components/Workspace/WebhookEditor";
+import Workspace from "./workspaces_.$id";
+import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "~/lib/types";
+
+type UserWithRole = Partial<User> & { role: string };
+
+type LoaderData = {
+  workspace: WorkspaceData;
+  userRole: MemberRole;
+  users: UserWithRole[];
+  activeUserId: string;
+  phoneNumbers: WorkspaceNumbers[];
+  pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
+  webhook: WorkspaceWebhook;
+  hasAccess: boolean;
+}   
+
+type WorkspaceNumbers = {
+  id: string;
+  phone_number: string;
+  capabilities: {
+    verification_status: 'success' | 'failed' | 'pending';
+  };
+  // ... other properties ...
+};
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
-  const { data: users, error } = await getWorkspaceUsers({
-    supabaseClient,
-    workspaceId,
-  });
-  const { data: phoneNumbers, error: numbersError } =
-    await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
-  const { data: pendingInvites, error: invitesError } = await supabaseClient
-    .from("workspace_invite")
-    .select(`*, user(*)`)
-    .eq("workspace", workspaceId);
-    
-  const { data: webhook, error: webhookError } = await supabaseClient
-    .from("webhook")
-    .select("*")
-    .eq("workspace", workspaceId)
+  if (!workspaceId) throw new Error("No workspace id found!");
+  const userId = serverSession.user.id;
+  const {data: workspace, error: workspaceError} = await supabaseClient
+    .from("workspace")
+    .select("name, id, workspace_users(role, user(username, id)), workspace_number(*), audience(*), workspace_invite(*, user(username, id, first_name, last_name)), webhook(*)")
+    .eq("id", workspaceId)
     .single();
-
-  if (serverSession) {
-    const userRole = getUserRole({ serverSession, workspaceId });
-    const hasAccess = userRole !== MemberRole.Caller;
-
-    return json(
+    
+  if (workspaceError) throw workspaceError;
+  const userRole = workspace.workspace_users.find((user) => user.user?.id === userId)?.role;
+  const users = [] as UserWithRole[];
+  const hasAccess = userRole !== MemberRole.Caller; 
+  const {workspace_users, workspace_number, audience, workspace_invite, webhook, ...rest} = workspace;
+  workspace_users.forEach((user) => {
+    users.push({role: user.role, id: user.user?.id, username: user.user?.username} as UserWithRole);
+  });
+  return json(
       {
-        hasAccess: hasAccess,
+        workspace: rest,
         userRole,
-        users: users,
-        activeUserId: serverSession.user.id,
-        phoneNumbers,
-        pendingInvites,
-        webhook,
+        users,
+        activeUserId: userId,
+        phoneNumbers: workspace_number,
+        pendingInvites: workspace_invite,
+        webhook: webhook[0] as WorkspaceWebhook,
+        hasAccess,
       },
       { headers },
     );
   }
 
-  return json(
-    {
-      hasAccess: false,
-      userRole: null,
-      users: null,
-      activeUserId: serverSession.user.id,
-      phoneNumbers,
-      pendingInvites,
-    },
-    { headers },
-  );
-};
-type User = {
-  id: string;
-  activity: object;
-  username: string;
-  last_name: string;
-  first_name: string;
-  access_level: string;
-  organization?: string;
-  created_at: string;
-};
-
-type Invitation = {
-  created_at: string;
-  workspace: string;
-  role: "caller" | "member" | "admin" | "owner";
-  user_id: string;
-  user: User;
-};
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const workspaceId = params.id;
-  const { supabaseClient, headers, session } =
+  const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   if (workspaceId == null) {
@@ -190,19 +179,19 @@ export default function WorkspaceSettings() {
     phoneNumbers,
     pendingInvites,
     webhook,
-  } = useLoaderData<typeof loader>();
-  const {flags} = useOutletContext();
+  } = useLoaderData<LoaderData>();
+  const {flags} = useOutletContext<{flags: {webhooks: {workspace: boolean}}}>();
   const actionData = useActionData<typeof action>();
   const workspaceOwner = users?.find(
-    (user) => user.user_workspace_role === "owner",
-  );
+    (user) => user?.role === "owner"
+  ) as UserWithRole | undefined;
   users?.sort((a, b) => compareMembersByRole(a, b));
   const formRef = useRef<HTMLFormElement | null>(null);
   useEffect(() => {
-    if (actionData?.error) {
+    if (actionData && actionData?.error) {
       toast.error(JSON.stringify(actionData.error));
     }
-    if (actionData?.data || actionData?.success) {
+    if (actionData && (actionData?.data || actionData?.success)) {
       toast.success("Action completed succesfully!");
       formRef?.current?.reset();
     }
@@ -315,12 +304,12 @@ export default function WorkspaceSettings() {
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
                 Owner
               </p>
-              <TeamMember
+              {workspaceOwner && <TeamMember
                 member={workspaceOwner}
                 userRole={userRole}
-                memberIsUser={workspaceOwner.id === activeUserId}
-                workspaceOwner={workspaceOwner}
-              />
+                memberIsUser={workspaceOwner?.id === activeUserId}
+                workspaceOwner={workspaceOwner!}
+              />}
             </div>
             <div className="flex flex-col py-4">
               <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
@@ -328,7 +317,10 @@ export default function WorkspaceSettings() {
               </p>
               <ul className=" flex w-full flex-col items-center gap-2">
                 {users?.map((member) => {
-                  if (member.user_workspace_role === "owner") {
+                  if (!member || !member.role) {
+                    return <></>;
+                  }
+                  if (member.role === "owner") {
                     return <></>;
                   }
                   return (
@@ -337,22 +329,25 @@ export default function WorkspaceSettings() {
                         member={member}
                         userRole={userRole}
                         memberIsUser={member.id === activeUserId}
-                        workspaceOwner={workspaceOwner}
+                        workspaceOwner={workspaceOwner!}
                       />
                     </li>
                   );
                 })}
-                {pendingInvites?.map((invite: Invitation) => {
+                {pendingInvites?.map((invite: WorkspaceInvite) => {
+                  if (!invite) {
+                    return <></>;
+                  }
                   return (
                     <li key={invite.id} className="w-full">
                       <TeamMember
                         member={{
                           ...invite.user,
-                          user_workspace_role: "invited",
-                        }}
+                          role: "invited",
+                        } as UserWithRole}
                         userRole={userRole}
                         memberIsUser={false}
-                        workspaceOwner={workspaceOwner}
+                        workspaceOwner={workspaceOwner!}
                       />
                     </li>
                   );
@@ -378,32 +373,35 @@ export default function WorkspaceSettings() {
               </p>
               <ul className="flex w-full flex-col items-center gap-2">
                 {phoneNumbers?.map((number) => {
+                  if (!number) {
+                    return <></>;
+                  } 
                   return (
                     <li key={number.id} className="w-full">
                       <div className="flex w-full items-center justify-between bg-transparent p-2 text-xl shadow-sm dark:border-white">
                         <p className="font-semibold">{number.phone_number}</p>
                         <div>
-                          {number.capabilities.verification_status ===
+                          {number.capabilities?.verification_status ===
                           "success" ? (
                             <div className="flex items-center gap-2">
                               <p className="text-xs uppercase">
-                                {number.capabilities.verification_status}
+                                {number.capabilities?.verification_status}
                               </p>
                               <MdCheckCircle fill="#008800" size={24} />
                             </div>
-                          ) : number.capabilities.verification_status ===
+                          ) : number.capabilities?.verification_status ===
                             "failed" ? (
                             <div className="flex items-center gap-2">
                               <p className="text-xs uppercase">
-                                {number.capabilities.verification_status}
+                                {number.capabilities?.verification_status}
                               </p>
                               <MdError fill="#880000" size={24} />
                             </div>
-                          ) : number.capabilities.verification_status ===
+                          ) : number.capabilities?.verification_status ===
                             "pending" ? (
                             <div className="i gap-2tems-center flex">
                               <p className="text-xs uppercase">
-                                {number.capabilities.verification_status}
+                                {number.capabilities?.verification_status}
                               </p>
                               <MdCached size={24} />
                             </div>

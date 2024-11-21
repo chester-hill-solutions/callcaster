@@ -14,6 +14,7 @@ import {
 
 import { Form } from "@remix-run/react";
 import { MdCancel } from "react-icons/md";
+import { User } from "~/lib/types";
 
 export enum MemberRole {
   Owner = "owner",
@@ -39,21 +40,27 @@ export const handleRoleTextStyles = (memberRole: MemberRole): string =>
     memberRole === MemberRole.Admin && "text-purple-500",
   );
 
+  type UserWithRole = Partial<User> & { role: string };
+
+
 export default function TeamMember({
   member,
   userRole,
   memberIsUser,
   workspaceOwner,
-}) {
-  const memberRole = member.user_workspace_role;
-  const firstName =
-    member.first_name === null ? "Unnamed" : capitalize(member.first_name);
-  const lastName =
-    member.last_name === null ? "" : capitalize(member.last_name);
+}: {
+  member: UserWithRole;
+  userRole: MemberRole;
+  memberIsUser: boolean;
+  workspaceOwner: UserWithRole;
+}) {  
+  const memberRole = member.role;
+  const firstName = member.first_name ? capitalize(member.first_name) : "Unnamed";  
+  const lastName = member.last_name ? capitalize(member.last_name) : "";
   const memberName = `${firstName} ${lastName}`;
 
-  const iconStyles = handleIconStyles(memberRole);
-  const roleTextStyles = handleRoleTextStyles(memberRole);
+  const iconStyles = handleIconStyles(memberRole as MemberRole);
+  const roleTextStyles = handleRoleTextStyles(memberRole as MemberRole);
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;

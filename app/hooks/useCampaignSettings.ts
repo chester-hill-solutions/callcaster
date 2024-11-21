@@ -145,6 +145,10 @@ export default function useCampaignSettings(
                     handleInputChange("status", "running");
                     handleInputChange("is_active", true);
                 }
+                if (type === "pause") {
+                    handleInputChange("status", "paused");
+                    handleInputChange("is_active", false);
+                }
                 break;
             case "running":
                 if (type === "pause") {
@@ -165,6 +169,10 @@ export default function useCampaignSettings(
                 } else if (type === "archive") {
                     clearSchedule()
                     handleInputChange("status", "archived")
+                    handleInputChange("is_active", false);
+                }
+                if (type === "schedule") {
+                    handleInputChange("status", "scheduled");
                     handleInputChange("is_active", false);
                 }
                 break;

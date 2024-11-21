@@ -50,13 +50,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
   const { id: workspace_id, selected_id: campaign_id } = params;
   if (!workspace_id || !campaign_id) throw redirect("../");
-  const { data: users } = await getWorkspaceUsers({supabaseClient, workspaceId: workspace_id});
+  const { data: users } = await getWorkspaceUsers({ supabaseClient, workspaceId: workspace_id });
   const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
 
   if (!outreachData || outreachData.length === 0) {
     return new Response("No data found", { status: 404 });
   }
-  
+
   const { csvHeaders, flattenedData } = processOutreachExportData(
     outreachData,
     users,
@@ -75,18 +75,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) throw redirect("/signin");
-
-  const [campaignData, resultsPromise, campaignCounts, { data: phoneNumbers }, { data: mediaData } = { data: [] }, scripts,] = 
-  await Promise.all([
-    fetchCampaignData(supabaseClient, selected_id),
-    fetchBasicResults(supabaseClient, selected_id),
-    fetchCampaignCounts(supabaseClient, selected_id),
-    getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id }),
-    supabaseClient.storage.from("workspaceAudio").list(workspace_id),
-    getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient }),
-  ]);
-  
+  const campaignData = await fetchCampaignData(supabaseClient, selected_id);
   if (!campaignData) throw redirect("../../");
+
+  const campaignCounts = await fetchCampaignCounts(supabaseClient, selected_id);
+  const { data: phoneNumbers } = await getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id });
+
+  const scripts = await getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient });
 
   const campaignType = campaignData.type;
   const campaignDetails = await fetchCampaignDetails(
@@ -102,6 +97,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           : "",
   );
 
+  const { data: mediaData } = await supabaseClient.storage.from("workspaceAudio").list(workspace_id) ?? { data: [] };
   let mediaLinksPromise;
   if (
     campaignType === "message" &&
@@ -120,7 +116,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-
   const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
   const isActive = (campaignData.is_active) && checkSchedule(campaignData);
@@ -129,7 +124,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaignDetails,
     hasAccess,
     user: serverSession?.user,
-    results: resultsPromise,
+    results: fetchBasicResults(supabaseClient, selected_id),
     campaignCounts,
     phoneNumbers,
     mediaData: mediaData ?? [],
@@ -159,7 +154,7 @@ export default function CampaignScreen() {
     isActive,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
-  const route = useLocation().pathname.split("/");  
+  const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1) ?? ''));
   const submit = useSubmit();
   useCsvDownload(csvData);
@@ -168,19 +163,19 @@ export default function CampaignScreen() {
     ? "No script selected"
     : !campaignData.caller_id
       ? "No outbound phone number selected"
-        : campaignData.status === "scheduled" ? 
+      : campaignData.status === "scheduled" ?
         `Campaign scheduled.`
         : !isActive
           ? "It is currently outside of the Campaign's calling hours"
           : null;
-  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text )
+  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
     ? "No script selected"
     : !campaignData.caller_id
       ? "No outbound phone number selected"
       : null;
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={campaignData.title} status={campaignData.status} isDesktop={false}/>
+      <CampaignHeader title={campaignData.title} status={campaignData.status} isDesktop={false} />
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
         <CampaignHeader title={campaignData.title} isDesktop status={campaignData.status} />
         <NavigationLinks
@@ -202,7 +197,7 @@ export default function CampaignScreen() {
                   hasAccess={hasAccess}
                   user={user}
                   campaignCounts={campaignCounts}
-                />  
+                />
               )
             }
           </Await>

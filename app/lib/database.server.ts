@@ -21,6 +21,7 @@ import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { ca } from "date-fns/locale";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -193,6 +194,32 @@ export async function getWorkspaceInfo({
 
   return { data, error };
 }
+type WorkspaceInfoWithDetails = {
+  workspace:WorkspaceData & {workspace_users: {role:MemberRole}[]};
+  campaigns:Partial<Campaign[]>;
+  phoneNumbers:Partial<WorkspaceNumbers[]>;
+  audiences:Partial<Audience[]>;
+}
+
+export async function getWorkspaceInfoWithDetails({
+  supabaseClient,
+  workspaceId,
+  userId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  userId: string;
+}) {
+  const { data: workspace, error: workspaceError } = await supabaseClient
+      .from("workspace")
+      .select("id, name, workspace_users(role), campaign(id, title, status, created_at), workspace_number(id, phone_number), audience(id, name)")
+      .eq("id", workspaceId)
+      .eq("workspace_users.user_id", userId)
+      .single();
+  if (workspaceError) throw workspaceError;
+  const {workspace_users, campaign, workspace_number, audience, ...rest} = workspace;
+    return { workspace: rest, campaigns: campaign, phoneNumbers: workspace_number, audiences: audience } as unknown as WorkspaceInfoWithDetails  ;
+} 
 
 export async function getWorkspaceCampaigns({
   supabaseClient,
