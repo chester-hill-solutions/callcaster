@@ -171,6 +171,10 @@ export default function useCampaignSettings(
                     handleInputChange("status", "archived")
                     handleInputChange("is_active", false);
                 }
+                if (type === "schedule") {
+                    handleInputChange("status", "scheduled");
+                    handleInputChange("is_active", false);
+                }
                 break;
 
             case "complete":

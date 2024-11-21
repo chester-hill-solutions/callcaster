@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import {
   Form,
   Link,
@@ -43,7 +43,7 @@ interface LoaderData {
   error: string | null;
 }
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
@@ -52,6 +52,10 @@ export const loader = async ({ request }: { request: Request }) => {
   }
 
   const userId = serverSession.user.id;
+  if (!userId) {
+    return redirect("/signin", { headers });
+  }
+
   const { data: workspaces, error: workspacesError } = await supabaseClient
     .from("workspace_users")
     .select("last_accessed, role, workspace(id, name)")
@@ -59,7 +63,6 @@ export const loader = async ({ request }: { request: Request }) => {
     .order("last_accessed", { ascending: false });
 
   if (workspacesError) {
-    console.log(workspacesError);
     return json(
       { workspaces: null, userId: userId, error: workspacesError },
       { headers },
@@ -111,8 +114,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return json({ ok: true, error: null }, { headers });
 };
 
-
-// eslint-disable-next-line react/display-name
 const WorkspaceCard = React.memo(
   ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {
     return (

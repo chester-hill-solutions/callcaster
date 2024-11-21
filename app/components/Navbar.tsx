@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { TypedResponse } from "@remix-run/node";
 import { Link, NavLink, Params, useLocation } from "@remix-run/react";
-import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
-import { WorkspaceData } from "~/lib/types";
+import { User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,21 +21,13 @@ type NavbarProps = {
   handleSignOut: () => Promise<
     TypedResponse<{ success: string | null; error: string | null }>
   >;
-  workspaces: WorkspaceData;
+  workspaces: WorkspaceData[] | null;
   isSignedIn: boolean;
-  user: JsonifyObject<{
-    access_level: string | null;
-    created_at: string;
-    first_name: string | null;
-    id: string;
-    last_name: string | null;
-    organization: number | null;
-    username: string;
-  }> | null;
+  user: User & { workspace_invite: WorkspaceInvite[] } | null;
   params: Params<string>;
 };
 
-export const NavButton = ({ to, children, className = "" }) => (
+export const NavButton = ({ to, children, className = "" }: { to: string, children: React.ReactNode, className?: string }) => (
   <NavLink
     to={to}
     className={({ isActive }) =>
@@ -51,7 +42,7 @@ export const NavButton = ({ to, children, className = "" }) => (
   </NavLink>
 );
 
-const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
+const UserDropdownMenu = ({ user, handleSignOut, workspaceId }: { user: User & { workspace_invite: WorkspaceInvite[] } | null, handleSignOut: () => Promise<TypedResponse<{ success: string | null; error: string | null }>>, workspaceId: string | undefined }) => user && (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button
@@ -70,7 +61,7 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
       <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuLabel className="font-normal">
-        {capitalize(user.first_name)}
+        {capitalize(user.first_name ?? "")}
       </DropdownMenuLabel>
       <DropdownMenuLabel className="font-normal">
         {user.username}
@@ -80,7 +71,7 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }) => (
         <NavLink
           to={"/accept-invite"}
           className={
-            user.workspace_invite.length > 0 && "bg-primary text-white"
+            user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
           }
         >
           {user.workspace_invite.length} Pending Invitation
@@ -124,6 +115,7 @@ export default function Navbar({
   const workspaceId = params.id;
   const location = useLocation();
   const [loc, setLoc] = useState(location);
+
   useEffect(() => {
     if (location.pathname !== loc.pathname) {
       setMobileMenuOpen(false);
@@ -131,6 +123,7 @@ export default function Navbar({
     }
   }, [loc, location]);
 
+  
   return loc.pathname.endsWith("call") ? (
     <div></div>
   ) : (
@@ -179,9 +172,8 @@ export default function Navbar({
       {mobileMenuOpen && (
         <MobileMenu
           isSignedIn={isSignedIn}
-          user={user}
+          user={user ?? null}
           handleSignOut={handleSignOut}
-          workspaceId={workspaceId}
           onClose={() => setMobileMenuOpen(false)}
         />
       )}
