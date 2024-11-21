@@ -10,6 +10,7 @@ import {
   Meta,
   NavigateFunction,
   Outlet,
+  Params,
   Scripts,
   ScrollRestoration,
   json,
@@ -26,12 +27,22 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { ThemeProvider } from "./components/theme-provider";
 
 import Navbar from "~/components/Navbar";
-import type { ENV } from "~/lib/types";
+import type { ENV, User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
 import stylesheet from "~/tailwind.css";
 import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
 
 import { Toaster } from "sonner";
+import { Session } from "@supabase/supabase-js";
+
+
+type LoaderData = {
+  env: ENV;
+  session: Session;
+  workspaces: WorkspaceData[] | null;
+  user: User & { workspace_invite: WorkspaceInvite[] } | null;
+  params: Params<string>;
+};  
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -53,30 +64,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     SUPABASE_KEY: process.env.SUPABASE_ANON_KEY,
     BASE_URL: process.env.BASE_URL,
   };
-  const response = new Response();
-  const { supabaseClient: supabase, headers } =
-    createSupabaseServerClient(request);
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
+  const { data: { session } } = await supabase.auth.getSession();
 
+  if (!session?.user.id) {
+    return json({
+      env,
+      session,  
+      workspaces: null,
+      user: null,
+      params,
+    }, { headers });
+  }
   const { data: userData, error: userError } = await supabase
     .from("user")
     .select(`*, workspace_invite(workspace(id, name))`)
     .eq("id", session?.user.id ?? "")
     .single();
 
-  // const { data: workspaces, error: workspaceQueryError } =
-  //   await getUserWorkspaces({ supabaseClient: supabase });
-
   const { data: workspaceData, error: workspacesError } = await supabase
     .from("workspace_users")
     .select("workspace ( id, name )")
     .eq("user_id", session?.user.id)
     .order("last_accessed", { ascending: false });
-
+  if (workspacesError || userError) {
+    console.error(workspacesError, userError);
+  }
   const workspaces = workspaceData?.map((data) => data.workspace);
-
+  
   return json(
     {
       env,
@@ -86,25 +101,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       params,
     },
     {
-      headers: response.headers,
+      headers: headers,
     },
   );
 };
 
 export default function App() {
-  const { env, session, workspaces, user, params } =
-    useLoaderData<typeof loader>();
+  const { env, session, workspaces, user, params } = useLoaderData<LoaderData>();
   const { revalidate } = useRevalidator();
+
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
     env.SUPABASE_KEY!,
   );
+  
   const serverAccessToken = session?.access_token;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<
-    TypedResponse<{ success: string | null; error: string | null }>
-  > {
+  async function signOut(): Promise<TypedResponse<{ success: string | null; error: string | null }>> {
     const { error: signOutError } = await supabase.auth.signOut();
     revalidate();
     if (signOutError) {
@@ -116,7 +130,7 @@ export default function App() {
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY"){
+      if (event === "PASSWORD_RECOVERY") {
         redirect("/reset")
       }
       if (session?.access_token !== serverAccessToken) {
@@ -145,15 +159,15 @@ export default function App() {
           enableSystem
           disableTransitionOnChange
         > */}
-          <Navbar
-            className="bg-brand-secondary"
-            handleSignOut={signOut}
-            workspaces={workspaces}
-            isSignedIn={serverAccessToken != null}
-            user={user}
-            params={params}
-          />
-          <Outlet context={{ supabase, env }} />
+        <Navbar
+          className="bg-brand-secondary"
+          handleSignOut={signOut}
+          workspaces={workspaces}
+          isSignedIn={serverAccessToken != null}
+          user={user ?? null}
+          params={params}
+        />
+        <Outlet context={{ supabase, env }} />
         {/* </ThemeProvider> */}
         <ScrollRestoration />
         <Scripts />

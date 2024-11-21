@@ -12,12 +12,8 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
-  checkSchedule,
   forceTokenRefresh,
-  getUserRole,
-  getWorkspaceCampaigns,
-  getWorkspaceInfo,
-  getWorkspacePhoneNumbers,
+  getWorkspaceInfoWithDetails,
   updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
@@ -26,16 +22,16 @@ import CampaignsList from "~/components/CampaignList";
 import { Audience, Campaign, ContextType, Flags, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
-type LoaderData = Promise<{
-  workspace:WorkspaceData;
-  audiences:Audience[];
-  campaigns:Campaign[];
+type LoaderData = {
+  workspace:WorkspaceData & {workspace_users: {role:MemberRole}[]};
+  audiences:Partial<Audience[]>;
+  campaigns:Partial<Campaign[]>;
   userRole:MemberRole;
-  phoneNumbers: WorkspaceNumbers[];
+  phoneNumbers:Partial<WorkspaceNumbers[]>;
   flags:Flags;
-}| typeof redirect> 
+}
 
-export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession) {
@@ -44,20 +40,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("No workspace found");
-  const { data: workspace, error } = await getWorkspaceInfo({
-    supabaseClient,
-    workspaceId,
-  });
-
-  if (error) {
-    console.log(error);
-    if (error.code === "PGRST116") {
-      throw redirect("/workspaces", { headers });
+  let workspace:Partial<WorkspaceData & {workspace_users: {role:MemberRole}[]}>;
+  let campaigns:Partial<Campaign[]>;
+  let phoneNumbers:Partial<WorkspaceNumbers[]>;  
+  let audiences:Partial<Audience[]>;
+  try{
+    ({ workspace, campaigns, phoneNumbers, audiences } = await getWorkspaceInfoWithDetails({supabaseClient, workspaceId, userId: serverSession.user.id }));
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
+      throw redirect("/workspaces", { headers }); 
     }
+    throw error;
   }
-
-  updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
-  const userRole = getUserRole({ serverSession, workspaceId });
+  const userRole = workspace?.workspace_users?.[0]?.role;
+  await updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
   if (userRole == null) {
     const {error: refreshError } = await forceTokenRefresh({
       serverSession,
@@ -66,32 +62,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs):LoaderData
     if (refreshError) throw refreshError
   }
   const {data:flags, error: flagsError} = await supabaseClient.from("workspace").select("feature_flags").eq("id", workspaceId).single();
-  if (flagsError) throw (flagsError)
-  try {
-    const { data: audiences, error: audiencesError } = await supabaseClient
-      .from("audience")
-      .select()
-      .eq("workspace", workspaceId);
-    if (audiencesError) throw { audiencesError };
+  if (flagsError) throw (flagsError);
 
-    const { data: campaignsList, error: campaignsError } =
-      await getWorkspaceCampaigns({
-        supabaseClient,
-        workspaceId,
-      });
-    if (campaignsError) throw { campaignsError };
-    const { data: phoneNumbers, error: numbersError } =
-      await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
-    if (numbersError) throw { numbersError };
-
-    return json(
-      { workspace, audiences, campaigns:campaignsList, userRole, phoneNumbers, flags:flags.feature_flags },
-      { headers },
-    );
-  } catch (error) {
-    console.log(error);
-    return json({ userRole, error }, 500);  
-  }
+  return json({
+    workspace,
+    audiences,
+    campaigns,
+    userRole,
+    phoneNumbers,
+    flags: flags.feature_flags
+  }, { headers });
 };
 
 export default function Workspace() {

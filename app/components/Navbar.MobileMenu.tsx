@@ -3,8 +3,18 @@ import { capitalize } from "~/lib/utils";
 import { Link, NavLink } from '@remix-run/react';
 import { FaTimes } from 'react-icons/fa';
 import { Button } from "./ui/button";
+import { User } from "~/lib/types";
+import { WorkspaceInvite } from "~/lib/types";
+import { TypedResponse } from "@remix-run/node";
 
-export const MobileMenu = ({ isSignedIn, user, handleSignOut, onClose }) => {
+type MobileMenuProps = {  
+  isSignedIn: boolean;
+  user: User & { workspace_invite: WorkspaceInvite[] } | null;
+  handleSignOut: () => Promise<TypedResponse<{ success: string | null; error: string | null }>>;
+  onClose: () => void;
+};
+
+export const MobileMenu = ({ isSignedIn, user, handleSignOut, onClose }: MobileMenuProps) => {
   return (
     <div className="fixed inset-0 z-50 bg-white dark:bg-gray-900 flex flex-col">
       <div className="flex justify-between items-center p-4">
@@ -19,7 +29,7 @@ export const MobileMenu = ({ isSignedIn, user, handleSignOut, onClose }) => {
         {user && (
           <>
             <div>
-              <p className="font-Zilla-Slab text-lg">{capitalize(user.first_name)}</p>
+              <p className="font-Zilla-Slab text-lg">{capitalize(user.first_name ?? "")}</p>
               <p className="font-Zilla-Slab text-lg">{user.username}</p>
             </div>
             <Button
