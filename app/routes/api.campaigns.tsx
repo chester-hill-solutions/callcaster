@@ -10,9 +10,9 @@ export const action = async ({ request }: { request: Request }) => {
     if (request.method === "PATCH") {
       const campaignData = JSON.parse(formData.get("campaignData") as string);
       const campaignDetails = JSON.parse(formData.get("campaignDetails") as string);
-      const { campaign, campaignDetails: updatedCampaignDetails, audienceChanges } =
+      const { campaign, campaignDetails: updatedCampaignDetails } =
         await updateCampaign({ supabase: supabaseClient, campaignData, campaignDetails });
-      return json({ campaign, campaignDetails: updatedCampaignDetails, audienceChanges }, { headers });
+      return json({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
 
     } else if (request.method === "DELETE") {
       const campaignId = formData.get("campaignId") as string;

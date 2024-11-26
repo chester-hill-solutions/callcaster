@@ -864,18 +864,17 @@ export async function updateCampaign({
   );
 
   let audienceUpdateResult = null;
-  if (audiences) {
+ /*  if (audiences) {
     audienceUpdateResult = await updateCampaignAudiences(
       supabase,
       id,
       audiences,
     );
-  }
+  } */
 
   return {
     campaign,
     campaignDetails: updatedCampaignDetails,
-    audienceChanges: audienceUpdateResult,
   };
 }
 
