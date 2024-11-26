@@ -44,14 +44,27 @@ const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_a
 };
 
 const fetchCall = async ({ supabase, callSid }) => {
-    const { data: dbCall, error: callError } = await supabase
-        .from('call')
-        .select('outreach_attempt_id, queue_id, is_last')
-        .eq('sid', callSid)
-        .single();
-    if (callError) throw callError;
-    if (!dbCall) throw new Error("Call not found");
-    return dbCall;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second delay between retries
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const { data: dbCall, error: callError } = await supabase
+            .from('call')
+            .select('outreach_attempt_id, queue_id, is_last')
+            .eq('sid', callSid)
+            .single();
+
+        if (!callError && dbCall) {
+            return dbCall;
+        }
+
+        if (attempt === maxRetries) {
+            throw callError || new Error("Call not found after maximum retries");
+        }
+
+        // Wait before next retry
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+    }
 };
 
 const isAnsweringMachine = (answeredBy) =>
