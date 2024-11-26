@@ -117,7 +117,6 @@ export default function Settings() {
     voicedrop_audio: campaignDetails?.voicedrop_audio || null,
     schedule: campaignData?.schedule || null,
     is_active: campaignData?.is_active || false,
-    campaign_audience: campaignAudience || null,
     details: campaignDetails,
   });
 
@@ -171,11 +170,6 @@ export default function Settings() {
     if (formFetcher.data) {
       const updatedData = {
         ...campaignSettingsData,
-        campaign_audience: campaignAudience?.[0] ? {
-          audience_id: campaignAudience[0].audience_id,
-          campaign_id: Number(selected_id),
-          created_at: new Date().toISOString()
-        } : null
       };
       handleUpdateData(updatedData);
     } 

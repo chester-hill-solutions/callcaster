@@ -23,7 +23,6 @@ export type CampaignSettingsData = {
     voicedrop_audio: string | null;
     schedule: Schedule;
     is_active: boolean;
-    campaign_audience?: CampaignAudience | null;
     details: LiveCampaign | MessageCampaign | IVRCampaign;
 };
 
@@ -47,7 +46,6 @@ export default function useCampaignSettings(
         voicedrop_audio,
         schedule,
         is_active,
-        campaign_audience,
         details,
     }: Omit<CampaignSettingsData, 'handleScheduleButton' | 'handleActiveChange'>
 ) {
@@ -71,7 +69,6 @@ export default function useCampaignSettings(
         voicedrop_audio,
         schedule,
         is_active,
-        campaign_audience,
         details,
     });
     const [initial, setInitial] = useState<CampaignSettingsData>(campaignData);
