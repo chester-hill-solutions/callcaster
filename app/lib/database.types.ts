@@ -3,7 +3,7 @@ export type Json =
   | number
   | boolean
   | null
-  | { [key: string]: Json | undefined }
+  | { [key: string]: Json | undefined, verification_status?: string }
   | Json[]
 
 export type Database = {
