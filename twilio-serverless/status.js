@@ -23,7 +23,7 @@ const handleVoicemail = async (dbCall, supabase) => {
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date() });
 };
 
-const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
+const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition, duration) => {
     // First check if there's already a voicemail disposition
     const { data: currentAttempt } = await supabase
         .from('outreach_attempt')
@@ -35,7 +35,7 @@ const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_a
     if (!currentAttempt?.disposition || currentAttempt.disposition !== 'voicemail') {
         await Promise.all([
             updateCallStatus(supabase, callSid, status, timestamp),
-            updateResult(supabase, outreach_attempt_id, { disposition, ended_at: new Date(timestamp) })
+            updateResult(supabase, outreach_attempt_id, { disposition, ended_at: new Date(timestamp), duration })
         ]);
     } else {
         // Just update call status if disposition is voicemail
@@ -80,7 +80,7 @@ const handleQueueUpdate = async (supabase, queueId) => {
 
 exports.handler = async function (context, event, callback) {
     const supabase = createClient(context.SUPABASE_URL, context.SUPABASE_SERVICE_KEY);
-    const { CallSid: callSid, CallStatus: callStatus, Timestamp: timestamp, AnsweredBy: answeredBy } = event;
+    const { CallSid: callSid, CallStatus: callStatus, Timestamp: timestamp, AnsweredBy: answeredBy, Duration: duration } = event;
 
     try {
         const dbCall = await fetchCall({ supabase, callSid });
@@ -91,10 +91,10 @@ exports.handler = async function (context, event, callback) {
             switch (callStatus) {
                 case 'failed':
                 case 'no-answer':
-                    await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, callStatus);
+                    await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, callStatus, duration); 
                     break;
                 case 'completed':
-                    await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed');
+                    await handleCallUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed', duration);
                     break;
                 case 'initiated':
                 case 'in-progress':
