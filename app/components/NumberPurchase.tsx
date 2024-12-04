@@ -1,6 +1,6 @@
 import { NumbersEmptyState } from "./NumbersPurchase.EmptyState";
 import { Button } from "./ui/button";
-import { useFetcher } from "@remix-run/react";
+import { Fetcher, FetcherWithComponents, useFetcher } from "@remix-run/react";
 import {
   Dialog,
   DialogClose,
@@ -10,7 +10,9 @@ import {
 } from "./ui/dialog";
 import { useEffect, useState } from "react";
 
-export const NumberPurchase = ({ fetcher, workspaceId }) => {
+import { FetcherData } from "../routes/workspaces_.$id_.settings_.numbers";
+
+export const NumberPurchase = ({ fetcher, workspaceId }: { fetcher: FetcherWithComponents<FetcherData>, workspaceId: string }) => {
   const purchaseFetcher = useFetcher();
   const complete = purchaseFetcher.state === "idle" && Boolean(purchaseFetcher.data?.newNumber);
   const [openNumber, setOpenNumber] = useState<number | null>(null)
@@ -144,6 +146,7 @@ export const NumberPurchase = ({ fetcher, workspaceId }) => {
                         </Dialog>
                       ))}
                     {!fetcher.data && <NumbersEmptyState />}
+                    {fetcher.data && Array.isArray(fetcher.data) && fetcher.data.length === 0 && <tr><td colSpan={6} className="text-center text-lg py-4">No numbers found with this Area Code.</td></tr>}
                   </tbody>
                 </table>
               </div>

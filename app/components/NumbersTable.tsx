@@ -17,7 +17,7 @@ export const NumbersTable = ({
 }: {
   phoneNumbers: WorkspaceNumbers[];
   users: User[];
-  mediaNames: string[];
+  mediaNames: { id: number; name: string; }[];
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
@@ -33,51 +33,51 @@ export const NumbersTable = ({
 
   const updateNumber = useCallback(
     (id: number, updates: Partial<WorkspaceNumbers>) => {
-      setNumbers((prevNumbers) =>
+      setNumbers((prevNumbers: WorkspaceNumbers[]) =>
         prevNumbers.map((number) =>
-          number.id === id ? { ...number, ...updates } : number,
-        ),
+          number?.id === id ? { ...number, ...updates } as WorkspaceNumbers : number
+        )
       );
     },
-    [],
+    []
   );
 
   const handleIncomingActivityChange = useCallback(
-    (id: number, value: string) => {
-      updateNumber(id, { inbound_action: value });
-      onIncomingActivityChange(id, value);
+    (numberId: number, value: string) => {
+      updateNumber(numberId, { inbound_action: value });
+      onIncomingActivityChange(numberId, value);
     },
     [updateNumber, onIncomingActivityChange],
   );
 
   const handleIncomingVoiceMessageChange = useCallback(
-    (id: number, value: string) => {
-      updateNumber(id, { inbound_audio: value });
-      onIncomingVoiceMessageChange(id, value);
+    (numberId: number, value: string) => {
+      updateNumber(numberId, { inbound_audio: value });
+      onIncomingVoiceMessageChange(numberId, value);
     },
     [updateNumber, onIncomingVoiceMessageChange],
   );
 
   const handleCallerIdChange = useCallback(
-    (id: number, value: string) => {
-      updateNumber(id, { friendly_name: value });
-      onCallerIdChange(id, value);
+    (numberId: number, value: string) => {
+      updateNumber(numberId, { friendly_name: value });
+      onCallerIdChange(numberId, value);
     },
     [updateNumber, onCallerIdChange],
   );
 
   const handleNumberRemoval = useCallback(
-    (id: number) => {
-      setNumbers((prevNumbers) =>
-        prevNumbers.filter((number) => number.id !== id),
+    (numberId: number) => {
+      setNumbers((prevNumbers: WorkspaceNumbers[]) =>
+        prevNumbers.filter((number) => number?.id !== numberId),
       );
-      onNumberRemoval(id);
+      onNumberRemoval(numberId);
     },
     [onNumberRemoval],
   );
 
   const verifiedNumbers = numbers.filter(
-    (number) => number.type === "caller_id",
+    (number) => number?.type === "caller_id",
   );
 
   return (
@@ -98,7 +98,7 @@ export const NumbersTable = ({
           <tbody>
             {numbers.map((number) => (
               <NumberRow
-                key={number.id}
+                key={number?.id}
                 number={number}
                 members={users}
                 verifiedNumbers={verifiedNumbers}
@@ -129,9 +129,9 @@ const NumberRow = ({
   number: WorkspaceNumbers;
   members: User[];
   verifiedNumbers: WorkspaceNumbers[];
-  mediaNames: string[];
-  handleIncomingActivityChange: (activity: string) => void;
-  handleIncomingVoiceMessageChange: (activity: string) => void;
+  mediaNames: { id: number; name: string; }[];
+  handleIncomingActivityChange: (id: number, value: string) => void;
+  handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
@@ -140,11 +140,11 @@ const NumberRow = ({
   const [callerId, setCallerId] = useState(number?.friendly_name || "");
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleCallerIdChange(number.id, callerId);
+    if (e.key === "Enter" && number?.id) {
+      handleCallerIdChange(number?.id, callerId);
       setIsEditingNumber(null);
     } else if (e.key === "Escape") {
-      setCallerId(number.friendly_name || "");
+      setCallerId(number?.friendly_name || "");
       setIsEditingNumber(null);
     }
   };
@@ -203,7 +203,16 @@ const NumberRow = ({
       </td>
       <td className="px-2 py-2">{number.phone_number}</td>
       <td className="py-2">
-        <StatusIndicator status={number.capabilities?.verification_status} />
+        <StatusIndicator 
+          status={
+            typeof number?.capabilities === 'object' && 
+            number.capabilities !== null &&
+            'verification_status' in number.capabilities &&
+            number.capabilities.verification_status !== undefined
+              ? String(number.capabilities.verification_status) 
+              : ''
+          } 
+        />
       </td>
       <td className="px-2 py-2">
         <IncomingActivitySelect
@@ -224,7 +233,7 @@ const NumberRow = ({
   );
 };
 
-const StatusIndicator = ({ status }) => {
+const StatusIndicator = ({ status }: { status: string }) => {
   switch (status) {
     case "success":
       return (
@@ -291,10 +300,10 @@ const IncomingActivitySelect = ({
             {verifiedNumbers.length > 0 &&
               verifiedNumbers.map((verifiedNumber) => (
                 <option
-                  key={verifiedNumber.id}
-                  value={`${verifiedNumber.phone_number}`}
+                  key={verifiedNumber?.id}
+                  value={`${verifiedNumber?.phone_number}`}
                 >
-                  Forward to {verifiedNumber.friendly_name}
+                  Forward to {verifiedNumber?.friendly_name}
                 </option>
               ))}
           </>
@@ -304,16 +313,17 @@ const IncomingActivitySelect = ({
   );
 };
 
-const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }) => {
+const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: WorkspaceNumbers, mediaNames: { id: number; name: string; }[], onChange: (id: number, value: string) => void }) => {
+  if (!number) return null;
   return (
     <select
       className="w-full rounded border p-2"
-      defaultValue={number.inbound_audio}
-      onChange={(e) => onChange(number.id, e.target.value)}
+      defaultValue={number?.inbound_audio || ""}
+      onChange={(e) => onChange(number?.id, e.target.value)}
     >
       <option value="">Select a voice message</option>
-      {mediaNames.map((mediaName, index) => (
-        <option key={index} value={mediaName.name}>
+      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number, name: string }, index: number) => (
+        <option key={index} value={mediaName.id}>
           {mediaName.name}
         </option>
       ))}
