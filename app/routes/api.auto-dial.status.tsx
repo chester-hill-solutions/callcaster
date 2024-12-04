@@ -95,6 +95,7 @@ const handleCallStatus = async (
   try {
     const callUpdate = await updateCall(parsedBody.CallSid, {
       end_time: new Date(parsedBody.Timestamp),
+      duration: parsedBody.Duration,
       status,
     });
     const outreachStatus = await updateOutreachAttempt(
@@ -134,6 +135,7 @@ const handleParticipantLeave = async (
 ) => {
   try {
     const dbCall = await updateCall(parsedBody.CallSid, {
+      duration: parsedBody.Duration,
       end_time: new Date(parsedBody.Timestamp),
     });
     const outreachStatus = await updateOutreachAttempt(
@@ -181,6 +183,7 @@ const handleParticipantJoin = async (
     if (!dbCall.conference_id) {
       await updateCall(parsedBody.CallSid, {
         conference_id: parsedBody.ConferenceSid,
+        duration: parsedBody.Duration,
         start_time: new Date(parsedBody.Timestamp),
       });
     }
