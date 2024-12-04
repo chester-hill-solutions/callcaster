@@ -14,7 +14,7 @@ async function getStripeCustomerHistory(stripeCustomerId: string) {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient } = await getSupabaseServerClientWithSession(request);
-  
+
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
   const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id").eq("id", workspaceId).single();
@@ -36,7 +36,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const formData = await request.formData();
   const amount = Number(formData.get("amount"));
-  
+
   if (!amount || amount * 0.003 > 0.5) {
     throw new Error("Invalid amount. Minimum amount is $0.50.");
   }
@@ -90,14 +90,13 @@ export default function Credits() {
   const [isCustom, setIsCustom] = useState(false);
 
   const creditPackages = [
-    { amount: 5000, price: 10 },
-    { amount: 10000, price: 18 },
-    { amount: 50000, price: 50 },
-    { amount: 100000, price: 180 },
-    { amount: 500000, price: 500 },
-    { amount: 1000000, price: 1800 },
+    { amount: 1667, price: 5 },
+    { amount: 5000, price: 15 },
+    { amount: 8333, price: 25 },
+    { amount: 16667, price: 50 },
+    { amount: 33333, price: 100 },
+    { amount: 66667, price: 200 },
   ];
-
   // Update the transaction display
   const formatDate = (timestamp: number) => {
     return new Date(timestamp * 1000).toLocaleDateString();
@@ -140,9 +139,8 @@ export default function Credits() {
             {creditPackages.map((pkg) => (
               <div
                 key={pkg.amount}
-                className={`cursor-pointer rounded-lg border p-4 ${
-                  selectedAmount === pkg.amount && !isCustom ? "border-primary bg-primary/5" : "border-gray-700"
-                }`}
+                className={`cursor-pointer rounded-lg border p-4 ${selectedAmount === pkg.amount && !isCustom ? "border-primary bg-primary/5" : "border-gray-700"
+                  }`}
                 onClick={() => {
                   setSelectedAmount(pkg.amount);
                   setIsCustom(false);
@@ -152,14 +150,9 @@ export default function Credits() {
                 <div className="text-gray-600">${pkg.price}</div>
               </div>
             ))}
-          </div>
-          
-          {/* Custom amount input */}
-          <div className="mt-4 flex items-center gap-4">
             <div
-              className={`cursor-pointer rounded-lg border p-4 ${
-                isCustom ? "border-primary bg-primary/5" : ""
-              }`}
+              className={`rounded-lg border p-4 ${isCustom ? "border-primary bg-primary/5" : "border-gray-700"
+                }`}
               onClick={() => {
                 setIsCustom(true);
                 setSelectedAmount(0);
@@ -183,6 +176,9 @@ export default function Credits() {
               </div>
             </div>
           </div>
+
+          {/* Custom amount input */}
+
 
           <Button
             type="submit"
@@ -210,9 +206,8 @@ export default function Credits() {
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{formatDate(transaction.created)}</td>
                   <td className="py-2">{transaction.description}</td>
-                  <td className={`py-2 text-right ${
-                    transaction.amount > 0 ? "text-green-600" : "text-red-600"
-                  }`}>
+                  <td className={`py-2 text-right ${transaction.amount > 0 ? "text-green-600" : "text-red-600"
+                    }`}>
                     {transaction.amount > 0 ? "+" : ""}{transaction.amount}
                   </td>
                 </tr>
