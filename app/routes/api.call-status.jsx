@@ -40,6 +40,7 @@ export const action = async ({ request }) => {
         start_time: underCaseData.start_time,
         end_time: underCaseData.end_time,
         duration: underCaseData.duration,
+        call_duration: underCaseData.duration,
         direction: underCaseData.direction,
         api_version: underCaseData.api_version,
         forwarded_from: underCaseData.forwarded_from,
@@ -74,6 +75,13 @@ export const action = async ({ request }) => {
             status: underCaseData.call_status
         }
     });
+    const { data: updatedCall, error: updateCallError } = await supabase.from('call')
+        .update({ underCaseData })
+        .eq('sid', underCaseData.call_sid)
+        .single();
+    if (updateCallError) {
+        console.error('Error updating call:', updateCallError);
+    }
 
     if (["initiated", "ringing", "in-progress", "idle"].includes(currentAttempt.disposition)) {
         console.log("updating", currentAttempt.disposition, underCaseData.call_status)
