@@ -89,10 +89,10 @@ export const action = async ({ request }: { request: Request }) => {
   return json({ data, error }, { headers });
 };
 export const loader = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const { data: serverSession } = await supabaseClient.auth.getSession();
 
-  if (serverSession && serverSession.user) {
+  if (serverSession && serverSession.session) {
     return redirect("/workspaces", { headers });
   }
   return json({ serverSession }, { headers });
