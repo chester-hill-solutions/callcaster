@@ -6,22 +6,20 @@ import { useEffect, useState, useRef } from "react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 
 interface QueueContentProps {
-    queueValue: {
-        queueData: QueueItem[] | null;
-        queueError: any;
-        totalCount: number | null;
-        unfilteredCount: number | null;
-        currentPage: number;
-        pageSize: number;
-        filters: {
-            name: string;
-            phone: string;
-            email: string;
-            address: string;
-            audiences: string;
-            status: string;
-        }
-    };
+    queueData: QueueItem[] | null;
+    queueError: any;
+    totalCount: number | null;
+    unfilteredCount: number | null;
+    currentPage: number;
+    pageSize: number;
+    filters: {
+        name: string;
+        phone: string;
+        email: string;
+        address: string;
+        audiences: string;
+        status: string;
+    }
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
     audiences: Audience[];
@@ -41,7 +39,13 @@ interface QueueContentProps {
 }
 
 export function QueueContent({
-    queueValue,
+    queueData: passedQueueData,
+    totalCount,
+    queuedCount,
+    unfilteredCount,
+    currentPage,
+    pageSize,
+    filters,
     handleFilterChange,
     clearFilter,
     audiences,
@@ -59,14 +63,14 @@ export function QueueContent({
     removeContactsFromQueue,
     supabase
 }: QueueContentProps) {
-    if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
-    const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
-    const [queueData, setQueueData] = useState(queueValue.queueData ?? []);
+    if (passedQueueData?.length === 0) return <div>No contacts in queue</div>;
+    const [queueCount, setQueueCount] = useState(totalCount ?? 0);
+    const [queueData, setQueueData] = useState(passedQueueData ?? []);
     const pendingUpdates = useRef<Set<number>>(new Set());
-    
+
     const fetchContactById = async (id: number) => {
         if (pendingUpdates.current.has(id)) return null;
-        
+
         pendingUpdates.current.add(id);
         try {
             const { data, error } = await supabase.from('contact').select('*').eq('id', id).single();
@@ -86,7 +90,7 @@ export function QueueContent({
         }
         if (payload.eventType === 'DELETE') {
             setQueueData(curr => curr.filter(item => item.id !== payload.old.id));
-        }   
+        }
     }
 
     useEffect(() => {
@@ -117,14 +121,14 @@ export function QueueContent({
 
     // Update queue data when parent data changes
     useEffect(() => {
-        setQueueData(queueValue.queueData ?? []);
-    }, [queueValue.queueData]);
+        setQueueData(passedQueueData ?? []);
+    }, [passedQueueData]);
 
     return (
         <div className="p-2">
             <QueueHeader
-                unfilteredCount={queueValue.unfilteredCount ?? 0}   
-                totalCount={queueValue.totalCount ?? 0}
+                unfilteredCount={unfilteredCount ?? 0}
+                totalCount={totalCount ?? 0}
                 isSelectingAudience={isSelectingAudience}
                 selectedAudience={selectedAudience}
                 audiences={audiences}
@@ -135,14 +139,14 @@ export function QueueContent({
                 onAddContact={handleAddContact}
             />
             <QueueTable
-                unfilteredCount={queueValue.unfilteredCount ?? 0}
+                unfilteredCount={unfilteredCount ?? 0}
                 handleFilterChange={handleFilterChange}
                 queue={queueData || []}
                 audiences={audiences}
-                totalCount={queueValue.totalCount}
-                currentPage={queueValue.currentPage}
-                pageSize={queueValue.pageSize}
-                defaultFilters={queueValue.filters}
+                totalCount={totalCount ?? 0}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                defaultFilters={filters}
                 onStatusChange={onStatusChange}
                 isAllFilteredSelected={isAllFilteredSelected}
                 onSelectAllFiltered={setIsAllFilteredSelected}
