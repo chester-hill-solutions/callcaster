@@ -24,6 +24,7 @@ export type CampaignSettingsData = {
     schedule: Schedule;
     is_active: boolean;
     details: LiveCampaign | MessageCampaign | IVRCampaign;
+    campaign_audience?: CampaignAudience[];
 };
 
 export default function useCampaignSettings(

@@ -19,6 +19,7 @@ interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
     queueError: any;
     totalCount: number | null;
+    unfilteredCount: number | null;
     currentPage: number;
     pageSize: number;
     filters: {
@@ -123,7 +124,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             .eq('status', 'queued')
             .then(({ count, error }) => ({ count, error })),
     ]);
-
+    
     return defer({
         queuePromise: Promise.resolve({
             queueData: queueData.data,
@@ -197,7 +198,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 
 export function ErrorBoundary() {
-    const error = useRouteError();
+    const error = useRouteError() as Error;
     return (
         <div className="flex flex-col items-center justify-center p-8">
             <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
@@ -260,9 +261,9 @@ export default function Queue() {
         contactFetcher.load(`/api/contacts?q=${query}&workspace_id=${campaignData.workspace}&campaign_id=${campaignId}`);
     }
 
-    const handleAddContactToQueue = (contacts: (Contact & { contact_audience: { audience_id: number }[] })[], unfilteredCount: number) => {
+    const handleAddContactToQueue = (queueValue: QueueResponse, contacts: (Contact & { contact_audience: { audience_id: number }[] })[]) => {
         fetcher.submit(
-            { ids: contacts.map((contact) => contact.id), campaign_id: Number(campaignId), startOrder: unfilteredCount },
+            { ids: contacts.map((contact) => contact.id), campaign_id: Number(campaignId), startOrder: queueValue.unfilteredCount ?? 0 },
             { action: "/api/campaign_queue", method: "POST", encType: "application/json", navigate: false }
         );
     }
@@ -275,7 +276,9 @@ export default function Queue() {
         }
     }
 
-    const selectedCampaignAudienceIds = campaignData.campaign_audience?.map((audience: CampaignAudience) => audience?.audience_id).filter((id: number): id is number => id !== null);
+    const selectedCampaignAudienceIds = (campaignData as CampaignSettingsData & { campaign_audience?: CampaignAudience[] })
+        .campaign_audience?.map(audience => audience?.audience_id)
+        .filter((id): id is number => id !== null && id !== undefined) ?? [];
 
     const handleFilterChange = (key: string, value: string) => {
         setSearchParams(prev => {
@@ -295,83 +298,85 @@ export default function Queue() {
             </div>
         }>
             <Await resolve={queuePromise}>
-                {(queueValue) => (
-                    <>
-                        <Dialog open={searchModalOpen} onOpenChange={setSearchModalOpen}>
-                            <DialogContent className="bg-white">
-                                <DialogHeader>
-                                    <DialogTitle>Search Contacts</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                    <div className="flex gap-2">
-                                        <Input
-                                            placeholder="Search by name or phone..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)} />
-                                        <Button size="icon" onClick={() => handleSearch(searchQuery)}>
-                                            <Search className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                    <div className="min-h-[200px]">
-                                        {contactFetcher.data?.contacts?.length ? (
-                                            <div className="space-y-2">
-                                                {contactFetcher.data.contacts.map((contact) => contact && (
-                                                    <div
-                                                        key={contact.id}
-                                                        className="grid grid-cols-[2fr,2fr,2fr,1fr] gap-2 p-2 border rounded-md hover:bg-gray-50 transition-colors text-sm"
-                                                    >
-                                                        <div className="truncate">
-                                                            {contact.firstname} {contact.surname}
-                                                        </div>
-                                                        <div className="truncate text-gray-600">
-                                                            {contact.phone && <div>{contact.phone}</div>}
-                                                            {contact.email && <div>{contact.email}</div>}
-                                                        </div>
-                                                        <div className="truncate text-gray-600">
-
-                                                            {contact.address}
-                                                        </div>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className={`text-xs w-full ${contact.queued ? "bg-green-500/20 border-green-500/60 hover:bg-green-500/30" : ""}`}
-                                                            disabled={contact.queued}
-                                                            onClick={() => handleAddContactToQueue([contact], queueValue.unfilteredCount ?? 0)}
+                {(queueValue) => {
+                    return (
+                        <>
+                            <Dialog open={searchModalOpen} onOpenChange={setSearchModalOpen}>
+                                <DialogContent className="bg-white">
+                                    <DialogHeader>
+                                        <DialogTitle>Search Contacts</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Search by name or phone..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)} />
+                                            <Button size="icon" onClick={() => handleSearch(searchQuery)}>
+                                                <Search className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <div className="min-h-[200px]">
+                                            {contactFetcher.data?.contacts?.length ? (
+                                                <div className="space-y-2">
+                                                    {contactFetcher.data.contacts.map((contact) => contact && (
+                                                        <div
+                                                            key={contact.id}
+                                                            className="grid grid-cols-[2fr,2fr,2fr,1fr] gap-2 p-2 border rounded-md hover:bg-gray-50 transition-colors text-sm"
                                                         >
-                                                            {contact.queued ? "Added" : "Add"}
-                                                        </Button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="text-center text-gray-500 py-4">
-                                                No results found
-                                            </div>
-                                        )}
+                                                            <div className="truncate">
+                                                                {contact.firstname} {contact.surname}
+                                                            </div>
+                                                            <div className="truncate text-gray-600">
+                                                                {contact.phone && <div>{contact.phone}</div>}
+                                                                {contact.email && <div>{contact.email}</div>}
+                                                            </div>
+                                                            <div className="truncate text-gray-600">
+
+                                                                {contact.address}
+                                                            </div>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className={`text-xs w-full ${contact.queued ? "bg-green-500/20 border-green-500/60 hover:bg-green-500/30" : ""}`}
+                                                                disabled={contact.queued}
+                                                                onClick={() => handleAddContactToQueue(queueValue, [contact])}
+                                                            >
+                                                                {contact.queued ? "Added" : "Add"}
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="text-center text-gray-500 py-4">
+                                                    No results found
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                        <QueueContent
-                            queueValue={queueValue as QueueResponse}
-                            handleFilterChange={handleFilterChange}
-                            clearFilter={clearFilter}
-                            audiences={audiences}
-                            selectedCampaignAudienceIds={selectedCampaignAudienceIds}
-                            isSelectingAudience={isSelectingAudience}
-                            selectedAudience={selectedAudience}
-                            setIsSelectingAudience={setIsSelectingAudience}
-                            setSelectedAudience={setSelectedAudience}
-                            handleAddFromAudience={handleAddFromAudience}
-                            handleAddContact={handleAddContact}
-                            onStatusChange={onStatusChange}
-                            isAllFilteredSelected={isAllFilteredSelected}
-                            setIsAllFilteredSelected={setIsAllFilteredSelected}
-                            supabase={supabase}
-                            addContactToQueue={handleAddContactToQueue}
-                            removeContactsFromQueue={handleRemoveContactsFromQueue} />
-                    </>
-                )}
+                                </DialogContent>
+                            </Dialog>
+                            <QueueContent
+                                queueValue={queueValue as QueueResponse}
+                                handleFilterChange={handleFilterChange}
+                                clearFilter={clearFilter}
+                                audiences={audiences}
+                                selectedCampaignAudienceIds={selectedCampaignAudienceIds}
+                                isSelectingAudience={isSelectingAudience}
+                                selectedAudience={selectedAudience}
+                                setIsSelectingAudience={setIsSelectingAudience}
+                                setSelectedAudience={setSelectedAudience}
+                                handleAddFromAudience={handleAddFromAudience}
+                                handleAddContact={handleAddContact}
+                                onStatusChange={onStatusChange}
+                                isAllFilteredSelected={isAllFilteredSelected}
+                                setIsAllFilteredSelected={setIsAllFilteredSelected}
+                                supabase={supabase}
+                                addContactToQueue={handleAddContactToQueue}
+                                removeContactsFromQueue={handleRemoveContactsFromQueue} />
+                        </>
+                    );
+                }}
             </Await>
         </Suspense >
     );
