@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { FetcherData } from "../routes/workspaces_.$id_.settings_.numbers";
 
 export const NumberPurchase = ({ fetcher, workspaceId }: { fetcher: FetcherWithComponents<FetcherData>, workspaceId: string }) => {
-  const purchaseFetcher = useFetcher();
+  const purchaseFetcher = useFetcher<{ newNumber: string }>();
   const complete = purchaseFetcher.state === "idle" && Boolean(purchaseFetcher.data?.newNumber);
   const [openNumber, setOpenNumber] = useState<number | null>(null)
 
