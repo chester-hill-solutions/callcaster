@@ -1164,6 +1164,7 @@ export type Database = {
           token: string | null
           twilio_data: Json
           users: string[] | null
+          credits: number
         }
         Insert: {
           created_at?: string
@@ -1178,6 +1179,7 @@ export type Database = {
           token?: string | null
           twilio_data?: Json
           users?: string[] | null
+          credits?: number
         }
         Update: {
           created_at?: string
@@ -1210,7 +1212,7 @@ export type Database = {
           isNew: boolean
           role: Database["public"]["Enums"]["workspace_role"]
           user_id: string
-          workspace: string
+          workspace: string 
         }
         Insert: {
           created_at?: string

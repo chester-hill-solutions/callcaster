@@ -168,7 +168,7 @@ export async function createNewWorkspace({
     console.error("Error in createNewWorkspace:", error);
     return {
       data: null,
-      error: error.message || "An unexpected error occurred",
+      error: error instanceof Error ? error.message : "An unexpected error occurred",
     };
   }
 }
@@ -212,7 +212,7 @@ export async function getWorkspaceInfoWithDetails({
 }) {
   const { data: workspace, error: workspaceError } = await supabaseClient
       .from("workspace")
-      .select("id, name, workspace_users(role), campaign(id, title, status, created_at), workspace_number(id, phone_number), audience(id, name)")
+      .select("id, name, credits, workspace_users(role), campaign(id, title, status, created_at), workspace_number(id, phone_number), audience(id, name)")
       .eq("id", workspaceId)
       .eq("workspace_users.user_id", userId)
       .single();
@@ -351,7 +351,7 @@ export function getUserRole({
 
   const jwt = jwtDecode(serverSession.access_token);
   const userRole = jwt["user_workspace_roles"]?.find(
-    (workspaceRoleObj) => workspaceRoleObj.workspace_id === workspaceId,
+    (workspaceRoleObj: { workspace_id: string }) => workspaceRoleObj.workspace_id === workspaceId,
   )?.role;
 
   // console.log("USER ROLE: ", userRole);
@@ -1483,16 +1483,21 @@ export async function createStripeContact({
   }
 
   const ownerUser = data.workspace_users[0].user;
+  if (!ownerUser) {
+    throw new Error("No owner user found");
+  }
+  const ownerEmail = ownerUser?.username;
+  if (!ownerEmail) {
+    throw new Error("Owner user has no email or username");
+  }
 
   const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
     apiVersion: "2020-08-27",
   });
 
-  //console.log("Creating Stripe customer for:", data.name, ownerUser.username);
-
   return await stripe.customers.create({
     name: data.name,
-    email: ownerUser.username,
+    email: ownerEmail,
   });
 }
 

@@ -46,6 +46,7 @@ export type User = Database["public"]["Tables"]["user"]["Row"] | null;
 export type WorkspaceInvite = Database["public"]["Tables"]["workspace_invite"]["Row"] | null;
 export type WorkspaceTable = Audience | Campaign | Contact | null;
 export type WorkspaceWebhook = Database["public"]["Tables"]["webhook"]["Row"] | null; 
+export type Workspace = Database["public"]["Tables"]["workspace"]["Row"] | null;
 
 export enum WorkspaceTableNames {
   Audience = "audiences",
