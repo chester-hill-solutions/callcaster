@@ -1491,7 +1491,7 @@ export async function createStripeContact({
     throw new Error("Owner user has no email or username");
   }
 
-  const stripe = new Stripe(process.env.STRIPE_API_KEY!, {
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: "2020-08-27",
   });
 

@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs, redirect, type ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData, Form, useActionData } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { useState } from "react";
@@ -8,7 +8,9 @@ import Stripe from "stripe";
 
 async function getStripeCustomerHistory(stripeCustomerId: string) {
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-  const history = await stripe.customers.listBalanceTransactions(stripeCustomerId);
+  const history = await stripe.checkout.sessions.list({
+    customer: stripeCustomerId,
+  });
   return history;
 }
 
@@ -24,7 +26,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return json({
     credits: {
       balance: workspace?.credits || 0,
-      history: stripeCustomerHistory.data,
+      history: stripeCustomerHistory.data.filter((session) => session.status === "complete"),
     },
   });
 }
@@ -37,8 +39,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const amount = Number(formData.get("amount"));
 
-  if (!amount || amount * 0.003 > 0.5) {
-    throw new Error("Invalid amount. Minimum amount is $0.50.");
+  if (!amount || amount * 0.003 < 0.5) {
+    return { error: "Invalid amount. Minimum amount is $0.50." };
   }
 
   const { data: workspace } = await supabaseClient
@@ -53,7 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const priceInCents = Math.round(amount * 0.003 * 100);
-
+  console.log(priceInCents);
   const session = await stripe.checkout.sessions.create({
     customer: workspace.stripe_id,
     payment_method_types: ["card"],
@@ -88,7 +90,7 @@ export default function Credits() {
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
-
+  const actionData = useActionData<typeof action>();
   const creditPackages = [
     { amount: 1667, price: 5 },
     { amount: 5000, price: 15 },
@@ -174,6 +176,7 @@ export default function Credits() {
               <div className="text-gray-500 text-sm">
                 {isCustom && `$${Math.round(Number(customAmount) * 0.003 * 100) / 100}`}
               </div>
+              {actionData?.error && <div className="text-red-500">{actionData.error}</div>}
             </div>
           </div>
 
@@ -205,10 +208,10 @@ export default function Credits() {
               {credits.history.map((transaction) => (
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{formatDate(transaction.created)}</td>
-                  <td className="py-2">{transaction.description}</td>
-                  <td className={`py-2 text-right ${transaction.amount > 0 ? "text-green-600" : "text-red-600"
+                  <td className="py-2">{transaction.metadata?.creditAmount} credits</td>
+                  <td className={`py-2 text-right ${transaction.amount_total && transaction.amount_total > 0 ? "text-green-600" : "text-red-600"
                     }`}>
-                    {transaction.amount > 0 ? "+" : ""}{transaction.amount}
+                    {transaction.amount_total && transaction.amount_total > 0 ? "$" : ""}{transaction.amount_total ? (transaction.amount_total / 100).toFixed(2) : "0.00"}
                   </td>
                 </tr>
               ))}
