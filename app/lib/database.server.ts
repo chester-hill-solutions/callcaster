@@ -1308,7 +1308,7 @@ export async function fetchConversationSummary(
   if (campaign_id) {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
+      { p_workspace: workspaceId, campaign_id_prop: Number(campaign_id) },
     );
     chats = data;
     chatsError = error;
@@ -1357,7 +1357,7 @@ export async function fetchContactData(
       contact_number,
       workspaceId,
     );
-    potentialContacts = contacts;
+    potentialContacts.push(...contacts || []);
   }
 
   if (contact_id) {
@@ -1492,7 +1492,7 @@ export async function createStripeContact({
   }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2020-08-27",
+    apiVersion: "2024-06-20",
   });
 
   return await stripe.customers.create({

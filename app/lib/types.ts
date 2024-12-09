@@ -97,3 +97,62 @@ export type Weekday =
   | "Friday"
   | "Saturday"
   | "Sunday";
+
+
+  export type BlockOption = {
+    next: string;
+    value?: string;
+    content?: string;
+  };
+  
+  export type IVROption = {
+    value: number | "vx-any";
+    next: string;
+    content?: string;
+  }
+
+  export type Block = {
+    id: string;
+    type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock" | "audio";
+    title: string;
+    content: string;
+    options: BlockOption[] | IVROption[];
+  };
+
+  export type IVRBlock = Block & {
+    audioFile: string; 
+    speechType: "recorded" | "synthetic";
+    responseType: "dtmf" | "speech" | "dtmf speech" | null;
+  }
+  
+  export type Page = {
+    id: string;
+    title: string;
+    blocks: string[];
+  };
+  
+  export type Flow = {
+    type: "ivr" | "script";
+    pages: {
+      [key: string]: Page;
+    };
+    blocks: {
+      [key: string]: Block;
+    };
+    startPage: string; 
+  };
+
+
+export interface DispositionResult {
+      disposition: string;
+      count: number;
+      average_call_duration: string;
+    }
+    
+export interface ResultsScreenProps {
+      totalCalls: number;
+      results: DispositionResult[];
+      expectedTotal: number;
+      isBusy:boolean;
+    }
+    

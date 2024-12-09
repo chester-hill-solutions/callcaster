@@ -27,14 +27,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("Invalid session metadata");
     }
 
-    const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("stripe_id, credits").eq("id", workspaceId).single();
-    if (workspaceError) {
-      throw workspaceError;
-    }   
-
-    const { error } = await supabaseClient.from("workspace").update({
-      credits: Number(workspace.credits) + creditAmount,
-    }).eq("id", workspaceId);
+    // Create transaction history entry instead of updating credits directly
+    const { error } = await supabaseClient.from("transaction_history").insert({
+      workspace: workspaceId,
+      amount: creditAmount,
+      type: 'CREDIT',
+      note: `stripe_session:${sessionId}`,
+      created_at: new Date().toISOString()
+    });
 
     if (error) {
       throw error;
