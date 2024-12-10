@@ -19,8 +19,9 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { LoaderFunctionArgs } from "@remix-run/node";
 
-export const loader = async ({ request }) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {
     supabaseClient: supabase,
     headers,
@@ -29,7 +30,7 @@ export const loader = async ({ request }) => {
   return json({ user });
 };
 
-const ContactForm = ({ isBusy }) => (
+const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
     <h2 className="mb-6 text-center text-3xl font-bold">Get In Touch</h2>
     <div className="flex flex-wrap gap-8">
@@ -126,6 +127,11 @@ const FeatureCard = ({
   title,
   description,
   bgColor = "bg-white dark:bg-zinc-800",
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  bgColor?: string;
 }) => (
   <Card
     className={`p-6 text-center transition-all duration-300 hover:shadow-lg ${bgColor}`}

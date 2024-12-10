@@ -58,7 +58,7 @@ export const action = async ({ request }) => {
             status: call.status,
             start_time: call.startTime,
             end_time: call.endTime,
-            duration: call.duration,
+            duration: Math.max(Number(call.duration), Number(call.call_duration)),
             price: call.price,
             direction: call.direction,
             answered_by: call.answeredBy,

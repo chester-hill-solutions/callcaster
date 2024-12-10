@@ -60,7 +60,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       direction: data.Direction,
       api_version: data.ApiVersion,
       workspace: number.workspace,
-      duration: data.Duration,
+      duration: Math.max(Number(data.Duration), Number(data.CallDuration)),
     })
     if (callError){
       console.error("Error on function insert call", callError);

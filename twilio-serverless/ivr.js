@@ -14,7 +14,7 @@ exports.handler = async function (context, event, callback) {
 
   const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id, index, total, isLastContact
   } = event;
-  
+
   let outreachAttemptId;
   let call;
   const { data, error } = await supabase
@@ -49,10 +49,12 @@ exports.handler = async function (context, event, callback) {
       from: caller_id,
       url: `${baseUrl}/flow`,
       machineDetection: "DetectMessageEnd",
+      machineDetectionSpeechThreshold: 1900,
+      machineDetectionSpeechEndThreshold: 1200,
       statusCallbackEvent: ["initiated", "answered", "completed"],
       statusCallback: `${baseUrl}/status`,
     });
-
+    
     const { data: insertData, error: insertError } = await supabase.from("call").insert({
       sid: call.sid,
       to: to_number,

@@ -109,11 +109,11 @@ exports.handler = async function (context, event, callback) {
         RecordingStatus,
         Timestamp: timestamp,
         AnsweredBy: answeredBy,
-        Duration: durationIn, 
+        Duration: durationIn,
         CallDuration: callDuration
     } = event;
     let duration = Math.max(Number(callDuration), Number(durationIn));
-    console.dir(event, { depth: null });
+
     try {
         if (RecordingStatus) {
             log('info', 'Recording status update', { callSid, RecordingStatus });
