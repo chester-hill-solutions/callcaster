@@ -50,7 +50,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     : { data: null, error: null };
   const { error: callError } = await supabase
     .from("call")
-    .insert({
+    .upsert({
       sid: data.CallSid,
       account_sid: data.AccountSid,
       to: data.To,
@@ -60,6 +60,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       direction: data.Direction,
       api_version: data.ApiVersion,
       workspace: number.workspace,
+      duration: data.Duration,
     })
     if (callError){
       console.error("Error on function insert call", callError);

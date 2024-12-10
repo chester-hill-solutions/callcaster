@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "./database.types";
+import { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 
 export type ENV = {
   SUPABASE_URL: string | undefined;
@@ -47,6 +48,9 @@ export type WorkspaceInvite = Database["public"]["Tables"]["workspace_invite"]["
 export type WorkspaceTable = Audience | Campaign | Contact | null;
 export type WorkspaceWebhook = Database["public"]["Tables"]["webhook"]["Row"] | null; 
 export type Workspace = Database["public"]["Tables"]["workspace"]["Row"] | null;
+export type WorkspaceNumber = Database["public"]["Tables"]["workspace_number"]["Row"] | null;
+
+export type TwilioAccountData = AccountInstance | null; 
 
 export enum WorkspaceTableNames {
   Audience = "audiences",

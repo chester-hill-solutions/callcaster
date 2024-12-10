@@ -1,3 +1,4 @@
+import { TwilioAccountData } from "~/lib/types";
 export type Json =
   | string
   | number
@@ -1195,7 +1196,7 @@ export type Json =
             owner: string | null
             stripe_id: string | null
             token: string | null
-            twilio_data: Json
+            twilio_data: TwilioAccountData
             users: string[] | null
           }
           Insert: {

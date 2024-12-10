@@ -251,8 +251,9 @@ const handlePauseCampaign = async (
 ) => {
   const { data, error } = await supabase
     .from("campaign")
-    .select("type, workspace")
+    .update({status:"pending"})
     .eq("id", id)
+    .select("type, workspace")
     .single();
   if (error) throw error;
   try {
@@ -292,10 +293,8 @@ Deno.serve(async (req) => {
       console.log("Initiating campaign:", record.id);
       await handleInitiateCampaign(supabase, record.id);
       
-    } else if (!record.is_active) {
+    } else if (!record.is_active && record.status === "running") {
       console.log("Pausing campaign:", record.id);
-      const {error} = await supabase.from("campaign").update({status:"scheduled"}).eq("id", record.id);
-      if (error) throw error;
       await handlePauseCampaign(supabase, record.id, twilio);
     }
   } catch (error) {

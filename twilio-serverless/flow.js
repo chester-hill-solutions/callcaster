@@ -1,72 +1,14 @@
 const { createClient } = require("@supabase/supabase-js");
 const Twilio = require("twilio");
 
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 200;
-
 const log = (level, message, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
 
-const encodeSignedUrl = (signedUrl) => {
-  try {
-    // Split the URL into parts (before and after the query string)
-    const [baseUrl, queryString] = signedUrl.split('?');
-
-    // Encode the base URL, preserving forward slashes
-    const encodedBaseUrl = baseUrl.split('/').map(segment =>
-      encodeURIComponent(segment)
-    ).join('/');
-
-    // If there's a query string, encode its parameters properly
-    if (queryString) {
-      const params = new URLSearchParams(queryString);
-      // Create a new URLSearchParams object to properly encode values
-      const encodedParams = new URLSearchParams();
-
-      for (const [key, value] of params.entries()) {
-        encodedParams.append(encodeURIComponent(key), encodeURIComponent(value));
-      }
-
-      return `${encodedBaseUrl}?${encodedParams.toString()}`;
-    }
-
-    return encodedBaseUrl;
-  } catch (error) {
-    console.error('Error encoding signed URL:', error);
-    return signedUrl; // Return original URL if encoding fails
-  }
-};
-
-const updateResult = async (supabase, outreach_attempt_id, update) => {
-  if (!outreach_attempt_id) {
-    throw new Error("outreach_attempt_id is undefined");
-  }
-  const { error } = await supabase
-    .from('outreach_attempt')
-    .update(update)
-    .eq('id', outreach_attempt_id);
-  if (error) throw error;
-};
-
-const updateCallStatus = async (supabase, callSid, status, timestamp) => {
-  const { error } = await supabase
-    .from('call')
-    .update({ end_time: new Date(timestamp), status })
-    .eq('sid', callSid);
-  if (error) throw error;
-};
-
-const handleCallUpdate = async (supabase, callSid, status, timestamp, outreach_attempt_id, disposition) => {
-  await Promise.all([
-    updateCallStatus(supabase, callSid, status, timestamp),
-    updateResult(supabase, outreach_attempt_id, { disposition })
-  ]);
-};
-
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 const getCallWithRetry = async (supabase, callSid, retries = 0) => {
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 200;
+
   const { data, error } = await supabase
     .from("call")
     .select('*, outreach_attempt(id, result, current_step), campaign(*,ivr_campaign(*, script(*)))')
@@ -76,18 +18,15 @@ const getCallWithRetry = async (supabase, callSid, retries = 0) => {
   if (error || !data) {
     log('warn', `Failed to retrieve call data`, { callSid, error, retryAttempt: retries });
     if (retries < MAX_RETRIES) {
-      await sleep(RETRY_DELAY);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
       return getCallWithRetry(supabase, callSid, retries + 1);
     }
-    log('error', `Failed to retrieve call after multiple attempts`, { callSid, maxRetries: MAX_RETRIES });
     throw new Error("Failed to retrieve call after multiple attempts");
   }
   return data;
 };
 
 const findNextStep = (currentBlock, userInput, script, pageId) => {
-  log('debug', `Finding next step`, { currentBlockId: currentBlock.id, userInput, pageId });
-
   if (currentBlock.options && currentBlock.options.length > 0) {
     const matchedOption = currentBlock.options.find((option) => {
       const optionValue = String(option.value).trim();
@@ -131,47 +70,35 @@ const findNextBlock = (script, currentPageId, currentBlockId) => {
 
 const handleVMAudio = async (supabase, campaign, workspace) => {
   const { voicemail_file } = campaign;
-  if (!voicemail_file) {
-    log('warn', 'No voicemail file specified');
-    return null;
-  }
+  if (!voicemail_file) return null;
+  
   try {
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from("workspaceAudio")
       .createSignedUrl(`${workspace}/${voicemail_file}`, 3600);
 
-    if (signedUrlError) {
-      throw signedUrlError;
-    }
-    return {
-      ...signedUrlData,
-      signedURL: signedUrlData.signedURL
-    };
+    if (signedUrlError) throw signedUrlError;
+    return { signedUrl: signedUrlData.signedUrl };
   } catch (error) {
     log('error', `Failed to create signed URL for voicemail`, { error: error.message });
     return null;
   }
 };
+
 const handleAudio = async (supabase, twiml, block, workspace) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
-    const { data: signedUrlData, error: signedUrlError } =
-      await supabase.storage
-        .from("workspaceAudio")
-        .createSignedUrl(`${workspace}/${audioFile}`, 3600);
-    if (signedUrlError) {
-      log('error', `Failed to create signed URL`, { error: signedUrlError });
-      throw signedUrlError;
-    }
-    log('info', 'Audio URL', signedUrlData.signedURL);
-    return signedUrlData.signedURL;
-  } else {
-    return audioFile;
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from("workspaceAudio")
+      .createSignedUrl(`${workspace}/${audioFile}`, 3600);
+      
+    if (signedUrlError) throw signedUrlError;
+    return signedUrlData.signedUrl;
   }
+  return audioFile;
 };
 
 const handleOptions = async (twiml, block, page_id, script, outreach_id, supabase, workspace) => {
-  log('debug', `Handling options`, { blockId: block.id, hasOptions: !!(block.options && block.options.length > 0) });
   const audio = await handleAudio(supabase, twiml, block, workspace);
 
   if (block.responseType === "speech") {
@@ -181,13 +108,16 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
       twiml.say(audio);
     }
     twiml.record({
-      action: `https://ivr-2916.twil.io/flow`,
+      action: 'https://ivr-2916.twil.io/recording',
       timeout: 5,
       maxLength: 60,
       playBeep: true,
-      recordingStatusCallback: `https://ivr-2916.twil.io/flow`,
-      recordingStatusCallbackEvent: ["completed"],
+      recordingStatusCallback: 'https://ivr-2916.twil.io/recording',
+      recordingStatusCallbackEvent: ["completed", "in-progress"],
+      statusCallback: 'https://ivr-2916.twil.io/status',
+      statusCallbackEvent: ['completed', 'failed']
     });
+    
   } else if (block.options && block.options.length > 0) {
     const gather = twiml.gather({
       action: `https://ivr-2916.twil.io/flow`,
@@ -195,6 +125,8 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
       speechTimeout: "auto",
       speechModel: "phone_call",
       timeout: 5,
+      statusCallback: 'https://ivr-2916.twil.io/status',
+      statusCallbackEvent: ['completed', 'failed']
     });
     if (block.type === 'recorded') {
       gather.play(audio);
@@ -210,13 +142,10 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
   }
 };
 
-
-const processResult = async (supabase, script, currentStep, result, userInput, callSid) => {
+const processResult = async (supabase, script, currentStep, result, userInput, outreach_attempt_id) => {
   let step = currentStep || 'page_1:block_1';
   let [currentPageId, currentBlockId] = step.split(':');
   const currentBlock = script.blocks[currentBlockId];
-
-  log('debug', `Processing step`, { step, userInput });
 
   if (userInput !== undefined) {
     result = {
@@ -229,128 +158,85 @@ const processResult = async (supabase, script, currentStep, result, userInput, c
     const nextStep = findNextStep(currentBlock, userInput, script, currentPageId);
     step = nextStep;
 
-    //log('info', `Updating result and current step for call`, { callSid, result, step });
     await supabase
       .from("outreach_attempt")
       .update({ result, current_step: step })
-      .eq("id", callSid);
+      .eq("id", outreach_attempt_id);
   }
 
   return { step, result };
 };
 
 exports.handler = async function (context, event, callback) {
-  const supabase = createClient(
-    context.SUPABASE_URL,
-    context.SUPABASE_SERVICE_KEY
-  );
+  const startTime = Date.now();
+  const supabase = createClient(context.SUPABASE_URL, context.SUPABASE_SERVICE_KEY);
   const twiml = new Twilio.twiml.VoiceResponse();
+
   try {
     const callSid = event.CallSid;
-    if (!callSid) {
-      log('error', `Missing CallSid`);
-      throw new Error("Missing CallSid");
-    }
+    if (!callSid) throw new Error("Missing CallSid");
 
-    // Handle recording results
+    // Skip if this is a recording webhook - let recording.js handle it
     if (event.RecordingUrl) {
-      log('info', 'Recording completed', { recordingUrl: event.RecordingUrl });
-      const callData = await getCallWithRetry(supabase, callSid);
-
-      // Get current step and block info
-      const [currentPageId, currentBlockId] = callData.outreach_attempt.current_step.split(':');
-      const script = callData.campaign.ivr_campaign[0].script.steps;
-      const currentBlock = script.blocks[currentBlockId];
-
-      // Update result with recording info for current block
-      const result = {
-        ...(callData.outreach_attempt?.result || {}),
-        [currentPageId]: {
-          ...(callData.outreach_attempt?.result?.[currentPageId] || {}),
-          [currentBlock.title]: {
-            recordingUrl: event.RecordingUrl,
-            transcription: event.TranscriptionText || null
-          }
-        }
-      };
-
-      // Find and set next step
-      const nextStep = findNextStep(currentBlock, null, script, currentPageId);
-      await updateResult(supabase, callData.outreach_attempt.id, {
-        result,
-        current_step: nextStep
-      });
-
-      if (nextStep === 'hangup') {
-        twiml.hangup();
-      } else {
-        twiml.redirect('https://ivr-2916.twil.io/flow');
-      }
-
+      twiml.redirect('https://ivr-2916.twil.io/recording');
       return callback(null, twiml);
     }
 
-    const userInput = event.Digits || event.SpeechResult;
     const callData = await getCallWithRetry(supabase, callSid);
-    if (event.AnsweredBy && event.AnsweredBy.includes('machine') && !event.AnsweredBy.includes('other')) {
-      await handleCallUpdate(supabase, callSid, 'voicemail', event.Timestamp, callData.outreach_attempt.id, 'voicemail');
+    if (!callData.campaign?.ivr_campaign?.[0]?.script?.steps) {
+      throw new Error("Invalid IVR campaign structure");
+    }
+
+    let currentStep = callData.outreach_attempt?.current_step || 'page_1:block_1';
+    const [currentPageId, currentBlockId] = currentStep.split(':');
+    const script = callData.campaign.ivr_campaign[0].script.steps;
+    const currentBlock = script.blocks[currentBlockId];
+    const userInput = event.Digits || event.SpeechResult;
+    let result = callData.outreach_attempt?.result || {};
+
+    // Handle voicemail detection
+    if (event.AnsweredBy?.includes('machine') && !event.AnsweredBy.includes('other')) {
       if (!callData.campaign.voicemail_file) {
-        log('info', 'No voicemail file specified, hanging up');
         twiml.hangup();
       } else {
-        try {
-          const audio = await handleVMAudio(supabase, callData.campaign, callData.workspace);
-          if (audio) {
-            twiml.pause({ length: 4 });
-            twiml.play(audio.signedURL);
-          } else {
-            log('warn', 'Failed to retrieve voicemail audio, hanging up');
-            twiml.hangup();
-          }
-        } catch (error) {
-          log('error', 'Error handling voicemail audio', { error: error.message });
+        const audio = await handleVMAudio(supabase, callData.campaign, callData.workspace);
+        if (audio) {
+          twiml.pause({ length: 4 });
+          twiml.play(audio.signedUrl);
+        } else {
           twiml.hangup();
         }
       }
       return callback(null, twiml);
     }
-    if (!callData.campaign?.ivr_campaign?.[0]?.script?.steps) {
-      log('error', `Invalid IVR campaign structure`, { callSid, campaignId: callData.campaign?.id });
-      throw new Error("Invalid IVR campaign structure");
-    }
-    const script = callData.campaign.ivr_campaign[0].script.steps;
-    let result = callData.outreach_attempt?.result || {};
-    let currentStep = callData.outreach_attempt?.current_step;
+
     const processedStep = await processResult(supabase, script, currentStep, result, userInput, callData.outreach_attempt.id);
     currentStep = processedStep.step;
-    result = processedStep.result;
 
     if (currentStep === 'hangup') {
-      //log('info', `Ending call`, { callSid });
       twiml.hangup();
     } else {
-      log('info', `Processing step`, { callSid, currentStep });
-      const [currentPageId, currentBlockId] = currentStep.split(':');
-      const currentBlock = script.blocks[currentBlockId];
-      await handleOptions(twiml, currentBlock, currentPageId, script, callData.outreach_attempt.id, supabase, callData.workspace);
-      if (!(currentBlock.options && currentBlock.options.length > 0)) {
-        const nextStep = findNextStep(currentBlock, null, script, currentPageId);
-        if (nextStep !== 'hangup') {
-          await supabase
-            .from("outreach_attempt")
-            .update({ current_step: nextStep })
-            .eq("id", callData.outreach_attempt.id);
-        }
-        twiml.redirect('https://ivr-2916.twil.io/flow');
-      }
+      await handleOptions(
+        twiml, 
+        currentBlock, 
+        currentPageId, 
+        script, 
+        callData.outreach_attempt.id, 
+        supabase, 
+        callData.workspace
+      );
     }
-  } catch (e) {
-    log('error', `IVR Error`, { error: e.message, stack: e.stack });
+
+    log('info', 'Flow completed', { 
+      callSid, 
+      duration: `${Date.now() - startTime}ms` 
+    });
+
+    return callback(null, twiml);
+  } catch (error) {
+    log('error', 'Flow error', { error: error.message, stack: error.stack });
     twiml.say("An error occurred. Please try again later.");
     twiml.hangup();
-    return callback(e, twiml);
+    return callback(null, twiml);
   }
-
-  //log('info', `Completed IVR flow iteration`);
-  return callback(null, twiml);
 };

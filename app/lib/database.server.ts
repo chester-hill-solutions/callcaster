@@ -802,7 +802,7 @@ export async function updateCampaign({
     voicedrop_audio: undefined,
     is_active: Boolean(restCampaignData.is_active),
   });
-  const tableKey = getCampaignTableKey(cleanCampaignData.type);
+  const tableKey = getCampaignTableKey(cleanCampaignData.type!);
 
   const cleanCampaignDetails =
     tableKey === "message_campaign"
@@ -845,7 +845,7 @@ export async function updateCampaign({
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
     delete cleanCampaignData.script_id;
   }
-
+  console.log(cleanCampaignData)
   const campaign = await handleDatabaseOperation(
     async () => await supabase.from("campaign").update(cleanCampaignData).eq("id", id).select().single(),
     "Error updating campaign"

@@ -1,4 +1,4 @@
-import { FetcherWithComponents } from "@remix-run/react";
+import { FetcherWithComponents, NavLink } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
 import { Button } from "./ui/button";
 import {
@@ -22,7 +22,7 @@ import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
 
 export type CampaignSettingsProps = {
   campaignData: CampaignSettingsData;
-  campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;  
+  campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
   flags: Flags;
   workspace: string;
   isActive: boolean;
@@ -30,7 +30,7 @@ export type CampaignSettingsProps = {
   audiences: Audience[];
   mediaData: FileObject[];
   campaign_id: string;
-  isChanged: boolean; 
+  isChanged: boolean;
   phoneNumbers: WorkspaceNumbers[];
   handleInputChange: (name: string, value: string | boolean | number | null | Schedule) => void;
   handleDuplicateButton: () => void;
@@ -108,7 +108,7 @@ export const CampaignSettings = ({
               handleDuplicateButton={handleDuplicateButton}
               phoneNumbers={phoneNumbers}
               flags={flags}
-              joinDisabled={joinDisabled} 
+              joinDisabled={joinDisabled}
               formFetcher={formFetcher}
               details={campaignDetails}
               scheduleDisabled={scheduleDisabled}
@@ -138,13 +138,14 @@ export const CampaignSettings = ({
                 <Button
                   variant="outline"
                   type="button"
-                  value={'../queue'}
-                  onClick={handleNavigate}
+                  asChild
                 >
-                  Manage Queue
+                  <NavLink to={`../queue`}>
+                    Manage Queue
+                  </NavLink>
                 </Button>
               </div>
-              
+
               <div className="flex gap-6 mb-6">
                 <div>
                   <span className="text-sm text-muted-foreground">Queued</span>

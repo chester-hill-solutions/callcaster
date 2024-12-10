@@ -403,7 +403,7 @@ export function isEmail(email) {
   return true;
 }
 
-export function normalizePhoneNumber(input) {
+export function normalizePhoneNumber(input:string) {
   let cleaned = input.replace(/[^0-9+]/g, "");
 
   if (cleaned.indexOf("+") > 0) {
