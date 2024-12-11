@@ -72,6 +72,8 @@ export default function useCampaignSettings(
         details,
     });
     const [initial, setInitial] = useState<CampaignSettingsData>(campaignData);
+    const [confirmStatus, setConfirmStatus] = useState<"schedule" | "play" | "archive" | "none">("none");
+
     const handleResetData = () => {
         setCampaignData(initial);
     }
@@ -205,6 +207,8 @@ export default function useCampaignSettings(
 
 
     return {
+        confirmStatus,
+        setConfirmStatus,
         isChanged,
         setChanged,
         campaignData,

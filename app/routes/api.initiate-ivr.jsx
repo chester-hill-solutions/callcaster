@@ -18,10 +18,15 @@ export const action = async ({ request, params }) => {
         formData.append('contact_id', contact.contact_id);
         formData.append('caller_id', contact.caller_id);
         formData.append('to_number', normalizePhoneNumber(contact.phone));
-        await fetch(`${process.env.BASE_URL}/api/ivr`, {
+        const res = await fetch(`${process.env.BASE_URL}/api/ivr`, {
             body: formData,
             method: "POST",
-        }).catch((e) => console.log(e))
+        }).then(e => e.json()).catch((e) => console.log(e))
+        if (res.creditsError) {
+            return {
+                creditsError: true,
+            }
+        }
     }
     return data;
 }

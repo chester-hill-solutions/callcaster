@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Form, NavLink, useNavigate, useSubmit } from "@remix-run/react";
+import { Form, NavLink, useFetcher, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
@@ -25,6 +26,9 @@ interface CampaignDialogsProps {
   currentState: any;
   fetchMore: (params: any) => void;
   householdMap: any;
+  isActive: boolean;
+  creditsError?: boolean;
+  hasAccess: boolean;
 }
 
 export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
@@ -39,13 +43,17 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   householdMap,
   currentState,
   isActive,
+  creditsError,
+  hasAccess
 }) => {
-  const [errorDescription, setErrorDescription] = useState();
-  const submit = useSubmit();
+  const [errorDescription, setErrorDescription] = useState<string>('');
+  const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(!!creditsError);
+  const { state } = useNavigation();
+  const fetcher = useFetcher();
   const navigate = useNavigate();
-  const handleSubmitError = (e) => {
+  const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    submit(
+    fetcher.submit(
       {
         errorDescription,
         currentState,
@@ -58,26 +66,29 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       },
     );
   };
-  const handleInactiveClose = (e) => {
-    e.preventDefault();
-    navigate(-1);
-  }
+
+  useEffect(() => {
+    if (state === 'idle') {
+      setCreditsDialogOpen(!!creditsError)
+    }
+  }, [creditsError, state])
+
   return (
     <>
-      <Dialog onOpenChange={handleInactiveClose} open={!isActive}>
+      <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
         <DialogContent className="flex w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               This campaign is currently inactive.
             </DialogTitle>
             <div className="my-4 w-[400px]">
-                <p className="mb-2">
-                  It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
-                </p>
+              <p className="mb-2">
+                It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
+              </p>
             </div>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={handleInactiveClose}>
+            <Button onClick={() => { navigate(-1) }}>
               OK
             </Button>
           </DialogFooter>
@@ -180,6 +191,28 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                 </div>
               </Form>
             </div>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setCreditsDialogOpen} open={isCreditsDialogOpen}>
+        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+          <DialogHeader>
+            <DialogTitle className="text-center font-Zilla-Slab text-2xl">
+              {hasAccess ? 'No Credits Remaining' : 'Campaign Disabled'}
+            </DialogTitle>
+            <div className="my-6 w-[400px]">
+              <p>
+                You have no credits remaining for this campaign. {hasAccess ? 'Purchase more credits to continue this campaign.' : 'Please contact your administrator to enable the campaign.'}
+              </p>
+            </div>
+            <DialogFooter>
+              <Button asChild>
+                <NavLink to={hasAccess ? "../../../settings/credits" : ".."} relative="path">
+                  {hasAccess ? 'Purchase Credits' : 'Go Back'}
+                </NavLink>
+              </Button>
+            </DialogFooter>
           </DialogHeader>
         </DialogContent>
       </Dialog>

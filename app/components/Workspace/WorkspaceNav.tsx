@@ -24,13 +24,16 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Audiences", path: "audiences", callerHidden: true },
 ];
 interface WorkspaceNavProps {
-  workspace: WorkspaceData;
+  workspace: {
+    id: string;
+    name: string;
+    credits: number;
+  };
   userRole: MemberRole;
   flags: Flags;
 }
 
 const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags }) => {
-  console.log(workspace);
   const location = useLocation();
   const userIsCaller = userRole === MemberRole.Caller;
   const getWorkspaceBaseUrl = () => {

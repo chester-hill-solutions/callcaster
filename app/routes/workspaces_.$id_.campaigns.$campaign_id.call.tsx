@@ -7,6 +7,7 @@ import {
   useSubmit,
   useNavigation,
   useNavigate,
+  useFetcher,
 } from "@remix-run/react";
 import { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -21,7 +22,7 @@ import {
   handleContact,
   handleQueue,
 } from "~/lib/callscreenActions";
-import { checkSchedule } from "~/lib/database.server";
+import { checkSchedule, getUserRole } from "~/lib/database.server";
 import { playTone } from "~/lib/utils";
 import { generateToken } from "./api.token";
 
@@ -54,6 +55,7 @@ import {
   OutreachAttempt,
   QueueItem,
 } from "~/lib/types";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 
 interface LoaderData {
   campaign: CampaignType;
@@ -62,6 +64,7 @@ interface LoaderData {
   audiences: Audience[];
   workspaceId: string;
   campaignDetails: LiveCampaign;
+  credits: number;
   contacts: Contact[];
   queue: QueueItem[];
   nextRecipient: QueueItem | null;
@@ -72,6 +75,7 @@ interface LoaderData {
   count: number;
   completed: number;
   isActive: boolean;
+  hasAccess: boolean;
 }
 
 export { ErrorBoundary };
@@ -185,7 +189,9 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   const initialRecentAttempt = attempts.data
     ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
-
+    const userRole = getUserRole({ serverSession, workspaceId: workspaceId });
+    const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
+  
   return json(
     {
       campaign: campaign.data,
@@ -193,6 +199,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       user: serverSession.user,
       audiences: audiences.data,
       campaignDetails: campaignDetails.data,
+      credits: hasAccess ? workspaceData.data.credits : 0,
       workspaceId,
       queue,
       contacts: queue.map((queueItem) => queueItem.contact),
@@ -204,6 +211,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       count: queueCount.count,
       completed: completedCount.count,
       isActive,
+      hasAccess,
     },
     { headers },
   );
@@ -240,6 +248,7 @@ const Campaign: React.FC = () => {
     user,
     workspaceId,
     campaignDetails,
+    credits,
     contacts,
     queue: initialQueue,
     nextRecipient: initialNextRecipient,
@@ -249,9 +258,9 @@ const Campaign: React.FC = () => {
     token,
     count,
     completed,
-    isActive
+    isActive,
+    hasAccess
   } = useLoaderData<LoaderData>();
-
   // State management
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [groupByHousehold] = useState<boolean>(true);
@@ -266,7 +275,6 @@ const Campaign: React.FC = () => {
   const [isErrorDialogOpen, setErrorDialog] = useState(!campaignDetails?.script_id);
   const [isDialogOpen, setDialog] = useState(campaign?.dial_type === "predictive" && !isErrorDialogOpen);
   const [isReportDialogOpen, setReportDialog] = useState(false);
-
   // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -305,6 +313,7 @@ const Campaign: React.FC = () => {
     attemptList,
     recentCall,
     recentAttempt,
+    availableCredits,
     setRecentAttempt,
     disposition,
     setDisposition,
@@ -312,7 +321,7 @@ const Campaign: React.FC = () => {
     nextRecipient,
     setNextRecipient,
   } = useSupabaseRealtime({
-    user,
+    user, 
     supabase,
     init: {
       predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
@@ -322,7 +331,9 @@ const Campaign: React.FC = () => {
       recentCall: initialRecentCall || null,
       recentAttempt: initialRecentAttempt || null,
       nextRecipient: initialNextRecipient || null,
+      credits: credits || 0,
     },
+    credits,
     contacts,
     campaign_id: campaign?.id! as unknown as string,
     activeCall,
@@ -332,15 +343,17 @@ const Campaign: React.FC = () => {
     setUpdate,
   });
 
-  const { begin, conference, setConference } = useStartConferenceAndDial(
+  const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
     user.id,
     campaign?.id! as unknown as string,
     workspaceId,
     campaign?.caller_id,
   );
 
-  const submit = useSubmit();
-
+  const fetcher = useFetcher<{creditsError?: boolean}>()
+  const queueFetcher = useFetcher<{queueError?: boolean}>()
+  const submit = fetcher.submit;
+  const creditsError = fetcher.data?.creditsError || conferenceCreditsError;
   // Action handlers
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({
@@ -356,7 +369,7 @@ const Campaign: React.FC = () => {
     calls: callsList,
   });
   const { dequeue, fetchMore } = handleQueue({
-    submit,
+    submit: queueFetcher.submit,
     groupByHousehold,
     campaign,
     workspaceId,
@@ -444,7 +457,7 @@ const Campaign: React.FC = () => {
       saveData();
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
-      handleNextNumber({ skipHousehold: true });
+      handleNextNumber(campaign?.group_household_queue || false);
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
       setUpdate({});
@@ -723,6 +736,7 @@ const Campaign: React.FC = () => {
     questionContact,
     update,
   };
+  const creditState: "GOOD" |"WARNING" |"BAD" = availableCredits > queue.length ? "GOOD" : availableCredits  > 0 && availableCredits < queue.length ? "WARNING" : "BAD";
 
   return (
     <main className="container mx-auto p-6">
@@ -754,6 +768,9 @@ const Campaign: React.FC = () => {
           handleSpeakerChange={handleSpeakerChange}
           handleMuteMicrophone={handleMuteMicrophone}
           isMicrophoneMuted={isMicrophoneMuted}
+          availableCredits={availableCredits}
+          creditState={creditState}
+          hasAccess={hasAccess}
         />
         <div className="m-4">
           <PhoneKeypad
@@ -837,6 +854,8 @@ const Campaign: React.FC = () => {
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
+        creditsError={credits === 0 || creditsError}
+        hasAccess={hasAccess}
       />
     </main>
   );

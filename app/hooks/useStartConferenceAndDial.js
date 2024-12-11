@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 
 const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId, initialConference) => {
     const [conference, setConference] = useState(initialConference);
+    const [creditsError, setCreditsError] = useState(false);
     const begin = useCallback(async () => {
         try {
             const startConferenceResponse = await fetch('/api/auto-dial', {
@@ -11,6 +12,10 @@ const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId, in
             });
 
             const startConferenceData = await startConferenceResponse.json();
+            if (startConferenceData.creditsError) {
+                setCreditsError(true);
+                return;
+            }
             if (startConferenceData.success) {
                 const conferenceName = startConferenceData.conferenceName;
                 setConference(conferenceName);
@@ -40,7 +45,7 @@ const useStartConferenceAndDial = (userId, campaignId, workspaceId, callerId, in
         }
     }, [userId, campaignId, workspaceId, callerId]);
 
-    return { begin, conference, setConference };
+    return { begin, conference, setConference, creditsError };
 };
 
 export { useStartConferenceAndDial };

@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       workspace: workspaceId,
       amount: creditAmount,
       type: 'CREDIT',
-      note: `stripe_session:${sessionId}`,
+      note: `Reloaded ${creditAmount} credits, stripe_session:${sessionId}`,
       created_at: new Date().toISOString()
     });
 

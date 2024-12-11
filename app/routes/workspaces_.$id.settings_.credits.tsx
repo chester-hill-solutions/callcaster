@@ -19,14 +19,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
-  const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id").eq("id", workspaceId).single();
-  const stripeCustomerHistory = await getStripeCustomerHistory(workspace?.stripe_id || "");
+  const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id, transaction_history(*)").eq("id", workspaceId).single();
+  //  const stripeCustomerHistory = await getStripeCustomerHistory(workspace?.stripe_id || "");
 
   if (workspaceError) throw workspaceError;
   return json({
     credits: {
       balance: workspace?.credits || 0,
-      history: stripeCustomerHistory.data.filter((session) => session.status === "complete"),
+      history: workspace?.transaction_history || [],
     },
   });
 }

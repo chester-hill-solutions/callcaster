@@ -4,7 +4,14 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
     const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id } = await request.json();
-
+    const {data, error} = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
+    if (error) throw error;
+    const credits = data.credits;
+    if (credits <= 0) {
+        return {
+            creditsError: true,
+        }
+    }
     function normalizePhoneNumber(input) {
         let cleaned = input.replace(/[^0-9+]/g, '');
 

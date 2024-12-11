@@ -14,7 +14,16 @@ exports.handler = async function (context, event, callback) {
 
   const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id, index, total, isLastContact
   } = event;
-
+  const { data: workspaceCredits, error: workspaceCreditsError } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
+  if (workspaceCreditsError) throw workspaceCreditsError;
+  const credits = workspaceCredits.credits;
+  if (credits <= 0) {
+    const {error: updateError} = await supabase.from("campaign").update({is_active:false}).eq("id", campaign_id);
+    if (updateError) throw updateError;
+    return {
+      creditsError: true,
+    }
+  }
   let outreachAttemptId;
   let call;
   const { data, error } = await supabase

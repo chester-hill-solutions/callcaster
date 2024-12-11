@@ -41,7 +41,17 @@ export const action = async ({ request }) => {
         });
         if (error) throw error;
         const owner = users.find((user) => user.user_workspace_role === "owner");
-
+        const {data: workspaceCredits, error: workspaceCreditsError} = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
+        if (workspaceCreditsError) throw workspaceCreditsError;
+        const credits = workspaceCredits.credits;
+        if (credits <= 1000) {
+            return new Response(JSON.stringify({ creditsError: true }), {
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                status: 400
+            })
+        }
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
@@ -65,6 +75,8 @@ export const action = async ({ request }) => {
             })
             .select().single();
         if (newNumberError) throw newNumberError;
+        const { error: updateError } = await supabase.from('workspace').update({credits: credits - 1000}).eq('id', workspace_id);
+        if (updateError) throw updateError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {
                 "Content-Type": "application/json"
