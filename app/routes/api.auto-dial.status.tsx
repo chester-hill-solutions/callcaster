@@ -120,7 +120,7 @@ const handleCallStatus = async (
     });
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate[0].conference_id,
-      status: ["in-progress"],
+      status: "in-progress",
     });
     if (conferences.length && status !== "completed") {
       await triggerAutoDialer(dbCall);
@@ -185,7 +185,7 @@ const handleParticipantLeave = async (
     });
     const conferences = await twilio.conferences.list({
       friendlyName: parsedBody.FriendlyName,
-      status: ["in-progress"],
+      status: "in-progress",
     });
     await Promise.all(
       conferences.map(({ sid }) =>
@@ -280,7 +280,7 @@ export const action = async ({ request }: { request: Request }) => {
     }
 
     return json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing action:", error);
     return json(
       { error: "Failed to process action: " + error.message },
