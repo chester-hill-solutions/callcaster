@@ -81,6 +81,7 @@ export const action = async ({ request }) => {
             type: "DEBIT",
             note: "Rented number - " + number.friendlyName
         });
+
         if (updateError) throw updateError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {
