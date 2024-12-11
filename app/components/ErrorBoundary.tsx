@@ -31,7 +31,7 @@ const getDetails = (error) => {
 };
 
 const MAX_ATTEMPTS = 3;
-const FALLBACK_URL = "/";
+const FALLBACK_URL = "/signin";
 const ATTEMPTS_KEY = "errorReportAttempts";
 
 export function ErrorBoundary() {
@@ -63,7 +63,7 @@ export function ErrorBoundary() {
     if (getAttempts() >= MAX_ATTEMPTS) {
       window.location.href = FALLBACK_URL;
     } else {
-      window.location.href = document.referrer || "/";
+      window.location.href = document.referrer || "/signin";
     }
   };
 

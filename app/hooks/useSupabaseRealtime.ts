@@ -16,6 +16,7 @@ interface InitialState {
   recentAttempt: OutreachAttempt | null;
   nextRecipient: QueueItem | null;
   phoneNumbers?: any;
+  credits?: number;
 }
 
 interface UseSupabaseRealtimeProps {
@@ -72,6 +73,13 @@ export const useSupabaseRealtime = ({
   const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
     usePhoneNumbers(init.phoneNumbers, workspace);
 
+    
+  const [availableCredits, setAvailableCredits] = useState(init.credits || 0);
+  const updateCredits = (payload: any) => {
+    setAvailableCredits((prev: number) => prev + payload.new.amount);
+  }
+
+
   useEffect(() => {
     const handleChange = (payload: any) => {
       switch (payload.table) {
@@ -93,6 +101,9 @@ export const useSupabaseRealtime = ({
           break;
         case "workspace_number":
           updateWorkspaceNumbers(payload);
+          break;
+        case "transaction_history":
+          updateCredits(payload);
           break;
       }
     };
@@ -158,5 +169,6 @@ export const useSupabaseRealtime = ({
     setNextRecipient,
     householdMap,
     setPhoneNumbers,
+    availableCredits
   };
 };

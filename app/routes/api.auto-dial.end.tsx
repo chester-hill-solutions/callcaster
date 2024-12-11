@@ -2,9 +2,10 @@ import { json } from "@remix-run/react";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { Tables } from "~/lib/database.types";
-import { OutreachAttempt } from "~/lib/types";
+import { Call, OutreachAttempt } from "~/lib/types";
+import { ActionFunctionArgs } from "@remix-run/node";
 
-export const action = async ({ request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   const { workspaceId: workspace_id } = await request.json();
@@ -18,6 +19,7 @@ export const action = async ({ request }) => {
     update: Partial<OutreachAttempt>,
   ) => {
     try {
+      if (!update) throw new Error("Update is required");
       const { data, error } = await supabaseClient
         .from("outreach_attempt")
         .update(update)
@@ -45,23 +47,24 @@ export const action = async ({ request }) => {
 
           const { data, error } = await supabaseClient
             .from("call")
-            .select("sid")
+            .select("sid, outreach_attempt_id")
             .eq("conference_id", conf.sid);
           if (error) throw error;
-            console.log(data)
+          if (!data || !data.length) return;
           await Promise.all(
-            data.map(async (call) => {
+            data.map(async (call: Partial<Call>) => {
+              if (!call || !call.sid || !call.outreach_attempt_id) return;
               try {
-                
+
                 if (call.outreach_attempt_id) {
                   const update = await updateOutreachAttempt(
-                    call.outreach_attempt_id,
+                    call.outreach_attempt_id.toString(),
                     { disposition: "completed" },
                   );
-                  const { data:queue, error } = await supabaseClient.rpc('dequeue_contact', { passed_contact_id: update[0].contact_id, group_on_household: true });
+                  const { data: queue, error } = await supabaseClient.rpc('dequeue_contact', { passed_contact_id: update[0].contact_id, group_on_household: true });
                   await twilio
-                  .calls(call.sid)
-                  .update({ twiml: `<Response><Hangup/></Response>` });
+                    .calls(call.sid)
+                    .update({ twiml: `<Response><Hangup/></Response>` });
                   console.log(queue, error)
                 }
               } catch (callError) {
@@ -74,7 +77,7 @@ export const action = async ({ request }) => {
         }
       }),
     );
-  } catch (e) {
+  } catch (e: any) {
     console.error("Error listing or updating conferences:", e);
     return json({ error: e.message }, { status: 500 });
   }

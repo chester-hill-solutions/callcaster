@@ -1,6 +1,8 @@
+//import * as Deno from "https://deno.land/std@0.203.0/http/server.ts";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+
 import * as crypto from "node:crypto";
 import { Buffer } from 'node:buffer';
 
@@ -107,7 +109,7 @@ const getWorkspaceOwner = async (
 ) => {
   const { data, error } = await getWorkspaceUsers(supabase, workspace_id);
   if (error) throw error;
-  return data.find((contact) => contact.user_workspace_role === "owner");
+  return data.find((contact: any) => contact.user_workspace_role === "owner");
 };
 
 const handleInitiateCampaign = async (
@@ -122,7 +124,7 @@ const handleInitiateCampaign = async (
   await handleTriggerStart(data, id, owner.id);
 };
 
-async function cancelCallAndUpdateDB(twilio, supabase, call) {
+async function cancelCallAndUpdateDB(twilio: typeof Twilio.Twilio, supabase: SupabaseClient, call: any) {
   try {
     const canceledCall = await twilio
       .calls(call.sid)
@@ -131,12 +133,12 @@ async function cancelCallAndUpdateDB(twilio, supabase, call) {
       in_call_sid: canceledCall.sid,
     });
     return canceledCall.sid;
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(`Error canceling call ${call.sid}: ${error.message}`);
   }
 }
 
-async function cancelMessageAndUpdateDB(twilio, supabase, message) {
+async function cancelMessageAndUpdateDB(twilio: typeof Twilio.Twilio, supabase: SupabaseClient, message: any) {
   try {
     const cancelledMessage = await twilio
       .messages(message.sid)
@@ -145,7 +147,7 @@ async function cancelMessageAndUpdateDB(twilio, supabase, message) {
       message_ids: cancelledMessage.sid,
     });
     return cancelledMessage.sid;
-  } catch (error) {
+  } catch (error: any) {
     throw new Error(`Error canceling call ${message.sid}: ${error.message}`);
   }
 }
@@ -169,7 +171,7 @@ const fetchQueuedCalls = async (supabase: SupabaseClient, id: string) => {
   return data;
 };
 
-async function fetchQueuedTwilioMessages(twilio) {
+async function fetchQueuedTwilioMessages(twilio: typeof Twilio.Twilio) {
   return await twilio.messages.list({
     status: "queued",
   });
@@ -189,7 +191,7 @@ async function fetchDatabaseMessages(
 
 async function fetchQueuedMessagesForCampaign(
   supabase: SupabaseClient,
-  twilio,
+  twilio: typeof Twilio.Twilio,
   campaign_id: string,
 ) {
   const [dbMessages, twilioMessages] = await Promise.all([
@@ -197,14 +199,14 @@ async function fetchQueuedMessagesForCampaign(
     fetchQueuedTwilioMessages(twilio),
   ]);
 
-  const campaignMessageSids = new Set(dbMessages.map((msg) => msg.sid));
+  const campaignMessageSids = new Set(dbMessages.map((msg: any) => msg.sid));
 
-  return twilioMessages.filter((msg) => campaignMessageSids.has(msg.sid));
+  return twilioMessages.filter((msg: any) => campaignMessageSids.has(msg.sid));
 }
 
 const handleBatch = async (
   supabase: SupabaseClient,
-  twilio,
+  twilio: typeof Twilio.Twilio,
   type: "live_call" | "message" | "robocall",
   campaign_id: string,
 ) => {
@@ -247,12 +249,13 @@ const handleBatch = async (
 const handlePauseCampaign = async (
   supabase: SupabaseClient,
   id: string,
-  twilio: any,
+  twilio: typeof Twilio.Twilio,
 ) => {
   const { data, error } = await supabase
     .from("campaign")
-    .select("type, workspace")
+    .update({status:"pending"})
     .eq("id", id)
+    .select("type, workspace")
     .single();
   if (error) throw error;
   try {
@@ -263,7 +266,7 @@ const handlePauseCampaign = async (
   }
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   console.log("Request received");
   const { record } = await req.json();
   console.log("Parsed record:", record);
@@ -292,13 +295,11 @@ Deno.serve(async (req) => {
       console.log("Initiating campaign:", record.id);
       await handleInitiateCampaign(supabase, record.id);
       
-    } else if (!record.is_active) {
+    } else if (!record.is_active && record.status === "running") {
       console.log("Pausing campaign:", record.id);
-      const {error} = await supabase.from("campaign").update({status:"scheduled"}).eq("id", record.id);
-      if (error) throw error;
       await handlePauseCampaign(supabase, record.id, twilio);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: error.message, details: error.details }),

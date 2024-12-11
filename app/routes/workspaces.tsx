@@ -22,9 +22,7 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 
-import { ErrorBoundary } from "~/components/ErrorBoundary";
-
-export { ErrorBoundary };
+export { ErrorBoundary } from "~/components/ErrorBoundary";
 
 interface Workspace {
   id: string;
@@ -198,6 +196,7 @@ const NewWorkspaceDialog = ({
     </DialogContent>
   </Dialog>
 );
+
 
 export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<LoaderData>();

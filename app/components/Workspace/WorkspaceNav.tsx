@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink, useLocation } from "@remix-run/react";
 import { Button } from "../ui/button";
 import { MemberRole } from "./TeamMember";
-import { MdSettings } from "react-icons/md";
+import { MdCreditCard, MdSettings } from "react-icons/md";
 import { Flags, WorkspaceData } from "~/lib/types";
 
 type NavItem = {
@@ -24,7 +24,11 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Audiences", path: "audiences", callerHidden: true },
 ];
 interface WorkspaceNavProps {
-  workspace: WorkspaceData;
+  workspace: {
+    id: string;
+    name: string;
+    credits: number;
+  };
   userRole: MemberRole;
   flags: Flags;
 }
@@ -91,14 +95,24 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags 
           </div>
           <div>
             {!userIsCaller && (
-              <Button size="icon" asChild variant="outline">
-                <NavLink
+              <div className="flex gap-1">
+                <Button size="icon" asChild variant="outline">
+                  <NavLink
                   to={`${baseUrl}/settings`}
-                  className="border-2 border-zinc-400"
-                >
-                  <MdSettings size={24} />
-                </NavLink>
-              </Button>
+                    className="border-2 border-zinc-400"
+                  >
+                    <MdSettings size={24} />
+                  </NavLink>
+                </Button>
+                <Button asChild variant="outline">
+                  <NavLink
+                    to={`${baseUrl}/settings/credits`}
+                    className="border-2 border-zinc-400 flex items-center gap-1 relative"
+                  >
+                    <MdCreditCard size={24} /> {workspace?.credits} <span className="text-xs absolute -bottom-5">Call Credits</span>
+                  </NavLink>
+                </Button>
+              </div>
             )}
           </div>
         </div>

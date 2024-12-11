@@ -38,22 +38,35 @@ import { SupabaseClient } from "@supabase/supabase-js";
 type LoaderData = {
   phoneNumbers: WorkspaceNumbers;
   workspaceId: string;
-  mediaNames: string[];
+  mediaNames: { id: number; name: string; }[];
   users: User[];
+  user: User;
 };
 
-export const loader = async ({ request, params }:LoaderFunctionArgs) => {
+export type FetcherData = {
+  data: WorkspaceNumbers[] | [];
+  error?: string;
+};
+export type ActionData = {
+  data: {
+    validationRequest?: ValidationRequest;
+    numberRequest?: NumberRequest;
+  }
+  error?: string;
+};
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
-  if (!serverSession.user) {
+  const workspaceId = params.id;
+  if (!serverSession.user || !workspaceId) {
     return redirect("/signin");
   }
-  const workspaceId = params.id;
+  const user = serverSession.user;
   const { data: users, error } = await getWorkspaceUsers({
     supabaseClient,
     workspaceId,
   });
-  const { data: phoneNumbers, error: numbersError }=
+  const { data: phoneNumbers, error: numbersError } =
     await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
   const { data: mediaNames } = await supabaseClient.storage
     .from("workspaceAudio")
@@ -77,12 +90,13 @@ export const loader = async ({ request, params }:LoaderFunctionArgs) => {
     {
       phoneNumbers,
       workspaceId,
-      user: serverSession?.user,
+      user,
       users,
     },
     { headers },
   );
 };
+
 type ValidationRequest = {
   accountSid: string;
   callSid: string;
@@ -108,15 +122,18 @@ type NumberRequest = Array<{
 type CallerIDResponse = {
   validationRequest: ValidationRequest;
   numberRequest: NumberRequest;
+  error?: string;
 };
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers } =
     await getSupabaseServerClientWithSession(request);
 
   const data = Object.fromEntries(await request.formData());
   const formName = data.formName;
   const workspace_id = params.id;
+  if (!workspace_id) return { error: "Workspace ID is required" };
+
   if (formName === "caller-id") {
     delete data.formName;
     const res = await fetch(`${process.env.BASE_URL}/api/caller-id`, {
@@ -130,51 +147,55 @@ export const action = async ({ request, params }) => {
     const { validationRequest, numberRequest }: CallerIDResponse =
       await res.json();
     return { validationRequest, numberRequest };
+
   } else if (formName === "remove-number") {
     delete data.formName;
     const { error } = await removeWorkspacePhoneNumber({
       supabaseClient,
-      numberId: data.numberId,
-      workspaceId: workspace_id,
+      numberId: data.numberId as unknown as bigint,
+      workspaceId: workspace_id as string,
     });
     if (error) return { error };
     return null;
+
   } else if (formName === "update-incoming-activity") {
     const { numberId, incomingActivity } = data;
     const { error: incomingActivityError } = await updateWorkspacePhoneNumber({
       supabaseClient,
-      numberId,
-      workspaceId: workspace_id,
-      updates: { inbound_action: incomingActivity },
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { inbound_action: incomingActivity as string },
     });
     if (incomingActivityError) return { error: incomingActivityError };
     return null;
+
   } else if (formName === "update-incoming-voice-message") {
     const { numberId: voiceNumberId, incomingVoiceMessage } = data;
     const { error: incomingVoiceMessageError } =
       await updateWorkspacePhoneNumber({
         supabaseClient,
-        numberId: voiceNumberId,
-        workspaceId: workspace_id,
-        updates: { inbound_audio: incomingVoiceMessage },
+        numberId: voiceNumberId as string,
+        workspaceId: workspace_id as string,
+        updates: { inbound_audio: incomingVoiceMessage as string },
       });
     if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
     return null;
+
   } else if (formName === "update-caller-id") {
     const { numberId: voiceNumberId, friendly_name } = data;
     const { data: number, error: friendlyNameError } =
       await updateWorkspacePhoneNumber({
         supabaseClient,
-        numberId: voiceNumberId,
-        workspaceId: workspace_id,
-        updates: { friendly_name },
+        numberId: voiceNumberId as string,
+        workspaceId: workspace_id as string,
+        updates: { friendly_name: friendly_name as string },
       });
     if (friendlyNameError) return { error: friendlyNameError };
     const updateData = await updateCallerId({
       supabaseClient,
-      workspaceId: workspace_id,
+      workspaceId: workspace_id as string,
       number,
-      friendly_name,
+      friendly_name: friendly_name as string,
     });
     if (updateData?.error) return { error: updateData.error };
     return null;
@@ -189,19 +210,32 @@ const WorkspaceSettings = () => {
     user,
     users,
     mediaNames,
-  } = useLoaderData<typeof loader>();
+  } = useLoaderData<LoaderData>();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
-  const actionData = useActionData();
-  const [isDialogOpen, setDialog] = useState<boolean>(!!actionData?.data);
-  const fetcher = useFetcher();
+  const actionData = useActionData<CallerIDResponse>();
+  const [isDialogOpen, setDialog] = useState<boolean>(!!actionData?.validationRequest);
+  const fetcher = useFetcher<FetcherData>();
   const updateFetcher = useFetcher();
 
   const { phoneNumbers, setPhoneNumbers } = useSupabaseRealtime({
     supabase,
     user,
     workspace: workspaceId,
-    init: { phoneNumbers: initNumbers, queue: [], callsList: [] },
+    init: {
+      phoneNumbers: initNumbers,
+      queue: [],
+      callsList: [],
+      predictiveQueue: [],
+      attempts: [],
+      recentCall: null,
+      recentAttempt: null,
+      nextRecipient: null
+    },
+    campaign_id: '',
+    predictive: false,
     setQuestionContact: () => null,
+    setCallDuration: () => null,
+    setUpdate: () => null,
   });
 
   useEffect(() => {
@@ -213,30 +247,30 @@ const WorkspaceSettings = () => {
     }
   }, [actionData]);
 
-  const handleIncomingActivityChange = (numberId: string, value: string) => {
+  const handleIncomingActivityChange = (numberId: number, value: string) => {
     updateFetcher.submit(
-      { formName: "update-incoming-activity", numberId, incomingActivity: value },
+      { formName: "update-incoming-activity", numberId: String(numberId), incomingActivity: value },
       { method: "POST" }
     );
   };
 
-  const handleIncomingVoiceMessageChange = (numberId: string, value: string) => {
+  const handleIncomingVoiceMessageChange = (numberId: number, value: string) => {
     updateFetcher.submit(
-      { formName: "update-incoming-voice-message", numberId, incomingVoiceMessage: value },
+      { formName: "update-incoming-voice-message", numberId: String(numberId), incomingVoiceMessage: value },
       { method: "POST" }
     );
   };
 
-  const handleCallerIdChange = (numberId: string, value: string) => {
+  const handleCallerIdChange = (numberId: number, value: string) => {
     updateFetcher.submit(
-      { formName: "update-caller-id", numberId, friendly_name: value },
+      { formName: "update-caller-id", numberId: String(numberId), friendly_name: value },
       { method: "POST" }
     );
   };
 
-  const handleNumberRemoval = (numberId: string) => {
+  const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
-      { formName: "remove-number", numberId },
+      { formName: "remove-number", numberId: String(numberId) },
       { method: "POST" }
     );
   };
@@ -246,7 +280,7 @@ const WorkspaceSettings = () => {
       <VerificationDialog
         isOpen={isDialogOpen}
         onOpenChange={setDialog}
-        validationRequest={actionData?.validationRequest}
+        validationRequest={actionData?.validationRequest as ValidationRequest}
       />
       <div className="flex flex-col min-h-screen">
         <BackButton disabled={updateFetcher.state !== "idle"} />
@@ -264,11 +298,11 @@ const WorkspaceSettings = () => {
             />
           </Panel>
           <div className="flex flex-col flex-grow flex-shrink-0 basis-full lg:basis-[calc(33.333%-1rem)] gap-4">
-            <Panel>
+            <Panel className="" >
               <NumberCallerId />
             </Panel>
-            <Panel>
-              <NumberPurchase fetcher={fetcher} workspaceId={workspaceId} />
+            <Panel className="">
+              <NumberPurchase fetcher={fetcher} workspaceId={workspaceId ?? ""} />
             </Panel>
           </div>
         </div>
@@ -277,7 +311,7 @@ const WorkspaceSettings = () => {
   );
 };
 
-const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }: { isOpen: boolean, onOpenChange: (open: boolean) => void, validationRequest: ValidationRequest } ) => (
+const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }: { isOpen: boolean, onOpenChange: (open: boolean) => void, validationRequest: ValidationRequest }) => (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="flex w-[450px] flex-col items-center bg-card">
       <DialogHeader>

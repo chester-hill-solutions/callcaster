@@ -44,12 +44,12 @@ export default function SelectDates({
       ) ||
       {},
   );
-  const utcToLocal = (utcTime) => {
+  const utcToLocal = (utcTime: string) => {
     if (!utcTime) return "";
     const [hours, minutes] = utcTime.split(":");
     const date = new Date();
-    date.setUTCHours(hours);
-    date.setUTCMinutes(minutes);
+    date.setUTCHours(Number(hours));
+    date.setUTCMinutes(Number(minutes));
     return date.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
@@ -57,12 +57,12 @@ export default function SelectDates({
     });
   };
 
-  const localToUTC = (localTime) => {
+  const localToUTC = (localTime: string) => {
     if (!localTime) return "";
     const [hours, minutes] = localTime.split(":");
     const date = new Date();
-    date.setHours(hours);
-    date.setMinutes(minutes);
+    date.setHours(Number(hours));
+    date.setMinutes(Number(minutes));
     return date.toUTCString().slice(17, 22);
   };
 

@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
-
+import { SupabaseClient } from "@supabase/supabase-js";
 const initSupabaseClient = () => {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -7,13 +7,13 @@ const initSupabaseClient = () => {
   );
 };
 
-const generateCronExpressions = async (schedule, supabase) => {
+const generateCronExpressions = async (schedule: string, supabase: SupabaseClient) => {
   const { data, error } = await supabase.rpc('generate_cron_expressions', { schedule });
   if (error) throw error;
   return data;
 };
 
-const createCronJob = async (supabase, jobName, schedule, command) => {
+const createCronJob = async (supabase: SupabaseClient, jobName: string, schedule: string, command: string) => {
   const { data, error } = await supabase.rpc('create_cron_job', {
     p_job_name: jobName,
     p_schedule: schedule,
@@ -26,7 +26,7 @@ const createCronJob = async (supabase, jobName, schedule, command) => {
   return data[0].job_id;
 };
 
-const storeJobIds = async (supabase, campaignId, startJobIds, endJobIds) => {
+const storeJobIds = async (supabase: SupabaseClient, campaignId: string, startJobIds: string[], endJobIds: string[]) => {
   const { data, error } = await supabase.from('campaign_schedule_jobs')
     .upsert({ 
       campaign_id: campaignId, 
@@ -42,7 +42,7 @@ const splitCronExpressions = (cronString: string): string[] => {
   return cronString.split('|').map(expr => expr.trim());
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   const { record } = await req.json();
   const supabase = initSupabaseClient();
   try {
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
             supabase,
             `campaign_start_${record.id}_${i}`,
             startSchedules[i],
-            `UPDATE public.campaign SET is_active = true WHERE id = ${record.id} AND status = 'scheduled'`
+            `UPDATE public.campaign SET is_active = true WHERE id = ${record.id} AND (status = 'scheduled' OR status = 'pending')`
           );
           startJobIds.push(startJobId);
         }
@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
             supabase,
             `campaign_end_${record.id}_${i}`,
             endSchedules[i],
-            `UPDATE public.campaign SET is_active = false WHERE id = ${record.id} AND status = 'scheduled'`
+            `UPDATE public.campaign SET is_active = false WHERE id = ${record.id} AND status = 'running'`
           );
           endJobIds.push(endJobId);
         }

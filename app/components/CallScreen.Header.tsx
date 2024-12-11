@@ -17,6 +17,9 @@ interface CampaignHeaderProps {
   handleSpeakerChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
   handleMuteMicrophone: () => void;
   isMicrophoneMuted: boolean;
+  availableCredits: number;
+  creditState: "GOOD" |"WARNING" |"BAD";
+  hasAccess: boolean;
 }
 
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
@@ -32,6 +35,9 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   handleSpeakerChange,
   handleMuteMicrophone,
   isMicrophoneMuted,
+  availableCredits,
+  creditState,
+  hasAccess,
 }) => {
   return (
     <div className="flex flex-col gap-6 p-6 w-full">
@@ -41,6 +47,18 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           <p className="text-gray-600 mt-1">
             {count - completed} of {count} remaining
           </p>
+          {hasAccess && <p className="text-gray-600 mt-1 flex items-center gap-2">
+            {availableCredits} credits remaining
+            <span className={`px-2 py-0.5 rounded-full text-sm ${
+              creditState === "GOOD" ? "bg-green-100 text-green-800" :
+              creditState === "WARNING" ? "bg-yellow-100 text-yellow-800" :
+              "bg-red-100 text-red-800"
+            }`}>
+              {creditState === "GOOD" ? "Healthy" :
+               creditState === "WARNING" ? "Running Low" :
+               "Critical"}
+            </span>
+          </p>}
         </div>
         <div className="flex gap-3">
           <Button 

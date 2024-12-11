@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import MailService from "@sendgrid/mail";
-import { json } from "@remix-run/node";
+import { ActionFunctionArgs, json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
+import { Workspace, WorkspaceNumber } from "~/lib/types";
+import { MailDataRequired } from "@sendgrid/mail";
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }:ActionFunctionArgs) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
@@ -26,13 +28,14 @@ export const action = async ({ request, params }) => {
       .select(`
         inbound_action,
         type,
-        workspace (id, twilio_data)
+        workspace (id, twilio_data, name)
       `)
       .eq("phone_number", call.to)
-      .single();
+      .single<WorkspaceNumber & {workspace: Workspace}>();
 
     if (numberError) throw new Error(`Error fetching workspace number: ${numberError.message}`);
-
+    if (!number.workspace) throw new Error(`Workspace not found`); 
+    if (!number.workspace.twilio_data) throw new Error(`Workspace twilio data not found`);
     const action = number.inbound_action;
     const now = new Date();
     
@@ -44,7 +47,8 @@ export const action = async ({ request, params }) => {
 
     if (!recordingResponse.ok) throw new Error(`Failed to fetch recording: ${recordingResponse.statusText}`);
 
-    const recording = await recordingResponse.blob();
+    const recording = await recordingResponse.blob()
+    const recordingBase64 = await recording.text()  
 
     const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -52,7 +56,7 @@ export const action = async ({ request, params }) => {
       .upload(fileName, recording, {
         cacheControl: "60",
         upsert: false,
-        contentType: "audio/mpeg",
+        contentType: "audio/mpeg",  
       });
 
     if (uploadError) throw new Error(`Error uploading to Supabase: ${uploadError.message}`);
@@ -60,19 +64,34 @@ export const action = async ({ request, params }) => {
     const { data: signedUrlData, error: signedUrlError } = await supabase
       .storage
       .from('workspaceAudio')
-      .createSignedUrl(fileName, 3600);
+      .createSignedUrl(fileName, 8640000, { download: true });
 
     if (signedUrlError) throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
 
     const signedUrl = signedUrlData.signedUrl;
 
     MailService.setApiKey(process.env.SENDGRID_API_KEY!);
-    const msg = {
-      to: action,
-      from: "info@callcaster.ca",
-      subject: `A new voicemail from ${call.from}`,
-      text: `A new voicemail has been recorded for you, you can listen at ${signedUrl}`,
-      html: `<p>A new voicemail has been recorded for you, you can listen to it at <a href="${signedUrl}">this link</a>.</p>`,
+    const msg: MailDataRequired = {
+      templateId: "d-8f12a98fe1af438cae0efdced5eeb512",
+      from: {
+        email: "info@callcaster.ca",
+        name: "Callcaster"
+      },
+      personalizations: [
+        {
+          to: [{ 
+            email: action?.toString() || '',
+            name: ""
+          }],
+          dynamicTemplateData: {
+            caller_number: call.from,
+            to_number: call.to,
+            workspace_name: number.workspace.name,
+            workspace_link: `${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails`,
+            voicemail_url: signedUrl,
+          },
+        },
+      ],
     };
 
     const result = await MailService.send(msg);

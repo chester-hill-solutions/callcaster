@@ -5,7 +5,16 @@ import { createWorkspaceTwilioInstance } from '../lib/database.server';
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
     const { user_id, caller_id, campaign_id, workspace_id } = await request.json();
-    const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id});
+    const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
+    if (error) throw error;
+    const credits = data.credits;
+    if (credits <= 0) {
+        return {
+            creditsError: true,
+        }
+    }
+
+    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
     const conferenceName = user_id;
     try {
         const call = await twilio.calls.create({
@@ -38,7 +47,7 @@ export const action = async ({ request }) => {
             workspace: workspace_id,
             conference_id: user_id
         };
-        
+
 
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
         const { error } = await supabase.from('call').upsert({ ...callData }).select();

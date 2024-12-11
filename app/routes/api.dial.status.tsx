@@ -2,27 +2,32 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { ActionFunction, ActionFunctionArgs } from "@remix-run/node";
 
-export const action = async ({ request }) => {
+export const action:ActionFunction = async ({ request }: ActionFunctionArgs) => {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     const formData = await request.formData();
 
-    const parsedBody = {};
+    const parsedBody: { [key: string]: FormDataEntryValue } = {};
 
     for (const pair of formData.entries()) {
-        parsedBody[pair[0]] = pair[1];
+        parsedBody[pair[0]] = pair[1] as string;
     }
+    
     try {
         const { data: dbCall, error: callError } = await supabase.from('call').select('campaign_id, outreach_attempt_id, workspace').eq('sid', parsedBody.CallSid).single();
         if (callError) throw callError
-        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
+        const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
         const { data: campaign, error: campaignError } = await supabase.from('campaign').select('voicemail_file').eq('id', dbCall.campaign_id).single();
         if (campaignError) throw campaignError
-        const { data, error: voicemailError } = campaign.voicemail_file ? await supabase.storage.from(`workspaceAudio`).createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600) : {data:null, error:null}
+        const { data, error: voicemailError } = campaign.voicemail_file ? await supabase.storage.from(`workspaceAudio`).createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600) : { data: null, error: null }
         if (voicemailError) throw voicemailError
+        if (typeof parsedBody.CallSid !== 'string') throw new Error('CallSid must be a string');
         const call = twilio.calls(parsedBody.CallSid);
         const answeredBy = formData.get('AnsweredBy');
         const callStatus = formData.get('CallStatus')
+        if (answeredBy && typeof answeredBy !== 'string') throw new Error('AnsweredBy must be a string');
+        if (callStatus && typeof callStatus !== 'string') throw new Error('CallStatus must be a string');
         if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
             try {
                 if (data && data.signedUrl) {

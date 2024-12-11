@@ -47,8 +47,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId);
-
-  if (mediaError) {
+  
+    if (mediaError) {
     console.log("Media Error: ", mediaError);
     return json(
       {
@@ -73,7 +73,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       { headers },
     );
   }
-
+  
   const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
   const { data: signedUrls, error: signedUrlsError } =
     await supabaseClient.storage
@@ -108,7 +108,7 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-undefined"));
+  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+" || "voicemail-undefined"));
   
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

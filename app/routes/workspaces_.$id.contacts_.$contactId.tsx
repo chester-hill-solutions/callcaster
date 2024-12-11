@@ -121,7 +121,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, serverSession } = 
     await getSupabaseServerClientWithSession(request);
 
-  const {id, initial_audiences, contact_audience, ...contactData} = contact;
+  const {id, initial_audiences, contact_audience, outreach_attempt, ...contactData} = contact;
+  
+  // Normalize phone number if present
+  if (contactData.phone) {
+    let cleaned = contactData.phone.replace(/[^0-9+]/g, "");
+    if (cleaned.indexOf("+") > 0) {
+      cleaned = cleaned.replace(/\+/g, "");
+    }
+    if (!cleaned.startsWith("+")) {
+      cleaned = "+" + cleaned;
+    }
+    if (cleaned.length < 11) {
+      cleaned = "+1" + cleaned.replace("+", "");
+    }
+    contactData.phone = cleaned;
+  }
 
   let savedContact = null;
   if (contactId === 'new') {
@@ -151,7 +166,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .in("contact_id", [contactId])
       .in(
         "audience_id",
-        deletions.map((d) => d.audience_id),
+        deletions.map((d) => d?.audience_id),
       );
     if (deleteError) {
       console.error("Error deleting contact audiences:", deleteError);
@@ -166,7 +181,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .from("contact_audience")
       .insert(additions.map(a => ({
         audience_id: Number(a?.audience_id),
-        contact_id: Number(a?.contact_id)
+        contact_id: savedContact.id
       })));
 
     if (insertError) {
@@ -176,22 +191,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         { status: 400 },
       );
     }
-  }
-
-  if (contactId !== 'new') {
-    return redirect(`/workspaces/${workspaceId}/contacts/${contactId}`);
-  }
-  const { data: contactUpdate, error: updateError } = await supabaseClient
-    .from("contact")
-    .update(contactData)
-    .eq("id", Number(contactId))
-    .select();
-
-  if (updateError) {
-    console.log(updateError);
-    return json({ success: false, error: updateError }, { headers });
-  }
-  return json({ success: true, contact: contactUpdate }, { headers });
+  } 
+  return redirect(`/workspaces/${workspaceId}/contacts/${savedContact.id}`);
 };
 
 export default function ContactScreen() {

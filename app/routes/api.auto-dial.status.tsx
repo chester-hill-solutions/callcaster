@@ -90,17 +90,21 @@ const handleCallStatus = async (
   dbCall: Tables<"call">,
   twilio: Twilio,
   realtime: RealtimeChannel,
-  status: string,
+  status: Tables<"call">["status"],
+  duration: number
 ) => {
   try {
     const callUpdate = await updateCall(parsedBody.CallSid, {
-      end_time: new Date(parsedBody.Timestamp),
-      status,
+      end_time: new Date(parsedBody.Timestamp).toISOString(),
+      status: status?.toLowerCase() as Tables<"call">["status"],
+      duration: duration.toString()
     });
     const outreachStatus = await updateOutreachAttempt(
       callUpdate[0].outreach_attempt_id,
-      { disposition: status },
+      { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
     );
+    const transaction = await updateTransaction(callUpdate[0], duration);
+
     const { error } = await supabase.rpc("dequeue_contact", {
       passed_contact_id: outreachStatus[0].contact_id,
       group_on_household: true,
@@ -116,9 +120,9 @@ const handleCallStatus = async (
     });
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate[0].conference_id,
-      status: ["in-progress"],
+      status: "in-progress",
     });
-    if (conferences.length) {
+    if (conferences.length && status !== "completed") {
       await triggerAutoDialer(dbCall);
     }
   } catch (error) {
@@ -127,19 +131,41 @@ const handleCallStatus = async (
   }
 };
 
+const onePerSixty = (duration: number) => {
+  return Math.floor(duration / 60) + 1;
+}
+const updateTransaction = async (call: Tables<"call">, duration: number) => {
+  const billingUnits = onePerSixty(duration);
+  const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
+    workspace: call.workspace,
+    type: "DEBIT",
+    amount: -billingUnits,
+    note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
+  }).select();
+  if (transactionError) {
+    console.error("Error creating transaction:", transactionError);
+    throw transactionError;
+  }
+  return transaction;
+}
+
 const handleParticipantLeave = async (
   parsedBody: { [x: string]: string },
   twilio: Twilio,
   realtime: RealtimeChannel,
 ) => {
+
   try {
     const dbCall = await updateCall(parsedBody.CallSid, {
-      end_time: new Date(parsedBody.Timestamp),
+      end_time: new Date(parsedBody.Timestamp).toISOString(),
+      duration: Math.max(Number(parsedBody.Duration), Number(parsedBody.CallDuration)).toString(),
+      status: parsedBody?.CallStatus?.toLowerCase() as Tables<"call">["status"]
     });
     const outreachStatus = await updateOutreachAttempt(
       dbCall[0].outreach_attempt_id,
-      { disposition: "completed", ended_at: new Date() },
+      { disposition: "completed", ended_at: new Date().toISOString() },
     );
+    
     const { error } = await supabase.rpc("dequeue_contact", {
       passed_contact_id: outreachStatus[0].contact_id,
       group_on_household: true,
@@ -159,7 +185,7 @@ const handleParticipantLeave = async (
     });
     const conferences = await twilio.conferences.list({
       friendlyName: parsedBody.FriendlyName,
-      status: ["in-progress"],
+      status: "in-progress",
     });
     await Promise.all(
       conferences.map(({ sid }) =>
@@ -181,13 +207,13 @@ const handleParticipantJoin = async (
     if (!dbCall.conference_id) {
       await updateCall(parsedBody.CallSid, {
         conference_id: parsedBody.ConferenceSid,
-        start_time: new Date(parsedBody.Timestamp),
+        start_time: new Date(parsedBody.Timestamp).toISOString(),
       });
     }
     if (dbCall.outreach_attempt_id) {
       const outreachStatus = await updateOutreachAttempt(
         `${dbCall.outreach_attempt_id}`,
-        { disposition: "in-progress", answered_at: new Date() },
+        { disposition: "in-progress", answered_at: new Date().toISOString() },
       );
       await updateCampaignQueue(outreachStatus[0].contact_id, {
         status: parsedBody.FriendlyName,
@@ -208,6 +234,7 @@ const handleParticipantJoin = async (
 };
 
 export const action = async ({ request }: { request: Request }) => {
+
   let realtime;
   try {
     const formData = await request.formData();
@@ -227,17 +254,18 @@ export const action = async ({ request }: { request: Request }) => {
       workspace_id: dbCall.workspace,
     });
     realtime = supabase.channel(parsedBody.ConferenceSid);
-
     switch (parsedBody.CallStatus) {
       case "failed":
       case "busy":
       case "no-answer":
+      case "completed":
         await handleCallStatus(
           parsedBody,
           dbCall,
           twilio,
           realtime,
-          parsedBody.CallStatus.toLowerCase(),
+          parsedBody.CallStatus?.toLowerCase() as Tables<"call">["status"],
+          Math.max(Number(parsedBody.CallDuration), Number(parsedBody.Duration))
         );
         break;
       default:
@@ -252,7 +280,7 @@ export const action = async ({ request }: { request: Request }) => {
     }
 
     return json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing action:", error);
     return json(
       { error: "Failed to process action: " + error.message },
