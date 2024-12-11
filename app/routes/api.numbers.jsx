@@ -75,7 +75,13 @@ export const action = async ({ request }) => {
             })
             .select().single();
         if (newNumberError) throw newNumberError;
-        const { error: updateError } = await supabase.from('workspace').update({credits: credits - 1000}).eq('id', workspace_id);
+        const { error: updateError } = await supabase.from('transaction_history').insert({
+            workspace: workspace_id,
+            amount: -1000,
+            type: "DEBIT",
+            note: "Rented number - " + number.friendlyName
+        });
+
         if (updateError) throw updateError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {

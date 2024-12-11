@@ -26,7 +26,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return json({
     credits: {
       balance: workspace?.credits || 0,
-      history: workspace?.transaction_history || [],
+      history: workspace?.transaction_history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [],
     },
   });
 }
@@ -207,11 +207,11 @@ export default function Credits() {
             <tbody>
               {credits.history.map((transaction) => (
                 <tr key={transaction.id} className="border-b">
-                  <td className="py-2">{formatDate(transaction.created)}</td>
-                  <td className="py-2">{transaction.metadata?.creditAmount} credits</td>
-                  <td className={`py-2 text-right ${transaction.amount_total && transaction.amount_total > 0 ? "text-green-600" : "text-red-600"
+                  <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
+                  <td className="py-2 px-2 max-w-xs text-xs">{transaction.note}</td>
+                  <td className={`py-2 text-right ${transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
                     }`}>
-                    {transaction.amount_total && transaction.amount_total > 0 ? "$" : ""}{transaction.amount_total ? (transaction.amount_total / 100).toFixed(2) : "0.00"}
+                    {transaction.amount}
                   </td>
                 </tr>
               ))}
