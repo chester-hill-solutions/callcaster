@@ -1,5 +1,6 @@
+import { FetcherWithComponents } from "@remix-run/react";
 import { getNextContact } from "./getNextContact";
-import { Contact } from "./types";
+import { Campaign, Contact, QueueItem } from "./types";
 import { isRecent } from "./utils";
 
 const getRecentAttempt = ({ attempts, contact }) => {
@@ -99,6 +100,12 @@ export const handleContact = ({
     householdMap,
     nextRecipient,
     groupByHousehold,
+  }: {
+    skipHousehold: boolean;
+    queue: QueueItem[];
+    householdMap: Map<string, QueueItem[]>;
+    nextRecipient: QueueItem | null;
+    groupByHousehold: boolean;
   }) => {
     const nextContact = getNextContact(
       queue,
@@ -133,8 +140,15 @@ export const handleQueue = ({
   campaign,
   workspaceId,
   setQueue,
+}:{
+  submit: FetcherWithComponents<any>["submit"];  
+  groupByHousehold: boolean;
+  campaign: Campaign;
+  workspaceId: string;
+  setQueue: (queue: QueueItem[]) => void;
 }) => {
-  const dequeue = ({ contact }) => {
+  const dequeue = ({ contact }:{contact:QueueItem }) => {
+    if (!contact || !contact.contact || !contact.contact.phone) return;
     submit(
       {
         contact_id: contact.contact.id,

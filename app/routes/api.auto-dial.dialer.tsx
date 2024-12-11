@@ -1,7 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { Twilio } from "twilio";
 
-function normalizePhoneNumber(input) {
+function normalizePhoneNumber(input:string) {
   let cleaned = input.replace(/[^0-9+]/g, "");
   if (cleaned.indexOf("+") > 0) {
     cleaned = cleaned.replace(/\+/g, "");
@@ -20,7 +21,7 @@ function normalizePhoneNumber(input) {
   return cleaned;
 }
 
-async function getNextContact(supabase, campaign_id, user_id) {
+async function getNextContact(supabase: SupabaseClient, campaign_id: number, user_id: string) {
   const { data: record, error } = await supabase.rpc("auto_dial_queue", {
     campaign_id_variable: campaign_id,
     user_id_variable: user_id,
@@ -30,11 +31,11 @@ async function getNextContact(supabase, campaign_id, user_id) {
 }
 
 async function createOutreachAttempt(
-  supabase,
-  contactRecord,
-  campaign_id,
-  workspace_id,
-  user_id,
+  supabase: SupabaseClient,
+  contactRecord: { contact_id: number, queue_id: number },
+  campaign_id: number,
+  workspace_id: string,
+  user_id: string,
 ) {
   const { data: outreachAttempt, error } = await supabase.rpc(
     "create_outreach_attempt",
@@ -50,7 +51,7 @@ async function createOutreachAttempt(
   return outreachAttempt;
 }
 
-async function createTwilioCall(twilio, toNumber, fromNumber, user_id) {
+async function createTwilioCall(twilio: Twilio, toNumber: string, fromNumber: string, user_id: string) {
   return await twilio.calls.create({
     to: toNumber,
     from: fromNumber,
@@ -61,7 +62,7 @@ async function createTwilioCall(twilio, toNumber, fromNumber, user_id) {
   });
 }
 
-async function saveCallToDatabase(supabase, callData) {
+async function saveCallToDatabase(supabase: SupabaseClient, callData: any) {
   Object.keys(callData).forEach(
     (key) => callData[key] === undefined && delete callData[key],
   );
@@ -72,7 +73,7 @@ async function saveCallToDatabase(supabase, callData) {
   if (error) console.error("Error saving the call to the database:", error);
 }
 
-async function completeAllConferences(twilio, user_id) {
+async function completeAllConferences(twilio: Twilio, user_id: string) {
   const conferences = await twilio.conferences.list({
     friendlyName: user_id,
     status: ["in-progress"],
@@ -84,7 +85,7 @@ async function completeAllConferences(twilio, user_id) {
   );
 }
 
-export const action = async ({ request }) => {
+export const action = async ({ request }: { request: Request }) => {
   const supabase = createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_KEY!,
@@ -164,7 +165,7 @@ export const action = async ({ request }) => {
         },
       );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error dialing number:", error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),

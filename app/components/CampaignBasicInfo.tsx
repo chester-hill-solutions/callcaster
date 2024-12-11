@@ -92,7 +92,7 @@ interface CampaignBasicInfoProps {
   flags: Flags;
 
   handleButton: (type: "play" | "pause" | "archive" | "schedule") => void;
-
+  handleConfirmStatus: (status: "queue" | "play" | "archive" | "none") => void;
   handleDuplicateButton: () => void;
   joinDisabled: string | null;
   formFetcher: FetcherWithComponents<{
@@ -112,6 +112,7 @@ export const CampaignBasicInfo = ({
   joinDisabled,
   flags,
   handleButton,
+  handleConfirmStatus,
   handleDuplicateButton,
   formFetcher,
   details,
@@ -154,6 +155,8 @@ export const CampaignBasicInfo = ({
                 e.preventDefault();
                 if (type === "duplicate") {
                   handleDuplicateButton();
+                } else if (type === "play" || type === "schedule" || type === "archive") {
+                  handleConfirmStatus(type);
                 } else {
                   handleButton(type as "play" | "pause" | "archive" | "schedule");
                 }

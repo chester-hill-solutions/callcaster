@@ -26,7 +26,7 @@ const getVoicemailSignedUrl = async (workspace, voicemailFile) => {
 
 const dequeueContact = async (contactId, groupOnHousehold) => {
     if (groupOnHousehold) {
-        const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contactId, group_on_household: true });
+        const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contactId, group_on_household: groupOnHousehold });
         if (error) throw new Error(`Error dequeueing household: ${error.message}`);
         return data;
     } else {

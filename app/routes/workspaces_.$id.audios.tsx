@@ -108,7 +108,7 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter((media) => !media.name.includes("voicemail-undefined"));
+  const workspaceAudios = audioMedia?.filter((media) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">

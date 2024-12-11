@@ -39,8 +39,7 @@ export const action = async ({ request }) => {
         status: (underCaseData.call_status || underCaseData.status),
         start_time: underCaseData.start_time,
         end_time: underCaseData.end_time,
-        duration: underCaseData.duration,
-        call_duration: underCaseData.duration,
+        duration: Math.max(Number(underCaseData.duration), Number(underCaseData.call_duration)),
         direction: underCaseData.direction,
         api_version: underCaseData.api_version,
         forwarded_from: underCaseData.forwarded_from,
@@ -62,7 +61,7 @@ export const action = async ({ request }) => {
     }
     const { data: currentAttempt, error: fetchError } = await supabase
         .from('outreach_attempt')
-        .select('disposition, contact_id')
+        .select('disposition, contact_id, workspace')
         .eq('id', data[0].outreach_attempt_id)
         .single();
     if (fetchError) {
@@ -75,16 +74,8 @@ export const action = async ({ request }) => {
             status: underCaseData.call_status
         }
     });
-    const { data: updatedCall, error: updateCallError } = await supabase.from('call')
-        .update({ underCaseData })
-        .eq('sid', underCaseData.call_sid)
-        .single();
-    if (updateCallError) {
-        console.error('Error updating call:', updateCallError);
-    }
-
-    if (["initiated", "ringing", "in-progress", "idle"].includes(currentAttempt.disposition)) {
-        console.log("updating", currentAttempt.disposition, underCaseData.call_status)
+    
+    if (["initiated", "ringing", "in-progress", "idle"].includes(underCaseData.call_status)) {
         const { data: updateAttempt, error: updateError } = await supabase
             .from('outreach_attempt')
             .update({ disposition: underCaseData.call_status })
@@ -96,6 +87,22 @@ export const action = async ({ request }) => {
             return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
         }
     }
-
-    return json({ success: true });
+    const onePerSixty = (duration) => {
+        return Math.floor(duration / 60) + 1;
+    }
+    if (["completed", "failed", "no-answer", "busy"].includes(underCaseData.call_status)) {
+        const billingUnits = onePerSixty(Math.max(Number(underCaseData.duration), Number(underCaseData.call_duration)));
+        const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
+            workspace: currentAttempt.workspace,
+            type: "DEBIT",
+            amount: -billingUnits,
+            note: `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${currentAttempt.id}`
+        }).select();
+        if (transactionError) {
+            console.error('Error creating transaction:', transactionError);
+            return json({ success: false, error: 'Failed to create transaction' }, { status: 500 });
+        }
+        console.log("transaction", transaction)
+    }
+    return json({ success: true })
 }

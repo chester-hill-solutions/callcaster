@@ -28,18 +28,24 @@ export const createSupabaseServerClient = (request: Request) => {
 
 export async function getSupabaseServerClientWithSession(request: Request) {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const nextUrl = new URL(request.url);
   const {
     data: { session: serverSession },
   } = await supabaseClient.auth.getSession();
   if (!serverSession) {
-    throw redirect("/signin");
+    throw redirect(`/signin?next=${nextUrl.pathname}`);
   }
   const {
     data: { user },
     error,
   } = await supabaseClient.auth.getUser();
   if (!user || error){
-    throw redirect("/signin");
+    throw redirect(`/signin?next=${nextUrl.pathname}`);
   }
   return { supabaseClient, headers, serverSession, user };
+}
+
+export async function signOut(request: Request) {
+  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  await supabaseClient.auth.signOut();
 }

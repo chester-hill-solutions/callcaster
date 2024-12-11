@@ -52,7 +52,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!workspace_id || !campaign_id) throw redirect("../");
   const { data: users } = await getWorkspaceUsers({ supabaseClient, workspaceId: workspace_id });
   const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
-
+  
   if (!outreachData || outreachData.length === 0) {
     return new Response("No data found", { status: 404 });
   }
@@ -79,7 +79,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!campaignData) throw redirect("../../");
 
   const campaignCounts = await fetchCampaignCounts(supabaseClient, selected_id);
-  const { data: phoneNumbers } = await getWorkspacePhoneNumbers({ supabaseClient, workspaceId: workspace_id });
+  const { data: workspace, error } = await supabaseClient.from('workspace').select('id, name, credits, workspace_number(*)').eq('id', workspace_id).single();
+  if (error) { console.error("Error fetching workspace", error); throw error;};
+  const credits = workspace.credits;
 
   const scripts = await getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient });
 
@@ -126,7 +128,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     user: serverSession?.user,
     results: fetchBasicResults(supabaseClient, selected_id),
     campaignCounts,
-    phoneNumbers,
+    phoneNumbers: workspace.workspace_number,  
+    credits: workspace.credits,
     mediaData: mediaData ?? [],
     scripts,
     mediaLinks: mediaLinksPromise,
@@ -152,6 +155,7 @@ export default function CampaignScreen() {
     scripts,
     mediaLinks,
     isActive,
+    credits,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
@@ -227,6 +231,7 @@ export default function CampaignScreen() {
           mediaLinks,
           flags,
           scheduleDisabled,
+          credits,
         }}
       />
     </div>

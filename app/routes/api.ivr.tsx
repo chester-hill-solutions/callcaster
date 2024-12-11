@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { ActionFunctionArgs } from "@remix-run/node";
 
-export const action = async ({ request }) => {
+export const action = async ({ request }:ActionFunctionArgs) => {
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
   const baseUrl = process.env.BASE_URL;
@@ -13,14 +14,16 @@ export const action = async ({ request }) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   const formData = await request.formData();
 
-  const to_number = formData.get("to_number");
-  const campaign_id = formData.get("campaign_id");
-  const workspace_id = formData.get("workspace_id");
-  const contact_id = formData.get("contact_id");
-  const caller_id = formData.get("caller_id");
-  const queue_id = formData.get("queue_id");
-  const user_id = formData.get("user_id");
-
+  const to_number = formData.get("to_number") as string;
+  const campaign_id = formData.get("campaign_id") as string;
+  const workspace_id = formData.get("workspace_id") as string;
+  const contact_id = formData.get("contact_id") as string;
+  const caller_id = formData.get("caller_id") as string;
+  const queue_id = formData.get("queue_id") as string;
+  const user_id = formData.get("user_id") as string;
+  if (!workspace_id || !campaign_id || !contact_id || !caller_id || !queue_id || !user_id) {
+    throw new Error("Missing required form data");
+  }
   let outreachAttemptId;
   let call;
   const twilio = await createWorkspaceTwilioInstance({
@@ -77,7 +80,7 @@ export const action = async ({ request }) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing call:", error);
 
     if (outreachAttemptId) {
