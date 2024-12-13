@@ -604,11 +604,13 @@ export async function endConferenceByUser({ user_id, supabaseClient, workspace_i
     data.twilio_data.sid,
     data.twilio_data.authToken,
   );
-  if (!user_id)
-    const conferences = await twilio.conferences.list({
-      friendlyName: user_id,
-      status: ["in-progress"],
-    });
+  if (!user_id) {
+    throw new Error("User ID is required"); 
+  }
+  const conferences = await twilio.conferences.list({
+    friendlyName: user_id,
+    status: ["in-progress"],
+  });
 
   await Promise.all(
     conferences.map(async (conf) => {
@@ -1782,7 +1784,7 @@ async function cancelMessageAndUpdateDB(twilio: typeof Twilio, supabase: Supabas
   }
 }
 
-async function processBatchCancellation(twilio: typeof Twilio, supabase: SupabaseClient<Database>, calls: { sid: string }[]) {
+async function processBatchCancellation(twilio, supabase, calls) {
   const results = await Promise.allSettled(
     calls.map((call) => cancelCallAndUpdateDB(twilio, supabase, call)),
   );
@@ -1799,7 +1801,7 @@ async function processBatchCancellation(twilio: typeof Twilio, supabase: Supabas
     { canceledCalls: [], errors: [] },
   );
 }
-async function processBatchMessageCancellation(twilio: typeof Twilio, supabase: SupabaseClient<Database>, messages: { sid: string }[]) {
+async function processBatchMessageCancellation(twilio, supabase, messages) {
   const results = await Promise.allSettled(
     messages.map((message) =>
       cancelMessageAndUpdateDB(twilio, supabase, message),
