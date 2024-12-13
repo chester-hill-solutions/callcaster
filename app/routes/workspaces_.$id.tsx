@@ -19,11 +19,11 @@ import {
 import { getSupabaseServerClientWithSession, signOut } from "~/lib/supabase.server";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
-import { Audience, Campaign, ContextType, Flags, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
 type LoaderData = {
-  workspace: WorkspaceData & { workspace_users: { role: MemberRole }[] };
+  workspace: WrkSpace & { workspace_users: { role: MemberRole }[] };
   audiences: Partial<Audience[]>;
   campaigns: Partial<Campaign[]>;
   userRole: MemberRole;
@@ -42,19 +42,20 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("No workspace found");
-  let workspace: Partial<WorkspaceData & { workspace_users: { role: MemberRole }[] }>;
+  let workspace: Partial<WorkspaceData>;
+  let workspace_users: Partial<{ role: MemberRole }[]>;
   let campaigns: Partial<Campaign[]>;
   let phoneNumbers: Partial<WorkspaceNumbers[]>;
   let audiences: Partial<Audience[]>;
   try {
-    ({ workspace, campaigns, phoneNumbers, audiences } = await getWorkspaceInfoWithDetails({ supabaseClient, workspaceId, userId: serverSession.user.id }));
+    ({ workspace, campaigns, phoneNumbers, audiences, workspace_users } = await getWorkspaceInfoWithDetails({ supabaseClient, workspaceId, userId: serverSession.user.id }));
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
       throw redirect("/workspaces", { headers });
     }
     throw error;
   }
-  const userRole = workspace?.workspace_users?.[0]?.role;
+  const userRole = workspace_users?.[0]?.role;
   await updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
   if (userRole == null) {
     const { error: refreshError } = await forceTokenRefresh({
@@ -66,17 +67,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       throw refreshError
     }
   }
-  const { data: flags, error: flagsError } = await supabaseClient.from("workspace").select("feature_flags").eq("id", workspaceId).single();
-  if (flagsError) throw (flagsError);
-
-  return json({
+  return {
     workspace,
     audiences,
     campaigns,
     userRole,
     phoneNumbers,
-    flags: flags.feature_flags
-  }, { headers });
+  }
 };
 
 export default function Workspace() {
@@ -125,3 +122,4 @@ export default function Workspace() {
     </main>
   );
 }
+  

@@ -18,12 +18,7 @@ import {
   fetchCampaignData,
   fetchCampaignDetails,
   fetchOutreachData,
-  getMedia,
-  getRecordingFileNames,
-  getSignedUrls,
   getUserRole,
-  getWorkspacePhoneNumbers,
-  getWorkspaceScripts,
   getWorkspaceUsers,
   processOutreachExportData,
 } from "~/lib/database.server";
@@ -42,6 +37,16 @@ import { generateCSVContent } from "~/lib/utils";
 import { Audience, Flags } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
+const getTable = (campaignType: string) => {
+  return campaignType === "live_call"
+    ? "live_campaign"
+    : campaignType === "message"
+      ? "message_campaign"
+      : ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
+        ? "ivr_campaign"
+        : "";
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, serverSession } =
     await getSupabaseServerClientWithSession(request);
@@ -52,14 +57,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!workspace_id || !campaign_id) throw redirect("../");
   const { data: users } = await getWorkspaceUsers({ supabaseClient, workspaceId: workspace_id });
   const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
-  
+
   if (!outreachData || outreachData.length === 0) {
     return new Response("No data found", { status: 404 });
   }
 
   const { csvHeaders, flattenedData } = processOutreachExportData(
     outreachData,
-    users,
+    users ?? []
   );
   const csvContent = generateCSVContent(csvHeaders, flattenedData);
 
@@ -75,67 +80,51 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
   if (!serverSession?.user) throw redirect("/signin");
-  const campaignData = await fetchCampaignData(supabaseClient, selected_id);
+
+  const [
+    campaignData,
+    campaignCounts,
+    workspace,
+    userRole,
+  ] = await Promise.all([
+    fetchCampaignData(supabaseClient, selected_id),
+    fetchCampaignCounts(supabaseClient, selected_id),
+    supabaseClient
+      .from('workspace')
+      .select('id, name, credits, workspace_number(*)')
+      .eq('id', workspace_id)
+      .single(),
+    getUserRole({ serverSession, workspaceId: workspace_id })
+  ]);
+
   if (!campaignData) throw redirect("../../");
-
-  const campaignCounts = await fetchCampaignCounts(supabaseClient, selected_id);
-  const { data: workspace, error } = await supabaseClient.from('workspace').select('id, name, credits, workspace_number(*)').eq('id', workspace_id).single();
-  if (error) { console.error("Error fetching workspace", error); throw error;};
-  const credits = workspace.credits;
-
-  const scripts = await getWorkspaceScripts({ workspace: workspace_id, supabase: supabaseClient });
+  if (workspace.error) throw workspace.error;
 
   const campaignType = campaignData.type;
+  const campaignTable = getTable(campaignType);
+
   const campaignDetails = await fetchCampaignDetails(
     supabaseClient,
     selected_id,
     workspace_id,
-    campaignType === "live_call"
-      ? "live_campaign"
-      : campaignType === "message"
-        ? "message_campaign"
-        : ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
-          ? "ivr_campaign"
-          : "",
+    campaignTable
   );
 
-  const { data: mediaData } = await supabaseClient.storage.from("workspaceAudio").list(workspace_id) ?? { data: [] };
-  let mediaLinksPromise;
-  if (
-    campaignType === "message" &&
-    campaignDetails?.message_media?.length > 0
-  ) {
-    mediaLinksPromise = getSignedUrls(
-      supabaseClient,
-      workspace_id,
-      campaignDetails.message_media,
-    );
-  } else if (campaignType === "robocall") {
-    mediaLinksPromise = getMedia(
-      getRecordingFileNames(campaignDetails.step_data),
-      supabaseClient,
-      workspace_id,
-    );
-  }
-
-  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
   const isActive = (campaignData.is_active) && checkSchedule(campaignData);
+
   return defer({
+    hasAccess,
     campaignData,
     campaignDetails,
-    hasAccess,
     user: serverSession?.user,
-    results: fetchBasicResults(supabaseClient, selected_id),
     campaignCounts,
-    phoneNumbers: workspace.workspace_number,  
-    credits: workspace.credits,
-    mediaData: mediaData ?? [],
-    scripts,
-    mediaLinks: mediaLinksPromise,
+    phoneNumbers: workspace.data.workspace_number,
+    credits: workspace.data.credits,
     isActive,
     totalCalls: 0,
     expectedTotal: 0,
+    results: fetchBasicResults(supabaseClient, selected_id), // Deferred loading
   });
 };
 
@@ -149,18 +138,11 @@ export default function CampaignScreen() {
     campaignCounts,
     totalCalls = 0,
     expectedTotal = 0,
-    user,
-    phoneNumbers,
-    mediaData,
-    scripts,
-    mediaLinks,
     isActive,
-    credits,
   } = useLoaderData<typeof loader>();
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1) ?? ''));
-  const submit = useSubmit();
   useCsvDownload(csvData);
 
   const joinDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
@@ -193,13 +175,12 @@ export default function CampaignScreen() {
           <Await resolve={results} errorElement={<ErrorLoadingResults />}>
             {(resolvedResults) =>
               resolvedResults.length < 1 ? (
-                <NoResultsYet campaign={campaignData} user={user} submit={submit} />
+                <NoResultsYet />
               ) : (
                 <ResultsDisplay
                   results={resolvedResults}
                   campaign={campaignData}
                   hasAccess={hasAccess}
-                  user={user}
                   campaignCounts={campaignCounts}
                 />
               )
@@ -224,14 +205,8 @@ export default function CampaignScreen() {
           audiences,
           campaignData,
           campaignDetails,
-          phoneNumbers,
-          mediaData,
-          scripts,
-          user,
-          mediaLinks,
           flags,
           scheduleDisabled,
-          credits,
         }}
       />
     </div>
