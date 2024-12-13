@@ -2,6 +2,7 @@ import { type ClassValue, clsx } from "clsx";
 import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
 import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
+import { OutreachExportData } from "./database.server";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -136,11 +137,11 @@ const headerMappings = {
   country: [/^(contact[-_\s]?)?(country|nation)$/i],
 };
 
-const parseCSVHeaders = (unparsedHeaders) => {
+const parseCSVHeaders = (unparsedHeaders: string[]) => {
   return unparsedHeaders.map((header) => header.toLowerCase().trim());
 };
 
-const matchHeader = (header) => {
+const matchHeader = (header: string) => {
   for (const [key, patterns] of Object.entries(headerMappings)) {
     if (patterns.some((pattern) => pattern.test(header))) {
       return key;
@@ -148,11 +149,11 @@ const matchHeader = (header) => {
   }
   return null;
 };
-const parseEmail = (email) => {
+const parseEmail = (email: string) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) ? email.toLowerCase() : null;
 };
-function parsePhoneNumber(input) {
+function parsePhoneNumber(input: string) {
   if (input) {
     let cleaned = input.replace(/[^0-9+]/g, "");
 
@@ -179,7 +180,7 @@ function parsePhoneNumber(input) {
   }
 }
 
-const parseName = (name) => {
+const parseName = (name: string | null) => {
   if (name) {
     const parts = name.split(/\s+/);
     if (parts.length === 1) {
@@ -189,12 +190,12 @@ const parseName = (name) => {
     } else if (parts.length > 2) {
       return { firstname: parts[0], surname: parts.slice(1).join(" ") };
     }
-    return { firstname: null, surname: null };
+    return { firstname: "", surname: "" };
   } else {
-    return { firstname: null, surname: null };
+    return { firstname: "", surname: "" };
   }
 };
-const parseOptOut = (value) => {
+const parseOptOut = (value: string) => {
   if (typeof value === "string") {
     value = value.toLowerCase().trim();
     return ["yes", "true", "1", "opt-out", "unsubscribe"].includes(value);
@@ -202,7 +203,7 @@ const parseOptOut = (value) => {
   return Boolean(value);
 };
 
-const parseCSVData = (data, parsedHeaders) => {
+const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
   return data.slice(1).map((row) => {
     const contact = {
       firstname: null,
@@ -441,7 +442,7 @@ export const handleNavlinkStyles = (isActive: boolean, isPending: boolean): stri
   return "rounded-md border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab text-sm font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
 };
 
-export function extractKeys(data) {
+export function extractKeys(data: OutreachExportData[]) {
   const dynamicKeys = new Set();
   const resultKeys = new Set();
   const otherDataKeys = new Set();
@@ -453,7 +454,7 @@ export function extractKeys(data) {
     if (row.result && typeof row.result === "object") {
       Object.keys(row.result).forEach(key => resultKeys.add(key));
     }
-
+    
     if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
       row.contact.other_data.forEach((item, index) => {
         if (typeof item === "object") {
@@ -468,20 +469,47 @@ export function extractKeys(data) {
   return { dynamicKeys, resultKeys, otherDataKeys };
 }
 
-export function flattenRow(row, users) {
-  const flattenedRow = {};
-  getAllKeys(row, "", flattenedRow);
-  getAllKeys(row.contact, "contact_", flattenedRow);
+export function formatCallDuration(seconds: number | null): string {
+  if (!seconds) return "00:00:00";
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
 
+export function flattenRow(row: any, users: any[]) {
+  const flattenedRow: any = {};
+  
+  const duration = row.calls?.reduce((acc: 0, call: {duration: number}) => acc + call.duration, 0) || null;
+  const billedCredits = Math.floor(duration / 60) + 1;
+  const formattedDuration = formatCallDuration(duration);
+  
+  const { calls, ...rowData } = row;
+  Object.assign(flattenedRow, {
+    ...rowData,
+    call_duration: formattedDuration,
+    billed_credits: billedCredits
+  });
+
+  // Process contact data
+  if (row.contact) {
+    getAllKeys(row.contact, "contact_", flattenedRow);
+  }
+  
+  // Handle user information
   const user = users.find(user => row.user_id === user.id);
   flattenedRow.user_id = user ? user.username : row.user_id;
 
+  // Process result data
   if (row.result && typeof row.result === "object") {
     Object.assign(flattenedRow, row.result);
   }
 
-  if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
-    row.contact.other_data.forEach((item, index) => {
+  // Process other_data array
+  if (row.contact?.other_data && Array.isArray(row.contact.other_data)) {
+    row.contact.other_data.forEach((item: any, index: number) => {
       if (typeof item === "object") {
         Object.keys(item).forEach(key => {
           flattenedRow[`other_data_${index}_${key}`] = item[key];
@@ -490,10 +518,6 @@ export function flattenRow(row, users) {
     });
     delete flattenedRow.contact_other_data;
   }
-
-  flattenedRow.call_duration = (!row.call_duration || row.call_duration.startsWith("-"))
-    ? "00:00:00"
-    : row.call_duration;
 
   if ("id" in flattenedRow) {
     flattenedRow.attempt_id = flattenedRow.id;
@@ -507,7 +531,9 @@ export function flattenRow(row, users) {
   return flattenedRow;
 }
 
-export function generateCSVContent(headers, data) {
+
+
+export function generateCSVContent(headers: string[], data: Record<string, any>[]) {
   let csvContent = "\ufeff";
   csvContent += headers.map(escapeCSV).join(",") + "\n";
 

@@ -33,8 +33,10 @@ const findNextStep = (currentBlock, userInput, script, pageId) => {
       const input = userInput !== undefined ? String(userInput).trim() : '';
       return optionValue === input || (input.length > 0 && optionValue === 'vx-any');
     });
-    if (matchedOption && matchedOption.next) {
-      return matchedOption.next;
+    if (matchedOption) {
+      if (matchedOption.next) {
+        return matchedOption.next;
+      }
     }
   }
 
@@ -71,7 +73,7 @@ const findNextBlock = (script, currentPageId, currentBlockId) => {
 const handleVMAudio = async (supabase, campaign, workspace) => {
   const { voicemail_file } = campaign;
   if (!voicemail_file) return null;
-  
+
   try {
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from("workspaceAudio")
@@ -87,18 +89,49 @@ const handleVMAudio = async (supabase, campaign, workspace) => {
 
 const handleAudio = async (supabase, twiml, block, workspace) => {
   const { type, audioFile } = block;
+
   if (type === "recorded") {
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from("workspaceAudio")
-      .createSignedUrl(`${workspace}/${audioFile}`, 3600);
-      
-    if (signedUrlError) throw signedUrlError;
-    return signedUrlData.signedUrl;
+    try {
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+        .from("workspaceAudio")
+        .createSignedUrl(`${workspace}/${audioFile}`, 3600);
+
+      if (signedUrlError) {
+        log('error', 'Failed to get signed URL', { error: signedUrlError });
+        throw signedUrlError;
+      }
+
+      // Check for both camelCase and uppercase URL variants
+      const signedUrl = signedUrlData?.signedUrl || signedUrlData?.signedURL;
+
+      if (!signedUrl) {
+        log('error', 'No signed URL returned', { signedUrlData });
+        throw new Error('No signed URL returned');
+      }
+
+      log('info', 'Successfully got signed URL', {
+        url: signedUrl.substring(0, 50) + '...'
+      });
+
+      return signedUrl;
+    } catch (error) {
+      log('error', 'Unexpected error in handleAudio', {
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
   }
   return audioFile;
 };
 
 const handleOptions = async (twiml, block, page_id, script, outreach_id, supabase, workspace) => {
+  log('info', 'Starting handleOptions', {
+    blockId: block.id,
+    type: block.type,
+    responseType: block.responseType
+  });
+
   const audio = await handleAudio(supabase, twiml, block, workspace);
 
   if (block.responseType === "speech") {
@@ -107,23 +140,38 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
     } else {
       twiml.say(audio);
     }
-    twiml.record({
-      action: 'https://ivr-2916.twil.io/recording',
+
+    const gatherOptions = {
+      action: 'https://ivr-2916.twil.io/flow',
       timeout: 5,
-      maxLength: 60,
-      playBeep: true,
-      recordingStatusCallback: 'https://ivr-2916.twil.io/recording',
-      recordingStatusCallbackEvent: ["completed", "in-progress"],
+      input: "speech",
+      speechTimeout: "auto",
+      speechModel: "phone_call",
       statusCallback: 'https://ivr-2916.twil.io/status',
       statusCallbackEvent: ['completed', 'failed']
-    });
-    
+    };
+
+    if (block.responseType === "speech") {
+      twiml.record({
+        action: 'https://ivr-2916.twil.io/recording',
+        timeout: 5,
+        maxLength: 60,
+        playBeep: true,
+        recordingStatusCallback: 'https://ivr-2916.twil.io/recording',
+        recordingStatusCallbackEvent: ["completed", "in-progress"]
+      });
+    } else {
+      const gather = twiml.gather(gatherOptions);
+      if (block.type === 'recorded') {
+        gather.play(audio);
+      } else {
+        gather.say(audio);
+      }
+    }
   } else if (block.options && block.options.length > 0) {
     const gather = twiml.gather({
       action: `https://ivr-2916.twil.io/flow`,
-      input: block.responseType || "dtmf speech",
-      speechTimeout: "auto",
-      speechModel: "phone_call",
+      input: block.responseType === "dtmf-speech" ? "dtmf speech" : "dtmf",
       timeout: 5,
       statusCallback: 'https://ivr-2916.twil.io/status',
       statusCallbackEvent: ['completed', 'failed']
@@ -139,29 +187,59 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
     } else {
       twiml.say(audio);
     }
+    const nextStep = findNextStep(block, null, script, page_id);
+    const { error } = await supabase.from("outreach_attempt").update({
+      current_step: nextStep
+    }).eq("id", outreach_id);
+    if (error) {
+      log('error', 'Failed to update current_step', { error });
+      throw error;
+    }
+    twiml.redirect({
+      method: 'POST'
+    }, `https://ivr-2916.twil.io/flow`);
   }
 };
 
 const processResult = async (supabase, script, currentStep, result, userInput, outreach_attempt_id) => {
   let step = currentStep || 'page_1:block_1';
   let [currentPageId, currentBlockId] = step.split(':');
-  const currentBlock = script.blocks[currentBlockId];
+  let currentBlock = script.blocks[currentBlockId];
 
   if (userInput !== undefined) {
+    // Ensure the result structure matches the script structure
+    const sanitizedInput = typeof userInput === 'string' ? userInput.trim() : userInput;
+
     result = {
       ...result,
       [currentPageId]: {
         ...(result[currentPageId] || {}),
-        [currentBlock.title]: userInput,
+        [currentBlock.title]: sanitizedInput,
       },
     };
-    const nextStep = findNextStep(currentBlock, userInput, script, currentPageId);
+
+    // Log the result for debugging
+    log('info', 'Processing result', {
+      step,
+      blockTitle: currentBlock.title,
+      input: sanitizedInput
+    });
+
+    const nextStep = findNextStep(currentBlock, sanitizedInput, script, currentPageId);
     step = nextStep;
 
-    await supabase
+    const { error } = await supabase
       .from("outreach_attempt")
-      .update({ result, current_step: step })
+      .update({
+        result,
+        current_step: step,
+      })
       .eq("id", outreach_attempt_id);
+
+    if (error) {
+      log('error', 'Failed to update result', { error });
+      throw error;
+    }
   }
 
   return { step, result };
@@ -176,7 +254,6 @@ exports.handler = async function (context, event, callback) {
     const callSid = event.CallSid;
     if (!callSid) throw new Error("Missing CallSid");
 
-    // Skip if this is a recording webhook - let recording.js handle it
     if (event.RecordingUrl) {
       twiml.redirect('https://ivr-2916.twil.io/recording');
       return callback(null, twiml);
@@ -186,12 +263,17 @@ exports.handler = async function (context, event, callback) {
     if (!callData.campaign?.ivr_campaign?.[0]?.script?.steps) {
       throw new Error("Invalid IVR campaign structure");
     }
+    log('info', 'Retrieved call data', {
+      currentStep: callData.outreach_attempt?.current_step,
+      scriptBlocks: Object.keys(callData.campaign.ivr_campaign[0].script.steps.blocks).length,
+      campaignId: callData.campaign?.id
+    });
 
     let currentStep = callData.outreach_attempt?.current_step || 'page_1:block_1';
-    const [currentPageId, currentBlockId] = currentStep.split(':');
+    let [currentPageId, currentBlockId] = currentStep.split(':');
     const script = callData.campaign.ivr_campaign[0].script.steps;
-    const currentBlock = script.blocks[currentBlockId];
-    const userInput = event.Digits || event.SpeechResult;
+    let currentBlock = script.blocks[currentBlockId];
+    let userInput = event.Digits || event.SpeechResult;
     let result = callData.outreach_attempt?.result || {};
 
     // Handle voicemail detection
@@ -210,26 +292,30 @@ exports.handler = async function (context, event, callback) {
       return callback(null, twiml);
     }
 
-    const processedStep = await processResult(supabase, script, currentStep, result, userInput, callData.outreach_attempt.id);
-    currentStep = processedStep.step;
-
     if (currentStep === 'hangup') {
       twiml.hangup();
     } else {
+      if (userInput) {
+        const { step: newStep, result: newResult } = await processResult(supabase, script, currentStep, result, userInput, callData.outreach_attempt.id);
+        currentStep = newStep;
+        [currentPageId, currentBlockId] = currentStep.split(':');
+        currentBlock = script.blocks[currentBlockId];
+        result = newResult;
+      }
+
       await handleOptions(
-        twiml, 
-        currentBlock, 
-        currentPageId, 
-        script, 
-        callData.outreach_attempt.id, 
-        supabase, 
+        twiml,
+        currentBlock,
+        currentPageId,
+        script,
+        callData.outreach_attempt.id,
+        supabase,
         callData.workspace
       );
     }
-
-    log('info', 'Flow completed', { 
-      callSid, 
-      duration: `${Date.now() - startTime}ms` 
+    log('info', 'Flow completed', {
+      callSid,
+      duration: `${Date.now() - startTime}ms`
     });
 
     return callback(null, twiml);

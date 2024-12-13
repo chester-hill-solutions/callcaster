@@ -6,12 +6,15 @@ import {
   Session,
   SupabaseClient,
 } from "@supabase/supabase-js";
-import type { Database } from "./database.types";
+import type { Database, Json } from "./database.types";
 import {
   Audience,
+  Call,
   Campaign,
   CampaignAudience,
   Contact,
+  OutreachAttempt,
+  Script,
   User,
   WorkspaceData,
   WorkspaceNumbers,
@@ -20,7 +23,6 @@ import { jwtDecode } from "jwt-decode";
 import { json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
-import { ca } from "date-fns/locale";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
 export async function getUserWorkspaces({
@@ -195,10 +197,11 @@ export async function getWorkspaceInfo({
   return { data, error };
 }
 type WorkspaceInfoWithDetails = {
-  workspace:WorkspaceData & {workspace_users: {role:MemberRole}[]};
-  campaigns:Partial<Campaign[]>;
-  phoneNumbers:Partial<WorkspaceNumbers[]>;
-  audiences:Partial<Audience[]>;
+  workspace: WorkspaceData & { workspace_users: { role: MemberRole }[] };
+  workspace_users: { role: MemberRole }[];
+  campaigns: Partial<Campaign[]>;
+  phoneNumbers: Partial<WorkspaceNumbers[]>;
+  audiences: Partial<Audience[]>;
 }
 
 export async function getWorkspaceInfoWithDetails({
@@ -211,15 +214,28 @@ export async function getWorkspaceInfoWithDetails({
   userId: string;
 }) {
   const { data: workspace, error: workspaceError } = await supabaseClient
-      .from("workspace")
-      .select("id, name, credits, workspace_users(role), campaign(id, title, status, created_at), workspace_number(id, phone_number), audience(id, name)")
-      .eq("id", workspaceId)
-      .eq("workspace_users.user_id", userId)
-      .single();
+    .from("workspace")
+    .select(
+      `id, name, credits, 
+        workspace_users(id, role), 
+        campaign(id, title, status, created_at), 
+        workspace_number(id, phone_number), 
+        audience(id, name)`
+    )
+    .eq("id", workspaceId)
+    .eq("workspace_users.user_id", userId)
+    .single();
   if (workspaceError) throw workspaceError;
-  const {workspace_users, campaign, workspace_number, audience, ...rest} = workspace;
-    return { workspace: rest, campaigns: campaign, phoneNumbers: workspace_number, audiences: audience } as unknown as WorkspaceInfoWithDetails  ;
-} 
+  const { workspace_users, campaign, workspace_number, audience, ...rest } = workspace;
+  return {
+    workspace: rest,
+    workspace_users,
+    campaigns: campaign,
+    phoneNumbers: workspace_number,
+    audiences: audience
+  } as unknown as WorkspaceInfoWithDetails;
+}
+
 
 export async function getWorkspaceCampaigns({
   supabaseClient,
@@ -479,6 +495,9 @@ export async function removeWorkspacePhoneNumber({
       supabase: supabaseClient,
       workspace_id: workspaceId,
     });
+    if (!number.friendly_name) {
+      throw new Error("Friendly name is required");
+    }
     const outgoingIds = await twilio.outgoingCallerIds.list({
       friendlyName: number.friendly_name,
     });
@@ -514,7 +533,7 @@ export async function updateCallerId({
   number: WorkspaceNumbers;
   friendly_name: string;
 }) {
-  if (!number) return;
+  if (!number || !number.phone_number) return;
   try {
     const twilio = await createWorkspaceTwilioInstance({
       supabase: supabaseClient,
@@ -585,7 +604,9 @@ export async function endConferenceByUser({ user_id, supabaseClient, workspace_i
     data.twilio_data.sid,
     data.twilio_data.authToken,
   );
-
+  if (!user_id) {
+    throw new Error("User ID is required"); 
+  }
   const conferences = await twilio.conferences.list({
     friendlyName: user_id,
     status: ["in-progress"],
@@ -781,11 +802,11 @@ export async function updateCampaign({
   } = campaignData;
 
   if (!id) throw new Error("Campaign ID is required");
-  campaignDetails.script_id = Number(campaignData.script_id) || null;
+  campaignDetails.script_id = campaignData.script_id?.toString() || undefined;
   campaignDetails.body_text = campaignData.body_text || "";
   campaignDetails.message_media = campaignData.message_media || [];
   campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
-  
+
   const cleanCampaignData = cleanObject({
     ...restCampaignData,
     campaign_audience: undefined,
@@ -864,13 +885,13 @@ export async function updateCampaign({
   );
 
   let audienceUpdateResult = null;
- /*  if (audiences) {
-    audienceUpdateResult = await updateCampaignAudiences(
-      supabase,
-      id,
-      audiences,
-    );
-  } */
+  /*  if (audiences) {
+     audienceUpdateResult = await updateCampaignAudiences(
+       supabase,
+       id,
+       audiences,
+     );
+   } */
 
   return {
     campaign,
@@ -990,7 +1011,7 @@ export async function createCampaign({
           step_data: undefined,
         });
   console.log("Inserting campaign details:", cleanCampaignDetails);
-  
+
   const { data: createdCampaignDetails, error: detailsError } = await supabase
     .from(tableKey)
     .insert(cleanCampaignDetails)
@@ -1008,7 +1029,14 @@ export async function createCampaign({
     campaignDetails: createdCampaignDetails,
   };
 }
-
+type ScriptUpdateProps = {
+  supabase: SupabaseClient;
+  scriptData: Script;
+  saveAsCopy: boolean;
+  campaignData: Campaign;
+  created_by: string;
+  created_at: string;
+}
 export async function updateOrCopyScript({
   supabase,
   scriptData,
@@ -1016,10 +1044,10 @@ export async function updateOrCopyScript({
   campaignData,
   created_by,
   created_at,
-}) {
+}: ScriptUpdateProps) {
   const { id, ...updateData } = scriptData;
   const { data: originalScript, error: fetchScriptError } = id
-    ? await supabase.from("script").select().eq("id", id)
+    ? await supabase.from("script").select().eq("id", id).single()
     : { data: null, error: null };
   let scriptOperation;
   const upsertData = {
@@ -1088,23 +1116,30 @@ export const fetchBasicResults = async (
   return data || [];
 };
 
+// Start of Selection
 export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campaignId: string) => {
-  const { count, error } = await supabaseClient.from("campaign_queue")
-    .select("count", { count: "exact" })
-    .eq("campaign_id", campaignId);   
+  const { count, error } = await supabaseClient
+    .from("campaign_queue")
+    .select("*", { count: "exact", head: true })
+    .eq("campaign_id", campaignId);
 
   const { count: callCount, error: callCountError } = await supabaseClient
     .from("outreach_attempt")
-    .select("contact_id", { count: "exact", head: true })
+    .select("*", { count: "exact", head: true })
     .eq("campaign_id", campaignId);
-  if (error) console.error("Error fetching campaign counts:", error);
-  if (callCountError) console.error("Error fetching call counts:", callCountError); 
+
+  if (error) {
+    console.error("Error fetching campaign counts:", error);
+  }
+  if (callCountError) {
+    console.error("Error fetching call counts:", callCountError);
+  }
+
   return {
     callCount: count,
     completedCount: callCount,
   };
 };
-
 export const fetchCampaignData = async (
   supabaseClient: SupabaseClient,
   campaignId: string,
@@ -1158,20 +1193,25 @@ export const fetchCampaignDetails = async (
 export const fetchCampaignWithAudience = async (
   supabaseClient: SupabaseClient<Database>,
   campaignId: string,
+  workspaceId: string,
 ) => {
   const campaignPromise = supabaseClient
     .from("campaign")
     .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
     .eq("id", campaignId)
+    .eq("workspace", workspaceId)
     .single();
-
+  const scriptsPromise = supabaseClient
+    .from("script")
+    .select(`*`)
+    .eq("workspace", workspaceId)
   const queuePromise = supabaseClient
     .from("campaign_queue")
     .select(`*, contact(*)`, { count: "exact" })
     .eq("campaign_id", campaignId)
     .limit(25);
 
-  const isQueuedCountPromise = supabaseClient 
+  const isQueuedCountPromise = supabaseClient
     .from("campaign_queue")
     .select(`count`, { count: "exact" })
     .eq("campaign_id", campaignId)
@@ -1182,23 +1222,25 @@ export const fetchCampaignWithAudience = async (
     .select(`count`, { count: "exact" })
     .eq("campaign_id", campaignId);
 
-  const [campaign, queueResult, isQueuedCount, totalCount] = await Promise.all([
+  const [campaign, queueResult, isQueuedCount, totalCount, scripts] = await Promise.all([
     campaignPromise,
     queuePromise,
     isQueuedCountPromise,
-    totalCountPromise
+    totalCountPromise,
+    scriptsPromise
   ]);
 
   if (campaign.error) throw new Error(`Error fetching campaign data: ${campaign.error.message}`);
   if (queueResult.error) throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
   if (isQueuedCount.error) throw new Error(`Error fetching queued count: ${isQueuedCount.error.message}`);
   if (totalCount.error) throw new Error(`Error fetching total count: ${totalCount.error.message}`);
-
+  if (scripts.error) throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
     ...campaign.data,
     campaign_queue: queueResult.data,
     queue_count: isQueuedCount.count,
-    total_count: totalCount.count
+    total_count: totalCount.count,
+    scripts: scripts.data
   };
 };
 
@@ -1378,26 +1420,55 @@ export async function fetchContactData(
   return { contact, potentialContacts, contactError };
 }
 
-export async function fetchOutreachData(
-  supabaseClient: SupabaseClient<Database>,
-  campaignId: string | number,
-) {
-  const { data, error } = await supabaseClient
-    .from("outreach_attempt")
-    .select(`*, contact(*)`)
-    .eq("campaign_id", campaignId);
+export type OutreachExportData = {
+  answered_at: string | null;
+  campaign_id: number;
+  contact_id: number;
+  created_at: string;
+  current_step: string | null;
+  disposition: string | null;
+  ended_at: string | null;
+  id: number;
+  result: Json;
+  user_id: string | null;
+  workspace: string;
+  contact: Database['public']['Tables']['contact']['Row'];
+  calls: { duration: number }[];
+}[];
 
-  if (error) {
-    console.error("Error fetching data:", error);
-    throw new Error("Error fetching data");
-  }
-
-  return data;
+type WorkspaceUserData = {
+  id: string;
+  username: string;
+  role: string;
 }
 
-export function processOutreachExportData(data, users) {
+interface ProcessedData {
+  csvHeaders: string[];
+  flattenedData: Record<string, any>[];
+}
+
+export async function fetchOutreachData(
+  supabaseClient: SupabaseClient<Database>,
+  campaignId: string | number
+) {
+  const { data, error } = await supabaseClient
+    .from('outreach_attempt')
+    .select(`
+      *,
+      contact:contact_id(*),
+      calls:call!outreach_attempt_id(duration)
+    `)
+    .eq('campaign_id', campaignId);
+
+  if (error) throw new Error('Error fetching data');
+  return (data || []) as unknown as OutreachExportData;
+}
+
+
+export function processOutreachExportData(data: OutreachExportData[], users: WorkspaceUserData[]) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-  console.log(dynamicKeys, resultKeys, otherDataKeys);
+
+  // Create initial headers
   let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
     header === "id"
       ? "attempt_id"
@@ -1406,22 +1477,27 @@ export function processOutreachExportData(data, users) {
         : header,
   );
 
+  // Ensure call_duration is in headers
+  if (!csvHeaders.includes('call_duration')) {
+    csvHeaders.push('call_duration');
+  }
+
   let flattenedData = data.map((row) => flattenRow(row, users));
 
   flattenedData.sort((a, b) => {
     if (a.callcaster_id < b.callcaster_id) return -1;
     if (a.callcaster_id > b.callcaster_id) return 1;
-    return new Date(a.created_at) - new Date(b.created_at);
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
-  const mergedData = [];
-  let currentGroup = null;
+  const mergedData: Record<string, any>[] = [];
+  let currentGroup: Record<string, any> | null = null;
 
   flattenedData.forEach((row) => {
     if (
       !currentGroup ||
       row.callcaster_id !== currentGroup.callcaster_id ||
-      new Date(row.created_at) - new Date(currentGroup.created_at) >
+      new Date(row.created_at).getTime() - new Date(currentGroup.created_at).getTime() >
       12 * 60 * 60 * 1000
     ) {
       if (currentGroup) {
@@ -1430,10 +1506,15 @@ export function processOutreachExportData(data, users) {
       currentGroup = { ...row };
     } else {
       Object.keys(row).forEach((key) => {
-        if (row[key] != null && row[key] !== "") {
+        if (row[key] != null && row[key] !== "" && currentGroup) {
           currentGroup[key] = row[key];
         }
       });
+
+      // Special handling for call_duration - keep the longer duration
+      if (row.call_duration > currentGroup.call_duration) {
+        currentGroup.call_duration = row.call_duration;
+      }
     }
   });
 
@@ -1441,8 +1522,12 @@ export function processOutreachExportData(data, users) {
     mergedData.push(currentGroup);
   }
 
+  // Filter headers but ensure call_duration remains
   csvHeaders = csvHeaders.filter((header) =>
-    mergedData.some((row) => row[header] != null && row[header] !== ""),
+    typeof header === 'string' && (
+      header === 'call_duration' ||
+      mergedData.some((row) => row[header] != null && row[header] !== "")
+    )
   );
 
   return { csvHeaders, flattenedData: mergedData };
@@ -1506,27 +1591,34 @@ export async function meterEvent({
   workspace_id,
   amount,
   type,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspace_id: string;
+  amount: number;
+  type: string;
 }) {
   const {
-    data: { stripe_id },
+    data,
     error,
   } = await supabaseClient
     .from("workspace")
     .select("stripe_id")
     .eq("id", workspace_id)
     .single();
+  if (error || !data?.stripe_id) return;
   const stripe = new Stripe(process.env.STRIPE_API_KEY!);
   return await stripe.billing.meterEvents.create({
     event_name: type,
     payload: {
       value: amount,
-      stripe_customer_id: stripe_id,
+      stripe_customer_id: data.stripe_id,
     },
   });
 }
 
-export const parseRequestData = async (request) => {
+export const parseRequestData = async (request: Request) => {
   const contentType = request.headers.get("Content-Type");
+  if (!contentType) return;
   if (contentType === "application/json") {
     return await request.json();
   } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
@@ -1536,12 +1628,12 @@ export const parseRequestData = async (request) => {
   throw new Error("Unsupported content type");
 };
 
-export const handleError = (error, message, status = 500) => {
+export const handleError = (error: Error, message: string, status = 500) => {
   console.error(`${message}:`, error);
   return json({ error: message }, { status });
 };
 
-export const updateContact = async (supabaseClient, data) => {
+export const updateContact = async (supabaseClient: SupabaseClient<Database>, data: Partial<Contact>) => {
   if (!data.id) {
     throw new Error("Contact ID is required");
   }
@@ -1632,7 +1724,7 @@ export const bulkCreateContacts = async (
   return { insert, audience_insert };
 };
 
-export async function getCampaignQueueById({ supabaseClient, campaign_id }) {
+export async function getCampaignQueueById({ supabaseClient, campaign_id }: { supabaseClient: SupabaseClient<Database>, campaign_id: string }) {
   const { data, error } = await supabaseClient
     .from("campaign_queue")
     .select("*, contact(*)")
@@ -1650,65 +1742,14 @@ async function handleDatabaseOperation<T>(
   return data;
 }
 
-async function updateCampaignAudiences(
-  supabase: SupabaseClient,
-  campaignId: string,
-  newAudiences: Array<{ audience_id: string; campaign_id: string }>,
-) {
-  const existing = await handleDatabaseOperation(
-    () =>
-      supabase.from("campaign_audience").select().eq("campaign_id", campaignId),
-    "Error fetching existing campaign audience",
-  );
-  const toDelete = existing.filter(
-    (row) =>
-      !newAudiences.some((newRow) => newRow.audience_id === row.audience_id),
-  );
-  const toAdd = newAudiences.filter(
-    (newRow) => !existing.some((row) => row.audience_id === newRow.audience_id),
-  );
-
-  const addPromise =
-    toAdd.length > 0
-      ? handleDatabaseOperation(
-        () =>
-          supabase
-            .from("campaign_audience")
-            .upsert(toAdd, { onConflict: ["audience_id", "campaign_id"] })
-            .select(),
-        "Error adding campaign audience",
-      )
-      : Promise.resolve([]);
-
-  const deletePromise =
-    toDelete.length > 0
-      ? handleDatabaseOperation(
-        () =>
-          supabase
-            .from("campaign_audience")
-            .delete()
-            .in(
-              "audience_id",
-              toDelete.map((row) => row.audience_id),
-            )
-            .eq("campaign_id", campaignId)
-            .select(),
-        "Error deleting campaign audience",
-      )
-      : Promise.resolve([]);
-
-  const [added, deleted] = await Promise.all([addPromise, deletePromise]);
-
-  return { added, deleted };
-}
-async function fetchQueuedCalls(twilio, batchSize) {
+async function fetchQueuedCalls(twilio: typeof Twilio, batchSize: number) {
   return await twilio.calls.list({
     status: "queued",
     limit: batchSize,
     pageSize: batchSize,
   });
 }
-async function fetchQueuedMessages(twilio, batchSize) {
+async function fetchQueuedMessages(twilio: typeof Twilio, batchSize: number) {
   return await twilio.messages.list({
     status: "queued",
     limit: batchSize,
@@ -1716,7 +1757,7 @@ async function fetchQueuedMessages(twilio, batchSize) {
   });
 }
 
-async function cancelCallAndUpdateDB(twilio, supabase, call) {
+async function cancelCallAndUpdateDB(twilio: typeof Twilio, supabase: SupabaseClient<Database>, call: { sid: string }) {
   try {
     const canceledCall = await twilio
       .calls(call.sid)
@@ -1729,7 +1770,7 @@ async function cancelCallAndUpdateDB(twilio, supabase, call) {
     throw new Error(`Error canceling call ${call.sid}: ${error.message}`);
   }
 }
-async function cancelMessageAndUpdateDB(twilio, supabase, message) {
+async function cancelMessageAndUpdateDB(twilio: typeof Twilio, supabase: SupabaseClient<Database>, message: { sid: string }) {
   try {
     const cancelledMessage = await twilio
       .messages(message.sid)
@@ -1780,9 +1821,9 @@ async function processBatchMessageCancellation(twilio, supabase, messages) {
   );
 }
 
-export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
-  let allCanceledCalls = [];
-  let allErrors = [];
+export async function cancelQueuedCalls(twilio: typeof Twilio, supabase: SupabaseClient<Database>, batchSize = 100) {
+  let allCanceledCalls = [] as string[];
+  let allErrors = [] as string[];
   let hasMoreCalls = true;
 
   while (hasMoreCalls) {
@@ -1804,7 +1845,7 @@ export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
       allErrors = allErrors.concat(errors);
 
       hasMoreCalls = calls.length === batchSize;
-    } catch (error) {
+    } catch (error: any) {
       allErrors.push(`Error retrieving calls: ${error.message}`);
       hasMoreCalls = false;
     }
@@ -1815,9 +1856,9 @@ export async function cancelQueuedCalls(twilio, supabase, batchSize = 100) {
     errors: allErrors,
   };
 }
-export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
-  let allCanceledMessages = [];
-  let allErrors = [];
+export async function cancelQueuedMessages(twilio: typeof Twilio, supabase: SupabaseClient<Database>, batchSize = 100) {
+  let allCanceledMessages = [] as string[];
+  let allErrors = [] as string[];
   let hasMoreMessages = true;
 
   while (hasMoreMessages) {
@@ -1847,7 +1888,7 @@ export async function cancelQueuedMessages(twilio, supabase, batchSize = 100) {
   };
 }
 
-export function checkSchedule(campaignData: Campaign) {
+export function checkSchedule(campaignData: { start_date: string, end_date: string, schedule: { [key: string]: { active: boolean, intervals: { start: string, end: string }[] } } }) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
   const utcNow = new Date(Date.UTC(

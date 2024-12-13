@@ -3,6 +3,7 @@ import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-r
 import {
   Form,
   Link,
+  NavLink,
   useActionData,
   useLoaderData,
   useNavigation,
@@ -61,15 +62,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .order("last_accessed", { ascending: false });
 
   if (workspacesError) {
-    return json(
-      { workspaces: null, userId: userId, error: workspacesError },
-      { headers },
-    );
+    return { workspaces: null, userId: userId, error: workspacesError }
   }
-  return json(
-    { workspaces: workspaces, userId: userId, error: null },
-    { headers },
-  );
+  return { workspaces: workspaces, userId: userId, error: null };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -82,10 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const userId = formData.get("userId") as string;
 
   if (!newWorkspaceName || !userId) {
-    return json(
-      { error: "Workspace name or User Id missing!" },
-      { status: 400, headers },
-    );
+    return { error: "Workspace name or User Id missing!" };
   }
 
   const { data: newWorkspaceId, error } = await createNewWorkspace({
@@ -95,10 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
   if (error) {
     console.log("Error: ", error);
-    return json(
-      { error: "Failed to create Workspace" },
-      { status: 500, headers },
-    );
+    return { error: "Failed to create Workspace" };
   }
 
   if (newWorkspaceId) {
@@ -109,13 +98,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect(`/workspaces/${newWorkspaceId}`, { headers });
   }
 
-  return json({ ok: true, error: null }, { headers });
+  return { ok: true, error: null };
 };
 
 const WorkspaceCard = React.memo(
   ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {
     return (
-      <Link
+      <NavLink
+        prefetch="intent"
         to={`/workspaces/${workspace.id}`}
         className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
       >
@@ -125,7 +115,7 @@ const WorkspaceCard = React.memo(
         <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
           {role}
         </p>
-      </Link>
+      </NavLink>
     );
   },
 );

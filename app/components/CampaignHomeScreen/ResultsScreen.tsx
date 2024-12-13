@@ -1,4 +1,3 @@
-import { ResultsScreenProps } from "~/lib/database.types";
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
@@ -10,7 +9,7 @@ const ResultsScreen = ({
   expectedTotal = 0,
   isBusy,
   campaignCounts
-}: ResultsScreenProps) => {
+}: { totalCalls: number, results: any, expectedTotal: number, isBusy: boolean, campaignCounts: any }) => {
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -20,7 +19,7 @@ const ResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalCalls totalCalls={totalCalls} expectedTotal={expectedTotal} />
-          <ExportButton isBusy={isBusy}/>
+          <ExportButton isBusy={isBusy} />
         </div>
         <DispositionBreakdown
           results={results}

@@ -64,12 +64,6 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags 
     return "rounded-md border-2 border-zinc-300 px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
   };
 
-  const isFeatureEnabled = (flag?: NavItem['flag']) => {
-    if (!flag) return true;
-    const { parent, child } = flag;
-    return flags[parent] && flags[parent][child] === true;
-  };
-
   return (
     <div className="flex-col justify-center">
       <div className="relative mb-4 flex items-center justify-between">
@@ -81,16 +75,16 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags 
             {NAV_ITEMS.map(
               (item) =>
                 (!item.callerHidden || !userIsCaller) &&
-                isFeatureEnabled(item.flag) && (
-                  <NavLink
-                    key={item.name}
-                    to={`${baseUrl}/${item.path}`}
-                    className={handleNavlinkStyles}
-                    end={item.end}
-                  >
-                    {item.name}
-                  </NavLink>
-                ),
+                <NavLink
+                  key={item.name}
+                  to={`${baseUrl}/${item.path}`}
+                  className={handleNavlinkStyles}
+                  end={item.end}
+                  prefetch="intent"
+                >
+                  {item.name}
+                </NavLink>
+
             )}
           </div>
           <div>
@@ -98,7 +92,8 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags 
               <div className="flex gap-1">
                 <Button size="icon" asChild variant="outline">
                   <NavLink
-                  to={`${baseUrl}/settings`}
+                    prefetch="intent"
+                    to={`${baseUrl}/settings`}
                     className="border-2 border-zinc-400"
                   >
                     <MdSettings size={24} />
@@ -108,6 +103,7 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags 
                   <NavLink
                     to={`${baseUrl}/settings/credits`}
                     className="border-2 border-zinc-400 flex items-center gap-1 relative"
+                    prefetch="intent"
                   >
                     <MdCreditCard size={24} /> {workspace?.credits} <span className="text-xs absolute -bottom-5">Call Credits</span>
                   </NavLink>

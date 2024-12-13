@@ -1,4 +1,4 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { FetcherWithComponents, NavLink, useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
 import { Suspense } from "react";
 import { FileObject } from "@supabase/storage-js";
@@ -73,29 +73,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   if (!serverSession?.user) return redirect("/signin");
   if (!selected_id) return redirect("../../");
+  if (!workspace_id) return redirect("../../");
+  const campaignWithAudience = await fetchCampaignWithAudience(supabaseClient, selected_id, workspace_id  );
+  const {data: mediaData} = await supabaseClient.storage.from("media").list(`${workspace_id}/`);
+  const {data:phoneNumbers} = await supabaseClient.from("workspace_number").select("*").eq("workspace", workspace_id);
+  const mediaLinksPromise = Promise.resolve(mediaData?.map((media) => media.name));
 
-  const campaignWithAudience = await fetchCampaignWithAudience(supabaseClient, selected_id);
-  return json({
+  return defer({
     workspace_id,
     selected_id,
     campaignAudience: campaignWithAudience.campaign_audience,
     campaignQueue: campaignWithAudience.campaign_queue,
     queueCount: campaignWithAudience.queue_count,
     totalCount: campaignWithAudience.total_count,
+    scripts: campaignWithAudience.scripts,
+    mediaData,
+    phoneNumbers,
+    user:serverSession.user,  
+    mediaLinks: mediaLinksPromise,
   });
 };
 
 export default function Settings() {
   const {
+    supabase,
+    joinDisabled,
+    audiences,
     campaignData,
     campaignDetails,
-    phoneNumbers,
-    mediaData,
-    scripts,
-    user,
-    mediaLinks,
-    audiences,
-    joinDisabled,
     flags,
     scheduleDisabled,
     credits
@@ -108,6 +113,11 @@ export default function Settings() {
     campaignQueue,
     queueCount,
     totalCount,
+    scripts,
+    mediaData,
+    phoneNumbers,
+    user,
+    mediaLinks,
   } = useLoaderData<typeof loader>();
 
   const duplicateFetcher = useFetcher<{ campaign: { id: string } }>();

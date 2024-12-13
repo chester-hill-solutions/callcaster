@@ -3,7 +3,7 @@ import { NavLink } from "@remix-run/react";
 import { handleNavlinkStyles } from "~/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip';
 
-export const NavigationLinks = ({ hasAccess, data, joinDisabled, }: { hasAccess: boolean, data: any, joinDisabled: string}) => (
+export const NavigationLinks = ({ hasAccess, data, joinDisabled, }: { hasAccess: boolean, data: any, joinDisabled: string | null }) => (
   <div className="flex gap-2 h-full py-4 max-w-[280px]">
   {hasAccess && (
       <><NavLink

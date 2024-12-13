@@ -4,8 +4,9 @@ import { FaPlus } from "react-icons/fa";
 import { Card, CardHeader } from "~/components/ui/card";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 import { Badge } from "~/components/ui/badge";
+import { Campaign } from "~/lib/types";
 
-const handleNavlinkStyles = ({ isActive, isPending }) =>
+const handleNavlinkStyles = ({ isActive, isPending }: { isActive: boolean; isPending: boolean }) =>
   `flex justify-between bg-gray-100 border-2 dark:bg-zinc-900 items-center py-2 text-sm font-medium transition-colors transition-borders font-Zilla-Slab ${
     isActive
       ? "border-primary border-b-2 text-primary-accent bg-white dark:bg-slate-700"
@@ -14,7 +15,7 @@ const handleNavlinkStyles = ({ isActive, isPending }) =>
       : "hover:bg-muted dark:hover:bg-zinc-500 border-b-0"
   }`;
 
-const StatusBadge = ({ status }) => {
+const StatusBadge = ({ status }: { status: string }) => {
   const badgeStyles = {
     pending:"bg-yellow-200 text-yellow-800",
     scheduled: "bg-blue-200 text-blue-800",
@@ -26,13 +27,17 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <Badge className={`text-xxs mx-2 ${badgeStyles[status] || ""}`}>
+    <Badge className={`text-xxs mx-2 ${badgeStyles[status as keyof typeof badgeStyles] || ""}`}>
         {status ? status?.charAt(0)?.toUpperCase() + status?.slice(1) : 'ERROR'}
     </Badge>
   );
 };
 
-const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }) => (
+const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }: { 
+  campaigns: (Campaign | undefined)[];
+  userRole: MemberRole;
+  setCampaignsListOpen: (open: boolean) => void 
+}) => (
   <Card className="flex flex-auto flex-col border-none bg-secondary dark:bg-blue-950">
     <CardHeader className="p-0">
       <NavLink
@@ -45,7 +50,8 @@ const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }) => (
     </CardHeader>
     <div className="flex flex-grow flex-col justify-between">
       <nav className="flex flex-col">
-        {campaigns?.map((row, i) => {
+        {campaigns?.map((row: Partial<Campaign> | undefined, i: number) => {
+          if (!row) return null;
           const draftNotAllowed =
             (userRole === MemberRole.Caller || userRole === MemberRole.Member) &&
             row.status === "draft";
@@ -57,9 +63,10 @@ const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }) => (
                 key={row.id}
                 className={handleNavlinkStyles}
                 onClick={() => setCampaignsListOpen(false)}
+                prefetch="intent"
               >
                 <span className="px-2">{row.title || `Unnamed campaign ${i + 1}`}</span>
-                <StatusBadge status={row.status} />
+                <StatusBadge status={row.status || ""} />
               </NavLink>
             )
           );
@@ -71,7 +78,7 @@ const CampaignsList = ({ campaigns, userRole, setCampaignsListOpen }) => (
           to={"#"}
         >
           {/* Todo: build "campaigns/archive" to display completed campaigns */}
-          Archived Campaigns ({campaigns.filter((i) => i.status === "archived").length})
+          Archived Campaigns ({campaigns.filter((i) => i?.status === "archived").length})
         </NavLink>
       </nav>
     </div>
