@@ -1,5 +1,5 @@
 import { Context, useState } from "react";
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { defer, LoaderFunctionArgs } from "@remix-run/node";
 import {
   json,
   redirect,
@@ -17,9 +17,10 @@ import {
   updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession, signOut } from "~/lib/supabase.server";
+import { useWorkspaceContacts } from "~/hooks/useWorkspaceContacts";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
-import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers, Contact } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
 type LoaderData = {
@@ -29,9 +30,8 @@ type LoaderData = {
   userRole: MemberRole;
   phoneNumbers: Partial<WorkspaceNumbers[]>;
   flags: Flags;
+  initialContacts: Contact[];
 }
-
-export { ErrorBoundary } from "~/components/ErrorBoundary";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -47,6 +47,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let campaigns: Partial<Campaign[]>;
   let phoneNumbers: Partial<WorkspaceNumbers[]>;
   let audiences: Partial<Audience[]>;
+
   try {
     ({ workspace, campaigns, phoneNumbers, audiences, workspace_users } = await getWorkspaceInfoWithDetails({ supabaseClient, workspaceId, userId: serverSession.user.id }));
   } catch (error) {
@@ -55,6 +56,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
     throw error;
   }
+
+
   const userRole = workspace_users?.[0]?.role;
   await updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
   if (userRole == null) {
@@ -67,24 +70,30 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       throw refreshError
     }
   }
+
   return {
     workspace,
     audiences,
     campaigns,
     userRole,
     phoneNumbers,
-  }
+  };
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } = useLoaderData<LoaderData>();
+  const { workspace, audiences, campaigns, userRole, phoneNumbers, } = useLoaderData<LoaderData>();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
-  const context = useOutletContext<Context<ContextType>>();
+  const context = useOutletContext<ContextType>();
+
+  const contactDb = useWorkspaceContacts({
+    supabase: context.supabase,
+    workspace_id: workspace.id,
+  });
+
   return (
     <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
       <WorkspaceNav
-        flags={flags}
         workspace={workspace}
         userRole={userRole}
       />
@@ -115,11 +124,19 @@ export default function Workspace() {
               type={phoneNumbers?.length > 0 ? "campaign" : "number"}
             />
           ) : (
-            <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, flags, ...context }} />
+            <Outlet
+              context={{
+                audiences,
+                campaigns,
+                phoneNumbers,
+                userRole,
+                contactDb,
+                ...context
+              }}
+            />
           )}
         </div>
       </div>
     </main>
   );
 }
-  

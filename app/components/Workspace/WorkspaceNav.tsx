@@ -30,10 +30,9 @@ interface WorkspaceNavProps {
     credits: number;
   };
   userRole: MemberRole;
-  flags: Flags;
 }
 
-const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags }) => {
+const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole }) => {
   const location = useLocation();
   const userIsCaller = userRole === MemberRole.Caller;
   const getWorkspaceBaseUrl = () => {

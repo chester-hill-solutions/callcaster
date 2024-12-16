@@ -1,6 +1,6 @@
 /** @type {import('@remix-run/dev').AppConfig} */
 export default {
-  ignoredRouteFiles: ["**/.*", "**/*.test.{js,jsx,ts,tsx}", "**/twilio-serverless/**"],
+  ignoredRouteFiles: ["**/.*", "**/*.test.{js,jsx,ts,tsx}", "**/twilio-serverless/**", "**/*.css"],
   // appDirectory: "app",
   // assetsBuildDirectory: "public/build",
   // publicPath: "/build/",
@@ -17,6 +17,7 @@ export default {
       events: true,
       window: true
     },
+    serverModuleFormat: 'cjs',
     globals: {
       Buffer: true,
     }

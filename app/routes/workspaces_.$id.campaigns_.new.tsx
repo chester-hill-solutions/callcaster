@@ -51,9 +51,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function CampaignsNew() {
   const { flags }:{flags:Flags} = useOutletContext();
-  const isLiveCallEnabled = flags?.call?.campaign === true;
-  const isMessageEnabled = flags?.sms?.campaign === true;
-  const isRobocallEnabled = flags?.ivr?.campaign === true;
+  const isLiveCallEnabled = true //flags?.call?.campaign === true;
+  const isMessageEnabled = true //flags?.sms?.campaign === true;
+  const isRobocallEnabled = true //flags?.ivr?.campaign === true;
 
   const actionData = useActionData<typeof action>();
   return (
@@ -93,7 +93,7 @@ export default function CampaignsNew() {
                 name="campaign-type"
                 id="campaign-type"
                 required
-                defaultValue={"live_call"}
+                
               >
                 {isLiveCallEnabled && (
                   <option value="live_call" className="dark:bg-black">

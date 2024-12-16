@@ -8,7 +8,7 @@ import {
   useOutletContext,
   useSubmit,
 } from "@remix-run/react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 import {
@@ -34,7 +34,7 @@ import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
 import { useCsvDownload } from "~/hooks/useCsvDownload";
 import { generateCSVContent } from "~/lib/utils";
-import { Audience, Flags } from "~/lib/types";
+import { Audience, Contact, Flags } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 const getTable = (campaignType: string) => {
@@ -129,7 +129,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function CampaignScreen() {
-  const { audiences, flags, supabase } = useOutletContext<{ audiences: Audience[], flags: Flags, supabase: SupabaseClient }>();
+  const { audiences, flags, supabase, contactDb } = useOutletContext<{ audiences: Audience[], flags: Flags, supabase: SupabaseClient, contactDb: any }>();
   const {
     campaignData,
     campaignDetails,
@@ -140,10 +140,18 @@ export default function CampaignScreen() {
     expectedTotal = 0,
     isActive,
   } = useLoaderData<typeof loader>();
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const csvData = useActionData();
   const route = useLocation().pathname.split("/");
   const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1) ?? ''));
   useCsvDownload(csvData);
+  useEffect(() => {
+    if (contactDb) {
+      const newContacts = contactDb.getAllContacts();
+      console.log("newContacts", newContacts);
+      setContacts(newContacts);
+    }
+  }, [contactDb]);
 
   const joinDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
     ? "No script selected"
