@@ -189,6 +189,14 @@ export default function useCampaignSettings(
                     handleInputChange("is_active", false);
                     clearSchedule();
                 }
+                if (type === "play") {
+                    handleInputChange("status", "running");
+                    handleInputChange("is_active", true);
+                }
+                if (type === "pause") {
+                    handleInputChange("status", "paused");
+                    handleInputChange("is_active", false);
+                }
                 break;
 
             default:

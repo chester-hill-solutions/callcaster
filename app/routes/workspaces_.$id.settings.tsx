@@ -57,7 +57,6 @@ type WorkspaceNumbers = {
   capabilities: {
     verification_status: 'success' | 'failed' | 'pending';
   };
-  // ... other properties ...
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
