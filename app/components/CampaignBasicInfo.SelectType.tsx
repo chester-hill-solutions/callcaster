@@ -7,10 +7,10 @@ import {
   SelectValue,
 } from "./ui/select";
 
-export default function SelectType({handleInputChange, campaignData, flags}){
-    const isLiveCallEnabled = flags?.call?.campaign === true;
-    const isMessageEnabled = flags?.sms?.campaign === true;
-    const isRobocallEnabled = flags?.ivr?.campaign === true;
+export default function SelectType({handleInputChange, campaignData, flags}: {handleInputChange: (key: string, value: string) => void, campaignData: CampaignData, flags: any}){
+    const isLiveCallEnabled = true;
+    const isMessageEnabled = true;
+    const isRobocallEnabled = true;
   
     return (
         <div className="flex flex-grow flex-col gap-1 min-w-48">

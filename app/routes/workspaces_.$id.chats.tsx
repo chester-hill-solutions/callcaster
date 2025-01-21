@@ -55,10 +55,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const contact_number = params.contact_number;
 
   if (!workspaceId) {
-    return json(
-      { workspace: null, error: "Workspace does not exist", userRole: null },
-      { headers },
-    );
+    return json({ workspace: null, error: "Workspace does not exist", userRole: null }, { headers });
   }
 
   const userRole = getUserRole({ serverSession, workspaceId });

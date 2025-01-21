@@ -80,7 +80,6 @@ export const CampaignSettings = ({
   handleConfirmStatus,
   confirmStatus,
 }: CampaignSettingsProps) => {
-
   return (
     <>
       <div

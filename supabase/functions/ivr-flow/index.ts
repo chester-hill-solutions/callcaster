@@ -1,12 +1,22 @@
-const { createClient } = require("@supabase/supabase-js");
-const Twilio = require("twilio");
+import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import Twilio from "npm:twilio@^5.3.0";
+import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
 
-const log = (level, message, data = {}) => {
+import { SupabaseClient } from "@supabase/supabase-js";
+interface TwilioEventData {
+  CallSid?: string;
+  RecordingUrl?: string;
+  Digits?: string;
+  SpeechResult?: string;
+  AnsweredBy?: string;
+}
+
+const log = (level: string, message: string, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 
-const getCallWithRetry = async (supabase, callSid, retries = 0) => {
+const baseUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1`;
+const getCallWithRetry = async (supabase: SupabaseClient, callSid: string, retries = 0) => {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 200;
 
@@ -29,15 +39,28 @@ const getCallWithRetry = async (supabase, callSid, retries = 0) => {
 
 const findNextStep = (currentBlock, userInput, script, pageId) => {
   if (currentBlock.options && currentBlock.options.length > 0) {
-    const matchedOption = currentBlock.options.find((option) => {
+    // First try to find an exact match
+    const exactMatch = currentBlock.options.find((option) => {
       const optionValue = String(option.value).trim();
       const input = userInput !== undefined ? String(userInput).trim() : '';
-      return optionValue === input || (input.length > 0 && optionValue === 'vx-any');
+      return optionValue === input;
     });
-    if (matchedOption) {
-      if (matchedOption.next) {
-        return matchedOption.next;
+    
+    if (exactMatch) {
+      if (exactMatch.next) {
+        return exactMatch.next;
       }
+    }
+
+    // If no exact match, try vx-any
+    const anyMatch = currentBlock.options.find((option) => {
+      const optionValue = String(option.value).trim();
+      const input = userInput !== undefined ? String(userInput).trim() : '';
+      return input.length > 0 && optionValue === 'vx-any';
+    });
+
+    if (anyMatch && anyMatch.next) {
+      return anyMatch.next;
     }
   }
 
@@ -48,7 +71,7 @@ const findNextStep = (currentBlock, userInput, script, pageId) => {
   return 'hangup';
 };
 
-const findNextBlock = (script, currentPageId, currentBlockId) => {
+const findNextBlock = (script: any, currentPageId: string, currentBlockId: string) => {
   const currentPage = script.pages[currentPageId];
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
   if (currentBlockIndex < currentPage.blocks.length - 1) {
@@ -143,22 +166,22 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
     }
 
     const gatherOptions = {
-      action: 'https://ivr-2916.twil.io/flow',
+      action: `${baseUrl}/ivr-flow`,
       timeout: 5,
       input: "speech",
       speechTimeout: "auto",
       speechModel: "phone_call",
-      statusCallback: 'https://ivr-2916.twil.io/status',
+      statusCallback: `${baseUrl}/ivr-status`,
       statusCallbackEvent: ['completed', 'failed']
     };
 
     if (block.responseType === "speech") {
       twiml.record({
-        action: 'https://ivr-2916.twil.io/recording',
+        action: `${baseUrl}/ivr-recording`,
         timeout: 5,
         maxLength: 60,
         playBeep: true,
-        recordingStatusCallback: 'https://ivr-2916.twil.io/recording',
+        recordingStatusCallback: `${baseUrl}/ivr-recording`,
         recordingStatusCallbackEvent: ["completed", "in-progress"]
       });
     } else {
@@ -171,10 +194,11 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
     }
   } else if (block.options && block.options.length > 0) {
     const gather = twiml.gather({
-      action: `https://ivr-2916.twil.io/flow`,
+      action: `${baseUrl}/ivr-flow`,
       input: block.responseType === "dtmf-speech" ? "dtmf speech" : "dtmf",
+      beep: true,
       timeout: 5,
-      statusCallback: 'https://ivr-2916.twil.io/status',
+      statusCallback: `${baseUrl}/ivr-status`,
       statusCallbackEvent: ['completed', 'failed']
     });
     if (block.type === 'recorded') {
@@ -198,12 +222,15 @@ const handleOptions = async (twiml, block, page_id, script, outreach_id, supabas
     }
     twiml.redirect({
       method: 'POST'
-    }, `https://ivr-2916.twil.io/flow`);
+    }, `${baseUrl}/ivr-flow`);  
   }
 };
 
 const processResult = async (supabase, script, currentStep, result, userInput, outreach_attempt_id) => {
   let step = currentStep || 'page_1:block_1';
+  if (step === 'hangup') {
+    return { step, result };
+  }
   let [currentPageId, currentBlockId] = step.split(':');
   let currentBlock = script.blocks[currentBlockId];
 
@@ -246,29 +273,99 @@ const processResult = async (supabase, script, currentStep, result, userInput, o
   return { step, result };
 };
 
-exports.handler = async function (context, event, callback) {
+const getWorkspaceData = async (supabase, workspace_id: string) => {
+  const { data, error } = await supabase
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspace_id)
+    .single();
+    
+  if (error || !data) {
+    throw new Error("Failed to retrieve workspace data");
+  }
+  
+  return data;
+};
+
+Deno.serve(async (req) => {
   const startTime = Date.now();
-  const supabase = createClient(context.SUPABASE_URL, context.SUPABASE_SERVICE_KEY);
-  const twiml = new Twilio.twiml.VoiceResponse();
-
+  
   try {
-    const callSid = event.CallSid;
-    if (!callSid) throw new Error("Missing CallSid");
+    // Get request details for validation
+    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-flow`;
+    log('info', 'Request URL', { url: publicUrl });
+    
+    const twilioSignature = req.headers.get('x-twilio-signature');
+    log('info', 'Twilio signature', { twilioSignature });
+    
+    const formData = await req.formData();
+    const params = Object.fromEntries(formData.entries());
+    log('info', 'Request parameters', { params });
+    
+    const event: TwilioEventData = params;
 
-    if (event.RecordingUrl) {
-      twiml.redirect('https://ivr-2916.twil.io/recording');
-      return callback(null, twiml);
+    // Get call data first to get workspace ID
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const callSid = event.CallSid;
+    log('info', 'Event data', { 
+      callSid,
+      digits: event.Digits,
+      speechResult: event.SpeechResult,
+      answeredBy: event.AnsweredBy
+    });
+    
+    if (!callSid) {
+      throw new Error("Missing CallSid");
     }
 
+    // Get call data to get workspace ID
+    log('info', 'Fetching call data', { callSid });
     const callData = await getCallWithRetry(supabase, callSid);
+    if (!callData.workspace) {
+      throw new Error("Call data missing workspace ID");
+    }
+    log('info', 'Call data retrieved', { workspace: callData.workspace });
+
+    // Get workspace data and validate request
+    log('info', 'Fetching workspace data', { workspace_id: callData.workspace });
+    const workspaceData = await getWorkspaceData(supabase, callData.workspace);
+    log('info', 'Validating request', {
+      authTokenLength: workspaceData.twilio_data.authToken.length,
+      url: publicUrl,
+      paramsCount: Object.keys(params).length
+    });
+    
+    const isValidRequest = validateRequest(
+      workspaceData.twilio_data.authToken,
+      twilioSignature || '',
+      publicUrl,
+      params
+    );
+
+    log('info', 'Request validation result', { isValidRequest });
+
+    if (!isValidRequest) {
+      return new Response("Invalid Twilio signature", { status: 403 });
+    }
+
+    // Create Twilio instance
+    const { VoiceResponse } = Twilio.twiml;
+    const twiml = new VoiceResponse();
+
+    if (event.RecordingUrl) {
+      twiml.redirect(`${baseUrl}/ivr-recording`);
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     if (!callData.campaign?.ivr_campaign?.[0]?.script?.steps) {
       throw new Error("Invalid IVR campaign structure");
     }
-    log('info', 'Retrieved call data', {
-      currentStep: callData.outreach_attempt?.current_step,
-      scriptBlocks: Object.keys(callData.campaign.ivr_campaign[0].script.steps.blocks).length,
-      campaignId: callData.campaign?.id
-    });
 
     let currentStep = callData.outreach_attempt?.current_step || 'page_1:block_1';
     let [currentPageId, currentBlockId] = currentStep.split(':');
@@ -290,7 +387,9 @@ exports.handler = async function (context, event, callback) {
           twiml.hangup();
         }
       }
-      return callback(null, twiml);
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
     if (currentStep === 'hangup') {
@@ -299,6 +398,12 @@ exports.handler = async function (context, event, callback) {
       if (userInput) {
         const { step: newStep, result: newResult } = await processResult(supabase, script, currentStep, result, userInput, callData.outreach_attempt.id);
         currentStep = newStep;
+        if (currentStep === 'hangup') {
+          twiml.hangup();
+          return new Response(twiml.toString(), {
+            headers: { "Content-Type": "text/xml" },
+          });
+        }
         [currentPageId, currentBlockId] = currentStep.split(':');
         currentBlock = script.blocks[currentBlockId];
         result = newResult;
@@ -319,11 +424,21 @@ exports.handler = async function (context, event, callback) {
       duration: `${Date.now() - startTime}ms`
     });
 
-    return callback(null, twiml);
+    return new Response(twiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+
   } catch (error) {
+    // Create a default TwiML response for errors
     log('error', 'Flow error', { error: error.message, stack: error.stack });
-    twiml.say("An error occurred. Please try again later.");
-    twiml.hangup();
-    return callback(null, twiml);
+    const { VoiceResponse } = Twilio.twiml;
+    const errorTwiml = new VoiceResponse();
+    errorTwiml.say("An error occurred. Please try again later.");
+    errorTwiml.hangup();
+    
+    return new Response(errorTwiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
+      status: 500
+    });
   }
-};
+});

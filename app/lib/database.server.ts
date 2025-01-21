@@ -1112,6 +1112,7 @@ export const fetchBasicResults = async (
   const { data, error } = await supabaseClient.rpc("get_campaign_stats", {
     campaign_id_param: campaignId,
   });
+  console.log(data);
   if (error) console.error("Error fetching basic results:", error);
   return data || [];
 };

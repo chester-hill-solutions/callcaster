@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Audio", path: "audios", callerHidden: true },
   { name: "Audiences", path: "audiences", callerHidden: true },
 ];
+
 interface WorkspaceNavProps {
   workspace: {
     id: string;
@@ -35,17 +36,8 @@ interface WorkspaceNavProps {
 const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole }) => {
   const location = useLocation();
   const userIsCaller = userRole === MemberRole.Caller;
-  const getWorkspaceBaseUrl = () => {
-    const pathSegments = location.pathname.split("/");
-    const workspaceIndex = pathSegments.findIndex(
-      (segment) => segment === "workspaces",
-    );
-    return workspaceIndex !== -1 && workspaceIndex + 1 < pathSegments.length
-      ? pathSegments.slice(0, workspaceIndex + 2).join("/")
-      : "/workspaces";
-  };
 
-  const baseUrl = getWorkspaceBaseUrl();
+  const baseUrl = `/workspaces/${workspace.id}`;
 
   const handleNavlinkStyles = ({
     isActive,
@@ -71,44 +63,39 @@ const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole }) => {
       <div className="mb-2 flex items-center text-black dark:text-white">
         <div className="flex flex-1 items-center justify-center sm:justify-between">
           <div className="flex gap-1">
-            {NAV_ITEMS.map(
-              (item) =>
-                (!item.callerHidden || !userIsCaller) &&
-                <NavLink
-                  key={item.name}
-                  to={`${baseUrl}/${item.path}`}
-                  className={handleNavlinkStyles}
-                  end={item.end}
-                  prefetch="intent"
-                >
-                  {item.name}
-                </NavLink>
-
-            )}
+            {NAV_ITEMS.filter(item => !userIsCaller || !item.callerHidden).map((item) => (
+              <NavLink
+                key={item.name}
+                to={`${baseUrl}${item.path ? `/${item.path}` : ''}`}
+                className={handleNavlinkStyles}
+                end={item.end}
+              >
+                {item.name}
+              </NavLink>
+            ))}
           </div>
-          <div>
-            {!userIsCaller && (
-              <div className="flex gap-1">
-                <Button size="icon" asChild variant="outline">
-                  <NavLink
-                    prefetch="intent"
-                    to={`${baseUrl}/settings`}
-                    className="border-2 border-zinc-400"
-                  >
-                    <MdSettings size={24} />
-                  </NavLink>
-                </Button>
-                <Button asChild variant="outline">
-                  <NavLink
-                    to={`${baseUrl}/settings/credits`}
-                    className="border-2 border-zinc-400 flex items-center gap-1 relative"
-                    prefetch="intent"
-                  >
-                    <MdCreditCard size={24} /> {workspace?.credits} <span className="text-xs absolute -bottom-5">Call Credits</span>
-                  </NavLink>
-                </Button>
-              </div>
+          <div className="flex gap-1">
+            {(userRole === MemberRole.Admin || userRole === MemberRole.Owner) && (
+              <NavLink
+                to={`${baseUrl}/settings`}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50 ${
+                  location.pathname.endsWith('/settings') ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50" : ""
+                }`}
+                end={true}
+              >
+                <MdSettings className="h-4 w-4" />
+                Settings
+              </NavLink>
             )}
+            <NavLink
+              to={`${baseUrl}/billing`}
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50 ${
+                location.pathname.endsWith('/billing') ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50" : ""
+              }`}
+            >
+              <MdCreditCard className="h-4 w-4" />
+              Credits: {workspace.credits}
+            </NavLink>
           </div>
         </div>
       </div>

@@ -75,9 +75,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!selected_id) return redirect("../../");
   if (!workspace_id) return redirect("../../");
   const campaignWithAudience = await fetchCampaignWithAudience(supabaseClient, selected_id, workspace_id  );
-  const {data: mediaData} = await supabaseClient.storage.from("media").list(`${workspace_id}/`);
+  const {data: mediaData} = await supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`);
   const {data:phoneNumbers} = await supabaseClient.from("workspace_number").select("*").eq("workspace", workspace_id);
-  const mediaLinksPromise = Promise.resolve(mediaData?.map((media) => media.name));
+  const mediaLinksPromise = Promise.resolve(mediaData?.map((media) => media.name)).then((mediaNames) => mediaNames?.filter((media) => !media.startsWith("voicemail-")));
 
   return defer({
     workspace_id,
@@ -87,7 +87,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     queueCount: campaignWithAudience.queue_count,
     totalCount: campaignWithAudience.total_count,
     scripts: campaignWithAudience.scripts,
-    mediaData,
+    mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
     phoneNumbers,
     user:serverSession.user,  
     mediaLinks: mediaLinksPromise,

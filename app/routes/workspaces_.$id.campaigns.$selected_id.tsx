@@ -112,7 +112,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
   const isActive = (campaignData.is_active) && checkSchedule(campaignData);
-
+  const results = fetchBasicResults(supabaseClient, selected_id);
+  results.then((results) => {
+    console.log(results);
+  })
   return defer({
     hasAccess,
     campaignData,
@@ -124,7 +127,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     isActive,
     totalCalls: 0,
     expectedTotal: 0,
-    results: fetchBasicResults(supabaseClient, selected_id), // Deferred loading
+    results: results || [], // Deferred loading
   });
 };
 

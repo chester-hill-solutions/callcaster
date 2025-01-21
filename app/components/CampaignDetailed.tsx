@@ -118,7 +118,7 @@ export const CampaignTypeSpecificSettings = ({
                 campaignData.caller_id
               )
             }
-            onClick={handleActivateButton}
+            onClick={() => handleActivateButton("play")}
           >
             Send
           </Button>
