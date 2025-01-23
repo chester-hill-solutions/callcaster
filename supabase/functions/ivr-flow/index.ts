@@ -293,52 +293,29 @@ Deno.serve(async (req) => {
   try {
     // Get request details for validation
     const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-flow`;
-    log('info', 'Request URL', { url: publicUrl });
-    
     const twilioSignature = req.headers.get('x-twilio-signature');
-    log('info', 'Twilio signature', { twilioSignature });
     
     const formData = await req.formData();
     const params = Object.fromEntries(formData.entries());
-    log('info', 'Request parameters', { params });
-    
     const event: TwilioEventData = params;
 
-    // Get call data first to get workspace ID
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     const callSid = event.CallSid;
-    log('info', 'Event data', { 
-      callSid,
-      digits: event.Digits,
-      speechResult: event.SpeechResult,
-      answeredBy: event.AnsweredBy
-    });
     
     if (!callSid) {
       throw new Error("Missing CallSid");
     }
 
-    // Get call data to get workspace ID
-    log('info', 'Fetching call data', { callSid });
     const callData = await getCallWithRetry(supabase, callSid);
     if (!callData.workspace) {
       throw new Error("Call data missing workspace ID");
     }
-    log('info', 'Call data retrieved', { workspace: callData.workspace });
-
-    // Get workspace data and validate request
-    log('info', 'Fetching workspace data', { workspace_id: callData.workspace });
-    const workspaceData = await getWorkspaceData(supabase, callData.workspace);
-    log('info', 'Validating request', {
-      authTokenLength: workspaceData.twilio_data.authToken.length,
-      url: publicUrl,
-      paramsCount: Object.keys(params).length
-    });
     
+    const workspaceData = await getWorkspaceData(supabase, callData.workspace);
     const isValidRequest = validateRequest(
       workspaceData.twilio_data.authToken,
       twilioSignature || '',
@@ -346,13 +323,10 @@ Deno.serve(async (req) => {
       params
     );
 
-    log('info', 'Request validation result', { isValidRequest });
-
     if (!isValidRequest) {
       return new Response("Invalid Twilio signature", { status: 403 });
     }
 
-    // Create Twilio instance
     const { VoiceResponse } = Twilio.twiml;
     const twiml = new VoiceResponse();
 
@@ -374,11 +348,28 @@ Deno.serve(async (req) => {
     let userInput = event.Digits || event.SpeechResult;
     let result = callData.outreach_attempt?.result || {};
 
-    // Handle voicemail detection
     if (event.AnsweredBy?.includes('machine') && !event.AnsweredBy.includes('other')) {
       if (!callData.campaign.voicemail_file) {
+        // Update disposition to voicemail-no-message if we have no voicemail to leave
+        const { error: dispositionError } = await supabase
+          .from("outreach_attempt")
+          .update({ disposition: 'voicemail-no-message' })
+          .eq("id", callData.outreach_attempt?.id);
+
+        if (dispositionError) {
+          log('error', 'Failed to update disposition for voicemail-no-message', { error: dispositionError });
+        }
         twiml.hangup();
       } else {
+        // Update disposition to voicemail if we're leaving a message
+        const { error: dispositionError } = await supabase
+          .from("outreach_attempt")
+          .update({ disposition: 'voicemail' })
+          .eq("id", callData.outreach_attempt?.id);
+
+        if (dispositionError) {
+          log('error', 'Failed to update disposition for voicemail', { error: dispositionError });
+        }
         const audio = await handleVMAudio(supabase, callData.campaign, callData.workspace);
         if (audio) {
           twiml.pause({ length: 4 });
@@ -429,7 +420,6 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    // Create a default TwiML response for errors
     log('error', 'Flow error', { error: error.message, stack: error.stack });
     const { VoiceResponse } = Twilio.twiml;
     const errorTwiml = new VoiceResponse();

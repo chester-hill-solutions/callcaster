@@ -87,9 +87,57 @@ const updateCallStatus = async (
 const handleCallCompletion = async (
   supabase: SupabaseClient,
   callData: any,
-  CallDuration?: string
+  CallDuration?: string,
+  CallStatus?: string
 ) => {
   try {
+    const { data: currentOutreach, error: fetchError } = await supabase
+      .from("outreach_attempt")
+      .select("disposition")
+      .eq("id", callData.outreach_attempt_id)
+      .single();
+
+    if (fetchError) {
+      log('error', 'Failed to fetch current disposition', { 
+        error: fetchError,
+        outreach_attempt_id: callData.outreach_attempt_id 
+      });
+      return;
+    }
+
+    const finalStates = ['voicemail', 'voicemail-no-message'];
+    if (!finalStates.includes(currentOutreach.disposition)) {
+      let disposition = 'completed';
+      if (CallStatus) {
+        switch (CallStatus.toLowerCase()) {
+          case 'no-answer':
+          case 'busy':
+          case 'failed':
+          case 'canceled':
+            disposition = CallStatus.toLowerCase();
+            break;
+          case 'completed':
+            disposition = 'completed';
+            break;
+          default:
+            disposition = 'failed';
+        }
+      }
+
+      // Update outreach attempt with final disposition
+      const { error: dispositionError } = await supabase
+        .from("outreach_attempt")
+        .update({ disposition })
+        .eq("id", callData.outreach_attempt_id);
+
+      if (dispositionError) {
+        log('error', 'Failed to update outreach attempt disposition', { 
+          error: dispositionError,
+          outreach_attempt_id: callData.outreach_attempt_id 
+        });
+      }
+    }
+
     // Check if this is the last call in a campaign
     if (callData.is_last) {
       const { error: campaignError } = await supabase
@@ -258,7 +306,7 @@ Deno.serve(async (req) => {
 
     // Handle call completion tasks if needed
     if (CallStatus === 'completed') {
-      await handleCallCompletion(supabase, callData, CallDuration);
+      await handleCallCompletion(supabase, callData, CallDuration, CallStatus);
     }
 
     // Create TwiML response
