@@ -114,8 +114,8 @@ export const CampaignBasicInfo = ({
   details,
   scheduleDisabled,
 }: CampaignBasicInfoProps) => {
-  
-  const isPlayDisabled = (!campaignData?.script_id && !campaignData.body_text) ?
+
+  const isPlayDisabled = (!details?.script_id && !details.body_text) ?
     "No script selected" :
     !campaignData.caller_id || campaignData.caller_id === "+15064364568" ?
       "No outbound phone number selected" :
