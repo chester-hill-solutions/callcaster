@@ -138,6 +138,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
 }
+
 export default function ChatsList() {
   const { supabase } = useOutletContext();
   const { chats, workspace, userRole, potentialContacts, contact, campaigns } =

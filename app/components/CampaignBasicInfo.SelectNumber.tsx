@@ -1,6 +1,5 @@
 import { NavLink } from "@remix-run/react";
 import { Button } from "./ui/button";
-import { Label } from "./ui/label";
 import {
   Select,
   SelectContent,
@@ -8,36 +7,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
+import { WorkspaceNumbers } from "~/lib/types";
+
+interface SelectNumberProps {
+  handleInputChange: (name: string, value: string) => void;
+  campaignData: {
+    caller_id?: string;
+  };
+  phoneNumbers: WorkspaceNumbers[];
+}
 
 export default function SelectNumber({
   handleInputChange,
   campaignData,
   phoneNumbers,
-}) {
+}: SelectNumberProps) {
+  if (!phoneNumbers.length) {
+    return (
+      <Button variant="outline" asChild>
+        <NavLink to="../../../settings/numbers">Get a Number</NavLink>
+      </Button>
+    );
+  }
+
   return (
-    <div className="gap-1 flex flex-grow flex-col min-w-48">
-      <Label htmlFor="caller_id">Phone Number</Label>
-      {phoneNumbers.length ? (
-        <Select
-          value={campaignData.caller_id}
-          onValueChange={(value) => handleInputChange("caller_id", value)}
-        >
-          <SelectTrigger id="caller_id">
-            <SelectValue placeholder="Select phone number" />
-          </SelectTrigger>
-          <SelectContent>
-            {phoneNumbers.map((number) => (
-              <SelectItem key={number.phone_number} value={number.phone_number}>
-                {number.friendly_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <Button asChild>
-          <NavLink to="../../../settings/numbers">Get a Number</NavLink>
-        </Button>
-      )}
-    </div>
+    <Select
+      value={campaignData.caller_id}
+      onValueChange={(value) => handleInputChange("caller_id", value)}
+    >
+      <SelectTrigger id="caller_id">
+        <SelectValue placeholder="(289) 401-4898" />
+      </SelectTrigger>
+      <SelectContent>
+        {phoneNumbers.map((number) => number?.phone_number && (
+          <SelectItem 
+            key={number.phone_number} 
+            value={number.phone_number}
+          >
+            {number.friendly_name || number.phone_number}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

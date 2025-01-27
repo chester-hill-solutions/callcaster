@@ -12,24 +12,24 @@ import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { Flags } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
   if (!serverSession) {
     return redirect("/signin", { headers });
   }
-  return null;
+return null;
 };
 
 export default function SelectedType() {
   const outlet = useOutlet();
-  const { selectedTable, audiences, campaigns, phoneNumbers, userRole, flags, supabase } = useOutletContext<{ selectedTable: string, audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, flags: Flags, supabase: SupabaseClient }>();
+  const { audiences, campaigns, phoneNumbers, userRole, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
   return !outlet ? (
     <CampaignEmptyState
       hasAccess={userRole === "admin" || userRole === "owner"}
       type={phoneNumbers?.length > 0 ? "campaign" : "number"}
     />
   ) : (
-    <Outlet context={{ selectedTable, audiences, campaigns, flags, supabase }} />
+    <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, workspace, supabase }} />
   );
 }

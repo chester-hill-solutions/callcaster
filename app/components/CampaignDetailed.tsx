@@ -11,8 +11,7 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
-import { IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
-import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
+import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -28,7 +27,7 @@ export const CampaignTypeSpecificSettings = ({
   joinDisabled,
   scheduleDisabled,
 }:{
-  campaignData: CampaignSettingsData,
+  campaignData: NonNullable<Campaign>,
   handleInputChange:(name: string, value: any) => void,
   mediaData: FileObject[],
   scripts: Script[],
@@ -61,7 +60,7 @@ export const CampaignTypeSpecificSettings = ({
           <div className="flex items-end gap-2">
             <SelectScript
               handleInputChange={handleInputChange}
-              campaignData={campaignData}
+              selectedScript={details.script_id}
               scripts={scripts}
             />
             <Button variant="outline" asChild size="icon" disabled={isBusy}>

@@ -25,7 +25,6 @@ interface QueueContentProps {
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
     audiences: Audience[];
-    selectedCampaignAudienceIds: number[];
     isSelectingAudience: boolean;
     selectedAudience: number | null;
     setIsSelectingAudience: (value: boolean) => void;
@@ -38,6 +37,7 @@ interface QueueContentProps {
     addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
     removeContactsFromQueue: (ids: string[] | 'all') => void;
     supabase: SupabaseClient;
+    selectedAudienceIds:number[]
 }
 
 export function QueueContent({
@@ -45,7 +45,6 @@ export function QueueContent({
     handleFilterChange,
     clearFilter,
     audiences,
-    selectedCampaignAudienceIds,
     isSelectingAudience,
     selectedAudience,
     setIsSelectingAudience,
@@ -57,16 +56,17 @@ export function QueueContent({
     setIsAllFilteredSelected,
     addContactToQueue,
     removeContactsFromQueue,
-    supabase
+    supabase,
+    selectedAudienceIds
 }: QueueContentProps) {
     if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
     const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
     const [queueData, setQueueData] = useState(queueValue.queueData ?? []);
     const pendingUpdates = useRef<Set<number>>(new Set());
-    
+
     const fetchContactById = async (id: number) => {
         if (pendingUpdates.current.has(id)) return null;
-        
+
         pendingUpdates.current.add(id);
         try {
             const { data, error } = await supabase.from('contact').select('*').eq('id', id).single();
@@ -86,7 +86,7 @@ export function QueueContent({
         }
         if (payload.eventType === 'DELETE') {
             setQueueData(curr => curr.filter(item => item.id !== payload.old.id));
-        }   
+        }
     }
 
     useEffect(() => {
@@ -123,12 +123,12 @@ export function QueueContent({
     return (
         <div className="p-2">
             <QueueHeader
-                unfilteredCount={queueValue.unfilteredCount ?? 0}   
+                unfilteredCount={queueValue.unfilteredCount ?? 0}
                 totalCount={queueValue.totalCount ?? 0}
                 isSelectingAudience={isSelectingAudience}
                 selectedAudience={selectedAudience}
                 audiences={audiences}
-                selectedCampaignAudienceIds={selectedCampaignAudienceIds}
+                selectedCampaignAudienceIds={selectedAudienceIds}
                 onSelectingAudienceChange={setIsSelectingAudience}
                 onSelectedAudienceChange={setSelectedAudience}
                 onAddFromAudience={handleAddFromAudience}

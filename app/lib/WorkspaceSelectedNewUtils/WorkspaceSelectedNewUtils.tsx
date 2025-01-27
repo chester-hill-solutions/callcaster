@@ -3,24 +3,53 @@ import { redirect } from "react-router";
 import { parseCSV } from "../utils";
 import { bulkCreateContacts } from "../database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { Contact } from "~/lib/types";
+import { Database } from "../database.types";
 
-async function insertCampaignAudience({
-  campaignId,
-  audienceId,
-  supabaseClient,
-}) {
-  return await supabaseClient
-    .from("campaign_audience")
-    .insert({
-      campaign_id: campaignId,
-      audience_id: audienceId,
-    })
-    .select()
-    .single();
+type CampaignType = "live_call" | "message" | "robocall";
+
+interface CampaignAudienceParams {
+  campaignId: string;
+  audienceId: string;
+  supabaseClient: SupabaseClient<Database>;
 }
 
-async function removeCampaignAudience({ supabaseClient, id }) {
-  return await supabaseClient.from("audience").delete().eq("id", id);
+interface RemoveCampaignAudienceParams {
+  supabaseClient: SupabaseClient<Database>;
+  id: string;
+}
+
+interface NewAudienceParams {
+  supabaseClient: SupabaseClient<Database>;
+  formData: FormData;
+  workspaceId: string;
+  headers: Headers;
+  contactsFile: File;
+  campaignId?: string;
+  contacts?: Array<Contact>;
+  userId: string;
+}
+
+interface NewCampaignParams {
+  supabaseClient: SupabaseClient<Database>;
+  formData: FormData;
+  workspaceId: string;
+  headers: Headers;
+}
+
+async function insertCampaignAudience({ campaignId, audienceId, supabaseClient }: CampaignAudienceParams) {
+  const { error } = await supabaseClient
+    .from("campaign_audience")
+    .insert([{ campaign_id: parseInt(campaignId), audience_id: parseInt(audienceId) }]);
+  return { error };
+}
+
+async function removeCampaignAudience({ supabaseClient, id }: RemoveCampaignAudienceParams) {
+  const { error } = await supabaseClient
+    .from("campaign_audience")
+    .delete()
+    .eq("id", id);
+  return { error };
 }
 
 export async function handleNewAudience({
@@ -30,17 +59,13 @@ export async function handleNewAudience({
   headers,
   contactsFile,
   campaignId,
-}: {
-  supabaseClient: SupabaseClient;
-  formData: FormData;
-  workspaceId: string;
-  headers: Headers;
-  contactsFile: File;
-  campaignId?: string;
-}) {
+  contacts = [],
+  userId,
+}: NewAudienceParams) {
   const newAudienceName = formData.get("audience-name") as string;
 
   try {
+    // Create the audience
     const { data: createAudienceData, error: createAudienceError } =
       await supabaseClient
         .from("audience")
@@ -54,23 +79,28 @@ export async function handleNewAudience({
     if (createAudienceError) {
       throw createAudienceError;
     }
+
+    // Link to campaign if provided
     if (campaignId) {
       const { error: campaignInsertError } = await insertCampaignAudience({
         campaignId,
-        audienceId: createAudienceData.id,
+        audienceId: createAudienceData.id.toString(),
         supabaseClient,
       });
-      if (campaignInsertError)
-        removeCampaignAudience({ supabaseClient, id: createAudienceData.id });
+      if (campaignInsertError) {
+        await removeCampaignAudience({ supabaseClient, id: createAudienceData.id.toString() });
+        throw campaignInsertError;
+      }
     }
-    if (contactsFile && contactsFile.size > 0) {
-      const fileContent = await contactsFile.text();
-      const { headers: csvHeaders, contacts } = parseCSV(fileContent);
+
+    // Add contacts if provided - these are already mapped from the CSV UI
+    if (contacts && contacts.length > 0) {
       await bulkCreateContacts(
         supabaseClient,
         contacts,
         workspaceId,
-        createAudienceData.id,
+        createAudienceData.id.toString(),
+        userId
       );
     }
 
@@ -80,10 +110,11 @@ export async function handleNewAudience({
     );
   } catch (error) {
     console.error("Error in handleNewAudience:", error);
+    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
     return json(
       {
         audienceData: null,
-        error: error.message || "An unexpected error occurred",
+        error: errorMessage,
       },
       { status: 500, headers },
     );
@@ -95,9 +126,9 @@ export async function handleNewCampaign({
   formData,
   workspaceId,
   headers,
-}) {
+}: NewCampaignParams) {
   const newCampaignName = formData.get("campaign-name") as string;
-  const newCampaignType = formData.get("campaign-type") as string;
+  const newCampaignType = formData.get("campaign-type") as CampaignType;
   console.log("Campaign Type: ", newCampaignType);
 
   const { data: campaignData, error: campaignError } = await supabaseClient
@@ -125,16 +156,23 @@ export async function handleNewCampaign({
   }
 
   const tableKey = newCampaignType === "live_call" ? "live_campaign" : 
-  newCampaignType === "message" ? "message_campaign" :
-  newCampaignType === "robocall"? "ivr_campaign": null;
+                   newCampaignType === "message" ? "message_campaign" :
+                   newCampaignType === "robocall" ? "ivr_campaign" : null;
+
+  if (!tableKey) {
+    return json(
+      { campaignData: null, error: "Invalid campaign type" },
+      { headers },
+    );
+  }
 
   const { error: detailsError } = await supabaseClient
     .from(tableKey)
-    .insert({ campaign_id: campaignData.id, workspace: workspaceId,  });
+    .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
     return json(
-      { campaignData: campaignData, error: detailsError.error },
+      { campaignData: campaignData, error: detailsError },
       { headers },
     );
   }

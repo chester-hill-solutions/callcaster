@@ -6,14 +6,14 @@ import {
   SelectContent,
   SelectItem,
 } from "./ui/select";
-import { IVRCampaign, MessageCampaign, LiveCampaign, Script } from "~/lib/types";
-import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
+import { IVRCampaign, MessageCampaign, LiveCampaign, Script, Campaign } from "~/lib/types";
+
 export default function SelectScript({
-  campaignData,
+  selectedScript,
   handleInputChange,
   scripts,
 }: {
-  campaignData: CampaignSettingsData;
+  selectedScript: number | string;
   handleInputChange: (name: string, value: any) => void;
   scripts: Script[];
 }) {
@@ -21,7 +21,7 @@ export default function SelectScript({
     <div className="space-y-2">
       <Label >Script</Label>
       <Select
-        value={campaignData && 'script_id' in campaignData ? campaignData.script_id?.toString() : undefined}
+        value={selectedScript.toString()}
         onValueChange={(value) =>
           handleInputChange("script_id", parseInt(value))
         }

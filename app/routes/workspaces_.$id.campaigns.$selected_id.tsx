@@ -1,10 +1,11 @@
-import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect, Session } from "@remix-run/node";
 import {
   Await,
   Outlet,
   useActionData,
   useLoaderData,
   useLocation,
+  useMatches,
   useOutletContext,
   useSubmit,
 } from "@remix-run/react";
@@ -34,8 +35,31 @@ import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
 import { useCsvDownload } from "~/hooks/useCsvDownload";
 import { generateCSVContent } from "~/lib/utils";
-import { Audience, Contact, Flags } from "~/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { SupabaseClient, User } from "@supabase/supabase-js";
+import { useRealtimeData } from "~/hooks/useWorkspaceContacts";
+
+export type CampaignState = {
+  campaign_id: string;
+  workspace: string;
+  title: string;
+  status: string;
+  type: "message" | "robocall" | "live_call" | "simple_ivr" | "complex_ivr" | "email";
+  dial_type: "call" | "predictive" | null;
+  group_household_queue: boolean;
+  start_date: string;
+  end_date: string;
+  caller_id: string | null;
+  voicemail_file: string | null;
+  script_id: number | null;
+  audiences: NonNullable<Audience>[];
+  body_text: string | null;
+  message_media: string[] | null;
+  voicedrop_audio: string | null;
+  schedule: Schedule | null;
+  is_active: boolean;
+  details: LiveCampaign | MessageCampaign | IVRCampaign;
+};
 
 const getTable = (campaignType: string) => {
   return campaignType === "live_call"
@@ -54,7 +78,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect("/signin");
   }
   const { id: workspace_id, selected_id: campaign_id } = params;
-  if (!workspace_id || !campaign_id) throw redirect("../");
+  if (!workspace_id || !campaign_id) {
+    return redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
   const { data: users } = await getWorkspaceUsers({ supabaseClient, workspaceId: workspace_id });
   const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
 
@@ -63,10 +89,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   const { csvHeaders, flattenedData } = processOutreachExportData(
-    outreachData,
-    users ?? []
+    [outreachData].filter(Boolean),
+    (users ?? []).map(u => u as any)
   );
-  const csvContent = generateCSVContent(csvHeaders, flattenedData);
+  const csvContent = generateCSVContent(csvHeaders as string[], flattenedData as any[]);
 
   return json({
     csvContent,
@@ -76,32 +102,30 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  if (!workspace_id || !selected_id) throw redirect("../../");
+  if (!workspace_id || !selected_id) {
+    return redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
+  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const user = serverSession.user;
 
-  const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) throw redirect("/signin");
-
+  if (!serverSession || !user) return redirect("/signin");
   const [
-    campaignData,
+    campaignType,
     campaignCounts,
     workspace,
     userRole,
   ] = await Promise.all([
+    supabaseClient.from('campaign').select('type').eq('id', selected_id).single(),
     fetchCampaignData(supabaseClient, selected_id),
     fetchCampaignCounts(supabaseClient, selected_id),
-    supabaseClient
-      .from('workspace')
-      .select('id, name, credits, workspace_number(*)')
-      .eq('id', workspace_id)
-      .single(),
     getUserRole({ serverSession, workspaceId: workspace_id })
   ]);
-
-  if (!campaignData) throw redirect("../../");
+  if (!campaignType || !campaignType.data) {
+    return redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
   if (workspace.error) throw workspace.error;
 
-  const campaignType = campaignData.type;
-  const campaignTable = getTable(campaignType);
+  const campaignTable = getTable(campaignType.data.type);
 
   const campaignDetails = await fetchCampaignDetails(
     supabaseClient,
@@ -110,71 +134,61 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaignTable
   );
 
-  const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
-  const isActive = (campaignData.is_active) && checkSchedule(campaignData);
-  const results = fetchBasicResults(supabaseClient, selected_id);
-  results.then((results) => {
-    console.log(results);
-  })
+  const resultsPromise = fetchBasicResults(supabaseClient, selected_id);
+
   return defer({
-    hasAccess,
-    campaignData,
+    selected_id,
+    hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole),
     campaignDetails,
-    user: serverSession?.user,
+    user: user,
     campaignCounts,
-    phoneNumbers: workspace.data.workspace_number,
-    credits: workspace.data.credits,
-    isActive,
     totalCalls: 0,
     expectedTotal: 0,
-    results: results || [], // Deferred loading
+    results: resultsPromise || [], // Deferred loading
   });
 };
 
 export default function CampaignScreen() {
-  const { audiences, flags, supabase, contactDb } = useOutletContext<{ audiences: Audience[], flags: Flags, supabase: SupabaseClient, contactDb: any }>();
   const {
-    campaignData,
-    campaignDetails,
     hasAccess,
-    results,
+    campaignDetails: initialCampaignDetails,
     campaignCounts,
     totalCalls = 0,
     expectedTotal = 0,
-    isActive,
+    results,
+    selected_id,
   } = useLoaderData<typeof loader>();
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const csvData = useActionData();
-  const route = useLocation().pathname.split("/");
-  const isCampaignParentRoute = !Number.isNaN(parseInt(route.at(-1) ?? ''));
-  useCsvDownload(csvData);
-  useEffect(() => {
-    if (contactDb) {
-      const newContacts = contactDb.getAllContacts();
-      console.log("newContacts", newContacts);
-      setContacts(newContacts);
-    }
-  }, [contactDb]);
+  const { audiences, campaigns, phoneNumbers, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
+  const campaignData = campaigns.find(c => c?.id.toString() === selected_id);
+  const csvData = useActionData() as { csvContent: string, filename: string };
+  const location = useLocation();
+  const route = location.pathname.split("/");
+  const isCampaignParentRoute = route.length === 5;
+  const { data: [campaignDetails], isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, workspace.id, getTable(campaignData?.type), [initialCampaignDetails])
 
-  const joinDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
+  useCsvDownload(csvData as { csvContent: string, filename: string });
+
+  const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"
-    : !campaignData.caller_id
+    : !campaignData?.caller_id
       ? "No outbound phone number selected"
-      : campaignData.status === "scheduled" ?
+      : campaignDetails.status === "scheduled" ?
         `Campaign scheduled.`
-        : !isActive
+        : !campaignData?.is_active
           ? "It is currently outside of the Campaign's calling hours"
           : null;
+
   const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
     ? "No script selected"
-    : !campaignData.caller_id
+    : !campaignData?.caller_id
       ? "No outbound phone number selected"
       : null;
+
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={campaignData.title} status={campaignData.status} isDesktop={false} />
+      <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
-        <CampaignHeader title={campaignData.title} isDesktop status={campaignData.status} />
+        <CampaignHeader title={campaignData?.title || ""} isDesktop status={campaignData?.status || "pending"} />
         <NavigationLinks
           hasAccess={hasAccess}
           data={campaignData}
@@ -201,7 +215,7 @@ export default function CampaignScreen() {
       )}
       {isCampaignParentRoute &&
         !hasAccess &&
-        (campaignData.type === "live_call" || !campaignData.type) && (
+        (campaignData?.type === "live_call" || !campaignData?.type) && (
           <CampaignInstructions
             campaignData={campaignData}
             totalCalls={totalCalls}
@@ -216,8 +230,9 @@ export default function CampaignScreen() {
           audiences,
           campaignData,
           campaignDetails,
-          flags,
           scheduleDisabled,
+          phoneNumbers,
+          workspace
         }}
       />
     </div>

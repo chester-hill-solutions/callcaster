@@ -1,9 +1,10 @@
 //import * as Deno from "https://deno.land/std@0.203.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
-import { Twilio } from "npm:twilio@5.3.0";
+import Twilio from "npm:twilio@5.3.0";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { encode } from "https://deno.land/std@0.177.0/encoding/base64.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const initSupabaseClient = () => {
   return createClient(
@@ -45,7 +46,7 @@ export async function getExpectedTwilioSignature(
     false,
     ["sign"]
   );
-  
+
   const signature = await crypto.subtle.sign(
     "HMAC",
     key,
@@ -82,7 +83,7 @@ const handleTriggerStart = async (
 ) => {
   const lastContactIndex = contacts.length - 1;
   const batchSize = 100;
-  
+
   // Split contacts into batches and queue them
   for (let i = 0; i < contacts.length; i += batchSize) {
     const batch = contacts.slice(i, i + batchSize);
@@ -135,7 +136,7 @@ const handleTriggerStart = async (
 async function getWorkspaceUsers(
   supabaseClient: SupabaseClient,
   workspaceId: string,
-) { 
+) {
   const { data, error } = await supabaseClient.rpc("get_workspace_users", {
     selected_workspace_id: workspaceId,
   });
@@ -201,7 +202,7 @@ serve(async (req: Request) => {
   const now = new Date();
   console.log("Start Time", now);
   console.log("record", record);
-  
+
   try {
     if (
       record.is_active &&
@@ -230,7 +231,7 @@ serve(async (req: Request) => {
       });
 
     } else if (
-      (!record.is_active || new Date(record.end_date) <= now) && 
+      (!record.is_active || new Date(record.end_date) <= now) &&
       record.status === "running"
     ) {
       const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
