@@ -148,6 +148,7 @@ const handleInitiateCampaign = async (
     });
     if (campaignQueueError) throw campaignQueueError;
     if (!data || !data.length) {
+      console.log(`The queue is empty`)
       return new Response(JSON.stringify({ status: "empty_queue" }), {
         headers: { "Content-Type": "application/json" },
       });
@@ -161,7 +162,7 @@ const handleInitiateCampaign = async (
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
         },
-        body: JSON.stringify({ campaign_id: id, owner })
+        body: JSON.stringify({ campaign_id: id, owner: owner.id })
       }
     );
     if (!response.ok) throw new Error('Failed to queue initial call.');

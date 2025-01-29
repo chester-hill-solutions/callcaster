@@ -15,19 +15,23 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
     const { data, error } = await supabase.rpc("get_campaign_queue", {
       campaign_id_pro: campaign_id
     });
     if (error || !data) throw error || "No queue found";
     if (!data.length) {
+      console.log(`Queue is now empty. Marking completed.`)
       const { error: campaignUpdateError } = await supabase
         .from("campaign")
         .update({ status: "complete" })
         .eq("id", campaign_id);
       if (campaignUpdateError) throw campaignUpdateError
     }
-    const { data: campaign, error: campaignError } = supabase.from("campaign").select('is_active, group_household_queue, type').eq("id", campaign_id).single();
+    const { data: campaign, error: campaignError } = await supabase
+      .from("campaign")
+      .select('is_active, group_household_queue, type')
+      .eq("id", campaign_id)
+      .single();
     if (campaignError) throw campaignError;
     if (!campaign.is_active) {
       return new Response(
@@ -35,6 +39,7 @@ Deno.serve(async (req) => {
       )
     }
     const contact = data[0];
+    console.log(`Calling contact`, contact, campaign);
     const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
       passed_contact_id: contact.contact_id,
       group_on_household: campaign.group_household_queue
@@ -69,7 +74,7 @@ Deno.serve(async (req) => {
         JSON.stringify(data),
         { headers: { "Content-Type": "application/json" } },
       )
-    } else if (campaign.type === "message"){
+    } else if (campaign.type === "message") {
       await fetch(
         `${baseUrl}/sms-handler`,
         {

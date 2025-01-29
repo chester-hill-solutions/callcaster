@@ -96,7 +96,9 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
+    const now = new Date();
+    console.log("Start Time", now);
+  
     const outreach_attempt_id = await createOutreachAttempt(supabase, body);
     const twilio_data = await getTwilioData(supabase, body.workspace_id);
     try {
