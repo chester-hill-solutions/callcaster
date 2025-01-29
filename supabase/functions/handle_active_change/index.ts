@@ -5,6 +5,7 @@ import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { encode } from "https://deno.land/std@0.177.0/encoding/base64.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { SupabaseClient } from "@supabase/supabase-js";
+const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
 const initSupabaseClient = () => {
   return createClient(
@@ -24,7 +25,6 @@ function toFormUrlEncodedParam(
   }
   return paramName + paramValue;
 }
-
 export async function getExpectedTwilioSignature(
   authToken: string,
   url: string,
@@ -55,7 +55,6 @@ export async function getExpectedTwilioSignature(
 
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
-
 export async function createWorkspaceTwilioInstance(
   supabase: SupabaseClient,
   workspace_id: string,
@@ -74,61 +73,47 @@ export async function createWorkspaceTwilioInstance(
   return twilio;
 }
 
-const handleTriggerStart = async (
-  contacts: any[],
-  campaign_id: string,
-  user_id: string,
-  type: "live_call" | "message" | "robocall",
+const handlePauseCampaign = async (
   supabase: SupabaseClient,
+  id: number,
+  twilio: typeof Twilio.Twilio,
 ) => {
-  const lastContactIndex = contacts.length - 1;
-  const batchSize = 100;
+  const { data, error } = await supabase
+    .from("campaign")
+    .update({ status: "pending" })
+    .eq("id", id)
+    .select("type")
+    .single();
+  if (error) throw error;
 
-  // Split contacts into batches and queue them
-  for (let i = 0; i < contacts.length; i += batchSize) {
-    const batch = contacts.slice(i, i + batchSize);
-    const tasks = batch.map((contact, batchIndex) => ({
-      to_number: contact.phone,
-      user_id: user_id,
-      campaign_id: Number(campaign_id),
-      workspace_id: contact.workspace,
-      queue_id: Number(contact.id),
-      contact_id: Number(contact.contact_id),
-      caller_id: contact.caller_id,
-      index: i + batchIndex,
-      total: contacts.length,
-      isLastContact: (i + batchIndex) === lastContactIndex,
-      type
-    }));
-
-    // Queue the batch using PGMQ
-    if (type === "robocall") {
-      const { error } = await supabase.rpc('enqueue_ivr_batch', {
-        p_tasks: tasks
-      });
-      if (error) throw error;
-    } else if (type === "message") {
-      const { error } = await supabase.rpc('enqueue_sms_batch', {
-        p_tasks: tasks
-      });
-      if (error) throw error;
-    }
-  }
-
-  // Fire and forget task processing
-  if (type === "robocall") {
+  if (data.type === "robocall") {
     try {
-      await supabase.rpc('process_ivr_tasks');
-      console.log('IVR task processing triggered');
-    } catch (error: unknown) {
-      console.error('Error triggering IVR processing:', error);
+      const { data: calls, error: callsError } = await supabase
+        .from('call')
+        .select(
+          "sid"
+        )
+        .eq('campaign_ id', id)
+        .eq('status', 'queued')
+      if (callsError) console.error(callsError)
+      if (calls && calls.length) {
+        calls.map(async (call: any) => {
+          await twilio.calls(call.sid).update({ status: "canceled" })
+        })
+        const { error: callUpdateError } = await supabase
+          .from('call')
+          .update({ status: 'canceled' })
+          .in('sid', calls.map((call) => call.sid))
+        if (callUpdateError) console.error('Error marking calls as cancelled', callUpdateError);
+      }
+    } catch (error) {
+      console.error('Error triggering IVR cleanup:', error);
     }
-  } else if (type === "message") {
+  } else if (data.type === "message") {
     try {
-      await supabase.rpc('process_sms_tasks');
-      console.log('SMS task processing triggered');
-    } catch (error: unknown) {
-      console.error('Error triggering SMS processing:', error);
+      // TODO: build SMS Cancellations
+    } catch (error) {
+      console.error('Error triggering SMS cleanup:', error);
     }
   }
 };
@@ -155,80 +140,92 @@ const getWorkspaceOwner = async (
 
 const handleInitiateCampaign = async (
   supabase: SupabaseClient,
-  id: string,
-  type: "live_call" | "message" | "robocall",
+  id: number,
 ) => {
-  const { data, error } = await supabase.rpc("get_campaign_queue", {
-    campaign_id_pro: id,
-  });
-  if (error || !data.length) throw error || new Error("No queue found");
-  const owner = await getWorkspaceOwner(supabase, data[0].workspace);
-  await handleTriggerStart(data, id, owner.id, type, supabase);
-};
-
-const handlePauseCampaign = async (
-  supabase: SupabaseClient,
-  id: string,
-  twilio: typeof Twilio.Twilio,
-) => {
-  // Update campaign status to pending - this will cause queue processors to skip remaining messages
-  const { data, error } = await supabase
-    .from("campaign")
-    .update({ status: "pending" })
-    .eq("id", id)
-    .select("type")
-    .single();
-  if (error) throw error;
-
-  // Trigger queue processing to clean up remaining messages
-  if (data.type === "robocall") {
-    try {
-      await supabase.rpc('process_ivr_tasks');
-    } catch (error) {
-      console.error('Error triggering IVR cleanup:', error);
+  try {
+    const { data, error: campaignQueueError } = await supabase.rpc("get_campaign_queue", {
+      campaign_id_pro: id,
+    });
+    if (campaignQueueError) throw campaignQueueError;
+    if (!data || !data.length) {
+      return new Response(JSON.stringify({ status: "empty_queue" }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
-  } else if (data.type === "message") {
-    try {
-      await supabase.rpc('process_sms_tasks');
-    } catch (error) {
-      console.error('Error triggering SMS cleanup:', error);
-    }
+    const owner = await getWorkspaceOwner(supabase, data[0].workspace);
+    const response = await fetch(
+      `${baseUrl}/queue-next`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
+        },
+        body: JSON.stringify({ campaign_id: id, owner })
+      }
+    );
+    if (!response.ok) throw new Error('Failed to queue initial call.');
+  } catch (error) {
+    console.error(error);
+    throw error
   }
 };
 
 serve(async (req: Request) => {
-  const { record } = await req.json();
+  const { record }: {
+    record: {
+      id: number,
+      title: string,
+      status: string,
+      type: "robocall" | "live_call" | "message",
+      start_date: string,
+      end_date: string,
+      created_at: string,
+      voicemail_file: string,
+      call_questions: {},
+      workspace: string,
+      caller_id: string,
+      group_household_queue: boolean,
+      dial_type: "call" | "predictive" | null,
+      dial_ratio: number,
+      schedule: any,
+      is_active: boolean,
+    }
+  } = await req.json();
   const supabase = initSupabaseClient();
   const now = new Date();
   console.log("Start Time", now);
   console.log("record", record);
-
   try {
+    // Todo: build cron cleanup if record.end_date < now
     if (
       record.is_active &&
       new Date(record.end_date) > now &&
       new Date(record.start_date) < now
     ) {
-      // Update campaign status immediately
-      const { error } = await supabase
+      const { error: campaignUpdateError } = await supabase
         .from("campaign")
         .update({ status: "running" })
         .eq("id", record.id);
-      if (error) throw error;
+      if (campaignUpdateError) throw campaignUpdateError;
 
       if (record.type === "live_call") {
+        // Return success if live campaign. Nothing to queue.
         return new Response(JSON.stringify({ status: "success" }), {
           headers: { "Content-Type": "application/json" },
         });
       }
+      else if (record.type === "robocall" || record.type === "message") {
+        await handleInitiateCampaign(supabase, record.id)
+          .catch(e => console.error('Error initiating campaign:', e));
 
-      // Fire and forget campaign initiation
-      void handleInitiateCampaign(supabase, record.id, record.type)
-        .catch(e => console.error('Error initiating campaign:', e));
-
-      return new Response(JSON.stringify({ status: "queued" }), {
-        headers: { "Content-Type": "application/json" },
-      });
+        return new Response(JSON.stringify({ status: "queued" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      else {
+        throw new Error("Unknown campaign type");
+      }
 
     } else if (
       (!record.is_active || new Date(record.end_date) <= now) &&
@@ -236,6 +233,7 @@ serve(async (req: Request) => {
     ) {
       const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
       // Fire and forget pause operation
+      // Todo: build a seperate and similar function to the queue to process cancellations.
       void handlePauseCampaign(supabase, record.id, twilio)
         .catch(e => console.error('Error pausing campaign:', e));
 

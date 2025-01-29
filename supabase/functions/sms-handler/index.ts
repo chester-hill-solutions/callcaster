@@ -8,7 +8,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
-
+const functionHeaders = {
+  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+  "Content-Type": "application/json"
+};
 interface SendMessageParams {
   body: string;
   to: string;
@@ -33,45 +36,28 @@ const normalizePhoneNumber = (input: string): string => {
   return cleaned;
 };
 
-const getCampaignData = async ({ 
-  supabase, 
-  campaign_id 
-}: { 
-  supabase: SupabaseClient; 
-  campaign_id: string 
-}): Promise<any> => {
-  const { data, error } = await supabase
-    .from("message_campaign")
-    .select(`*`)
-    .eq("campaign_id", campaign_id)
-    .single();
+async function processNextMessage(user_id, campaign_id) {
+  try {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    await fetch(
+      `${baseUrl}/queue-next`,
+      {
+        method: 'POST',
+        headers: functionHeaders,
+        body: JSON.stringify({
+          user_id: user_id,
+          campaign_id: campaign_id,
+        })
+      }
+    );
 
-  if (error) throw new Error(`Campaign fetch failed: ${error.message}`);
-  return data;
-};
+  } catch (error) {
+    console.error(`Error initiating next call for campaign ${campaign_id}:`, {
+      error: error.message,
+    });
+  }
+}
 
-const getCampaignQueueById = async ({
-  supabase,
-  campaign_id
-}: {
-  supabase: SupabaseClient;
-  campaign_id: string;
-}) => {
-  const { data, error } = await supabase
-    .from("campaign_queue")
-    .select(`
-      id,
-      contact_id,
-      contact (
-        phone
-      )
-    `)
-    .eq("campaign_id", campaign_id)
-    .eq("status", "queued");
-
-  if (error) throw error;
-  return data;
-};
 
 const createWorkspaceTwilioInstance = async ({
   supabase,
@@ -90,10 +76,12 @@ const createWorkspaceTwilioInstance = async ({
     throw new Error("Failed to get workspace Twilio credentials");
   }
 
-  return {twilio: new Twilio(
-    workspace.twilio_data.sid,
-    workspace.twilio_data.authToken
-  ), credits: workspace.credits};
+  return {
+    twilio: new Twilio(
+      workspace.twilio_data.sid,
+      workspace.twilio_data.authToken
+    ), credits: workspace.credits
+  };
 };
 
 const sendMessage = async ({
@@ -124,7 +112,7 @@ const sendMessage = async ({
       throw new Error("Insufficient credits to send message");
     }
 
-    const {twilio, credits} = await createWorkspaceTwilioInstance({
+    const { twilio } = await createWorkspaceTwilioInstance({
       supabase,
       workspace_id: workspace,
     });
@@ -179,26 +167,22 @@ const sendMessage = async ({
           contact_id,
         })
         .select(),
-      
+
       updateOutreach({
         supabase,
         id: outreachAttempt,
         status: 'completed'
       }),
 
-      supabase
-        .from("campaign_queue")
-        .update({ status: "dequeued" })
-        .eq("id", queue_id)
     ]);
 
     return { message };
   } catch (error) {
     console.error("Error in SMS handler:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }), 
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }),
       {
         headers: { "Content-Type": "application/json" },
         status: 500,
@@ -207,11 +191,11 @@ const sendMessage = async ({
   }
 };
 
-const updateOutreach = async ({ 
-  supabase, 
-  id, 
-  status 
-}: { 
+const updateOutreach = async ({
+  supabase,
+  id,
+  status
+}: {
   supabase: SupabaseClient;
   id: string;
   status: string;
@@ -259,57 +243,38 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-
-    const { campaign_id, workspace_id, caller_id, user_id } = await req.json();
-    
-    const [campaign, audience] = await Promise.all([
-      getCampaignData({ supabase, campaign_id }),
-      getCampaignQueueById({
-        supabase,
-        campaign_id,
-      })
-    ]);
-
-    const media = campaign.message_media?.length 
+    const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id } = await req.json();
+    const { data: campaignDetails, error: detailsError } = await supabase
+      .from("message_campaign")
+      .select()
+      .eq('campaign_id', campaign_id)
+      .single()
+    if (detailsError) throw detailsError;
+    const media = campaignDetails.message_media?.length
       ? await Promise.all(
-          campaign.message_media.map(mediaItem =>
-            supabase.storage
-              .from("messageMedia")
-              .createSignedUrl(`${workspace_id}/${mediaItem}`, 3600)
-              .then(({ data }) => data?.signedUrl)
-          )
+        campaignDetails.message_media.map((mediaItem: string) =>
+          supabase.storage
+            .from("messageMedia")
+            .createSignedUrl(`${workspace_id}/${mediaItem}`, 3600)
+            .then(({ data }) => data?.signedUrl)
         )
+      )
       : [];
-
-    const BATCH_SIZE = 25;
-    const results = [];
-    
-    for (let i = 0; i < audience.length; i += BATCH_SIZE) {
-      const batch = audience.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(member => 
-          sendMessage({
-            body: campaign.body_text,
-            media: media.filter(Boolean) as string[],
-            to: normalizePhoneNumber(member.contact?.phone || ''),
-            from: caller_id,
-            supabase,
-            campaign_id,
-            workspace: workspace_id,
-            contact_id: member.contact_id,
-            queue_id: member.id,
-            user_id,
-          }).then(
-            result => ({ [member.contact_id]: { success: true, ...result }}),
-            error => ({ [member.contact_id]: { success: false, error: error.message }})
-          )
-        )
-      );
-      results.push(...batchResults);
-    }
-
+    const result = await sendMessage({
+      body: campaignDetails.body_text,
+      media: media.filter(Boolean) as string[],
+      to: normalizePhoneNumber(to_number),
+      from: caller_id,
+      supabase,
+      campaign_id,
+      workspace: workspace_id,
+      contact_id,
+      queue_id,
+      user_id,
+    })
+    await processNextMessage(user_id, campaign_id);
     return new Response(
-      JSON.stringify({ responses: results }), 
+      JSON.stringify({ result }),
       {
         headers: { "Content-Type": "application/json" },
       }
@@ -318,9 +283,9 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error in SMS handler:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }), 
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'Unknown error'
+      }),
       {
         headers: { "Content-Type": "application/json" },
         status: 500,

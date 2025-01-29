@@ -53,11 +53,11 @@ const getWorkspaceData = async (supabase: SupabaseClient, workspace_id: string):
     .select("id, twilio_data")
     .eq("id", workspace_id)
     .single();
-    
+
   if (error || !data) {
     throw new Error("Failed to retrieve workspace data");
   }
-  
+
   return data;
 };
 
@@ -68,7 +68,7 @@ const updateCallStatus = async (
   duration?: string
 ) => {
   const updateData: Record<string, any> = { status };
-  
+
   if (duration) {
     updateData.duration = parseInt(duration);
   }
@@ -98,9 +98,9 @@ const handleCallCompletion = async (
       .single();
 
     if (fetchError) {
-      log('error', 'Failed to fetch current disposition', { 
+      log('error', 'Failed to fetch current disposition', {
         error: fetchError,
-        outreach_attempt_id: callData.outreach_attempt_id 
+        outreach_attempt_id: callData.outreach_attempt_id
       });
       return;
     }
@@ -131,24 +131,9 @@ const handleCallCompletion = async (
         .eq("id", callData.outreach_attempt_id);
 
       if (dispositionError) {
-        log('error', 'Failed to update outreach attempt disposition', { 
+        log('error', 'Failed to update outreach attempt disposition', {
           error: dispositionError,
-          outreach_attempt_id: callData.outreach_attempt_id 
-        });
-      }
-    }
-
-    // Check if this is the last call in a campaign
-    if (callData.is_last) {
-      const { error: campaignError } = await supabase
-        .from("campaign")
-        .update({ status: 'complete' })
-        .eq("id", callData.campaign_id);
-
-      if (campaignError) {
-        log('error', 'Failed to update campaign status', { 
-          error: campaignError,
-          campaign_id: callData.campaign_id 
+          outreach_attempt_id: callData.outreach_attempt_id
         });
       }
     }
@@ -165,25 +150,13 @@ const handleCallCompletion = async (
         });
 
       if (transactionError) {
-        log('error', 'Failed to create transaction', { 
+        log('error', 'Failed to create transaction', {
           error: transactionError,
           workspace: callData.workspace
         });
       }
     }
 
-    // Dequeue the contact
-    const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
-      passed_contact_id: callData.contact_id,
-      group_on_household: false
-    });
-
-    if (dequeueError) {
-      log('error', 'Failed to dequeue contact', {
-        error: dequeueError,
-        contact_id: callData.contact_id
-      });
-    }
   } catch (error) {
     log('error', 'Error in handleCallCompletion', {
       error: error instanceof Error ? error.message : String(error),
@@ -221,7 +194,6 @@ const checkWorkspaceCredits = async (
       log('error', 'Failed to update campaign status', { updateError });
     }
 
-    // Cancel the call
     try {
       await twilioClient.calls(callSid).update({ status: "canceled" });
     } catch (error) {
@@ -238,21 +210,21 @@ Deno.serve(async (req) => {
   try {
     // Get request details for validation
     const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-status`;
-        
+
     const twilioSignature = req.headers.get('x-twilio-signature');
-    
+
     const formData = await req.formData();
     const params = Object.fromEntries(formData.entries());
-        
+
     const event: TwilioEventData = params;
-    
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
     const { CallSid, CallStatus, CallDuration, Timestamp } = event;
-    
+
     if (!CallSid || !CallStatus) {
       throw new Error("Missing required parameters");
     }
@@ -265,7 +237,7 @@ Deno.serve(async (req) => {
 
     // Get workspace data and validate request
     const workspace = await getWorkspaceData(supabase, callData.workspace);
-    
+
     const isValidRequest = validateRequest(
       workspace.twilio_data.authToken,
       twilioSignature || '',
@@ -287,8 +259,13 @@ Deno.serve(async (req) => {
         CallSid,
         twilioClient
       );
-
-      if (!hasCredits) {
+      const {data, error} = supabase.from("campaign").select('is_active').eq("id", callData.campaign_id).single();
+      if (error) throw error;
+      if (!data.is_active){
+        console.log('Campaign inactive, shutting down call.');
+      }
+      if (!hasCredits || !data.is_active) {
+        twilioClient.calls(CallSid).update({status: "canceled"})
         return new Response(
           JSON.stringify({ error: 'Insufficient credits', success: false }),
           { headers: { "Content-Type": "application/json" }, status: 400 }
@@ -315,22 +292,22 @@ Deno.serve(async (req) => {
 
     // Always redirect back to flow
     response.redirect(`${baseUrl}/ivr-flow`);
-    
+
     return new Response(response.toString(), {
       headers: { "Content-Type": "text/xml" },
     });
 
   } catch (error) {
     // Use default TwiML response for errors
-    log('error', 'Status handler error', { 
+    log('error', 'Status handler error', {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined
     });
-    
+
     const { VoiceResponse } = Twilio.twiml;
     const errorResponse = new VoiceResponse();
     errorResponse.say('An error occurred. Please try again later.');
-    
+
     return new Response(errorResponse.toString(), {
       headers: { "Content-Type": "text/xml" },
       status: 500
