@@ -125,7 +125,7 @@ const sendMessage = async ({
         statusCallback: `${baseUrl}/sms-status`,
         ...(media?.length && { mediaUrl: media }),
       }).catch(e => ({ error: e })),
-      createOutreachAttempt({
+      await createOutreachAttempt({
         supabase,
         contact_id,
         campaign_id,
@@ -168,7 +168,7 @@ const sendMessage = async ({
         })
         .select(),
 
-      updateOutreach({
+      await updateOutreach({
         supabase,
         id: outreachAttempt,
         status: 'completed'

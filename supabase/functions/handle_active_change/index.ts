@@ -217,6 +217,7 @@ serve(async (req: Request) => {
         });
       }
       else if (record.type === "robocall" || record.type === "message") {
+        
         await handleInitiateCampaign(supabase, record.id)
           .catch(e => console.error('Error initiating campaign:', e));
 

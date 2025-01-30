@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
             index: 0,
             total: data.length,
             isLastContact: 0 === data.length - 1,
-            type: campaign.type
+            type: campaign.type,
+            owner
           })
         }
       );

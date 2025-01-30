@@ -27,7 +27,7 @@ const log = (level: string, message: string, data = {}) => {
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 
 const getCallWithRetry = async (supabase: SupabaseClient, callSid: string, retries = 0) => {
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 5;
   const RETRY_DELAY = 200;
 
   const { data, error } = await supabase

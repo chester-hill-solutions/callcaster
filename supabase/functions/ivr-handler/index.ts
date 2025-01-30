@@ -15,6 +15,7 @@ interface RequestBody {
   total?: number;
   isLastContact?: boolean;
   type: string;
+  owner: string;
 }
 
 const functionHeaders = {
@@ -28,16 +29,11 @@ async function getTwilioData(supabase, workspace_id) {
     .select("twilio_data")
     .eq("id", workspace_id)
     .single();
+
   if (workspaceError || !workspace) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: workspaceError?.message || "Workspace not found"
-      }),
-      { headers: { "Content-Type": "application/json" }, status: 404 }
-    );
+    return null;
   }
-  return workspace.twilio_data
+  return workspace.twilio_data;
 }
 
 async function createOutreachAttempt(supabase, body) {
@@ -53,29 +49,23 @@ async function createOutreachAttempt(supabase, body) {
   );
 
   if (outreachError) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: outreachError.message,
-        outreachAttemptId: null
-      }),
-      { headers: { "Content-Type": "application/json" }, status: 500 }
-    );
+    console.error("Error creating outreach attempt:", outreachError.message);
+    return null;
   }
   return outreachAttemptId;
 }
 
-async function processNextCall(body, campaign_id) {
+async function processNextCall(owner, campaign_id) {
   try {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 500));
     await fetch(
       `${baseUrl}/queue-next`,
       {
         method: 'POST',
         headers: functionHeaders,
         body: JSON.stringify({
-          user_id: body.user_id,
-          campaign_id: body.campaign_id,
+          user_id: owner,
+          campaign_id: campaign_id,
         })
       }
     );
@@ -98,13 +88,13 @@ Deno.serve(async (req) => {
     );
     const now = new Date();
     console.log("Start Time", now);
-  
+
     const outreach_attempt_id = await createOutreachAttempt(supabase, body);
+    if (!outreach_attempt_id) throw new Error("Outreach creation failed");
     const twilio_data = await getTwilioData(supabase, body.workspace_id);
+    if (!twilio_data) throw new Error("Twilio data retrieval failed");
     try {
-
       const twilio = new Twilio(twilio_data.sid, twilio_data.authToken);
-
       const call = await twilio.calls.create({
         to: body.to_number,
         from: body.caller_id,
@@ -115,12 +105,24 @@ Deno.serve(async (req) => {
         statusCallbackEvent: ["initiated", "answered", "completed"],
         statusCallback: `${baseUrl}/ivr-status`,
       }).catch((callError: any) => {
-        console.error('Error placing call to Twilio');
-        console.error(callError);
-        void processNextCall(supabase, body);
-        throw callError
+        console.error('Error placing call to Twilio', callError);
+        return null;
       });
-
+      if (!call) {
+        if (outreach_attempt_id) {
+          await supabase
+            .from("outreach_attempt")
+            .update({
+              disposition: "failed",
+            })
+            .eq("id", outreach_attempt_id);
+        }
+        await processNextCall(body.owner, body.campaign_id);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to place Twilio call" }),
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
       const { error: insertError } = await supabase
         .from("call")
         .insert({
@@ -134,13 +136,30 @@ Deno.serve(async (req) => {
           queue_id: body.queue_id,
           is_last: body.isLastContact,
         })
-
       if (insertError) {
-        throw insertError || new Error("Failed to create call record");
+        await twilio.calls(call.sid).update({ status: 'canceled' });
+        if (outreach_attempt_id) {
+          await supabase
+            .from("outreach_attempt")
+            .update({
+              disposition: "failed",
+            })
+            .eq("id", outreach_attempt_id);
+        }
+        await processNextCall(body.owner, body.campaign_id)
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to insert call record" }),
+          { headers: { "Content-Type": "application/json" }, status: 500 }
+        );
       }
+      await processNextCall(body.owner, body.campaign_id)
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { "Content-Type": "application/json" } }
+      );
 
     } catch (error) {
-
       if (outreach_attempt_id) {
         await supabase
           .from("outreach_attempt")
@@ -149,8 +168,19 @@ Deno.serve(async (req) => {
           })
           .eq("id", outreach_attempt_id);
       }
-    }
+      await processNextCall(body.owner, body.campaign_id)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: error.message || "Internal server error"
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
 
+    }
   } catch (error) {
     console.error("Error processing call:", error);
     return new Response(
