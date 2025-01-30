@@ -91,27 +91,60 @@ const handlePauseCampaign = async (
       const { data: calls, error: callsError } = await supabase
         .from('call')
         .select(
-          "sid"
+          "sid, queue_id"
         )
-        .eq('campaign_ id', id)
+        .eq('campaign_id', id)
         .eq('status', 'queued')
       if (callsError) console.error(callsError)
       if (calls && calls.length) {
         calls.map(async (call: any) => {
+          // Cancel the calls with twilio (has to be done individually)
           await twilio.calls(call.sid).update({ status: "canceled" })
         })
+        // Mark the call as cancelled in the database
         const { error: callUpdateError } = await supabase
           .from('call')
           .update({ status: 'canceled' })
           .in('sid', calls.map((call) => call.sid))
         if (callUpdateError) console.error('Error marking calls as cancelled', callUpdateError);
+        // Re-queue any which did not get sent for the next run.
+        const { error: queueUpdateError } = await supabase
+          .from("campaign_queue")
+          .update({ status: "queued" })
+          .in("id", calls.map((call) => call.queue_id));
+        if (queueUpdateError) console.error('Error re-queuing delayed calls', queueUpdateError);
+
       }
     } catch (error) {
       console.error('Error triggering IVR cleanup:', error);
     }
   } else if (data.type === "message") {
     try {
-      // TODO: build SMS Cancellations
+      const { data: messages, error: messagesError } = await supabase
+        .from('messages')
+        .select(
+          "sid, queue_id"
+        )
+        .eq('campaign_id', id)
+        .eq('status', 'queued')
+      if (messagesError) throw messagesError;
+      if (messages && messages.length) {
+        messages.map(async (message: any) => {
+          // Cancel messages with twilio
+          await twilio.messages(message.sid).remove()
+        })
+        const { error: messageUpdateError } = await supabase
+          .from('message')
+          .update({ status: 'canceled' })
+          .in('sid', messages.map((message) => message.sid))
+        if (messageUpdateError) console.error('Error marking messages as cancelled', messageUpdateError);
+        // Re-queue any which did not get sent for the next run.
+        const { error: queueUpdateError } = await supabase
+          .from("campaign_queue")
+          .update({ status: "queued" })
+          .in("id", messages.map((message) => message.queue_id));
+        if (queueUpdateError) console.error('Error re-queuing delayed messages', queueUpdateError);
+      }
     } catch (error) {
       console.error('Error triggering SMS cleanup:', error);
     }
@@ -204,6 +237,7 @@ serve(async (req: Request) => {
       new Date(record.end_date) > now &&
       new Date(record.start_date) < now
     ) {
+      console.log(`Initiating campaign ${record.id}`)
       const { error: campaignUpdateError } = await supabase
         .from("campaign")
         .update({ status: "running" })
@@ -217,7 +251,7 @@ serve(async (req: Request) => {
         });
       }
       else if (record.type === "robocall" || record.type === "message") {
-        
+
         await handleInitiateCampaign(supabase, record.id)
           .catch(e => console.error('Error initiating campaign:', e));
 

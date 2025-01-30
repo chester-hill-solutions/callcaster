@@ -64,7 +64,7 @@ async function processNextCall(owner, campaign_id) {
         method: 'POST',
         headers: functionHeaders,
         body: JSON.stringify({
-          user_id: owner,
+          owner,
           campaign_id: campaign_id,
         })
       }
@@ -86,9 +86,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const now = new Date();
-    console.log("Start Time", now);
-
+    console.log(body)
     const outreach_attempt_id = await createOutreachAttempt(supabase, body);
     if (!outreach_attempt_id) throw new Error("Outreach creation failed");
     const twilio_data = await getTwilioData(supabase, body.workspace_id);
@@ -117,7 +115,7 @@ Deno.serve(async (req) => {
             })
             .eq("id", outreach_attempt_id);
         }
-        await processNextCall(body.owner, body.campaign_id);
+        await processNextCall(body.owner || body.user_id, body.campaign_id);
         return new Response(
           JSON.stringify({ success: false, error: "Failed to place Twilio call" }),
           { headers: { "Content-Type": "application/json" } }
@@ -146,13 +144,16 @@ Deno.serve(async (req) => {
             })
             .eq("id", outreach_attempt_id);
         }
-        await processNextCall(body.owner, body.campaign_id)
+        await processNextCall(body.owner || body.user_id, body.campaign_id)
         return new Response(
           JSON.stringify({ success: false, error: "Failed to insert call record" }),
           { headers: { "Content-Type": "application/json" }, status: 500 }
         );
       }
-      await processNextCall(body.owner, body.campaign_id)
+      if (!body.owner || !body.user_id){
+        console.log('No owner passed.')
+      }
+      await processNextCall(body.owner || body.user_id, body.campaign_id)
 
       return new Response(
         JSON.stringify({ success: true }),
@@ -168,7 +169,7 @@ Deno.serve(async (req) => {
           })
           .eq("id", outreach_attempt_id);
       }
-      await processNextCall(body.owner, body.campaign_id)
+      await processNextCall(body.owner || body.user_id, body.campaign_id)
       return new Response(
         JSON.stringify({
           success: false,

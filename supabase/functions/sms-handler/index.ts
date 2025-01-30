@@ -139,42 +139,34 @@ const sendMessage = async ({
       throw message.error;
     }
 
-    await Promise.all([
-      supabase
-        .from("message")
-        .insert({
-          sid: message.sid || `failed-${to}-${Date.now()}`,
-          body: message.body,
-          num_segments: message.numSegments,
-          direction: message.direction,
-          from: message.from,
-          to: message.to,
-          date_updated: message.dateUpdated,
-          price: message.price,
-          error_message: message.errorMessage,
-          account_sid: message.accountSid,
-          uri: message.uri,
-          num_media: message.numMedia,
-          status: message.status,
-          messaging_service_sid: message.messagingServiceSid,
-          date_sent: message.dateSent,
-          error_code: message.errorCode,
-          price_unit: message.priceUnit,
-          api_version: message.apiVersion,
-          subresource_uris: message.subresourceUris,
-          campaign_id,
-          workspace,
-          contact_id,
-        })
-        .select(),
-
-      await updateOutreach({
-        supabase,
-        id: outreachAttempt,
-        status: 'completed'
-      }),
-
-    ]);
+    const { error: messageInsertError } = await supabase
+      .from("message")
+      .insert({
+        sid: message.sid || `failed-${to}-${Date.now()}`,
+        body: message.body,
+        num_segments: message.numSegments,
+        direction: message.direction,
+        from: message.from,
+        to: message.to,
+        date_updated: message.dateUpdated,
+        price: message.price,
+        error_message: message.errorMessage,
+        account_sid: message.accountSid,
+        uri: message.uri,
+        num_media: message.numMedia,
+        status: message.status,
+        messaging_service_sid: message.messagingServiceSid,
+        date_sent: message.dateSent,
+        error_code: message.errorCode,
+        price_unit: message.priceUnit,
+        api_version: message.apiVersion,
+        subresource_uris: message.subresourceUris,
+        campaign_id,
+        workspace,
+        contact_id,
+        queue_id,
+      })
+    if (messageInsertError) throw messageInsertError;
 
     return { message };
   } catch (error) {
@@ -189,23 +181,6 @@ const sendMessage = async ({
       }
     );
   }
-};
-
-const updateOutreach = async ({
-  supabase,
-  id,
-  status
-}: {
-  supabase: SupabaseClient;
-  id: string;
-  status: string;
-}) => {
-  const { data, error } = await supabase
-    .from("outreach_attempt")
-    .update({ disposition: status })
-    .eq("id", id);
-  if (error) throw error;
-  return data;
 };
 
 const createOutreachAttempt = async ({
