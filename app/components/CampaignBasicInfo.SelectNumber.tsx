@@ -36,7 +36,7 @@ export default function SelectNumber({
       onValueChange={(value) => handleInputChange("caller_id", value)}
     >
       <SelectTrigger id="caller_id">
-        <SelectValue placeholder="(289) 401-4898" />
+        <SelectValue placeholder="Select a number" />
       </SelectTrigger>
       <SelectContent>
         {phoneNumbers.map((number) => number?.phone_number && (

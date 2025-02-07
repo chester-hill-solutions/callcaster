@@ -106,7 +106,6 @@ export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
   phoneNumbers,
-  joinDisabled,
   flags,
   handleButton,
   handleConfirmStatus,

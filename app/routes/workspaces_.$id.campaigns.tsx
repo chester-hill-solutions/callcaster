@@ -18,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!serverSession) {
     return redirect("/signin", { headers });
   }
-return null;
+  return null;
 };
 
 export default function SelectedType() {

@@ -1124,7 +1124,6 @@ export const fetchBasicResults = async (
   const { data, error } = await supabaseClient.rpc("get_campaign_stats", {
     campaign_id_param: campaignId,
   });
-  console.log(data);
   if (error) console.error("Error fetching basic results:", error);
   return data || [];
 };
@@ -1135,7 +1134,6 @@ export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campai
     .from("campaign_queue")
     .select("*", { count: "exact", head: true })
     .eq("campaign_id", campaignId);
-
   const { count: callCount, error: callCountError } = await supabaseClient
     .from("outreach_attempt")
     .select("*", { count: "exact", head: true })
@@ -1177,7 +1175,6 @@ export const fetchCampaignDetails = async (
   workspaceId: string,
   tableName: string,
 ) => {
-  console.log(campaignId, tableName)
   const { data, error } = await supabaseClient
     .from(tableName)
     .select()

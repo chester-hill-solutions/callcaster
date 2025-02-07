@@ -21,7 +21,7 @@ export default function SelectScript({
     <div className="space-y-2">
       <Label >Script</Label>
       <Select
-        value={selectedScript.toString()}
+        value={selectedScript?.toString()}
         onValueChange={(value) =>
           handleInputChange("script_id", parseInt(value))
         }

@@ -164,21 +164,21 @@ export default function CampaignScreen() {
   const location = useLocation();
   const route = location.pathname.split("/");
   const isCampaignParentRoute = route.length === 5;
-  const { data: [campaignDetails], isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, workspace.id, getTable(campaignData?.type), [initialCampaignDetails])
-
+  const { data: campaignDetailsArray, isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails])
+  const campaignDetails = campaignDetailsArray?.[0];
   useCsvDownload(csvData as { csvContent: string, filename: string });
 
   const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"
     : !campaignData?.caller_id
       ? "No outbound phone number selected"
-      : campaignDetails.status === "scheduled" ?
+      : campaignData?.status === "scheduled" ?
         `Campaign scheduled.`
         : !campaignData?.is_active
           ? "It is currently outside of the Campaign's calling hours"
           : null;
 
-  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails.body_text)
+  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"
     : !campaignData?.caller_id
       ? "No outbound phone number selected"

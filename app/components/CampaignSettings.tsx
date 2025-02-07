@@ -1,4 +1,4 @@
-import { FetcherWithComponents, Form, NavLink, useNavigation, useNavigationType } from "@remix-run/react";
+import { FetcherWithComponents, Form, NavLink, useNavigation, useNavigationType, useSubmit } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
 import { Button } from "./ui/button";
 import {
@@ -14,9 +14,9 @@ import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./CampaignDetailed";
 import { SaveBar } from "./SaveBar";
-import { useCampaignSettings, CampaignState } from "~/hooks/useCampaignSettings";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
 import { Tables } from "~/lib/database.types";
+import { CampaignState } from "~/routes/workspaces_.$id.campaigns.$selected_id";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
@@ -43,7 +43,7 @@ export type CampaignSettingsProps = {
   handleActiveChange: (isActive: boolean, status: string | null) => void;
   handleAudienceChange: (audience: CampaignAudience | null, isChecked: boolean) => void;
   handleScheduleButton: (e: React.MouseEvent<HTMLButtonElement>) => void;
-  handleStatusButtons: (type: "play" | "pause" | "archive" | "schedule") => void;
+  handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   formFetcher: FetcherWithComponents<{ campaign: Campaign, campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign }>;
   user: User;
   joinDisabled: string | null;
@@ -67,7 +67,7 @@ export const CampaignSettings = ({
   handleSave,
   handleResetData,
   handleScheduleButton,
-  handleStatusButtons,
+  handleStatusButton,
   handleDuplicateButton,
   formFetcher,
   scripts,
@@ -83,7 +83,6 @@ export const CampaignSettings = ({
   confirmStatus,
 }: CampaignSettingsProps) => {
   const nav = useNavigation();
-
   return (
     <>
       <div
@@ -117,7 +116,7 @@ export const CampaignSettings = ({
               <CampaignBasicInfo
                 campaignData={campaignData}
                 handleInputChange={handleInputChange}
-                handleButton={handleStatusButtons}
+                handleButton={handleStatusButton}
                 handleConfirmStatus={handleConfirmStatus}
                 handleDuplicateButton={handleDuplicateButton}
                 phoneNumbers={phoneNumbers}
@@ -133,7 +132,7 @@ export const CampaignSettings = ({
                 handleInputChange={handleInputChange}
                 mediaData={mediaData}
                 scripts={scripts}
-                handleActivateButton={handleStatusButtons}
+                handleActivateButton={handleStatusButton}
                 handleScheduleButton={handleScheduleButton}
                 details={campaignDetails}
                 mediaLinks={mediaLinks}

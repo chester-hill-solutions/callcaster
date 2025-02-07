@@ -17,6 +17,7 @@ import {
   IVRCampaign,
 } from "~/lib/types";
 import { Database } from "~/lib/database.types";
+import { Button } from "~/components/ui/button";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -48,17 +49,13 @@ type ActionData = {
   campaignDetails?: CampaignDetails;
 };
 
-function assertCampaignDetails(details: unknown): asserts details is CampaignDetails {
-  if (!details || typeof details !== 'object') throw new Error('Invalid campaign details');
-}
-
 async function handleCampaignUpdate(
   supabaseClient: SupabaseClient,
   selected_id: string,
   workspace_id: string,
   updates: Record<string, any>
 ) {
-  if (updates["script_id"]) {
+  if (updates["script_id"] || updates["body_text"] || updates["message_media"]) {
     const { data: campaign, error: getCampaignError } = await supabaseClient
       .from("campaign")
       .select("type")
@@ -69,10 +66,10 @@ async function handleCampaignUpdate(
       throw new Error(getCampaignError?.message || "No campaign found");
     }
 
-    const table = campaign.type === "message" 
-      ? "message_campaign" 
-      : campaign.type === "robocall" 
-        ? "ivr_campaign" 
+    const table = campaign.type === "message"
+      ? "message_campaign"
+      : campaign.type === "robocall"
+        ? "ivr_campaign"
         : "live_campaign";
 
     const { data, error } = await supabaseClient
@@ -84,6 +81,10 @@ async function handleCampaignUpdate(
 
     if (error) throw error;
   } else {
+    if (updates["schedule"]){
+       const parseUpdate = JSON.parse(updates["schedule"])
+       updates.schedule = parseUpdate
+    }
     const { error } = await supabaseClient
       .from("campaign")
       .update(updates)
@@ -91,18 +92,20 @@ async function handleCampaignUpdate(
 
     if (error) throw error;
   }
-
   return { success: true };
 }
 
 async function handleStatusChange(
   supabaseClient: SupabaseClient,
   selected_id: string,
-  status: CampaignStatus
+  status: string
 ) {
+  let update = { status };
+  if (status === "play") update = { status: "running", is_active: true };
+  if (status === "pause") update = { status: "paused", is_active: false };
   const { error } = await supabaseClient
     .from("campaign")
-    .update({ status })
+    .update({ ...update })
     .eq("id", selected_id);
 
   if (error) throw error;
@@ -116,7 +119,7 @@ async function handleCampaignDuplicate(
   campaignData: string
 ) {
   const parsedData = JSON.parse(campaignData);
-  
+
   // Create new campaign
   const { data: campaign, error } = await supabaseClient
     .from("campaign")
@@ -332,6 +335,7 @@ export default function CampaignSettingsRoute() {
   };
 
   const handleStatusChange = (status: CampaignStatus) => {
+
     fetcher.submit(
       { intent: "status", status },
       { method: "post" }
@@ -339,15 +343,28 @@ export default function CampaignSettingsRoute() {
   };
 
   const handleInputChange = (name: string, value: any) => {
-    console.log(name, value)
     fetcher.submit(
       { intent: "update", [name]: value },
       { method: "post" }
     );
   };
 
+  const resetCampaign = () => {
+    const formData = new FormData();
+    formData.append("campaign_id", selected_id);
+    fetcher.submit(formData, {
+      method:'POST',
+      action: "/api/reset_campaign",
+      navigate: false
+    })
+  }
+
   return (
     <>
+      {(user.id === "a656121d-17af-414c-97c7-71f2008f8f14" || user.id === "60c86cc8-b9fc-4995-b81e-f49e88ec208c") &&
+        <Button onClick={() => resetCampaign()}>
+          Reset Campaign
+        </Button>}
       <CampaignSettings
         workspace={workspace_id}
         campaignData={campaignData}
@@ -360,7 +377,8 @@ export default function CampaignSettingsRoute() {
         phoneNumbers={phoneNumbers}
         handleInputChange={handleInputChange}
         handleDuplicateButton={handleDuplicate}
-        handleStatusChange={handleStatusChange}
+        handleStatusButton={handleStatusChange}
+        handleConfirmStatus={handleStatusChange}
         handleScheduleButton={() => handleStatusChange("scheduled")}
         formFetcher={fetcher}
         user={user}
