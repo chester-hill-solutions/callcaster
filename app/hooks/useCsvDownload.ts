@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export const useCsvDownload = (csvData) => {
+export const useCsvDownload = (csvData: { csvContent: string, filename: string }) => {
   useEffect(() => {
     if (csvData && csvData.csvContent) {
       const blob = new Blob([csvData.csvContent], { type: "text/csv" });

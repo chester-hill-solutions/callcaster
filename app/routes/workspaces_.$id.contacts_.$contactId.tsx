@@ -117,12 +117,12 @@ function compareContactAudiences(
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { contactId, id: workspaceId } = params;
   const contact = await request.json();
-  
-  const { supabaseClient, headers, serverSession } = 
+
+  const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
-  const {id, initial_audiences, contact_audience, outreach_attempt, ...contactData} = contact;
-  
+  const { id, initial_audiences, contact_audience, outreach_attempt, ...contactData } = contact;
+
   // Normalize phone number if present
   if (contactData.phone) {
     let cleaned = contactData.phone.replace(/[^0-9+]/g, "");
@@ -137,7 +137,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
     contactData.phone = cleaned;
   }
-
   let savedContact = null;
   if (contactId === 'new') {
     const { data: newContact, error: createError } = await supabaseClient
@@ -149,6 +148,18 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return json({ success: false, error: createError }, { headers });
     }
     savedContact = newContact;
+  } else {
+    const { data: updateContact, error: updateError } = await supabaseClient
+      .from("contact")
+      .update({ ...contactData })
+      .eq("id", Number(contactId))
+      .select()
+      .single()
+    if (updateError) {
+      return json({ success: false, error: updateError }, { headers })
+    }
+    console.log(updateContact)
+    savedContact = updateContact
   }
   if (!savedContact) {
     return json({ success: false, error: "Failed to create contact" }, { headers });
@@ -191,7 +202,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         { status: 400 },
       );
     }
-  } 
+  }
   return redirect(`/workspaces/${workspaceId}/contacts/${savedContact.id}`);
 };
 

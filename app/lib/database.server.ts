@@ -218,18 +218,17 @@ export async function getWorkspaceInfoWithDetails({
     .select(
       `id, name, credits, 
         workspace_users(id, role), 
-        campaign(id, title, status, created_at), 
-        workspace_number(id, phone_number), 
+        campaign(*), 
+        workspace_number(id, phone_number, capabilities), 
         audience(id, name)`
     )
     .eq("id", workspaceId)
     .eq("workspace_users.user_id", userId)
     .single();
   if (workspaceError) throw workspaceError;
-  const { workspace_users, campaign, workspace_number, audience, ...rest } = workspace;
+  const { campaign, workspace_number, audience, ...rest } = workspace;
   return {
     workspace: rest,
-    workspace_users,
     campaigns: campaign,
     phoneNumbers: workspace_number,
     audiences: audience
@@ -849,6 +848,7 @@ export async function updateCampaign({
           message_media: undefined,
           step_data: undefined,
           voicedrop_audio: undefined,
+          campaign_id: id,
         })
         : cleanObject({
           ...campaignDetails,
@@ -866,32 +866,44 @@ export async function updateCampaign({
     cleanCampaignDetails.script_id = cleanCampaignData.script_id;
     delete cleanCampaignData.script_id;
   }
-  console.log(cleanCampaignData)
+
   const campaign = await handleDatabaseOperation(
     async () => await supabase.from("campaign").update(cleanCampaignData).eq("id", id).select().single(),
     "Error updating campaign"
   );
 
-  //tableKey === "message_campaign"
-  const updatedCampaignDetails = await handleDatabaseOperation(
-    async () =>
-      await supabase
-        .from(tableKey)
-        .update(cleanCampaignDetails)
-        .eq("campaign_id", id)
-        .select()
-        .single(),
-    "Error updating campaign details",
-  );
+  // First check if the record exists
+  const { data: existingRecord } = await supabase
+    .from(tableKey)
+    .select()
+    .eq("campaign_id", id)
+    .single();
 
-  let audienceUpdateResult = null;
-  /*  if (audiences) {
-     audienceUpdateResult = await updateCampaignAudiences(
-       supabase,
-       id,
-       audiences,
-     );
-   } */
+  let updatedCampaignDetails;
+  if (existingRecord) {
+    // Update if record exists
+    updatedCampaignDetails = await handleDatabaseOperation(
+      async () =>
+        await supabase
+          .from(tableKey)
+          .update(cleanCampaignDetails)
+          .eq("campaign_id", id)
+          .select()
+          .single(),
+      "Error updating campaign details",
+    );
+  } else {
+    // Insert if record doesn't exist
+    updatedCampaignDetails = await handleDatabaseOperation(
+      async () =>
+        await supabase
+          .from(tableKey)
+          .insert({ ...cleanCampaignDetails, campaign_id: id })
+          .select()
+          .single(),
+      "Error creating campaign details",
+    );
+  }
 
   return {
     campaign,
@@ -1122,7 +1134,6 @@ export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campai
     .from("campaign_queue")
     .select("*", { count: "exact", head: true })
     .eq("campaign_id", campaignId);
-
   const { count: callCount, error: callCountError } = await supabaseClient
     .from("outreach_attempt")
     .select("*", { count: "exact", head: true })
@@ -1169,7 +1180,6 @@ export const fetchCampaignDetails = async (
     .select()
     .eq("campaign_id", campaignId)
     .single();
-
   if (error) {
     if (error.code === "PGRST116") {
       const { data: newCampaign, error: newCampaignError } =
@@ -1190,17 +1200,11 @@ export const fetchCampaignDetails = async (
   }
   return data;
 };
-export const fetchCampaignWithAudience = async (
+export const fetchCampaignAudience = async (
   supabaseClient: SupabaseClient<Database>,
   campaignId: string,
   workspaceId: string,
 ) => {
-  const campaignPromise = supabaseClient
-    .from("campaign")
-    .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
-    .eq("id", campaignId)
-    .eq("workspace", workspaceId)
-    .single();
   const scriptsPromise = supabaseClient
     .from("script")
     .select(`*`)
@@ -1222,21 +1226,18 @@ export const fetchCampaignWithAudience = async (
     .select(`count`, { count: "exact" })
     .eq("campaign_id", campaignId);
 
-  const [campaign, queueResult, isQueuedCount, totalCount, scripts] = await Promise.all([
-    campaignPromise,
+  const [queueResult, isQueuedCount, totalCount, scripts] = await Promise.all([
     queuePromise,
     isQueuedCountPromise,
     totalCountPromise,
     scriptsPromise
   ]);
 
-  if (campaign.error) throw new Error(`Error fetching campaign data: ${campaign.error.message}`);
   if (queueResult.error) throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
   if (isQueuedCount.error) throw new Error(`Error fetching queued count: ${isQueuedCount.error.message}`);
   if (totalCount.error) throw new Error(`Error fetching total count: ${totalCount.error.message}`);
   if (scripts.error) throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
-    ...campaign.data,
     campaign_queue: queueResult.data,
     queue_count: isQueuedCount.count,
     total_count: totalCount.count,
@@ -1529,7 +1530,7 @@ export function processOutreachExportData(data: OutreachExportData[], users: Wor
       header === 'call_duration' ||
       mergedData.some((row) => row[header] != null && row[header] !== "")
     )
-  );
+  ) || [];
 
   return { csvHeaders, flattenedData: mergedData };
 }
@@ -1889,7 +1890,8 @@ export async function cancelQueuedMessages(twilio: typeof Twilio, supabase: Supa
   };
 }
 
-export function checkSchedule(campaignData: { start_date: string, end_date: string, schedule: { [key: string]: { active: boolean, intervals: { start: string, end: string }[] } } }) {
+export function checkSchedule(campaignData: { start_date: string, end_date: string, schedule: { [key: string]: { active: boolean, intervals: { start: string, end: string }[] } } } | null) {
+  if (!campaignData) return false;
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
   const utcNow = new Date(Date.UTC(

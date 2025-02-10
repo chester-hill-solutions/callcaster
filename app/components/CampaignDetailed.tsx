@@ -11,8 +11,7 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
-import { IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
-import { CampaignSettingsData } from "~/hooks/useCampaignSettings";
+import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -27,9 +26,9 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
   scheduleDisabled,
-}:{
-  campaignData: CampaignSettingsData,
-  handleInputChange:(name: string, value: any) => void,
+}: {
+  campaignData: NonNullable<Campaign>,
+  handleInputChange: (name: string, value: any) => void,
   mediaData: FileObject[],
   scripts: Script[],
   handleActivateButton: (type: "play" | "pause" | "archive" | "schedule") => void,
@@ -61,7 +60,7 @@ export const CampaignTypeSpecificSettings = ({
           <div className="flex items-end gap-2">
             <SelectScript
               handleInputChange={handleInputChange}
-              campaignData={campaignData}
+              selectedScript={details?.script_id}
               scripts={scripts}
             />
             <Button variant="outline" asChild size="icon" disabled={isBusy}>
@@ -101,27 +100,36 @@ export const CampaignTypeSpecificSettings = ({
         </>
       )}
       {campaignData.type === "message" && (
-        <div>
+        <div className="flex flex-col gap-4">
           <MessageSettings
             mediaLinks={mediaLinks}
             details={details}
             campaignData={campaignData}
             onChange={handleInputChange}
           />
-          <Button
-            type="button"
-            disabled={
-              isBusy ||
-              isChanged ||
-              !(
-                (campaignData.body_text || campaignData.message_media) &&
-                campaignData.caller_id
-              )
-            }
-            onClick={handleActivateButton}
-          >
-            Send
-          </Button>
+          <div className="flex gap-2 justify-end">
+            <Button
+              type="button"
+              disabled={
+                isBusy ||
+                isChanged ||
+                !(
+                  (details?.body_text || details?.message_media) &&
+                  campaignData.caller_id
+                )
+              }
+              onClick={() => handleActivateButton("play")}
+            >
+              Send Now
+            </Button>
+            <Button
+              type="button"
+              disabled={!!scheduleDisabled || isBusy}
+              onClick={handleScheduleButton}
+            >
+              Schedule Campaign
+            </Button>
+          </div>
         </div>
       )}
     </>

@@ -1,5 +1,5 @@
-import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient, createClient } from "npm:@supabase/supabase-js@^2.39.6";
+
 const initSupabaseClient = () => {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -39,12 +39,14 @@ const storeJobIds = async (supabase: SupabaseClient, campaignId: string, startJo
 };
 
 const splitCronExpressions = (cronString: string): string[] => {
-  return cronString.split('|').map(expr => expr.trim());
+  // Split by '|' and filter out any empty or whitespace-only strings
+  return cronString.split('|').map(expr => expr.trim()).filter(Boolean);
 };
 
 Deno.serve(async (req: Request) => {
   const { record } = await req.json();
   const supabase = initSupabaseClient();
+
   try {
     const cronExpressions = await generateCronExpressions(record.schedule, supabase);
     if (cronExpressions && cronExpressions.length > 0) {
@@ -52,6 +54,7 @@ Deno.serve(async (req: Request) => {
       const endJobIds = [];
 
       for (const { start_cron, end_cron } of cronExpressions) {
+        // Filter out any blank expressions
         const startSchedules = splitCronExpressions(start_cron);
         const endSchedules = splitCronExpressions(end_cron);
 

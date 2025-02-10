@@ -27,16 +27,23 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const workspace_id = params.id;
   const audience_id = params.audience_id;
 
-    const { data: contacts, error: contactError, count } = await supabaseClient
+  if (!audience_id) {
+    return json(
+      { contacts: null, error: "Audience ID is required" },
+      { headers }
+    );
+  }
+
+  const { data: contacts, error: contactError, count } = await supabaseClient
     .from("contact_audience")
-    .select("...contact(*)", { count: 'exact' })
-    .eq("audience_id", audience_id)
+    .select("contact(*)", { count: 'exact' })
+    .eq("audience_id", parseInt(audience_id))
     .range(from, to);
 
   const { data: audience, error: audienceError } = await supabaseClient
     .from("audience")
     .select()
-    .eq("id", audience_id)
+    .eq("id", parseInt(audience_id))
     .single();
 
   if (contactError) {

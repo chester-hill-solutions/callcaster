@@ -14,7 +14,9 @@ const AudienceTable = ({
   audience: initialAudience,
   pagination
 }) => {
-  const [contacts, setContacts] = useState(initialContacts);
+  // Transform the contacts data to extract the nested contact info
+  const transformedContacts = initialContacts?.map(item => item.contact) || [];
+  const [contacts, setContacts] = useState(transformedContacts);
   const [audienceInfo, setAudienceInfo] = useState(initialAudience);
   const [newContact, setNewContact] = useState({
     name: "",
@@ -28,15 +30,14 @@ const AudienceTable = ({
   const submit = useSubmit();
 
   useEffect(() => {
-    setContacts(initialContacts);
+    const transformed = initialContacts?.map(item => item.contact) || [];
+    setContacts(transformed);
     setAudienceInfo(initialAudience);
   }, [initialContacts, initialAudience]);
 
   const handlePageChange = (newPage) => {
     setSearchParams({ page: newPage.toString(), pageSize: pagination.pageSize.toString() });
   };
-
-
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -109,13 +110,50 @@ const AudienceTable = ({
     }
   };
 
+  const sanitizeValue = (value) => {
+    if (value === null || value === undefined) return '';
+    const str = String(value).trim();
+    // Remove null bytes and other problematic characters
+    return str.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\uFFFD]/g, '');
+  };
+
+  const sanitizeContact = (contact) => {
+    const sanitized = {};
+    Object.entries(contact).forEach(([key, value]) => {
+      sanitized[key] = sanitizeValue(value);
+    });
+    return sanitized;
+  };
 
   const readCSVFile = (file) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
-      const { headers, contacts } = parseCSV(e.target.result);
+      const { headers, contacts: rawContacts } = parseCSV(e.target.result);
+      
+      // Sanitize each contact and ensure required fields
+      const sanitizedContacts = rawContacts.map(contact => ({
+        firstname: sanitizeValue(contact.firstname),
+        surname: sanitizeValue(contact.surname),
+        phone: sanitizeValue(contact.phone),
+        email: sanitizeValue(contact.email),
+        address: sanitizeValue(contact.address),
+        city: sanitizeValue(contact.city),
+        province: sanitizeValue(contact.province),
+        postal: sanitizeValue(contact.postal),
+        country: sanitizeValue(contact.country),
+        opt_out: false,
+        workspace: workspace_id,
+        other_data: []
+      }));
+      
+      console.log('Sending contacts:', sanitizedContacts);
+
       submit(
-        { contacts, audience_id, workspace_id },
+        {
+          contacts: sanitizedContacts,
+          audience_id,
+          workspace_id
+        },
         {
           action: "/api/contacts",
           method: "POST",

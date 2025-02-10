@@ -20,7 +20,7 @@ import {
   WorkspaceNumbers,
 } from "~/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
-import SelectNumber from "./CampaignBasicInfo.SelectNumber"; 
+import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
 
 // Types
@@ -28,7 +28,7 @@ type ButtonState = "Active" | "Inactive" | "Disabled";
 
 type CampaignState =
   | "running"
-  | "paused" 
+  | "paused"
   | "archived"
   | "draft"
   | "pending"
@@ -42,7 +42,7 @@ const getButtonStates = (
 ): Record<string, ButtonState> => {
   const states: Record<string, ButtonState> = {
     play: "Disabled",
-    pause: "Disabled", 
+    pause: "Disabled",
     archive: "Disabled",
     schedule: "Disabled",
   };
@@ -64,7 +64,7 @@ const getButtonStates = (
     case "draft":
     case "pending":
       states.play = isPlayDisabled ? "Disabled" : "Inactive";
-      states.pause = "Inactive"; 
+      states.pause = "Inactive";
       states.archive = "Inactive";
       states.schedule = "Disabled";
       break;
@@ -96,10 +96,6 @@ interface CampaignBasicInfoProps {
   handleConfirmStatus: (status: "queue" | "play" | "archive" | "none") => void;
   handleDuplicateButton: () => void;
   joinDisabled: string | null;
-  formFetcher: FetcherWithComponents<{
-    campaign: Campaign;
-    campaignDetails: LiveCampaign | IVRCampaign | MessageCampaign;
-  }>;
   details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign;
 
   scheduleDisabled: string | boolean;
@@ -110,18 +106,15 @@ export const CampaignBasicInfo = ({
   campaignData,
   handleInputChange,
   phoneNumbers,
-  joinDisabled,
   flags,
   handleButton,
   handleConfirmStatus,
   handleDuplicateButton,
-  formFetcher,
   details,
-
   scheduleDisabled,
 }: CampaignBasicInfoProps) => {
 
-  const isPlayDisabled = (!campaignData?.script_id && !campaignData.body_text) ?
+  const isPlayDisabled = (!details?.script_id && !details.body_text) ?
     "No script selected" :
     !campaignData.caller_id || campaignData.caller_id === "+15064364568" ?
       "No outbound phone number selected" :
@@ -181,75 +174,75 @@ export const CampaignBasicInfo = ({
   };
 
   return (
-    <div className="flex flex-wrap gap-6">
-
-      {/* Control Buttons */}
-      <div className="flex justify-end">
-        <div className="flex gap-2">
-          {renderButton(
-            "play",
-            <Play className="h-4 w-4" />,
-            isPlayDisabled || "Start the campaign",
-          )}
-          {renderButton(
-            "schedule",
-            <Clock className="h-4 w-4" />,
-            "Schedule the campaign",
-          )}
-          {renderButton(
-            "pause",
-            <Pause className="h-4 w-4" />,
-            "Pause the campaign",
-          )}
-          {renderButton(
-            "duplicate",
-            <Copy className="h-4 w-4" />,
-            "Duplicate the campaign",
-          )}
-          {renderButton(
-            "archive",
-            <Archive className="h-4 w-4" />,
-            "Archive the campaign",
-          )}
-
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-6">
-        {/* Campaign Title */}
-        <div className="flex min-w-48 flex-grow flex-col gap-1">
-          <Label htmlFor="title">Campaign Title</Label>
+    <div className="space-y-6">
+      {/* Title and Actions Row */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1">
           <Input
             id="title"
             name="title"
             value={campaignData.title}
             onChange={(e) => handleInputChange("title", e.target.value)}
+            className="border-0 bg-transparent px-0 text-lg font-medium h-9 focus-visible:ring-0"
+            placeholder="Campaign Title"
           />
         </div>
-
-        {/* Campaign Type Selection */}
-        <SelectType
-          handleInputChange={handleInputChange}
-          campaignData={campaignData}
-          flags={flags}
-        />
-
-        {/* Phone Number Selection */}
-        <SelectNumber
-          handleInputChange={handleInputChange}
-          campaignData={campaignData}
-          phoneNumbers={phoneNumbers}
-        />
-
-
-        {/* Date Selection */}
-        <div className="flex flex-wrap gap-6">
-          <SelectDates
-            campaignData={campaignData}
-            handleInputChange={handleInputChange}
-            formFetcher={formFetcher}
-            details={details}
-          />
+        <div className="flex items-center gap-1">
+          {renderButton(
+            "play",
+            <Play className="h-4 w-4" />,
+            isPlayDisabled || "Start the campaign"
+          )}
+          {renderButton(
+            "schedule",
+            <Clock className="h-4 w-4" />,
+            "Schedule the campaign"
+          )}
+          {renderButton(
+            "pause",
+            <Pause className="h-4 w-4" />,
+            "Pause the campaign"
+          )}
+          {renderButton(
+            "duplicate",
+            <Copy className="h-4 w-4" />,
+            "Duplicate the campaign"
+          )}
+          {renderButton(
+            "archive",
+            <Archive className="h-4 w-4" />,
+            "Archive the campaign"
+          )}
         </div>
+      </div>
+
+      {/* Form Fields */}
+      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        <div className="space-y-4">
+          <div>
+            <Label className="text-sm font-medium">Campaign Type</Label>
+            <SelectType
+              handleInputChange={handleInputChange}
+              campaignData={campaignData}
+              flags={flags}
+            />
+          </div>
+          <div>
+            <Label className="text-sm font-medium">Phone Number</Label>
+            <SelectNumber
+              handleInputChange={handleInputChange}
+              campaignData={campaignData}
+              phoneNumbers={phoneNumbers}
+            />
+          </div>
+        </div>
+      </div>
+      <div>
+        <Label className="text-sm font-medium">Schedule</Label>
+        <SelectDates
+          campaignData={campaignData}
+          handleInputChange={handleInputChange}
+        />
       </div>
     </div>
   );

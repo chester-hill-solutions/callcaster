@@ -1,49 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import WeeklyScheduleTable from "./CampaignBasicInfo.Schedule";
 import { Button } from "./ui/button";
 import { DateTimePicker } from "./ui/datetime";
 import { Label } from "./ui/label";
-import { days } from "~/lib/utils";
 import { Clock } from "lucide-react";
-import { CampaignSettingsData } from "./CampaignSettings";
 import {
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
   Schedule,
   Script,
-  Weekday,
 } from "~/lib/types";
-import InfoHover from "./InfoPopover";
-import { FetcherWithComponents } from "@remix-run/react";
+import { FetcherWithComponents, useSubmit } from "@remix-run/react";
+
+type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+const WEEKDAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+const DAYS_OF_WEEK: DayName[] = [...WEEKDAYS, 'saturday', 'sunday'];
+
+interface SelectDatesProps {
+  campaignData: any;
+  handleInputChange: (name: string, value: any) => void;
+}
 
 export default function SelectDates({
   campaignData,
   handleInputChange,
-  formFetcher,
-  details,
-}: {
-  campaignData: CampaignSettingsData;
-  handleInputChange: (name: string, value: any) => void;
-  formFetcher: FetcherWithComponents<CampaignSettingsData>;
-  details:
-    | ((LiveCampaign | IVRCampaign) & { script: Script })
-    | MessageCampaign;
-}) {
+}: SelectDatesProps) {
   const [showSchedule, setShowSchedule] = useState(false);
-  const [currentSchedule, setCurrentSchedule] = useState<Schedule>(
-    campaignData?.schedule ||
-      Object.fromEntries(
-        days.map((day) => [
-          day.toLowerCase(),
-          {
-            active: false,
-            intervals: [],
-          },
-        ]),
-      ) ||
-      {},
-  );
+  const [currentSchedule, setCurrentSchedule] = useState<Schedule>(() => {
+    const defaultSchedule = {
+      monday: { active: false, intervals: [] },
+      tuesday: { active: false, intervals: [] },
+      wednesday: { active: false, intervals: [] },
+      thursday: { active: false, intervals: [] },
+      friday: { active: false, intervals: [] },
+      saturday: { active: false, intervals: [] },
+      sunday: { active: false, intervals: [] },
+    };
+
+    if (!campaignData?.schedule) return defaultSchedule;
+
+    try {
+      if (typeof campaignData.schedule === 'string') {
+        return JSON.parse(campaignData.schedule);
+      }
+      return campaignData.schedule;
+    } catch (e) {
+      console.error('Error parsing schedule:', e);
+      return defaultSchedule;
+    }
+  });
+
   const utcToLocal = (utcTime: string) => {
     if (!utcTime) return "";
     const [hours, minutes] = utcTime.split(":");
@@ -66,89 +73,151 @@ export default function SelectDates({
     return date.toUTCString().slice(17, 22);
   };
 
-  const handleCheckboxChange = (day:Weekday) => {
+  const applyScheduleToAll = (schedule: { start: string; end: string }) => {
+    setCurrentSchedule((prev) => {
+      const newSchedule = { ...prev };
+      DAYS_OF_WEEK.forEach((day) => {
+        newSchedule[day] = {
+          active: true,
+          intervals: [schedule],
+        };
+      });
+      return newSchedule;
+    });
+  };
+
+  const applyScheduleToWeekdays = (schedule: { start: string; end: string }) => {
+    setCurrentSchedule((prev) => {
+      const newSchedule = { ...prev };
+      WEEKDAYS.forEach((day) => {
+        newSchedule[day] = {
+          active: true,
+          intervals: [schedule],
+        };
+      });
+      return newSchedule;
+    });
+  };
+
+  const handleCheckboxChange = (day: DayName) => {
     const localMidnightUTC = localToUTC("00:00");
     const localEndOfDayUTC = localToUTC("23:59");
+    const schedule = { start: localMidnightUTC, end: localEndOfDayUTC };
 
-    setCurrentSchedule((prev:Schedule) => ({
-      ...prev,
-      [day.toLowerCase()]: {
-        active: !prev[day.toLowerCase()]?.active,
-        intervals: prev[day.toLowerCase()]?.active
-          ? []
-          : [{ start: localMidnightUTC, end: localEndOfDayUTC }],
-      },
-    }));
+    setCurrentSchedule((prev) => {
+      const newSchedule: Schedule = {
+        ...prev,
+        [day]: {
+          active: !prev[day]?.active,
+          intervals: prev[day]?.active ? [] : [schedule],
+        },
+      };
+      return newSchedule;
+    });
   };
 
-  const handleTimeChange = (day:Weekday, field, localValue, index = 0) => {
+  const handleTimeChange = (
+    day: DayName,
+    field: 'start' | 'end',
+    localValue: string,
+    index = 0
+  ) => {
     const utcValue = localToUTC(localValue);
-    setCurrentSchedule((prev) => ({
-      ...prev,
-      [day.toLowerCase()]: {
-        ...prev[day.toLowerCase()],
-        intervals: prev[day.toLowerCase()].intervals.map((interval, i) =>
-          i === index ? { ...interval, [field]: utcValue } : interval,
-        ),
-      },
-    }));
+    setCurrentSchedule((prev) => {
+      const daySchedule = prev[day] || { active: true, intervals: [{ start: "00:00", end: "23:59" }] };
+      
+      if (daySchedule.intervals.length === 0) {
+        daySchedule.intervals = [{ start: "00:00", end: "23:59" }];
+      }
+
+      const newSchedule: Schedule = {
+        ...prev,
+        [day]: {
+          ...daySchedule,
+          intervals: daySchedule.intervals.map((interval, i) =>
+            i === index ? { ...interval, [field]: utcValue } : interval
+          ),
+        },
+      };
+      return newSchedule;
+    });
   };
+
   const handleSave = () => {
-    handleInputChange("schedule", currentSchedule);
-    formFetcher.submit(
-      {
-        campaignData: JSON.stringify({
-          ...campaignData,
-          schedule: currentSchedule,
-        }),
-        campaignDetails: JSON.stringify(details),
-      },
-      {
-        method: "patch",
-        action: "/api/campaigns",
-      },
-    );
+    // Remove any extra properties that might have been added
+    const cleanSchedule = DAYS_OF_WEEK.reduce((acc, day) => ({
+      ...acc,
+      [day]: {
+        active: currentSchedule[day].active,
+        intervals: currentSchedule[day].intervals.map(interval => ({
+          start: interval.start,
+          end: interval.end
+        }))
+      }
+    }), {} as Schedule);
+    
+    // Convert to a JSONB-compatible string for Supabase
+    handleInputChange("schedule", JSON.stringify(cleanSchedule));
     setShowSchedule(false);
   };
 
-  const scheduleForDisplay = Object.fromEntries(
-    Object.entries(currentSchedule).map(([day, daySchedule]) => [
-      day,
-      {
-        ...daySchedule,
-        intervals: daySchedule.intervals.map((interval) => ({
-          start: utcToLocal(interval.start),
-          end: utcToLocal(interval.end),
-        })),
-      },
-    ]) || {},
-  );
+  const scheduleForDisplay: Schedule = {
+    monday: transformDaySchedule(currentSchedule.monday),
+    tuesday: transformDaySchedule(currentSchedule.tuesday),
+    wednesday: transformDaySchedule(currentSchedule.wednesday),
+    thursday: transformDaySchedule(currentSchedule.thursday),
+    friday: transformDaySchedule(currentSchedule.friday),
+    saturday: transformDaySchedule(currentSchedule.saturday),
+    sunday: transformDaySchedule(currentSchedule.sunday),
+  };
+
+  function transformDaySchedule(daySchedule: typeof currentSchedule[DayName] | undefined) {
+    if (!daySchedule) {
+      return { active: false, intervals: [] };
+    }
+    return {
+      ...daySchedule,
+      intervals: daySchedule.intervals?.map((interval) => ({
+        start: utcToLocal(interval.start),
+        end: utcToLocal(interval.end),
+      })) || [],
+    };
+  }
 
   const getScheduleSummary = () => {
-    const activeDays = Object.entries(currentSchedule)
-      .filter(([, { active }]) => active)
-      .map(([day, schedule]) => ({
+    const activeDays = DAYS_OF_WEEK
+      .map(day => ({
+        day,
+        schedule: currentSchedule[day]
+      }))
+      .filter(({ schedule }) => schedule?.active)
+      .map(({ day, schedule }) => ({
         day: day.charAt(0).toUpperCase() + day.slice(1),
-        time: schedule.intervals[0]
+        time: schedule?.intervals?.[0]
           ? `${utcToLocal(schedule.intervals[0].start)} - ${utcToLocal(schedule.intervals[0].end)}`
           : "All day",
       }));
 
-    if (activeDays.length === 0) return "No calling hours set";
-    if (
-      activeDays.length === 7 &&
-      activeDays.every((day) => day.time === "All day")
-    )
+    if (!activeDays?.length) return "No calling hours set";
+    if (activeDays.length === 7 && activeDays.every((day) => day.time === "All day"))
       return "24/7";
 
-    return activeDays.map(({ day, time }) => `${day} ${time}`).join(", ");
+    return (
+      <ul className="space-y-1 list-disc pl-4">
+        {activeDays.map(({ day, time }) => (
+          <li key={day} className="text-sm">
+            <span className="font-medium">{day}:</span> {time}
+          </li>
+        ))}
+      </ul>
+    );
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row">
-        <div className="">
-          <Label htmlFor="start_date">Start Date</Label>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label>Start Date & Time</Label>
           <DateTimePicker
             value={
               campaignData.start_date
@@ -161,11 +230,8 @@ export default function SelectDates({
             hourCycle={24}
           />
         </div>
-        <div className="">
-          <Label htmlFor="end_date">
-            End Date
-            <InfoHover tooltip="Your campaign will run until your designated end time on this date." />
-          </Label>
+        <div className="space-y-2">
+          <Label>End Date & Time</Label>
           <DateTimePicker
             value={
               campaignData.end_date
@@ -178,33 +244,61 @@ export default function SelectDates({
             hourCycle={24}
           />
         </div>
-        <div className="flex items-end">
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="text-gray-500" size={20} />
+            <Label className="font-semibold">Calling Hours</Label>
+          </div>
           <Button
             variant="outline"
-            onClick={() => setShowSchedule(!showSchedule)}
-            className="border-2 border-primary"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowSchedule(!showSchedule)
+            }}
+            size="sm"
           >
             {showSchedule ? "Hide Calling Hours" : "Set Calling Hours"}
           </Button>
         </div>
-      </div>
-      <div className="flex items-center gap-2 rounded-md bg-gray-100 p-3">
-        <Clock className="text-gray-500" size={20} />
-        <Label className="font-semibold">Calling Hours:</Label>
-        <div className="flex-grow text-sm text-gray-600">
+
+        <div className="rounded-md bg-gray-100 p-4">
           {getScheduleSummary()}
         </div>
-      </div>
-      <div className="space-y-4">
+
         {showSchedule && (
-          <div className="rounded-md border p-4">
+          <div className="rounded-md border p-4 space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault();
+                  applyScheduleToAll({ start: localToUTC("09:00"), end: localToUTC("17:00") })
+                }}
+              >
+                Apply 9-5 to All Days
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.preventDefault()
+                  applyScheduleToWeekdays({ start: localToUTC("09:00"), end: localToUTC("17:00") })
+                }}
+              >
+                Apply 9-5 to Weekdays
+              </Button>
+            </div>
             <WeeklyScheduleTable
               schedule={scheduleForDisplay}
               handleCheckboxChange={handleCheckboxChange}
               handleTimeChange={handleTimeChange}
             />
-            <div className="mt-4 flex justify-end">
-              <Button onClick={handleSave}>Save</Button>
+            <div className="flex justify-end">
+              <Button onClick={handleSave}>Save Calling Hours</Button>
             </div>
           </div>
         )}
