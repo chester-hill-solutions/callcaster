@@ -32,55 +32,73 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
   const isAdmin = userRole === MemberRole.Admin || userRole === MemberRole.Owner;
   const baseUrl = `/workspaces/${workspace.id}`;
 
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-md border-2 px-2 py-1 font-Zilla-Slab font-semibold transition-colors ${
-      isActive
-        ? "border-brand-primary bg-brand-primary text-white"
-        : "border-zinc-300 text-black hover:bg-zinc-100 dark:text-white"
-    }`;
+  const handleNavlinkStyles = ({
+    isActive,
+    isPending,
+  }: {
+    isActive: boolean;
+    isPending: boolean;
+  }) => {
+    if (isActive) {
+      return "rounded-md border-2 border-brand-primary bg-brand-primary text-white px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+    }
+    if (isPending) {
+      return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
+    }
+    return "rounded-md border-2 border-zinc-300 px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+  };
 
-  const iconLinkClass = (isActive: boolean) =>
-    `flex items-center gap-2 rounded-lg px-3 py-2 transition-all ${
-      isActive
-        ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
-        : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
-    }`;
+  const isFeatureEnabled = (flag?: NavItem['flag']) => {
+    if (!flag) return true;
+    const { parent, child } = flag;
+    return flags[parent] && flags[parent][child] === true;
+  };
 
   return (
     <div className="flex-col justify-center">
-      <h3 className="mb-4 font-Tabac-Slab sm:text-xl">{workspace.name}</h3>
-      
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex gap-1">
-          {NAV_ITEMS.filter(item => !userIsCaller || !item.callerHidden).map((item) => (
-            <NavLink
-              key={item.name}
-              to={`${baseUrl}${item.path ? `/${item.path}` : ''}`}
-              className={navLinkClass}
-              end={item.end}
-            >
-              {item.name}
-            </NavLink>
-          ))}
-        </div>
-
-        <div className="flex gap-1">
-            <NavLink
-              to={`${baseUrl}/settings`}
-              className={({ isActive }) => iconLinkClass(isActive)}
-              end
-            >
-              <MdSettings className="h-4 w-4" />
-              Settings
-            </NavLink>
-          {isAdmin && (
-          <NavLink
-            to={`${baseUrl}/billing`}
-            className={({ isActive }) => iconLinkClass(isActive)}
-          >
-            <MdCreditCard className="h-4 w-4" />
-            Credits: {workspace.credits}
-          </NavLink>)}
+      <div className="relative mb-4 flex items-center justify-between">
+        <h3 className="font-Tabac-Slab sm:text-xl">{workspace?.name}</h3>
+      </div>
+      <div className="mb-2 flex items-center text-black dark:text-white">
+        <div className="flex flex-1 items-center justify-center sm:justify-between">
+          <div className="flex gap-1">
+            {NAV_ITEMS.map(
+              (item) =>
+                (!item.callerHidden || !userIsCaller) &&
+                isFeatureEnabled(item.flag) && (
+                  <NavLink
+                    key={item.name}
+                    to={`${baseUrl}/${item.path}`}
+                    className={handleNavlinkStyles}
+                    end={item.end}
+                  >
+                    {item.name}
+                  </NavLink>
+                ),
+            )}
+          </div>
+          <div>
+            {!userIsCaller && (
+              <div className="flex gap-1">
+                <Button size="icon" asChild variant="outline">
+                  <NavLink
+                  to={`${baseUrl}/settings`}
+                    className="border-2 border-zinc-400"
+                  >
+                    <MdSettings size={24} />
+                  </NavLink>
+                </Button>
+                <Button asChild variant="outline">
+                  <NavLink
+                    to={`${baseUrl}/settings/credits`}
+                    className="border-2 border-zinc-400 flex items-center gap-1 relative"
+                  >
+                    <MdCreditCard size={24} /> {workspace?.credits} <span className="text-xs absolute -bottom-5">Call Credits</span>
+                  </NavLink>
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

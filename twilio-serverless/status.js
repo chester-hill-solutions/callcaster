@@ -4,7 +4,6 @@ const Twilio = require("twilio");
 const log = (level, message, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 
 const getCallWithRetry = async (supabase, callSid, retries = 0) => {
   const MAX_RETRIES = 3;

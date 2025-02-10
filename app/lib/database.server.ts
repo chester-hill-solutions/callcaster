@@ -214,27 +214,15 @@ export async function getWorkspaceInfoWithDetails({
   userId: string;
 }) {
   const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(
-      `id, name, credits, 
-        workspace_users(id, role), 
-        campaign(*), 
-        workspace_number(id, phone_number, capabilities), 
-        audience(id, name)`
-    )
-    .eq("id", workspaceId)
-    .eq("workspace_users.user_id", userId)
-    .single();
+      .from("workspace")
+      .select("id, name, credits, workspace_users(role), campaign(id, title, status, created_at), workspace_number(id, phone_number), audience(id, name)")
+      .eq("id", workspaceId)
+      .eq("workspace_users.user_id", userId)
+      .single();
   if (workspaceError) throw workspaceError;
-  const { campaign, workspace_number, audience, ...rest } = workspace;
-  return {
-    workspace: rest,
-    campaigns: campaign,
-    phoneNumbers: workspace_number,
-    audiences: audience
-  } as unknown as WorkspaceInfoWithDetails;
-}
-
+  const {workspace_users, campaign, workspace_number, audience, ...rest} = workspace;
+    return { workspace: rest, campaigns: campaign, phoneNumbers: workspace_number, audiences: audience } as unknown as WorkspaceInfoWithDetails  ;
+} 
 
 export async function getWorkspaceCampaigns({
   supabaseClient,
@@ -872,38 +860,26 @@ export async function updateCampaign({
     "Error updating campaign"
   );
 
-  // First check if the record exists
-  const { data: existingRecord } = await supabase
-    .from(tableKey)
-    .select()
-    .eq("campaign_id", id)
-    .single();
+  //tableKey === "message_campaign"
+  const updatedCampaignDetails = await handleDatabaseOperation(
+    async () =>
+      await supabase
+        .from(tableKey)
+        .update(cleanCampaignDetails)
+        .eq("campaign_id", id)
+        .select()
+        .single(),
+    "Error updating campaign details",
+  );
 
-  let updatedCampaignDetails;
-  if (existingRecord) {
-    // Update if record exists
-    updatedCampaignDetails = await handleDatabaseOperation(
-      async () =>
-        await supabase
-          .from(tableKey)
-          .update(cleanCampaignDetails)
-          .eq("campaign_id", id)
-          .select()
-          .single(),
-      "Error updating campaign details",
+  let audienceUpdateResult = null;
+ /*  if (audiences) {
+    audienceUpdateResult = await updateCampaignAudiences(
+      supabase,
+      id,
+      audiences,
     );
-  } else {
-    // Insert if record doesn't exist
-    updatedCampaignDetails = await handleDatabaseOperation(
-      async () =>
-        await supabase
-          .from(tableKey)
-          .insert({ ...cleanCampaignDetails, campaign_id: id })
-          .select()
-          .single(),
-      "Error creating campaign details",
-    );
-  }
+  } */
 
   return {
     campaign,
@@ -1130,10 +1106,10 @@ export const fetchBasicResults = async (
 
 // Start of Selection
 export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campaignId: string) => {
-  const { count, error } = await supabaseClient
-    .from("campaign_queue")
-    .select("*", { count: "exact", head: true })
-    .eq("campaign_id", campaignId);
+  const { count, error } = await supabaseClient.from("campaign_queue")
+    .select("count", { count: "exact" })
+    .eq("campaign_id", campaignId);   
+
   const { count: callCount, error: callCountError } = await supabaseClient
     .from("outreach_attempt")
     .select("*", { count: "exact", head: true })
@@ -1205,10 +1181,12 @@ export const fetchCampaignAudience = async (
   campaignId: string,
   workspaceId: string,
 ) => {
-  const scriptsPromise = supabaseClient
-    .from("script")
-    .select(`*`)
-    .eq("workspace", workspaceId)
+  const campaignPromise = supabaseClient
+    .from("campaign")
+    .select(`*, campaign_audience(*), campaign_queue(*, contact(*))`)
+    .eq("id", campaignId)
+    .single();
+
   const queuePromise = supabaseClient
     .from("campaign_queue")
     .select(`*, contact(*)`, { count: "exact" })
@@ -1226,7 +1204,8 @@ export const fetchCampaignAudience = async (
     .select(`count`, { count: "exact" })
     .eq("campaign_id", campaignId);
 
-  const [queueResult, isQueuedCount, totalCount, scripts] = await Promise.all([
+  const [campaign, queueResult, isQueuedCount, totalCount] = await Promise.all([
+    campaignPromise,
     queuePromise,
     isQueuedCountPromise,
     totalCountPromise,
@@ -1468,22 +1447,15 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data: OutreachExportData[], users: WorkspaceUserData[]) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-
-  // Create initial headers
-  let csvHeaders = [...dynamicKeys, ...otherDataKeys, ...resultKeys].map((header) =>
+  console.log(dynamicKeys, resultKeys, otherDataKeys);
+  let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
     header === "id"
       ? "attempt_id"
       : header === "contact_id"
         ? "callcaster_id"
         : header,
   );
-  // Ensure call_duration is in headers
-  if (!csvHeaders.includes('call_duration')) {
-    csvHeaders.push('call_duration');
-  }
-  if (!csvHeaders.includes('billed_credits')) {
-    csvHeaders.push('billed_credits');
-  }
+
   let flattenedData = data.map((row) => flattenRow(row, users));
 
   flattenedData.sort((a, b) => {
@@ -1526,11 +1498,8 @@ export function processOutreachExportData(data: OutreachExportData[], users: Wor
 
   // Filter headers but ensure call_duration remains
   csvHeaders = csvHeaders.filter((header) =>
-    typeof header === 'string' && (
-      header === 'call_duration' ||
-      mergedData.some((row) => row[header] != null && row[header] !== "")
-    )
-  ) || [];
+    mergedData.some((row) => row[header] != null && row[header] !== ""),
+  );
 
   return { csvHeaders, flattenedData: mergedData };
 }
@@ -1890,8 +1859,7 @@ export async function cancelQueuedMessages(twilio: typeof Twilio, supabase: Supa
   };
 }
 
-export function checkSchedule(campaignData: { start_date: string, end_date: string, schedule: { [key: string]: { active: boolean, intervals: { start: string, end: string }[] } } } | null) {
-  if (!campaignData) return false;
+export function checkSchedule(campaignData: Campaign) {
   const { start_date, end_date, schedule } = campaignData;
   const now = new Date();
   const utcNow = new Date(Date.UTC(
