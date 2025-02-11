@@ -450,7 +450,10 @@ export function extractKeys(data: OutreachExportData[]) {
   data.forEach(row => {
     getAllKeys(row, "", dynamicKeys);
     getAllKeys(row.contact, "contact_", dynamicKeys);
-    getAllKeys(row.result, "result_", resultKeys);
+
+    if (row.result && typeof row.result === "object") {
+      Object.keys(row.result).forEach(key => resultKeys.add(key));
+    }
 
     if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
       row.contact.other_data.forEach((item, index) => {
@@ -464,41 +467,14 @@ export function extractKeys(data: OutreachExportData[]) {
   return { dynamicKeys, resultKeys, otherDataKeys };
 }
 
-export function formatCallDuration(seconds: number | null): string {
-  if (!seconds) return "00:00:00";
+export function flattenRow(row, users) {
+  const flattenedRow = {};
+  getAllKeys(row, "", flattenedRow);
+  getAllKeys(row.contact, "contact_", flattenedRow);
 
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const remainingSeconds = seconds % 60;
-
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
-
-export function flattenRow(row: any, users: any[]) {
-  const flattenedRow: any = {};
-
-  const duration = row.calls?.reduce((acc: 0, call: { duration: number }) => acc + call.duration, 0) || null;
-  const billedCredits = Math.floor(duration / 60) + 1;
-  const formattedDuration = formatCallDuration(duration);
-
-  const { calls, ...rowData } = row;
-  Object.assign(flattenedRow, {
-    ...rowData,
-    call_duration: formattedDuration,
-    billed_credits: billedCredits
-  });
-
-  // Process contact data
-  if (row.contact) {
-    getAllKeys(row.contact, "contact_", flattenedRow);
-  }
-
-  // Handle user information
   const user = users.find(user => row.user_id === user.id);
   flattenedRow.user_id = user ? user.username : row.user_id;
 
-  // Process result data - Updated to use getAllKeys
   if (row.result && typeof row.result === "object") {
     getAllKeys(row.result, "result_", flattenedRow);
   }

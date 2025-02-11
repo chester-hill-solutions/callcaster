@@ -46,6 +46,12 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
         : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
     }`;
 
+  const isFeatureEnabled = (flag?: NavItem['flag']) => {
+    if (!flag) return true;
+    const { parent, child } = flag;
+    return flags[parent] && flags[parent][child] === true;
+  };
+
   return (
     <div className="flex-col justify-center">
       <h3 className="mb-4 font-Tabac-Slab sm:text-xl">{workspace.name}</h3>

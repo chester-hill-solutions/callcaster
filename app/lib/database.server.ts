@@ -1468,22 +1468,15 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data: OutreachExportData[], users: WorkspaceUserData[]) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-
-  // Create initial headers
-  let csvHeaders = [...dynamicKeys, ...otherDataKeys, ...resultKeys].map((header) =>
+  console.log(dynamicKeys, resultKeys, otherDataKeys);
+  let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
     header === "id"
       ? "attempt_id"
       : header === "contact_id"
         ? "callcaster_id"
         : header,
   );
-  // Ensure call_duration is in headers
-  if (!csvHeaders.includes('call_duration')) {
-    csvHeaders.push('call_duration');
-  }
-  if (!csvHeaders.includes('billed_credits')) {
-    csvHeaders.push('billed_credits');
-  }
+
   let flattenedData = data.map((row) => flattenRow(row, users));
 
   flattenedData.sort((a, b) => {
