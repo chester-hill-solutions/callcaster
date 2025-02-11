@@ -10,7 +10,24 @@ import { Checkbox } from "./ui/checkbox";
 import { days } from "~/lib/utils";
 import InfoHover from "./InfoPopover";
 
-const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange }) => {
+interface TimeInterval {
+  start: string; // Format: "HH:mm"
+  end: string;   // Format: "HH:mm"
+}
+interface Day {
+  active: boolean;
+  intervals: TimeInterval[];
+}
+type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+type Schedule = Record<DayName, Day>;
+
+
+const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange }: {
+  schedule: Schedule,
+  handleCheckboxChange: (day: DayName) => void;
+  handleTimeChange: (day: DayName, field: "start" | "end", localValue: string, index: number) => void;
+}) => {
   return (
     <Table>
       <TableHeader>
@@ -18,7 +35,7 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
           <TableHead>Day</TableHead>
           <TableHead>Active</TableHead>
           <TableHead>Start</TableHead>
-          <TableHead>End{" "}<InfoHover tooltip="The latest time to begin dialing."/></TableHead>
+          <TableHead>End{" "}<InfoHover tooltip="The latest time to begin dialing." /></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -26,9 +43,11 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
           <TableRow key={day}>
             <TableCell>{day}</TableCell>
             <TableCell>
-              <Checkbox 
-                checked={schedule[day.toLowerCase()]?.active}
-                onCheckedChange={() => handleCheckboxChange(day)}
+              <Checkbox
+                checked={schedule[day.toLowerCase() as DayName]?.active}
+                onCheckedChange={(e) => {
+                  handleCheckboxChange(day.toLowerCase() as DayName)
+                }}
               />
             </TableCell>
             <TableCell>
@@ -37,9 +56,9 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
                 id={`${day.toLowerCase()}-start`}
                 type="time"
                 className="rounded border p-1"
-                value={schedule[day.toLowerCase()]?.intervals[0]?.start || ""}
-                onChange={(e) => handleTimeChange(day, 'start', e.target.value)}
-                disabled={!schedule[day.toLowerCase()]?.active}
+                value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.start || ""}
+                onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'start', e.target.value, 0)}
+                disabled={!schedule[day.toLowerCase() as DayName]?.active}
               />
             </TableCell>
             <TableCell>
@@ -48,9 +67,9 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
                 id={`${day.toLowerCase()}-end`}
                 type="time"
                 className="rounded border p-1"
-                value={schedule[day.toLowerCase()]?.intervals[0]?.end || ""}
-                onChange={(e) => handleTimeChange(day, 'end', e.target.value)}
-                disabled={!schedule[day.toLowerCase()]?.active}
+                value={schedule[day.toLowerCase() as DayName]?.intervals?.[0]?.end || ""}
+                onChange={(e) => handleTimeChange(day.toLowerCase() as DayName, 'end', e.target.value, 0)}
+                disabled={!schedule[day.toLowerCase() as DayName]?.active}
               />
             </TableCell>
           </TableRow>

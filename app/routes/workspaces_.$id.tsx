@@ -1,6 +1,7 @@
-import { Context, useState } from "react";
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { Context, Suspense, useEffect, useState } from "react";
+import { defer, LoaderFunctionArgs } from "@remix-run/node";
 import {
+  Await,
   json,
   redirect,
   useLoaderData,
@@ -13,25 +14,24 @@ import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
   forceTokenRefresh,
+  getUserRole,
   getWorkspaceInfoWithDetails,
   updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession, signOut } from "~/lib/supabase.server";
+import { useRealtimeData, useWorkspaceContacts } from "~/hooks/useWorkspaceContacts";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
-import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers, Contact } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
-type LoaderData = {
+type WorkspaceInfo = {
   workspace: WrkSpace & { workspace_users: { role: MemberRole }[] };
   audiences: Partial<Audience[]>;
   campaigns: Partial<Campaign[]>;
   userRole: MemberRole;
   phoneNumbers: Partial<WorkspaceNumbers[]>;
-  flags: Flags;
-}
-
-export { ErrorBoundary } from "~/components/ErrorBoundary";
+};
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, serverSession } =
@@ -42,83 +42,91 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("No workspace found");
-  let workspace: Partial<WorkspaceData>;
-  let workspace_users: Partial<{ role: MemberRole }[]>;
-  let campaigns: Partial<Campaign[]>;
-  let phoneNumbers: Partial<WorkspaceNumbers[]>;
-  let audiences: Partial<Audience[]>;
-  try {
-    ({ workspace, campaigns, phoneNumbers, audiences, workspace_users } = await getWorkspaceInfoWithDetails({ supabaseClient, workspaceId, userId: serverSession.user.id }));
-  } catch (error) {
+  const userRole = await getUserRole({ serverSession, workspaceId: workspaceId });
+  const workspacePromise = getWorkspaceInfoWithDetails({ 
+    supabaseClient, 
+    workspaceId, 
+    userId: serverSession.user.id 
+  }).catch(error => {
     if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
       throw redirect("/workspaces", { headers });
     }
     throw error;
-  }
-  const userRole = workspace_users?.[0]?.role;
-  await updateUserWorkspaceAccessDate({ workspaceId, supabaseClient });
-  if (userRole == null) {
-    const { error: refreshError } = await forceTokenRefresh({
-      serverSession,
-      supabaseClient,
-    });
-    if (refreshError) {
-      await signOut(request);
-      throw refreshError
-    }
-  }
-  return {
-    workspace,
-    audiences,
-    campaigns,
+  });
+  return defer({
     userRole,
-    phoneNumbers,
-  }
+    workspaceData: workspacePromise,
+    headers
+  });
 };
 
 export default function Workspace() {
-  const { workspace, audiences, campaigns, userRole, phoneNumbers, flags } = useLoaderData<LoaderData>();
+  const { workspaceData, userRole } = useLoaderData<typeof loader>();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
-  const context = useOutletContext<Context<ContextType>>();
+  const context = useOutletContext<ContextType>();
+
   return (
     <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
-      <WorkspaceNav
-        flags={flags}
-        workspace={workspace}
-        userRole={userRole}
-      />
-      <div className="flex flex-grow flex-col gap-4 sm:flex-row">
-        <div className="relative w-full flex-shrink-0 rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900 sm:w-[250px]">
-          <Button
-            variant="outline"
-            className="flex w-full items-center justify-between md:hidden"
-            onClick={() => setCampaignsListOpen(!campaignsListOpen)}
-          >
-            <span>Campaigns</span>
-            {campaignsListOpen ? <FaChevronUp /> : <FaChevronDown />}
-          </Button>
-          <div
-            className={`${campaignsListOpen ? "block" : "hidden"} h-full md:flex`}
-          >
-            <CampaignsList
-              campaigns={campaigns}
-              userRole={userRole}
-              setCampaignsListOpen={setCampaignsListOpen}
-            />
-          </div>
-        </div>
-        <div className="flex flex-auto flex-col contain-content overflow-hidden">
-          {!outlet ? (
-            <CampaignEmptyState
-              hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-              type={phoneNumbers?.length > 0 ? "campaign" : "number"}
-            />
-          ) : (
-            <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, flags, ...context }} />
-          )}
-        </div>
-      </div>
+      <Suspense fallback={<div>Loading workspace...</div>}>
+        <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
+          {(resolvedData: any) => {
+            const { workspace, audiences, campaigns, phoneNumbers } = resolvedData;
+            const {data: workspaceData, isSyncing: workspaceSyncing, error: workspaceError} = useRealtimeData(context.supabase, workspace.id, 'workspace', [workspace]); 
+            const {data: campaignsData, isSyncing: campaignsSyncing, error: campaignsError} = useRealtimeData(context.supabase, workspace.id, 'campaign', campaigns); 
+            const {data: phoneNumbersData, isSyncing: phoneNumbersSyncing, error: phoneNumbersError} = useRealtimeData(context.supabase, workspace.id, 'workspace_numbers', phoneNumbers); 
+            const {data: audiencesData, isSyncing: audiencesSyncing, error: audiencesError} = useRealtimeData(context.supabase, workspace.id, 'audience', audiences); 
+            return (
+              <>
+                <WorkspaceNav
+                  workspace={workspaceData?.[0]}
+                  userRole={userRole}
+                />
+                <div className="flex flex-grow flex-col gap-4 sm:flex-row">
+                  <div className="relative w-full flex-shrink-0 rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900 sm:w-[250px]">
+                    <Button
+                      variant="outline"
+                      className="flex w-full items-center justify-between md:hidden"
+                      onClick={() => setCampaignsListOpen(!campaignsListOpen)}
+                    >
+                      <span>Campaigns</span>
+                      {campaignsListOpen ? <FaChevronUp /> : <FaChevronDown />}
+                    </Button>
+                    <div
+                      className={`${campaignsListOpen ? "block" : "hidden"} h-full md:flex`}
+                    >
+                      <CampaignsList
+                        campaigns={campaignsData?.flat().filter(Boolean) as Campaign[] || []}
+                        userRole={userRole}
+                        setCampaignsListOpen={setCampaignsListOpen}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-auto flex-col contain-content overflow-hidden">
+                    {!outlet ? (
+                      <CampaignEmptyState
+                        hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
+                        type={phoneNumbersData?.length > 0 ? "campaign" : "number"}
+                      />
+                    ) : (
+                      <Outlet
+                        context={{
+                          workspace: workspaceData?.[0],
+                          audiences: audiencesData,
+                          campaigns: campaignsData,
+                          phoneNumbers: phoneNumbersData,
+                          userRole,
+                          ...context
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </>
+            );
+          }}
+        </Await>
+      </Suspense>
     </main>
   );
 }

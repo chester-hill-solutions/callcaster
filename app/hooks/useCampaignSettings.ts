@@ -1,224 +1,149 @@
 import { NavigateFunction } from "@remix-run/react";
-import { Fetcher } from "@remix-run/react";
+import { Fetcher, SubmitFunction } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { Audience, CampaignAudience, IVRCampaign, LiveCampaign, MessageCampaign, Schedule } from "~/lib/types";
+import { Audience, CampaignAudience, Schedule, Script } from "~/lib/types";
 import { deepEqual } from "~/lib/utils";
+import { Tables, Database } from "~/lib/database.types";
 
-export type CampaignSettingsData = {
-    campaign_id: string;
-    workspace: string;
-    title: string;
-    status: string;
-    type: "live_call" | "message" | "robocall";
-    dial_type: "call" | "predictive";
-    group_household_queue: boolean;
-    start_date: string;
-    end_date: string;
-    caller_id: string | null;
-    voicemail_file: string | null;
-    script_id: number | null;
-    audiences: Audience[];
-    body_text: string;
-    message_media: string[];
-    voicedrop_audio: string | null;
-    schedule: Schedule;
-    is_active: boolean;
-    details: LiveCampaign | MessageCampaign | IVRCampaign;
+type Contact = Tables<"contact">;
+type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+type LiveCampaign = Tables<"live_campaign"> & { script: Script };
+type MessageCampaign = Tables<"message_campaign">;
+type IVRCampaign = Tables<"ivr_campaign"> & { script: Script };
+
+
+
+export type CampaignUIState = {
+    isChanged: boolean;
+    confirmStatus: "play" | "pause" | "archive" | "none";
+    scheduleDisabled: string | boolean;
+    joinDisabled: string | null;
 };
 
-export default function useCampaignSettings(
-    {
-        campaign_id,
-        workspace,
-        title,
-        status,
-        type,
-        dial_type,
-        group_household_queue,
-        start_date,
-        end_date,
-        caller_id,
-        voicemail_file,
-        script_id,
-        audiences,
-        body_text,
-        message_media,
-        voicedrop_audio,
-        schedule,
-        is_active,
-        details,
-    }: Omit<CampaignSettingsData, 'handleScheduleButton' | 'handleActiveChange'>
-) {
-    const [isChanged, setChanged] = useState(false);
-    const [campaignData, setCampaignData] = useState<CampaignSettingsData>({
-        campaign_id,
-        workspace,
-        title,
-        status,
-        type,
-        dial_type,
-        group_household_queue,
-        start_date,
-        end_date,
-        caller_id,
-        voicemail_file,
-        script_id,
-        audiences,
-        body_text,
-        message_media,
-        voicedrop_audio,
-        schedule,
-        is_active,
-        details,
+export function useCampaignSettings({
+    initialState,
+    navigate,
+    fetcher,
+}: {
+    initialState: CampaignState;
+    navigate: NavigateFunction;
+    fetcher: Fetcher<{success?: boolean, campaign?: Partial<CampaignState>, campaignDetails?: CampaignState['details']}> & { submit: SubmitFunction };
+}) {
+    const [state, setState] = useState<CampaignState>(initialState);
+    const [uiState, setUIState] = useState<CampaignUIState>({
+        isChanged: false,
+        confirmStatus: "none",
+        scheduleDisabled: false,
+        joinDisabled: null,
     });
-    const [initial, setInitial] = useState<CampaignSettingsData>(campaignData);
-    const [confirmStatus, setConfirmStatus] = useState<"schedule" | "play" | "archive" | "none">("none");
 
-    const handleResetData = () => {
-        setCampaignData(initial);
-    }
+    useEffect(() => {
+        if (!deepEqual(state, initialState)) {
+            setUIState(prev => ({ ...prev, isChanged: true }));
+        } else {
+            setUIState(prev => ({ ...prev, isChanged: false }));
+        }
+    }, [state, initialState]);
 
-    const handleInputChange = (name: string, value: string | boolean | number | null | Schedule) => {
-        setCampaignData((prev) => ({ ...prev, [name]: value }));
-    };
-
-    const handleAudienceChange = (audience: CampaignAudience | null, isChecked: boolean) => {
-        setCampaignData((prev) => ({
+    const updateCampaignField = (field: keyof CampaignState, value: any) => {
+        setState(prev => ({
             ...prev,
-            audiences: isChecked
-                ? [...prev.audiences, audience].filter((a): a is Audience => a !== null)
-                : prev.audiences.filter((aud) => aud && aud.id !== audience?.audience_id),
+            [field]: value,
         }));
     };
 
-    const clearSchedule = () => {
-        handleInputChange("schedule", {
-            sunday: { active: false, intervals: [] },
-            monday: { active: false, intervals: [] },
-            tuesday: { active: false, intervals: [] },
-            wednesday: { active: false, intervals: [] },
-            thursday: { active: false, intervals: [] },
-            friday: { active: false, intervals: [] },
-            saturday: { active: false, intervals: [] },
-        });
+    const resetState = () => {
+        setState(initialState);
+        setUIState(prev => ({ ...prev, isChanged: false }));
     };
 
-    const getScheduleData = () => {
-        return {
-            campaignData: JSON.stringify({ ...campaignData, status: "scheduled" }),
-            campaignDetails: JSON.stringify(details),
-        };
+    const handleAudienceChange = (audience: NonNullable<CampaignAudience>, isChecked: boolean) => {
+        if (!audience) return;
+        const newAudiences = isChecked
+            ? [...state.audiences, { id: audience.audience_id } as NonNullable<Audience>]
+            : state.audiences.filter(a => a.id !== audience.audience_id);
+        updateCampaignField("audiences", newAudiences);
     };
 
-    const getActiveChangeData = (isActive: boolean, status: string | null) => {
-        return {
-            campaignData: JSON.stringify({ ...campaignData, is_active: isActive, ...(status && { status }) }),
-            campaignDetails: JSON.stringify(details),
-        };
-    };
-
-    const handleStatusButtons = (
-        type: "play" | "pause" | "archive" | "schedule",
-    ) => {
-        const status = campaignData.status;
-        switch (status) {
-            case "draft":
-                if (type === "play") {
-                    handleInputChange("status", "running");
-                    handleInputChange("is_active", true);
-                } else if (type === "schedule") {
-                    handleInputChange("status", "scheduled");
-                } else if (type === "archive") {
-                    clearSchedule();
-                    handleInputChange("status", "archived");
-                    handleInputChange("is_active", false);
-                }
-                break;
-            case "scheduled":
-                if (type === "archive") {
-                    clearSchedule();
-                    handleInputChange("status", "archived");
-                    handleInputChange("is_active", false);
-                }
-                if (type === "play") {
-                    handleInputChange("status", "running");
-                    handleInputChange("is_active", true);
-                }
-                if (type === "pause") {
-                    handleInputChange("status", "paused");
-                    handleInputChange("is_active", false);
-                }
-                break;
-            case "running":
-                if (type === "pause") {
-                    handleInputChange("status", "paused");
-                    handleInputChange("is_active", false);
-                } else if (type === "archive") {
-                    handleInputChange("status", "archived");
-                    clearSchedule();
-                } else if (type === "schedule") {
-                    handleInputChange("status", "scheduled");
-                    handleInputChange("is_active", false);
-                }
-                break;
-            case "paused":
-                if (type === "play") {
-                    handleInputChange("status", "running");
-                    handleInputChange("is_active", true);
-                } else if (type === "archive") {
-                    clearSchedule()
-                    handleInputChange("status", "archived")
-                    handleInputChange("is_active", false);
-                }
-                if (type === "schedule") {
-                    handleInputChange("status", "scheduled");
-                    handleInputChange("is_active", false);
-                }
-                break;
-
-            case "complete":
-                if (type === "archive") {
-                    handleInputChange("status", "archived");
-                    clearSchedule();
-                }
-                break;
-
-            case "pending":
-                if (type === "archive") {
-                    handleInputChange("status", "archive");
-                    handleInputChange("is_active", false);
-                    clearSchedule();
-                }
-                break;
-
-            default:
-                console.error(`Unhandled status: ${status}`);
+    const handleStatusButtons = (type: "play" | "pause" | "archive" | "schedule") => {
+        if (type === "schedule") {
+            navigate("schedule");
+            return;
         }
+        if (type === "pause") {
+            const updatedState = {
+                ...state,
+                status: "paused",
+                is_active: false
+            };
+            setState(updatedState);
+            fetcher.submit(
+                {
+                    campaignData: JSON.stringify(updatedState),
+                    campaignDetails: JSON.stringify(state.details),
+                },
+                { method: "patch", action: "/api/campaigns" }
+            );
+            setUIState(prev => ({ ...prev, confirmStatus: "none" }));
+            return;
+        }
+        setUIState(prev => ({ ...prev, confirmStatus: type }));
     };
 
-    const handleUpdateData = (campaignData: CampaignSettingsData) => {
-        setCampaignData(campaignData);
-        setInitial(campaignData);
-    }
+    const handleConfirmStatus = (status: "play" | "pause" | "archive" | "none") => {
+        if (status === "none" && uiState.confirmStatus !== "none") {
+            const newStatus = uiState.confirmStatus === "play" ? "running" :
+                            uiState.confirmStatus === "archive" ? "archived" :
+                            state.status;
+            
+            const updatedState = {
+                ...state,
+                status: newStatus,
+                is_active: newStatus === "running"
+            };
+
+            setState(updatedState);
+            fetcher.submit(
+                {
+                    campaignData: JSON.stringify(updatedState),
+                    campaignDetails: JSON.stringify(state.details),
+                },
+                { method: "patch", action: "/api/campaigns" }
+            );
+        }
+        setUIState(prev => ({ ...prev, confirmStatus: status }));
+    };
+
+    const handleSave = () => {
+        fetcher.submit(
+            {
+                campaignData: JSON.stringify(state),
+                campaignDetails: JSON.stringify(state.details),
+            },
+            { method: "patch", action: "/api/campaigns" }
+        );
+    };
 
     useEffect(() => {
-        setChanged(!deepEqual(campaignData, initial));
-    }, [campaignData, initial]);
-
+        const data = fetcher.data;
+        if (fetcher.state === 'idle' && data?.success && data.campaign && data.campaignDetails) {
+            setUIState(prev => ({ ...prev, isChanged: false }));
+            setState(prevState => ({
+                ...prevState,
+                ...(data.campaign as Partial<CampaignState>),
+                details: data.campaignDetails as CampaignState['details']
+            }));
+        }
+    }, [fetcher.state, fetcher.data]);
 
     return {
-        confirmStatus,
-        setConfirmStatus,
-        isChanged,
-        setChanged,
-        campaignData,
-        setCampaignData,
-        handleInputChange,
+        state,
+        uiState,
+        updateCampaignField,
+        resetState,
         handleAudienceChange,
         handleStatusButtons,
-        handleResetData,
-        handleUpdateData,
-        getScheduleData,
-        getActiveChangeData
+        handleConfirmStatus,
+        handleSave,
     };
 }

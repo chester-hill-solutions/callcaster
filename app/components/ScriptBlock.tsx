@@ -260,7 +260,7 @@ const MergedQuestionBlock = ({
               <SelectValue placeholder="Select an audio file" />
             </SelectTrigger>
             <SelectContent className="bg-white">
-              {mediaNames.map((media) => (
+              {mediaNames.filter((media) => !media.name.startsWith("voicemail-")).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map((media) => (
                 <SelectItem key={media.id} value={media.name}>
                   {media.name}
                 </SelectItem>

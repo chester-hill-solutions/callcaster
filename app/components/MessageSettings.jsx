@@ -1,10 +1,12 @@
 import { MdAddAPhoto } from "react-icons/md";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Await, Form, useSubmit } from "@remix-run/react";
 
 export const MessageSettings = ({ mediaLinks, details, campaignData, onChange }) => {
 
     const [eraseVisible, setEraseVisible] = useState({});
+    const debounceRef = useRef(null);
+
     const submit = useSubmit();
     const showErase = (imageId) => {
         setEraseVisible((prevState) => ({
@@ -47,7 +49,7 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
         });
     };
     const renderMediaContent = (resolvedMediaLinks) => {
-        if (!campaignData.message_media || !resolvedMediaLinks) return null;
+        if (!details.message_media || !resolvedMediaLinks) return null;
 
         return (
             <div className="flex flex-wrap justify-between">
@@ -82,7 +84,18 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
         );
     };
 
-    const handleBodyTextChange = (event) => { onChange("body_text", event.target.value) };
+    const handleBodyTextChange = (() => {
+        const debounceTimeout = useRef(null);
+        return (event) => {
+            if (debounceTimeout.current) {
+                clearTimeout(debounceTimeout.current);
+            }
+
+            debounceTimeout.current = setTimeout(() => {
+                onChange("body_text", event.target.value);
+            }, 300); // Adjust delay as needed
+        };
+    })();
     return (
         <div className="flex flex-col items-center">
             <div className="my-1 flex flex-col gap-2 px-2">
@@ -111,7 +124,7 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
                                         className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
                                         style={{ caretColor: "black" }}
                                         rows={5}
-                                        value={campaignData.body_text}
+                                        value={details.body_text}
                                         onChange={handleBodyTextChange}
                                     />
                                 </div>
@@ -122,13 +135,13 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {(campaignData.body_text?.length || 0) % 140} /{" "}
-                                    {Math.max(1, Math.ceil(campaignData.body_text?.length / 140)) * 140}{" "}
-                                    character{campaignData.body_text?.length !== 1 && 's'}
+                                    {(details.body_text?.length || 0) % 140} /{" "}
+                                    {Math.max(1, Math.ceil(details.body_text?.length / 140)) * 140}{" "}
+                                    character{details.body_text?.length !== 1 && 's'}
                                 </div>
                                 <div>
-                                    {Math.ceil(campaignData.body_text?.length / 140 || 0)} part
-                                    {(Math.ceil(campaignData.body_text?.length / 140 || 0)) !== 1 && 's'}
+                                    {Math.ceil(details.body_text?.length / 140 || 0)} part
+                                    {(Math.ceil(details.body_text?.length / 140 || 0)) !== 1 && 's'}
                                 </div>
                             </div>
                             <div>

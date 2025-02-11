@@ -55,10 +55,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const contact_number = params.contact_number;
 
   if (!workspaceId) {
-    return json(
-      { workspace: null, error: "Workspace does not exist", userRole: null },
-      { headers },
-    );
+    return json({ workspace: null, error: "Workspace does not exist", userRole: null }, { headers });
   }
 
   const userRole = getUserRole({ serverSession, workspaceId });
@@ -141,6 +138,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
 }
+
 export default function ChatsList() {
   const { supabase } = useOutletContext();
   const { chats, workspace, userRole, potentialContacts, contact, campaigns } =

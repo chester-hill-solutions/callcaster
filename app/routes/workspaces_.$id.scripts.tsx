@@ -14,6 +14,43 @@ import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 import { formatDateToLocale } from "~/lib/utils";
 import { useEffect } from "react";
+import type { PostgrestError } from "@supabase/supabase-js";
+import { Json } from "~/lib/supabase.types";
+
+type ScriptSteps = {
+  pages?: Record<string, unknown>;
+  blocks?: Record<string, unknown>;
+};
+
+type Script = {
+  id: number;
+  name: string;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  workspace: string | null;
+  type: string | null;
+  steps: Json;
+};
+
+type ScriptWithParsedSteps = Omit<Script, 'steps'> & {
+  steps: ScriptSteps | null;
+};
+
+type Workspace = {
+  id: string;
+  name: string;
+};
+
+type LoaderData = 
+  | { workspace: null; error: string; userRole: null; scripts?: undefined }
+  | { scripts: null; error: string; userRole: any; workspace?: undefined }
+  | { scripts: Script[] | null; workspace: Workspace | null; error: null; userRole: any };
+
+type ActionData = 
+  | { error: string }
+  | { fileContent: string; fileName: string; contentType: string };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
@@ -21,7 +58,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return json(
+    return json<LoaderData>(
       {
         workspace: null,
         error: "Workspace does not exist",
@@ -43,21 +80,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .select()
     .eq("workspace", workspaceId);
 
-  if ([scriptsError, workspaceError].filter(Boolean).length) {
-    return json(
+  if (scriptsError || workspaceError) {
+    const errorMessage = [scriptsError, workspaceError]
+      .filter((e): e is PostgrestError => e !== null)
+      .map((error) => error.message)
+      .join(", ");
+
+    return json<LoaderData>(
       {
         scripts: null,
-        error: [scriptsError, workspaceError]
-          .filter(Boolean)
-          .map((error) => error.message)
-          .join(", "),
+        error: errorMessage,
         userRole,
       },
       { headers },
     );
   }
 
-  return json({ scripts, workspace, error: null, userRole }, { headers });
+  return json<LoaderData>(
+    { scripts, workspace, error: null, userRole },
+    { headers },
+  );
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -107,13 +149,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
     },
   );
 }
+
 export default function WorkspaceScripts() {
-  const { scripts, error, userRole, workspace } =
-    useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
+  // Narrow the type of loaderData
+  const { error, userRole } = loaderData;
+  const workspace = 'workspace' in loaderData ? loaderData.workspace : null;
+  const rawScripts = 'scripts' in loaderData ? loaderData.scripts : null;
+
+  // Parse the steps for each script
+  const scripts = rawScripts?.map(script => ({
+    ...script,
+    steps: typeof script.steps === 'string' ? JSON.parse(script.steps) : script.steps
+  })) ?? null;
+
   useEffect(() => {
-    if (actionData) {
+    if (actionData && 'fileContent' in actionData) {
       const blob = new Blob([actionData.fileContent], {
         type: actionData.contentType,
       });
@@ -123,21 +176,18 @@ export default function WorkspaceScripts() {
       link.setAttribute("download", actionData.fileName);
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
+      if (link.parentNode) {
+        link.parentNode.removeChild(link);
+      }
     }
   }, [actionData]);
 
-  const isWorkspaceAudioEmpty = !scripts?.length > 0;
+  const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;
+
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">
       <div className="flex">
-
-      <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
-      {workspace != null
-            ? `${workspace?.name} Script Library`
-            : "No Workspace"}
-        </h1>
         </div>
         <Button asChild className="font-Zilla-Slab text-lg font-semibold">
             <Link to={`./new`}>Add a Script</Link>
@@ -154,7 +204,7 @@ export default function WorkspaceScripts() {
         </h4>
       )}
 
-      {scripts?.length > 0 && (
+      {scripts && scripts.length > 0 && (
         <DataTable
           className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
           columns={[
@@ -175,11 +225,12 @@ export default function WorkspaceScripts() {
             {
               header: "Details",
               cell: ({ row }) => {
+                const script = row.original as ScriptWithParsedSteps;
                 const sectionCount = Object.values(
-                  row.original.steps?.pages || {},
+                  script.steps?.pages || {},
                 ).length;
                 const blocksCount = Object.values(
-                  row.original.steps?.blocks || {},
+                  script.steps?.blocks || {},
                 ).length;
                 return (
                   <div>
@@ -196,10 +247,10 @@ export default function WorkspaceScripts() {
             {
               header: "Download",
               cell: ({ row }) => {
-                const id = row.original.id;
+                const script = row.original as ScriptWithParsedSteps;
                 return (
                   <Form method="POST">
-                    <input hidden value={id} name="id" id="id" />
+                    <input hidden value={script.id} name="id" id="id" />
                     <Button variant="ghost" type="submit">
                       <MdDownload />
                     </Button>
@@ -210,10 +261,10 @@ export default function WorkspaceScripts() {
             {
               header: "Edit",
               cell: ({ row }) => {
-                const id = row.original.id;
+                const script = row.original as ScriptWithParsedSteps;
                 return (
                   <Button variant="ghost" asChild>
-                    <NavLink to={`./${id}`} relative="path">
+                    <NavLink to={`./${script.id}`} relative="path">
                       <MdEdit />
                     </NavLink>
                   </Button>

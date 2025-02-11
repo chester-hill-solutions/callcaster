@@ -1,28 +1,23 @@
 import React from "react";
-import { NavLink, useLocation } from "@remix-run/react";
-import { Button } from "../ui/button";
-import { MemberRole } from "./TeamMember";
+import { NavLink,  } from "@remix-run/react";
 import { MdCreditCard, MdSettings } from "react-icons/md";
-import { Flags, WorkspaceData } from "~/lib/types";
+import { MemberRole } from "./TeamMember";
 
-type NavItem = {
+interface NavItem {
   name: string;
   path: string;
   end?: boolean;
-  flag?: {
-    parent: string;
-    child: string;
-  };
   callerHidden?: boolean;
-};
+}
 
 const NAV_ITEMS: NavItem[] = [
   { name: "Campaigns", path: "", end: true },
-  { name: "Chats", path: "chats", flag: { parent: "sms", child: "chat" } },
+  { name: "Chats", path: "chats" },
   { name: "Scripts", path: "scripts", callerHidden: true },
   { name: "Audio", path: "audios", callerHidden: true },
   { name: "Audiences", path: "audiences", callerHidden: true },
 ];
+
 interface WorkspaceNavProps {
   workspace: {
     id: string;
@@ -30,87 +25,68 @@ interface WorkspaceNavProps {
     credits: number;
   };
   userRole: MemberRole;
-  flags: Flags;
 }
 
-const WorkspaceNav: React.FC<WorkspaceNavProps> = ({ workspace, userRole, flags }) => {
-  const location = useLocation();
+const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
   const userIsCaller = userRole === MemberRole.Caller;
-  const getWorkspaceBaseUrl = () => {
-    const pathSegments = location.pathname.split("/");
-    const workspaceIndex = pathSegments.findIndex(
-      (segment) => segment === "workspaces",
-    );
-    return workspaceIndex !== -1 && workspaceIndex + 1 < pathSegments.length
-      ? pathSegments.slice(0, workspaceIndex + 2).join("/")
-      : "/workspaces";
-  };
+  const isAdmin = userRole === MemberRole.Admin || userRole === MemberRole.Owner;
+  const baseUrl = `/workspaces/${workspace.id}`;
 
-  const baseUrl = getWorkspaceBaseUrl();
+  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `rounded-md border-2 px-2 py-1 font-Zilla-Slab font-semibold transition-colors ${
+      isActive
+        ? "border-brand-primary bg-brand-primary text-white"
+        : "border-zinc-300 text-black hover:bg-zinc-100 dark:text-white"
+    }`;
 
-  const handleNavlinkStyles = ({
-    isActive,
-    isPending,
-  }: {
-    isActive: boolean;
-    isPending: boolean;
-  }) => {
-    if (isActive) {
-      return "rounded-md border-2 border-brand-primary bg-brand-primary text-white px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
-    }
-    if (isPending) {
-      return "rounded-md bg-brand-tertiary border-2 border-zinc-400 px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out dark:text-white";
-    }
-    return "rounded-md border-2 border-zinc-300 px-2 py-1 font-Zilla-Slab font-semibold text-black transition-colors duration-150 ease-in-out hover:bg-zinc-100 dark:text-white";
+  const iconLinkClass = (isActive: boolean) =>
+    `flex items-center gap-2 rounded-lg px-3 py-2 transition-all ${
+      isActive
+        ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+        : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
+    }`;
+
+  const isFeatureEnabled = (flag?: NavItem['flag']) => {
+    if (!flag) return true;
+    const { parent, child } = flag;
+    return flags[parent] && flags[parent][child] === true;
   };
 
   return (
     <div className="flex-col justify-center">
-      <div className="relative mb-4 flex items-center justify-between">
-        <h3 className="font-Tabac-Slab sm:text-xl">{workspace?.name}</h3>
-      </div>
-      <div className="mb-2 flex items-center text-black dark:text-white">
-        <div className="flex flex-1 items-center justify-center sm:justify-between">
-          <div className="flex gap-1">
-            {NAV_ITEMS.map(
-              (item) =>
-                (!item.callerHidden || !userIsCaller) &&
-                <NavLink
-                  key={item.name}
-                  to={`${baseUrl}/${item.path}`}
-                  className={handleNavlinkStyles}
-                  end={item.end}
-                  prefetch="intent"
-                >
-                  {item.name}
-                </NavLink>
+      <h3 className="mb-4 font-Tabac-Slab sm:text-xl">{workspace.name}</h3>
+      
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex gap-1">
+          {NAV_ITEMS.filter(item => !userIsCaller || !item.callerHidden).map((item) => (
+            <NavLink
+              key={item.name}
+              to={`${baseUrl}${item.path ? `/${item.path}` : ''}`}
+              className={navLinkClass}
+              end={item.end}
+            >
+              {item.name}
+            </NavLink>
+          ))}
+        </div>
 
-            )}
-          </div>
-          <div>
-            {!userIsCaller && (
-              <div className="flex gap-1">
-                <Button size="icon" asChild variant="outline">
-                  <NavLink
-                    prefetch="intent"
-                    to={`${baseUrl}/settings`}
-                    className="border-2 border-zinc-400"
-                  >
-                    <MdSettings size={24} />
-                  </NavLink>
-                </Button>
-                <Button asChild variant="outline">
-                  <NavLink
-                    to={`${baseUrl}/settings/credits`}
-                    className="border-2 border-zinc-400 flex items-center gap-1 relative"
-                    prefetch="intent"
-                  >
-                    <MdCreditCard size={24} /> {workspace?.credits} <span className="text-xs absolute -bottom-5">Call Credits</span>
-                  </NavLink>
-                </Button>
-              </div>
-            )}
-          </div>
+        <div className="flex gap-1">
+            <NavLink
+              to={`${baseUrl}/settings`}
+              className={({ isActive }) => iconLinkClass(isActive)}
+              end
+            >
+              <MdSettings className="h-4 w-4" />
+              Settings
+            </NavLink>
+          {isAdmin && (
+          <NavLink
+            to={`${baseUrl}/billing`}
+            className={({ isActive }) => iconLinkClass(isActive)}
+          >
+            <MdCreditCard className="h-4 w-4" />
+            Credits: {workspace.credits}
+          </NavLink>)}
         </div>
       </div>
     </div>
