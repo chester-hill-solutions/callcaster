@@ -71,16 +71,6 @@ const getTable = (campaignType: string) => {
         : "";
 }
 
-const getTable = (campaignType: string) => {
-  return campaignType === "live_call"
-    ? "live_campaign"
-    : campaignType === "message"
-      ? "message_campaign"
-      : ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
-        ? "ivr_campaign"
-        : "";
-}
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, serverSession } =
     await getSupabaseServerClientWithSession(request);
