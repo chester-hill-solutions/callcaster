@@ -115,7 +115,11 @@ Deno.serve(async (req) => {
             })
             .eq("id", outreach_attempt_id);
         }
-        await processNextCall(body.owner || body.user_id, body.campaign_id);
+        try {
+          await processNextCall(body.owner || body.user_id, body.campaign_id);
+        } catch (error) {
+          console.error('Error processing next call:', error);
+        }        
         return new Response(
           JSON.stringify({ success: false, error: "Failed to place Twilio call" }),
           { headers: { "Content-Type": "application/json" } }
@@ -153,7 +157,11 @@ Deno.serve(async (req) => {
       if (!body.owner || !body.user_id){
         console.log('No owner passed.')
       }
-      await processNextCall(body.owner || body.user_id, body.campaign_id)
+      try {
+        await processNextCall(body.owner || body.user_id, body.campaign_id)
+      } catch (error) {
+        console.error('Error processing next call:', error);
+      }
 
       return new Response(
         JSON.stringify({ success: true }),
@@ -169,7 +177,11 @@ Deno.serve(async (req) => {
           })
           .eq("id", outreach_attempt_id);
       }
-      await processNextCall(body.owner || body.user_id, body.campaign_id)
+      try {
+        await processNextCall(body.owner || body.user_id, body.campaign_id)
+      } catch (error) {
+        console.error('Error processing next call:', error);
+      }
       return new Response(
         JSON.stringify({
           success: false,
