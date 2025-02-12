@@ -9,7 +9,6 @@ import { MemberRole } from "~/components/Workspace/TeamMember";
 import { Audience, WorkspaceNumbers } from "~/lib/types";
 import { Campaign } from "~/lib/types";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { Flags } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
