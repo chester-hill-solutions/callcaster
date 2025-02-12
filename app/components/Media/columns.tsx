@@ -12,7 +12,7 @@ export const mediaColumns: ColumnDef<Media>[] = [
     header: "Created",
     cell: ({ row }) => {
       const formatted = formatDateToLocale(row.getValue("created_at"));
-      return <div className="">{formatted.split(",")[0]}</div>;
+      return <div className="">{formatted}</div>;
     },
   },
   {

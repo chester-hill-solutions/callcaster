@@ -46,7 +46,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
-    .list(workspaceId);
+    .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });
   
     if (mediaError) {
     console.log("Media Error: ", mediaError);
