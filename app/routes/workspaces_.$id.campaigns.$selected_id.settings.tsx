@@ -16,7 +16,6 @@ import {
   MessageCampaign,
   IVRCampaign,
 } from "~/lib/types";
-import { Database } from "~/lib/database.types";
 import { Button } from "~/components/ui/button";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
@@ -59,7 +58,7 @@ async function handleCampaignUpdate(
     const { data: campaign, error: getCampaignError } = await supabaseClient
       .from("campaign")
       .select("type")
-      .eq("id", selected_id)
+      .eq("id", Number(selected_id))
       .single();
 
     if (!campaign || getCampaignError) {
@@ -75,7 +74,7 @@ async function handleCampaignUpdate(
     const { data, error } = await supabaseClient
       .from(table)
       .update({ workspace: workspace_id, ...updates })
-      .eq("campaign_id", selected_id)
+      .eq("campaign_id", Number(selected_id))
       .select()
       .single();
 
@@ -88,7 +87,7 @@ async function handleCampaignUpdate(
     const { error } = await supabaseClient
       .from("campaign")
       .update(updates)
-      .eq("id", selected_id);
+      .eq("id", Number(selected_id));
 
     if (error) throw error;
   }
@@ -106,7 +105,7 @@ async function handleStatusChange(
   const { error } = await supabaseClient
     .from("campaign")
     .update({ ...update })
-    .eq("id", selected_id);
+    .eq("id", Number(selected_id));
 
   if (error) throw error;
   return { success: true };

@@ -5,15 +5,12 @@ import {
   useActionData,
   useLoaderData,
   useLocation,
-  useMatches,
   useOutletContext,
-  useSubmit,
 } from "@remix-run/react";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense } from "react";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
 
 import {
-  checkSchedule,
   fetchBasicResults,
   fetchCampaignCounts,
   fetchCampaignData,
@@ -115,7 +112,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     workspace,
     userRole,
   ] = await Promise.all([
-    supabaseClient.from('campaign').select('type').eq('id', selected_id).single(),
+    supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchCampaignData(supabaseClient, selected_id),
     fetchCampaignCounts(supabaseClient, selected_id),
     getUserRole({ serverSession, workspaceId: workspace_id })
