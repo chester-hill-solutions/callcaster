@@ -1,8 +1,8 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Media } from "~/lib/types";
+import type { FileObject } from "@supabase/storage-js";
 import { formatDateToLocale } from "~/lib/utils";
 
-export const mediaColumns: ColumnDef<Media>[] = [
+export const mediaColumns: ColumnDef<FileObject>[] = [
   {
     accessorKey: "name",
     header: "Name",
@@ -12,7 +12,7 @@ export const mediaColumns: ColumnDef<Media>[] = [
     header: "Created",
     cell: ({ row }) => {
       const formatted = formatDateToLocale(row.getValue("created_at"));
-      return <div className="">{formatted.split(",")[0]}</div>;
+      return <div className="">{formatted}</div>;
     },
   },
   {
@@ -22,7 +22,7 @@ export const mediaColumns: ColumnDef<Media>[] = [
       const audioUrl = row.getValue("signedUrl");
       return (
         <div className="">
-          <audio src={audioUrl} controls>
+          <audio src={audioUrl as string} controls>
             Can`&apos`t show audio
           </audio>
         </div>

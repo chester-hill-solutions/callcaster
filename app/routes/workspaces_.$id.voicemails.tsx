@@ -1,115 +1,74 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, json, useLoaderData } from "@remix-run/react";
+import { redirect, useLoaderData, useOutletContext } from "@remix-run/react";
 import { mediaColumns } from "~/components/Media/columns";
 
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
-import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { Workspace } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, serverSession } =
     await getSupabaseServerClientWithSession(request);
 
   const workspaceId = params.id;
-  if (workspaceId == null) {
-    return json(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: "Workspace does not exist",
-        userRole: null,
-      },
-      { headers },
-    );
+  if (!workspaceId) {
+   return redirect("/workspaces") 
   }
 
-  const userRole = getUserRole({ serverSession, workspaceId });
+    
 
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return json(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: workspaceError.message,
-        userRole,
-      },
-      { headers },
-    );
-  }
-
+ 
 
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
-    .list(workspaceId);
-  
-    if (mediaError) {
-    console.log("Media Error: ", mediaError);
-    return json(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: mediaError.message,
-        userRole,
-      },
-      { headers },
-    );
-  }
+    .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });
 
+  if (mediaError) {
+    console.log("Media Error: ", mediaError);
+    return {
+      audioMedia: null,
+      error: mediaError.message,
+    }
+  }
   if (mediaData.length === 0) {
     console.log("No workspace folder exists");
-    return json(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: "No Audio in Workspace",
-        userRole,
-      },
-      { headers },
-    );
+    return {
+      audioMedia: null,
+      error: "No Audio in Workspace",
+    };
   }
-  
+
   const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
   const { data: signedUrls, error: signedUrlsError } =
     await supabaseClient.storage
       .from("workspaceAudio")
-      .createSignedUrls(mediaPaths, 60);
+      .createSignedUrls(mediaPaths, 3600);
 
   if (signedUrlsError) {
-    console.log("SignedUrls Error: ", signedUrlsError);
-    return json({
+    return {
       audioMedia: null,
-      workspace: workspaceData,
       error: signedUrlsError.message,
-      userRole,
-    });
+    };
   }
 
-  for (const media of mediaData) {
+  for (let media of mediaData) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
     )?.signedUrl;
     media["signedUrl"] = url;
   }
 
-  return json(
-    { audioMedia: mediaData, workspace: workspaceData, error: null, userRole },
-    { headers },
-  );
+  return { audioMedia: mediaData, error: null };
 }
 
 export default function WorkspaceAudio() {
-  const { audioMedia, workspace, error, userRole } =
+  const { audioMedia, error} =
     useLoaderData<typeof loader>();
-
+  const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
   const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+" || "voicemail-undefined"));
-  
+
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">

@@ -17,7 +17,7 @@ export default {
       events: true,
       window: true
     },
-    serverModuleFormat: 'cjs',
+    serverModuleFormat: 'esm',
     globals: {
       Buffer: true,
     }
