@@ -4,22 +4,19 @@ import { mediaColumns } from "~/components/Media/columns";
 
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { getUserRole } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { Workspace } from "~/lib/types";
+import { verifyAuth } from "~/lib/supabase.server";
+import { Workspace, User } from "~/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (!workspaceId) {
    return redirect("/workspaces") 
   }
 
-    
-
- 
-
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });
@@ -56,7 +53,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
     )?.signedUrl;
-    media["signedUrl"] = url;
+    if (url) {
+      media["signedUrl"] = url;
+    }
   }
 
   return { audioMedia: mediaData, error: null };

@@ -1,15 +1,16 @@
-import { json, redirect } from "@remix-run/node";
+import { json, redirect, LoaderFunctionArgs, ActionFunctionArgs  } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { useState, useEffect } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole, listMedia } from "~/lib/database.server";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
-import { Script, WorkspaceData } from "~/lib/types";
+import { Script, WorkspaceData, User } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-
+import { SupabaseClient } from "@supabase/supabase-js";
+  
 type LoaderDataProps = Promise<{
   workspace: WorkspaceData;
   workspace_id: string;
@@ -19,28 +20,27 @@ type LoaderDataProps = Promise<{
   userRole: MemberRole;
 }>;
 
-export const loader = async ({ request, params }): LoaderDataProps => {
+export const loader = async ({ request, params }: LoaderFunctionArgs): LoaderDataProps => {
   const { id: workspace_id, scriptId: selected_id } = params;
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) {
-    return redirect("/signin");
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+  if (!user) {
+    throw redirect("/signin");
   }
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()
-    .eq("id", workspace_id)
+    .eq("id", workspace_id as string)
     .single();
   if (workspaceError) throw workspaceError;
-  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspace_id as string });
   const { data: script } = await supabaseClient
     .from("script")
     .select()
-    .eq("workspace", workspace_id)
-    .eq("id", selected_id)
+    .eq("workspace", workspace_id as string)
+    .eq("id", Number(selected_id) || 0)
     .single();
 
-  const mediaNames = await listMedia(supabaseClient, workspace_id);
+  const mediaNames = await listMedia(supabaseClient, workspace_id as string );
   return json({
     workspace: workspaceData,
     workspace_id,
@@ -52,19 +52,18 @@ export const loader = async ({ request, params }): LoaderDataProps => {
 };
 export { ErrorBoundary };
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }: ActionFunctionArgs  ) => {
   const campaignId = params.selected_id;
   const formData = await request.formData();
-  const mediaName = formData.get("fileName");
+  const mediaName = formData.get("fileName") as string;
   const encodedMediaName = encodeURI(mediaName);
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const { data: campaign, error } = await supabaseClient
     .from("message_campaign")
     .select("id, message_media")
-    .eq("campaign_id", campaignId)
+    .eq("campaign_id", Number(campaignId) || 0)
     .single();
   if (error) {
     console.log("Campaign Error", error);
@@ -73,11 +72,11 @@ export const action = async ({ request, params }) => {
   const { data: campaignUpdate, error: updateError } = await supabaseClient
     .from("message_campaign")
     .update({
-      message_media: campaign.message_media.filter(
+      message_media: campaign.message_media?.filter(
         (med) => med !== encodedMediaName,
       ),
     })
-    .eq("campaign_id", campaignId)
+    .eq("campaign_id", Number(campaignId) || 0)
     .select();
 
   if (updateError) {
@@ -124,7 +123,7 @@ export default function ScriptEditor() {
     setChanged(false);
   };
 
-  const handlePageDataChange = (newPageData) => {
+  const handlePageDataChange = (newPageData: any) => {
     setScript(newPageData.campaignDetails.script);
     const obj1 = script;
     const obj2 = newPageData;
@@ -155,7 +154,7 @@ export default function ScriptEditor() {
             You have unsaved changes
           </div>
           <Button
-            onClick={() => handleSaveUpdate(true)}
+            onClick={() => handleSaveUpdate()}
             className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
           >
             Save Changes
@@ -165,7 +164,7 @@ export default function ScriptEditor() {
       <div className="h-full flex-grow p-4">
         <CampaignSettingsScript
           pageData={{ campaignDetails: { script } }}
-          onPageDataChange={(newData) => {
+          onPageDataChange={(newData: any) => {
             handlePageDataChange(newData);
           }}
           mediaNames={mediaNames}

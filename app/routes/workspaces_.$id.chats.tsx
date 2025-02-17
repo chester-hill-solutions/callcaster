@@ -1,11 +1,13 @@
 import {
   ActionFunctionArgs,
   LoaderFunctionArgs,
+  defer,
   redirect,
 } from "@remix-run/node";
 import {
   NavLink,
   Outlet,
+  Await,
   json,
   useFetcher,
   useLoaderData,
@@ -21,12 +23,11 @@ import {
   fetchCampaignsByType,
   fetchContactData,
   fetchConversationSummary,
-  fetchWorkspaceData,
   getUserRole,
 } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { normalizePhoneNumber } from "~/lib/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "~/components/ui/card";
 import { useConversationSummaryRealTime } from "~/hooks/useChatRealtime";
 import ChatHeader from "~/components/Chat/ChatHeader";
@@ -41,67 +42,51 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { X } from "lucide-react";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { WorkspaceData, User } from "~/lib/types";
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { id: workspaceId } = params;
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
-  const workspaceId = params.id;
   const contact_number = params.contact_number;
 
   if (!workspaceId) {
-    return json({ workspace: null, error: "Workspace does not exist", userRole: null }, { headers });
+    throw redirect("/workspaces");
   }
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
 
-  const userRole = getUserRole({ serverSession, workspaceId });
+  const [contactData, smsCampaigns] = await Promise.all([
+    !contact_id || !contact_number ? null : fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
+    fetchCampaignsByType({
+      supabaseClient,
+      workspaceId,
+      type: "message_campaign",
+    }),
+  ]);
 
-  const [workspaceData, chatsData, contactData, smsCampaigns] =
-    await Promise.all([
-      fetchWorkspaceData(supabaseClient, workspaceId),
-      fetchConversationSummary(supabaseClient, workspaceId, campaign_id),
-      fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
-      fetchCampaignsByType({
-        supabaseClient,
-        workspaceId,
-        type: "message_campaign",
-      }),
-    ]);
-
-  const { workspace, workspaceError } = workspaceData;
-  const { chats, chatsError } = chatsData;
-  const { contact, potentialContacts, contactError } = contactData;
-  const chatNumbers = Array.from(
-    new Set(
-      chats
-        ?.filter((i) => Boolean(i.contact_phone))
-        .map((chat) => chat.contact_phone),
-    ),
-  );
-  const shapedChats = chatNumbers.map((num) =>
-    chats?.find((chat) => chat.contact_phone === num),
-  );
-  const errors = [workspaceError, chatsError, contactError].filter(Boolean);
-  if (errors.length) {
+  const { contact, potentialContacts, contactError } = contactData || { contact: null, potentialContacts: [], contactError: null };
+  if (contactError) {
     return json(
       {
-        error: errors.map((error) => error.message).join(", "),
+        error: contactError.message,
         userRole,
       },
       { headers },
     );
   }
-  return json(
+
+  const chatsPromise = fetchConversationSummary(supabaseClient, workspaceId, campaign_id);
+  return defer(
     {
       campaigns: smsCampaigns,
-      chats: shapedChats,
+      chatsPromise,
       potentialContacts,
       contact,
-      workspace,
       error: null,
       userRole,
       contact_number,
@@ -111,14 +96,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
   const contact_number = normalizePhoneNumber(
-    params.contact_number || data.contact_number,
+    params.contact_number || data.contact_number as string,
   );
   const res = await fetch(`${process.env.BASE_URL}/api/chat_sms`, {
     method: "POST",
@@ -140,9 +124,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function ChatsList() {
-  const { supabase } = useOutletContext();
-  const { chats, workspace, userRole, potentialContacts, contact, campaigns } =
-    useLoaderData();
+  const { supabase, workspace } = useOutletContext<{ supabase: SupabaseClient, workspace: WorkspaceData }>();
+  const { chatsPromise, potentialContacts, contact, campaigns } = useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
   const imageFetcher = useFetcher({ key: "images" });
@@ -174,12 +157,6 @@ export default function ChatsList() {
     initialContact: contact,
   });
   const [selectedImages, setSelectedImages] = useState([]);
-
-  const { conversations } = useConversationSummaryRealTime({
-    supabase: supabase,
-    initial: chats,
-    workspace: workspace?.id,
-  });
 
   const handleImageSelect = useCallback(
     (e) => {
@@ -288,7 +265,6 @@ export default function ChatsList() {
               defaultValue={searchParams.get("campaign_id") || undefined}
               onValueChange={(val) => {
                 setSearchParams((prev) => {
-                  console.log(Object.fromEntries(prev), val);
                   prev.set("campaign_id", val);
                   return prev;
                 });
@@ -325,50 +301,76 @@ export default function ChatsList() {
           </div>
         </filterFetcher.Form>
         <div className="flex-1 overflow-y-auto">
-          {conversations?.length > 0 ? (
-            conversations
-              .filter((i) => Boolean(i.contact_phone))
-              .map((chat) => (
-                <NavLink
-                  key={chat.contact_phone}
-                  to={chat.contact_phone}
-                  className={({ isActive }) => `
-                flex items-center border-b border-gray-200 p-3 transition-colors hover:bg-gray-100 dark:bg-zinc-900
-                ${isActive ? "bg-primary/10 font-semibold" : ""}
-                ${chat.unread_count > 0 ? "border-l-4 border-l-primary" : ""}
-              `}
-                >
-                  <MdChat
-                    className="mr-3 flex-shrink-0 text-gray-500"
-                    size={20}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between">
-                      <span className="truncate font-medium">
-                        {chat.contact_firstname || chat.contact_surname
-                          ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
-                          : chat.contact_phone}
-                      </span>
-                      <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
-                        {formatDate(new Date(chat.conversation_last_update))}
-                      </span>
-                    </div>
-                    <p className="truncate text-sm text-gray-600">
-                      {chat.contact_phone}
-                    </p>
-                  </div>
-                  {chat.unread_count > 0 && (
-                    <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
-                      {chat.unread_count}
-                    </span>
-                  )}
-                </NavLink>
-              ))
-          ) : (
-            <div className="p-4 text-center text-gray-500">
-              No conversations yet
-            </div>
-          )}
+          <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading conversations...</div>}>
+            <Await resolve={chatsPromise}>
+              {(chatsData) => {
+                const { chats, chatsError } = chatsData;
+                if (chatsError) {
+                  return <div className="p-4 text-center text-red-500">Error loading conversations</div>;
+                }
+                
+                const chatNumbers = Array.from(
+                  new Set(
+                    chats
+                      ?.filter((i) => Boolean(i.contact_phone))
+                      .map((chat) => chat.contact_phone),
+                  ),
+                );
+                const shapedChats = chatNumbers.map((num) =>
+                  chats?.find((chat) => chat.contact_phone === num),
+                );
+
+                const { conversations } = useConversationSummaryRealTime({
+                  supabase: supabase,
+                  initial: shapedChats,
+                  workspace: workspace?.id,
+                });
+
+                if (!conversations?.length) {
+                  return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
+                }
+
+                return conversations
+                  .filter((i) => Boolean(i.contact_phone))
+                  .map((chat) => (
+                    <NavLink
+                      key={chat.contact_phone}
+                      to={chat.contact_phone}
+                      className={({ isActive }) => `
+                        flex items-center border-b border-gray-200 p-3 transition-colors hover:bg-gray-100 dark:bg-zinc-900
+                        ${isActive ? "bg-primary/10 font-semibold" : ""}
+                        ${chat.unread_count > 0 ? "border-l-4 border-l-primary" : ""}
+                      `}
+                    >
+                      <MdChat
+                        className="mr-3 flex-shrink-0 text-gray-500"
+                        size={20}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between">
+                          <span className="truncate font-medium">
+                            {chat.contact_firstname || chat.contact_surname
+                              ? `${chat.contact_firstname || ""} ${chat.contact_surname || ""}`.trim()
+                              : chat.contact_phone}
+                          </span>
+                          <span className="ml-2 flex-shrink-0 text-xs text-gray-500">
+                            {formatDate(new Date(chat.conversation_last_update))}
+                          </span>
+                        </div>
+                        <p className="truncate text-sm text-gray-600">
+                          {chat.contact_phone}
+                        </p>
+                      </div>
+                      {chat.unread_count > 0 && (
+                        <span className="ml-2 flex-shrink-0 rounded-full bg-primary px-2 py-1 text-xs font-bold text-white">
+                          {chat.unread_count}
+                        </span>
+                      )}
+                    </NavLink>
+                  ));
+              }}
+            </Await>
+          </Suspense>
         </div>
       </Card>
 

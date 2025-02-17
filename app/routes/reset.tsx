@@ -8,13 +8,11 @@ import {
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
-import {
-  createSupabaseServerClient,
-  getSupabaseServerClientWithSession,
-} from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
+import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();
@@ -25,15 +23,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
   const formData = await request.formData();
   const password = formData.get("password");
   const confirmPassword = formData.get("confirmPassword");
   if (password !== confirmPassword)
     return { error: { message: "Passwords don't match" }, data: null };
-  const { data, error } = await supabaseClient.auth.updateUser({ password });
+  const { data, error } = await supabaseClient.auth.updateUser({ password: password as string });
   if (error) {
     return json({ data: null, error });
   }
@@ -41,11 +38,11 @@ export const action = async ({ request }: { request: Request }) => {
 };
 
 export default function Reset() {
-  const actionData = useActionData();
+  const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (actionData?.data) {
+    if (actionData && actionData?.data) {
       toast.success("New password set!");
       const redirectTimer = setTimeout(() => {
         navigate("/workspaces");

@@ -1,9 +1,9 @@
 import { json } from "@remix-run/node";
 import { createCampaign, deleteCampaign, updateCampaign } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
   
   try {
     const formData = await request.formData();

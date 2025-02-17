@@ -1,12 +1,9 @@
 import { json } from "@remix-run/node";
-import {
-  createSupabaseServerClient,
-  getSupabaseServerClientWithSession,
-} from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient: supabase, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient: supabase, user } =
+    await verifyAuth(request);
   const data = await request.json();
   const {
     id,
@@ -20,8 +17,8 @@ export const action = async ({ request }: { request: Request }) => {
     const scriptData = {
       name,
       steps,
-      updated_at: new Date(),
-      updated_by: serverSession.user.id,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id,
       workspace,
     };
 

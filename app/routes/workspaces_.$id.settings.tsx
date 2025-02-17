@@ -10,14 +10,14 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { ContextType, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Button } from "~/components/ui/button";
 import {
   getUserRole,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
 } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import {
   handleAddUser,
   handleDeleteSelf,
@@ -60,12 +60,11 @@ type WorkspaceNumbers = {
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("No workspace id found!");
-  const userId = serverSession.user.id;
+  const userId = user?.id;
   const {data: workspace, error: workspaceError} = await supabaseClient
     .from("workspace")
     .select("name, id, workspace_users(role, user(username, id)), workspace_number(*), audience(*), workspace_invite(*, user(username, id, first_name, last_name)), webhook(*)")
@@ -97,8 +96,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const workspaceId = params.id;
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (workspaceId == null) {
     return json({ error: "No workspace_id found!" }, { headers });
@@ -153,17 +151,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   );
 };
 
-function compareMembersByRole(a, b) {
+function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
   const memberRoleArray = Object.values(MemberRole);
 
   if (
-    memberRoleArray.indexOf(a.user_workspace_role) <
-    memberRoleArray.indexOf(b.user_workspace_role)
+    memberRoleArray.indexOf(a.role) <
+    memberRoleArray.indexOf(b.role)
   )
     return -1;
   if (
-    memberRoleArray.indexOf(a.user_workspace_role) >
-    memberRoleArray.indexOf(b.user_workspace_role)
+    memberRoleArray.indexOf(a.role) >
+    memberRoleArray.indexOf(b.role)
   )
     return 1;
   return 0;
@@ -179,8 +177,8 @@ export default function WorkspaceSettings() {
     pendingInvites,
     webhook,
   } = useLoaderData<LoaderData>();
-  const {flags} = useOutletContext<{flags: {webhooks: {workspace: boolean}}}>();
-  const actionData = useActionData<typeof action>();
+  const {workspace} = useOutletContext<{workspace: WorkspaceData}>();
+    const actionData = useActionData<typeof action>();
   const workspaceOwner = users?.find(
     (user) => user?.role === "owner"
   ) as UserWithRole | undefined;
@@ -426,7 +424,7 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
-       {flags && flags?.webhooks?.workspace && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+        {false && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Webhook

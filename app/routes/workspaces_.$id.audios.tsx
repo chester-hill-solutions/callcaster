@@ -5,11 +5,10 @@ import { mediaColumns } from "~/components/Media/columns";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -24,7 +23,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const userRole = getUserRole({ serverSession, workspaceId });
+  const userRole = getUserRole({ user: user as unknown as User, workspaceId });
 
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")

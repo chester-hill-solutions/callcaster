@@ -2,14 +2,14 @@ import { FaPlus } from "react-icons/fa";
 import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import ContactDetails from "~/components/ContactDetails";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
-import { Audience, Contact, ContactAudience, WorkspaceData } from "../lib/types";
+import { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 
 interface AudienceChanges {
@@ -31,9 +31,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!workspace_id) return redirect("/workspaces");
   if (!selected_id) return redirect(`/workspaces/${workspace_id}`);
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) {
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+  if (!user) {
     return redirect("/signin");
   }
   const { data: workspaceData, error: workspaceError } = await supabaseClient
@@ -42,14 +41,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .eq("id", workspace_id)
     .single();
   if (workspaceError) throw workspaceError;
-  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspace_id });
 
   let contact = null;
   if (selected_id !== 'new') {
     const { data, error: contactError } = await supabaseClient
       .from("contact")
       .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
-      .eq("id", selected_id)
+      .eq("id", Number(selected_id) || 0)
       .filter("outreach_attempt.workspace", 'eq', workspace_id)
       .single();
     if (contactError) throw contactError;
@@ -92,8 +91,9 @@ function compareContactAudiences(
       )
     ) {
       additions.push({
-        contact_id: contactId,
+        contact_id: Number(contactId),
         audience_id: currentAudience.audience_id,
+        created_at: new Date().toISOString(),
       });
     }
   });
@@ -105,8 +105,9 @@ function compareContactAudiences(
       )
     ) {
       deletions.push({
-        contact_id: contactId,
+        contact_id: Number(contactId) || 0,
         audience_id: initialAudience.audience_id,
+        created_at: new Date().toISOString(),
       });
     }
   });
@@ -118,8 +119,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { contactId, id: workspaceId } = params;
   const contact = await request.json();
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const { id, initial_audiences, contact_audience, outreach_attempt, ...contactData } = contact;
 

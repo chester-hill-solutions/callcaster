@@ -1,4 +1,4 @@
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 import { json } from "@remix-run/node";
 
 function sanitizeFilename(filename) {
@@ -15,8 +15,8 @@ function sanitizeFilename(filename) {
 
 export async function action({ request, params }) {
 
-    const { supabaseClient, headers, serverSession } =
-        await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, headers, user } =
+        await verifyAuth(request);
     const method = request.method;
     const formData = await request.formData();
     const workspaceId = formData.get('workspaceId')

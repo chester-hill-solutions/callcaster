@@ -1,9 +1,8 @@
 import { ActionFunctionArgs } from "@remix-run/node";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { supabaseClient, headers, serverSession } =
-        await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, user } = await verifyAuth(request);
     const formData = await request.formData();
     const campaign_id = formData.get("campaign_id");
 

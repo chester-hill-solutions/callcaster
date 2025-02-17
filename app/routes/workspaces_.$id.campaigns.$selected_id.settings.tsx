@@ -1,6 +1,6 @@
 import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { fetchCampaignAudience } from "~/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -166,9 +166,9 @@ async function handleCampaignDuplicate(
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!serverSession?.user) return redirect("/signin");
+  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   try {
@@ -207,9 +207,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!serverSession?.user) return redirect("/signin");
+  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   const campaignWithAudience = await fetchCampaignAudience(supabaseClient, selected_id, workspace_id);
@@ -225,7 +225,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     totalCount: campaignWithAudience.total_count,
     scripts: campaignWithAudience.scripts.filter((s): s is NonNullable<typeof s> => s !== null),
     mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
-    user: serverSession.user,
+    user: user,
     mediaLinks: mediaLinksPromise,
   });
 };

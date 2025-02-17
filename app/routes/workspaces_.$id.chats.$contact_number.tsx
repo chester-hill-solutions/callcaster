@@ -1,20 +1,20 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData, useOutletContext } from "@remix-run/react";
-import { findPotentialContacts, getUserRole } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { useEffect, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "~/hooks/useChatRealtime";
 import { useIntersectionObserver } from "~/hooks/useIntersectionOverserver";
 import MessageList from "~/components/Chat/ChatMessages";
-import { Message } from "~/lib/types";
+import { Message, WorkspaceData } from "~/lib/types";
 
-const getMessageMedia = async ({ messages, supabaseClient }) => {
+const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
   return Promise.all(
-    messages?.map(async (message) => {
-      if (message?.inbound_media?.filter(Boolean)?.length > 0) {
+    (messages ?? []).map(async (message: Message) => {
+      const inboundMedia = message?.inbound_media ?? [];
+      if (inboundMedia.filter(Boolean).length > 0) {
         const urls = await Promise.all(
-          message.inbound_media.map(async (file) => {
+          inboundMedia.map(async (file) => {
             const { data, error } = await supabaseClient.storage
               .from("messageMedia")
               .createSignedUrl(file, 3600);
@@ -31,8 +31,7 @@ const getMessageMedia = async ({ messages, supabaseClient }) => {
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const {id, contact_number} = params;
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
   let messages = [];
 
   if (contact_number !== "new") {
@@ -40,13 +39,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .from("message")
       .select(`*, outreach_attempt(campaign_id)`)
       .or(`from.eq.${contact_number}, to.eq.${contact_number}`)
-      .eq('workspace', id)
+      .eq('workspace', id as string)
       .not('date_created', 'is', null)
       .neq('status', 'failed')
       .order("date_created", { ascending: true });
     messages.push(
       ...(await getMessageMedia({
-        messages: messagesData,
+        messages: messagesData as Message[] ,
         supabaseClient,
       })),
     );
@@ -61,18 +60,18 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function ChatScreen() {
-  const { supabase, workspace } = useOutletContext<{ supabase: SupabaseClient }>();
-  const { messages: initialMessages,  } = useLoaderData<Message[]>();
+  const { supabase, workspace } = useOutletContext<{ supabase: SupabaseClient, workspace: WorkspaceData }>();
+  const { messages: initialMessages } = useLoaderData<{ messages: Message[] }>();
 
   const messagesEndRef = useRef(null);
 
   const { messages, setMessages } = useChatRealTime({
     supabase,
     initial: initialMessages,
-    workspace: workspace?.id,
+    workspace: workspace?.id as string,
   });
 
-  const updateMessageStatus = async (messageId) => {
+  const updateMessageStatus = async (messageId: string) => {
     const { data, error } = await supabase
       .from("message")
       .update({ status: "delivered" })
@@ -81,19 +80,19 @@ export default function ChatScreen() {
     if (error) {
       console.error("Error updating message status:", error);
     } else {
-      setMessages((prevMessages) =>
-        prevMessages.map((msg) =>
+      setMessages((prevMessages: Message[]) =>
+        prevMessages.map((msg: Message) =>
           msg.sid === messageId ? { ...msg, status: "delivered" } : msg,
         ),
       );
     }
   };
 
-  const observerCallback = (target) => {
+  const observerCallback = (target: HTMLElement) => {
     const messageId = target.dataset.messageId;
     const messageStatus = target.dataset.messageStatus;
     if (messageStatus === "received") {
-      updateMessageStatus(messageId);
+      updateMessageStatus(messageId as string);
     }
   };
 
@@ -103,13 +102,13 @@ export default function ChatScreen() {
     const messageElements = document.querySelectorAll(".message-item");
     messageElements.forEach((el) => {
       if (observer) {
-        observer.observe(el);
+        observer.observe(el as HTMLElement);
       }
     });
 
     return () => {
       if (observer) {
-        messageElements.forEach((el) => observer.unobserve(el));
+        messageElements.forEach((el) => observer.unobserve(el as HTMLElement));
       }
     };
   }, [messages, observer]);

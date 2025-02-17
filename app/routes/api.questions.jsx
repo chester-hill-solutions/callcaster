@@ -1,8 +1,8 @@
 import { json } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 
 export const action = async ({ request }) => {
-    const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, headers, user } = await verifyAuth(request);
     const { update, contact_id, campaign_id, workspace, disposition, queue_id } = await request.json();
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentOutreach, error: searchError } = await supabaseClient
@@ -10,7 +10,7 @@ export const action = async ({ request }) => {
         .select()
         .eq('contact_id', contact_id)
         .eq("campaign_id", campaign_id)
-        .gte('created_at', tenMinutesAgo)
+        .gte('created_at', tenMinutesAgo)       
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -28,7 +28,7 @@ export const action = async ({ request }) => {
             .update({
                 ...(update && { result: update }),
                 disposition,
-                user_id: serverSession.user.id
+                user_id: user.id
             })
             .eq('id', recentOutreach.id)
             .select();
@@ -44,7 +44,7 @@ export const action = async ({ request }) => {
             cam_id: campaign_id,
             queue_id,
             wks_id: workspace,
-            usr_id: serverSession.user.id
+            usr_id: user.id
         });
 
         if (error) {

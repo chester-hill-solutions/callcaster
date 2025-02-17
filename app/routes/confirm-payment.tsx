@@ -1,9 +1,9 @@
 import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import Stripe from "stripe";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { supabaseClient } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient } = await verifyAuth(request);
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session_id");
 

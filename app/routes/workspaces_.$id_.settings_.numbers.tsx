@@ -15,12 +15,12 @@ import { Button } from "~/components/ui/button";
 import {
   getUserRole,
   getWorkspacePhoneNumbers,
-  getWorkspaceUsers,
+  getWorkspaceUsers,  
   removeWorkspacePhoneNumber,
   updateCallerId,
   updateWorkspacePhoneNumber,
 } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { useSupabaseRealtime } from "~/hooks/useSupabaseRealtime";
 import { toast } from "sonner";
 import {
@@ -55,13 +55,11 @@ export type ActionData = {
   error?: string;
 };
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
-  if (!serverSession.user || !workspaceId) {
+  if (!user || !workspaceId) {
     return redirect("/signin");
   }
-  const user = serverSession.user;
   const { data: users, error } = await getWorkspaceUsers({
     supabaseClient,
     workspaceId,
@@ -71,8 +69,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: mediaNames } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId);
-  if (serverSession) {
-    const userRole = getUserRole({ serverSession, workspaceId });
+  if (user) {
+    const userRole = getUserRole({ user: user as User, workspaceId });
     const hasAccess = userRole !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
     return json(
@@ -126,8 +124,7 @@ type CallerIDResponse = {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, headers } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const data = Object.fromEntries(await request.formData());
   const formName = data.formName;

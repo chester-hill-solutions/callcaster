@@ -3,7 +3,7 @@ import { useLoaderData, Form, useActionData } from "@remix-run/react";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
 import { useState } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import Stripe from "stripe";
 
 async function getStripeCustomerHistory(stripeCustomerId: string) {
@@ -15,7 +15,7 @@ async function getStripeCustomerHistory(stripeCustomerId: string) {
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
@@ -32,7 +32,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
 

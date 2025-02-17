@@ -13,11 +13,10 @@ import { FaPlus } from "react-icons/fa";
 import { Toaster, toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "~/components/CustomCard";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -40,8 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -58,7 +56,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const { data: uploadData, error: uploadError } = await supabaseClient.storage
     .from("workspaceAudio")
-    .upload(`${workspaceId}/${mediaName}.mp3`, mediaToUpload, {
+    .upload(`${workspaceId}/${mediaName}.mp3`, mediaToUpload as File, {
       cacheControl: "60",
       upsert: false,
       contentType: "audio/mpeg",
@@ -85,7 +83,7 @@ export default function Media() {
     }
   }, [actionData]);
 
-  const displayFileToUpload = (e) => {
+  const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
     setPendingFileName(filePath.split("\\").at(-1));
   };

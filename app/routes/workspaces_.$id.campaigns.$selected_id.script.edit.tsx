@@ -1,8 +1,7 @@
-import { FaPlus } from "react-icons/fa";
 import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
+import { useLoaderData, useSubmit } from "@remix-run/react";
 import { useState, useEffect } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import CampaignSettingsScript from "../components/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
@@ -24,10 +23,8 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import type { IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
-import type { Database } from "~/lib/database.types";
+import type { IVRCampaign, LiveCampaign, MessageCampaign, Script, User } from "~/lib/types";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import type { FileObject } from "@supabase/storage-js";
 
 type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
 
@@ -67,13 +64,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response("Missing required parameters", { status: 400 });
   }
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) {
+  const { supabaseClient, user } = await verifyAuth(request);
+  if (!user) {
     return redirect("/signin");
   }
 
-  const userRole = getUserRole({ serverSession, workspaceId: workspace_id });
+  const userRole = getUserRole({ user: user as unknown as User, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
     supabase: supabaseClient,
@@ -125,7 +121,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         );
         campaignDetails = {
           ...campaignDetails,
-          mediaLinks
+          mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
         };
       }
       break;
@@ -147,7 +143,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         ) || [];
         campaignDetails = {
           ...campaignDetails,
-          mediaLinks
+          mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
         };
       }
       break;
@@ -199,7 +195,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return json({ success: false, error: "File name is required" });
   }
 
-  const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const { data: campaign, error } = await supabaseClient
     .from("message_campaign")
