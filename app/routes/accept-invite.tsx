@@ -11,13 +11,13 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import {
   AuthSession,
   EmailOtpType,
-  Session,
   SupabaseClient,
+  User,
   VerifyTokenHashParams,
 } from "@supabase/supabase-js";
 import {
   createSupabaseServerClient,
-  getSupabaseServerClientWithSession,
+  verifyAuth,
 } from "~/lib/supabase.server";
 import {
   acceptWorkspaceInvitations,
@@ -183,13 +183,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
   } else if (actionType === "acceptInvitations") {
-    const { supabaseClient, headers, serverSession } =
-      (await getSupabaseServerClientWithSession(request)) as {
+    const { supabaseClient, headers, user } =
+      (await verifyAuth(request)) as {
         supabaseClient: SupabaseClient;
         headers: Headers;
-        serverSession: Session;
+        user: User;
       };
-    const userId = serverSession?.user?.id;
+    const userId = user?.id;
     const invitationIds = formData.getAll("invitation_id") as string[];
 
     const { errors } = await acceptWorkspaceInvitations(

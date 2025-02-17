@@ -1,12 +1,12 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { parseRequestData } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { CampaignQueue } from "~/lib/types";
 import { filteredSearch } from "./workspaces_.$id.campaigns.$selected_id.queue";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
-    if (!serverSession?.user) throw redirect("/signin");
+    const { supabaseClient, user } = await verifyAuth(request);
+    if (!user) throw redirect("/signin");
     const data = await parseRequestData(request);
 
     if (request.method === "POST") {

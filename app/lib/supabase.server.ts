@@ -45,6 +45,18 @@ export async function getSupabaseServerClientWithSession(request: Request) {
   return { supabaseClient, headers, serverSession, user };
 }
 
+export async function verifyAuth(request: Request, nextUrl = '/login') {
+  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const {
+    data: { user },
+    error,
+  } = await supabaseClient.auth.getUser();
+  if (!user || error){
+    throw redirect(`/signin?next=${nextUrl}`);
+  }
+  return { supabaseClient, headers, user };
+}
+
 export async function signOut(request: Request) {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   await supabaseClient.auth.signOut();

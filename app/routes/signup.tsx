@@ -13,11 +13,10 @@ import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient: supabase, headers } =
-    createSupabaseServerClient(request);
+  const { supabaseClient: supabase, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
 
@@ -89,7 +88,7 @@ export const action = async ({ request }: { request: Request }) => {
   return json({ data, error }, { headers });
 };
 export const loader = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
   const { data: serverSession } = await supabaseClient.auth.getSession();
 
   if (serverSession && serverSession.session) {

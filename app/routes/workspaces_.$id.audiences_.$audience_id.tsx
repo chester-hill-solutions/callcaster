@@ -12,11 +12,10 @@ import {
 import { useEffect } from "react";
 import { AudienceTable } from "~/components/AudienceTable";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1", 10);

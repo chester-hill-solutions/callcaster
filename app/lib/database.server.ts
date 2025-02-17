@@ -341,34 +341,32 @@ export async function testAuthorize({
 }) {
   const { data, error } = await supabaseClient.rpc("authorize", {
     selected_workspace_id: workspaceId,
-    requested_permission: permission,
+    requested_permission: permission as "workspace.delete" | "workspace.addUser" | "workspace.removeUser" | "workspace.call" | "workspace.addCampaign" | "workspace.addAudience" | "workspace.addContact" | "workspace.editUser" | "workspace.removeMedia",
   });
-  console.log("\nXXXXXXXXXXXXXXXXXXXXXXXXX");
-  console.log("Data: ", data);
-  console.log("Error: ", error);
-  console.log("XXXXXXXXXXXXXXXXXXXXXXXXX");
+
 
   return { data, error };
 }
 
-export function getUserRole({
-  serverSession,
+export async function getUserRole({
+  supabaseClient,
+  user,
   workspaceId,
 }: {
-  serverSession: AuthSession;
+  user: User;
   workspaceId: string;
 }) {
-  if (serverSession == null || serverSession.access_token == null) {
+  if (user == null || user.access_token == null) {
     return null;
   }
 
-  const jwt = jwtDecode(serverSession.access_token);
-  const userRole = jwt["user_workspace_roles"]?.find(
-    (workspaceRoleObj: { workspace_id: string }) => workspaceRoleObj.workspace_id === workspaceId,
-  )?.role;
-
-  // console.log("USER ROLE: ", userRole);
-  if (userRole == null) {
+  const {data: userRole, error: userRoleError} = await supabaseClient
+    .from("workspace_users")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (userRoleError) {
     console.error("No User Role found on this workspace");
   }
 
@@ -468,7 +466,6 @@ export async function forceTokenRefresh({
     return { data: null, error: refreshError };
   }
 
-  console.log("\nREFRESH");
   return { data: refreshData, error: null };
 }
 
@@ -1020,7 +1017,6 @@ export async function createCampaign({
           message_media: undefined,
           step_data: undefined,
         });
-  console.log("Inserting campaign details:", cleanCampaignDetails);
 
   const { data: createdCampaignDetails, error: detailsError } = await supabase
     .from(tableKey)
@@ -1224,6 +1220,7 @@ export const fetchCampaignAudience = async (
     .eq('status', 'queued')
     .not('contact.phone', 'is', null)
     .neq('contact.phone', '')
+    .limit(1);
 
   const [queueResult, isQueuedCount, scripts] = await Promise.all([
     queuePromise,
@@ -1465,7 +1462,6 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data: OutreachExportData[], users: WorkspaceUserData[]) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-  console.log(dynamicKeys, resultKeys, otherDataKeys);
   let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
     header === "id"
       ? "attempt_id"

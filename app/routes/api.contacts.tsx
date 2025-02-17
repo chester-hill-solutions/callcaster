@@ -1,10 +1,10 @@
 import { json, LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "../lib/database.server";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 import { Contact } from "~/lib/types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
   const method = request.method;
 
   try {
@@ -17,10 +17,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       case 'POST':
         if (Array.isArray(data.contacts)) {
-          const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id, serverSession.user.id);
+            const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id, user.id);
           return json(bulkResult);
         } else {
-          const newContact = await createContact(supabaseClient, data, data.audience_id, serverSession.user.id);
+          const newContact = await createContact(supabaseClient, data, data.audience_id, user.id);
           return json(newContact);
         }
 
@@ -36,7 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("q")?.toLowerCase() || "";
   const workspaceId = url.searchParams.get("workspace_id") || "";
@@ -79,7 +79,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       const { data: queuedContacts, error: queuedError } = await supabaseClient
         .from('campaign_queue')
         .select('contact_id')
-        .eq('campaign_id', campaignId)
+        .eq('campaign_id', Number(campaignId))
         .in('contact_id', allContacts.map((contact) => contact?.id))
       if (queuedError) throw queuedError;
       const contacts = allContacts.map((contact) => ({

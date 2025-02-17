@@ -12,13 +12,12 @@ import {
 import { MdAdd, MdClose } from "react-icons/md";
 import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { CardContent } from "~/components/ui/card";
 import { Card, CardActions, CardTitle } from "~/components/CustomCard";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
   const url = new URL(request.url);
   const search = new URLSearchParams(url.search);
   const ref = search.get("ref") || null;
@@ -34,10 +33,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const { data: campaign } = await supabaseClient
       .from("campaign")
       .select("type")
-      .eq("id", ref)
+      .eq("id", Number(ref) || 0)
       .eq("workspace", workspaceId)
       .single();
-    campaignType = campaign.type;
+    campaignType = campaign?.type;
   }
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
@@ -49,14 +48,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   return json(
-    { workspace: workspaceData, error: null, ref, campaignType },
+    { workspace: workspaceData, error: null, ref: ref || null, campaignType },
     { headers },
   );
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -96,10 +94,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { data, error } = await supabaseClient
     .from("script")
     .insert({
-      name,
+      name: name as string  ,
       type,
       steps,
-      created_by: serverSession.user.id,
+      created_by: user?.id,
       workspace: workspaceId,
     })
     .select();
@@ -108,7 +106,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const { data: update, error: updateError } = await supabaseClient
       .from(tableKey)
       .update({ script_id: data[0].id })
-      .eq("campaign_id", ref)
+      .eq("campaign_id", Number(ref) || 0)
       .select();
     if (updateError) console.error(updateError);
     console.log(update)

@@ -1,18 +1,18 @@
 import MailService from "@sendgrid/mail";
 import { json } from "@remix-run/node";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
   try {
     const error = await request.json();
-    const {supabaseClient, headers, serverSession} = await getSupabaseServerClientWithSession(request);
+    const {supabaseClient, user} = await verifyAuth(request);
     MailService.setApiKey(process.env.SENDGRID_API_KEY!);
     const msg = {
       to: 'info@callcaster.ca',
       from: "info@callcaster.ca",
-      reply_to: serverSession?.user?.username,
+      reply_to: user.email || user.user_metadata.email,
       subject: `An error occured which needs your attention`,
-      text: `An error occured which needs your attention\n\n: ${JSON.stringify({error, user: serverSession?.user})}`,
+      text: `An error occured which needs your attention\n\n: ${JSON.stringify({error, user: user})}`,
     };
     
     const result = await MailService.send(msg);

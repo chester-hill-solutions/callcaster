@@ -4,11 +4,11 @@ import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { audienceColumns } from "~/components/WorkspaceTable/columns";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
+import { User } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -18,7 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const userRole = getUserRole({ serverSession, workspaceId });
+  const userRole = getUserRole({ user: user as unknown as User, workspaceId });
 
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")
@@ -48,7 +48,7 @@ export default function AudienceChart() {
   const { audienceData, workspace, error, userRole } =
     useLoaderData<typeof loader>();
 
-  const isWorkspaceAudienceEmpty = !audienceData?.length > 0;
+  const isWorkspaceAudienceEmpty = !audienceData?.length;
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

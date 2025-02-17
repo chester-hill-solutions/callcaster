@@ -1,9 +1,9 @@
-import { getSupabaseServerClientWithSession } from '../lib/supabase.server';
+import { verifyAuth } from '../lib/supabase.server';
 import { normalizePhoneNumber } from '../lib/utils';
 
 export const action = async ({ request, params }) => {
     const { campaign_id, user_id, workspace_id } = await request.json()
-    const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient: supabase } = await verifyAuth(request);
     const { data, error } = await supabase
         .rpc('get_campaign_queue', { campaign_id_pro: campaign_id })
     if (error) throw error;
@@ -12,7 +12,7 @@ export const action = async ({ request, params }) => {
         let contact = data[i];
         const formData = new FormData();
         formData.append('user_id', user_id.id);
-        formData.append('campaign_id', campaign_id);
+        formData.append('campaign_id', Number(campaign_id)  );
         formData.append('workspace_id', workspace_id);
         formData.append('queue_id', contact.id);
         formData.append('contact_id', contact.contact_id);

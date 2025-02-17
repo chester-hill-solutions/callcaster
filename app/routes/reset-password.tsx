@@ -3,15 +3,14 @@ import { Button } from "~/components/ui/button";
 
 import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
 import { Toaster, toast } from "sonner";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { useEffect } from "react";
 export async function loader({ request }: LoaderFunctionArgs) {
   return {};
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { supabaseClient, serverSession, headers } =
-    getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
   const newPasswordRaw = formData.get("password") as string;

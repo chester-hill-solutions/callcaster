@@ -8,7 +8,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { Suspense } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 import {
   fetchBasicResults,
@@ -69,9 +69,8 @@ const getTable = (campaignType: string) => {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { supabaseClient, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user) {
+  const { supabaseClient, user } = await verifyAuth(request);
+  if (!user) {
     return redirect("/signin");
   }
   const { id: workspace_id, selected_id: campaign_id } = params;
@@ -102,10 +101,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!workspace_id || !selected_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
-  const user = serverSession.user;
+  const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!serverSession || !user) return redirect("/signin");
+  if (!user) return redirect("/signin");
   const [
     campaignType,
     campaignCounts,
@@ -115,7 +113,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchCampaignData(supabaseClient, selected_id),
     fetchCampaignCounts(supabaseClient, selected_id),
-    getUserRole({ serverSession, workspaceId: workspace_id })
+    getUserRole({ user: user as unknown as User, workspaceId: workspace_id })
   ]);
   if (!campaignType || !campaignType.data) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);

@@ -13,51 +13,51 @@ import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
-  forceTokenRefresh,
   getUserRole,
   getWorkspaceInfoWithDetails,
-  updateUserWorkspaceAccessDate,
 } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession, signOut } from "~/lib/supabase.server";
-import { useRealtimeData, useWorkspaceContacts } from "~/hooks/useWorkspaceContacts";
+import { verifyAuth } from "~/lib/supabase.server";
+import { useRealtimeData } from "~/hooks/useWorkspaceContacts";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import CampaignsList from "~/components/CampaignList";
-import { Audience, Campaign, ContextType, Flags, Workspace as WrkSpace, WorkspaceData, WorkspaceNumbers, Contact } from "~/lib/types";
-import { MemberRole } from "~/components/Workspace/TeamMember";
-
-type WorkspaceInfo = {
-  workspace: WrkSpace & { workspace_users: { role: MemberRole }[] };
-  audiences: Partial<Audience[]>;
-  campaigns: Partial<Campaign[]>;
-  userRole: MemberRole;
-  phoneNumbers: Partial<WorkspaceNumbers[]>;
-};
+import { Campaign, ContextType, User } from "~/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession) {
-    throw redirect("/signin", { headers });
-  }
-
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("No workspace found");
-  const userRole = await getUserRole({ serverSession, workspaceId: workspaceId });
-  const workspacePromise = getWorkspaceInfoWithDetails({ 
-    supabaseClient, 
-    workspaceId, 
-    userId: serverSession.user.id 
-  }).catch(error => {
-    if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
-      throw redirect("/workspaces", { headers });
+  try {
+    const { supabaseClient, headers, user } = await verifyAuth(request);
+    if (!user) {
+      throw redirect("/signin", { headers });
     }
+
+    const workspaceId = params.id;
+    if (!workspaceId) {
+      throw new Error("No workspace found");
+    }
+
+    const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
+
+    try {
+      const workspacePromise = getWorkspaceInfoWithDetails({
+        supabaseClient,
+        workspaceId,
+          userId: user.id
+      });
+
+      return defer({
+        userRole,
+        workspaceData: workspacePromise,
+        headers
+      });
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
+        throw redirect("/workspaces", { headers });
+      }
+      throw error;
+    }
+  } catch (error) {
     throw error;
-  });
-  return defer({
-    userRole,
-    workspaceData: workspacePromise,
-    headers
-  });
+  }
 };
 
 export default function Workspace() {

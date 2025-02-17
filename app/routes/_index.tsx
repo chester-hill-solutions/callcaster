@@ -18,7 +18,7 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
-import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

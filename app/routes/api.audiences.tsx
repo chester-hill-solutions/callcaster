@@ -1,5 +1,5 @@
 import { json } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 interface SupabaseResponse {
@@ -14,7 +14,7 @@ interface AudienceData {
 
 export const action = async ({ request }: { request: Request }) => {
     const { supabaseClient, headers }: SupabaseResponse =
-        await getSupabaseServerClientWithSession(request);
+        await verifyAuth(request);
 
     const method = request.method;
 
@@ -57,7 +57,7 @@ export const action = async ({ request }: { request: Request }) => {
 
 export const loader = async ({ request }: { request: Request }) => {
     const { supabaseClient, headers }: SupabaseResponse =
-        await getSupabaseServerClientWithSession(request);
+        await verifyAuth(request);
     const url = new URL(request.url);
     const audienceId = url.searchParams.get('audienceId');
     const returnType = url.searchParams.get('returnType');

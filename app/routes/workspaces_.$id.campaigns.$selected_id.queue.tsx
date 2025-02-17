@@ -1,16 +1,11 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
 import { Suspense, useState } from "react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { Spinner } from "~/components/ui/spinner";
 import { Button } from "~/components/ui/button";
-import { CampaignAudience, Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign } from "~/lib/types";
+import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign } from "~/lib/types";
 import { Contact } from "~/lib/types";
-import { DialogTitle } from "~/components/ui/dialog";
-import { Dialog, DialogHeader } from "~/components/ui/dialog";
-import { DialogContent } from "~/components/ui/dialog";
-import { Search } from "lucide-react";
-import { Input } from "~/components/ui/input";
 import { QueueContent } from "~/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "~/components/queue/ContactSearchDialog";
@@ -79,14 +74,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const pageSize = 50;
     const offset = (page - 1) * pageSize;
 
-    const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, user } = await verifyAuth(request);
 
-    if (!serverSession?.user) throw redirect("/signin");
+    if (!user) throw redirect("/signin");
     if (!selected_id) throw redirect("../../");
     const { data: selectedAudiences, error: selectedAudienceError } = await supabaseClient
         .from('campaign_audience')
         .select('audience_id')
-        .eq('campaign_id', selected_id);
+        .eq('campaign_id', parseInt(selected_id));
     if (selectedAudienceError) throw selectedAudienceError;
     const selectedAudienceIds = selectedAudiences.map((aud) => aud.audience_id) || [];
     const filters = {
@@ -149,10 +144,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-    const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, user } = await verifyAuth(request);
     const { id: workspace_id, selected_id } = params;
 
-    if (!serverSession?.user) throw redirect("/signin");
+    if (!user) throw redirect("/signin");
 
     if (!selected_id) throw redirect("../../");
 

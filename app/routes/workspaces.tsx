@@ -11,7 +11,7 @@ import {
 import { FaPlus } from "react-icons/fa";
 import { Button } from "~/components/ui/button";
 import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { Toaster, toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "~/components/Workspace/TeamMember";
 import {
@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog";
-
+import { Session } from "@supabase/supabase-js";  
 export { ErrorBoundary } from "~/components/ErrorBoundary";
 
 interface Workspace {
@@ -43,14 +43,13 @@ interface LoaderData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  if (!serverSession) {
+  if (!user) {
     return redirect("/signin", { headers });
   }
 
-  const userId = serverSession.user.id;
+  const userId = user.id;
   if (!userId) {
     return redirect("/signin", { headers });
   }
@@ -68,8 +67,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const formData = await request.formData();
 
@@ -83,7 +81,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { data: newWorkspaceId, error } = await createNewWorkspace({
     supabaseClient,
     workspaceName: newWorkspaceName,
-    user_id: serverSession?.user.id,
+    user_id: userId,
   });
   if (error) {
     console.log("Error: ", error);
@@ -93,7 +91,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (newWorkspaceId) {
     const { data: refreshData, error: refreshError } = await forceTokenRefresh({
       supabaseClient,
-      serverSession,
+      serverSession: user as unknown as Session,
     });
     return redirect(`/workspaces/${newWorkspaceId}`, { headers });
   }
