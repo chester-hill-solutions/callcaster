@@ -8,14 +8,13 @@ import {
   CardTitle,
 } from "~/components/CustomCard";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { Flags } from "~/lib/types";
 
 import { handleNewCampaign } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
 

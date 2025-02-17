@@ -1,6 +1,6 @@
 import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { CampaignSettings } from "../components/CampaignSettings";
 import { fetchCampaignAudience } from "~/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -16,7 +16,6 @@ import {
   MessageCampaign,
   IVRCampaign,
 } from "~/lib/types";
-import { Database } from "~/lib/database.types";
 import { Button } from "~/components/ui/button";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
@@ -59,7 +58,7 @@ async function handleCampaignUpdate(
     const { data: campaign, error: getCampaignError } = await supabaseClient
       .from("campaign")
       .select("type")
-      .eq("id", selected_id)
+      .eq("id", Number(selected_id))
       .single();
 
     if (!campaign || getCampaignError) {
@@ -75,7 +74,7 @@ async function handleCampaignUpdate(
     const { data, error } = await supabaseClient
       .from(table)
       .update({ workspace: workspace_id, ...updates })
-      .eq("campaign_id", selected_id)
+      .eq("campaign_id", Number(selected_id))
       .select()
       .single();
 
@@ -88,7 +87,7 @@ async function handleCampaignUpdate(
     const { error } = await supabaseClient
       .from("campaign")
       .update(updates)
-      .eq("id", selected_id);
+      .eq("id", Number(selected_id));
 
     if (error) throw error;
   }
@@ -106,7 +105,7 @@ async function handleStatusChange(
   const { error } = await supabaseClient
     .from("campaign")
     .update({ ...update })
-    .eq("id", selected_id);
+    .eq("id", Number(selected_id));
 
   if (error) throw error;
   return { success: true };
@@ -167,9 +166,9 @@ async function handleCampaignDuplicate(
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!serverSession?.user) return redirect("/signin");
+  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   try {
@@ -208,9 +207,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, serverSession } = await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, user } = await verifyAuth(request);
 
-  if (!serverSession?.user) return redirect("/signin");
+  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
   const campaignWithAudience = await fetchCampaignAudience(supabaseClient, selected_id, workspace_id);
@@ -226,7 +225,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     totalCount: campaignWithAudience.total_count,
     scripts: campaignWithAudience.scripts.filter((s): s is NonNullable<typeof s> => s !== null),
     mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
-    user: serverSession.user,
+    user: user,
     mediaLinks: mediaLinksPromise,
   });
 };

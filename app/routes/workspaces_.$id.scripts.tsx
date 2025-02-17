@@ -11,11 +11,13 @@ import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { formatDateToLocale } from "~/lib/utils";
 import { useEffect } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
 import { Json } from "~/lib/supabase.types";
+import { User } from "~/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;
@@ -53,8 +55,7 @@ type ActionData =
   | { fileContent: string; fileName: string; contentType: string };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -68,7 +69,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const userRole = getUserRole({ serverSession, workspaceId });
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
   const { data: workspace, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()
@@ -103,8 +104,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const formData = await request.formData();
   const data = Object.fromEntries(formData.entries());
@@ -116,7 +116,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { data: script, error: scriptError } = await supabaseClient
     .from("script")
     .select("name, steps")
-    .eq("id", data.id)
+    .eq("id", Number(data.id) || 0)
     .single();
 
   if (scriptError) {

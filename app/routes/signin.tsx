@@ -3,13 +3,10 @@ import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
-import {
-  createSupabaseServerClient,
-  getSupabaseServerClientWithSession,
-} from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
   const requestUrl = new URL(request.url);
   const next = requestUrl.searchParams.get('next');
 
@@ -32,7 +29,7 @@ export const action = async ({ request }: { request: Request }) => {
 };
 
 export const loader = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
+    const { supabaseClient, headers } = await verifyAuth(request);
   const { data: {user} } = await supabaseClient.auth.getUser();
   if (user) {
     return redirect("/workspaces", { headers });

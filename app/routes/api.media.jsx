@@ -1,4 +1,4 @@
-import { getSupabaseServerClientWithSession } from '../lib/supabase.server';
+import { verifyAuth } from '../lib/supabase.server';
 import { json } from '@remix-run/react';
 
 export const action = async ({ request }) => {
@@ -6,10 +6,10 @@ export const action = async ({ request }) => {
     const file = formData.get('file');
     const live_campaign_id = formData.get('live_campaign_id');
     const campaignName = formData.get('campaign_name') || Date.now();
-    const { supabaseClient: supabase, headers, serverSession } = await getSupabaseServerClientWithSession(request);
-    const arrayBuffer = await file.arrayBuffer();
+    const { supabaseClient: supabase, user } = await verifyAuth(request);
+    const arrayBuffer = await file.arrayBuffer();   
     const buffer = Buffer.from(arrayBuffer);
-    const fileName = `${serverSession.user.id}.${campaignName}`;
+    const fileName = `${user.id}.${campaignName}`;
     try {
         const { data, error } = await supabase.storage
             .from('audio')

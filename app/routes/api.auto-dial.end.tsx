@@ -1,13 +1,12 @@
 import { json } from "@remix-run/react";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { Tables } from "~/lib/database.types";
 import { Call, OutreachAttempt } from "~/lib/types";
 import { ActionFunctionArgs } from "@remix-run/node";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } =
+    await verifyAuth(request);
   const { workspaceId: workspace_id } = await request.json();
   const twilio = await createWorkspaceTwilioInstance({
     supabase: supabaseClient,
@@ -36,7 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const conferences = await twilio.conferences.list({
-      friendlyName: serverSession.user.id,
+      friendlyName: user.id,
       status: ["in-progress"],
     });
 

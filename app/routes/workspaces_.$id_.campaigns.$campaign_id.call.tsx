@@ -15,7 +15,7 @@ import { SupabaseClient, User } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
 // Lib imports
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { verifyAuth } from "../lib/supabase.server";
 import {
   handleCall,
   handleConference,
@@ -85,10 +85,10 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   const {
     supabaseClient: supabase,
     headers,
-    serverSession,
-  } = await getSupabaseServerClientWithSession(request);
+    user,
+  } = await verifyAuth(request);
 
-  if (!serverSession || !workspaceId || !id) throw redirect("/signin");
+  if (!user || !workspaceId || !id) throw redirect("/signin");
 
   const [
     workspaceData,
@@ -100,27 +100,27 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     attempts,
   ] = await Promise.all([
     supabase.from("workspace").select("*").eq("id", workspaceId).single(),
-    supabase.from("campaign").select().eq("id", id).single(),
+    supabase.from("campaign").select().eq("id", parseInt(id)).single(),
     supabase
       .from("live_campaign")
       .select(`*, script:script(*)`)
-      .eq("campaign_id", id)
+      .eq("campaign_id", parseInt(id))
       .single(),
     supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: parseInt(id) }),
     supabase
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
-      .eq("campaign_id", id),
+      .eq("campaign_id", parseInt(id)),
     supabase
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
-      .eq("campaign_id", id)
+      .eq("campaign_id", parseInt(id))
       .eq("status", "dequeued"),
     supabase
       .from("outreach_attempt")
       .select(`*, call:call(*)`)
-      .eq("campaign_id", id)
-      .eq("user_id", serverSession.user.id),
+      .eq("campaign_id", parseInt(id))
+      .eq("user_id", user.id),
   ]);
 
   const isActive = checkSchedule(campaign.data);
@@ -144,7 +144,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     twilioAccountSid: twilioData.sid,
     twilioApiKey: workspaceData.data.key as string,
     twilioApiSecret: workspaceData.data.token as string,
-    identity: serverSession.user.id,
+    identity: user.id,
   });
 
   let queue = [] as QueueItem[];
@@ -153,8 +153,8 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     const { data, error } = await supabase
       .from("campaign_queue")
       .select(`*, contact:contact(*)`)
-      .in("status", ["queued", serverSession.user.id])
-      .eq("campaign_id", id)
+      .in("status", ["queued", user.id])
+      .eq("campaign_id", parseInt(id))
       .order("attempts", { ascending: true })
       .order("queue_order", { ascending: true });
 
@@ -167,8 +167,9 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     const { data, error } = await supabase
       .from("campaign_queue")
       .select(`id, status, contact:contact(*)`)
-      .eq("status", serverSession.user.id)
-      .eq("campaign_id", id);
+      .eq("status", user.id)
+      .eq("campaign_id", parseInt(id))
+      .limit(50);
 
     if (error) {
       console.error(error);
@@ -189,17 +190,17 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   const initialRecentAttempt = attempts.data
     ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
-    const userRole = getUserRole({ serverSession, workspaceId: workspaceId });
-    const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole);
+    const userRole = await getUserRole({ supabaseClient: supabase as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
+    const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
   
   return json(
     {
       campaign: campaign.data,
       attempts: attempts.data,
-      user: serverSession.user,
+      user,
       audiences: audiences.data,
       campaignDetails: campaignDetails.data,
-      credits: hasAccess ? workspaceData.data.credits : 0,
+      credits: workspaceData.data.credits,
       workspaceId,
       queue,
       contacts: queue.map((queueItem) => queueItem.contact),
@@ -220,16 +221,15 @@ export const loader: LoaderFunction = async ({ request, params }) => {
 export const action: ActionFunction = async ({ request, params }) => {
   const { campaign_id } = params;
 
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession?.user || !campaign_id) {
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+  if (!user || !campaign_id) {
     throw redirect("/signin");
   }
   const update = await supabaseClient
     .from("campaign_queue")
     .update({ status: "queued" })
-    .eq("status", serverSession.user.id)
-    .eq("campaign_id", campaign_id)
+    .eq("status", user.id)
+    .eq("campaign_id", parseInt(campaign_id))
     .select();
   if (update.error) {
     console.error(update.error);

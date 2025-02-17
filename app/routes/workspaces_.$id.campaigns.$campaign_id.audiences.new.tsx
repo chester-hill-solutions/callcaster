@@ -9,14 +9,13 @@ import {
 import { useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { Card, CardContent, CardTitle } from "~/components/CustomCard";
 import { handleNewAudience } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
 import { MdAdd, MdClose } from "react-icons/md";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   const campaignId = params.campaign_id;
@@ -35,7 +34,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
     .select()
-    .eq("id", campaignId)
+    .eq("id", parseInt(campaignId))
     .eq("workspace", workspaceId)
     .single();
 
@@ -47,8 +46,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   const campaignId = params.campaign_id;
@@ -100,7 +98,7 @@ export default function NewAudience() {
   const actionData = useActionData<typeof action>();
   const [pendingFileName, setPendingFileName] = useState("");
 
-  const displayFileToUpload = (e) => {
+  const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
     setPendingFileName(filePath.split("\\").at(-1));
   };

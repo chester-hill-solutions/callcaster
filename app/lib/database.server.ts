@@ -33,7 +33,6 @@ export async function getUserWorkspaces({
   const {
     data: { session },
   } = await supabaseClient.auth.getSession();
-  // console.log("Session? ", session);
   if (session == null) {
     return { data: null, error: "No user session found" };
   }
@@ -266,7 +265,6 @@ export async function getWorkspaceUsers({
   const { data, error } = await supabaseClient.rpc("get_workspace_users", {
     selected_workspace_id: workspaceId,
   });
-  // console.log("INSIDE FUNC:", data);
   if (error) {
     console.error("Error on function getWorkspaceUsers", error);
   }
@@ -343,34 +341,32 @@ export async function testAuthorize({
 }) {
   const { data, error } = await supabaseClient.rpc("authorize", {
     selected_workspace_id: workspaceId,
-    requested_permission: permission,
+    requested_permission: permission as "workspace.delete" | "workspace.addUser" | "workspace.removeUser" | "workspace.call" | "workspace.addCampaign" | "workspace.addAudience" | "workspace.addContact" | "workspace.editUser" | "workspace.removeMedia",
   });
-  console.log("\nXXXXXXXXXXXXXXXXXXXXXXXXX");
-  console.log("Data: ", data);
-  console.log("Error: ", error);
-  console.log("XXXXXXXXXXXXXXXXXXXXXXXXX");
+
 
   return { data, error };
 }
 
-export function getUserRole({
-  serverSession,
+export async function getUserRole({
+  supabaseClient,
+  user,
   workspaceId,
 }: {
-  serverSession: AuthSession;
+  user: User;
   workspaceId: string;
 }) {
-  if (serverSession == null || serverSession.access_token == null) {
+  if (user == null || user.access_token == null) {
     return null;
   }
 
-  const jwt = jwtDecode(serverSession.access_token);
-  const userRole = jwt["user_workspace_roles"]?.find(
-    (workspaceRoleObj: { workspace_id: string }) => workspaceRoleObj.workspace_id === workspaceId,
-  )?.role;
-
-  // console.log("USER ROLE: ", userRole);
-  if (userRole == null) {
+  const {data: userRole, error: userRoleError} = await supabaseClient
+    .from("workspace_users")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("workspace_id", workspaceId)
+    .single();
+  if (userRoleError) {
     console.error("No User Role found on this workspace");
   }
 
@@ -470,7 +466,6 @@ export async function forceTokenRefresh({
     return { data: null, error: refreshError };
   }
 
-  console.log("\nREFRESH");
   return { data: refreshData, error: null };
 }
 
@@ -1022,7 +1017,6 @@ export async function createCampaign({
           message_media: undefined,
           step_data: undefined,
         });
-  console.log("Inserting campaign details:", cleanCampaignDetails);
 
   const { data: createdCampaignDetails, error: detailsError } = await supabase
     .from(tableKey)
@@ -1209,38 +1203,38 @@ export const fetchCampaignAudience = async (
     .from("script")
     .select(`*`)
     .eq("workspace", workspaceId)
+
   const queuePromise = supabaseClient
     .from("campaign_queue")
-    .select(`*, contact(*)`, { count: "exact" })
-    .eq("campaign_id", campaignId)
+    .select(`*, contact!inner(*)`, { count: "exact" })
+    .eq("campaign_id", Number(campaignId))
+    .not('contact.phone', 'is', null)
+    .neq('contact.phone', '')
     .limit(25);
 
   const isQueuedCountPromise = supabaseClient
     .from("campaign_queue")
-    .select(`count`, { count: "exact" })
-    .eq("campaign_id", campaignId)
-    .eq("status", "queued");
+    .select(
+      `id, contact_id, contact!inner(*)`, { count: "exact" })
+    .eq('campaign_id', Number(campaignId))
+    .eq('status', 'queued')
+    .not('contact.phone', 'is', null)
+    .neq('contact.phone', '')
+    .limit(1);
 
-  const totalCountPromise = supabaseClient
-    .from("campaign_queue")
-    .select(`count`, { count: "exact" })
-    .eq("campaign_id", campaignId);
-
-  const [queueResult, isQueuedCount, totalCount, scripts] = await Promise.all([
+  const [queueResult, isQueuedCount, scripts] = await Promise.all([
     queuePromise,
     isQueuedCountPromise,
-    totalCountPromise,
     scriptsPromise
   ]);
 
   if (queueResult.error) throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
   if (isQueuedCount.error) throw new Error(`Error fetching queued count: ${isQueuedCount.error.message}`);
-  if (totalCount.error) throw new Error(`Error fetching total count: ${totalCount.error.message}`);
   if (scripts.error) throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
     campaign_queue: queueResult.data,
     queue_count: isQueuedCount.count,
-    total_count: totalCount.count,
+    total_count: queueResult.count,
     scripts: scripts.data
   };
 };
@@ -1468,7 +1462,6 @@ export async function fetchOutreachData(
 
 export function processOutreachExportData(data: OutreachExportData[], users: WorkspaceUserData[]) {
   const { dynamicKeys, resultKeys, otherDataKeys } = extractKeys(data);
-  console.log(dynamicKeys, resultKeys, otherDataKeys);
   let csvHeaders = [...dynamicKeys, ...otherDataKeys].map((header) =>
     header === "id"
       ? "attempt_id"
@@ -1523,7 +1516,7 @@ export function processOutreachExportData(data: OutreachExportData[], users: Wor
       header === 'call_duration' ||
       mergedData.some((row) => row[header] != null && row[header] !== "")
     )
-  ) || [];
+  );
 
   return { csvHeaders, flattenedData: mergedData };
 }

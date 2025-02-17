@@ -6,16 +6,14 @@ import {
 } from "@remix-run/react";
 import CampaignEmptyState from "~/components/CampaignEmptyState";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-import { Audience, WorkspaceNumbers } from "~/lib/types";
+import { Audience, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { Campaign } from "~/lib/types";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
-import { Flags } from "~/lib/types";
+import { verifyAuth } from "~/lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
-  if (!serverSession) {
+  const { headers, user } = await verifyAuth(request);  
+  if (!user) {
     return redirect("/signin", { headers });
   }
   return null;

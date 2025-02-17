@@ -6,15 +6,14 @@ import { useState } from "react";
 import { MdAdd, MdClose } from "react-icons/md";
 import { Card, CardContent, CardTitle } from "~/components/CustomCard";
 import { Button } from "~/components/ui/button";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 import { Contact } from "~/lib/types";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "~/components/ui/table";
 
 import { handleNewAudience } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, serverSession } =
-    await getSupabaseServerClientWithSession(request);
+  const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
 
@@ -68,7 +67,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         headers,
         contactsFile,
         contacts,
-        userId: serverSession.user.id,
+        userId: user.id,
       });
     }
     default:

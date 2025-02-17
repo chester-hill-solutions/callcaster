@@ -1,9 +1,9 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { getSupabaseServerClientWithSession } from "~/lib/supabase.server";
+import { verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { supabaseClient, headers } = await getSupabaseServerClientWithSession(request);
+    const { supabaseClient, headers } = await verifyAuth(request);
     const method = request.method;
 
     try {
