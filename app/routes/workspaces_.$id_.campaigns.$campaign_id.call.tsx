@@ -115,8 +115,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
       .eq("campaign_id", parseInt(id))
-      .eq("status", "dequeued")
-      .limit(50),
+      .eq("status", "dequeued"),
     supabase
       .from("outreach_attempt")
       .select(`*, call:call(*)`)
