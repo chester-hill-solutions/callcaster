@@ -115,7 +115,8 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
       .eq("campaign_id", parseInt(id))
-      .eq("status", "dequeued"),
+      .eq("status", "dequeued")
+      .limit(50),
     supabase
       .from("outreach_attempt")
       .select(`*, call:call(*)`)
@@ -156,7 +157,8 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       .in("status", ["queued", user.id])
       .eq("campaign_id", parseInt(id))
       .order("attempts", { ascending: true })
-      .order("queue_order", { ascending: true });
+      .order("queue_order", { ascending: true })
+      .limit(50);
 
     if (error) {
       console.error(error);
