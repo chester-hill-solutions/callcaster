@@ -353,6 +353,7 @@ export async function getUserRole({
   user,
   workspaceId,
 }: {
+  supabaseClient: SupabaseClient;
   user: User;
   workspaceId: string;
 }) {
