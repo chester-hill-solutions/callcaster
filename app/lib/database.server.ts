@@ -353,10 +353,11 @@ export async function getUserRole({
   user,
   workspaceId,
 }: {
+  supabaseClient: SupabaseClient<Database>;
   user: User;
   workspaceId: string;
 }) {
-  if (user == null || user.access_token == null) {
+  if (!user) {
     return null;
   }
 
@@ -370,7 +371,7 @@ export async function getUserRole({
     console.error("No User Role found on this workspace");
   }
 
-  return userRole;
+  return userRole?.role;
 }
 
 export async function updateUserWorkspaceAccessDate({

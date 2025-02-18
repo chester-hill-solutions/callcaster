@@ -13,7 +13,6 @@ import { verifyAuth } from "~/lib/supabase.server";
 import {
   fetchBasicResults,
   fetchCampaignCounts,
-  fetchCampaignData,
   fetchCampaignDetails,
   fetchOutreachData,
   getUserRole,
@@ -32,9 +31,20 @@ import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
 import { useCsvDownload } from "~/hooks/useCsvDownload";
 import { generateCSVContent } from "~/lib/utils";
-import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+import { Audience, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { SupabaseClient, User } from "@supabase/supabase-js";
 import { useRealtimeData } from "~/hooks/useWorkspaceContacts";
+import { Json } from "~/lib/database.types";
+
+interface ExtendedUser extends User {
+  access_level: string | null;
+  activity: Json;
+  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  organization: number | null;
+  username: string;
+}
 
 export type CampaignState = {
   campaign_id: string;
@@ -98,44 +108,63 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
+  
   if (!workspace_id || !selected_id) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
+    throw new Error("Missing required parameters");
   }
+  
   const { supabaseClient, user } = await verifyAuth(request);
-
-  if (!user) return redirect("/signin");
-  const [
-    campaignType,
-    campaignCounts,
-    workspace,
-    userRole,
-  ] = await Promise.all([
-    supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
-    fetchCampaignData(supabaseClient, selected_id),
-    fetchCampaignCounts(supabaseClient, selected_id),
-    getUserRole({ user: user as unknown as User, workspaceId: workspace_id })
-  ]);
-  if (!campaignType || !campaignType.data) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
+  if (!user) {
+    throw redirect("/signin");
   }
-  if (workspace.error) throw workspace.error;
 
-  const campaignTable = getTable(campaignType.data.type);
+  // Fetch campaign data and type in parallel
+  const [campaignResponse, userRole] = await Promise.all([
+    supabaseClient
+      .from('campaign')
+      .select('*, type')
+      .eq('id', Number(selected_id))
+      .single(),
+    getUserRole({ 
+      supabaseClient, 
+      user: user as unknown as ExtendedUser, 
+      workspaceId: workspace_id 
+    })
+  ]);
 
-  const campaignDetails = await fetchCampaignDetails(
-    supabaseClient,
-    selected_id,
-    workspace_id,
-    campaignTable
-  );
+  if (campaignResponse.error || !campaignResponse.data) {
+    console.error("Campaign fetch error:", campaignResponse.error);
+    throw redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
 
+  const campaign = campaignResponse.data;
+  const campaignTable = getTable(campaign.type || "live_call");
+
+  // Fetch campaign details and counts
+  const [campaignDetails, campaignCounts] = await Promise.all([
+    fetchCampaignDetails(
+      supabaseClient,
+      selected_id,
+      workspace_id,
+      campaignTable
+    ),
+    fetchCampaignCounts(supabaseClient, selected_id)
+  ]);
+
+  if (!campaignDetails) {
+    console.error("Campaign details not found");
+    throw redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
+
+  // Start loading results in the background
   const resultsPromise = fetchBasicResults(supabaseClient, selected_id);
-
+  
   return defer({
     selected_id,
     hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole),
     campaignDetails,
-    user: user,
+    campaignData: campaign,
+    user,
     campaignCounts,
     totalCalls: 0,
     expectedTotal: 0,
@@ -147,46 +176,44 @@ export default function CampaignScreen() {
   const {
     hasAccess,
     campaignDetails: initialCampaignDetails,
+    campaignData: initialCampaignData,
     campaignCounts,
     totalCalls = 0,
     expectedTotal = 0,
     results,
     selected_id,
   } = useLoaderData<typeof loader>();
-  const { audiences, campaigns, phoneNumbers, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
-  const campaignData = campaigns.find(c => c?.id.toString() === selected_id);
+  const { audiences, phoneNumbers, workspace, supabase } = useOutletContext<{ audiences: Audience[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
   const csvData = useActionData() as { csvContent: string, filename: string };
   const location = useLocation();
   const route = location.pathname.split("/");
   const isCampaignParentRoute = route.length === 5;
-  const { data: campaignDetailsArray, isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails])
+  const { data: campaignDetailsArray, isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, route[2], getTable(initialCampaignData?.type || "live_call"), [initialCampaignDetails])
   const campaignDetails = campaignDetailsArray?.[0];
+  
   useCsvDownload(csvData as { csvContent: string, filename: string });
-
   const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"
-    : !campaignData?.caller_id
+    : !initialCampaignData?.caller_id
       ? "No outbound phone number selected"
-      : campaignData?.status === "scheduled" ?
+      : initialCampaignData?.status === "scheduled" ?
         `Campaign scheduled.`
-        : !campaignData?.is_active
+        : !initialCampaignData?.is_active
           ? "It is currently outside of the Campaign's calling hours"
           : null;
-
   const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"
-    : !campaignData?.caller_id
+    : !initialCampaignData?.caller_id
       ? "No outbound phone number selected"
       : null;
-
   return (
     <div className="flex h-full w-full flex-col">
-      <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
+      <CampaignHeader title={initialCampaignData?.title || ""} status={initialCampaignData?.status || "pending"} isDesktop={false} />
       <div className="flex items-center justify-center border-b-2 border-zinc-300 p-4 sm:justify-between">
-        <CampaignHeader title={campaignData?.title || ""} isDesktop status={campaignData?.status || "pending"} />
+        <CampaignHeader title={initialCampaignData?.title || ""} isDesktop status={initialCampaignData?.status || "pending"} />
         <NavigationLinks
           hasAccess={hasAccess}
-          data={campaignData}
+          data={initialCampaignData}
           joinDisabled={joinDisabled}
         />
       </div>
@@ -199,7 +226,7 @@ export default function CampaignScreen() {
               ) : (
                 <ResultsDisplay
                   results={resolvedResults}
-                  campaign={campaignData}
+                  campaign={initialCampaignData}
                   hasAccess={hasAccess}
                   campaignCounts={campaignCounts}
                 />
@@ -210,9 +237,9 @@ export default function CampaignScreen() {
       )}
       {isCampaignParentRoute &&
         !hasAccess &&
-        (campaignData?.type === "live_call" || !campaignData?.type) && (
+        (initialCampaignData?.type === "live_call" || !initialCampaignData?.type) && (
           <CampaignInstructions
-            campaignData={campaignData}
+            campaignData={initialCampaignData}
             totalCalls={totalCalls}
             expectedTotal={expectedTotal}
             joinDisabled={joinDisabled}
@@ -223,7 +250,7 @@ export default function CampaignScreen() {
           supabase,
           joinDisabled,
           audiences,
-          campaignData,
+          campaignData: initialCampaignData,
           campaignDetails,
           scheduleDisabled,
           phoneNumbers,

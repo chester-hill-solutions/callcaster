@@ -4,14 +4,13 @@ import {
   useLoaderData,
   useOutletContext,
   redirect,
-  useSubmit,
   useNavigation,
   useNavigate,
   useFetcher,
 } from "@remix-run/react";
 import { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { SupabaseClient, User } from "@supabase/supabase-js";
+import { SupabaseClient, User, createClient } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
 // Lib imports
@@ -22,14 +21,15 @@ import {
   handleContact,
   handleQueue,
 } from "~/lib/callscreenActions";
-import { checkSchedule, getUserRole } from "~/lib/database.server";
+import { getUserRole } from "~/lib/database.server";
 import { playTone } from "~/lib/utils";
 import { generateToken } from "./api.token";
+import { Json } from "~/lib/database.types";
 
 // Component imports
 import { QueueList } from "../components/CallScreen.QueueList";
 import { CallArea } from "../components/CallScreen.CallArea";
-import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
+import CallQuestionnaire from "../components/CallScreen.Questionnaire";
 import { Household } from "~/components/CallScreen.Household";
 import { ErrorBoundary } from "~/components/ErrorBoundary";
 import { CampaignHeader } from "~/components/CallScreen.Header";
@@ -43,6 +43,7 @@ import useSupabaseRoom from "../hooks/useSupabaseRoom";
 import { useTwilioDevice } from "../hooks/useTwilioDevice";
 import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
 import { useCallState } from "~/hooks/useCallState";
+import { useQueueManagement } from "~/hooks/useQueueManagement";
 
 // Type imports
 import {
@@ -50,20 +51,47 @@ import {
   Call,
   Campaign as CampaignType,
   Contact,
-  IVRCampaign,
   LiveCampaign,
   OutreachAttempt,
   QueueItem,
+  Workspace,
+  WorkspaceNumbers,
 } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
+
+interface ExtendedUser extends User {
+  access_level: string | null;
+  activity: Json;
+  created_at: string;
+  first_name: string | null;
+  last_name: string | null;
+  organization: number | null;
+  username: string;
+}
 
 interface LoaderData {
   campaign: CampaignType;
   attempts: OutreachAttempt[];
-  user: User;
+  user: ExtendedUser;
   audiences: Audience[];
   workspaceId: string;
-  campaignDetails: LiveCampaign;
+  workspace: Workspace;
+  campaignDetails: {
+    campaign_id: number | null;
+    created_at: string;
+    disposition_options: Json | any[];
+    id: number;
+    questions: Json | any[];
+    script_id: number | null;
+    voicedrop_audio: string | null;
+    workspace: string;
+    script?: {
+      steps?: {
+        pages?: Record<string, any>;
+        blocks?: Record<string, any>;
+      };
+    };
+  };
   credits: number;
   contacts: Contact[];
   queue: QueueItem[];
@@ -76,146 +104,174 @@ interface LoaderData {
   completed: number;
   isActive: boolean;
   hasAccess: boolean;
+  phoneNumbers: WorkspaceNumbers[];
 }
 
 export { ErrorBoundary };
 
 export const loader: LoaderFunction = async ({ request, params }) => {
-  const { campaign_id: id, id: workspaceId } = params;
-  const {
-    supabaseClient: supabase,
-    headers,
-    user,
-  } = await verifyAuth(request);
+  const { selected_id: id, id: workspaceId } = params;
+  const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
 
-  if (!user || !workspaceId || !id) throw redirect("/signin");
+  if (!user || !workspaceId || !id) {
+    throw redirect("/signin");
+  }
 
-  const [
-    workspaceData,
-    campaign,
-    campaignDetails,
-    audiences,
-    queueCount,
-    completedCount,
-    attempts,
-  ] = await Promise.all([
-    supabase.from("workspace").select("*").eq("id", workspaceId).single(),
-    supabase.from("campaign").select().eq("id", parseInt(id)).single(),
+  // Fetch essential campaign and workspace data in parallel
+  const [campaignResponse, workspaceResponse] = await Promise.all([
     supabase
-      .from("live_campaign")
-      .select(`*, script:script(*)`)
-      .eq("campaign_id", parseInt(id))
+      .from("campaign")
+      .select('*, details:live_campaign(*)')
+      .eq("id", parseInt(id))
       .single(),
-    supabase.rpc("get_audiences_by_campaign", { selected_campaign_id: parseInt(id) }),
     supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", parseInt(id)),
-    supabase
-      .from("campaign_queue")
-      .select("id", { count: "exact", head: true })
-      .eq("campaign_id", parseInt(id) )
-      .eq("status", "dequeued"),
-    supabase
-      .from("outreach_attempt")
-      .select(`*, call:call(*)`)
-      .eq("campaign_id", parseInt(id))
-      .eq("user_id", user.id),
+      .from("workspace")
+      .select("*, twilio_data, workspace_number(*)")
+      .eq("id", workspaceId)
+      .single()
   ]);
 
-  const isActive = checkSchedule(campaign.data);
-  const errors = [
-    workspaceData.error,
-    campaign.error,
-    campaignDetails.error,
-    audiences.error,
-    queueCount.error,
-    completedCount.error,
-    attempts.error,
-  ].filter(Boolean);
-  if (errors.length) {
-    throw "Error fetching campaign data";
+  if (campaignResponse.error || !campaignResponse.data) {
+    console.error("Campaign not found", campaignResponse.error);
+    throw new Error("Campaign not found");
   }
-  if (!workspaceData.data || !workspaceData.data.twilio_data) {
-    throw "Error fetching workspace data";
+
+  if (workspaceResponse.error || !workspaceResponse.data) {
+    console.error("Workspace not found", workspaceResponse.error);
+    throw new Error("Workspace not found");
   }
-  const twilioData = workspaceData.data.twilio_data as { sid: string };
+
+  const campaign = campaignResponse.data;
+  const workspace = workspaceResponse.data;
+
+  // Early validation of campaign type
+  if (!campaign.dial_type) {
+    return redirect(`./../settings`);
+  }
+
+  if (!workspace.twilio_data) {
+    throw new Error("Workspace configuration error");
+  }
+
+  // Fetch campaign details and audiences in parallel
+  const [campaignDetails, audiencesResponse] = await Promise.all([
+    supabase
+      .from(campaign.type === "live_call" ? "live_campaign" : "ivr_campaign")
+      .select("*, script(*)")
+      .eq("campaign_id", parseInt(id))
+      .single(),
+    supabase
+      .from("audience")
+      .select("*")
+      .eq("workspace", workspaceId)
+  ]);
+
+  if (campaignDetails.error) {
+    throw new Error("Campaign details not found");
+  }
+
+  const twilioData = workspace.twilio_data as { sid: string };
+  
+  // Generate Twilio token
   const token = generateToken({
     twilioAccountSid: twilioData.sid,
-    twilioApiKey: workspaceData.data.key as string,
-    twilioApiSecret: workspaceData.data.token as string,
+    twilioApiKey: workspace.key as string,
+    twilioApiSecret: workspace.token as string,
     identity: user.id,
   });
 
-  let queue = [] as QueueItem[];
+  // Fetch queue data based on campaign type
+  const queueQuery = supabase
+    .from("campaign_queue")
+    .select(`*, contact:contact(*)`)
+    .eq("campaign_id", parseInt(id));
 
-  if (campaign.data?.dial_type === "predictive") {
-    const { data, error } = await supabase
-      .from("campaign_queue")
-      .select(`*, contact:contact(*)`)
-      .in("status", ["queued", user.id])
-      .eq("campaign_id", parseInt(id))
-      .order("attempts", { ascending: true })
-      .order("queue_order", { ascending: true })
-      .limit(50);
-
-    if (error) {
-      console.error(error);
-      throw error.message || "Error fetching queue data";
-    }
-    queue = data as unknown as QueueItem[];
-  } else if (campaign.data?.dial_type === "call") {
-    const { data, error } = await supabase
-      .from("campaign_queue")
-      .select(`id, status, contact:contact(*)`)
-      .eq("status", user.id)
-      .eq("campaign_id", parseInt(id))
-      .limit(50);
-
-    if (error) {
-      console.error(error);
-      throw error.message || "Error fetching queue data";
-    }
-    queue = data as unknown as QueueItem[];
-  } else if (!campaign.data?.dial_type) {
-    return redirect("./../settings");
+  if (campaign.dial_type === "predictive") {
+    queueQuery.in("status", ["queued", user.id]);
+  } else {
+    queueQuery.eq("status", user.id);
   }
-  const nextRecipient =
-    queue && campaign.data.dial_type === "call" ? queue[0] : null;
-  const initalCallsList = attempts.data?.flatMap((attempt) => attempt.call) || [];
-  const initialRecentCall =
-    nextRecipient?.contact &&
-    initalCallsList.find(
-      (call) => call.contact_id === nextRecipient?.contact?.id,
-    );
-  const initialRecentAttempt = attempts.data
+
+  queueQuery
+    .order("attempts", { ascending: true })
+    .order("queue_order", { ascending: true })
+    .limit(50);
+
+  const { data: queueData, error: queueError } = await queueQuery;
+  const queue = queueData || [];
+
+  if (queueError) {
+    console.error("Queue fetch error:", queueError);
+    throw queueError;
+  }
+
+  // Get queue counts
+  const [queueCount, completedCount] = await Promise.all([
+    supabase
+      .from("campaign_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", parseInt(id))
+      .limit(1),
+    supabase
+      .from("campaign_queue")
+      .select("id", { count: "exact", head: true })
+      .eq("campaign_id", parseInt(id))
+      .eq("status", "dequeued")
+      .limit(1)
+  ]);
+
+  // Fetch user attempts and calls
+  const { data: attempts = [], error: attemptsError } = await supabase
+    .from("outreach_attempt")
+    .select(`*, call:call(*)`)
+    .eq("campaign_id", parseInt(id))
+    .eq("user_id", user.id);
+
+  if (attemptsError) {
+    console.error("Attempts fetch error:", attemptsError);
+    throw attemptsError;
+  }
+
+  // Get user role
+  const userRole = await getUserRole({ 
+    supabaseClient: supabase, 
+    user: user as unknown as ExtendedUser, 
+    workspaceId 
+  });
+
+  // Prepare initial state
+  const nextRecipient = campaign.dial_type === "call" ? queue[0] : null;
+  const callsList = attempts?.flatMap((attempt) => attempt.call) || [];
+  const recentCall = nextRecipient?.contact && 
+    callsList.find((call) => call.contact_id === nextRecipient?.contact?.id);
+  const recentAttempt = attempts
     ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
-    const userRole = await getUserRole({ supabaseClient: supabase as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
-    const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
-  
+
   return json(
     {
-      campaign: campaign.data,
-      attempts: attempts.data,
+      attempts,
       user,
-      audiences: audiences.data,
-      campaignDetails: campaignDetails.data,
-      credits: workspaceData.data.credits,
+      credits: workspace.credits,
       workspaceId,
+      workspace,
+      campaign,
+      campaignDetails: campaignDetails.data,
+      audiences: audiencesResponse.data || [],
+      phoneNumbers: workspace.workspace_number,
       queue,
       contacts: queue.map((queueItem) => queueItem.contact),
       nextRecipient,
-      initalCallsList,
-      initialRecentCall,
-      initialRecentAttempt,
+      initalCallsList: callsList,
+      initialRecentCall: recentCall,
+      initialRecentAttempt: recentAttempt,
       token,
-      count: queueCount.count,
-      completed: completedCount.count,
-      isActive,
-      hasAccess,
+      count: queueCount.count || 0,
+      completed: completedCount.count || 0,
+      hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole),
+      isActive: true
     },
-    { headers },
+    { headers }
   );
 };
 
@@ -239,15 +295,15 @@ export const action: ActionFunction = async ({ request, params }) => {
   return redirect("/workspaces");
 };
 
+// Add type for householdMap
+type HouseholdMap = Record<string, QueueItem[]>;
+
 const Campaign: React.FC = () => {
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
-  const { state: navState } = useNavigation();
-  const isBusy = navState !== "idle";
   const {
-    campaign,
     attempts: initialAttempts,
     user,
     workspaceId,
+    campaign,
     campaignDetails,
     credits,
     contacts,
@@ -259,12 +315,40 @@ const Campaign: React.FC = () => {
     token,
     count,
     completed,
-    isActive,
+    isActive = true,
     hasAccess
   } = useLoaderData<LoaderData>();
+
+  const { state: navState } = useNavigation();
+  const isBusy = navState !== "idle";
+
+  // Get supabase instance
+  const {supabase} = useOutletContext<{supabase: SupabaseClient}>();
+
+  // Calculate disabled states
+  const joinDisabled = (!campaignDetails?.script_id)
+    ? "No script selected"
+    : !campaign?.caller_id
+      ? "No outbound phone number selected"
+      : campaign?.status === "scheduled"
+        ? `Campaign scheduled.`
+        : !campaign?.is_active
+          ? "It is currently outside of the Campaign's calling hours"
+          : null;
+
+  const scheduleDisabled = (!campaignDetails?.script_id)
+    ? "No script selected"
+    : !campaign?.caller_id
+      ? "No outbound phone number selected"
+      : null;
+
+  if (!campaign) {
+    throw new Error("Campaign data is required");
+  }
+
   // State management
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
-  const [groupByHousehold] = useState<boolean>(true);
+  const [groupByHousehold] = useState<boolean>(Boolean(campaign.group_household_queue));
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [microphone, setMicrophone] = useState<string | null>(null);
@@ -274,7 +358,7 @@ const Campaign: React.FC = () => {
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isErrorDialogOpen, setErrorDialog] = useState(!campaignDetails?.script_id);
-  const [isDialogOpen, setDialog] = useState(campaign?.dial_type === "predictive" && !isErrorDialogOpen);
+  const [isDialogOpen, setDialog] = useState(campaignDetails?.campaign_id && !isErrorDialogOpen);
   const [isReportDialogOpen, setReportDialog] = useState(false);
   // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -302,7 +386,7 @@ const Campaign: React.FC = () => {
   } = useSupabaseRoom({
     supabase,
     workspace: workspaceId,
-    campaign: campaign?.id,
+    campaign: campaign.id,
     userId: user.id,
   });
 
@@ -322,33 +406,30 @@ const Campaign: React.FC = () => {
     nextRecipient,
     setNextRecipient,
   } = useSupabaseRealtime({
-    user, 
+    user: user as ExtendedUser,
     supabase,
     init: {
-      predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
-      queue: campaign?.dial_type === "call" ? initialQueue : [],
+      predictiveQueue: campaign.dial_type === "predictive" ? initialQueue : [],
+      queue: campaign.dial_type === "call" ? initialQueue : [],
       callsList: initalCallsList,
       attempts: initialAttempts,
       recentCall: initialRecentCall || null,
       recentAttempt: initialRecentAttempt || null,
       nextRecipient: initialNextRecipient || null,
-      credits: credits || 0,
+      credits: credits || 0
     },
-    credits,
-    contacts,
-    campaign_id: campaign?.id! as unknown as string,
-    activeCall,
+    campaign_id: campaign.id! as unknown as string,
     setQuestionContact,
-    predictive: campaign?.dial_type === "predictive",
+    predictive: campaign.dial_type === "predictive",
     setCallDuration,
     setUpdate,
   });
 
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
     user.id,
-    campaign?.id! as unknown as string,
+    campaign.id! as unknown as string,
     workspaceId,
-    campaign?.caller_id,
+    campaign.caller_id,
   );
 
   const fetcher = useFetcher<{creditsError?: boolean}>()
@@ -372,7 +453,7 @@ const Campaign: React.FC = () => {
   const { dequeue, fetchMore } = handleQueue({
     submit: queueFetcher.submit,
     groupByHousehold,
-    campaign,
+    campaign: campaign,
     workspaceId,
     setQueue,
   });
@@ -380,7 +461,7 @@ const Campaign: React.FC = () => {
     update,
     recentAttempt,
     nextRecipient,
-    campaign,
+    campaign: campaign,
     workspaceId,
     disposition,
     toast,
@@ -395,16 +476,16 @@ const Campaign: React.FC = () => {
   );
 
   const handleDialButton = useCallback(() => {
-    if (campaign?.dial_type === "predictive") {
+    if (campaign.dial_type === "predictive") {
       if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
         console.log("Device Busy", deviceStatus, device?.calls.length);
         return;
       }
       begin();
-    } else if (campaign?.dial_type === "call") {
+    } else if (campaign.dial_type === "call") {
       startCall({
         contact: nextRecipient?.contact,
-        campaign,
+        campaign: campaign,
         user,
         workspaceId,
         nextRecipient,
@@ -412,7 +493,7 @@ const Campaign: React.FC = () => {
       });
     }
   }, [
-    campaign,
+    campaign.dial_type,
     deviceIsBusy,
     incomingCall,
     deviceStatus,
@@ -449,23 +530,25 @@ const Campaign: React.FC = () => {
   );
 
   const handleDequeueNext = useCallback(() => {
-    if (campaign?.dial_type === "predictive") {
+    if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
       setCallDuration(0);
       handleDialButton();
       saveData();
-    } else if (campaign?.dial_type === "call") {
+    } else if (campaign.dial_type === "call" && nextRecipient) {
       saveData();
       dequeue({ contact: nextRecipient });
-      fetchMore({ householdMap });
-      handleNextNumber(campaign?.group_household_queue || false);
+      const householdMapObject: Record<string, QueueItem[]> = householdMap as Record<string, QueueItem[]>;
+      fetchMore({ householdMap: householdMapObject });
+      handleNextNumber(campaign.group_household_queue || false);
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
       setUpdate({});
       setCallDuration(0);
     }
   }, [
-    campaign?.dial_type,
+    campaign.dial_type,
+    campaign.group_household_queue,
     send,
     setCallDuration,
     handleDialButton,
@@ -477,6 +560,10 @@ const Campaign: React.FC = () => {
     handleNextNumber,
     setRecentAttempt,
   ]);
+
+  const handleQueueButtonClick = useCallback(() => {
+    fetchMore({ householdMap });
+  }, [fetchMore, householdMap]);
 
   // Audio handlers
   const requestMicrophoneAccess = useCallback(async () => {
@@ -575,23 +662,21 @@ const Campaign: React.FC = () => {
     const formData = new FormData();
     formData.append("callId", activeCall?.parameters?.CallSid);
     formData.append("workspaceId", workspaceId);
-    formData.append("campaignId", campaign?.id?.toString() || "");
+    formData.append("campaignId", campaign.id?.toString() || "");
 
     submit(formData, {
       method: "POST",
-      action: "/api/audiodrop",
-      navigate: false,
+      action: "/api/audiodrop"
     });
   };
 
   const requeueContacts = () => {
     const userId = user.id;
-    const campaignId = campaign?.id?.toString() || "";
+    const campaignId = campaign.id?.toString() || "";
     submit({ userId, campaignId }, {
       method: "DELETE",
       action: "/api/queues",
-      encType: "application/json",
-      navigate: false,
+      encType: "application/json"
     });
   }
 
@@ -630,12 +715,12 @@ const Campaign: React.FC = () => {
               activeCall,
             );
 
-  const house =
-    householdMap[
+  // Update householdMap type
+  const house = householdMap[
     Object.keys(householdMap).find(
       (house) => house === nextRecipient?.contact?.address,
     ) || ""
-    ];
+  ] as QueueItem[];
 
   const displayColor =
     displayState === "failed"
@@ -740,19 +825,11 @@ const Campaign: React.FC = () => {
   const creditState: "GOOD" |"WARNING" |"BAD" = availableCredits > queue.length ? "GOOD" : availableCredits  > 0 && availableCredits < queue.length ? "WARNING" : "BAD";
 
   return (
-    <main className="container mx-auto p-6">
-      <div
-        style={{
-          border: "3px solid #BCEBFF",
-          alignItems: "stretch",
-          display: "flex",
-          borderRadius: "20px",
-          justifyContent: "space-between",
-        }}
-        className="mb-6"
-      >
+    <main className="container mx-auto p-6 min-h-screen bg-gray-50">
+      {/* Header Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
         <CampaignHeader
-          campaign={campaign!}
+          campaign={campaign}
           count={count}
           completed={completed}
           onLeaveCampaign={() => {
@@ -773,7 +850,7 @@ const Campaign: React.FC = () => {
           creditState={creditState}
           hasAccess={hasAccess}
         />
-        <div className="m-4">
+        <div className="border-t border-gray-200 p-4">
           <PhoneKeypad
             onKeyPress={handleDTMF}
             displayState={displayState}
@@ -782,14 +859,17 @@ const Campaign: React.FC = () => {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <div className="space-y-6">
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 max-h-[calc(100vh-20rem)]">
+        {/* Left Column - Call Controls */}
+        <div className="flex flex-col gap-6 max-h-full overflow-y-auto">
           <CallArea
             conference={conference}
             isBusy={isBusy || deviceIsBusy}
-            predictive={campaign?.dial_type === "predictive"}
+            predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
-            activeCall={activeCall}
+            activeCall={activeCall as any}
             recentCall={recentCall}
             handleVoiceDrop={handleVoiceDrop}
             hangUp={() =>
@@ -802,7 +882,7 @@ const Campaign: React.FC = () => {
                 : hangUp()
             }
             displayState={displayState}
-            dispositionOptions={campaignDetails?.disposition_options}
+            dispositionOptions={campaignDetails?.disposition_options as any[] ?? []}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
@@ -812,6 +892,7 @@ const Campaign: React.FC = () => {
             callDuration={callDuration}
             voiceDrop={Boolean(campaignDetails?.voicedrop_audio)}
           />
+          
           <Household
             isBusy={isBusy}
             house={house}
@@ -820,39 +901,69 @@ const Campaign: React.FC = () => {
             questionContact={questionContact}
           />
         </div>
-        <CallQuestionnaire
-          isBusy={isBusy}
-          handleResponse={handleResponse}
-          campaignDetails={campaignDetails}
-          update={update}
-          nextRecipient={questionContact}
-          handleQuickSave={saveData}
-          disabled={!questionContact}
-        />
-        <QueueList
-          isBusy={isBusy}
-          householdMap={householdMap}
-          groupByHousehold={groupByHousehold}
-          queue={campaign.dial_type === "call" ? queue : predictiveQueue}
-          handleNextNumber={handleNextNumber}
-          nextRecipient={nextRecipient}
-          handleQueueButton={fetchMore}
-          predictive={campaign.dial_type === "predictive"}
-          count={count}
-          completed={completed}
-        />
+
+        {/* Middle Column - Questionnaire */}
+        <div className="max-h-full overflow-y-auto">
+          {questionContact && campaignDetails && (
+            <CallQuestionnaire
+              isBusy={isBusy}
+              handleResponse={handleResponse}
+              campaignDetails={{
+                campaign_id: campaignDetails?.campaign_id ?? null,
+                created_at: campaignDetails?.created_at ?? '',
+                disposition_options: (campaignDetails?.disposition_options as any[] | null) ?? [],
+                id: campaignDetails?.id ?? 0,
+                questions: (campaignDetails?.questions as any[] | null) ?? [],
+                script_id: campaignDetails?.script_id ?? null,
+                voicedrop_audio: campaignDetails?.voicedrop_audio ?? null,
+                workspace: campaignDetails?.workspace ?? workspaceId,
+                script: campaignDetails?.script || {
+                  steps: {
+                    pages: {},
+                    blocks: {}
+                  }
+                }
+              }}
+              update={update || {}}
+              nextRecipient={questionContact}
+              handleQuickSave={saveData}
+              disabled={!questionContact}
+            />
+          )}
+        </div>
+
+        {/* Right Column - Queue */}
+        <div className="max-h-full overflow-y-auto">
+          <QueueList
+            isBusy={isBusy}
+            householdMap={householdMap as HouseholdMap}
+            groupByHousehold={groupByHousehold}
+            queue={campaign.dial_type === "call" ? queue : predictiveQueue}
+            handleNextNumber={handleNextNumber}
+            nextRecipient={nextRecipient}
+            handleQueueButton={handleQueueButtonClick}
+            predictive={campaign.dial_type === "predictive"}
+            count={count}
+            completed={completed}
+          />
+        </div>
       </div>
+
       <Toaster richColors />
       <CampaignDialogs
-        isDialogOpen={isDialogOpen}
+        isDialogOpen={Boolean(isDialogOpen)}
         setDialog={setDialog}
         isErrorDialogOpen={isErrorDialogOpen}
         setErrorDialog={setErrorDialog}
         isReportDialogOpen={isReportDialogOpen}
         setReportDialog={setReportDialog}
-        campaign={campaign}
+        campaign={{
+          title: campaign.title || '',
+          dial_type: campaign.dial_type || '',
+          voicemail_file: Boolean(campaign.voicemail_file)
+        }}
         fetchMore={fetchMore}
-        householdMap={householdMap}
+        householdMap={householdMap as HouseholdMap}
         currentState={currentState}
         isActive={isActive}
         creditsError={credits === 0 || creditsError}

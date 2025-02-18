@@ -1,12 +1,29 @@
-import React, { useEffect, useState } from "react";
+import { Button } from "~/components/ui/button";
 import { useNavigation } from "@remix-run/react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Save } from "lucide-react";
 import Result from "./CallList/CallContact/Result";
-import { Button } from "./ui/button";
+import { Progress } from "~/components/ui/progress";
 import { Tables } from "~/lib/database.types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
-type CampaignDetails = Tables<"live_campaign">;
+type CampaignDetails = {
+  campaign_id: number | null;
+  created_at: string;
+  disposition_options: any[];
+  id: number;
+  questions: any[];
+  script_id: number | null;
+  voicedrop_audio: string | null;
+  workspace: string;
+  script?: {
+    steps?: {
+      pages?: Record<string, any>;
+      blocks?: Record<string, any>;
+    };
+  };
+};
 
 interface Script {
   steps?: {
@@ -31,19 +48,31 @@ interface Script {
 }
 
 interface CallQuestionnaireProps {
-  handleResponse: (response: {
-    pageId: string;
-    blockId: string;
-    value: any;
-  }) => void;
-  campaignDetails: CampaignDetails & { script: Script };
+  handleResponse: (response: { pageId: string; blockId: string; value: any }) => void;
+  campaignDetails: {
+    campaign_id: number | null;
+    created_at: string;
+    disposition_options: any[];
+    id: number;
+    questions: any[];
+    script_id: number | null;
+    voicedrop_audio: string | null;
+    workspace: string;
+    script?: {
+      steps?: {
+        pages?: Record<string, any>;
+        blocks?: Record<string, any>;
+      };
+    };
+  };
   update: Record<string, any>;
-  nextRecipient: QueueItem | null;
+  nextRecipient: any;
   handleQuickSave: () => void;
   disabled: boolean;
   isBusy: boolean;
 }
-const CallQuestionnaire = ({
+
+const CallQuestionnaire: React.FC<CallQuestionnaireProps> = ({
   handleResponse,
   campaignDetails,
   update,
@@ -51,61 +80,94 @@ const CallQuestionnaire = ({
   handleQuickSave,
   disabled,
   isBusy
-}: CallQuestionnaireProps) => {
-  const navigation = useNavigation();
-  const [currentPageId, setCurrentPageId] = useState(
-    Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
-  );
-  const [localUpdate, setLocalUpdate] = useState(update || {});
+}) => {
+  const { state } = useNavigation();
+  const [currentPage, setCurrentPage] = useState<string>("");
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
-  useEffect(() => {
-    setLocalUpdate(update || {});
-      }, [update]);
+  const pages = campaignDetails.script?.steps?.pages ? Object.keys(campaignDetails.script.steps.pages) : [];
+  const currentPageIndex = pages.indexOf(currentPage);
+  const progress = ((currentPageIndex + 1) / pages.length) * 100;
 
   const handleBlockResponse = (blockId: string, value: any) => {
-    const newUpdate = {
-      ...localUpdate,
-      [currentPageId]: {
-        ...(localUpdate[currentPageId] || {}),
-        [blockId]: value,
-      },
-    };
-    setLocalUpdate(newUpdate);
-    handleResponse({ pageId: currentPageId, blockId, value });
+    handleResponse({
+      pageId: currentPage,
+      blockId,
+      value,
+    });
+  };
+
+  const handleSave = async () => {
+    setSaveStatus("saving");
+    await handleQuickSave();
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 2000);
+  };
+
+  const navigateToPage = (direction: "next" | "prev") => {
+    const newIndex = direction === "next" ? currentPageIndex + 1 : currentPageIndex - 1;
+    if (newIndex >= 0 && newIndex < pages.length) {
+      setCurrentPage(pages[newIndex]);
+    }
   };
 
   const renderBlock = (blockId: string) => {
-    const block = campaignDetails.script?.steps.blocks[blockId];
-    
+    if (!campaignDetails.script?.steps?.blocks) return null;
+    const block = campaignDetails.script.steps.blocks[blockId];
+    if (!block) return null;
+
     return (
-      <div>
       <Result
         disabled={disabled}
-        action={(response) => handleBlockResponse(block.title, response.value)}
+        action={({ column, value }: { column: string; value: any }) => handleBlockResponse(column, value)}
         questions={block}
-        key={`questions-${blockId}`}
+        key={blockId}
         questionId={blockId}
-        initResult={localUpdate[block.title] || null}
-        type={block.type}
+        initResult={update[blockId]}
       />
-      </div>
     );
   };
 
-  return (
+  useEffect(() => {
+    if (pages.length > 0 && !currentPage) {
+      setCurrentPage(pages[0]);
+    }
+  }, [pages, currentPage]);
 
-    <div
+  if (!campaignDetails.script?.steps?.pages) {
+    return (
+      <div 
+        style={{
+          border: "3px solid #BCEBFF",
+          borderRadius: "20px",
+          minHeight: "300px",
+          boxShadow: "3px 5px 0 rgba(50,50,50,.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        <p className="text-gray-500 text-lg font-Zilla-Slab">No script available</p>
+      </div>
+    );
+  }
+
+  const currentBlocks = campaignDetails.script.steps.pages[currentPage]?.blocks || [];
+
+  return (
+    <div 
       style={{
-        position: "relative",
-        minWidth: "30%",
-        flex: "1 1 auto",
         border: "3px solid #BCEBFF",
         borderRadius: "20px",
-        backgroundColor: "hsl(var(--card))",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
+        minHeight: "300px",
+        boxShadow: "3px 5px 0 rgba(50,50,50,.6)",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        backgroundColor: "hsl(var(--card))"
       }}
-      className="flex flex-col"
     >
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -114,70 +176,103 @@ const CallQuestionnaire = ({
           borderTopLeftRadius: "18px",
           borderTopRightRadius: "18px",
           padding: "16px",
-          marginBottom: "10px",
+          background: "hsl(var(--brand-secondary))",
         }}
-        className="bg-brand-primary font-Tabac-Slab text-xl text-white "
+        className="font-Tabac-Slab text-xl text-slate-800"
       >
         <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-          Script & Questionnaire{" "}
-          {contact &&
-            contact.contact &&
-            ` - ${contact.contact.firstname} ${contact.contact.surname}`}
+          Script Questions
+          <span className="ml-2 text-sm text-gray-600">
+            Page {currentPageIndex + 1} of {pages.length}
+          </span>
         </div>
       </div>
-      <div className="p-4">
-        <div className="flex flex-col gap-4">
-          {campaignDetails.script?.steps?.pages?.[currentPageId]?.blocks.map(
-            renderBlock,
-          )}
+
+      {/* Progress bar */}
+      <div className="px-4 py-2 border-b border-gray-200">
+        <Progress value={progress} className="h-2" />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="space-y-6 p-6">
+          {currentBlocks.map((blockId: string) => renderBlock(blockId))}
         </div>
-        {campaignDetails.script?.step?.pages && <div className="mt-4 flex justify-between">
-          <Button
-            onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
-              const currentIndex = pageIds.indexOf(currentPageId);
-              if (currentIndex > 0) {
-                setCurrentPageId(pageIds[currentIndex - 1]);
-              }
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-200 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigateToPage("prev")}
+              disabled={currentPageIndex === 0 || disabled || isBusy}
+              style={{
+                flex: "1 1 auto",
+                padding: "4px 8px",
+                border: "1px solid #d60000",
+                borderRadius: "5px",
+                fontSize: "small",
+                opacity: currentPageIndex === 0 || disabled || isBusy ? ".6" : "unset",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                minWidth: "80px",
+                justifyContent: "center"
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </button>
+            <button
+              onClick={() => navigateToPage("next")}
+              disabled={currentPageIndex === pages.length - 1 || disabled || isBusy}
+              style={{
+                flex: "1 1 auto",
+                padding: "4px 8px",
+                border: "1px solid #d60000",
+                borderRadius: "5px",
+                fontSize: "small",
+                opacity: currentPageIndex === pages.length - 1 || disabled || isBusy ? ".6" : "unset",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                minWidth: "80px",
+                justifyContent: "center"
+              }}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={disabled || isBusy || state !== "idle"}
+            style={{
+              flex: "1 1 auto",
+              padding: "4px 8px",
+              background: "#4CA83D",
+              borderRadius: "5px",
+              color: "white",
+              fontSize: "small",
+              opacity: disabled || isBusy || state !== "idle" ? ".6" : "unset",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
+              minWidth: "100px"
             }}
-            disabled={
-              isBusy ||
-              currentPageId ===
-              Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
-            }
           >
-            Previous Page
-          </Button>
-          <Button
-            onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
-              const currentIndex = pageIds.indexOf(currentPageId);
-              if (currentIndex < pageIds.length - 1) {
-                setCurrentPageId(pageIds[currentIndex + 1]);
-              }
-            }}
-            disabled={
-              isBusy ||
-              currentPageId ===
-              Object.keys(campaignDetails.script?.steps.pages || {})[
-                Object.keys(campaignDetails.script?.steps.pages || {}).length - 1
-              ]
-            }
-          >
-            Next Page
-          </Button>
-        </div>}
-        <div className="flex justify-end p-2">
-          <Button
-            onClick={handleQuickSave}
-            disabled={isBusy}
-          >
-            Save
-          </Button>
+            <Save className="h-4 w-4" />
+            <span>
+              {saveStatus === "saving" ? "Saving..." : 
+               saveStatus === "saved" ? "Saved!" : "Save"}
+            </span>
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-export { CallQuestionnaire };
+export default CallQuestionnaire;
