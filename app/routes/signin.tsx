@@ -6,12 +6,11 @@ import { Button } from "~/components/ui/button";
 import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers } = await verifyAuth(request);
+  const { supabaseClient, headers } = createSupabaseServerClient(request);
   const requestUrl = new URL(request.url);
   const next = requestUrl.searchParams.get('next');
 
   const formData = await request.formData();
-
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -21,7 +20,9 @@ export const action = async ({ request }: { request: Request }) => {
   });
 
   if (!error) {
-    if (next) return redirect(next, {headers});
+    if (next && next.startsWith('/') && !next.startsWith('/signin')) {
+      return redirect(next, {headers});
+    }
     return redirect("/workspaces", { headers });
   }
   console.log(error);
