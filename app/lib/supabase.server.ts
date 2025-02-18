@@ -45,7 +45,7 @@ export async function getSupabaseServerClientWithSession(request: Request) {
   return { supabaseClient, headers, serverSession, user };
 }
 
-export async function verifyAuth(request: Request, nextUrl = '/login') {
+export async function verifyAuth(request: Request, nextUrl = '/signin') {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const {
     data: { user },
