@@ -36,12 +36,12 @@ type Chat = {
 }
 
 type ChatHeaderParams = {
-  contact?: Contact,
+  contact?: Contact | null,
   outlet: boolean,
   phoneNumber?: string,
   handlePhoneChange: (e:string | null) => null;
   isValid: boolean;
-  selectedContact?: Contact;
+  selectedContact?: Contact | null;
   contacts: Contact[];
   toggleContactMenu: () => null;
   isContactMenuOpen: boolean;

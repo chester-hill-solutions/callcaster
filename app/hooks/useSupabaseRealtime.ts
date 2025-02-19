@@ -7,6 +7,16 @@ import { usePhoneNumbers } from "./usePhoneNumbers";
 import { QueueItem, User, OutreachAttempt, Call } from "~/lib/types";
 import { Database } from "~/lib/database.types";
 
+type RealtimeChangePayload = {
+  table: string;
+  schema: string;
+  commit_timestamp: string;
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  new: Record<string, any>;
+  old: Record<string, any>;
+  errors: null | any[];
+};
+
 interface InitialState {
   queue: QueueItem[];
   predictiveQueue: QueueItem[];
@@ -30,6 +40,40 @@ interface UseSupabaseRealtimeProps {
   setCallDuration: (duration: number) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
+
+export const useSupabaseRealtimeSubscription = ({
+  supabase,
+  schema = "public",
+  table,
+  filter,
+  onChange,
+}: {
+  supabase: SupabaseClient<Database>;
+  schema?: string;
+  table: string | string[];
+  filter?: string;
+  onChange: (payload: RealtimeChangePayload) => void;
+}) => {
+  useEffect(() => {
+    const channel = supabase
+      .channel("db-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema,
+          table,
+          ...(filter ? { filter } : {}),
+        },
+        onChange
+      )
+      .subscribe();
+
+    return () => {
+      void channel.unsubscribe();
+    };
+  }, [supabase, schema, table, filter, onChange]);
+};
 
 export const useSupabaseRealtime = ({
   user,

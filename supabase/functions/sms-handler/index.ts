@@ -3,9 +3,8 @@
 // This enables autocomplete, go to definition, etc.
 
 // Setup type definitions for built-in Supabase Runtime APIs
-import { SupabaseClient } from "@supabase/supabase-js";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 const functionHeaders = {
@@ -36,24 +35,23 @@ const normalizePhoneNumber = (input: string): string => {
   return cleaned;
 };
 
-async function processNextMessage(user_id, campaign_id) {
+async function processNextMessage(user_id: string, campaign_id: string) {
   try {
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 300));
     await fetch(
       `${baseUrl}/queue-next`,
       {
         method: 'POST',
         headers: functionHeaders,
         body: JSON.stringify({
-          user_id: user_id,
+          owner: user_id,
           campaign_id: campaign_id,
         })
       }
     );
-
   } catch (error) {
-    console.error(`Error initiating next call for campaign ${campaign_id}:`, {
-      error: error.message,
+    console.error(`Error initiating next message for campaign ${campaign_id}:`, {
+      error: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 }
@@ -96,6 +94,7 @@ const sendMessage = async ({
   queue_id,
   user_id,
 }: SendMessageParams) => {
+  let outreachAttemptId: string | null = null;
   try {
     // Check workspace credits before sending
     const { data: workspaceData, error: workspaceError } = await supabase
@@ -117,25 +116,33 @@ const sendMessage = async ({
       workspace_id: workspace,
     });
 
-    const [message, outreachAttempt] = await Promise.all([
-      twilio.messages.create({
-        body,
-        to,
-        from,
-        statusCallback: `${baseUrl}/sms-status`,
-        ...(media?.length && { mediaUrl: media }),
-      }).catch(e => ({ error: e })),
-      await createOutreachAttempt({
-        supabase,
-        contact_id,
-        campaign_id,
-        queue_id,
-        workspace,
-        user_id,
-      })
-    ]);
+    outreachAttemptId = await createOutreachAttempt({
+      supabase,
+      contact_id,
+      campaign_id,
+      queue_id,
+      workspace,
+      user_id,
+    });
+
+    if (!outreachAttemptId) {
+      throw new Error("Failed to create outreach attempt");
+    }
+
+    const message = await twilio.messages.create({
+      body,
+      to,
+      from,
+      statusCallback: `${baseUrl}/sms-status`,
+      ...(media?.length && { mediaUrl: media }),
+    }).catch((e: Error) => ({ error: e }));
 
     if ('error' in message) {
+      // Update outreach attempt as failed
+      await supabase
+        .from("outreach_attempt")
+        .update({ disposition: "failed" })
+        .eq("id", outreachAttemptId);
       throw message.error;
     }
 
@@ -165,21 +172,28 @@ const sendMessage = async ({
         workspace,
         contact_id,
         queue_id,
-      })
-    if (messageInsertError) throw messageInsertError;
+        outreach_attempt_id: outreachAttemptId,
+      });
 
-    return { message };
+    if (messageInsertError) {
+      // Update outreach attempt as failed if message insert fails
+      await supabase
+        .from("outreach_attempt")
+        .update({ disposition: "failed" })
+        .eq("id", outreachAttemptId);
+      throw messageInsertError;
+    }
+
+    return { message, outreachAttemptId };
   } catch (error) {
+    if (outreachAttemptId) {
+      await supabase
+        .from("outreach_attempt")
+        .update({ disposition: "failed" })
+        .eq("id", outreachAttemptId);
+    }
     console.error("Error in SMS handler:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    return { error: error instanceof Error ? error.message : 'Unknown error' };
   }
 };
 
@@ -219,22 +233,40 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
     const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id } = await req.json();
+
+    // Check if campaign is still active
+    const { data: campaign, error: campaignError } = await supabase
+      .from("campaign")
+      .select("is_active")
+      .eq("id", campaign_id)
+      .single();
+
+    if (campaignError || !campaign?.is_active) {
+      return new Response(
+        JSON.stringify({ status: "campaign_completed" }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     const { data: campaignDetails, error: detailsError } = await supabase
       .from("message_campaign")
       .select()
       .eq('campaign_id', campaign_id)
-      .single()
+      .single();
+
     if (detailsError) throw detailsError;
+
     const media = campaignDetails.message_media?.length
       ? await Promise.all(
         campaignDetails.message_media.map((mediaItem: string) =>
           supabase.storage
             .from("messageMedia")
             .createSignedUrl(`${workspace_id}/${mediaItem}`, 3600)
-            .then(({ data }) => data?.signedUrl)
+            .then(({ data }: { data: { signedUrl: string } | null }) => data?.signedUrl)
         )
       )
       : [];
+
     const result = await sendMessage({
       body: campaignDetails.body_text,
       media: media.filter(Boolean) as string[],
@@ -246,19 +278,30 @@ Deno.serve(async (req) => {
       contact_id,
       queue_id,
       user_id,
-    })
+    });
+
+    if ('error' in result) {
+      await processNextMessage(user_id, campaign_id);
+      return new Response(
+        JSON.stringify({ success: false, error: result.error }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 500,
+        }
+      );
+    }
+
     await processNextMessage(user_id, campaign_id);
     return new Response(
-      JSON.stringify({ result }),
-      {
-        headers: { "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true, result }),
+      { headers: { "Content-Type": "application/json" } }
     );
 
   } catch (error) {
     console.error("Error in SMS handler:", error);
     return new Response(
       JSON.stringify({
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error'
       }),
       {
