@@ -38,7 +38,7 @@ const normalizePhoneNumber = (input: string): string => {
 
 async function processNextMessage(user_id: string, campaign_id: string) {
   try {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
     await fetch(
       `${baseUrl}/queue-next`,
       {
