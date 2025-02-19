@@ -39,7 +39,11 @@ Deno.serve(async (req) => {
       )
     }
     const contact = data[0];
-    console.log(`Calling contact`, contact, campaign);
+    if (campaign.type === "message") {  
+      console.log(`Sending message to contact`, contact, campaign);
+    } else {
+      console.log(`Calling contact`, contact, campaign);
+    }
     const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
       passed_contact_id: contact.contact_id,
       group_on_household: campaign.group_household_queue

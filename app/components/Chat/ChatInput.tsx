@@ -1,9 +1,41 @@
 import { MdSend, MdImage } from "react-icons/md";
 import MessagesImages from "./ChatImages";
+import type { Contact } from "~/lib/types";
+import type { Database } from "~/lib/database.types";
+import type { useFetcher } from "@remix-run/react";
+
+type WorkspaceNumber = {
+  id: string;
+  phone_number: string;
+};
+
+type Workspace = {
+  id: string;
+  name: string;
+  owner: string | null;
+  users: string[] | null;
+  workspace_number?: WorkspaceNumber[];
+  created_at: string;
+};
+
+interface ChatInputProps {
+  workspace: NonNullable<Workspace>;
+  workspaceNumbers: WorkspaceNumber[];
+  initialFrom: string;
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleImageRemove: (imageUrl: string) => void;
+  selectedImages: string[];
+  selectedContact: Contact | null;
+  messageFetcher: ReturnType<typeof useFetcher>;
+  phoneNumber: string;
+  isValid: boolean;
+}
 
 export default function ChatInput({
   workspace,
   initialFrom,
+  workspaceNumbers,
   handleSubmit,
   handleImageSelect,
   handleImageRemove,
@@ -12,7 +44,7 @@ export default function ChatInput({
   messageFetcher,
   phoneNumber,
   isValid,
-}) {
+}: ChatInputProps) {
   return (
     <div className="border-t bg-white p-4">
       <messageFetcher.Form
@@ -30,7 +62,7 @@ export default function ChatInput({
             defaultValue={initialFrom}
             className="flex-grow rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
           >
-            {workspace?.workspace_number?.map((num) => (
+            {workspaceNumbers?.map((num) => (
               <option key={num.id} value={num.phone_number}>
                 {num.phone_number}
               </option>
@@ -73,6 +105,7 @@ export default function ChatInput({
               !(selectedContact || (phoneNumber && isValid))
             }
             className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white transition-colors hover:bg-blue-600 disabled:bg-gray-400"
+            aria-label="Send message"
           >
             <MdSend size={20} />
           </button>

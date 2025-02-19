@@ -44,7 +44,8 @@ import {
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/lib/database.types";
-import type { User, Contact } from "~/lib/types";
+import type { User, Contact, WorkspaceNumber, Workspace } from "~/lib/types";
+import { sendMessage } from "./api.chat_sms";
 
 type WorkspaceContextType = {
   supabase: SupabaseClient<Database>;
@@ -53,7 +54,7 @@ type WorkspaceContextType = {
     name: string;
     owner: string | null;
     users: string[] | null;
-    workspace_number?: string[];
+    workspace_number?: WorkspaceNumber[];
     created_at: string;
   };
 };
@@ -107,7 +108,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
 
-  const [contactData, smsCampaigns] = await Promise.all([
+  const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
+    supabaseClient.from("workspace_number").select("*").eq("workspace", workspaceId).eq('type', 'rented'),
     !contact_id || !contact_number ? null : fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
     fetchCampaignsByType({
       supabaseClient,
@@ -115,7 +117,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       type: "message_campaign",
     }),
   ]);
-
   const { contact, potentialContacts, contactError } = contactData || { contact: null, potentialContacts: [], contactError: null };
   if (contactError) {
     return json(
@@ -131,6 +132,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return defer(
     {
       campaigns: smsCampaigns,
+      workspaceNumbers: workspaceNumbers?.data,
       chatsPromise,
       potentialContacts,
       contact,
@@ -151,28 +153,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const contact_number = normalizePhoneNumber(
     params.contact_number || data.contact_number as string,
   );
-  const res = await fetch(`${process.env.BASE_URL}/api/chat_sms`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      body: data.body,
-      to_number: contact_number,
-      caller_id: data.from,
-      workspace_id: workspaceId,
-      contact_id: data.contact_id,
-      media: data.media,
-    }),
-  });
-  const responseData = await res.json();
+  
+  const responseData = await sendMessage({
+    body: data.body as string,
+    to: contact_number as string,
+    from: data.from as string,
+    media: data.media as string,
+    supabase: supabaseClient,
+    workspace: workspaceId as string,
+    contact_id: data.contact_id as string,
+  });   
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
 }
 
 export default function ChatsList() {
   const { supabase, workspace } = useOutletContext<WorkspaceContextType>();
-  const { chatsPromise, potentialContacts, contact, campaigns } = useLoaderData<LoaderData>();
+  const { chatsPromise, potentialContacts, contact, campaigns, workspaceNumbers } = useLoaderData<LoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
   const imageFetcher = useFetcher({ key: "images" });
@@ -298,9 +295,8 @@ export default function ChatsList() {
       return date.toLocaleDateString([], { month: "short", day: "numeric" });
     }
   }
-
   return (
-    <main className="flex h-full max-h-[80vh] w-full gap-4">
+    <main className="flex h-[calc(100vh-80px)] w-full gap-4">
       <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
         <Button
           className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
@@ -353,7 +349,19 @@ export default function ChatsList() {
           </div>
         </filterFetcher.Form>
         <div className="flex-1 overflow-y-auto">
-          <Suspense fallback={<div className="p-4 text-center text-gray-500">Loading conversations...</div>}>
+          <Suspense fallback={
+            <div className="h-[calc(100vh-200px)] animate-pulse space-y-4 p-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-4">
+                  <div className="h-10 w-10 rounded-full bg-gray-200"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
+                    <div className="h-3 w-1/2 rounded bg-gray-200"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          }>
             <Await resolve={chatsPromise}>
               {(chatsData: any) => {
                 const { chats, chatsError } = chatsData as ChatsData;
@@ -446,14 +454,15 @@ export default function ChatsList() {
           handleExistingConversationClick={handleExistingConversationClick as unknown as (phoneNumber: string) => null}
           setDialog={setDialog as unknown as (contact: Contact) => null}
         />
-        <div className="flex h-full flex-col overflow-y-scroll bg-gray-100 dark:bg-zinc-900">
-          <Outlet context={{ supabase, workspace }} />
+        <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
+          <Outlet context={{ supabase, workspace, workspaceNumbers }} />
         </div>
         <ChatInput
           isValid={isValid}
           phoneNumber={phoneNumber}
-          workspace={workspace}
-          initialFrom={workspace?.workspace_number?.[0]}
+          workspace={workspace as NonNullable<Workspace>}
+          workspaceNumbers={workspaceNumbers as WorkspaceNumber[]}
+          initialFrom={workspaceNumbers?.[0]?.phone_number as string}
           handleSubmit={handleSubmit}
           handleImageSelect={handleImageSelect}
           handleImageRemove={handleImageRemove}
