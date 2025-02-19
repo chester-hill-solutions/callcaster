@@ -353,6 +353,7 @@ export async function getUserRole({
   user,
   workspaceId,
 }: {
+  supabaseClient: SupabaseClient;
   user: User;
   workspaceId: string;
 }) {
@@ -1345,7 +1346,7 @@ export async function fetchConversationSummary(
   if (campaign_id) {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: Number(campaign_id) },
+      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
     );
     chats = data;
     chatsError = error;

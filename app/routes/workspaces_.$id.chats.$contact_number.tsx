@@ -6,7 +6,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "~/hooks/useChatRealtime";
 import { useIntersectionObserver } from "~/hooks/useIntersectionOverserver";
 import MessageList from "~/components/Chat/ChatMessages";
-import { Message, WorkspaceData } from "~/lib/types";
+import { Message, Workspace, WorkspaceNumber } from "~/lib/types";
 
 const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
   return Promise.all(
@@ -60,19 +60,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function ChatScreen() {
-  const { supabase, workspace } = useOutletContext<{ supabase: SupabaseClient, workspace: WorkspaceData }>();
+  const { supabase, workspace, workspaceNumbers } = useOutletContext<{ supabase: SupabaseClient, workspace: NonNullable<Workspace>, workspaceNumbers: WorkspaceNumber[] }>();
   const { messages: initialMessages } = useLoaderData<{ messages: Message[] }>();
 
-  const messagesEndRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef<number>(initialMessages.length);
+  const scrollPositionRef = useRef<number>(0);
 
   const { messages, setMessages } = useChatRealTime({
     supabase,
     initial: initialMessages,
-    workspace: workspace?.id as string,
+    workspace: workspace.id,
   });
 
   const updateMessageStatus = async (messageId: string) => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("message")
       .update({ status: "delivered" })
       .eq("sid", messageId);
@@ -80,9 +82,9 @@ export default function ChatScreen() {
     if (error) {
       console.error("Error updating message status:", error);
     } else {
-      setMessages((prevMessages: Message[]) =>
-        prevMessages.map((msg: Message) =>
-          msg.sid === messageId ? { ...msg, status: "delivered" } : msg,
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg?.sid === messageId ? { ...msg, status: "delivered" } : msg,
         ),
       );
     }
@@ -98,23 +100,56 @@ export default function ChatScreen() {
 
   const observer = useIntersectionObserver(observerCallback);
 
+  // Handle intersection observer setup once
   useEffect(() => {
-    const messageElements = document.querySelectorAll(".message-item");
-    messageElements.forEach((el) => {
-      if (observer) {
-        observer.observe(el as HTMLElement);
-      }
-    });
+    if (!observer) return;
+
+    const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
+    messageElements.forEach((el) => observer.observe(el));
 
     return () => {
-      if (observer) {
-        messageElements.forEach((el) => observer.unobserve(el as HTMLElement));
-      }
+      messageElements.forEach((el) => observer.unobserve(el));
+    };
+  }, [observer]); // Only re-run when observer changes
+
+  // Handle new message elements
+  useEffect(() => {
+    if (!observer) return;
+
+    // Only observe new messages
+    const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
+    const newMessages = Array.from(messageElements).slice(lastMessageCountRef.current);
+    
+    newMessages.forEach((el) => observer.observe(el));
+    lastMessageCountRef.current = messageElements.length;
+
+    return () => {
+      newMessages.forEach((el) => observer.unobserve(el));
     };
   }, [messages, observer]);
 
+  // Intelligent scroll handling
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messagesEndRef.current) return;
+
+    const container = messagesEndRef.current.parentElement;
+    if (!container) return;
+
+    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+    const hasNewMessages = messages.length > lastMessageCountRef.current;
+
+    if (hasNewMessages) {
+      if (isAtBottom) {
+        // User is at bottom, scroll to new messages
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      } else {
+        // Preserve scroll position if user has scrolled up
+        scrollPositionRef.current = container.scrollTop;
+        requestAnimationFrame(() => {
+          container.scrollTop = scrollPositionRef.current;
+        });
+      }
+    }
   }, [messages]);
 
   return (

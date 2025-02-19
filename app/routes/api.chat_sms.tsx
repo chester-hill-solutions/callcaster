@@ -1,7 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance } from '../lib/database.server';
+import { Database } from '~/lib/database.types';
 
-const normalizePhoneNumber = (input) => {
+const normalizePhoneNumber = (input: string) => {
     let cleaned = input.replace(/[^0-9+]/g, '');
 
     cleaned = cleaned.indexOf('+') > 0 ? cleaned.replace(/\+/g, '') : cleaned;
@@ -19,16 +20,19 @@ const normalizePhoneNumber = (input) => {
     return cleaned;
 };
 
-const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id }) => {
+export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string }) => {
     const mediaData = media && JSON.parse(media);
+    console.log(body, to, from, mediaData, workspace, contact_id);
     const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id:workspace});
-    const message = await twilio.messages.create({
-        body,
+    try {
+        const message = await twilio.messages.create({
+            body,
         to,
         from,
         statusCallback: `${process.env.BASE_URL}/api/sms/status`,
         ...(mediaData && mediaData.length > 0 && { mediaUrl: [...mediaData] })
     });
+    console.log(message);
     const {
         sid,
         body: sentBody,
@@ -75,14 +79,18 @@ const sendMessage = async ({ body, to, from, media, supabase, workspace, contact
         workspace,
         ...(contact_id && {contact_id}),
         ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] })
-    }).select();
+    }).select();    
     if (error) throw { 'message_entry_error:': error };
     return { message, data };
+    } catch (error) {
+        console.log(`Error sending message: ${error}`);
+        return { error: 'Failed to send message' };
+    }
 };
 
-export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { to_number, workspace_id, contact_id, caller_id, body, media } = await request.json();
+export const action = async ({ request }: { request: Request }) => {
+    const supabase = createClient(process.env.SUPABASE_URL as string, process.env.SUPABASE_SERVICE_KEY as string);
+    const { to_number, workspace_id, contact_id, caller_id, body, media } = await request.json() as { to_number: string, workspace_id: string, contact_id: string, caller_id: string, body: string, media: string };
     let to;
     try {
         to = normalizePhoneNumber(to_number);
