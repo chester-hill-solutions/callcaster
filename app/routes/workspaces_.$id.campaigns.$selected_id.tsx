@@ -113,7 +113,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchCampaignData(supabaseClient, selected_id),
     fetchCampaignCounts(supabaseClient, selected_id),
-    getUserRole({ user: user as unknown as User, workspaceId: workspace_id })
+    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id })
   ]);
   if (!campaignType || !campaignType.data) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -129,11 +129,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     campaignTable
   );
 
-  const resultsPromise = fetchBasicResults(supabaseClient, selected_id);
+  const resultsPromise = fetchBasicResults(supabaseClient, selected_id) as unknown as { disposition: string, count: number, average_call_duration: string, average_wait_time: string, expected_total: number }[];
 
   return defer({
     selected_id,
-    hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole),
+    hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole),
     campaignDetails,
     user: user,
     campaignCounts,

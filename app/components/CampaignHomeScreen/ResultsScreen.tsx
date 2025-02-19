@@ -3,14 +3,32 @@ import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
 
+type CampaignResult = {
+  disposition: string;
+  count: number;
+  average_call_duration: string;
+  average_wait_time: string;
+  expected_total: number;
+};
+
+type CampaignCounts = {
+  completedCount: number | null;
+  callCount: number | null;
+};
+
 const ResultsScreen = ({
   totalCalls = 0,
   results = [],
   expectedTotal = 0,
   isBusy,
   campaignCounts
-}: { totalCalls: number, results: any, expectedTotal: number, isBusy: boolean, campaignCounts: any }) => {
-
+}: { 
+  totalCalls: number;
+  results: CampaignResult[];
+  expectedTotal: number;
+  isBusy: boolean;
+  campaignCounts: CampaignCounts;
+}) => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -23,13 +41,13 @@ const ResultsScreen = ({
         </div>
         <DispositionBreakdown
           results={results}
-          totalCalls={campaignCounts.completedCount}
-          expectedTotal={campaignCounts.callCount}
+          totalCalls={campaignCounts.completedCount || 0}
+          expectedTotal={campaignCounts.callCount || 0}
         />
         <KeyMetrics
           results={results}
-          totalCalls={campaignCounts.completedCount}
-          expectedTotal={campaignCounts.callCount}
+          totalCalls={campaignCounts.completedCount || 0}
+          expectedTotal={campaignCounts.callCount || 0}
         />
       </div>
     </div>

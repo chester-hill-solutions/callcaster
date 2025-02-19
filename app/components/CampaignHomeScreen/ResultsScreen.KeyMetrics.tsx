@@ -1,6 +1,6 @@
-import { ResultsScreenProps } from "~/lib/database.types";
+import { DispositionResult } from "~/lib/types";
 
-export const KeyMetrics = ({ results, totalCalls }: ResultsScreenProps) => {
+export const KeyMetrics = ({ results, totalCalls }: { results: DispositionResult[]; totalCalls: number }) => {
   const getRate = (disposition: string): string => {
     const count =
       results?.find((d) => d.disposition === disposition)?.count || 0;
@@ -33,11 +33,16 @@ export const KeyMetrics = ({ results, totalCalls }: ResultsScreenProps) => {
 export const KeyMessageMetrics = ({
   results,
   totalCalls,
-}: ResultsScreenProps) => {
+  expectedTotal,
+}: {
+  results: DispositionResult[];
+  totalCalls: number;
+  expectedTotal: number;
+}) => {
   const getRate = (disposition: string): string => {
     const count =
       results?.find((d) => d.disposition === disposition)?.count || 0;
-    return ((count / totalCalls) * 100).toFixed(1);
+    return ((count /  expectedTotal ) * 100).toFixed(1);
   };
 
   return (
@@ -46,12 +51,12 @@ export const KeyMessageMetrics = ({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg bg-blue-100 p-4">
           <p className="text-lg font-semibold text-blue-500">Delivered Rate</p>
-          <p className="text-3xl font-bold text-blue-800">{getRate("sent")}%</p>
+          <p className="text-3xl font-bold text-blue-800">{getRate("delivered")}%</p>
         </div>
         <div className="rounded-lg bg-red-100 p-4">
           <p className="text-lg font-semibold text-red-500">Failed Rate</p>
           <p className="text-3xl font-bold text-red-800">
-            {getRate("failed")}%
+            {getRate("undelivered")}%
           </p>
         </div>
       </div>

@@ -133,7 +133,7 @@ const sendMessage = async ({
       body,
       to,
       from,
-      statusCallback: `${baseUrl}/sms-status`,
+      statusCallback: `${baseUrl}sms-status`,
       ...(media?.length && { mediaUrl: media }),
     }).catch((e: Error) => ({ error: e }));
 

@@ -357,7 +357,7 @@ export async function getUserRole({
   user: User;
   workspaceId: string;
 }) {
-  if (user == null || user.access_token == null) {
+  if (!user ) {
     return null;
   }
 
@@ -1123,7 +1123,6 @@ export const fetchBasicResults = async (
   return data || [];
 };
 
-// Start of Selection
 export const fetchCampaignCounts = async (supabaseClient: SupabaseClient, campaignId: string) => {
   const { count, error } = await supabaseClient
     .from("campaign_queue")
@@ -1350,6 +1349,7 @@ export async function fetchConversationSummary(
     );
     chats = data;
     chatsError = error;
+    console.log(error);
   } else {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary",

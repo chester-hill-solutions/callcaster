@@ -5,8 +5,8 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import Twilio from "npm:twilio@^5.3.0";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
+import Twilio, { validateRequest } from "npm:twilio@^5.3.0";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
@@ -55,27 +55,61 @@ Deno.serve(async (req) => {
       throw new Error("Missing required parameters");
     }
 
-    // Update message status
+    // Get message data to find the workspace
     const { data: messageData, error: messageError } = await supabase
       .from("message")
-      .update({ status })
-      .eq("sid", sid)
       .select("*, outreach_attempt(workspace)")
+      .eq("sid", sid)
       .single();
 
-    if (messageError) {
-      throw new Error(`Failed to update message: ${messageError.message}`);
+    if (messageError || !messageData?.outreach_attempt?.workspace) {
+      throw new Error(`Failed to get message data: ${messageError?.message || 'No workspace found'}`);
+    }
+
+    // Get workspace data to get Twilio auth token
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspace")
+      .select("twilio_data")
+      .eq("id", messageData.outreach_attempt.workspace)
+      .single();
+
+    if (workspaceError || !workspace?.twilio_data?.authToken) {
+      throw new Error(`Failed to get workspace data: ${workspaceError?.message || 'No auth token found'}`);
+    }
+
+    // Validate the request is from Twilio
+    const twilioSignature = req.headers.get('x-twilio-signature');
+    const url = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/sms-status`;
+    const isValidRequest = validateRequest(
+      workspace.twilio_data.authToken,
+      twilioSignature || '',
+      url,
+      Object.fromEntries(formData)
+    );
+
+    if (!isValidRequest) {
+      return new Response("Invalid Twilio signature", { status: 403 });
+    }
+
+    // Update message status
+    const { error: updateError } = await supabase
+      .from("message")
+      .update({ status })
+      .eq("sid", sid);
+
+    if (updateError) {
+      throw new Error(`Failed to update message: ${updateError.message}`);
     }
 
     // Debit credits when message is delivered
-    if (status === 'delivered' && messageData?.outreach_attempt?.workspace) {
+    if ((status === 'delivered' || status === 'failed' || status === 'undelivered') && messageData?.outreach_attempt?.workspace) {
       const { error: transactionError } = await supabase
         .from('transaction_history')
         .insert({
           workspace: messageData.outreach_attempt.workspace,
           type: "DEBIT",
           amount: -1,
-          note: `SMS ${sid} delivered`
+          note: `SMS ${sid} ${status}`
         });
 
       if (transactionError) {

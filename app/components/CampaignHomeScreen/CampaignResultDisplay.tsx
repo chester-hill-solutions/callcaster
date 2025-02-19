@@ -1,30 +1,47 @@
 import { useNavigation } from "@remix-run/react";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
+import { CampaignState } from "~/routes/workspaces_.$id.campaigns.$selected_id";
 
-export const ResultsDisplay = ({ results, campaign, campaignCounts, hasAccess }: 
-  { results: any, campaign: any, campaignCounts: any, hasAccess: boolean }) => {
+type CampaignResult = {
+  disposition: string;
+  count: number;
+  average_call_duration: string;
+  average_wait_time: string;
+  expected_total: number;
+};
 
-  const totalCalls = campaignCounts?.completedCount;
-  const expectedTotal = campaignCounts?.callCount || 0;
+type CampaignCounts = {
+  completedCount: number | null;
+  callCount: number | null;
+};
+
+export const ResultsDisplay = ({ 
+  results, 
+  campaign, 
+  campaignCounts, 
+  hasAccess 
+}: { 
+  results: CampaignResult[];
+  campaign: CampaignState;
+  campaignCounts: CampaignCounts;
+  hasAccess: boolean;
+}) => {
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
 
   return campaign.type === "message" ? (
     <MessageResultsScreen
-      totalCalls={totalCalls}
       results={results}
-      expectedTotal={expectedTotal}
       type={campaign.type}
-      dial_type={campaign.dial_type}
+      hasAccess={hasAccess}
     />
   ) : (
     <ResultsScreen
       campaignCounts={campaignCounts}
       isBusy={isBusy}
-      totalCalls={totalCalls}
       results={results}
-      expectedTotal={expectedTotal}
+      hasAccess={hasAccess}
     />
   );
 };
