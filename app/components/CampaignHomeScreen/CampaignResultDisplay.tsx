@@ -1,30 +1,65 @@
 import { useNavigation } from "@remix-run/react";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
+import { CampaignState } from "~/routes/workspaces_.$id.campaigns.$selected_id";
+import { Campaign } from "~/lib/types";
 
-export const ResultsDisplay = ({ results, campaign, campaignCounts, hasAccess }: 
-  { results: any, campaign: any, campaignCounts: any, hasAccess: boolean }) => {
+type CampaignResult = {
+  disposition: string;
+  count: number;
+  average_call_duration: string;
+  average_wait_time: string;
+  expected_total: number;
+};
 
-  const totalCalls = campaignCounts?.completedCount;
-  const expectedTotal = campaignCounts?.callCount || 0;
+type CampaignCounts = {
+  completedCount: number | null;
+  callCount: number | null;
+};
+
+const getTotalsByDisposition = (results: CampaignResult[]) => {
+  return results.reduce((acc, result) => {
+    acc[result.disposition as string] = (acc[result.disposition as string] || 0) + result.count;
+    return acc;
+  }, {} as Record<string, number>);
+};
+
+
+export const ResultsDisplay = ({ 
+  results, 
+  campaign, 
+  hasAccess,
+  queueCounts
+}: { 
+  results: CampaignResult[];
+  campaign: NonNullable<Campaign>;
+  hasAccess: boolean;
+  queueCounts: {
+    fullCount: number;
+    queuedCount: number;
+  };
+}) => {
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
-
+  const totalsByDisposition = getTotalsByDisposition(results);
+  const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
   return campaign.type === "message" ? (
     <MessageResultsScreen
-      totalCalls={totalCalls}
+      totalsByDisposition={totalsByDisposition}
+      totalOfAllResults={totalOfAllResults}
       results={results}
-      expectedTotal={expectedTotal}
       type={campaign.type}
-      dial_type={campaign.dial_type}
+      hasAccess={hasAccess}
+      queueCounts={queueCounts}
     />
   ) : (
     <ResultsScreen
-      campaignCounts={campaignCounts}
+      totalsByDisposition={totalsByDisposition}
+      totalOfAllResults={totalOfAllResults}
       isBusy={isBusy}
-      totalCalls={totalCalls}
       results={results}
-      expectedTotal={expectedTotal}
+      hasAccess={hasAccess}
+      queueCounts={queueCounts}
     />
   );
 };

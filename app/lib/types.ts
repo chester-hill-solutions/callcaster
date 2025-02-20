@@ -151,6 +151,8 @@ export interface DispositionResult {
       disposition: string;
       count: number;
       average_call_duration: string;
+      average_wait_time: string;
+      expected_total: number;
     }
     
 export interface ResultsScreenProps {

@@ -1,20 +1,31 @@
-import { ResultsScreenProps } from "~/lib/database.types";
+import { ResultsScreenProps, DispositionResult } from "~/lib/types";
 import { TotalMessages } from "./ResultsScreen.TotalCalls";
 import { ExportButton } from "./ResultsScreen.ExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
 import { NavLink, useNavigation } from "@remix-run/react";
 
+interface MessageResultsScreenProps {
+  results: DispositionResult[];
+  type?: string;
+  hasAccess?: boolean;
+  totalsByDisposition: Record<string, number>;
+  totalOfAllResults: number;
+  queueCounts: {
+    fullCount: number;
+    queuedCount: number;
+  };
+}
+
 const MessageResultsScreen = ({
-  totalCalls = 0,
   results = [],
-  expectedTotal = 0,
   type,
-  dial_type,
-  handleNavlinkStyles,
-  hasAccess,
-}: ResultsScreenProps) => {
-  const {state} = useNavigation();
+  hasAccess = false,
+  totalsByDisposition,
+  totalOfAllResults,
+  queueCounts,
+}: MessageResultsScreenProps) => {
+  const { state } = useNavigation();
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -24,10 +35,14 @@ const MessageResultsScreen = ({
             <div>
               {type === "live_call" || !type ? (
                 <NavLink
-                  className={({ isActive, isPending }) =>
-                    handleNavlinkStyles(isActive, isPending)
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-2 font-Zilla-Slab text-lg font-bold transition-colors duration-150 ease-in-out ${isActive
+                      ? "bg-brand-primary text-white"
+                      : "bg-secondary text-brand-primary hover:bg-white"
+                    }`
                   }
-                  to={`${dial_type || "call"}`}
+
+                  to={`${type || "call"}`}
                   relative="path"
                 >
                   Join Campaign
@@ -42,21 +57,19 @@ const MessageResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalMessages
-            totalMessages={totalCalls}
-            expectedTotal={expectedTotal}
+            totalMessages={totalsByDisposition.delivered || 0}
+            expectedTotal={queueCounts.fullCount || 0}
           />
-          <ExportButton isBusy={state !== "idle"}/>
+          <ExportButton isBusy={state !== "idle"} />
         </div>
         <DispositionBreakdown
           results={results}
-          totalCalls={totalCalls}
-          expectedTotal={expectedTotal}
+          totalCalls={totalOfAllResults || 0}
+          expectedTotal={totalOfAllResults || 0}
         />
         <KeyMessageMetrics
           results={results}
-          totalCalls={totalCalls}
-          expectedTotal={expectedTotal}
-          isBusy={state !== "idle"}
+          expectedTotal={totalOfAllResults || 0}
         />
       </div>
     </div>
