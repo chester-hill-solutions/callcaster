@@ -6,6 +6,7 @@ import { DataTable } from "~/components/WorkspaceTable/DataTable";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
+import { User } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -23,7 +24,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const userRole = getUserRole({ user: user as unknown as User, workspaceId });
+  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
 
   const { data: workspaceData, error: workspaceError } = await supabaseClient
     .from("workspace")

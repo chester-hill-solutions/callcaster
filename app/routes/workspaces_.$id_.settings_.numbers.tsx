@@ -70,7 +70,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .from("workspaceAudio")
     .list(workspaceId);
   if (user) {
-    const userRole = getUserRole({ user: user as User, workspaceId });
+    const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
     const hasAccess = userRole !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
     return json(

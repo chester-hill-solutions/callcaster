@@ -69,7 +69,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect("/signin");
   }
 
-  const userRole = getUserRole({ user: user as unknown as User, workspaceId: workspace_id });
+  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
     supabase: supabaseClient,
