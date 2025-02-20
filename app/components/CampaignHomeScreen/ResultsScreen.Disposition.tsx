@@ -12,28 +12,27 @@ const dispositionColors: Record<string, string> = {
 
 const DispositionBar = ({
   disposition,
-  count,
-  totalCalls,
-  average_call_duration,
-  expectedTotal,
-  }: DispositionResult & { totalCalls: number, expectedTotal: number }) => (
+  dispositionCount,
+  totalOfAllResults,
+  averageCallDuration,
+}: DispositionResult & { dispositionCount: number, totalOfAllResults: number, averageCallDuration: string }) => (
   <div key={disposition} className="mb-6">
     <div className="mb-1 flex items-center justify-between">
       <span className="text-sm font-medium capitalize">{disposition}</span>
       <span className="text-sm font-medium">
-        {count} ({((count / (totalCalls || expectedTotal)) * 100).toFixed(1)}%)
+        {dispositionCount} ({((dispositionCount / totalOfAllResults) * 100).toFixed(1)}%)
       </span>
     </div>
     <div className="h-2.5 w-full rounded-full bg-gray-200">
       <div
         className={`h-2.5 rounded-full ${dispositionColors[disposition] || "bg-gray-500"}`}
-        style={{ width: `${(count / (totalCalls || expectedTotal)) * 100}%` }}
+        style={{ width: `${(dispositionCount / totalOfAllResults) * 100}%` }}
       ></div>
     </div>
     {(disposition === "completed" || disposition === "voicemail") && (
       <div className="mt-1 text-sm">
         Avg. Duration:{" "}
-        {average_call_duration
+        {averageCallDuration
           ?.split(".")
           .map((t, i) => (i === 1 ? t.slice(0, 2) : t))
           .join(".")}
@@ -44,13 +43,15 @@ const DispositionBar = ({
 
 export const DispositionBreakdown = ({
   results,
-  totalCalls,
-  expectedTotal,
+  totalsByDisposition,
+  totalOfAllResults,
 }: {
   results: DispositionResult[];
-  totalCalls: number;
-  expectedTotal: number;
-}) => (
+  totalsByDisposition: Record<string, number>;
+  totalOfAllResults: number;
+}) => {
+  console.log(results);
+  return(
   <div className="mb-8">
     <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
     {results?.map(
@@ -59,10 +60,11 @@ export const DispositionBreakdown = ({
           <DispositionBar
             key={result.disposition}
             {...result}
-            totalCalls={totalCalls}
-            expectedTotal={expectedTotal}
+            dispositionCount={totalsByDisposition[`${result.disposition}`] || 0}
+            totalOfAllResults={totalOfAllResults}
+            averageCallDuration={result?.average_call_duration || "00:00:00"}
           />
         ),
     )}
   </div>
-);
+)};

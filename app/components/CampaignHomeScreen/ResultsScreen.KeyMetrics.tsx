@@ -1,14 +1,27 @@
 import { DispositionResult } from "~/lib/types";
 
-export const KeyMetrics = ({ results, totalCalls }: { results: DispositionResult[]; totalCalls: number }) => {
+export const KeyMetrics = ({
+  results,
+  totalsByDisposition,
+  totalOfAllResults
+}: {
+  results: DispositionResult[];
+  totalsByDisposition: Record<string, number>;
+  totalOfAllResults: number;
+}) => {
+
   const getRate = (disposition: string): string => {
-    const count =
-      results?.find((d) => d.disposition === disposition)?.count || 0;
-    const rate = (count / totalCalls) * 100;
+    if (!Array.isArray(results)) {
+      return "0.0";
+    }
 
-    return isNaN(rate) || !isFinite(rate) ? "0.0" : rate.toFixed(1);
+    const count = totalsByDisposition[disposition] || 0;
+    const rate = (count / totalOfAllResults) * 100;
+    const formattedRate = isNaN(rate) || !isFinite(rate) ? "0.0" : rate.toFixed(1);
+    return formattedRate;
   };
-
+  const completionRate = getRate("completed");
+  const voicemailRate = getRate("voicemail");
   return (
     <div className="mt-8">
       <h3 className="mb-4 text-xl font-semibold">Key Metrics</h3>
@@ -16,13 +29,13 @@ export const KeyMetrics = ({ results, totalCalls }: { results: DispositionResult
         <div className="rounded-lg bg-blue-100 p-4">
           <p className="text-lg font-semibold text-blue-500">Completion Rate</p>
           <p className="text-3xl font-bold text-blue-800">
-            {getRate("completed")}%
+            {completionRate}%
           </p>
         </div>
         <div className="rounded-lg bg-green-100 p-4">
           <p className="text-lg font-semibold text-green-500">Voicemail Rate</p>
           <p className="text-3xl font-bold text-green-800">
-            {getRate("voicemail")}%
+            {voicemailRate}%
           </p>
         </div>
       </div>
@@ -32,18 +45,25 @@ export const KeyMetrics = ({ results, totalCalls }: { results: DispositionResult
 
 export const KeyMessageMetrics = ({
   results,
-  totalCalls,
-  expectedTotal,
+  totalsByDisposition,
+  totalOfAllResults,
 }: {
   results: DispositionResult[];
-  totalCalls: number;
-  expectedTotal: number;
+  totalsByDisposition: Record<string, number>;
+  totalOfAllResults: number;
 }) => {
   const getRate = (disposition: string): string => {
-    const count =
-      results?.find((d) => d.disposition === disposition)?.count || 0;
-    return ((count /  expectedTotal ) * 100).toFixed(1);
+    if (!Array.isArray(results)) {
+      return "0.0";
+    }
+
+    const count = totalsByDisposition[disposition] || 0;
+    const rate = (count / totalOfAllResults) * 100;
+    const formattedRate = isNaN(rate) || !isFinite(rate) ? "0.0" : rate.toFixed(1);
+    return formattedRate;
   };
+  const deliveredRate = getRate("delivered");
+  const undeliveredRate = getRate("undelivered");
 
   return (
     <div className="mt-8">
@@ -51,12 +71,12 @@ export const KeyMessageMetrics = ({
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="rounded-lg bg-blue-100 p-4">
           <p className="text-lg font-semibold text-blue-500">Delivered Rate</p>
-          <p className="text-3xl font-bold text-blue-800">{getRate("delivered")}%</p>
+          <p className="text-3xl font-bold text-blue-800">{deliveredRate}%</p>
         </div>
         <div className="rounded-lg bg-red-100 p-4">
           <p className="text-lg font-semibold text-red-500">Failed Rate</p>
           <p className="text-3xl font-bold text-red-800">
-            {getRate("undelivered")}%
+            {undeliveredRate}%
           </p>
         </div>
       </div>

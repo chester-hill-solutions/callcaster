@@ -2,6 +2,7 @@ import { useNavigation } from "@remix-run/react";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
 import { CampaignState } from "~/routes/workspaces_.$id.campaigns.$selected_id";
+import { Campaign } from "~/lib/types";
 
 type CampaignResult = {
   disposition: string;
@@ -16,32 +17,49 @@ type CampaignCounts = {
   callCount: number | null;
 };
 
+const getTotalsByDisposition = (results: CampaignResult[]) => {
+  return results.reduce((acc, result) => {
+    acc[result.disposition as string] = (acc[result.disposition as string] || 0) + result.count;
+    return acc;
+  }, {} as Record<string, number>);
+};
+
+
 export const ResultsDisplay = ({ 
   results, 
   campaign, 
-  campaignCounts, 
-  hasAccess 
+  hasAccess,
+  queueCounts
 }: { 
   results: CampaignResult[];
-  campaign: CampaignState;
-  campaignCounts: CampaignCounts;
+  campaign: NonNullable<Campaign>;
   hasAccess: boolean;
+  queueCounts: {
+    fullCount: number;
+    queuedCount: number;
+  };
 }) => {
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
-
+  const totalsByDisposition = getTotalsByDisposition(results);
+  const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
   return campaign.type === "message" ? (
     <MessageResultsScreen
+      totalsByDisposition={totalsByDisposition}
+      totalOfAllResults={totalOfAllResults}
       results={results}
       type={campaign.type}
       hasAccess={hasAccess}
+      queueCounts={queueCounts}
     />
   ) : (
     <ResultsScreen
-      campaignCounts={campaignCounts}
+      totalsByDisposition={totalsByDisposition}
+      totalOfAllResults={totalOfAllResults}
       isBusy={isBusy}
       results={results}
       hasAccess={hasAccess}
+      queueCounts={queueCounts}
     />
   );
 };

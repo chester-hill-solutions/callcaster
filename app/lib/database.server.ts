@@ -20,7 +20,7 @@ import {
   WorkspaceNumbers,
 } from "./types";
 import { jwtDecode } from "jwt-decode";
-import { json } from "@remix-run/node";
+import { data, json } from "@remix-run/node";
 import { extractKeys, flattenRow } from "./utils";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "~/components/Workspace/TeamMember";
@@ -1194,6 +1194,34 @@ export const fetchCampaignDetails = async (
   }
   return data;
 };
+
+export const fetchQueueCounts = async (supabaseClient: SupabaseClient<Database>, campaignId: string) => {
+  const { error: fullCountError, count: fullCountCount } = await supabaseClient
+    .from("campaign_queue")
+    .select("*, contact!inner(*)", { count: "exact", head: true })
+    .eq("campaign_id", Number(campaignId))
+    .not('contact.phone', 'is', null)
+    .neq('contact.phone', '')
+    .limit(1);
+  
+  const { error: queuedCountError, count: queuedCountCount } = await supabaseClient
+    .from("campaign_queue")
+    .select("*, contact!inner(*)", { count: "exact", head: true })
+    .eq("campaign_id", Number(campaignId))
+    .eq('status', 'queued')
+    .not('contact.phone', 'is', null)
+    .neq('contact.phone', '')
+    .limit(1);
+
+  if (fullCountError) throw new Error(`Error fetching full count: ${fullCountError?.message || "Unknown error fetching full count"}`);
+  if (queuedCountError) throw new Error(`Error fetching queued count: ${queuedCountError?.message || "Unknown error fetching queued count"}`);
+  
+  return {
+    fullCount: fullCountCount,
+    queuedCount: queuedCountCount,
+  };
+};  
+
 export const fetchCampaignAudience = async (
   supabaseClient: SupabaseClient<Database>,
   campaignId: string,

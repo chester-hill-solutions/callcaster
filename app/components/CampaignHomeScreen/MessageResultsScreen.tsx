@@ -5,29 +5,27 @@ import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
 import { NavLink, useNavigation } from "@remix-run/react";
 
-interface MessageResultsScreenProps extends ResultsScreenProps {
+interface MessageResultsScreenProps {
+  results: DispositionResult[];
   type?: string;
-  handleNavlinkStyles?: (isActive: boolean, isPending: boolean) => string;
   hasAccess?: boolean;
+  totalsByDisposition: Record<string, number>;
+  totalOfAllResults: number;
+  queueCounts: {
+    fullCount: number;
+    queuedCount: number;
+  };
 }
-type Disposition = "delivered" | "failed" | "pending" | "sending" | "sent" | "undelivered" | "unknown";
-
-const getTotalsByDisposition = (results: DispositionResult[]) => {
-  return results.reduce((acc, result) => {
-    acc[result.disposition as Disposition] = (acc[result.disposition as Disposition] || 0) + result.count;
-    return acc;
-  }, {} as Record<Disposition, number>);
-};
 
 const MessageResultsScreen = ({
   results = [],
   type,
-  handleNavlinkStyles = () => "",
   hasAccess = false,
+  totalsByDisposition,
+  totalOfAllResults,
+  queueCounts,
 }: MessageResultsScreenProps) => {
-  const {state} = useNavigation();
-  const totalsByDisposition = getTotalsByDisposition(results);
-  const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
+  const { state } = useNavigation();
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -37,9 +35,13 @@ const MessageResultsScreen = ({
             <div>
               {type === "live_call" || !type ? (
                 <NavLink
-                  className={({ isActive, isPending }) =>
-                    handleNavlinkStyles(isActive, isPending)
+                  className={({ isActive }) =>
+                    `rounded-md px-3 py-2 font-Zilla-Slab text-lg font-bold transition-colors duration-150 ease-in-out ${isActive
+                      ? "bg-brand-primary text-white"
+                      : "bg-secondary text-brand-primary hover:bg-white"
+                    }`
                   }
+
                   to={`${type || "call"}`}
                   relative="path"
                 >
@@ -56,9 +58,9 @@ const MessageResultsScreen = ({
         <div className="flex justify-between">
           <TotalMessages
             totalMessages={totalsByDisposition.delivered || 0}
-            expectedTotal={totalOfAllResults || 0}
+            expectedTotal={queueCounts.fullCount || 0}
           />
-          <ExportButton isBusy={state !== "idle"}/>
+          <ExportButton isBusy={state !== "idle"} />
         </div>
         <DispositionBreakdown
           results={results}
@@ -67,7 +69,6 @@ const MessageResultsScreen = ({
         />
         <KeyMessageMetrics
           results={results}
-          totalCalls={totalsByDisposition.sent || 0}
           expectedTotal={totalOfAllResults || 0}
         />
       </div>

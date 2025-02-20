@@ -12,10 +12,12 @@ import { verifyAuth } from "~/lib/supabase.server";
 
 import {
   fetchBasicResults,
+  fetchCampaignAudience,
   fetchCampaignCounts,
   fetchCampaignData,
   fetchCampaignDetails,
   fetchOutreachData,
+  fetchQueueCounts,
   getUserRole,
   getWorkspaceUsers,
   processOutreachExportData,
@@ -78,22 +80,34 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
   const { data: users } = await getWorkspaceUsers({ supabaseClient, workspaceId: workspace_id });
-  const outreachData = await fetchOutreachData(supabaseClient, campaign_id);
-
-  if (!outreachData || outreachData.length === 0) {
-    return new Response("No data found", { status: 404 });
+  const campaignType = await supabaseClient.from('campaign').select('type').eq('id', Number(campaign_id)).single();
+  if (!campaignType || !campaignType.data) {
+    return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
-
-  const { csvHeaders, flattenedData } = processOutreachExportData(
-    [outreachData].filter(Boolean),
-    (users ?? []).map(u => u as any)
-  );
-  const csvContent = generateCSVContent(csvHeaders as string[], flattenedData as any[]);
-
-  return json({
-    csvContent,
-    filename: `outreach_results_${campaign_id}.csv`,
-  });
+  if (campaignType.data.type === "message") {
+    const { data, error } = await supabaseClient.rpc('get_campaign_messages', {
+      prop_campaign_id: Number(campaign_id),
+      prop_workspace_id: workspace_id
+    }).csv();
+    if (error || !data) {
+      console.error(error);
+      return json({ error: error?.message || "Error fetching campaign messages" }, { status: 500 });
+    }
+    return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
+  } else if (campaignType.data.type === "live_call" || campaignType.data.type === "robocall") {
+    const { data, error } = await supabaseClient.rpc('get_campaign_attempts', {
+      prop_campaign_id: Number(campaign_id),
+      prop_workspace_id: workspace_id
+    }).csv();
+    if (error || !data) {
+      console.error(error);
+      return json({ error: error?.message || "Error fetching campaign attempts" }, { status: 500 });
+    }
+    return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
+  }
+  else {
+    return json({ error: "Invalid campaign type" }, { status: 400 });
+  }
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -105,14 +119,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   if (!user) return redirect("/signin");
   const [
-    campaignType,
-    campaignCounts,
+    campaignType, 
+    queueCounts,
     workspace,
     userRole,
   ] = await Promise.all([
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
+    fetchQueueCounts(supabaseClient, selected_id),
     fetchCampaignData(supabaseClient, selected_id),
-    fetchCampaignCounts(supabaseClient, selected_id),
     getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id })
   ]);
   if (!campaignType || !campaignType.data) {
@@ -130,16 +144,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   );
 
   const resultsPromise = fetchBasicResults(supabaseClient, selected_id) as unknown as { disposition: string, count: number, average_call_duration: string, average_wait_time: string, expected_total: number }[];
-
+  
   return defer({
     selected_id,
     hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole),
     campaignDetails,
-    user: user,
-    campaignCounts,
-    totalCalls: 0,
-    expectedTotal: 0,
+    user: user, 
     results: resultsPromise || [], // Deferred loading
+    queueCounts,
   });
 };
 
@@ -147,11 +159,9 @@ export default function CampaignScreen() {
   const {
     hasAccess,
     campaignDetails: initialCampaignDetails,
-    campaignCounts,
-    totalCalls = 0,
-    expectedTotal = 0,
     results,
     selected_id,
+    queueCounts,
   } = useLoaderData<typeof loader>();
   const { audiences, campaigns, phoneNumbers, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
   const campaignData = campaigns.find(c => c?.id.toString() === selected_id);
@@ -178,7 +188,6 @@ export default function CampaignScreen() {
     : !campaignData?.caller_id
       ? "No outbound phone number selected"
       : null;
-
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
@@ -194,16 +203,17 @@ export default function CampaignScreen() {
         <Suspense fallback={<LoadingResults />}>
           <Await resolve={results} errorElement={<ErrorLoadingResults />}>
             {(resolvedResults) =>
-              resolvedResults.length < 1 ? (
+              {
+                return resolvedResults.length < 1 ? (
                 <NoResultsYet />
               ) : (
                 <ResultsDisplay
                   results={resolvedResults}
                   campaign={campaignData}
                   hasAccess={hasAccess}
-                  campaignCounts={campaignCounts}
+                  queueCounts={queueCounts}
                 />
-              )
+              )}
             }
           </Await>
         </Suspense>
@@ -213,9 +223,8 @@ export default function CampaignScreen() {
         (campaignData?.type === "live_call" || !campaignData?.type) && (
           <CampaignInstructions
             campaignData={campaignData}
-            totalCalls={totalCalls}
-            expectedTotal={expectedTotal}
             joinDisabled={joinDisabled}
+            queueCounts={queueCounts}
           />
         )}
       <Outlet
