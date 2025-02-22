@@ -368,7 +368,7 @@ export default function CampaignSettingsRoute() {
         workspace={workspace_id}
         campaignData={campaignData}
         campaignDetails={campaignDetails}
-        isActive={campaignData.status === "running"}
+        isActive={campaignData?.status === "running" || false}
         scripts={scripts}
         audiences={audiences}
         mediaData={mediaData || []}
