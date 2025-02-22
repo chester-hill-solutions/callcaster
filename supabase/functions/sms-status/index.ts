@@ -6,7 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
-import Twilio, { validateRequest } from "npm:twilio@^5.3.0";
+import Twilio from "npm:twilio@^5.3.0";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     // Validate the request is from Twilio
     const twilioSignature = req.headers.get('x-twilio-signature');
     const url = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/sms-status`;
-    const isValidRequest = validateRequest(
+    const isValidRequest = Twilio.validateRequest(
       workspace.twilio_data.authToken,
       twilioSignature || '',
       url,

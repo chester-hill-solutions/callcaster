@@ -20,7 +20,7 @@ const ResultsScreen = ({
   hasAccess,
   queueCounts
 }: { 
-  totalsByDisposition: Record<string, number>;
+  totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
   isBusy: boolean;
   results: CampaignResult[];

@@ -23,7 +23,7 @@ export const NavigationLinks = ({ hasAccess, data, joinDisabled, }: { hasAccess:
         </NavLink>
       </>
     )}
-    {data.type === "live_call" && (
+    {data?.type === "live_call" && (
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>

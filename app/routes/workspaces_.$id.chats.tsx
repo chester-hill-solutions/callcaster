@@ -16,6 +16,7 @@ import {
   useOutlet,
   useOutletContext,
   useSearchParams,
+  useAsyncError,
 } from "@remix-run/react";
 import { MdAdd, MdChat, MdExpandMore } from "react-icons/md";
 import { Button } from "~/components/ui/button";
@@ -153,7 +154,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const contact_number = normalizePhoneNumber(
     params.contact_number || data.contact_number as string,
   );
-  
+
   const responseData = await sendMessage({
     body: data.body as string,
     to: contact_number as string,
@@ -162,7 +163,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     supabase: supabaseClient,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
-  });   
+  });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
 }
@@ -362,13 +363,9 @@ export default function ChatsList() {
               ))}
             </div>
           }>
-            <Await resolve={chatsPromise}>
+            <Await resolve={chatsPromise} errorElement={<ErrorBoundary />}>
               {(chatsData: any) => {
-                const { chats, chatsError } = chatsData as ChatsData;
-                if (chatsError) {
-                  return <div className="p-4 text-center text-red-500">Error loading conversations</div>;
-                }
-                
+                const { chats } = chatsData as ChatsData;
                 const chatNumbers = Array.from(
                   new Set(
                     chats
@@ -481,3 +478,9 @@ export default function ChatsList() {
     </main>
   );
 }
+
+function ErrorBoundary() {
+  const error = useAsyncError();
+  console.error(error);   
+  return <div>Error</div>;
+} 

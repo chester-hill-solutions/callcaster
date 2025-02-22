@@ -43,7 +43,7 @@ export const ResultsDisplay = ({
   const isBusy = nav.state !== "idle";
   const totalsByDisposition = getTotalsByDisposition(results);
   const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
-  return campaign.type === "message" ? (
+  return campaign?.type === "message" ? (
     <MessageResultsScreen
       totalsByDisposition={totalsByDisposition}
       totalOfAllResults={totalOfAllResults}

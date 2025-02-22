@@ -17,6 +17,7 @@ import {
   IVRCampaign,
 } from "~/lib/types";
 import { Button } from "~/components/ui/button";
+import { useState } from "react";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -321,6 +322,7 @@ export default function CampaignSettingsRoute() {
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();
+  const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none" | "queue">("none");
 
   const handleDuplicate = () => {
     const { id, ...dataToDuplicate } = campaignData;
@@ -334,11 +336,22 @@ export default function CampaignSettingsRoute() {
   };
 
   const handleStatusChange = (status: CampaignStatus) => {
-
     fetcher.submit(
       { intent: "status", status },
       { method: "post" }
     );
+  };
+
+  const handleConfirmStatus = (status: "play" | "archive" | "none" | "queue") => {
+    if (status === "none") {
+      // If confirming an action
+      if (confirmStatus === "play") {
+        handleStatusChange("running");
+      } else if (confirmStatus === "archive") {
+        handleStatusChange("archived");
+      }
+    }
+    setConfirmStatus(status);
   };
 
   const handleInputChange = (name: string, value: any) => {
@@ -368,7 +381,7 @@ export default function CampaignSettingsRoute() {
         workspace={workspace_id}
         campaignData={campaignData}
         campaignDetails={campaignDetails}
-        isActive={campaignData.status === "running"}
+        isActive={campaignData?.status === "running" || false}
         scripts={scripts}
         audiences={audiences}
         mediaData={mediaData || []}
@@ -376,8 +389,16 @@ export default function CampaignSettingsRoute() {
         phoneNumbers={phoneNumbers}
         handleInputChange={handleInputChange}
         handleDuplicateButton={handleDuplicate}
-        handleStatusButton={handleStatusChange}
-        handleConfirmStatus={handleStatusChange}
+        handleStatusButton={(type) => {
+          if (type === "play" || type === "archive") {
+            setConfirmStatus(type);
+          } else if (type === "pause") {
+            handleStatusChange("paused");
+          } else if (type === "schedule") {
+            handleStatusChange("scheduled");
+          }
+        }}
+        handleConfirmStatus={handleConfirmStatus}
         handleScheduleButton={() => handleStatusChange("scheduled")}
         formFetcher={fetcher}
         user={user}
@@ -391,6 +412,7 @@ export default function CampaignSettingsRoute() {
           navigate(e.currentTarget.value);
         }}
         scheduleDisabled={scheduleDisabled}
+        confirmStatus={confirmStatus}
       />
     </>
   );

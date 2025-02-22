@@ -1377,7 +1377,7 @@ export async function fetchConversationSummary(
     );
     chats = data;
     chatsError = error;
-    console.log(error);
+    
   } else {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary",
