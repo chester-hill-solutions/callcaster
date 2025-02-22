@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     // Validate the request is from Twilio
     const twilioSignature = req.headers.get('x-twilio-signature');
     const url = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/sms-status`;
-    const isValidRequest = Twilio.twilio.webhook.validateRequest(
+    const isValidRequest = Twilio.validateRequest(
       workspace.twilio_data.authToken,
       twilioSignature || '',
       url,

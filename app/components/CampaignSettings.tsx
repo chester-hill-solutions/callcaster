@@ -2,6 +2,14 @@ import { FetcherWithComponents, Form, NavLink, useNavigation, useNavigationType,
 import { FileObject } from "@supabase/storage-js";
 import { Button } from "./ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import {
   Audience,
   Campaign,
   CampaignAudience,
@@ -25,7 +33,7 @@ type MessageCampaign = Tables<"message_campaign">;
 type IVRCampaign = Tables<"ivr_campaign"> & { script: Script };
 
 export type CampaignSettingsProps = {
-  campaignData: CampaignState;
+  campaignData: Campaign & { credits?: number };
   campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
   flags: Flags;
   workspace: string;
@@ -38,13 +46,11 @@ export type CampaignSettingsProps = {
   phoneNumbers: WorkspaceNumbers[];
   handleInputChange: (name: string, value: string | boolean | number | null | Schedule) => void;
   handleDuplicateButton: () => void;
-  handleSave: () => void;
-  handleResetData: () => void;
-  handleActiveChange: (isActive: boolean, status: string | null) => void;
-  handleAudienceChange: (audience: CampaignAudience | null, isChecked: boolean) => void;
-  handleScheduleButton: (e: React.MouseEvent<HTMLButtonElement>) => void;
   handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
-  formFetcher: FetcherWithComponents<{ campaign: Campaign, campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign }>;
+  handleScheduleButton: () => void;
+  handleSave?: () => void;
+  handleResetData?: () => void;
+  formFetcher: FetcherWithComponents<any>;
   user: User;
   joinDisabled: string | null;
   campaignQueue: QueueItem[];
@@ -53,15 +59,15 @@ export type CampaignSettingsProps = {
   mediaLinks: string[];
   handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void;
   scheduleDisabled: string | boolean;
-  handleConfirmStatus: (status: "queue" | "play" | "archive" | "none") => void;
-  confirmStatus: "queue" | "play" | "archive" | "none";
+  handleConfirmStatus: (status: "play" | "archive" | "none" | "queue") => void;
+  confirmStatus: "play" | "archive" | "none" | "queue";
 };
 
 export const CampaignSettings = ({
   campaignData,
   campaignDetails,
   mediaData,
-  isChanged,
+  isChanged = false,
   phoneNumbers = [],
   handleInputChange,
   handleSave,
@@ -83,23 +89,110 @@ export const CampaignSettings = ({
   confirmStatus,
 }: CampaignSettingsProps) => {
   const nav = useNavigation();
+
+  const renderConfirmDescription = () => {
+    if (confirmStatus === "play") {
+      return (
+        <div className="space-y-4">
+          <p className="font-medium text-lg">
+            Are you sure you want to start this campaign? {
+              campaignData?.type === "live_call" ?
+                "This will make your campaign active and available for callers." :
+                campaignData?.type === "message" ?
+                  "This will begin sending messages to your contacts." :
+                  "This will begin dialing contacts automatically."
+            }
+          </p>
+
+          <div className="rounded-lg bg-muted p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-primary">💰</span>
+              <div>
+                <p className="font-medium">Credits Available: {campaignData.credits || 0}</p>
+                <p className="text-sm text-muted-foreground">
+                  Cost: {campaignData?.type === "message" ?
+                    "1 credit per message" :
+                    "1 credit per dial + 1 credit per minute after first minute"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-primary">📞</span>
+              <div>
+                <p className="font-medium">
+                  Contacts to {campaignData?.type === "message" ? "Message" : "Dial"}: {queueCount}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Estimated cost: {queueCount} - {queueCount * 2} credits
+                  {queueCount > (campaignData.credits || 0) && (
+                    <span className="text-destructive"> (Exceeds available credits)</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {queueCount > (campaignData.credits || 0) && (
+            <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+              ⚠️ Warning: Your campaign will be paused when you run out of credits
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (confirmStatus === "archive") {
+      return "Are you sure you want to archive this campaign? It will be hidden from your campaigns list, and can't be undone.";
+    }
+
+    return "";
+  };
+
   return (
     <>
+      <Dialog open={confirmStatus !== "none"} onOpenChange={() => handleConfirmStatus("none")}>
+        <DialogContent className="bg-white dark:bg-slate-900">
+          <DialogHeader>
+            <DialogTitle>
+              {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {renderConfirmDescription()}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => handleConfirmStatus("none")}
+              className="mr-2"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleConfirmStatus("none")}
+              variant={confirmStatus === "archive" ? "destructive" : "default"}
+            >
+              {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div
         id="campaignSettingsContainer"
         className="flex h-full flex-col gap-8 p-6"
         role="region"
         aria-label="Campaign Settings"
       >
-        <SaveBar
-          isChanged={isChanged}
-          isSaving={nav.state === 'submitting'}
-          onSave={(e) => {
-            e.preventDefault();
-            handleSave();
-          }}
-          onReset={handleResetData}
-        />
+        {handleSave && handleResetData && (
+          <SaveBar
+            isChanged={isChanged || false}
+            isSaving={nav.state === 'submitting'}
+            onSave={handleSave}
+            onReset={handleResetData}
+          />
+        )}
         <Form method="patch">
           <input
             type="hidden"

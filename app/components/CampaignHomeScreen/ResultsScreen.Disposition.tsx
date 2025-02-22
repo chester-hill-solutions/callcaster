@@ -46,11 +46,10 @@ export const DispositionBreakdown = ({
   totalsByDisposition,
   totalOfAllResults,
 }: {
-  results: DispositionResult[];
-  totalsByDisposition: Record<string, number>;
+  results: DispositionResult[] | null;
+  totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
 }) => {
-  console.log(results);
   return(
   <div className="mb-8">
     <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
@@ -60,7 +59,7 @@ export const DispositionBreakdown = ({
           <DispositionBar
             key={result.disposition}
             {...result}
-            dispositionCount={totalsByDisposition[`${result.disposition}`] || 0}
+            dispositionCount={totalsByDisposition?.[`${result.disposition}`] || 0}
             totalOfAllResults={totalOfAllResults}
             averageCallDuration={result?.average_call_duration || "00:00:00"}
           />

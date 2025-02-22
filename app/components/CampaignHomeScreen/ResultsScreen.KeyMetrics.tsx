@@ -48,16 +48,16 @@ export const KeyMessageMetrics = ({
   totalsByDisposition,
   totalOfAllResults,
 }: {
-  results: DispositionResult[];
-  totalsByDisposition: Record<string, number>;
+  results: DispositionResult[] | null;
+  totalsByDisposition: Record<string, number> | null;
   totalOfAllResults: number;
 }) => {
   const getRate = (disposition: string): string => {
-    if (!Array.isArray(results)) {
+    if (!Array.isArray(results) || !totalsByDisposition || !totalOfAllResults || !results.length) {
       return "0.0";
     }
 
-    const count = totalsByDisposition[disposition] || 0;
+    const count = totalsByDisposition?.[disposition] || 0;
     const rate = (count / totalOfAllResults) * 100;
     const formattedRate = isNaN(rate) || !isFinite(rate) ? "0.0" : rate.toFixed(1);
     return formattedRate;
