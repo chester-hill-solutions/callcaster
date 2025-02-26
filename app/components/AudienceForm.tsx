@@ -1,8 +1,9 @@
 import { Form } from "@remix-run/react";
 import { Button } from "./ui/button";
-import { ChangeEvent, FormEvent } from "react";
+import { ChangeEvent, FormEvent, useState } from "react";
 import { Database } from "~/lib/database.types";
-
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 interface AudienceFormProps {
   audienceInfo: Database["public"]["Tables"]["audience"]["Row"] | null;
   handleSaveAudience: (e: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -15,22 +16,38 @@ const AudienceForm = ({
   handleSaveAudience,
   audience_id,
   workspace_id
-}: AudienceFormProps) => (
-  <Form action="/api/audiences" method="PATCH" onSubmit={handleSaveAudience}>
-    <input name="id" hidden value={audience_id} readOnly />
-    <input name="workspace" hidden value={workspace_id} readOnly />
-    <input
-      type="text"
-      name="name"
-      placeholder="Audience Name"
-      value={audienceInfo?.name || ""}
-      onChange={(e) => {
-        null;
-      }}
-      className="border-[unset] border-b-2 border-b-solid border-b-[#333] text-[#333]"
-    />
-    <Button type="submit">SAVE</Button>
-  </Form>
-);
+}: AudienceFormProps) => {
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState<string>(audienceInfo?.name || "");
+  const handleSave = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    handleSaveAudience(e);
+    setError(null);
+  };
+  return (
+    <Form action="/api/audiences" method="PATCH" onSubmit={handleSave} className="py-4">
+      <input name="id" hidden value={audience_id} readOnly />
+      <input name="workspace" hidden value={workspace_id} readOnly />
+      <Label htmlFor="name" className="text-muted-foreground">Audience Name</Label>
+      <div className="flex gap-2">
+        <Input
+          type="text"
+          name="name"
+          placeholder="Audience Name"
+          value={name}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value.length > 0) {
+              setError(null);
+            }
+            setName(value);
+          }}
+          className="text-muted-foreground"
+        />
+        <Button type="submit" disabled={name.length === 0}>SAVE</Button>
+      </div>
+    </Form>
+  )
+};
 
 export { AudienceForm };

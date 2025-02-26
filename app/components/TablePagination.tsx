@@ -9,12 +9,18 @@ import {
   PaginationPrevious,
 } from "~/components/ui/pagination";
 
+type TablePaginationProps = {
+  currentPage: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  maxVisiblePages?: number;
+};  
 const TablePagination = ({ 
   currentPage, 
   totalPages, 
   onPageChange,
   maxVisiblePages = 5
-}) => {
+}: TablePaginationProps) => {
   const renderPaginationItems = () => {
     const items = [];
     const halfMaxVisiblePages = Math.floor(maxVisiblePages / 2);
@@ -28,7 +34,7 @@ const TablePagination = ({
 
     if (startPage > 1) {
       items.push(
-        <PaginationItem key="start-ellipsis">
+        <PaginationItem key="start-ellipsis" className="text-muted-foreground">
           <PaginationEllipsis />
         </PaginationItem>
       );
@@ -36,7 +42,7 @@ const TablePagination = ({
 
     for (let i = startPage; i <= endPage; i++) {
       items.push(
-        <PaginationItem key={i}>
+        <PaginationItem key={i} className="text-muted-foreground">
           <PaginationLink
             href="#"
             onClick={(e) => {
@@ -53,7 +59,7 @@ const TablePagination = ({
 
     if (endPage < totalPages) {
       items.push(
-        <PaginationItem key="end-ellipsis">
+        <PaginationItem key="end-ellipsis" className="text-muted-foreground">
           <PaginationEllipsis />
         </PaginationItem>
       );
@@ -65,7 +71,7 @@ const TablePagination = ({
   return (
     <Pagination>
       <PaginationContent>
-        <PaginationItem>
+        <PaginationItem className="text-muted-foreground">
           <PaginationPrevious
             href="#"
             onClick={(e) => {
@@ -76,7 +82,7 @@ const TablePagination = ({
           />
         </PaginationItem>
         {renderPaginationItems()}
-        <PaginationItem>
+        <PaginationItem className="text-muted-foreground">
           <PaginationNext
             href="#"
             onClick={(e) => {

@@ -11,7 +11,6 @@ const AudienceTable = ({
   audience: initialAudience,
   pagination
 }) => {
-  // Transform the contacts data to extract the nested contact info
   const transformedContacts = initialContacts?.map(item => item.contact) || [];
   const [contacts, setContacts] = useState(transformedContacts);
   const [audienceInfo, setAudienceInfo] = useState(initialAudience);
@@ -40,30 +39,11 @@ const AudienceTable = ({
     setNewContact((prevContact) => ({ ...prevContact, [name]: value }));
   };
 
-  const handleAudienceChange = (e) => {
-    const { name, value } = e.target;
-    setAudienceInfo((prevContact) => ({ ...prevContact, [name]: value }));
-  };
 
   const handleSaveContact = async () => {
     setNewContact({ name: "", phone: "", email: "", address: "" });
   };
 
-  const handleSaveAudience = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const response = await fetch("/api/audiences", {
-      method: "PATCH",
-      body: formData,
-    });
-    const result = await response.json();
-
-    if (response.ok) {
-      setAudienceInfo(result);
-    } else {
-      console.error("Failed to save audience", result);
-    }
-  };
 
   const handleRemoveContact = async (id) => {
     setContacts((curr) => curr.filter((contact) => contact.id !== id));
@@ -93,9 +73,6 @@ const AudienceTable = ({
 
   return (
     <div className="w-full overflow-scroll">
-      <div id="audience-settings" className="flex justify-between items-center">
-
-      </div>
       <div className="flex" style={{ maxHeight: "800px", overflow: 'scroll' }}>
         <ContactTable
           {...{
