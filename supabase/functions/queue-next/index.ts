@@ -46,7 +46,9 @@ Deno.serve(async (req) => {
     }
     const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
       passed_contact_id: contact.contact_id,
-      group_on_household: campaign.group_household_queue
+      group_on_household: campaign.group_household_queue,
+      dequeued_by_id: owner || null,
+      dequeued_reason_text: "Automated queue processing"
     });
 
     if (dequeueError) throw dequeueError;

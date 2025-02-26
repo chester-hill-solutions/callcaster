@@ -108,6 +108,8 @@ const handleCallStatus = async (
     const { error } = await supabase.rpc("dequeue_contact", {
       passed_contact_id: outreachStatus[0].contact_id,
       group_on_household: true,
+      dequeued_by_id: callUpdate[0].user_id,
+      dequeued_reason_text: `Call ${status?.toLowerCase()}`
     });
     if (error) {
       console.error("Error dequeing contact", error);
@@ -161,14 +163,21 @@ const handleParticipantLeave = async (
       duration: Math.max(Number(parsedBody.Duration), Number(parsedBody.CallDuration)).toString(),
       status: parsedBody?.CallStatus?.toLowerCase() as Tables<"call">["status"]
     });
-    const outreachStatus = await updateOutreachAttempt(
-      dbCall[0].outreach_attempt_id,
-      { disposition: "completed", ended_at: new Date().toISOString() },
-    );
-    
+    const { data: outreachStatus, error: outreachError } = await supabase
+      .from('outreach_attempt')
+      .select('*, campaign_queue!inner(campaign!inner(group_household_queue))')
+      .eq('id', dbCall[0].outreach_attempt_id)
+      .single();
+    if (outreachError) {
+      console.error("Error fetching outreach status", outreachError);
+      throw outreachError;
+    }
+
     const { error } = await supabase.rpc("dequeue_contact", {
-      passed_contact_id: outreachStatus[0].contact_id,
-      group_on_household: true,
+      passed_contact_id: outreachStatus.contact_id,
+      group_on_household: outreachStatus.campaign_queue.campaign.group_household_queue,
+      dequeued_by_id: dbCall[0].user_id,
+      dequeued_reason_text: "Participant left call"
     });
     if (error) {
       console.error("Error dequeing contact", error);

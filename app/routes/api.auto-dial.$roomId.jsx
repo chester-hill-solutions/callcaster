@@ -24,13 +24,23 @@ const getVoicemailSignedUrl = async (workspace, voicemailFile) => {
     return data.signedUrl;
 };
 
-const dequeueContact = async (contactId, groupOnHousehold) => {
+const dequeueContact = async (contactId, groupOnHousehold, userId) => {
     if (groupOnHousehold) {
-        const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contactId, group_on_household: groupOnHousehold });
+        const { data, error } = await supabase.rpc('dequeue_contact', { 
+            passed_contact_id: contactId, 
+            group_on_household: groupOnHousehold,
+            dequeued_by_id: userId,
+            dequeued_reason_text: "Auto-dial completed"
+        });
         if (error) throw new Error(`Error dequeueing household: ${error.message}`);
         return data;
     } else {
-        const { data, error } = await supabase.from('campaign_queue').update({ status: 'dequeued' }).eq('contact_id', contactId).select();
+        const { data, error } = await supabase.from('campaign_queue').update({ 
+            status: 'dequeued',
+            dequeued_by: userId,
+            dequeued_at: new Date().toISOString(),
+            dequeued_reason: "Auto-dial completed"
+        }).eq('contact_id', contactId).select();
         if (error) throw new Error(`Error updating queue status: ${error.message}`);
         return data;
     }
@@ -53,7 +63,7 @@ const triggerAutoDialer = async (userId, campaignId, workspaceId) => {
 const handleAnsweringMachine = async (call, twilio, dbCall, campaign, signedUrl, outreachStatus) => {
     const twiml = new Twilio.twiml.VoiceResponse();
 
-    await dequeueContact(dbCall.contact_id, campaign.group_household_queue);
+    await dequeueContact(dbCall.contact_id, campaign.group_household_queue, outreachStatus[0].user_id);
     await updateOutreachAttempt(dbCall.outreach_attempt_id, { disposition: 'voicemail' });
 
     const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id, status: 'in-progress' });

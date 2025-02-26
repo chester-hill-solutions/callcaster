@@ -71,7 +71,12 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     // Dequeue
     const { error: dequeueError } = await supabase
       .from("campaign_queue")
-      .update({ status: "dequeued" })
+      .update({ 
+        status: "dequeued",
+        dequeued_at: new Date().toISOString(),
+        dequeued_reason: "IVR call completed",
+        dequeued_by: user_id, 
+      })
       .eq("id", queue_id);
       
     if (dequeueError) throw dequeueError;

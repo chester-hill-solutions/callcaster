@@ -129,7 +129,12 @@ const sendMessage = async ({
 
     supabase
       .from("campaign_queue")
-      .update({ status: "dequeued" })
+      .update({ 
+        status: "dequeued",
+        dequeued_by: user_id,
+        dequeued_at: new Date().toISOString(),
+        dequeued_reason: "SMS message sent"
+      })
       .eq("id", queue_id)
   ]);
 

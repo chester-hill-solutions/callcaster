@@ -473,6 +473,9 @@ export type Json =
             id: number
             queue_order: number | null
             status: string
+            dequeued_by: string | null
+            dequeued_at: string | null
+            dequeued_reason: string | null
           }
           Insert: {
             attempts?: number
@@ -482,6 +485,9 @@ export type Json =
             id?: number
             queue_order?: number | null
             status?: string
+            dequeued_by?: string | null
+            dequeued_at?: string | null
+            dequeued_reason?: string | null
           }
           Update: {
             attempts?: number
@@ -491,6 +497,9 @@ export type Json =
             id?: number
             queue_order?: number | null
             status?: string
+            dequeued_by?: string | null
+            dequeued_at?: string | null
+            dequeued_reason?: string | null
           }
           Relationships: [
             {
@@ -505,6 +514,13 @@ export type Json =
               columns: ["contact_id"]
               isOneToOne: false
               referencedRelation: "contact"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "campaign_queue_dequeued_by_fkey"
+              columns: ["dequeued_by"]
+              isOneToOne: false
+              referencedRelation: "user"
               referencedColumns: ["id"]
             },
           ]
@@ -1567,12 +1583,16 @@ export type Json =
           Args: {
             passed_contact_id: number
             group_on_household: boolean
+            dequeued_by_id?: string
+            dequeued_reason_text?: string
           }
           Returns: undefined
         }
         dequeue_household: {
           Args: {
             contact_id_variable: number
+            dequeued_by_id?: string
+            dequeued_reason_text?: string
           }
           Returns: undefined
         }
