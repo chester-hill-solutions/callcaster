@@ -82,11 +82,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     query = query.order(`contact(${sortKey})`, { ascending: sortDirection === 'asc' });
   }
   
-  // Apply pagination
   const { data: contacts, error: contactError, count } = await query.range(from, to);
-  
-  
-   console.log(contacts, contactError, count);
 
   const { data: audience, error: audienceError } = await supabaseClient
     .from("audience")
