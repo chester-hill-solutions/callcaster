@@ -16,6 +16,7 @@ export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
   const workspaceId = formData.get("workspace_id") as string;
   const audienceName = formData.get("audience_name") as string;
+  const audienceIdStr = formData.get("audience_id") as string;
   const contactsFile = formData.get("contacts") as File;
   const headerMapping = formData.get("header_mapping") as string;
   const splitNameColumn = formData.get("split_name_column") as string;
@@ -24,8 +25,8 @@ export const action = async ({ request }: { request: Request }) => {
     return json({ error: "Workspace ID is required" }, { status: 400, headers });
   }
 
-  if (!audienceName) {
-    return json({ error: "Audience name is required" }, { status: 400, headers });
+  if (!audienceIdStr && !audienceName) {
+    return json({ error: "Either Audience ID or Audience name is required" }, { status: 400, headers });
   }
 
   if (!contactsFile) {
@@ -33,21 +34,51 @@ export const action = async ({ request }: { request: Request }) => {
   }
 
   try {
-    // Create the audience
-    const { data: audienceData, error: audienceError } = await supabaseClient
-      .from("audience")
-      .insert({
-        name: audienceName,
-        workspace: workspaceId
-      })
-      .select()
-      .single();
+    // If audienceId is provided, use it; otherwise create a new audience
+    let finalAudienceId: number;
+    
+    if (audienceIdStr) {
+      const audienceId = parseInt(audienceIdStr, 10);
+      
+      // Verify the audience exists and belongs to the workspace
+      const { data: existingAudience, error: audienceCheckError } = await supabaseClient
+        .from("audience")
+        .select("id")
+        .eq("id", audienceId)
+        .eq("workspace", workspaceId)
+        .single();
+        
+      if (audienceCheckError || !existingAudience) {
+        return json({ error: "Audience not found or not accessible" }, { status: 404, headers });
+      }
+      
+      finalAudienceId = audienceId;
+      
+      // Update the audience status to indicate it's being updated
+      await supabaseClient
+        .from("audience")
+        .update({
+          status: "updating"
+        })
+        .eq("id", finalAudienceId);
+    } else {
+      // Create a new audience
+      const { data: audienceData, error: audienceError } = await supabaseClient
+        .from("audience")
+        .insert({
+          name: audienceName,
+          workspace: workspaceId,
+          status: "pending"
+        })
+        .select()
+        .single();
 
-    if (audienceError) {
-      return json({ error: audienceError.message }, { status: 500, headers });
+      if (audienceError) {
+        return json({ error: audienceError.message }, { status: 500, headers });
+      }
+
+      finalAudienceId = audienceData.id;
     }
-
-    const audienceId = audienceData.id;
 
     // Convert file to base64 for sending to edge function
     const fileContent = await contactsFile.arrayBuffer();
@@ -58,7 +89,7 @@ export const action = async ({ request }: { request: Request }) => {
     const { data: uploadData, error: uploadError } = await supabaseClient
       .from("audience_upload")
       .insert({
-        audience_id: audienceId,
+        audience_id: finalAudienceId,
         workspace: workspaceId,
         created_by: user.id,
         status: "pending",
@@ -84,7 +115,7 @@ export const action = async ({ request }: { request: Request }) => {
       {
         body: {
           uploadId,
-          audienceId,
+          audienceId: finalAudienceId,
           workspaceId,
           userId: user.id,
           fileContent: fileBase64,
@@ -111,9 +142,11 @@ export const action = async ({ request }: { request: Request }) => {
     return json(
       { 
         success: true, 
-        audience_id: audienceId,
+        audience_id: finalAudienceId,
         upload_id: uploadId,
-        message: "Audience created and file upload started. Processing in background."
+        message: audienceIdStr 
+          ? "File upload started. Processing in background." 
+          : "Audience created and file upload started. Processing in background."
       }, 
       { headers }
     );

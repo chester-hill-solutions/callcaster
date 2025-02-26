@@ -66,8 +66,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   };
   const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
   const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session?.user.id) {
+  const user = await supabase.auth.getUser();
+  if (!user.data.user) {
     return json({
       env,
       session,  
@@ -79,13 +79,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: userData, error: userError } = await supabase
     .from("user")
     .select(`*, workspace_invite(workspace(id, name))`)
-    .eq("id", session?.user.id ?? "")
+    .eq("id", user.data.user.id)
     .single();
 
   const { data: workspaceData, error: workspacesError } = await supabase
     .from("workspace_users")
     .select("workspace ( id, name )")
-    .eq("user_id", session?.user.id)
+    .eq("user_id", user.data.user.id)
     .order("last_accessed", { ascending: false });
   if (workspacesError || userError) {
     console.error(workspacesError, userError);
@@ -132,9 +132,6 @@ export default function App() {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         redirect("/reset")
-      }
-      if (session?.access_token !== serverAccessToken) {
-        supabase.auth.getSession();
       }
     });
 

@@ -185,7 +185,8 @@ Deno.serve(async (req: Request) => {
         workspace: body!.workspaceId,
         created_by: body!.userId,
         created_at: new Date().toISOString(),
-        other_data: []
+        other_data: [],
+        upload_id: body!.uploadId
       };
       
       // Apply header mapping

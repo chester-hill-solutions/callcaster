@@ -146,7 +146,6 @@ const AudienceTable = ({
         other_data: []
       }));
       
-      console.log('Sending contacts:', sanitizedContacts);
 
       submit(
         {
@@ -178,6 +177,22 @@ const AudienceTable = ({
       navigate: false
     })
   }
+  
+  // This function will be called after bulk deletion to refresh the UI
+  const handleBulkDeleteComplete = (deletedIds) => {
+    if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+      setContacts((curr) => curr.filter((contact) => !deletedIds.includes(contact.id)));
+      
+      // Update audience info with new contact count if available
+      if (audienceInfo && typeof audienceInfo.total_contacts === 'number') {
+        setAudienceInfo(prev => ({
+          ...prev,
+          total_contacts: prev.total_contacts - deletedIds.length
+        }));
+      }
+    }
+  };
+  
   const totalPages = Math.ceil(pagination.totalCount / pagination.pageSize);
 
   return (
@@ -192,29 +207,6 @@ const AudienceTable = ({
             workspace_id={workspace_id}
           />
         </div>
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <input
-            type="file"
-            name="file"
-            id="file"
-            accept=".csv"
-            ref={inputRef}
-            className="hidden"
-            onChange={handleOnClick}
-          />
-          <Button asChild className={`${isDragging ? "bg-gray-200" : "bg-brand-primary"}`}>
-            <label htmlFor="file">
-              IMPORT{" "}
-              <span style={{ transform: "rotate(180deg)", marginLeft: "1rem" }}>
-                <ImportIcon />
-              </span>
-            </label>
-          </Button>
-        </div>
       </div>
       <div className="flex" style={{ maxHeight: "800px", overflow: 'scroll' }}>
         <ContactTable
@@ -225,7 +217,8 @@ const AudienceTable = ({
             handleInputChange,
             handleSaveContact,
             workspace_id,
-            handleRemoveContact
+            handleRemoveContact,
+            onBulkDeleteComplete: handleBulkDeleteComplete
           }}
         />
       </div>
