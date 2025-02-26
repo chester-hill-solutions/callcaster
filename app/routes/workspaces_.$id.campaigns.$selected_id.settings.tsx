@@ -18,6 +18,7 @@ import {
 } from "~/lib/types";
 import { Button } from "~/components/ui/button";
 import { useState } from "react";
+import { Dialog, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -37,7 +38,6 @@ type Context = {
   campaignData: CampaignWithAudiences;
   campaignDetails: CampaignDetails;
   scheduleDisabled: string | boolean;
-  credits: number;
   phoneNumbers: WorkspaceNumbers[];
   workspace: WorkspaceData;
 };
@@ -81,9 +81,9 @@ async function handleCampaignUpdate(
 
     if (error) throw error;
   } else {
-    if (updates["schedule"]){
-       const parseUpdate = JSON.parse(updates["schedule"])
-       updates.schedule = parseUpdate
+    if (updates["schedule"]) {
+      const parseUpdate = JSON.parse(updates["schedule"])
+      updates.schedule = parseUpdate
     }
     const { error } = await supabaseClient
       .from("campaign")
@@ -95,14 +95,23 @@ async function handleCampaignUpdate(
   return { success: true };
 }
 
-async function handleStatusChange(
+async function updateCampaignStatus(
   supabaseClient: SupabaseClient,
   selected_id: string,
-  status: string
+  status: string,
+  is_active?: boolean
 ) {
-  let update = { status };
-  if (status === "play") update = { status: "running", is_active: true };
-  if (status === "pause") update = { status: "paused", is_active: false };
+  let update: { status: string; is_active?: boolean } = { status };
+
+  // Use is_active from client if provided, otherwise determine based on status
+  if (is_active !== undefined) {
+    update.is_active = is_active;
+  } else {
+    if (status === "running") update.is_active = true;
+    if (status === "paused") update.is_active = false;
+  }
+
+  console.log("Server update object:", JSON.stringify(update));
   const { error } = await supabaseClient
     .from("campaign")
     .update({ ...update })
@@ -186,7 +195,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
       case "status":
         return json<ActionData>(
-          await handleStatusChange(supabaseClient, selected_id, updates.status as CampaignStatus)
+          await updateCampaignStatus(
+            supabaseClient,
+            selected_id,
+            updates.status as CampaignStatus,
+            updates.is_active === "true" ? true : updates.is_active === "false" ? false : undefined
+          )
         );
 
       case "duplicate":
@@ -231,70 +245,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
 };
 
-function renderConfirmDescription(
-  status: "play" | "archive" | "none" | "queue",
-  campaignData: CampaignWithAudiences | null,
-  queueCount: number,
-  credits: number
-) {
-  if (status === "play") {
-    return (
-      <div className="space-y-4">
-        <p className="font-medium text-lg">
-          Are you sure you want to start this campaign? {
-            campaignData?.type === "live_call" ?
-              "This will make your campaign active and available for callers." :
-              campaignData?.type === "message" ?
-                "This will begin sending messages to your contacts." :
-                "This will begin dialing contacts automatically."
-          }
-        </p>
-
-        <div className="rounded-lg bg-muted p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <span className="text-primary">💰</span>
-            <div>
-              <p className="font-medium">Credits Available: {credits}</p>
-              <p className="text-sm text-muted-foreground">
-                Cost: {campaignData?.type === "message" ?
-                  "1 credit per message" :
-                  "1 credit per dial + 1 credit per minute after first minute"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-primary">📞</span>
-            <div>
-              <p className="font-medium">
-                Contacts to {campaignData?.type === "message" ? "Message" : "Dial"}: {queueCount}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Estimated cost: {queueCount} - {queueCount * 2} credits
-                {queueCount > credits && (
-                  <span className="text-destructive"> (Exceeds available credits)</span>
-                )}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {queueCount > credits && (
-          <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-            ⚠️ Warning: Your campaign will be paused when you run out of credits
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (status === "archive") {
-    return "Are you sure you want to archive this campaign? It will be hidden from your campaigns list, and can't be undone.";
-  }
-
-  return "";
-}
-
 export default function CampaignSettingsRoute() {
   const {
     supabase,
@@ -302,7 +252,6 @@ export default function CampaignSettingsRoute() {
     audiences,
     campaignData,
     campaignDetails,
-    credits,
     phoneNumbers,
     workspace,
     scheduleDisabled
@@ -336,19 +285,26 @@ export default function CampaignSettingsRoute() {
   };
 
   const handleStatusChange = (status: CampaignStatus) => {
+    setConfirmStatus("none");
+    let formData: { intent: string; status: CampaignStatus; is_active?: boolean } = { intent: "status", status };
+
+    if (status === "running") formData.is_active = true;
+    if (status === "paused") formData.is_active = false;
+
     fetcher.submit(
-      { intent: "status", status },
+      formData,
       { method: "post" }
     );
   };
 
   const handleConfirmStatus = (status: "play" | "archive" | "none" | "queue") => {
-    if (status === "none") {
-      // If confirming an action
+    if (status !== "none") {
       if (confirmStatus === "play") {
         handleStatusChange("running");
+        return;
       } else if (confirmStatus === "archive") {
         handleStatusChange("archived");
+        return;
       }
     }
     setConfirmStatus(status);
@@ -365,9 +321,8 @@ export default function CampaignSettingsRoute() {
     const formData = new FormData();
     formData.append("campaign_id", selected_id);
     fetcher.submit(formData, {
-      method:'POST',
-      action: "/api/reset_campaign",
-      navigate: false
+      method: 'POST',
+      action: "/api/reset_campaign"
     })
   }
 
@@ -380,7 +335,8 @@ export default function CampaignSettingsRoute() {
       <CampaignSettings
         workspace={workspace_id}
         campaignData={campaignData}
-        campaignDetails={campaignDetails}
+        campaignDetails={campaignDetails as any}
+        credits={(workspace as any)?.credits || 0}
         isActive={campaignData?.status === "running" || false}
         scripts={scripts}
         audiences={audiences}
@@ -413,6 +369,8 @@ export default function CampaignSettingsRoute() {
         }}
         scheduleDisabled={scheduleDisabled}
         confirmStatus={confirmStatus}
+        flags={{}}
+        isChanged={false}
       />
     </>
   );
