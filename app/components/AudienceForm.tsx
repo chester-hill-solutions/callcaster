@@ -25,8 +25,7 @@ const AudienceForm = ({
       placeholder="Audience Name"
       value={audienceInfo?.name || ""}
       onChange={(e) => {
-        // This is just to make the input controlled
-        // The actual state update happens in the parent component
+        null;
       }}
       className="border-[unset] border-b-2 border-b-solid border-b-[#333] text-[#333]"
     />

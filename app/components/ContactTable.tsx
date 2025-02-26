@@ -46,9 +46,7 @@ const ContactTable = ({
 }: ContactTableProps) => {
   const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
   const fetcher = useFetcher<BulkDeleteResponse>();
-  const submit = useSubmit();
 
-  // Monitor fetcher state to detect when bulk delete is complete
   useEffect(() => {
     if (fetcher.state === 'idle' && fetcher.data && fetcher.data.success) {
       if (onBulkDeleteComplete && selectedContacts.length > 0) {
