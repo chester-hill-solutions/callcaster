@@ -84,6 +84,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         headers,
         contactsFile,
         campaignId,
+        userId: user.id,
       });
     }
     default:
@@ -100,7 +101,7 @@ export default function NewAudience() {
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
-    setPendingFileName(filePath.split("\\").at(-1));
+    setPendingFileName(filePath.split("\\").at(-1) || "");
   };
 
   const handleRemoveFile = () => {

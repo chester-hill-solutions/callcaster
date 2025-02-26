@@ -24,10 +24,9 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {
     supabaseClient: supabase,
-    headers,
   } = createSupabaseServerClient(request);
   const user = await supabase.auth.getUser();
-  return json({ user });
+  return { user };
 };
 
 const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
