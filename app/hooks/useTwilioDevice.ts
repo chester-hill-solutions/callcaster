@@ -65,8 +65,10 @@ export function useTwilioDevice(token: string, workspaceId: string, send: (actio
             return;
         }
         const connection = deviceRef.current.connect(params);
-        setActiveCall(connection);
-        setCallState('dialing');
+        connection.then((call) => {
+            setActiveCall(call);
+            setCallState('dialing');
+        });
     }, []);
 
     const hangUp = useCallback(() => {

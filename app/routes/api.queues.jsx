@@ -18,11 +18,17 @@ export const loader = async ({ request, params }) => {
 };
 
 export const action = async ({ request, params }) => {
-    const { supabaseClient: supabase } = createSupabaseServerClient(request);
+    const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
+    const user = serverSession?.user;
 
     if (request.method === 'POST') {
         const { contact_id, household } = await request.json();
-        const { data, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: contact_id, group_on_household: household })
+        const { data, error } = await supabase.rpc('dequeue_contact', { 
+            passed_contact_id: contact_id, 
+            group_on_household: household,
+            dequeued_by_id: user?.id,
+            dequeued_reason_text: "Manually dequeued by user"
+        });
         if (error) {
             console.error('Error updating campaign queue:', error);
             return json({ error: error.message }, { status: 500 });
