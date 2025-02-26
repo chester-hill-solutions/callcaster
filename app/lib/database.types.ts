@@ -42,6 +42,11 @@ export type Json =
             is_conditional: boolean
             name: string | null
             workspace: string | null
+            status: string | null
+            total_contacts: number | null
+            processed_contacts: number | null
+            processed_at: string | null
+            error_message: string | null
           }
           Insert: {
             created_at?: string
@@ -49,6 +54,11 @@ export type Json =
             is_conditional?: boolean
             name?: string | null
             workspace?: string | null
+            status?: string | null
+            total_contacts?: number | null
+            processed_contacts?: number | null
+            processed_at?: string | null
+            error_message?: string | null
           }
           Update: {
             created_at?: string
@@ -56,6 +66,11 @@ export type Json =
             is_conditional?: boolean
             name?: string | null
             workspace?: string | null
+            status?: string | null
+            total_contacts?: number | null
+            processed_contacts?: number | null
+            processed_at?: string | null
+            error_message?: string | null
           }
           Relationships: [
             {
@@ -65,6 +80,79 @@ export type Json =
               referencedRelation: "workspace"
               referencedColumns: ["id"]
             },
+          ]
+        }
+        audience_upload: {
+          Row: {
+            id: number
+            audience_id: number
+            workspace: string
+            created_by: string | null
+            created_at: string
+            status: string
+            file_name: string | null
+            file_size: number | null
+            total_contacts: number
+            processed_contacts: number
+            processed_at: string | null
+            error_message: string | null
+            header_mapping: Json | null
+            split_name_column: string | null
+          }
+          Insert: {
+            id?: number
+            audience_id: number
+            workspace: string
+            created_by?: string | null
+            created_at?: string
+            status?: string
+            file_name?: string | null
+            file_size?: number | null
+            total_contacts?: number
+            processed_contacts?: number
+            processed_at?: string | null
+            error_message?: string | null
+            header_mapping?: Json | null
+            split_name_column?: string | null
+          }
+          Update: {
+            id?: number
+            audience_id?: number
+            workspace?: string
+            created_by?: string | null
+            created_at?: string
+            status?: string
+            file_name?: string | null
+            file_size?: number | null
+            total_contacts?: number
+            processed_contacts?: number
+            processed_at?: string | null
+            error_message?: string | null
+            header_mapping?: Json | null
+            split_name_column?: string | null
+          }
+          Relationships: [
+            {
+              foreignKeyName: "audience_upload_audience_id_fkey"
+              columns: ["audience_id"]
+              isOneToOne: false
+              referencedRelation: "audience"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "audience_upload_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "audience_upload_created_by_fkey"
+              columns: ["created_by"]
+              isOneToOne: false
+              referencedRelation: "users"
+              referencedColumns: ["id"]
+            }
           ]
         }
         audience_rule: {

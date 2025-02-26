@@ -11,8 +11,23 @@ import {
 } from "@remix-run/react";
 import { useEffect } from "react";
 import { AudienceTable } from "~/components/AudienceTable";
+import AudienceUploadHistory from "~/components/AudienceUploadHistory";
 import { Button } from "~/components/ui/button";
 import { verifyAuth } from "~/lib/supabase.server";
+import { Database } from "~/lib/database.types";
+
+type LoaderData = {
+  contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;
+  workspace_id: string | undefined;
+  audience: Database['public']['Tables']['audience']['Row'] | null;
+  audience_id: string | undefined;
+  error: string | null;
+  pagination: {
+    currentPage: number;
+    pageSize: number;
+    totalCount: number | null;
+  };
+};
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -27,8 +42,19 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const audience_id = params.audience_id;
 
   if (!audience_id) {
-    return json(
-      { contacts: null, error: "Audience ID is required" },
+    return json<LoaderData>(
+      { 
+        contacts: null, 
+        workspace_id,
+        audience: null,
+        audience_id,
+        error: "Audience ID is required",
+        pagination: {
+          currentPage: page,
+          pageSize,
+          totalCount: null
+        }
+      },
       { headers }
     );
   }
@@ -46,10 +72,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
 
   if (contactError) {
-    return json({ contacts: null, error: contactError.message }, { headers });
+    return json<LoaderData>({ 
+      contacts: null, 
+      workspace_id,
+      audience: null,
+      audience_id,
+      error: contactError.message,
+      pagination: {
+        currentPage: page,
+        pageSize,
+        totalCount: null
+      }
+    }, { headers });
   }
 
-  return json(
+  return json<LoaderData>(
     { 
       contacts, 
       workspace_id, 
@@ -94,6 +131,15 @@ export default function AudienceView() {
           </Form>
         </div>
       </div>
+      
+      {/* Upload History Section */}
+      <div className="mb-6">
+        <h2 className="font-Zilla-Slab text-xl font-semibold mb-2 text-brand-primary dark:text-white">
+          Upload History
+        </h2>
+        <AudienceUploadHistory audienceId={Number(audience_id)} />
+      </div>
+      
       <AudienceTable
         {...{ contacts, workspace_id, selected_id: audience_id, audience, pagination }}
       />
