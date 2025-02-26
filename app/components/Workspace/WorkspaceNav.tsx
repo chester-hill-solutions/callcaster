@@ -31,7 +31,6 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
   const userIsCaller = userRole === MemberRole.Caller;
   const isAdmin = userRole === MemberRole.Admin || userRole === MemberRole.Owner;
   const baseUrl = `/workspaces/${workspace.id}`;
-
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `rounded-md border-2 px-2 py-1 font-Zilla-Slab font-semibold transition-colors ${
       isActive
@@ -46,11 +45,6 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
         : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
     }`;
 
-  const isFeatureEnabled = (flag?: NavItem['flag']) => {
-    if (!flag) return true;
-    const { parent, child } = flag;
-    return flags[parent] && flags[parent][child] === true;
-  };
 
   return (
     <div className="flex-col justify-center">

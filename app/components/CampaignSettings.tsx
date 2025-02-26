@@ -33,7 +33,7 @@ type MessageCampaign = Tables<"message_campaign">;
 type IVRCampaign = Tables<"ivr_campaign"> & { script: Script };
 
 export type CampaignSettingsProps = {
-  campaignData: Campaign & { credits?: number };
+  campaignData: Campaign;
   campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
   flags: Flags;
   workspace: string;
@@ -61,6 +61,7 @@ export type CampaignSettingsProps = {
   scheduleDisabled: string | boolean;
   handleConfirmStatus: (status: "play" | "archive" | "none" | "queue") => void;
   confirmStatus: "play" | "archive" | "none" | "queue";
+  credits: number;
 };
 
 export const CampaignSettings = ({
@@ -69,6 +70,7 @@ export const CampaignSettings = ({
   mediaData,
   isChanged = false,
   phoneNumbers = [],
+  credits,
   handleInputChange,
   handleSave,
   handleResetData,
@@ -91,10 +93,11 @@ export const CampaignSettings = ({
   const nav = useNavigation();
 
   const renderConfirmDescription = () => {
+
     if (confirmStatus === "play") {
       return (
         <div className="space-y-4">
-          <p className="font-medium text-lg">
+          <div className="font-medium text-lg">
             Are you sure you want to start this campaign? {
               campaignData?.type === "live_call" ?
                 "This will make your campaign active and available for callers." :
@@ -102,13 +105,13 @@ export const CampaignSettings = ({
                   "This will begin sending messages to your contacts." :
                   "This will begin dialing contacts automatically."
             }
-          </p>
+          </div>
 
           <div className="rounded-lg bg-muted p-4 space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-primary">💰</span>
               <div>
-                <p className="font-medium">Credits Available: {campaignData.credits || 0}</p>
+                <p className="font-medium">Credits Available: {credits || 0}</p>
                 <p className="text-sm text-muted-foreground">
                   Cost: {campaignData?.type === "message" ?
                     "1 credit per message" :
@@ -125,7 +128,7 @@ export const CampaignSettings = ({
                 </p>
                 <p className="text-sm text-muted-foreground">
                   Estimated cost: {queueCount} - {queueCount * 2} credits
-                  {queueCount > (campaignData.credits || 0) && (
+                  {queueCount > (credits || 0) && (
                     <span className="text-destructive"> (Exceeds available credits)</span>
                   )}
                 </p>
@@ -133,7 +136,7 @@ export const CampaignSettings = ({
             </div>
           </div>
 
-          {queueCount > (campaignData.credits || 0) && (
+          {queueCount > (credits || 0) && (
             <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
               ⚠️ Warning: Your campaign will be paused when you run out of credits
             </div>
@@ -151,16 +154,24 @@ export const CampaignSettings = ({
 
   return (
     <>
-      <Dialog open={confirmStatus !== "none"} onOpenChange={() => handleConfirmStatus("none")}>
+      <Dialog 
+        open={confirmStatus !== "none"} 
+        onOpenChange={(open) => {
+          if (!open) {
+            handleConfirmStatus("none");
+          }
+        }}
+      >
         <DialogContent className="bg-white dark:bg-slate-900">
-          <DialogHeader>
-            <DialogTitle>
-              {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : ""}
-            </DialogTitle>
-            <DialogDescription>
-              {renderConfirmDescription()}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : ""}
+          </DialogTitle>
+        </DialogHeader>
+          <DialogDescription>
+            {renderConfirmDescription()}
+          </DialogDescription>
+
           <DialogFooter>
             <Button
               onClick={() => handleConfirmStatus("none")}
@@ -169,15 +180,15 @@ export const CampaignSettings = ({
             >
               Cancel
             </Button>
-            <Button 
-              onClick={() => handleConfirmStatus("none")}
+            <Button
+              onClick={() => handleConfirmStatus(confirmStatus)}
               variant={confirmStatus === "archive" ? "destructive" : "default"}
             >
               {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       <div
         id="campaignSettingsContainer"
@@ -197,7 +208,7 @@ export const CampaignSettings = ({
           <input
             type="hidden"
             name="campaignData"
-            value={JSON.stringify({ ...campaignData, is_active: campaignData.is_active })}
+            value={JSON.stringify({ ...campaignData, is_active: campaignData?.is_active })}
           />
           <input
             type="hidden"
@@ -221,7 +232,7 @@ export const CampaignSettings = ({
             </section>
             <section className="rounded-lg border p-4">
               <CampaignTypeSpecificSettings
-                campaignData={campaignData}
+                campaignData={campaignData as any}
                 handleInputChange={handleInputChange}
                 mediaData={mediaData}
                 scripts={scripts}

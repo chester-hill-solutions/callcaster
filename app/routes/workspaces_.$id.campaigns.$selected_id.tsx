@@ -96,8 +96,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
   } else if (campaignType.data.type === "live_call" || campaignType.data.type === "robocall") {
     const { data, error } = await supabaseClient.rpc('get_campaign_attempts', {
-      prop_campaign_id: Number(campaign_id),
-      prop_workspace_id: workspace_id
+      p_campaign_id: Number(campaign_id)
     }).csv();
     if (error || !data) {
       console.error(error);
