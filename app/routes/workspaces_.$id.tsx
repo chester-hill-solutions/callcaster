@@ -35,17 +35,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       throw new Error("No workspace found");
     }
 
-    const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
-
+    const userRole = (await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string }))?.role;
     try {
       const workspacePromise = getWorkspaceInfoWithDetails({
         supabaseClient,
         workspaceId,
-          userId: user.id
+        userId: user.id
       });
 
       return defer({
-        userRole,
+        userRole: userRole,
         workspaceData: workspacePromise,
         headers
       });
@@ -72,10 +71,10 @@ export default function Workspace() {
         <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
           {(resolvedData: any) => {
             const { workspace, audiences, campaigns, phoneNumbers } = resolvedData;
-            const {data: workspaceData, isSyncing: workspaceSyncing, error: workspaceError} = useRealtimeData(context.supabase, workspace.id, 'workspace', [workspace]); 
-            const {data: campaignsData, isSyncing: campaignsSyncing, error: campaignsError} = useRealtimeData(context.supabase, workspace.id, 'campaign', campaigns); 
-            const {data: phoneNumbersData, isSyncing: phoneNumbersSyncing, error: phoneNumbersError} = useRealtimeData(context.supabase, workspace.id, 'workspace_numbers', phoneNumbers); 
-            const {data: audiencesData, isSyncing: audiencesSyncing, error: audiencesError} = useRealtimeData(context.supabase, workspace.id, 'audience', audiences); 
+            const { data: workspaceData, isSyncing: workspaceSyncing, error: workspaceError } = useRealtimeData(context.supabase, workspace.id, 'workspace', [workspace]);
+            const { data: campaignsData, isSyncing: campaignsSyncing, error: campaignsError } = useRealtimeData(context.supabase, workspace.id, 'campaign', campaigns);
+            const { data: phoneNumbersData, isSyncing: phoneNumbersSyncing, error: phoneNumbersError } = useRealtimeData(context.supabase, workspace.id, 'workspace_numbers', phoneNumbers);
+            const { data: audiencesData, isSyncing: audiencesSyncing, error: audiencesError } = useRealtimeData(context.supabase, workspace.id, 'audience', audiences);
             return (
               <>
                 <WorkspaceNav
@@ -130,4 +129,3 @@ export default function Workspace() {
     </main>
   );
 }
-  
