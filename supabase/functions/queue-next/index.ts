@@ -51,7 +51,10 @@ Deno.serve(async (req) => {
       dequeued_reason_text: "Automated queue processing"
     });
 
-    if (dequeueError) throw dequeueError;
+    if (dequeueError) {
+      console.error(dequeueError);
+      throw dequeueError;
+    }
 
     await new Promise(resolve => setTimeout(resolve, 200));
     if (campaign.type === "robocall") {
