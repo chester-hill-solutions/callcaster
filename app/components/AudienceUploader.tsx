@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "@remix-run/react";
+import { useParams, useNavigate, useSubmit, useFetcher } from "@remix-run/react";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck, MdArrowForward } from "react-icons/md";
 import { Button } from "~/components/ui/button";
@@ -60,6 +60,9 @@ type AudienceUploaderProps = {
   onUploadComplete?: (audienceId: string) => void;
 };
 
+// Add a type for the fetcher state
+type FetcherState = "idle" | "submitting" | "loading";
+
 export default function AudienceUploader({ 
   audienceName = "", 
   existingAudienceId,
@@ -81,13 +84,15 @@ export default function AudienceUploader({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   
   // Upload progress state
-  const [uploadInProgress, setUploadInProgress] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [audienceId, setAudienceId] = useState<string | null>(existingAudienceId || null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [totalContacts, setTotalContacts] = useState(0);
   const [processedContacts, setProcessedContacts] = useState(0);
+  
+  // Use fetcher instead of submit for better control over the submission and response
+  const fetcher = useFetcher();
 
   // Listen for changes to the audience status
   useSupabaseRealtimeSubscription({
@@ -195,7 +200,7 @@ export default function AudienceUploader({
       return;
     }
     
-    setUploadInProgress(true);
+    // We'll track the upload progress through fetcher state instead
     setUploadError(null);
     
     try {
@@ -219,26 +224,39 @@ export default function AudienceUploader({
         formData.append("split_name_column", splitNameColumn);
       }
       
-      const response = await fetch("/api/audience-upload", {
+      // Use fetcher.submit instead of submit
+      fetcher.submit(formData, {
         method: "POST",
-        body: formData,
+        action: "/api/audience-upload",
+        encType: "multipart/form-data",
       });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to upload contacts");
-      }
-      
-      setAudienceId(result.audience_id);
-      setUploadStatus("processing");
       
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError(error instanceof Error ? error.message : "An unexpected error occurred");
-      setUploadInProgress(false);
     }
   };
+
+  // Handle fetcher state changes
+  useEffect(() => {
+    const currentState = fetcher.state as FetcherState;
+    
+    if (currentState === "submitting") {
+      // Form is being submitted
+      setUploadStatus("submitting");
+    } else if (currentState === "loading") {
+      // Transition from submitting to loading means the server has responded
+      const data = fetcher.data as { error?: string; audience_id?: string; success?: boolean } | undefined;
+      
+      if (data?.error) {
+        setUploadError(data.error);
+        setUploadStatus("error");
+      } else if (data?.audience_id) {
+        setAudienceId(data.audience_id);
+        setUploadStatus("processing");
+      }
+    }
+  }, [fetcher.state, fetcher.data]);
 
   // Redirect to audience page when upload is complete
   useEffect(() => {
@@ -421,6 +439,7 @@ export default function AudienceUploader({
             <span className="text-sm font-medium">
               {uploadStatus === "processing" ? "Processing..." : 
                uploadStatus === "completed" ? "Completed!" : 
+               uploadStatus === "submitting" ? "Submitting..." :
                uploadStatus === "error" ? "Error" : "Preparing..."}
             </span>
             <span className="text-sm">
@@ -431,14 +450,14 @@ export default function AudienceUploader({
         </div>
       )}
       
-      {!uploadInProgress ? (
+      {(fetcher.state as FetcherState) === "idle" && !uploadStatus ? (
         <div className="flex justify-end">
           <Button
             onClick={handleUploadContacts}
-            disabled={!pendingFileName || !isHeaderMappingConfirmed}
+            disabled={!pendingFileName || !isHeaderMappingConfirmed || (fetcher.state as FetcherState) !== "idle"}
             className="bg-brand-primary text-white hover:bg-brand-secondary"
           >
-            Start Upload
+            {(fetcher.state as FetcherState) !== "idle" ? "Uploading..." : "Start Upload"}
           </Button>
         </div>
       ) : (
@@ -452,7 +471,10 @@ export default function AudienceUploader({
           ) : uploadStatus === "error" ? (
             <Button
               type="button"
-              onClick={() => setUploadInProgress(false)}
+              onClick={() => {
+                setUploadStatus(null);
+                setUploadError(null);
+              }}
               variant="outline"
               className="mt-4"
             >

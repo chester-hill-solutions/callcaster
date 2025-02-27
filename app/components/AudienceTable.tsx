@@ -5,13 +5,13 @@ import { ImportIcon, Download, Search, X } from "lucide-react";
 import { useSearchParams, useSubmit } from "@remix-run/react";
 import TablePagination from "./TablePagination";
 import { Input } from "./ui/input";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "./ui/table";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -24,7 +24,7 @@ import {
 } from "./ui/dropdown-menu";
 import { Database } from "~/lib/database.types";
 import { Contact } from "~/lib/types";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -104,11 +104,11 @@ export function AudienceTable({
   const handleRemoveContact = async (id: number) => {
     // Optimistically update UI
     setContacts((curr) => curr.filter((contact) => contact.id !== id));
-    
+
     const formData = new FormData();
     formData.append('contact_id', id.toString());
     formData.append('audience_id', audience_id || '');
-    
+
     submit(formData, {
       action: '/api/contact-audience',
       method: "DELETE",
@@ -118,27 +118,27 @@ export function AudienceTable({
 
   const handleRemoveSelected = async () => {
     if (selectedContacts.length === 0) return;
-    
+
     // Convert string IDs to numbers for filtering
     const selectedIds = selectedContacts.map(id => parseInt(id, 10));
-    
+
     // Remove contacts from UI immediately (optimistic update)
     setContacts((curr) => curr.filter((contact) => !selectedIds.includes(contact.id)));
-    
+
     // Create form data with all selected contacts
     const formData = new FormData();
     selectedContacts.forEach(id => {
       formData.append('contact_ids[]', id);
     });
     formData.append('audience_id', audience_id || '');
-    
+
     // Submit the form
     submit(formData, {
       action: '/api/contact-audience/bulk-delete',
       method: "DELETE",
       navigate: false
     });
-    
+
     // Clear selection
     setSelectedContacts([]);
   };
@@ -148,13 +148,13 @@ export function AudienceTable({
     const headers = ["id", "firstname", "surname", "phone", "email", "address", "city", "province", "postal", "country"];
     const csvContent = [
       headers.join(","),
-      ...contacts.map(contact => 
-        headers.map(header => 
+      ...contacts.map(contact =>
+        headers.map(header =>
           JSON.stringify((contact as any)[header] || "")
         ).join(",")
       )
     ].join("\n");
-    
+
     // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -168,7 +168,7 @@ export function AudienceTable({
 
   const handleSort = (key: string) => {
     const newParams = new URLSearchParams(searchParams);
-    
+
     // If already sorting by this key, toggle direction
     if (sorting.sortKey === key) {
       const newDirection = sorting.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -178,10 +178,10 @@ export function AudienceTable({
       newParams.set("sortKey", key);
       newParams.set("sortDirection", "asc");
     }
-    
+
     // Reset to first page when sorting changes
     newParams.set("page", "1");
-    
+
     setSearchParams(newParams);
   };
 
@@ -219,16 +219,13 @@ export function AudienceTable({
   return (
     <div className="w-full space-y-4">
       <div id="audience-settings" className="flex justify-between items-center">
-        <div className="p-4">
-          <AudienceForm
-            audienceInfo={audienceInfo}
-            handleSaveAudience={handleSaveAudience}
-            audience_id={audience_id}
-            workspace_id={workspace_id}
-          />
-        </div>
+        <AudienceForm
+          audienceInfo={audienceInfo}
+          handleSaveAudience={handleSaveAudience}
+          audience_id={audience_id}
+          workspace_id={workspace_id}
+        />
       </div>
-      
       <div className="flex justify-between items-center mb-4">
         <div className="relative w-72">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -249,13 +246,13 @@ export function AudienceTable({
             </Button>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2">
-          <Select 
-            value={pagination.pageSize.toString()} 
+          <Select
+            value={pagination.pageSize.toString()}
             onValueChange={handlePageSizeChange}
           >
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-[120px] text-muted-foreground">
               <SelectValue placeholder="Rows per page" />
             </SelectTrigger>
             <SelectContent>
@@ -265,12 +262,12 @@ export function AudienceTable({
               <SelectItem value="100">100 per page</SelectItem>
             </SelectContent>
           </Select>
-          
-          <Button variant="outline" size="sm" onClick={handleExportCSV}>
+
+          <Button variant="outline" size="sm" onClick={handleExportCSV} className="text-muted-foreground">
             <Download className="h-4 w-4 mr-2" />
             Export CSV
           </Button>
-          
+
           {selectedContacts.length > 0 && (
             <Button variant="destructive" size="sm" onClick={handleRemoveSelected}>
               Remove Selected ({selectedContacts.length})
@@ -278,54 +275,54 @@ export function AudienceTable({
           )}
         </div>
       </div>
-      
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]">
-                <Checkbox 
+                <Checkbox
                   checked={selectedContacts.length === contacts.length && contacts.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('id')}
               >
                 ID {sorting.sortKey === 'id' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('firstname')}
               >
                 First Name {sorting.sortKey === 'firstname' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('surname')}
               >
                 Last Name {sorting.sortKey === 'surname' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('phone')}
               >
                 Phone {sorting.sortKey === 'phone' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('email')}
               >
                 Email {sorting.sortKey === 'email' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('address')}
               >
                 Address {sorting.sortKey === 'address' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
               </TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer"
                 onClick={() => handleSort('city')}
               >
@@ -345,7 +342,7 @@ export function AudienceTable({
               filteredContacts.map((contact) => (
                 <TableRow key={contact.id}>
                   <TableCell>
-                    <Checkbox 
+                    <Checkbox
                       checked={selectedContacts.includes(contact.id.toString())}
                       onCheckedChange={(checked) => handleSelectContact(contact.id, !!checked)}
                     />
@@ -384,14 +381,14 @@ export function AudienceTable({
           </TableBody>
         </Table>
       </div>
-      
+
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
           Showing {filteredContacts.length} of {pagination.totalCount || 0} contacts
         </div>
-        <TablePagination 
-          currentPage={pagination.currentPage} 
-          totalPages={totalPages} 
+        <TablePagination
+          currentPage={pagination.currentPage}
+          totalPages={totalPages}
           onPageChange={handlePageChange}
         />
       </div>

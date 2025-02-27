@@ -15,9 +15,14 @@ export const action = async ({ request }: { request: Request }) => {
                 status: 'idle'
             }
         });
-        const {data:queue, error:queueError} = await supabase.from("campaign_queue").select().eq("status", user.id).single()
+        const {data:queue, error:queueError} = await supabase.from("campaign_queue").select('*, campaign(group_household_queue)').eq("status", user.id).single();
         if (queueError) throw queueError;
-        const { data:dequeue, error } = await supabase.rpc('dequeue_contact', { passed_contact_id: queue.contact_id, group_on_household: true });
+        const { data:dequeue, error } = await supabase.rpc('dequeue_contact', { 
+            passed_contact_id: queue.contact_id, 
+            group_on_household: queue.campaign.group_household_queue,
+            dequeued_by_id: user.id,
+            dequeued_reason_text: "Call completed"
+        });
         if (error) throw error;
         const {data:outreach, error:outreachError} = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", data.workspaceId)
         if (outreachError) throw outreachError;

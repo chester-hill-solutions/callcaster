@@ -1,0 +1,108 @@
+{
+  "pages": {
+    "page_1": {
+      "id": "page_1",
+      "title": "Introduction",
+      "blocks": ["block_1", "block_2"]
+    },
+    "page_2": {
+      "id": "page_2",
+      "title": "Main Questions",
+      "blocks": ["block_3", "block_4", "block_5"]
+    },
+    "page_3": {
+      "id": "page_3",
+      "title": "Closing",
+      "blocks": ["block_6"]
+    }
+  },
+  "blocks": {
+    "block_1": {
+      "id": "block_1",
+      "type": "textarea",
+      "title": "Greeting",
+      "content": "Hello, my name is [Agent Name]. I'm calling from [Company Name]. How are you today?",
+      "options": [],
+      "audioFile": ""
+    },
+    "block_2": {
+      "id": "block_2",
+      "type": "select",
+      "title": "Initial Response",
+      "content": "Do you have a few minutes to talk about our services?",
+      "options": [
+        {
+          "content": "Yes",
+          "next": "block_3"
+        },
+        {
+          "content": "No",
+          "next": "block_6"
+        },
+        {
+          "content": "Call back later",
+          "next": "block_6"
+        }
+      ],
+      "audioFile": ""
+    },
+    "block_3": {
+      "id": "block_3",
+      "type": "textarea",
+      "title": "Service Introduction",
+      "content": "Great! We're offering a new service that helps businesses like yours to [value proposition]. Many of our clients have seen [specific benefit].",
+      "options": [],
+      "audioFile": ""
+    },
+    "block_4": {
+      "id": "block_4",
+      "type": "radio",
+      "title": "Interest Level",
+      "content": "On a scale of 1-3, how interested are you in learning more about this service?",
+      "options": [
+        {
+          "content": "1 - Not interested",
+          "next": "block_6"
+        },
+        {
+          "content": "2 - Somewhat interested",
+          "next": "block_5"
+        },
+        {
+          "content": "3 - Very interested",
+          "next": "block_5"
+        }
+      ],
+      "audioFile": ""
+    },
+    "block_5": {
+      "id": "block_5",
+      "type": "checkbox",
+      "title": "Follow-up Preferences",
+      "content": "What would be the best way to follow up with you?",
+      "options": [
+        {
+          "content": "Email information",
+          "next": "block_6"
+        },
+        {
+          "content": "Schedule a demo",
+          "next": "block_6"
+        },
+        {
+          "content": "Call back next week",
+          "next": "block_6"
+        }
+      ],
+      "audioFile": ""
+    },
+    "block_6": {
+      "id": "block_6",
+      "type": "textarea",
+      "title": "Closing",
+      "content": "Thank you for your time today. [If interested: We'll follow up as discussed.] Have a great day!",
+      "options": [],
+      "audioFile": ""
+    }
+  }
+} 

@@ -73,6 +73,12 @@ function parseCSV(csvString: string): Record<string, string>[] {
   const headerLine = lines[0];
   const headers = parseCSVLine(headerLine);
   
+  // Create a normalized header map for case-insensitive matching
+  const normalizedHeaderMap = new Map<string, string>();
+  headers.forEach(header => {
+    normalizedHeaderMap.set(header.trim().toLowerCase(), header);
+  });
+  
   // Parse each data row
   const records: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -189,9 +195,20 @@ Deno.serve(async (req: Request) => {
         upload_id: body!.uploadId
       };
       
+      // Create a map of normalized CSV headers for case-insensitive matching
+      const normalizedRowHeaders = new Map<string, string>();
+      Object.keys(row).forEach(header => {
+        normalizedRowHeaders.set(header.trim().toLowerCase(), header);
+      });
+      
       // Apply header mapping
       Object.entries(body!.headerMapping).forEach(([originalHeader, mappedField]) => {
-        const value = row[originalHeader];
+        // Normalize the original header for case-insensitive matching
+        const normalizedOriginalHeader = originalHeader.trim().toLowerCase();
+        // Find the actual header in the CSV that matches (case-insensitive)
+        const actualHeader = normalizedRowHeaders.get(normalizedOriginalHeader);
+        // Get the value using the actual header if found, otherwise try the original
+        const value = actualHeader ? row[actualHeader] : row[originalHeader];
         
         if (body!.splitNameColumn && originalHeader === body!.splitNameColumn && mappedField === 'name') {
           // Handle name splitting properly

@@ -1,13 +1,9 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import {
   Form,
-  Link,
   json,
-  useActionData,
   useLoaderData,
-  useLocation,
   useNavigate,
-  useNavigation,
   useOutletContext,
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
@@ -139,13 +135,10 @@ export default function AudienceView() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const handleUploadComplete = () => {
-    // Refresh the contacts list
     setRefreshTrigger(prev => prev + 1);
-    // Switch to contacts tab
     setActiveTab("contacts");
   };
 
-  // Refresh the page when refreshTrigger changes
   useEffect(() => {
     if (refreshTrigger > 0) {
       navigate(".", { replace: true });
