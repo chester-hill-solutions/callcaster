@@ -76,6 +76,9 @@ function parseCSV(csvString: string): Record<string, string>[] {
   // Create a normalized header map for case-insensitive matching
   const normalizedHeaderMap = new Map<string, string>();
   headers.forEach(header => {
+    normalizedHeaderMap.set(header.trim().toLowerCase(), header);
+  });
+  
   // Parse each data row
   const records: Record<string, string>[] = [];
   for (let i = 1; i < lines.length; i++) {
