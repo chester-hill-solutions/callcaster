@@ -6,3 +6,5 @@ node_modules
 .env
 migrations
 .DS_Store
+/public/exports
+/public/exports/*
