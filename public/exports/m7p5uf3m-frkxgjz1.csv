@@ -1,0 +1,548 @@
+body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date
+Ingrid Please call me  I need to send Kevin a Shopping List for Food but I am having trouble sending it,inbound,received,2025-02-27T19:53:15.178+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Thank you. I will cast my vote for her.,inbound,received,2025-02-27T21:46:56.237+00:00,1070063,,,4168750807,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4168750807,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:43.978571+00:00,1071395,,,2267501758,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,2267501758,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:05:45.699563+00:00,1070125,,,2892402363,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,2892402363,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:47.414017+00:00,1069350,,,2893873704,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,2893873704,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:49.28927+00:00,1068894,,,2897883224,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,2897883224,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:51.068071+00:00,1069605,,,2899258015,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,2899258015,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:52.810128+00:00,1068660,,,4162008964,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162008964,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:05:54.267432+00:00,1070790,,,4162031513,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162031513,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:05:55.923611+00:00,1069036,,,4162032885,,,,false,2025-02-27T15:50:33.71+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162032885,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:05:57.473132+00:00,1068442,,,4162036950,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162036950,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:05:59.093772+00:00,1069910,,,4162039915,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162039915,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:00.628028+00:00,1070164,,,4162145769,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162145769,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:02.286702+00:00,1069241,,,4162146355,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162146355,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:03.615087+00:00,1068466,,,4162149323,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162149323,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:05.293854+00:00,1067781,,,4162161655,,,,false,2025-02-27T15:50:33.704+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162161655,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:06.847007+00:00,1070884,,,4162197679,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162197679,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:08.763693+00:00,1071505,,,4162205799,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162205799,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:10.267997+00:00,1071118,,,4162208592,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162208592,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:11.86689+00:00,1069559,,,4162216639,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162216639,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:13.516727+00:00,1071547,,,4162242857,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162242857,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:15.372066+00:00,1069531,,,4162248707,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162248707,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:16.916714+00:00,1071244,,,4162251074,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162251074,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:18.554767+00:00,1069445,,,4162252695,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162252695,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:20.234442+00:00,1071623,,,4162254126,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162254126,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:21.9821+00:00,1070998,,,4162260334,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162260334,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:23.561854+00:00,1071029,,,4162266230,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162266230,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:25.199666+00:00,1071029,,,4162266230,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162266230,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:26.780336+00:00,1070770,,,4162270702,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162270702,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:28.442996+00:00,1070558,,,4162291514,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162291514,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:29.846992+00:00,1070376,,,4162307284,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162307284,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:31.681268+00:00,1068426,,,4162339940,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162339940,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:32.969525+00:00,1068219,,,4162349586,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162349586,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:34.443487+00:00,1068223,,,4162400846,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162400846,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:36.145784+00:00,1068450,,,4162414757,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162414757,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:37.602291+00:00,1069129,,,4162452671,,,,false,2025-02-27T15:50:33.71+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162452671,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:39.219581+00:00,1070878,,,4162459055,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162459055,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:40.838462+00:00,1071329,,,4162474165,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162474165,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:42.123013+00:00,1068600,,,4162478127,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162478127,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:43.432802+00:00,1071686,,,4162498472,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162498472,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:44.838921+00:00,1070792,,,4162544670,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162544670,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:46.40392+00:00,1071707,,,4162557480,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162557480,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:47.919822+00:00,1069761,,,4162563556,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162563556,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:49.45171+00:00,1070163,,,4162564037,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162564037,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:50.911014+00:00,1068218,,,4162564424,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162564424,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:52.125593+00:00,1070251,,,4162600850,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162600850,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:53.296452+00:00,1069292,,,4162612391,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162612391,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:54.702473+00:00,1068367,,,4162617753,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162617753,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:06:56.019764+00:00,1068367,,,4162617753,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162617753,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:57.572703+00:00,1068468,,,4162618692,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162618692,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:06:59.168615+00:00,1068075,,,4162627155,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162627155,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:00.717224+00:00,1068559,,,4162650590,,,,false,2025-02-27T15:50:33.708+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162650590,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:02.148622+00:00,1069295,,,4162650905,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162650905,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:03.764513+00:00,1070754,,,4162652451,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162652451,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:05.259601+00:00,1069351,,,4162655133,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162655133,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:06.716012+00:00,1068354,,,4162655759,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162655759,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:07.865313+00:00,1070155,,,4162662690,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162662690,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:09.202992+00:00,1068024,,,4162667598,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162667598,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:10.535507+00:00,1068024,,,4162667598,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162667598,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:11.785307+00:00,1068024,,,4162667598,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162667598,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:13.054653+00:00,1068024,,,4162667598,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162667598,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:14.623226+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:15.932042+00:00,1070958,,,4162679362,,,,false,2025-02-27T15:50:33.716+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162679362,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:17.516822+00:00,1069188,,,4162694886,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162694886,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:18.742438+00:00,1070043,,,4162697875,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162697875,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:19.949145+00:00,1069041,,,4162698591,,,,false,2025-02-27T15:50:33.71+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162698591,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:21.091331+00:00,1068554,,,4162703000,,,,false,2025-02-27T15:50:33.708+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162703000,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:22.283429+00:00,1067924,,,4162741463,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162741463,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:23.860901+00:00,1069569,,,4162755375,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162755375,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:25.231386+00:00,1068131,,,4162757253,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162757253,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:26.55537+00:00,1069969,,,4162759764,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162759764,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:27.964689+00:00,1069693,,,4162768632,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162768632,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:29.200732+00:00,1068662,,,4162769201,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162769201,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:30.832051+00:00,1070080,,,4162825666,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162825666,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:32.237904+00:00,1067761,,,4162829271,,,,false,2025-02-27T15:50:33.704+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162829271,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:33.695181+00:00,1070118,,,4162831212,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162831212,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:35.116473+00:00,1070140,,,4162834816,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162834816,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:36.378272+00:00,1068415,,,4162835845,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162835845,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:37.611883+00:00,1069734,,,4162837447,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162837447,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:38.921205+00:00,1068159,,,4162850044,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850044,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:40.101853+00:00,1068156,,,4162850053,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850053,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:41.835047+00:00,1071661,,,4162850168,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850168,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:43.372114+00:00,1071798,,,4162850256,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850256,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:44.789281+00:00,1071798,,,4162850256,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850256,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:46.136257+00:00,1067755,,,4162850286,,,,false,2025-02-27T15:50:33.704+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850286,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:47.308184+00:00,1072014,,,4162850353,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850353,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:48.819767+00:00,1072014,,,4162850353,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850353,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:49.968806+00:00,1071465,,,4162850405,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850405,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:51.144349+00:00,1071465,,,4162850405,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850405,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:52.356534+00:00,1071740,,,4162850845,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850845,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:53.592972+00:00,1071740,,,4162850845,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850845,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:54.704467+00:00,1072005,,,4162850899,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850899,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:55.892478+00:00,1071491,,,4162850986,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162850986,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:07:57.341152+00:00,1068129,,,4162851313,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851313,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:58.545842+00:00,1069416,,,4162851327,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851327,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:07:59.706136+00:00,1068107,,,4162851336,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851336,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:01.430648+00:00,1068110,,,4162851652,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851652,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:02.762015+00:00,1069818,,,4162851861,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851861,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:04.075478+00:00,1071508,,,4162851973,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162851973,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:05.689667+00:00,1069825,,,4162854329,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162854329,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:06.887378+00:00,1071486,,,4162854486,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162854486,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:08.167013+00:00,1071413,,,4162854867,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162854867,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:08:09.655772+00:00,1071464,,,4162854915,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162854915,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:08:10.926182+00:00,1071464,,,4162854915,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162854915,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:12.438427+00:00,1071476,,,4162855038,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855038,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:13.842429+00:00,1071748,,,4162855154,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855154,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:15.044251+00:00,1069286,,,4162855264,,,,false,2025-02-27T15:50:33.711+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855264,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:16.433958+00:00,1071437,,,4162855303,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855303,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:17.549838+00:00,1071437,,,4162855303,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855303,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:18.842223+00:00,1071829,,,4162855600,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855600,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:20.163273+00:00,1071829,,,4162855600,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855600,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:21.349282+00:00,1071829,,,4162855600,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855600,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:22.611888+00:00,1071989,,,4162855666,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855666,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:23.865067+00:00,1071450,,,4162855991,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162855991,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:25.128145+00:00,1071526,,,4162856014,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856014,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:26.342017+00:00,1071528,,,4162856053,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856053,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:27.753394+00:00,1071438,,,4162856204,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856204,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:29.088272+00:00,1072036,,,4162856496,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856496,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:30.375325+00:00,1071544,,,4162856633,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856633,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:31.610958+00:00,1071544,,,4162856633,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856633,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:32.835275+00:00,1071544,,,4162856633,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856633,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:34.011091+00:00,1071820,,,4162856773,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856773,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:08:35.265787+00:00,1068624,,,4162856781,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856781,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:36.512471+00:00,1071765,,,4162856855,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856855,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+STOP ,inbound,received,2025-02-27T23:08:37.631+00:00,1068554,,,4162703000,,,,false,2025-02-27T15:50:33.708+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162703000,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:37.681927+00:00,1071731,,,4162856996,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856996,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:38.978354+00:00,1071731,,,4162856996,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162856996,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:40.236356+00:00,1072027,,,4162857262,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162857262,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:41.537437+00:00,1071800,,,4162857265,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162857265,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:42.738269+00:00,1071980,,,4162857320,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162857320,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:08:44.019107+00:00,1071833,,,4162857455,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162857455,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:45.399717+00:00,1071780,,,4162857690,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162857690,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:46.631816+00:00,1068147,,,4162858557,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162858557,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:47.876556+00:00,1068143,,,4162859166,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859166,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:49.015731+00:00,1071850,,,4162859305,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859305,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:50.277248+00:00,1071850,,,4162859305,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859305,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:51.574275+00:00,1068140,,,4162859376,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859376,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:52.783487+00:00,1068099,,,4162859422,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859422,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:54.029079+00:00,1068099,,,4162859422,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859422,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:55.180835+00:00,1068148,,,4162859572,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859572,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:56.360653+00:00,1071812,,,4162859663,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859663,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:57.571707+00:00,1067743,,,4162859673,,,,false,2025-02-27T15:50:33.704+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859673,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:08:58.832276+00:00,1069836,,,4162859785,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859785,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:00.036403+00:00,1069836,,,4162859785,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162859785,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:01.4568+00:00,1067910,,,4162860771,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162860771,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:02.679603+00:00,1071540,,,4162880784,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162880784,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:03.863712+00:00,1071540,,,4162880784,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162880784,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:05.049188+00:00,1071540,,,4162880784,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162880784,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:06.491741+00:00,1068165,,,4162880974,,,,false,2025-02-27T15:50:33.706+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162880974,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:07.664731+00:00,1071527,,,4162881489,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162881489,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:08.930128+00:00,1069800,,,4162881670,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162881670,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:10.111095+00:00,1069853,,,4162881937,,,,false,2025-02-27T15:50:33.713+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162881937,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:11.435837+00:00,1071560,,,4162885753,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162885753,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:12.810934+00:00,1071411,,,4162886521,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162886521,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:14.023507+00:00,1071821,,,4162886882,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162886882,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:15.43655+00:00,1070433,,,4162888230,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888230,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:16.569917+00:00,1070433,,,4162888230,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888230,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:18.180218+00:00,1071766,,,4162888280,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888280,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:19.360661+00:00,1071488,,,4162888330,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888330,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:20.621294+00:00,1071968,,,4162888392,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888392,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:21.817651+00:00,1071768,,,4162888394,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888394,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:23.090283+00:00,1072017,,,4162888538,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162888538,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:24.261205+00:00,1070450,,,4162889306,,,,false,2025-02-27T15:50:33.715+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162889306,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:25.437719+00:00,1071813,,,4162889385,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162889385,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:26.751483+00:00,1071758,,,4162889526,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162889526,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:28.186857+00:00,1071851,,,4162889858,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162889858,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:29.465824+00:00,1071416,,,4162889904,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162889904,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:31.042159+00:00,1070191,,,4162928066,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162928066,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:32.181956+00:00,1070403,,,4162932535,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162932535,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:33.336307+00:00,1071280,,,4162975850,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162975850,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:35.125875+00:00,1072038,,,4162991821,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162991821,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:36.328476+00:00,1071739,,,4162996221,,,,false,2025-02-27T15:50:33.718+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162996221,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:37.923878+00:00,1070137,,,4162996939,,,,false,2025-02-27T15:50:33.714+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162996939,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:39.55597+00:00,1068378,,,4163026001,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163026001,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:41.07858+00:00,1071404,,,4163039531,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163039531,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:42.32621+00:00,1071893,,,4163173945,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163173945,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:43.800876+00:00,1068529,,,4163177600,,,,false,2025-02-27T15:50:33.708+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163177600,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,delivered,2025-02-27T23:09:45.061468+00:00,1068815,,,4163181149,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163181149,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:46.408131+00:00,1071307,,,4163211733,,,,false,2025-02-27T15:50:33.717+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163211733,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:47.594717+00:00,1071879,,,4163218202,,,,false,2025-02-27T15:50:33.719+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163218202,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"It's Mary-Margaret McMahon, your Ontario Liberal Party Candidate for MPP in Beaches-East York. Polls are open TODAY from 9am-9pm. Send Doug Ford a message and vote Mary-Margaret McMahon TODAY
+
+Reply STOP to STOP",outbound-api,undelivered,2025-02-27T23:09:48.774892+00:00,1069566,,,4163220459,,,,false,2025-02-27T15:50:33.712+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4163220459,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+I VOTE FOR MARY MARGARET MCMAHON. Mary Killackey,inbound,received,2025-02-27T23:11:47.749+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Done!!!,inbound,received,2025-02-27T23:13:43.087+00:00,1068662,,,4162769201,,,,false,2025-02-27T15:50:33.709+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162769201,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Bro I can't even vote bud like leave me alone cuz wa u doin with ur life bro like cmon blud,inbound,received,2025-02-27T23:22:22.797+00:00,1068442,,,4162036950,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162036950,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+And if I could vote I wouldn't vote for u 💀🙏🙏,inbound,received,2025-02-27T23:22:52.682+00:00,1068442,,,4162036950,,,,false,2025-02-27T15:50:33.707+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162036950,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+"Ingrid If you are home now or know that you will be here tomorrow morning please call me Curtis is bringing me 6 Cartons of Cigarettes at 930 am
+However I need to go to the Bank Machine on the first floor to get the money to pay him before he gets here Do you know what time money goes into those bank machines or what time they go back Online They seem to go offline around 11 00 pm.  ",inbound,received,2025-02-28T00:31:17.823+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Ingrid ,inbound,received,2025-02-28T00:36:09.344+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Ingrid I also have to contact Kevin re groceries since it is almost 3 weeks since his last shopping He has been away most of that time with his family I was going to ask you to take a picture of the Shopping List to send to Kevin,inbound,received,2025-02-28T00:44:04.944+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Ingrid my camera is no longer functioning,inbound,received,2025-02-28T00:57:45.627+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00
+Ingrid I will have to go to bed soon since Curtis will be here so early tomorrow morning,inbound,received,2025-02-28T01:10:03.43+00:00,1067916,,,4162670752,,,,false,2025-02-27T15:50:33.705+00:00,48dd5ad0-97b9-4964-9959-780e52b400a9,,,,,,,4162670752,gotvText,2025-02-27T05:00:00+00:00,2025-02-28T05:00:00+00:00

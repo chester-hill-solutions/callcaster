@@ -1,9 +1,9 @@
 import { ResultsScreenProps, DispositionResult } from "~/lib/types";
 import { TotalMessages } from "./ResultsScreen.TotalCalls";
-import { ExportButton } from "./ResultsScreen.ExportButton";
+import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
-import { NavLink, useNavigation } from "@remix-run/react";
+import { NavLink, useNavigation, useParams } from "@remix-run/react";
 
 interface MessageResultsScreenProps {
   results: DispositionResult[];
@@ -26,6 +26,10 @@ const MessageResultsScreen = ({
   queueCounts,
 }: MessageResultsScreenProps) => {
   const { state } = useNavigation();
+  const params = useParams();
+  const campaignId = params.selected_id || "";
+  const workspaceId = params.id || "";
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -37,7 +41,7 @@ const MessageResultsScreen = ({
             totalMessages={totalOfAllResults || 0}
             expectedTotal={queueCounts.fullCount || 0}
           />
-          <ExportButton isBusy={state !== "idle"} />
+          <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown
           results={results}
