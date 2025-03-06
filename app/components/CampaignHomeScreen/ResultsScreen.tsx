@@ -1,7 +1,8 @@
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
-import { ExportButton } from "./ResultsScreen.ExportButton";
+import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
+import { useParams } from "@remix-run/react";
 
 type CampaignResult = {
   disposition: string;
@@ -30,6 +31,12 @@ const ResultsScreen = ({
     queuedCount: number;
   };
 }) => {
+  const params = useParams();
+  const campaignId = params.selected_id || "";
+  const workspaceId = params.id || "";
+  
+  const safeDispositionTotals = totalsByDisposition || {};
+  
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -38,16 +45,16 @@ const ResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalCalls totalCalls={totalOfAllResults || 0} expectedTotal={queueCounts.fullCount || 0} />
-          <ExportButton isBusy={isBusy} />
+          <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown
           results={results}
-          totalsByDisposition={totalsByDisposition}
+          totalsByDisposition={safeDispositionTotals}
           totalOfAllResults={totalOfAllResults}
         />
         <KeyMetrics
           results={results}
-          totalsByDisposition={totalsByDisposition}
+          totalsByDisposition={safeDispositionTotals}
           totalOfAllResults={totalOfAllResults}
         />
       </div>
