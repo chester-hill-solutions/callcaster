@@ -18,20 +18,58 @@ const generateUniqueId = () => {
   return `${timestamp}-${randomStr}`;
 };
 
-// Function to clean up old export files (older than 24 hours)
-const cleanupOldExports = () => {
-  const files = fs.readdirSync(EXPORT_DIR);
-  const now = Date.now();
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-  
-  files.forEach(file => {
-    const filePath = path.join(EXPORT_DIR, file);
-    const stats = fs.statSync(filePath);
-    if (now - stats.mtimeMs > ONE_DAY_MS) {
-      fs.unlinkSync(filePath);
-    }
-  });
+// Configuration for cleanup
+const CLEANUP_CONFIG = {
+  MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours
+  MAX_FILES_PER_WORKSPACE: 50,      // Maximum number of export files per workspace
+  CLEANUP_BATCH_SIZE: 100,          // Number of files to process in one cleanup batch
 };
+
+// Enhanced cleanup function with better error handling and logging
+const cleanupOldExports = async () => {
+  try {
+    const files = fs.readdirSync(EXPORT_DIR);
+    const now = Date.now();
+    
+    // Group files by workspace and type
+    const fileGroups = files.reduce((acc, file) => {
+      // Skip non-export files
+      if (!file.endsWith('.csv') && !file.endsWith('.json')) {
+        return acc;
+      }
+      
+      // Get file stats
+      const filePath = path.join(EXPORT_DIR, file);
+      const stats = fs.statSync(filePath);
+      
+      // Check if file is older than MAX_AGE_MS
+      if (now - stats.mtimeMs > CLEANUP_CONFIG.MAX_AGE_MS) {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`Cleaned up old export file: ${file}`);
+        } catch (error) {
+          console.error(`Error deleting old file ${file}:`, error);
+        }
+      }
+      
+      return acc;
+    }, {});
+    
+    // Log cleanup summary
+    console.log(`Export cleanup completed. Processed ${files.length} files.`);
+  } catch (error) {
+    console.error("Error during export cleanup:", error);
+  }
+};
+
+// Schedule periodic cleanup
+const scheduleCleanup = () => {
+  const CLEANUP_INTERVAL = 60 * 60 * 1000; // Run cleanup every hour
+  setInterval(cleanupOldExports, CLEANUP_INTERVAL);
+};
+
+// Initialize cleanup schedule when the server starts
+scheduleCleanup();
 
 // Define types for our data structures
 interface Contact {

@@ -1,1 +1,0 @@
-{"status":"error","error":"Could not choose the best candidate function between: public.get_campaign_messages_count(prop_campaign_id => integer, prop_workspace_id => text), public.get_campaign_messages_count(prop_campaign_id => integer, prop_workspace_id => uuid)","exportId":"m7p21igw-s838l96m"}
