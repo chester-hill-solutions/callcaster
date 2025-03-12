@@ -91,8 +91,8 @@ export const NumbersTable = ({
               <th className="py-2 text-left">Caller ID</th>
               <th className="py-2 text-left">Phone Number</th>
               <th className="py-2 text-left">Status</th>
-              <th className="py-2 text-left">Incoming Activity</th>
-              <th className="py-2 text-left">Incoming Voice Message</th>
+              <th className="py-2 text-left">Handle Voicemail</th>
+              <th className="py-2 text-left">Voicemail Message</th>
             </tr>
           </thead>
           <tbody>
@@ -285,6 +285,7 @@ const IncomingActivitySelect = ({
         ) : (
           <>
             <option value="">Select how to handle incoming calls</option>
+            <option value="webhook_only">Webhook Only</option>
             {members.map(
               (member: User) =>
                 member && (

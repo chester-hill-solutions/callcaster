@@ -2,6 +2,7 @@ import { LoaderFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "~/lib/utils";
+import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 export const action = async ({ request }: LoaderFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
@@ -19,7 +20,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       inbound_audio,
       type,
       workspace,
-      ...workspace!inner(twilio_data)`,
+      ...workspace!inner(twilio_data, webhook(*))`,
     )
     .eq("phone_number", data.Called)
     .single() as {
@@ -48,7 +49,9 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       .from(`workspaceAudio`)
       .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
     : { data: null, error: null };
-  const { error: callError } = await supabase
+  
+  // Insert call record
+  const { data: call, error: callError } = await supabase
     .from("call")
     .upsert({
       sid: data.CallSid,
@@ -62,10 +65,33 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       workspace: number.workspace,
       duration: Math.max(Number(data.Duration), Number(data.CallDuration)),
     })
-    if (callError){
-      console.error("Error on function insert call", callError);
-      throw { status: 500, statusText: "Internal Server Error" };
-    }
+    .select()
+    .single();
+
+  if (callError) {
+    console.error("Error on function insert call", callError);
+    throw { status: 500, statusText: "Internal Server Error" };
+  }
+
+  // Send webhook notification for inbound call
+  const callWebhook = number.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_call")).flat()
+  if (callWebhook.length > 0) {
+    await sendWebhookNotification({
+      eventCategory: "inbound_call",
+      eventType: "INSERT",
+      workspaceId: number.workspace || "",
+      payload: {
+        call_sid: call.sid,
+        from: call.from,
+        to: call.to,
+        status: call.status,
+        direction: call.direction,
+        timestamp: call.start_time,
+      },
+      supabaseClient: supabase,
+    });
+  }
+
   if (isPhoneNumber(number?.inbound_action)) {
     twiml.pause({ length: 1 });
     twiml.dial(number.inbound_action || '');

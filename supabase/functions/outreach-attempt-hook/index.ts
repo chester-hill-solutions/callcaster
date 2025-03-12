@@ -7,7 +7,7 @@ const initSupabaseClient = () => {
   );
 };
 
-const fetchWebhook = async (record) => {
+const fetchWebhook = async (record: any) => {
   const supabase = initSupabaseClient();
   const { data, error } = await supabase
     .from("webhook")
@@ -17,63 +17,77 @@ const fetchWebhook = async (record) => {
     console.error("Error fetching webhooks:", error);
     throw error;
   }
-  console.log("Fetched webhooks:", data);
   return data;
 };
 
-const getResult = async ({ type, record, old_record }) => {
+const getResult = async ({ type, record, old_record }: { type: string, record: any, old_record: any }) => {
   const webhooks = await fetchWebhook(record);
   if (webhooks && webhooks.length > 0) {
     const webhook = webhooks[0];
-    if (webhook.event.includes(type)) {
+
+    // Check if this event type is enabled in the events array
+    // For outreach attempts, we use the "outbound_call" or "outbound_sms" category
+    // depending on the record type
+    const category = record.type === 'call' ? 'outbound_call' : 'outbound_sms';
+
+    const hasMatchingEvent = webhook.events &&
+      Array.isArray(webhook.events) &&
+      webhook.events.some((event: any) =>
+        event.category === category && event.type === type
+      );
+
+    if (hasMatchingEvent) {
       const res = await fetch(webhook.destination_url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(webhook.custom_headers || {}),
         },
-        body: JSON.stringify({ type, record, old_record }),
+        body: JSON.stringify({
+          event_category: category,
+          event_type: type,
+          workspace_id: record.workspace,
+          timestamp: new Date().toISOString(),
+          payload: { type, record, old_record }
+        }),
       });
       const responseText = await res.text();
-      console.log(`Raw response:`, responseText);
       if (!res.ok) {
         console.error(`Webhook request failed with status ${res.status}`);
         throw new Error(`Error with the webhook event: ${responseText}`);
       }
       try {
         const result = JSON.parse(responseText);
-        console.log(`Webhook response:`, result);
+
         return result;
       } catch (e) {
         console.error("Failed to parse response as JSON:", e);
         throw new Error(`Invalid JSON response: ${responseText}`);
       }
     } else {
-      console.log(`Event type ${type} not included in webhook events:`, webhook.event);
+      console.warn(`Event type ${type} for category ${category} not configured in webhook events`);
       return;
     }
   } else {
-    console.log("No webhooks found for the workspace");
+    console.warn("No webhooks found for the workspace");
     return;
   }
 };
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   try {
     const { type, record, old_record } = await req.json();
-    console.log(`Processing outreach event:`, { type, record, old_record });
     const result = await getResult({ type, record, old_record });
     if (result) {
-      console.log("Webhook processed successfully");
       return new Response(JSON.stringify(result), {
         headers: { "Content-Type": "application/json" },
       });
     } else {
-      console.log("No webhook processed");
       return new Response(JSON.stringify({ message: "No action taken" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Server error:", error);
     return new Response(
       JSON.stringify({ error: error.message, status: "error" }),

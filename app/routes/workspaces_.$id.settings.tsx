@@ -424,14 +424,14 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
-        {false && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+        {hasAccess && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Webhook
             </h3>
             <div className="flex flex-col py-4">
-              {hasAccess ? (
-                <WebhookEditor initialWebhook={webhook} userId={activeUserId} />
+              {hasAccess && workspace?.id ? (
+                <WebhookEditor initialWebhook={webhook || null} userId={activeUserId} workspaceId={workspace.id} />
               ) : (
                 <p className="text-center text-gray-600">
                   You don't have permission to manage webhooks.
