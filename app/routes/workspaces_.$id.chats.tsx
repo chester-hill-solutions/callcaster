@@ -247,6 +247,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     supabase: supabaseClient,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
+    user: user as unknown as User,
   });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });

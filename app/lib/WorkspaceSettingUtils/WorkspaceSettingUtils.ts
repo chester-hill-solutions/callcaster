@@ -48,7 +48,7 @@ export async function handleUpdateUser(
   const updatedWorkspaceRole = formData.get("updated_workspace_role") as string;
   const { data: updatedUser, error: errorUpdatingUser } = await supabaseClient
     .from("workspace_users")
-    .update({ role: updatedWorkspaceRole })
+    .update({ role: updatedWorkspaceRole as "owner" | "member" | "caller" | "admin" | undefined })
     .eq("workspace_id", workspaceId)
     .eq("user_id", userId)
     .select()
@@ -100,8 +100,8 @@ export async function handleDeleteSelf(
     .select()
     .single();
   if (errorDeletingSelf) {
-    console.log(errorDeletingSelf);
-    return json({ data: null, error: errorDeletingSelf.message });
+    console.error(errorDeletingSelf);
+    return { data: null, error: errorDeletingSelf.message };
   }
 
   return redirect("/workspaces", { headers });
@@ -164,8 +164,8 @@ export async function handleDeleteWorkspace({
       .select();
 
   if (deleteWorkspaceError) {
-    console.log("Error deleting workspace: ", deleteWorkspaceError);
-    return json({ data: null, error: deleteWorkspaceError }, { headers });
+    console.error("Error deleting workspace: ", deleteWorkspaceError);
+    return { data: null, error: deleteWorkspaceError };
   }
 
   return redirect("/workspaces");
@@ -187,65 +187,178 @@ export async function removeInvite({
     .from("workspace_invite")
     .delete()
     .eq("workspace", workspaceId)
-    .eq("user_id", userId);
+    .eq("user_id", userId as string);
   if (error) {
-    console.log("Error removing invite: ", error);
-    return json({ data: null, error }, { headers });
+    console.error("Error removing invite: ", error);
+    return { data: null, error };
   }
-  return json({ data, error: null }, { headers });
+  return { data, error: null };
 }
 
 export async function handleUpdateWebhook(
   formData: FormData,
   workspaceId: string,
-  supabaseClient: SupabaseClient,
+  supabaseClient: SupabaseClient<Database>,
   headers: Headers,
 ) {
-  const { destinationUrl, insertEvent, updateEvent, userId, customHeaders } =
-    Object.fromEntries(formData);
-  const eventTypes = [];
-  if (insertEvent) eventTypes.push("INSERT");
-  if (updateEvent) eventTypes.push("UPDATE");
+  const webhookId = formData.get("webhookId") as string;
+  const destinationUrl = formData.get("destinationUrl") as string;
+  const userId = formData.get("userId") as string;
+  const customHeaders = formData.get("customHeaders") as string;
+  const events = formData.get("events") as string;
+  
+  // Parse the events array from JSON
+  const parsedEvents = JSON.parse(events);
+  
   const headersArray = JSON.parse(customHeaders);
-  const custom_headers = {};
-  headersArray.map((header) => (custom_headers[header[0]] = header[1]));
+  const custom_headers: Record<string, string> = {};
+  headersArray.map((header: [string, string]) => (custom_headers[header[0]] = header[1]));
+  const updateData = {
+    id: parseInt(webhookId),
+    destination_url: destinationUrl,
+    updated_at: new Date().toISOString(),
+    updated_by: userId,
+    custom_headers,
+    events: parsedEvents,
+    workspace: workspaceId,
+  };
   const { data: webhook, error: webhookError } = await supabaseClient
     .from("webhook")
-    .update({
-      destination_url: destinationUrl,
-      event: eventTypes,
-      updated_at: new Date().toISOString(),
-      updated_by: userId,
-      custom_headers,
-    })
-    .eq("workspace", workspaceId)
+    .upsert(updateData)
     .select();
   if (webhookError) {
     console.error("Error updating webhook", webhookError);
-    return json({ data: null, error: webhookError }, { headers });
+    return json({ data: null, error: webhookError.message }, { headers });
   }
+  
   return json({ data: webhook, error: null }, { headers });
 }
 
 export async function testWebhook(
-  testData: any,
+  testData: string | any,
   destination_url: string,
-  custom_headers: Headers,
+  custom_headers: string | Record<string, string>,
 ) {
   try {
+    // Handle possible string inputs (from form submissions)
+    const parsedTestData = typeof testData === 'string' ? JSON.parse(testData) : testData;
+    const parsedHeaders = typeof custom_headers === 'string' ? JSON.parse(custom_headers) : custom_headers;
+    
+    // Convert headers array to object if needed
+    const headersObject: Record<string, string> = {};
+    if (Array.isArray(parsedHeaders)) {
+      parsedHeaders.forEach(([key, value]: [string, string]) => {
+        if (key) headersObject[key] = value;
+      });
+    } else {
+      Object.assign(headersObject, parsedHeaders);
+    }
+
     const response = await fetch(destination_url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...custom_headers,
+        ...headersObject,
       },
-      body: JSON.stringify(testData),
+      body: JSON.stringify(parsedTestData),
     });
 
-    const data = await response.json();
-    return { data, error: null };
-  } catch (error) {
+    // Try to parse response as JSON, fallback to text if not possible
+    let data;
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
+
+    return { 
+      data, 
+      status: response.status,
+      statusText: response.statusText,
+      error: null 
+    };
+  } catch (error: unknown) {
     console.error("Error sending test data", error);
-    return { data: null, error: error.message };
+    return { 
+      data: null, 
+      status: 500,
+      statusText: "Error sending webhook",
+      error: error instanceof Error ? error.message : String(error) 
+    };
+  }
+}
+
+/**
+ * Send webhook notifications for events
+ */
+export async function sendWebhookNotification({
+  eventCategory,
+  eventType,
+  workspaceId,
+  payload,
+  supabaseClient,
+}: {
+  eventCategory: string;
+  eventType: "INSERT" | "UPDATE";
+  workspaceId: string;
+  payload: any;
+  supabaseClient: SupabaseClient<Database>;
+}) {
+  try {
+    // Get the webhook configuration for this workspace
+    const { data: webhook, error: webhookError } = await supabaseClient
+      .from("webhook")
+      .select("*")
+      .eq("workspace", workspaceId)
+      .single();
+    
+    if (webhookError || !webhook) {
+      console.error(`No webhook configured for workspace ${workspaceId}`);
+      return { success: false, error: webhookError?.message || "No webhook configured" };
+    }
+
+    // Check if this event type is enabled in the events array
+    const webhookAny = webhook as any;
+    const hasMatchingEvent = webhookAny.events && Array.isArray(webhookAny.events) && 
+      webhookAny.events.some((event: any) => 
+        event.category === eventCategory && event.type === eventType
+      );
+    
+    if (!hasMatchingEvent) {
+      console.warn(`Webhook not configured for ${eventCategory}/${eventType} events`);
+      return { success: false, error: "Event type not enabled for this webhook" };
+    }
+
+    // Handle custom headers - ensure it's an object
+    const customHeaders = webhook.custom_headers 
+      ? (typeof webhook.custom_headers === 'object' ? webhook.custom_headers : {})
+      : {};
+
+    // Send the webhook
+    const result = await fetch(webhook.destination_url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(customHeaders as Record<string, string>),
+      },
+      body: JSON.stringify({
+        event_category: eventCategory,
+        event_type: eventType,
+        workspace_id: workspaceId,
+        timestamp: new Date().toISOString(),
+        payload,
+      }),
+    });
+
+    if (!result.ok) {
+      console.error(`Webhook delivery failed: ${result.status} ${result.statusText}`);
+      return { success: false, error: `Webhook delivery failed: ${result.status} ${result.statusText}` };
+    }
+
+    return { success: true, error: null };
+  } catch (error: unknown) {
+    console.error("Error sending webhook notification", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

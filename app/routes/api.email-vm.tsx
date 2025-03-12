@@ -4,8 +4,9 @@ import { ActionFunctionArgs, json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 import { Workspace, WorkspaceNumber } from "~/lib/types";
 import { MailDataRequired } from "@sendgrid/mail";
+import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
-export const action = async ({ request, params }:ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
@@ -28,17 +29,17 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
       .select(`
         inbound_action,
         type,
-        workspace (id, twilio_data, name)
+        workspace (id, twilio_data, name, webhook(*))
       `)
       .eq("phone_number", call.to)
-      .single<WorkspaceNumber & {workspace: Workspace}>();
+      .single<WorkspaceNumber & { workspace: Workspace }>();
 
     if (numberError) throw new Error(`Error fetching workspace number: ${numberError.message}`);
-    if (!number.workspace) throw new Error(`Workspace not found`); 
+    if (!number.workspace) throw new Error(`Workspace not found`);
     if (!number.workspace.twilio_data) throw new Error(`Workspace twilio data not found`);
     const action = number.inbound_action;
     const now = new Date();
-    
+
     const recordingResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${data.AccountSid}/Recordings/${data.RecordingSid}.mp3`, {
       headers: {
         'Authorization': `Basic ${Buffer.from(`${number.workspace.twilio_data.sid}:${number.workspace.twilio_data.authToken}`).toString('base64')}`
@@ -48,7 +49,7 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
     if (!recordingResponse.ok) throw new Error(`Failed to fetch recording: ${recordingResponse.statusText}`);
 
     const recording = await recordingResponse.blob()
-    const recordingBase64 = await recording.text()  
+    const recordingBase64 = await recording.text()
 
     const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -56,7 +57,7 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
       .upload(fileName, recording, {
         cacheControl: "60",
         upsert: false,
-        contentType: "audio/mpeg",  
+        contentType: "audio/mpeg",
       });
 
     if (uploadError) throw new Error(`Error uploading to Supabase: ${uploadError.message}`);
@@ -70,6 +71,7 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
 
     const signedUrl = signedUrlData.signedUrl;
 
+    // Send email notification
     MailService.setApiKey(process.env.SENDGRID_API_KEY!);
     const msg: MailDataRequired = {
       templateId: "d-8f12a98fe1af438cae0efdced5eeb512",
@@ -79,7 +81,7 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
       },
       personalizations: [
         {
-          to: [{ 
+          to: [{
             email: action?.toString() || '',
             name: ""
           }],
@@ -95,6 +97,26 @@ export const action = async ({ request, params }:ActionFunctionArgs) => {
     };
 
     const result = await MailService.send(msg);
+
+    // Send webhook notification
+    const voicemailWebhook = number.workspace.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "voicemail")).flat()
+    if (voicemailWebhook.length > 0) {
+      await sendWebhookNotification({
+        eventCategory: "voicemail",
+        eventType: "INSERT",
+        workspaceId: number.workspace.id,
+        payload: {
+          call_sid: call.sid,
+          from: call.from,
+          to: call.to,
+          recording_url: signedUrl,
+          duration: data.RecordingDuration,
+          timestamp: now.toISOString(),
+        },
+        supabaseClient: supabase,
+      });
+    }
+
     return json({ success: true, message: "Voicemail processed and email sent", result });
   } catch (error) {
     console.error('Error processing voicemail:', error);

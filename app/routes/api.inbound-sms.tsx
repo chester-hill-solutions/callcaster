@@ -1,5 +1,6 @@
 import { json, ActionFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
+import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const supabase = createClient(
@@ -13,7 +14,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .select(
       `
         workspace,
-        ...workspace!inner(twilio_data)`,
+        ...workspace!inner(twilio_data, webhook(*))`,
     )
     .eq("phone_number", data.To)
     .single();
@@ -21,7 +22,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (number) {
     const media = [];
     const now = new Date();
-
     for (let i = 0; i < parseInt(data.NumMedia as string); i++) {
       try {
         const mediaResponse = await fetch(
@@ -66,7 +66,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (contactError) {
       console.error('Contact lookup error:', contactError);
     }
-
 
     const messageData = {
       sid: data.MessageSid,
@@ -123,10 +122,31 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }).in("id", contact.map((c) => c.id));
       }
     }
+
     if (messageError) {
       console.error('Message insert error:', messageError);
       return json({ messageError }, 400);
     }
+    const smsWebhook = number.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_sms")).flat()
+    if (smsWebhook.length > 0) {
+      await sendWebhookNotification({
+        eventCategory: "inbound_sms",
+        eventType: "INSERT",
+        workspaceId: number.workspace,
+        payload: {
+          message_sid: data.MessageSid,
+          from: data.From,
+          to: data.To,
+          body: data.Body,
+          status: data.Status,
+          num_media: parseInt(data.NumMedia as string),
+          media_urls: media.length > 0 ? media : null,
+          timestamp: now.toISOString(),
+        },
+        supabaseClient: supabase,
+      });
+    }
+
     return json({ message }, 201);
   } else {
     return json({ error: "Number not found" }, 404);
