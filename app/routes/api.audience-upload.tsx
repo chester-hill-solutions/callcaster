@@ -1,5 +1,272 @@
 import { json } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
+import { parseCSV } from "../lib/csv";
+
+interface StorageBucket {
+  id: string;
+  name: string;
+  owner: string;
+  created_at: string;
+  updated_at: string;
+  public: boolean;
+}
+
+interface CSVContact {
+  [key: string]: string;
+}
+
+interface MappedContact {
+  id?: number;
+  workspace: string;
+  created_by: string;
+  firstname?: string;
+  surname?: string;
+  other_data?: Array<{ key: string; value: any }>; // JSONB array of key-value pairs
+  [key: string]: any;
+}
+
+// Type guard for other_data array
+function isOtherDataArray(value: any): value is Array<{ key: string; value: any }> {
+  return Array.isArray(value) && value.every(item => 
+    typeof item === 'object' && 
+    item !== null && 
+    'key' in item && 
+    'value' in item
+  );
+}
+
+// Generate a unique ID without using uuid package
+const generateUniqueId = () => {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substring(2, 10);
+  return `${timestamp}-${randomStr}`;
+};
+
+// Process audience upload in background
+const processAudienceUpload = async (
+  supabaseClient: any,
+  uploadId: number,
+  audienceId: number,
+  workspaceId: string,
+  userId: string,
+  fileContent: string,
+  headerMapping: Record<string, string>,
+  splitNameColumn: string | null
+) => {
+  // Initialize status data at the top level so it's available in catch block
+  const statusData = {
+    status: "processing",
+    progress: 0,
+    uploadId,
+    audienceId,
+    workspaceId,
+    stage: "Starting upload",
+    created_at: new Date().toISOString()
+  };
+
+  try {
+    // First verify the bucket exists
+    const { data: buckets, error: bucketError } = await supabaseClient.storage
+      .listBuckets();
+    
+    if (bucketError) {
+      throw new Error(`Error listing buckets: ${bucketError.message}`);
+    }
+
+    const audienceUploadsBucket = buckets?.find((b: StorageBucket) => b.name === 'audience-uploads');
+    if (!audienceUploadsBucket) {
+      // Create the bucket if it doesn't exist
+      const { error: createError } = await supabaseClient.storage
+        .createBucket('audience-uploads', { public: false });
+      
+      if (createError) {
+        throw new Error(`Error creating bucket: ${createError.message}`);
+      }
+    }
+
+    // Create initial status file
+    const { error: statusError } = await supabaseClient.storage
+      .from("audience-uploads")
+      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify(statusData), {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (statusError) {
+      throw new Error(`Error creating status file: ${statusError.message}`);
+    }
+
+    // Parse the CSV content
+    const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
+    const { contacts: parsedContacts, headers } = parseCSV(decodedContent);
+
+    // Update total contacts count
+    await supabaseClient
+      .from("audience_upload")
+      .update({
+        total_contacts: parsedContacts.length
+      })
+      .eq("id", uploadId);
+
+    // Process contacts in chunks
+    const CHUNK_SIZE = 100;
+    let processedCount = 0;
+
+    for (let i = 0; i < parsedContacts.length; i += CHUNK_SIZE) {
+      const chunk = parsedContacts.slice(i, i + CHUNK_SIZE);
+      
+      // Map the contacts according to the header mapping
+      const mappedContacts = chunk.map((contact: CSVContact) => {
+        const mappedContact: MappedContact = {
+          workspace: workspaceId,
+          created_by: userId,
+          other_data: [] // Initialize as empty array
+        };
+
+        // Handle name splitting if specified
+        if (splitNameColumn) {
+          const fullName = contact[splitNameColumn] || '';
+          const [firstName, ...lastNameParts] = fullName.split(' ');
+          mappedContact.firstname = firstName || '';
+          mappedContact.surname = lastNameParts.join(' ') || '';
+        }
+
+        // Map other fields
+        Object.entries(headerMapping).forEach(([csvHeader, dbField]) => {
+          if (dbField !== 'name') { // Skip the name field as it's handled above
+            if (dbField === 'other_data') {
+              // Add to other_data array as a key-value pair
+              (mappedContact.other_data as Array<{ key: string; value: any }>).push({
+                key: csvHeader,
+                value: contact[csvHeader]
+              });
+            } else {
+              mappedContact[dbField] = contact[csvHeader];
+            }
+          }
+        });
+
+        // Remove other_data if empty, otherwise ensure it's properly formatted
+        if (!mappedContact.other_data?.length) {
+          delete mappedContact.other_data;
+        }
+
+        return mappedContact;
+      });
+
+      // Insert contacts
+      const { data: insertedContacts, error: insertError } = await supabaseClient
+        .from("contact")
+        .insert(mappedContacts)
+        .select('id');
+
+      if (insertError) {
+        console.error("Insert error details:", {
+          error: insertError,
+          firstContact: mappedContacts[0]
+        });
+        throw new Error(`Error inserting contacts: ${insertError.message}`);
+      }
+
+      // Link contacts to audience
+      const { error: linkError } = await supabaseClient
+        .from("contact_audience")
+        .insert(
+          insertedContacts.map((contact: { id: number }) => ({
+            contact_id: contact.id,
+            audience_id: audienceId
+          }))
+        );
+
+      if (linkError) {
+        throw new Error(`Error linking contacts to audience: ${linkError.message}`);
+      }
+
+      // Update progress
+      processedCount += chunk.length;
+      const progress = Math.round((processedCount / parsedContacts.length) * 100);
+
+      // Update status file
+      await supabaseClient.storage
+        .from("audience-uploads")
+        .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
+          ...statusData,
+          progress,
+          stage: `Processing contacts (${processedCount}/${parsedContacts.length})`
+        }), { upsert: true });
+
+      // Update upload record
+      await supabaseClient
+        .from("audience_upload")
+        .update({
+          processed_contacts: processedCount,
+          status: "processing"
+        })
+        .eq("id", uploadId);
+
+      // Small delay to prevent overwhelming the database
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    // Update audience status
+    await supabaseClient
+      .from("audience")
+      .update({
+        status: "active",
+        total_contacts: processedCount
+      })
+      .eq("id", audienceId);
+
+    // Update upload status to completed
+    await supabaseClient
+      .from("audience_upload")
+      .update({
+        status: "completed",
+        processed_at: new Date().toISOString()
+      })
+      .eq("id", uploadId);
+
+    // Update final status file
+    await supabaseClient.storage
+      .from("audience-uploads")
+      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
+        ...statusData,
+        status: "completed",
+        progress: 100,
+        stage: "Upload completed"
+      }), { upsert: true });
+
+  } catch (error) {
+    console.error("Upload processing error:", error);
+    
+    // Update audience status to error
+    await supabaseClient
+      .from("audience")
+      .update({
+        status: "error",
+        error_message: error instanceof Error ? error.message : "Unknown error"
+      })
+      .eq("id", audienceId);
+
+    // Update upload status to error
+    await supabaseClient
+      .from("audience_upload")
+      .update({
+        status: "error",
+        error_message: error instanceof Error ? error.message : "Unknown error"
+      })
+      .eq("id", uploadId);
+
+    // Update status file
+    await supabaseClient.storage
+      .from("audience-uploads")
+      .upload(`${workspaceId}/${uploadId}.json`, JSON.stringify({
+        ...statusData,
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error"
+      }), { upsert: true });
+  }
+};
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -80,7 +347,7 @@ export const action = async ({ request }: { request: Request }) => {
       finalAudienceId = audienceData.id;
     }
 
-    // Convert file to base64 for sending to edge function
+    // Convert file to base64 for processing
     const fileContent = await contactsFile.arrayBuffer();
     const fileContentText = new TextDecoder().decode(fileContent);
     
@@ -89,7 +356,7 @@ export const action = async ({ request }: { request: Request }) => {
     const encoder = new TextEncoder();
     const utf8Bytes = encoder.encode(fileContentText);
     
-    // Convert the UTF-8 bytes to base64 using a safe method
+    // Convert the UTF-8 bytes to base64
     const fileBase64 = Buffer.from(utf8Bytes).toString('base64');
 
     // Create an upload record
@@ -116,34 +383,19 @@ export const action = async ({ request }: { request: Request }) => {
 
     const uploadId = uploadData.id;
 
-    // Call the edge function to process the file
-    const { data: edgeData, error: edgeError } = await supabaseClient.functions.invoke(
-      "process-audience-upload",
-      {
-        body: {
-          uploadId,
-          audienceId: finalAudienceId,
-          workspaceId,
-          userId: user.id,
-          fileContent: fileBase64,
-          headerMapping: headerMapping ? JSON.parse(headerMapping) : {},
-          splitNameColumn: splitNameColumn || null
-        }
-      }
-    );
-
-    if (edgeError) {
-      // Update upload status to error if edge function fails
-      await supabaseClient
-        .from("audience_upload")
-        .update({
-          status: "error",
-          error_message: edgeError.message
-        })
-        .eq("id", uploadId);
-        
-      return json({ error: edgeError.message }, { status: 500, headers });
-    }
+    // Start background processing
+    processAudienceUpload(
+      supabaseClient,
+      uploadId,
+      finalAudienceId,
+      workspaceId,
+      user.id,
+      fileBase64,
+      headerMapping ? JSON.parse(headerMapping) : {},
+      splitNameColumn || null
+    ).catch(error => {
+      console.error("Background processing error:", error);
+    });
 
     // Return the audience ID and upload ID immediately
     return json(
@@ -157,12 +409,11 @@ export const action = async ({ request }: { request: Request }) => {
       }, 
       { headers }
     );
+
   } catch (error) {
-    console.error("Error in audience upload:", error);
-    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-    return json(
-      { error: errorMessage },
-      { status: 500, headers }
-    );
+    console.error("Upload request error:", error);
+    return json({ 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    }, { status: 500, headers });
   }
 }; 

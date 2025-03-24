@@ -8,6 +8,7 @@ import { Progress } from "~/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import { useSupabaseRealtimeSubscription } from "~/hooks/useSupabaseRealtime";
 import { Contact } from "~/lib/types";
+import { useInterval } from "~/hooks/useInterval";
 
 const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
 
@@ -94,6 +95,10 @@ export default function AudienceUploader({
   // Use fetcher instead of submit for better control over the submission and response
   const fetcher = useFetcher();
 
+  // Add new state for status polling
+  const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
+  const [currentUploadId, setCurrentUploadId] = useState<number | null>(null);
+
   // Listen for changes to the audience status
   useSupabaseRealtimeSubscription({
     supabase,
@@ -119,6 +124,52 @@ export default function AudienceUploader({
       }
     },
   });
+
+  // Status polling interval
+  useInterval(
+    async () => {
+      if (!currentUploadId || !workspaceId) return;
+
+      try {
+        const response = await fetch(
+          `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspaceId}`
+        );
+        const data = await response.json();
+
+        if (data.error) {
+          setUploadError(data.error);
+          setStatusPollingEnabled(false);
+          return;
+        }
+
+        if (data.status === "completed") {
+          setUploadStatus("completed");
+          setUploadProgress(100);
+          setStatusPollingEnabled(false);
+          if (onUploadComplete) {
+            onUploadComplete(data.audienceId.toString());
+          }
+        } else if (data.status === "error") {
+          setUploadError(data.error_message || "An error occurred during upload");
+          setUploadStatus("error");
+          setStatusPollingEnabled(false);
+        } else {
+          setUploadStatus(data.status);
+          setTotalContacts(data.total_contacts || 0);
+          setProcessedContacts(data.processed_contacts || 0);
+          if (data.total_contacts > 0) {
+            const progress = Math.round((data.processed_contacts / data.total_contacts) * 100);
+            setUploadProgress(progress);
+          }
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        setUploadError("Error checking upload status");
+        setStatusPollingEnabled(false);
+      }
+    },
+    statusPollingEnabled ? 2000 : null // Poll every 2 seconds when enabled
+  );
 
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
@@ -200,8 +251,8 @@ export default function AudienceUploader({
       return;
     }
     
-    // We'll track the upload progress through fetcher state instead
     setUploadError(null);
+    setUploadStatus("submitting");
     
     try {
       if (!selectedFile) {
@@ -211,7 +262,6 @@ export default function AudienceUploader({
       const formData = new FormData();
       formData.append("workspace_id", workspaceId as string);
       
-      // If we have an existing audience ID, use it, otherwise use the name to create a new one
       if (existingAudienceId) {
         formData.append("audience_id", existingAudienceId);
       } else {
@@ -224,16 +274,27 @@ export default function AudienceUploader({
         formData.append("split_name_column", splitNameColumn);
       }
       
-      // Use fetcher.submit instead of submit
-      fetcher.submit(formData, {
+      const response = await fetch("/api/audience-upload", {
         method: "POST",
-        action: "/api/audience-upload",
-        encType: "multipart/form-data",
+        body: formData
       });
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // Start polling for status
+      setCurrentUploadId(data.upload_id);
+      setStatusPollingEnabled(true);
+      setUploadStatus("processing");
+      setAudienceId(data.audience_id);
       
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError(error instanceof Error ? error.message : "An unexpected error occurred");
+      setUploadStatus("error");
     }
   };
 
