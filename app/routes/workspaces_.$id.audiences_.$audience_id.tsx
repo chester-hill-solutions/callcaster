@@ -5,6 +5,7 @@ import {
   useLoaderData,
   useNavigate,
   useOutletContext,
+  useRevalidator
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { AudienceTable } from "~/components/AudienceTable";
@@ -14,6 +15,7 @@ import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { verifyAuth } from "~/lib/supabase.server";
 import { Database } from "~/lib/database.types";
+import { useInterval } from "~/hooks/useInterval";
 
 type LoaderData = {
   contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;
@@ -30,6 +32,14 @@ type LoaderData = {
     sortKey: string;
     sortDirection: 'asc' | 'desc';
   };
+  latestUpload?: {
+    id: number;
+    status: string;
+    progress: number;
+    total_contacts: number;
+    processed_contacts: number;
+    error_message?: string | null;
+  } | null;
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -86,6 +96,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", parseInt(audience_id))
     .single();
 
+  // Get the latest upload for this audience
+  const { data: latestUpload } = await supabaseClient
+    .from("audience_upload")
+    .select("*")
+    .eq("audience_id", parseInt(audience_id))
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
   if (contactError) {
     return json<LoaderData>({
       contacts: null,
@@ -101,7 +120,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       sorting: {
         sortKey,
         sortDirection
-      }
+      },
+      latestUpload: null
     }, { headers });
   }
 
@@ -120,30 +140,70 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       sorting: {
         sortKey,
         sortDirection
-      }
+      },
+      latestUpload: latestUpload ? {
+        id: latestUpload.id,
+        status: latestUpload.status,
+        progress: latestUpload.processed_contacts && latestUpload.total_contacts 
+          ? Math.round((latestUpload.processed_contacts / latestUpload.total_contacts) * 100)
+          : 0,
+        total_contacts: latestUpload.total_contacts || 0,
+        processed_contacts: latestUpload.processed_contacts || 0,
+        error_message: latestUpload.error_message
+      } : null
     },
     { headers },
   );
 }
 
 export default function AudienceView() {
-  const { contacts, audience, error, workspace_id, audience_id, pagination, sorting } =
+  const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
     useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { supabase } = useOutletContext<{ supabase: any }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const revalidator = useRevalidator();
 
-  const handleUploadComplete = () => {
+  // Track current upload status
+  const [currentUploadId, setCurrentUploadId] = useState<number | null>(
+    latestUpload?.status === "processing" ? latestUpload.id : null
+  );
+
+  // Poll for status updates if there's an active upload
+  useInterval(
+    async () => {
+      if (!currentUploadId || !workspace_id) return;
+
+      try {
+        const response = await fetch(
+          `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspace_id}`
+        );
+        const data = await response.json();
+
+        if (data.error || data.status === "completed" || data.status === "error") {
+          setCurrentUploadId(null);
+          revalidator.revalidate();
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        setCurrentUploadId(null);
+      }
+    },
+    currentUploadId ? 2000 : null
+  );
+
+  const handleUploadComplete = (uploadId: string) => {
+    setCurrentUploadId(null);
     setRefreshTrigger(prev => prev + 1);
     setActiveTab("contacts");
   };
 
   useEffect(() => {
     if (refreshTrigger > 0) {
-      navigate(".", { replace: true });
+      revalidator.revalidate();
     }
-  }, [refreshTrigger, navigate]);
+  }, [refreshTrigger, revalidator]);
 
   return (
     <main className="flex h-full flex-col gap-4 text-white">
@@ -172,7 +232,14 @@ export default function AudienceView() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="contacts">Contacts</TabsTrigger>
+          <TabsTrigger value="contacts">
+            Contacts
+            {latestUpload?.status === "processing" && (
+              <span className="ml-2 text-xs text-blue-500">
+                Processing... ({latestUpload.processed_contacts}/{latestUpload.total_contacts})
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="upload">Upload Contacts</TabsTrigger>
           <TabsTrigger value="history">Upload History</TabsTrigger>
         </TabsList>
