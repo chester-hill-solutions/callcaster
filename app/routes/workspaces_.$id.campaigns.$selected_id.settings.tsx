@@ -18,7 +18,6 @@ import {
 } from "~/lib/types";
 import { Button } from "~/components/ui/button";
 import { useState } from "react";
-import { Dialog, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -174,51 +173,75 @@ async function handleCampaignDuplicate(
   return { success: true };
 }
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export async function action({ request, params }: ActionFunctionArgs) {
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
   if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
-  try {
-    const formData = await request.formData();
-    const intent = formData.get("intent");
-    const updates = Object.fromEntries(formData);
-    delete updates.intent;
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
 
-    switch (intent) {
-      case "update":
-        return json<ActionData>(
-          await handleCampaignUpdate(supabaseClient, selected_id, workspace_id, updates)
-        );
+  if (intent === "update") {
+    const updates: Record<string, any> = {};
+    const campaignDataStr = formData.get("campaignData") as string;
+    const campaignDetailsStr = formData.get("campaignDetails") as string;
 
-      case "status":
-        return json<ActionData>(
-          await updateCampaignStatus(
-            supabaseClient,
-            selected_id,
-            updates.status as CampaignStatus,
-            updates.is_active === "true" ? true : updates.is_active === "false" ? false : undefined
-          )
-        );
-
-      case "duplicate":
-        return json<ActionData>(
-          await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, updates.campaignData as string)
-        );
-
-      default:
-        return json<ActionData>({ error: "Invalid intent" }, { status: 400 });
+    // Handle script_id update
+    if (formData.has("script_id")) {
+      const script_id = Number(formData.get("script_id"));
+      if (campaignDataStr) {
+        const campaignData = JSON.parse(campaignDataStr);
+        await supabaseClient
+          .from("campaign")
+          .update({ script_id })
+          .eq("id", selected_id);
+      }
+      if (campaignDetailsStr) {
+        const campaignDetails = JSON.parse(campaignDetailsStr);
+        const tableKey = getCampaignTableKey(campaignDetails.type);
+        await supabaseClient
+          .from(tableKey)
+          .update({ script_id })
+          .eq("campaign_id", selected_id);
+      }
+      return json({ success: true });
     }
-  } catch (error) {
-    console.error('Action error:', error);
-    return json<ActionData>(
-      { error: error instanceof Error ? error.message : "An unexpected error occurred" },
-      { status: 400 }
-    );
+
+    // Handle other updates
+    for (const [key, value] of formData.entries()) {
+      if (key !== "intent") {
+        updates[key] = value;
+      }
+    }
+
+    await supabaseClient
+      .from("campaign")
+      .update(updates)
+      .eq("id", selected_id);
   }
-};
+
+  switch (intent) {
+    case "status":
+      return json<ActionData>(
+        await updateCampaignStatus(
+          supabaseClient,
+          selected_id,
+          updates.status as CampaignStatus,
+          updates.is_active === "true" ? true : updates.is_active === "false" ? false : undefined
+        )
+      );
+
+    case "duplicate":
+      return json<ActionData>(
+        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, updates.campaignData as string)
+      );
+
+    default:
+      return json<ActionData>({ error: "Invalid intent" }, { status: 400 });
+  }
+}
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
@@ -311,10 +334,23 @@ export default function CampaignSettingsRoute() {
   };
 
   const handleInputChange = (name: string, value: any) => {
-    fetcher.submit(
-      { intent: "update", [name]: value },
-      { method: "post" }
-    );
+    if (name === "script_id") {
+      // For script selection, we need to update both campaign data and details
+      fetcher.submit(
+        { 
+          intent: "update", 
+          script_id: value,
+          campaignData: JSON.stringify({ ...campaignData, script_id: value }),
+          campaignDetails: JSON.stringify({ ...campaignDetails, script_id: value })
+        },
+        { method: "post" }
+      );
+    } else {
+      fetcher.submit(
+        { intent: "update", [name]: value },
+        { method: "post" }
+      );
+    }
   };
 
   const resetCampaign = () => {

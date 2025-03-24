@@ -2,7 +2,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
 
-import { Archive, Pause, Play, Calendar, Copy, TimerIcon, Clock } from "lucide-react";
+import { Archive, Pause, Play, Calendar, Copy, TimerIcon, Clock, AlertCircle } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -85,6 +85,33 @@ const getButtonStates = (
   return states;
 };
 
+// Validation helper
+const validateRequiredFields = (campaignData: any, details: any) => {
+  const errors: string[] = [];
+  
+  if (!campaignData.type) {
+    errors.push("Campaign type is required");
+  }
+  
+  if (!campaignData.caller_id) {
+    errors.push("Phone number is required");
+  }
+  
+  if (!campaignData.start_date || !campaignData.end_date) {
+    errors.push("Start and end dates are required");
+  }
+  
+  if (!campaignData.schedule) {
+    errors.push("Calling hours are required");
+  }
+  
+  if (!details?.script_id && !details?.body_text) {
+    errors.push("Script or message content is required");
+  }
+  
+  return errors;
+};
+
 // Component Props Interface
 interface CampaignBasicInfoProps {
   campaignData: any;
@@ -113,12 +140,8 @@ export const CampaignBasicInfo = ({
   details,
   scheduleDisabled,
 }: CampaignBasicInfoProps) => {
-
-  const isPlayDisabled = (!details?.script_id && !details.body_text) ?
-    "No script selected" :
-    !campaignData.caller_id || campaignData.caller_id === "+15064364568" ?
-      "No outbound phone number selected" :
-      null;
+  const validationErrors = validateRequiredFields(campaignData, details);
+  const isPlayDisabled = validationErrors.length > 0 ? validationErrors.join(", ") : null;
 
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
@@ -220,29 +243,56 @@ export const CampaignBasicInfo = ({
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
         <div className="space-y-4">
           <div>
-            <Label className="text-sm font-medium">Campaign Type</Label>
+            <Label className="text-sm font-medium flex items-center gap-1">
+              Campaign Type
+              <span className="text-destructive">*</span>
+            </Label>
             <SelectType
               handleInputChange={handleInputChange}
               campaignData={campaignData}
               flags={flags}
             />
+            {!campaignData.type && (
+              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                Required field
+              </p>
+            )}
           </div>
           <div>
-            <Label className="text-sm font-medium">Phone Number</Label>
+            <Label className="text-sm font-medium flex items-center gap-1">
+              Phone Number
+              <span className="text-destructive">*</span>
+            </Label>
             <SelectNumber
               handleInputChange={handleInputChange}
               campaignData={campaignData}
               phoneNumbers={phoneNumbers}
             />
+            {!campaignData.caller_id && (
+              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                Required field
+              </p>
+            )}
           </div>
         </div>
       </div>
       <div>
-        <Label className="text-sm font-medium">Schedule</Label>
+        <Label className="text-sm font-medium flex items-center gap-1">
+          Schedule
+          <span className="text-destructive">*</span>
+        </Label>
         <SelectDates
           campaignData={campaignData}
           handleInputChange={handleInputChange}
         />
+        {(!campaignData.start_date || !campaignData.end_date || !campaignData.schedule) && (
+          <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+            <AlertCircle className="h-4 w-4" />
+            Start date, end date, and calling hours are required
+          </p>
+        )}
       </div>
     </div>
   );

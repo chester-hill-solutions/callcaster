@@ -12,6 +12,12 @@ import {
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
 import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
+import { AlertCircle } from "lucide-react";
+import { Tables } from "~/lib/database.types";
+
+type LiveCampaignDetails = Tables<"live_campaign"> & { script: Script };
+type MessageCampaignDetails = Tables<"message_campaign">;
+type IVRCampaignDetails = Tables<"ivr_campaign"> & { script: Script };
 
 export const CampaignTypeSpecificSettings = ({
   campaignData,
@@ -33,14 +39,15 @@ export const CampaignTypeSpecificSettings = ({
   scripts: Script[],
   handleActivateButton: (type: "play" | "pause" | "archive" | "schedule") => void,
   handleScheduleButton: (e: React.MouseEvent<HTMLButtonElement>) => void,
-
-  details: LiveCampaign | MessageCampaign | IVRCampaign,
+  details: LiveCampaignDetails | MessageCampaignDetails | IVRCampaignDetails,
   mediaLinks: string[],
   isChanged: boolean,
   isBusy: boolean,
   joinDisabled: string | null,
   scheduleDisabled: string | boolean,
 }) => {
+  const isScriptRequired = !('script_id' in details) && !('body_text' in details);
+
   return (
     <>
       {campaignData.type !== "message" && (
@@ -57,25 +64,33 @@ export const CampaignTypeSpecificSettings = ({
               </NavLink>
             </Button>
           </div>
-          <div className="flex items-end gap-2">
-            <SelectScript
-              handleInputChange={handleInputChange}
-              selectedScript={details?.script_id}
-              scripts={scripts}
-            />
-            <Button variant="outline" asChild size="icon" disabled={isBusy}>
-              <NavLink
-                to={`../../../scripts/new?ref=${campaignData.campaign_id}`}
-              >
-                <MdAdd />
-              </NavLink>
-            </Button>
+          <div className="flex flex-col gap-1">
+            <div className="flex items-end gap-2">
+              <SelectScript
+                handleInputChange={handleInputChange}
+                selectedScript={'script_id' in details && details.script_id ? details.script_id : 0}
+                scripts={scripts}
+              />
+              <Button variant="outline" asChild size="icon" disabled={isBusy}>
+                <NavLink
+                  to={`../../../scripts/new?ref=${campaignData.id}`}
+                >
+                  <MdAdd />
+                </NavLink>
+              </Button>
+            </div>
+            {isScriptRequired && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" />
+                Script is required
+              </p>
+            )}
           </div>
           <ActivateButtons
             joinDisabled={joinDisabled}
             scheduleDisabled={scheduleDisabled}
             isBusy={isBusy}
-            handleScheduleButton={handleScheduleButton}
+            handleScheduleButton={() => handleScheduleButton(new Event('click') as any)}
           />
         </div>
       )}
@@ -103,10 +118,16 @@ export const CampaignTypeSpecificSettings = ({
         <div className="flex flex-col gap-4">
           <MessageSettings
             mediaLinks={mediaLinks}
-            details={details}
+            details={details as MessageCampaignDetails}
             campaignData={campaignData}
             onChange={handleInputChange}
           />
+          {isScriptRequired && (
+            <p className="text-sm text-destructive flex items-center gap-1">
+              <AlertCircle className="h-4 w-4" />
+              Message content is required
+            </p>
+          )}
           <div className="flex gap-2 justify-end">
             <Button
               type="button"
@@ -114,7 +135,8 @@ export const CampaignTypeSpecificSettings = ({
                 isBusy ||
                 isChanged ||
                 !(
-                  (details?.body_text || details?.message_media) &&
+                  ('body_text' in details && details.body_text) ||
+                  ('message_media' in details && details.message_media) &&
                   campaignData.caller_id
                 )
               }
@@ -125,7 +147,7 @@ export const CampaignTypeSpecificSettings = ({
             <Button
               type="button"
               disabled={!!scheduleDisabled || isBusy}
-              onClick={handleScheduleButton}
+              onClick={() => handleScheduleButton(new Event('click') as any)}
             >
               Schedule Campaign
             </Button>
