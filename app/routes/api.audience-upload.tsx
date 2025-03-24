@@ -100,10 +100,6 @@ const processAudienceUpload = async (
     const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
     const { contacts: parsedContacts, headers } = parseCSV(decodedContent);
 
-    console.log('CSV Headers:', headers);
-    console.log('First CSV row:', parsedContacts[0]);
-    console.log('Header mapping:', headerMapping);
-
     // Create case-insensitive header lookup
     const headerLookup = new Map(
       headers.map(header => [header.toLowerCase(), header])
@@ -147,7 +143,6 @@ const processAudienceUpload = async (
           const actualHeader = headerLookup.get(splitNameColumn.toLowerCase());
           if (actualHeader) {
             const fullName = contact[actualHeader] || '';
-            console.log('Splitting name from column:', actualHeader, 'value:', fullName);
             const [firstName, ...lastNameParts] = fullName.split(' ');
             mappedContact.firstname = firstName || '';
             mappedContact.surname = lastNameParts.join(' ') || '';
@@ -159,12 +154,12 @@ const processAudienceUpload = async (
           // Get the actual header with correct case from CSV
           const actualHeader = headerLookup.get(csvHeader.toLowerCase());
           if (!actualHeader) {
-            console.log(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
+            console.warn(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
             return;
           }
 
           const value = contact[actualHeader];
-          console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
+            //console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
 
           if (dbField !== 'name') { // Skip the name field as it's handled above
             if (dbField === 'other_data') {
