@@ -2,15 +2,6 @@ import { ActionFunctionArgs, json } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "~/lib/database.types";
-import fs from "fs";
-import path from "path";
-
-// Create a temporary directory for exports if it doesn't exist
-const EXPORT_DIR = path.join(process.cwd(), "public", "exports");
-if (!fs.existsSync(EXPORT_DIR)) {
-  fs.mkdirSync(EXPORT_DIR, { recursive: true });
-}
-
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);
@@ -18,58 +9,9 @@ const generateUniqueId = () => {
   return `${timestamp}-${randomStr}`;
 };
 
-// Configuration for cleanup
-const CLEANUP_CONFIG = {
-  MAX_AGE_MS: 24 * 60 * 60 * 1000, // 24 hours
-  MAX_FILES_PER_WORKSPACE: 50,      // Maximum number of export files per workspace
-  CLEANUP_BATCH_SIZE: 100,          // Number of files to process in one cleanup batch
-};
 
-// Enhanced cleanup function with better error handling and logging
-const cleanupOldExports = async () => {
-  try {
-    const files = fs.readdirSync(EXPORT_DIR);
-    const now = Date.now();
 
-    // Group files by workspace and type
-    const fileGroups = files.reduce((acc, file) => {
-      // Skip non-export files
-      if (!file.endsWith('.csv') && !file.endsWith('.json')) {
-        return acc;
-      }
-
-      // Get file stats
-      const filePath = path.join(EXPORT_DIR, file);
-      const stats = fs.statSync(filePath);
-
-      // Check if file is older than MAX_AGE_MS
-      if (now - stats.mtimeMs > CLEANUP_CONFIG.MAX_AGE_MS) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (error) {
-          console.error(`Error deleting old file ${file}:`, error);
-        }
-      }
-
-      return acc;
-    }, {});
-
-    // Log cleanup summary
-    console.log(`Export cleanup completed. Processed ${files.length} files.`);
-  } catch (error) {
-    console.error("Error during export cleanup:", error);
-  }
-};
-
-// Schedule periodic cleanup
-const scheduleCleanup = () => {
-  const CLEANUP_INTERVAL = 60 * 60 * 1000; // Run cleanup every hour
-  setInterval(cleanupOldExports, CLEANUP_INTERVAL);
-};
-
-// Initialize cleanup schedule when the server starts
-scheduleCleanup();
-
+// Schedule periodic cleanu
 // Define types for our data structures
 interface Contact {
   id: number | string;
@@ -206,14 +148,66 @@ const processMessageCampaignExport = async (
   supabaseClient: ReturnType<typeof createClient<Database>>,
   campaignId: number,
   workspaceId: string,
-  exportId: string
+  exportId: string,
+  campaignName: string
 ) => {
-  const exportFilePath = path.join(EXPORT_DIR, `${exportId}.csv`);
-  const statusFilePath = path.join(EXPORT_DIR, `${exportId}.json`);
+  // Initialize status
+  const statusData = {
+    status: "processing",
+    progress: 0,
+    exportId,
+    filename: `campaign_export_${campaignId}.csv`,
+    campaignName,
+    stage: "Starting export",
+    workspaceId,
+    created_at: new Date().toISOString()
+  };
 
   try {
-    // Initialize CSV file
-    fs.writeFileSync(exportFilePath, '');
+    // First verify the bucket exists
+    const { data: buckets, error: bucketError } = await supabaseClient.storage
+      .listBuckets();
+    
+    
+    if (bucketError) {
+      throw new Error(`Error listing buckets: ${bucketError.message}`);
+    }
+
+    const campaignExportsBucket = buckets?.find(b => b.name === 'campaign-exports');
+    if (!campaignExportsBucket) {
+      // Create the bucket if it doesn't exist
+      const { error: createError } = await supabaseClient.storage
+        .createBucket('campaign-exports', { public: false });
+      
+      if (createError) {
+        throw new Error(`Error creating bucket: ${createError.message}`);
+      }
+    }
+
+    // Test write to ensure we have permissions
+    const testData = JSON.stringify({ test: true });
+    const { error: testError } = await supabaseClient.storage
+      .from('campaign-exports')
+      .upload(`${workspaceId}/test.json`, testData, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (testError) {
+      throw new Error(`Error testing write access: ${testError.message}`);
+    }
+
+    // Create initial status file
+    const { error: statusError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.json`, JSON.stringify(statusData), {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (statusError) {
+      throw new Error(`Error creating status file: ${statusError.message}`);
+    }
 
     // First, get campaign info
     const { data: campaignData, error: campaignError } = await supabaseClient
@@ -244,6 +238,9 @@ const processMessageCampaignExport = async (
       throw new Error("No contacts found in campaign");
     }
 
+    // Initialize CSV data with headers
+    let csvData = 'body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date\n';
+
     // Get contact details in batches
     const CONTACT_BATCH_SIZE = 100;
     let contactDetails: Contact[] = [];
@@ -267,13 +264,13 @@ const processMessageCampaignExport = async (
 
       // Update status
       const progress = Math.round((i / contactIds.length) * 30); // First 30% is contact fetching
-      fs.writeFileSync(statusFilePath, JSON.stringify({
-        status: "processing",
-        progress,
-        exportId,
-        filename: `campaign_export_${campaignId}.csv`,
-        stage: "Fetching contacts"
-      }));
+      await supabaseClient.storage
+        .from("campaign-exports")
+        .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+          ...statusData,
+          progress,
+          stage: "Fetching contacts"
+        }), { upsert: true });
     }
 
     // Process contacts to get phone patterns
@@ -301,7 +298,6 @@ const processMessageCampaignExport = async (
     const MESSAGE_CHUNK_SIZE = 100;
     let totalMessages = 0;
     let processedMessages = 0;
-    let isFirstChunk = true;
 
     // First, get a count of messages in the date range
     const { count: messageCount, error: countError } = await supabaseClient
@@ -363,17 +359,8 @@ const processMessageCampaignExport = async (
         }
       }
 
-      // Convert matched messages to CSV
+      // Add matched messages to CSV data
       if (matchedMessages.length > 0) {
-        let csvData = '';
-
-        // Add headers if first chunk
-        if (isFirstChunk) {
-          csvData = 'body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date\n';
-          isFirstChunk = false;
-        }
-
-        // Add data rows
         for (const item of matchedMessages) {
           csvData += [
             escapeCsvField(item.body || ''),
@@ -397,54 +384,92 @@ const processMessageCampaignExport = async (
             escapeCsvField(item.contact.province || ''),
             escapeCsvField(item.contact.country || ''),
             escapeCsvField(item.contact.cleanPhone || ''),
-            escapeCsvField(JSON.stringify(item.contact.other_data) || ''),
             escapeCsvField(campaign.title || ''),
             escapeCsvField(campaign.start_date || ''),
             escapeCsvField(campaign.end_date || '')
           ].join(',') + '\n';
         }
-
-        // Append to file
-        fs.appendFileSync(exportFilePath, csvData);
       }
 
       processedMessages += messages.length;
 
       // Update status
       const progress = 30 + Math.round((processedMessages / totalMessages) * 70); // Remaining 70% is message processing
-      fs.writeFileSync(statusFilePath, JSON.stringify({
-        status: "processing",
-        progress: Math.min(progress, 99),
-        exportId,
-        filename: `campaign_export_${campaignId}.csv`,
-        stage: "Processing messages",
-        processed: processedMessages,
-        total: totalMessages
-      }));
+      await supabaseClient.storage
+        .from("campaign-exports")
+        .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+          ...statusData,
+          progress: Math.min(progress, 99),
+          stage: "Processing messages",
+          processed: processedMessages,
+          total: totalMessages,
+          campaignId,
+          campaignName: campaign.title
+        }), { upsert: true });
 
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Update status to completed
-    fs.writeFileSync(statusFilePath, JSON.stringify({
-      status: "completed",
-      progress: 100,
-      exportId,
-      filename: `campaign_export_${campaignId}.csv`,
-      downloadUrl: `/exports/${exportId}.csv`
-    }));
+    // Upload the final CSV file
+    const { error: csvError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.csv`, new Blob([csvData], { type: 'text/csv' }), {
+        contentType: "text/csv",
+        upsert: true
+      });
 
-    // Clean up old exports
-    cleanupOldExports();
+    if (csvError) {
+      throw new Error(`Error uploading CSV file: ${csvError.message}`);
+    }
+
+    // Create a signed URL for the CSV file
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .createSignedUrl(`${workspaceId}/${exportId}.csv`, 24 * 60 * 60); // 24 hours expiry
+
+    if (signedUrlError) {
+      throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
+    }
+
+    // Update status to completed
+    const { error: finalStatusError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+        ...statusData,
+        status: "completed",
+        progress: 100,
+        downloadUrl: signedUrlData.signedUrl,
+        campaignId,
+        campaignName: campaign.title,
+        stage: "Export completed"
+      }), { upsert: true });
+
+    if (finalStatusError) {
+      throw new Error(`Error updating final status: ${finalStatusError.message}`);
+    }
+
   } catch (error) {
     console.error("Export error:", error);
-    // Update status to error
-    fs.writeFileSync(statusFilePath, JSON.stringify({
-      status: "error",
-      error: error instanceof Error ? error.message : "Unknown error",
-      exportId
-    }));
+    try {
+      // Update status to error
+      const { error: errorStatusError } = await supabaseClient.storage
+        .from("campaign-exports")
+        .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+          ...statusData,
+          status: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+          exportId,
+          workspaceId,
+          stage: "Export failed"
+        }), { upsert: true });
+
+      if (errorStatusError) {
+        console.error("Error updating error status:", errorStatusError);
+      }
+    } catch (statusError) {
+      console.error("Error writing error status:", statusError);
+    }
   }
 };
 
@@ -452,14 +477,38 @@ const processMessageCampaignExport = async (
 const processCallCampaignExport = async (
   supabaseClient: ReturnType<typeof createClient<Database>>,
   campaignId: number,
-  exportId: string
+  workspaceId: string,
+  exportId: string,
+  campaignName: string
 ) => {
-  const exportFilePath = path.join(EXPORT_DIR, `${exportId}.csv`);
-  const statusFilePath = path.join(EXPORT_DIR, `${exportId}.json`);
+  // Initialize status
+  const statusData = {
+    status: "processing",
+    progress: 0,
+    exportId,
+    filename: `campaign_export_${campaignId}.csv`,
+    stage: "Starting export",
+    workspaceId,
+    campaignName,
+    created_at: new Date().toISOString()
+  };
 
   try {
-    // Initialize CSV file
-    fs.writeFileSync(exportFilePath, '');
+    // Create initial status file
+    const { error: statusError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.json`, JSON.stringify(statusData), {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (statusError) {
+      throw new Error(`Error creating status file: ${statusError.message}`);
+    }
+
+    // Initialize CSV data
+    let csvData = '';
+    let isFirstChunk = true;
 
     // First, get campaign info
     const { data: campaignData, error: campaignError } = await supabaseClient
@@ -528,7 +577,6 @@ const processCallCampaignExport = async (
     const totalAttempts = attemptCount || 0;
     const ATTEMPT_CHUNK_SIZE = 100;
     let processedAttempts = 0;
-    let isFirstChunk = true;
 
     // Process attempts in small chunks
     for (let offset = 0; offset < totalAttempts; offset += ATTEMPT_CHUNK_SIZE) {
@@ -604,8 +652,6 @@ const processCallCampaignExport = async (
 
       // Convert matched attempts to CSV
       if (matchedAttempts.length > 0) {
-        let csvData = '';
-
         // Add headers if first chunk
         if (isFirstChunk) {
           const baseHeaders = 'attempt_id,disposition,full_result,attempt_start,call_sid,duration_seconds,answered_by,call_start,call_end,contact_id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,postal,province,country,campaign_name,campaign_start_date,campaign_end_date,campaign_type,campaign_status,credits_used,pages';
@@ -703,48 +749,75 @@ const processCallCampaignExport = async (
 
           csvData += [...baseData, ...questionResponses].join(',') + '\n';
         }
-
-        // Append to file
-        fs.appendFileSync(exportFilePath, csvData);
       }
 
       processedAttempts += attempts.length;
 
       // Update status
       const progress = Math.round((processedAttempts / totalAttempts) * 100);
-      fs.writeFileSync(statusFilePath, JSON.stringify({
-        status: "processing",
-        progress: Math.min(progress, 99),
-        exportId,
-        filename: `campaign_export_${campaignId}.csv`,
-        stage: "Processing call attempts",
-        processed: processedAttempts,
-        total: totalAttempts
-      }));
+      await supabaseClient.storage
+        .from("campaign-exports")
+        .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+          ...statusData,
+          progress: Math.min(progress, 99),
+          stage: "Processing call attempts",
+          processed: processedAttempts,
+          total: totalAttempts
+        }), { upsert: true });
 
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Update status to completed
-    fs.writeFileSync(statusFilePath, JSON.stringify({
-      status: "completed",
-      progress: 100,
-      exportId,
-      filename: `campaign_export_${campaignId}.csv`,
-      downloadUrl: `/exports/${exportId}.csv`
-    }));
+    // Upload the final CSV file
+    const { error: csvError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.csv`, new Blob([csvData], { type: 'text/csv' }), {
+        contentType: "text/csv",
+        upsert: true
+      });
 
-    // Clean up old exports
-    cleanupOldExports();
+    if (csvError) {
+      throw new Error(`Error uploading CSV file: ${csvError.message}`);
+    }
+
+    // Create a signed URL for the CSV file
+    const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .createSignedUrl(`${workspaceId}/${exportId}.csv`, 24 * 60 * 60); // 24 hours expiry
+
+    if (signedUrlError) {
+      throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
+    }
+
+    // Update status to completed
+    await supabaseClient.storage
+      .from("campaign-exports")
+      .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+        ...statusData,
+        status: "completed",
+        progress: 100,
+        downloadUrl: signedUrlData.signedUrl,
+        stage: "Export completed"
+      }), { upsert: true });
+
   } catch (error) {
     console.error("Export error:", error);
-    // Update status to error
-    fs.writeFileSync(statusFilePath, JSON.stringify({
-      status: "error",
-      error: error instanceof Error ? error.message : "Unknown error",
-      exportId
-    }));
+    try {
+      // Update status to error
+      await supabaseClient.storage
+        .from("campaign-exports")
+        .upload(`${workspaceId}/${exportId}.json`, JSON.stringify({
+          ...statusData,
+          status: "error",
+          error: error instanceof Error ? error.message : "Unknown error",
+          exportId,
+          workspaceId,
+          stage: "Export failed"
+        }), { upsert: true });
+    } catch (statusError) {
+      console.error("Error writing error status:", statusError);
+    }
   }
 };
 
@@ -778,10 +851,42 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return new Response("Missing required parameters", { status: 400 });
     }
 
+    // First verify the bucket exists
+    const { data: buckets, error: bucketError } = await supabaseClient.storage
+      .listBuckets();
+    
+    if (bucketError) {
+      throw new Error(`Error listing buckets: ${bucketError.message}`);
+    }
+
+    const campaignExportsBucket = buckets?.find(b => b.name === 'campaign-exports');
+    if (!campaignExportsBucket) {
+      // Create the bucket if it doesn't exist
+      const { error: createError } = await supabaseClient.storage
+        .createBucket('campaign-exports', { public: false });
+      
+      if (createError) {
+        throw new Error(`Error creating bucket: ${createError.message}`);
+      }
+    }
+
+    // Test write to ensure we have permissions
+    const testData = JSON.stringify({ test: true });
+    const { error: testError } = await supabaseClient.storage
+      .from('campaign-exports')
+      .upload(`${workspaceId}/test.json`, testData, {
+        contentType: "application/json",
+        upsert: true
+      });
+
+    if (testError) {
+      throw new Error(`Error testing write access: ${testError.message}`);
+    }
+
     // Get campaign type
     const { data: campaignData, error: campaignError } = await supabaseClient
       .from('campaign')
-      .select('type')
+      .select('type, title')
       .eq('id', Number(campaignId))
       .single();
 
@@ -792,41 +897,37 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     // Generate a unique ID for this export
     const exportId = generateUniqueId();
 
-    // Create initial status file
-    const statusFilePath = path.join(EXPORT_DIR, `${exportId}.json`);
-    fs.writeFileSync(statusFilePath, JSON.stringify({
-      status: "started",
-      progress: 0,
-      exportId,
-      filename: `campaign_export_${campaignId}.csv`
-    }));
-
     // Start the export process asynchronously based on campaign type
     if (campaignData.type === "message") {
       processMessageCampaignExport(
         supabaseClient,
         Number(campaignId),
         workspaceId.toString(),
-        exportId
+        exportId,
+        campaignData.title || ''
       );
     } else if (campaignData.type === "live_call" || campaignData.type === "robocall") {
       processCallCampaignExport(
         supabaseClient,
         Number(campaignId),
-        exportId
+        workspaceId.toString(),
+        exportId,
+        campaignData.title || ''
       );
     } else {
       return new Response("Invalid campaign type", { status: 400 });
     }
 
     // Return the export ID immediately
-    return ({
+    return json({
       exportId,
       status: "started",
-      statusUrl: `/api/campaign-export-status?exportId=${exportId}`
+      statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`
     });
   } catch (error) {
     console.error("Export request error:", error);
-    return new Response(error instanceof Error ? error.message : "Unknown error", { status: 500 });
+    return json({ 
+      error: error instanceof Error ? error.message : "Unknown error" 
+    }, { status: 500 });
   }
 }; 

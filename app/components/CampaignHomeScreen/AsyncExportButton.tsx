@@ -22,7 +22,7 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
     if (exportId && (exportStatus === "processing" || exportStatus === "started")) {
       intervalId = setInterval(async () => {
         try {
-          const response = await fetch(`/api/campaign-export-status?exportId=${exportId}`);
+          const response = await fetch(`/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`);
           const data = await response.json();
           
           setExportStatus(data.status);
