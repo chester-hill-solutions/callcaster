@@ -1,13 +1,8 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
-import fs from "fs";
-import path from "path";
-
-// Directory where exports are stored
-const EXPORT_DIR = path.join(process.cwd(), "public", "exports");
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { user } = await verifyAuth(request);
+  const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -15,20 +10,26 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
     const url = new URL(request.url);
     const exportId = url.searchParams.get("exportId");
+    const workspaceId = url.searchParams.get("workspaceId");
     
-    if (!exportId) {
-      return json({ error: "Missing export ID" }, { status: 400 });
+    if (!exportId || !workspaceId) {
+      return json({ error: "Missing required parameters" }, { status: 400 });
     }
     
-    const statusFilePath = path.join(EXPORT_DIR, `${exportId}.json`);
-    
-    // Check if status file exists
-    if (!fs.existsSync(statusFilePath)) {
-      return json({ error: "Export not found" }, { status: 404 });
+    // Download the status file from Supabase storage
+    const { data: statusFile, error: downloadError } = await supabaseClient.storage
+      .from("campaign-exports")
+      .download(`${workspaceId}/${exportId}.json`);
+
+    if (downloadError) {
+      if (downloadError.message.includes("Object not found")) {
+        return json({ error: "Export not found" }, { status: 404 });
+      }
+      throw downloadError;
     }
     
-    // Read and return the status
-    const statusData = fs.readFileSync(statusFilePath, 'utf8');
+    // Read and parse the status data
+    const statusData = await statusFile.text();
     const status = JSON.parse(statusData);
     
     return json(status);

@@ -16,6 +16,7 @@ const NAV_ITEMS: NavItem[] = [
   { name: "Scripts", path: "scripts", callerHidden: true },
   { name: "Audio", path: "audios", callerHidden: true },
   { name: "Audiences", path: "audiences", callerHidden: true },
+  { name: "Exports", path: "exports", callerHidden: true },
 ];
 
 interface WorkspaceNavProps {
@@ -32,26 +33,25 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
   const isAdmin = userRole === MemberRole.Admin || userRole === MemberRole.Owner;
   const baseUrl = `/workspaces/${workspace.id}`;
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `rounded-md border-2 px-2 py-1 font-Zilla-Slab font-semibold transition-colors ${
+    `rounded-md border-2 px-2 py-1 font-Zilla-Slab font-semibold transition-colors whitespace-nowrap ${
       isActive
         ? "border-brand-primary bg-brand-primary text-white"
         : "border-zinc-300 text-black hover:bg-zinc-100 dark:text-white"
     }`;
 
   const iconLinkClass = (isActive: boolean) =>
-    `flex items-center gap-2 rounded-lg px-3 py-2 transition-all ${
+    `flex items-center gap-2 rounded-lg px-3 py-2 transition-all whitespace-nowrap ${
       isActive
         ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
         : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50"
     }`;
 
-
   return (
     <div className="flex-col justify-center">
       <h3 className="mb-4 font-Tabac-Slab sm:text-xl">{workspace.name}</h3>
       
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex gap-1">
+      <div className="mb-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-2">
           {NAV_ITEMS.filter(item => !userIsCaller || !item.callerHidden).map((item) => (
             <NavLink
               key={item.name}
@@ -64,7 +64,7 @@ const WorkspaceNav = ({ workspace, userRole }: WorkspaceNavProps) => {
           ))}
         </div>
 
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-2">
             <NavLink
               to={`${baseUrl}/settings`}
               className={({ isActive }) => iconLinkClass(isActive)}
