@@ -755,7 +755,7 @@ interface CampaignDetails {
   script_id?: string;
   [key: string]: any;
 }
-function getCampaignTableKey(type: CampaignType): string {
+export function getCampaignTableKey(type: CampaignType): string {
   switch (type) {
     case "live_call":
       return "live_campaign";
