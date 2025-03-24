@@ -46,7 +46,6 @@ const cleanupOldExports = async () => {
       if (now - stats.mtimeMs > CLEANUP_CONFIG.MAX_AGE_MS) {
         try {
           fs.unlinkSync(filePath);
-          console.log(`Cleaned up old export file: ${file}`);
         } catch (error) {
           console.error(`Error deleting old file ${file}:`, error);
         }
@@ -652,7 +651,6 @@ const processCallCampaignExport = async (
                 }
               });
 
-              console.log('Extracted responses:', responses); // Debug log
             } catch (e) {
               console.error('Error parsing result:', e, 'Raw result:', item.result);
             }
@@ -700,7 +698,6 @@ const processCallCampaignExport = async (
           const questionResponses = scriptQuestions.map(q => {
             // Look for response by the question's title/name instead of block ID
             const response = responses[q.id] || '';
-            console.log(`Mapping question ${q.title} to response: ${response}`); // Debug log
             return escapeCsvField(response);
           });
 
