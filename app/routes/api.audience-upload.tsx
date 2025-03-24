@@ -100,6 +100,19 @@ const processAudienceUpload = async (
     const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
     const { contacts: parsedContacts, headers } = parseCSV(decodedContent);
 
+    // Create case-insensitive header lookup
+    const headerLookup = new Map(
+      headers.map(header => [header.toLowerCase(), header])
+    );
+
+    // Validate that all mapped headers exist in the CSV (case-insensitive)
+    const missingHeaders = Object.keys(headerMapping).filter(
+      header => !headerLookup.has(header.toLowerCase())
+    );
+    if (missingHeaders.length > 0) {
+      throw new Error(`Missing headers in CSV: ${missingHeaders.join(', ')}`);
+    }
+
     // Update total contacts count
     await supabaseClient
       .from("audience_upload")
@@ -117,56 +130,93 @@ const processAudienceUpload = async (
       
       // Map the contacts according to the header mapping
       const mappedContacts = chunk.map((contact: CSVContact) => {
+        console.log('Processing contact:', contact);
+        
         const mappedContact: MappedContact = {
           workspace: workspaceId,
           created_by: userId,
-          other_data: [] // Initialize as empty array
+          other_data: []
         };
 
         // Handle name splitting if specified
         if (splitNameColumn) {
-          const fullName = contact[splitNameColumn] || '';
-          const [firstName, ...lastNameParts] = fullName.split(' ');
-          mappedContact.firstname = firstName || '';
-          mappedContact.surname = lastNameParts.join(' ') || '';
+          const actualHeader = headerLookup.get(splitNameColumn.toLowerCase());
+          if (actualHeader) {
+            const fullName = contact[actualHeader] || '';
+            const [firstName, ...lastNameParts] = fullName.split(' ');
+            mappedContact.firstname = firstName || '';
+            mappedContact.surname = lastNameParts.join(' ') || '';
+          }
         }
 
         // Map other fields
         Object.entries(headerMapping).forEach(([csvHeader, dbField]) => {
+          // Get the actual header with correct case from CSV
+          const actualHeader = headerLookup.get(csvHeader.toLowerCase());
+          if (!actualHeader) {
+            console.warn(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
+            return;
+          }
+
+          const value = contact[actualHeader];
+            //console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
+
           if (dbField !== 'name') { // Skip the name field as it's handled above
             if (dbField === 'other_data') {
               // Add to other_data array as a key-value pair
-              (mappedContact.other_data as Array<{ key: string; value: any }>).push({
-                key: csvHeader,
-                value: contact[csvHeader]
-              });
+              if (value !== undefined) {
+                mappedContact.other_data?.push({
+                  key: actualHeader,
+                  value: value
+                });
+              }
             } else {
-              mappedContact[dbField] = contact[csvHeader];
+              if (value !== undefined) {
+                mappedContact[dbField] = value;
+              }
             }
           }
         });
 
-        // Remove other_data if empty, otherwise ensure it's properly formatted
+        // Remove other_data if empty
         if (!mappedContact.other_data?.length) {
           delete mappedContact.other_data;
         }
 
+        console.log('Final mapped contact:', mappedContact);
         return mappedContact;
       });
+
+      // Log the first contact's transformation
+      if (i === 0) {
+        console.log('First chunk transformation:');
+        console.log('Raw CSV row:', chunk[0]);
+        console.log('Available headers:', headers);
+        console.log('Header mapping used:', headerMapping);
+        console.log('Mapped result:', mappedContacts[0]);
+      }
 
       // Insert contacts
       const { data: insertedContacts, error: insertError } = await supabaseClient
         .from("contact")
         .insert(mappedContacts)
-        .select('id');
+        .select('id, firstname, surname, other_data');
 
       if (insertError) {
         console.error("Insert error details:", {
           error: insertError,
-          firstContact: mappedContacts[0]
+          firstContact: mappedContacts[0],
+          mappingUsed: headerMapping,
+          sampleData: {
+            workspace: workspaceId,
+            created_by: userId,
+            mappedFields: Object.keys(mappedContacts[0])
+          }
         });
         throw new Error(`Error inserting contacts: ${insertError.message}`);
       }
+
+      console.log('Inserted contacts sample:', insertedContacts[0]);
 
       // Link contacts to audience
       const { error: linkError } = await supabaseClient
