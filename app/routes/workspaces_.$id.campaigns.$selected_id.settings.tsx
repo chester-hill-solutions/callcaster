@@ -18,6 +18,7 @@ import {
 } from "~/lib/types";
 import { Button } from "~/components/ui/button";
 import { useState } from "react";
+import { getCampaignTableKey } from "~/lib/database.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -195,16 +196,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const campaignData = JSON.parse(campaignDataStr);
         await supabaseClient
           .from("campaign")
-          .update({ script_id })
-          .eq("id", selected_id);
+          .update({ ...campaignData })
+          .eq("id", Number(selected_id));
       }
       if (campaignDetailsStr) {
         const campaignDetails = JSON.parse(campaignDetailsStr);
         const tableKey = getCampaignTableKey(campaignDetails.type);
         await supabaseClient
-          .from(tableKey)
+          .from(tableKey as any)
           .update({ script_id })
-          .eq("campaign_id", selected_id);
+          .eq("campaign_id", Number(selected_id));
       }
       return json({ success: true });
     }
@@ -219,23 +220,26 @@ export async function action({ request, params }: ActionFunctionArgs) {
     await supabaseClient
       .from("campaign")
       .update(updates)
-      .eq("id", selected_id);
+      .eq("id", Number(selected_id));
   }
 
   switch (intent) {
     case "status":
+      const status = formData.get("status") as CampaignStatus;
+      const is_active = formData.get("is_active") as string;
       return json<ActionData>(
         await updateCampaignStatus(
           supabaseClient,
           selected_id,
-          updates.status as CampaignStatus,
-          updates.is_active === "true" ? true : updates.is_active === "false" ? false : undefined
+          status,
+          is_active === "true" ? true : is_active === "false" ? false : undefined
         )
       );
 
     case "duplicate":
+      const campaignData = formData.get("campaignData") as string;
       return json<ActionData>(
-        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, updates.campaignData as string)
+        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData)
       );
 
     default:
