@@ -1,27 +1,26 @@
 import { FetcherWithComponents } from "@remix-run/react";
 import { getNextContact } from "./getNextContact";
-import { Campaign, Contact, QueueItem } from "./types";
+import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
 
-const getRecentAttempt = ({ attempts, contact }) => {
-  return attempts.find((call) => call.contact_id === contact.contact.id) || {};
+const getRecentAttempt = ({ attempts, contact }:{attempts:OutreachAttempt[], contact:Contact}) => {
+  return attempts.find((call) => call.contact_id === contact?.contact?.id) || {};
 };
-const getAttemptCalls = ({ attempt, calls }) => {
+const getAttemptCalls = ({ attempt, calls }:{attempt:OutreachAttempt, calls:Call[]}) => {
   return calls.filter((call) => call.outreach_attempt_id === attempt.id);
 };
 
-export const handleConference = ({ submit, begin }) => {
+export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents<any>["submit"], begin:() => void}) => {
   const handleConferenceStart = () => {
     begin();
   };
 
-  const handleConferenceEnd = ({ activeCall, setConference, workspaceId }) => {
+  const handleConferenceEnd = ({ activeCall, setConference, workspaceId }:{activeCall:ActiveCall, setConference:() => void, workspaceId:string}) => {
     submit(
       { workspaceId },
       {
         method: "post",
         action: "/api/auto-dial/end",
-        navigate: false,
         encType: "application/json",
       },
     );
@@ -40,7 +39,7 @@ export const handleConference = ({ submit, begin }) => {
   return { handleConferenceStart, handleConferenceEnd };
 };
 
-export const handleCall = ({ submit }) => {
+export const handleCall = ({ submit }:{submit:FetcherWithComponents<any>["submit"]}) => {
   const startCall = ({
     contact,
     campaign,
@@ -48,6 +47,7 @@ export const handleCall = ({ submit }) => {
     workspaceId,
     nextRecipient,
     recentAttempt,
+    selectedDevice,
   }) => {
     if (contact.phone) {
       const data = {
@@ -59,14 +59,13 @@ export const handleCall = ({ submit }) => {
         outreach_id: recentAttempt?.id,
         queue_id: nextRecipient?.id,
         caller_id: campaign.caller_id,
+        selected_device: selectedDevice,
       };
 
       submit(data, {
         action: "/api/dial",
         method: "POST",
         encType: "application/json",
-        navigate: false,
-        fetcherKey: "place-call",
       });
     }
   };
@@ -158,8 +157,6 @@ export const handleQueue = ({
         action: "/api/queues",
         method: "POST",
         encType: "application/json",
-        navigate: false,
-        fetcherKey: "dequeue",
       },
     );
     setQueue((prevQueue) => {

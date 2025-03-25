@@ -3,8 +3,9 @@ import { createSupabaseServerClient } from '../lib/supabase.server';
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 export const action = async ({ request }) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id } = await request.json();
-    const {data, error} = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
+    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id, selected_device } = await request.json();
+
+    const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
     if (error) throw error;
     const credits = data.credits;
     if (credits <= 0) {
@@ -40,7 +41,7 @@ export const action = async ({ request }) => {
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await twilio.calls.create({
-            to: `client:${user_id}`,
+            to: selected_device ? selected_device : `client:${user_id}`,
             from: caller_id,
             url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to)}`,
 

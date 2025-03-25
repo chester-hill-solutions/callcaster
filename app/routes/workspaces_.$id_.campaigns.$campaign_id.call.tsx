@@ -11,7 +11,7 @@ import {
 } from "@remix-run/react";
 import { LoaderFunction, ActionFunction } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { SupabaseClient, User } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
 // Lib imports
@@ -45,38 +45,21 @@ import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
 import { useCallState } from "~/hooks/useCallState";
 
 // Type imports
-import {
-  Audience,
+import type {
+  LoaderData,
+  Campaign,
   Call,
-  Campaign as CampaignType,
   Contact,
-  IVRCampaign,
-  LiveCampaign,
-  OutreachAttempt,
   QueueItem,
+  CampaignDetails,
+  OutreachAttempt,
+  ActiveCall,
+  UseSupabaseRealtimeProps,
+  AppUser,
+  CampaignSchedule,
+  BaseUser
 } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
-
-interface LoaderData {
-  campaign: CampaignType;
-  attempts: OutreachAttempt[];
-  user: User;
-  audiences: Audience[];
-  workspaceId: string;
-  campaignDetails: LiveCampaign;
-  credits: number;
-  contacts: Contact[];
-  queue: QueueItem[];
-  nextRecipient: QueueItem | null;
-  initalCallsList: Call[];
-  initialRecentCall: Call | null;
-  initialRecentAttempt: OutreachAttempt | null;
-  token: string;
-  count: number;
-  completed: number;
-  isActive: boolean;
-  hasAccess: boolean;
-}
 
 export { ErrorBoundary };
 
@@ -88,6 +71,17 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     user,
   } = await verifyAuth(request);
 
+  const { data: userData, error: userError } = await supabase
+    .from('user')
+    .select('verified_audio_numbers')
+    .eq('id', user.id)
+    .single();
+
+  if (userError) {
+    console.error(userError);
+    throw userError;
+  }
+  const verifiedNumbers = userData?.verified_audio_numbers || [];
   if (!user || !workspaceId || !id) throw redirect("/signin");
 
   const [
@@ -114,7 +108,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     supabase
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
-      .eq("campaign_id", parseInt(id) )
+      .eq("campaign_id", parseInt(id))
       .eq("status", "dequeued"),
     supabase
       .from("outreach_attempt")
@@ -123,7 +117,6 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       .eq("user_id", user.id),
   ]);
 
-  const isActive = checkSchedule(campaign.data);
   const errors = [
     workspaceData.error,
     campaign.error,
@@ -133,12 +126,15 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     completedCount.error,
     attempts.error,
   ].filter(Boolean);
+
   if (errors.length) {
     throw "Error fetching campaign data";
   }
+
   if (!workspaceData.data || !workspaceData.data.twilio_data) {
     throw "Error fetching workspace data";
   }
+
   const twilioData = workspaceData.data.twilio_data as { sid: string };
   const token = generateToken({
     twilioAccountSid: twilioData.sid,
@@ -180,6 +176,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   } else if (!campaign.data?.dial_type) {
     return redirect("./../settings");
   }
+
   const nextRecipient =
     queue && campaign.data.dial_type === "call" ? queue[0] : null;
   const initalCallsList = attempts.data?.flatMap((attempt) => attempt.call) || [];
@@ -191,9 +188,15 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   const initialRecentAttempt = attempts.data
     ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .find((call) => call.contact_id === nextRecipient?.contact?.id);
-    const userRole = await getUserRole({ supabaseClient: supabase as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
-    const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
-  
+
+  const userRole = await getUserRole({
+    supabaseClient: supabase,
+    user: user as unknown as BaseUser,
+    workspaceId
+  });
+
+  const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole?.role as MemberRole);
+  const isActive = campaign.data ? checkSchedule(campaign.data as unknown as CampaignSchedule) : false;
   return json(
     {
       campaign: campaign.data,
@@ -214,6 +217,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
       completed: completedCount.count,
       isActive,
       hasAccess,
+      verifiedNumbers,
     },
     { headers },
   );
@@ -239,7 +243,7 @@ export const action: ActionFunction = async ({ request, params }) => {
   return redirect("/workspaces");
 };
 
-const Campaign: React.FC = () => {
+const CallScreen: React.FC = () => {
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const { state: navState } = useNavigation();
   const isBusy = navState !== "idle";
@@ -260,8 +264,14 @@ const Campaign: React.FC = () => {
     count,
     completed,
     isActive,
-    hasAccess
+    hasAccess,
+    verifiedNumbers,
   } = useLoaderData<LoaderData>();
+
+  if (!user || !campaign || !campaignDetails) {
+    return null;
+  }
+
   // State management
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [groupByHousehold] = useState<boolean>(true);
@@ -276,6 +286,12 @@ const Campaign: React.FC = () => {
   const [isErrorDialogOpen, setErrorDialog] = useState(!campaignDetails?.script_id);
   const [isDialogOpen, setDialog] = useState(campaign?.dial_type === "predictive" && !isErrorDialogOpen);
   const [isReportDialogOpen, setReportDialog] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<'computer' | string>('computer');
+  const [phoneConnectionStatus, setPhoneConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
+  const [phoneCallSid, setPhoneCallSid] = useState<string | null>(null);
+  const [isAddingNumber, setIsAddingNumber] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+
   // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
@@ -293,7 +309,7 @@ const Campaign: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-  } = useTwilioDevice(token, workspaceId, send as (action: { type: string }) => void);
+  } = useTwilioDevice(token, selectedDevice, workspaceId, send as (action: { type: string }) => void);
 
   const {
     status: liveStatus,
@@ -322,7 +338,7 @@ const Campaign: React.FC = () => {
     nextRecipient,
     setNextRecipient,
   } = useSupabaseRealtime({
-    user, 
+    user: user as unknown as AppUser,
     supabase,
     init: {
       predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
@@ -334,15 +350,12 @@ const Campaign: React.FC = () => {
       nextRecipient: initialNextRecipient || null,
       credits: credits || 0,
     },
-    credits,
-    contacts,
-    campaign_id: campaign?.id! as unknown as string,
-    activeCall,
+    campaign_id: campaign?.id?.toString() || "",
     setQuestionContact,
     predictive: campaign?.dial_type === "predictive",
     setCallDuration,
     setUpdate,
-  });
+  } as UseSupabaseRealtimeProps);
 
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
     user.id,
@@ -351,10 +364,12 @@ const Campaign: React.FC = () => {
     campaign?.caller_id,
   );
 
-  const fetcher = useFetcher<{creditsError?: boolean}>()
-  const queueFetcher = useFetcher<{queueError?: boolean}>()
+  const fetcher = useFetcher<{ creditsError?: boolean }>()
+  const queueFetcher = useFetcher<{ queueError?: boolean }>()
   const submit = fetcher.submit;
   const creditsError = fetcher.data?.creditsError || conferenceCreditsError;
+  const verifyFetcher = useFetcher<{ verificationId: string, callSid: string, pin: string , error?: any }>( )
+  const pin = verifyFetcher.data?.pin;
   // Action handlers
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({
@@ -395,20 +410,25 @@ const Campaign: React.FC = () => {
   );
 
   const handleDialButton = useCallback(() => {
-    if (campaign?.dial_type === "predictive") {
+    if (!campaign) return;
+
+    if (campaign.dial_type === "predictive") {
       if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
         console.log("Device Busy", deviceStatus, device?.calls.length);
         return;
       }
       begin();
-    } else if (campaign?.dial_type === "call") {
+    } else if (campaign.dial_type === "call") {
+      if (!nextRecipient?.contact) return;
+
       startCall({
-        contact: nextRecipient?.contact,
+        contact: nextRecipient.contact,
         campaign,
         user,
         workspaceId,
         nextRecipient,
         recentAttempt,
+        selectedDevice,
       });
     }
   }, [
@@ -423,15 +443,18 @@ const Campaign: React.FC = () => {
     user,
     workspaceId,
     recentAttempt,
+    selectedDevice,
   ]);
 
   const handleNextNumber = useCallback(
     (skipHousehold = false) => {
-      activeCall?.parameters?.CallSid && hangUp();
+      if (activeCall?.parameters?.CallSid) {
+        hangUp();
+      }
       nextNumber({
         skipHousehold,
         queue,
-        householdMap,
+        householdMap: new Map(Object.entries(householdMap)),
         nextRecipient,
         groupByHousehold,
       });
@@ -449,15 +472,17 @@ const Campaign: React.FC = () => {
   );
 
   const handleDequeueNext = useCallback(() => {
-    if (campaign?.dial_type === "predictive") {
+    if (!campaign || !nextRecipient) return;
+
+    if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
       setCallDuration(0);
       handleDialButton();
       saveData();
-    } else if (campaign?.dial_type === "call") {
+    } else if (campaign.dial_type === "call") {
       saveData();
       dequeue({ contact: nextRecipient });
-      fetchMore({ householdMap });
+      fetchMore({ householdMap: new Map(Object.entries(householdMap)) });
       handleNextNumber(campaign?.group_household_queue || false);
       send({ type: "HANG_UP" });
       setRecentAttempt(null);
@@ -465,13 +490,13 @@ const Campaign: React.FC = () => {
       setCallDuration(0);
     }
   }, [
-    campaign?.dial_type,
+    campaign,
+    nextRecipient,
     send,
     setCallDuration,
     handleDialButton,
     saveData,
     dequeue,
-    nextRecipient,
     fetchMore,
     householdMap,
     handleNextNumber,
@@ -485,7 +510,7 @@ const Campaign: React.FC = () => {
       setAvailableMicrophones(devices.filter((device) => device.kind === "audioinput"));
       setAvailableSpeakers(devices.filter((device) => device.kind === "audiooutput"));
       const audioContext = new window.AudioContext();
-      audioContextRef.current = audioContext; 
+      audioContextRef.current = audioContext;
       const gainNode = audioContext.createGain();
       gainNodeRef.current = gainNode;
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -561,37 +586,34 @@ const Campaign: React.FC = () => {
 
   const handleDTMF = useCallback(
     (key: string) => {
-      if (audioContextRef.current) playTone(key, audioContextRef?.current);
+      if (audioContextRef.current) playTone(key, audioContextRef.current);
       if (!activeCall) return;
-      else {
-        activeCall?.sendDigits(key);
-      }
+      activeCall?.sendDigits(key);
     },
     [activeCall],
   );
 
   const handleVoiceDrop = () => {
-    if (!activeCall) return;
+    if (!activeCall?.parameters?.CallSid) return;
     const formData = new FormData();
-    formData.append("callId", activeCall?.parameters?.CallSid);
+    formData.append("callId", activeCall.parameters.CallSid);
     formData.append("workspaceId", workspaceId);
     formData.append("campaignId", campaign?.id?.toString() || "");
 
     submit(formData, {
       method: "POST",
       action: "/api/audiodrop",
-      navigate: false,
     });
   };
 
   const requeueContacts = () => {
+    if (!campaign?.id) return;
     const userId = user.id;
-    const campaignId = campaign?.id?.toString() || "";
+    const campaignId = campaign.id.toString();
     submit({ userId, campaignId }, {
       method: "DELETE",
       action: "/api/queues",
       encType: "application/json",
-      navigate: false,
     });
   }
 
@@ -599,7 +621,7 @@ const Campaign: React.FC = () => {
   const getDisplayState = useCallback((
     state: string,
     disposition: string | undefined,
-    activeCall: object | null,
+    activeCall: ActiveCall | null,
   ): string => {
     if (state === "failed" || disposition === "failed") return "failed";
     if (
@@ -613,7 +635,7 @@ const Campaign: React.FC = () => {
     if (state === "completed" && disposition) return "completed";
     if (!activeCall && !disposition) return "idle";
     return "idle";
-  }, [state, disposition, activeCall]);
+  }, []);
 
   const displayState =
     predictiveState.status === "dialing"
@@ -627,7 +649,7 @@ const Campaign: React.FC = () => {
             : getDisplayState(
               state,
               recentAttempt?.disposition || undefined,
-              activeCall,
+              activeCall as unknown as ActiveCall,
             );
 
   const house =
@@ -663,7 +685,7 @@ const Campaign: React.FC = () => {
     if (!stream && !permissionError) {
       requestMicrophoneAccess();
     }
-  }, [stream, permissionError, requestMicrophoneAccess]);
+  }, [stream, permissionError]);
 
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext ||
@@ -711,9 +733,6 @@ const Campaign: React.FC = () => {
     if (!predictiveState.contact_id && predictiveState.status === "dialing") {
       setUpdate(null);
     }
-    if (!predictiveState.contact_id && predictiveState.status === "dialing") {
-      setUpdate(null);
-    }
     if (
       predictiveState.contact_id !== nextRecipient?.contact_id &&
       predictiveState.status === "dialing"
@@ -737,8 +756,49 @@ const Campaign: React.FC = () => {
     questionContact,
     update,
   };
-  const creditState: "GOOD" |"WARNING" |"BAD" = availableCredits > queue.length ? "GOOD" : availableCredits  > 0 && availableCredits < queue.length ? "WARNING" : "BAD";
 
+  const creditState: "GOOD" | "WARNING" | "BAD" =
+    availableCredits > queue.length ? "GOOD" :
+      availableCredits > 0 && availableCredits < queue.length ? "WARNING" :
+        "BAD";
+
+  // Add new function to handle phone number verification
+  const handleVerifyNewNumber = async () => {
+    verifyFetcher.load(`/api/verify-audio-session?phoneNumber=${newPhoneNumber}&fromNumber=${campaign.caller_id}&workspace_id=${workspaceId}`)
+    toast.success('Verification call initiated. Please answer your phone to complete verification.');
+    setIsAddingNumber(false);
+  }
+
+  // Update the handlePhoneDeviceSelection function
+  const handlePhoneDeviceSelection = async (phoneNumber: string) => {
+    if (phoneNumber === 'computer') {
+      setPhoneConnectionStatus('disconnected');
+      setPhoneCallSid(null);
+      requestMicrophoneAccess();
+      return;
+    }
+
+    try {
+      setSelectedDevice(phoneNumber);
+      setPhoneConnectionStatus('connected');
+      toast.success('Connected to your phone. You can now make calls.');
+
+    } catch (error) {
+      console.error('Error connecting phone device:', error);
+      toast.error('Failed to connect to your phone. Please try again.');
+      setPhoneConnectionStatus('disconnected');
+      setSelectedDevice('computer');
+      requestMicrophoneAccess();
+    }
+  };
+
+  // Effect to handle device changes
+  useEffect(() => {
+    if (selectedDevice !== 'computer') {
+      handlePhoneDeviceSelection(selectedDevice);
+    }
+  }, [selectedDevice]);
+console.log(verifiedNumbers)
   return (
     <main className="container mx-auto p-6">
       <div
@@ -752,7 +812,7 @@ const Campaign: React.FC = () => {
         className="mb-6"
       >
         <CampaignHeader
-          campaign={campaign!}
+          campaign={campaign}
           count={count}
           completed={completed}
           onLeaveCampaign={() => {
@@ -772,6 +832,17 @@ const Campaign: React.FC = () => {
           availableCredits={availableCredits}
           creditState={creditState}
           hasAccess={hasAccess}
+          phoneStatus={phoneConnectionStatus}
+          selectedDevice={selectedDevice}
+          onDeviceSelect={setSelectedDevice}
+          verifiedNumbers={verifiedNumbers}
+          isAddingNumber={isAddingNumber}
+          onAddNumberClick={() => setIsAddingNumber(true)}
+          onAddNumberCancel={() => setIsAddingNumber(false)}
+          newPhoneNumber={newPhoneNumber}
+          onNewPhoneNumberChange={setNewPhoneNumber}
+          onVerifyNewNumber={handleVerifyNewNumber}
+          pin={pin || ""} 
         />
         <div className="m-4">
           <PhoneKeypad
@@ -787,22 +858,24 @@ const Campaign: React.FC = () => {
           <CallArea
             conference={conference}
             isBusy={isBusy || deviceIsBusy}
-            predictive={campaign?.dial_type === "predictive"}
+            predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
-            activeCall={activeCall}
+            activeCall={activeCall as unknown as ActiveCall}
             recentCall={recentCall}
             handleVoiceDrop={handleVoiceDrop}
-            hangUp={() =>
+            hangUp={
               campaign.dial_type === "predictive"
-                ? handleConferenceEnd({
-                  activeCall,
+                ? () => handleConferenceEnd({
+                  activeCall: activeCall as unknown as ActiveCall,
                   setConference,
                   workspaceId,
                 })
-                : hangUp()
+                : () => {
+                  if (hangUp) hangUp();
+                }
             }
             displayState={displayState}
-            dispositionOptions={campaignDetails?.disposition_options}
+            dispositionOptions={(campaignDetails as any).disposition_options as any[]}
             handleDialNext={handleDialButton}
             handleDequeueNext={handleDequeueNext}
             disposition={disposition}
@@ -810,7 +883,7 @@ const Campaign: React.FC = () => {
             recentAttempt={recentAttempt}
             callState={callState}
             callDuration={callDuration}
-            voiceDrop={Boolean(campaignDetails?.voicedrop_audio)}
+            voiceDrop={Boolean(campaignDetails.voicedrop_audio)}
           />
           <Household
             isBusy={isBusy}
@@ -823,8 +896,8 @@ const Campaign: React.FC = () => {
         <CallQuestionnaire
           isBusy={isBusy}
           handleResponse={handleResponse}
-          campaignDetails={campaignDetails}
-          update={update}
+          campaignDetails={campaignDetails as unknown as CampaignDetails}
+          update={update || {}}
           nextRecipient={questionContact}
           handleQuickSave={saveData}
           disabled={!questionContact}
@@ -836,7 +909,7 @@ const Campaign: React.FC = () => {
           queue={campaign.dial_type === "call" ? queue : predictiveQueue}
           handleNextNumber={handleNextNumber}
           nextRecipient={nextRecipient}
-          handleQueueButton={fetchMore}
+          handleQueueButton={() => fetchMore({ householdMap: new Map(Object.entries(householdMap)) })}
           predictive={campaign.dial_type === "predictive"}
           count={count}
           completed={completed}
@@ -850,7 +923,11 @@ const Campaign: React.FC = () => {
         setErrorDialog={setErrorDialog}
         isReportDialogOpen={isReportDialogOpen}
         setReportDialog={setReportDialog}
-        campaign={campaign}
+        campaign={{
+          title: campaign.title,
+          dial_type: campaign.dial_type || "call",
+          voicemail_file: Boolean(campaign.voicemail_file),
+        }}
         fetchMore={fetchMore}
         householdMap={householdMap}
         currentState={currentState}
@@ -862,4 +939,4 @@ const Campaign: React.FC = () => {
   );
 };
 
-export default Campaign;
+export default CallScreen;

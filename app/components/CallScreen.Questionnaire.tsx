@@ -54,7 +54,7 @@ const CallQuestionnaire = ({
 }: CallQuestionnaireProps) => {
   const navigation = useNavigation();
   const [currentPageId, setCurrentPageId] = useState(
-    Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
+    Object.keys(campaignDetails.script?.steps?.pages || {})?.[0]
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
@@ -75,18 +75,18 @@ const CallQuestionnaire = ({
   };
 
   const renderBlock = (blockId: string) => {
-    const block = campaignDetails.script?.steps.blocks[blockId];
+    const block = campaignDetails.script?.steps?.blocks?.[blockId];
     
     return (
       <div>
       <Result
         disabled={disabled}
-        action={(response) => handleBlockResponse(block.title, response.value)}
+        action={(response) => handleBlockResponse(blockId, response.value)}
         questions={block}
         key={`questions-${blockId}`}
         questionId={blockId}
-        initResult={localUpdate[block.title] || null}
-        type={block.type}
+        initResult={localUpdate[blockId] || null}
+        type={block?.type}
       />
       </div>
     );
@@ -131,10 +131,10 @@ const CallQuestionnaire = ({
             renderBlock,
           )}
         </div>
-        {campaignDetails.script?.step?.pages && <div className="mt-4 flex justify-between">
+        {campaignDetails.script?.steps?.pages && <div className="mt-4 flex justify-between">
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
+              const pageIds = Object.keys(campaignDetails.script?.steps?.pages || {});
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex > 0) {
                 setCurrentPageId(pageIds[currentIndex - 1]);
@@ -143,14 +143,14 @@ const CallQuestionnaire = ({
             disabled={
               isBusy ||
               currentPageId ===
-              Object.keys(campaignDetails.script?.steps.pages || {})?.[0]
+              Object.keys(campaignDetails.script?.steps?.pages || {})?.[0]
             }
           >
             Previous Page
           </Button>
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps.pages);
+              const pageIds = Object.keys(campaignDetails.script?.steps?.pages || {});
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex < pageIds.length - 1) {
                 setCurrentPageId(pageIds[currentIndex + 1]);
@@ -159,8 +159,8 @@ const CallQuestionnaire = ({
             disabled={
               isBusy ||
               currentPageId ===
-              Object.keys(campaignDetails.script?.steps.pages || {})[
-                Object.keys(campaignDetails.script?.steps.pages || {}).length - 1
+              Object.keys(campaignDetails.script?.steps?.pages || {})[
+                Object.keys(campaignDetails.script?.steps?.pages || {}).length - 1
               ]
             }
           >
