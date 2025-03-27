@@ -188,20 +188,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const updates: Record<string, any> = {};
     const campaignDataStr = formData.get("campaignData") as string;
     const campaignDetailsStr = formData.get("campaignDetails") as string;
-
+    const campaignData = JSON.parse(campaignDataStr || "{}");
     // Handle script_id update
     if (formData.has("script_id")) {
       const script_id = Number(formData.get("script_id"));
       if (campaignDataStr) {
-        const campaignData = JSON.parse(campaignDataStr);
         await supabaseClient
           .from("campaign")
           .update({ ...campaignData })
           .eq("id", Number(selected_id));
       }
       if (campaignDetailsStr) {
-        const campaignDetails = JSON.parse(campaignDetailsStr);
-        const tableKey = getCampaignTableKey(campaignDetails.type);
+        const tableKey = getCampaignTableKey(campaignData.type);
         await supabaseClient
           .from(tableKey as any)
           .update({ script_id })
@@ -213,7 +211,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
     // Handle other updates
     for (const [key, value] of formData.entries()) {
       if (key !== "intent") {
-        updates[key] = value;
+        if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
+          updates[key] = JSON.parse(value);
+        } else {
+          updates[key] = value;
+        }
       }
     }
 
