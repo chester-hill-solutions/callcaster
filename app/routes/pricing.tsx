@@ -1,15 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { BsChatLeftText } from "react-icons/bs";
-import { FaChevronCircleDown, FaChevronCircleUp } from "react-icons/fa";
 import { FaPhoneVolume, FaMicrophone } from "react-icons/fa6";
 import React, { ReactNode } from "react";
-
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "~/components/ui/accordion";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   return {};
@@ -19,196 +11,146 @@ export async function action({ request }: ActionFunctionArgs) {
   return {};
 }
 
-const SectionTitle = ({ children }) => (
-  <h1 className="text-center font-Zilla-Slab text-5xl font-bold md:text-left">
+const SectionTitle = ({ children }: { children: ReactNode }) => (
+  <h1 className="mb-12 text-center font-Zilla-Slab text-5xl font-bold">
     {children}
   </h1>
 );
 
-const SectionText = ({ children }) => (
-  <p className="font-Zilla-Slab text-xl font-semibold">{children}</p>
-);
+interface PricingRowProps {
+  icon: ReactNode;
+  service: string;
+  type: string;
+  rates: Array<{
+    name: string;
+    price: string;
+    description: string;
+  }>;
+}
 
-const PricingCard = ({ children, cardTitle, cardIcon }): ReactNode => (
-  <div
-    id={`pricing-${cardTitle}`}
-    className="flex min-h-fit w-full flex-col items-center gap-4 rounded-xl bg-brand-secondary px-4 py-8 drop-shadow-[4px_8px_4px_rgba(0,0,0,0.33)] xl:h-fit"
-  >
-    <h3
-      className="flex items-baseline justify-center gap-4 text-center font-Zilla-Slab
-       text-4xl font-semibold uppercase leading-none text-brand-primary"
-    >
-      <span>{cardTitle}</span>
-      {cardIcon}
-    </h3>
-    <div
-      id="product-card"
-      className="flex w-full flex-col items-center justify-center gap-4 rounded-lg py-4"
-    >
-      {children}
+const PricingRow = ({ icon, service, type, rates }: PricingRowProps) => (
+  <div className="mb-8 overflow-hidden rounded-xl bg-[#bae6fd] last:mb-0">
+    <div className="flex items-center gap-3 border-b border-white/20 bg-[#bae6fd]/80 p-6">
+      <span className="text-[#dc2626]">{icon}</span>
+      <div>
+        <h3 className="font-Zilla-Slab text-2xl font-bold uppercase text-[#dc2626]">
+          {service}
+        </h3>
+        <p className="font-Zilla-Slab text-lg text-gray-700">{type}</p>
+      </div>
+    </div>
+    <div className="grid gap-4 p-6 md:grid-cols-2">
+      {rates.map((rate, index) => (
+        <div key={index} className="rounded-lg bg-white p-6">
+          <div className="mb-2">
+            <div className="flex items-baseline justify-between">
+              <span className="font-Zilla-Slab text-lg font-semibold text-gray-900">
+                {rate.name}
+              </span>
+              <span className="font-Zilla-Slab text-xl font-bold text-[#dc2626]">
+                {rate.price}
+              </span>
+            </div>
+          </div>
+          <p className="font-Zilla-Slab text-base text-gray-600">
+            {rate.description}
+          </p>
+        </div>
+      ))}
     </div>
   </div>
 );
 
 export default function Pricing() {
+  const pricingData: PricingRowProps[] = [
+    {
+      icon: <BsChatLeftText size="24px" />,
+      service: "Texting",
+      type: "SMS",
+      rates: [
+        {
+          name: "Incoming Text Rate",
+          price: "$0.03/text",
+          description: "The 'Text Rate' is charged per text (maximum 140 characters), and per Media SMS.",
+        },
+        {
+          name: "Outgoing Text Rate",
+          price: "$0.03/text",
+          description: "The 'Text Rate' is charged per text (maximum 140 characters), and per Media SMS.",
+        },
+      ],
+    },
+    {
+      icon: <FaPhoneVolume size="24px" />,
+      service: "Calling",
+      type: "Auto Dialer",
+      rates: [
+        {
+          name: "Per Dial Rate",
+          price: "$0.06/dial",
+          description: "The 'Dial Rate' is the cost per call attempt. The first minute of each call is covered by the 'Dial Rate'.",
+        },
+        {
+          name: "Per Minute Rate",
+          price: "$0.06/minute",
+          description: "The 'Minute Rate' cost kicks in after the first minute of each call and is the cost accrued for each remaining minute of the call.",
+        },
+      ],
+    },
+    {
+      icon: <FaPhoneVolume size="24px" />,
+      service: "Staffed Live Calls",
+      type: "Profeessional Interactions",
+      rates: [
+        {
+          name: "Per Call Rate",
+          price: "$1.20/call",
+          description: "Professional staffed calls with trained representatives to handle your customer interactions.",
+        },
+      ],
+    },
+    {
+      icon: <FaMicrophone size="24px" />,
+      service: "VoiceMail",
+      type: "IVR",
+      rates: [
+        {
+          name: "Per Dial Rate",
+          price: "$0.03/dial",
+          description: "The 'Dial Rate' is the cost per call attempt. The first minute of each call is covered by the 'Dial Rate'.",
+        },
+        {
+          name: "Per Minute Rate",
+          price: "$0.03/minute",
+          description: "The 'Minute Rate' cost kicks in after the first minute of each call and is the cost accrued for each remaining minute of the call.",
+        },
+      ],
+    },
+  ];
+
   return (
-    <main className="flex flex-col max-w-6xl items-center gap-8 rounded-sm p-8 dark:text-white md:h-[calc(100vh-80px)] md:min-h-fit md:items-start xl:mx-auto xl:w-[90%] xl:gap-8">
+    <main className="mx-auto max-w-7xl px-4 py-12">
       <SectionTitle>Our Pricing Plan</SectionTitle>
-      <section
-        id="plans-container"
-        className="flex h-fit w-full flex-col gap-8 md:flex-row xl:h-full"
-      >
-        <PricingCard
-          cardTitle={"Texting"}
-          cardIcon={<BsChatLeftText size="28px" />}
-        >
-          <p className="font-Zilla-Slab text-3xl font-semibold">SMS</p>
+      
+      <div className="space-y-6">
+        {pricingData.map((row, index) => (
+          <PricingRow key={index} {...row} />
+        ))}
+      </div>
 
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Incoming Text Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">$0.03/text</span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Text Rate" is charged per text (maximum 140 characters),
-                  and per Media SMS.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Outgoing Text Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">$0.03/text</span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Text Rate" is charged per text (maximum 140 characters),
-                  and per Media SMS.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </PricingCard>
-
-        <PricingCard
-          cardTitle={"Calling"}
-          cardIcon={<FaPhoneVolume size={"28px"} />}
-        >
-          <p className="font-Zilla-Slab text-3xl font-semibold">Auto Dialer</p>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Per Dial Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">$0.06/dial</span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Dial Rate" is the cost per call attempt. The first minute
-                  of each call is covered by the "Dial Rate".
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Per Minute Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">
-                      $0.06/minute
-                    </span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Minute Rate" cost kicks in after the first minute of each
-                  call and is the cost accrewed for each remaining minute of the
-                  call.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </PricingCard>
-
-        <PricingCard
-          cardTitle={"VoiceMail"}
-          cardIcon={<FaMicrophone size="28px" />}
-        >
-          <p className="font-Zilla-Slab text-3xl font-semibold">IVR</p>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Per Dial Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">$0.03/dial</span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Dial Rate" is the cost per call attempt. The first minute
-                  of each call is covered by the "Dial Rate".
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1" className="w-full">
-              <AccordionTrigger className="w-full bg-brand-tertiary px-8 hover:bg-brand-primary hover:text-white hover:no-underline data-[state=closed]:rounded-lg data-[state=open]:rounded-t-lg data-[state=open]:bg-brand-primary data-[state=open]:text-white">
-                <div className="flex w-full items-center justify-between">
-                  <p className="font-Zilla-Slab text-xl font-semibold">
-                    Per Minute Rate:{" "}
-                    <span className="ml-2 text-2xl font-bold">
-                      $0.03/minute
-                    </span>
-                  </p>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="rounded-b-lg bg-white px-8 py-4">
-                <p className="w-full font-Zilla-Slab text-xl">
-                  The "Minute Rate" cost kicks in after the first minute of each
-                  call and is the cost accrewed for each remaining minute of the
-                  call.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </PricingCard>
-      </section>
-
-      <p className="rounded-3xl border-4 border-brand-secondary bg-white p-4 font-Zilla-Slab text-2xl font-bold">
-        For More Information Contact <br />
-        <a
-          href="mailto: info@callcaster.ca"
-          className="font-bold text-brand-primary underline transition-colors hover:text-blue-600"
-        >
-          info@callcaster.ca
-        </a>
-      </p>
+      <div className="mt-12 text-center">
+        <div className="inline-block rounded-full border-2 border-[#bae6fd] bg-white px-8 py-4">
+          <p className="font-Zilla-Slab text-xl">
+            For More Information Contact{" "}
+            <a
+              href="mailto:info@callcaster.ca"
+              className="font-bold text-[#dc2626] hover:underline"
+            >
+              info@callcaster.ca
+            </a>
+          </p>
+        </div>
+      </div>
     </main>
   );
 }
