@@ -3,7 +3,7 @@ import { isRecent, updateAttemptWithCall } from "~/lib/utils";
 import { User } from "@supabase/supabase-js";
 import { Call, OutreachAttempt, QueueItem } from "~/lib/types";
 
-export const useAttempts = (initialAttempts: OutreachAttempt[], initialRecentAttempt: OutreachAttempt | null, nextRecipient: QueueItem) => {
+export const useAttempts = (initialAttempts: OutreachAttempt[], initialRecentAttempt: OutreachAttempt | null, nextRecipient: QueueItem | null) => {
   const [attemptList, setAttempts] = useState<OutreachAttempt[]>(initialAttempts);
   const [recentAttempt, setRecentAttempt] = useState<OutreachAttempt | null>(initialRecentAttempt);
 

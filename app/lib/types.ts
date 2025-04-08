@@ -166,7 +166,7 @@ export type CampaignState = {
 export type LoaderData = {
   campaign: Campaign;
   attempts: OutreachAttempt[];
-  user: User;
+  user: NonNullable<User>;
   audiences: any[];
   campaignDetails: CampaignDetails;
   credits: number;
