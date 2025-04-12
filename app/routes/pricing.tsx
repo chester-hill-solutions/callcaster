@@ -100,7 +100,7 @@ export default function Pricing() {
     {
       icon: <FaPhoneVolume size="24px" />,
       service: "Staffed Live Calls",
-      type: "Profeessional Interactions",
+      type: "Professional Interactions",
       rates: [
         {
           name: "Per Call Rate",
