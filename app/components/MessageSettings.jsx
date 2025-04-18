@@ -1,11 +1,27 @@
 import { MdAddAPhoto } from "react-icons/md";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useRef, useState, useCallback, useEffect } from "react";
 import { Await, Form, useSubmit } from "@remix-run/react";
 
-export const MessageSettings = ({ mediaLinks, details, campaignData, onChange }) => {
+const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+};
 
+export const MessageSettings = ({ mediaLinks, details, campaignData, onChange }) => {
+    const [displayText, setDisplayText] = useState(details?.body_text || '');
     const [eraseVisible, setEraseVisible] = useState({});
     const debounceRef = useRef(null);
+
+    useEffect(() => {
+        setDisplayText(details?.body_text || '');
+    }, [details?.body_text]);
 
     const submit = useSubmit();
     const showErase = (imageId) => {
@@ -84,18 +100,19 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
         );
     };
 
-    const handleBodyTextChange = (() => {
-        const debounceTimeout = useRef(null);
-        return (event) => {
-            if (debounceTimeout.current) {
-                clearTimeout(debounceTimeout.current);
-            }
+    const handleBodyTextChange = useCallback((event) => {
+        const newText = event.target.value;
+        setDisplayText(newText);
+        
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
 
-            debounceTimeout.current = setTimeout(() => {
-                onChange("body_text", event.target.value);
-            }, 300); // Adjust delay as needed
-        };
-    })();
+        debounceRef.current = setTimeout(() => {
+            onChange("body_text", newText);
+        }, 500);
+    }, [onChange]);
+
     return (
         <div className="flex flex-col items-center">
             <div className="my-1 flex flex-col gap-2 px-2">
@@ -124,7 +141,7 @@ export const MessageSettings = ({ mediaLinks, details, campaignData, onChange })
                                         className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
                                         style={{ caretColor: "black" }}
                                         rows={5}
-                                        value={details.body_text}
+                                        value={displayText}
                                         onChange={handleBodyTextChange}
                                     />
                                 </div>

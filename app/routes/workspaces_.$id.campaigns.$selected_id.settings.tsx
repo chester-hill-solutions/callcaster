@@ -184,68 +184,78 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
-  if (intent === "update") {
-    const updates: Record<string, any> = {};
-    const campaignDataStr = formData.get("campaignData") as string;
-    const campaignDetailsStr = formData.get("campaignDetails") as string;
-    const campaignData = JSON.parse(campaignDataStr || "{}");
-    // Handle script_id update
-    if (formData.has("script_id")) {
-      const script_id = Number(formData.get("script_id"));
-      if (campaignDataStr) {
-        await supabaseClient
-          .from("campaign")
-          .update({ ...campaignData })
-          .eq("id", Number(selected_id));
+  switch (intent) {
+    case "update": {
+      const updates: Record<string, any> = {};
+      const campaignDataStr = formData.get("campaignData") as string;
+      const campaignDetailsStr = formData.get("campaignDetails") as string;
+      const campaignData = JSON.parse(campaignDataStr || "{}");
+
+      // Handle script_id update
+      if (formData.has("script_id")) {
+        const script_id = Number(formData.get("script_id"));
+        if (campaignDataStr) {
+          await supabaseClient
+            .from("campaign")
+            .update({ ...campaignData })
+            .eq("id", Number(selected_id));
+        }
+        if (campaignDetailsStr) {
+          const tableKey = getCampaignTableKey(campaignData.type);
+          await supabaseClient
+            .from(tableKey as any)
+            .update({ script_id })
+            .eq("campaign_id", Number(selected_id));
+        }
+        return { success: true };
       }
-      if (campaignDetailsStr) {
+
+      // Handle body_text update
+      if (formData.has("body_text")) {
+        const body_text = formData.get("body_text") as string;
         const tableKey = getCampaignTableKey(campaignData.type);
         await supabaseClient
           .from(tableKey as any)
-          .update({ script_id })
+          .update({ body_text })
           .eq("campaign_id", Number(selected_id));
+        return { success: true };
       }
-      return json({ success: true });
-    }
 
-    // Handle other updates
-    for (const [key, value] of formData.entries()) {
-      if (key !== "intent") {
-        if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
-          updates[key] = JSON.parse(value);
-        } else {
-          updates[key] = value;
+      for (const [key, value] of formData.entries()) {
+        if (key !== "intent") {
+          if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
+            updates[key] = JSON.parse(value);
+          } else {
+            updates[key] = value;
+          }
         }
       }
+
+      await supabaseClient
+        .from("campaign")
+        .update(updates)
+        .eq("id", Number(selected_id));
+      return { success: true };
     }
 
-    await supabaseClient
-      .from("campaign")
-      .update(updates)
-      .eq("id", Number(selected_id));
-  }
-
-  switch (intent) {
-    case "status":
+    case "status": {
       const status = formData.get("status") as CampaignStatus;
       const is_active = formData.get("is_active") as string;
-      return json<ActionData>(
-        await updateCampaignStatus(
-          supabaseClient,
-          selected_id,
-          status,
-          is_active === "true" ? true : is_active === "false" ? false : undefined
-        )
+      return updateCampaignStatus(
+        supabaseClient,
+        selected_id,
+        status,
+        is_active === "true" ? true : is_active === "false" ? false : undefined
       );
+    }
 
-    case "duplicate":
+    case "duplicate": {
       const campaignData = formData.get("campaignData") as string;
-      return json<ActionData>(
-        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData)
-      );
+      return handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
+    }
 
     default:
-      return json<ActionData>({ error: "Invalid intent" }, { status: 400 });
+      return { error: "Invalid intent" };
   }
 }
 
@@ -348,6 +358,17 @@ export default function CampaignSettingsRoute() {
           script_id: value,
           campaignData: JSON.stringify({ ...campaignData, script_id: value }),
           campaignDetails: JSON.stringify({ ...campaignDetails, script_id: value })
+        },
+        { method: "post" }
+      );
+    } else if (name === "body_text") {
+      // For message updates, we need to update the campaign details
+      fetcher.submit(
+        {
+          intent: "update",
+          body_text: value,
+          campaignData: JSON.stringify({ ...campaignData}),
+          campaignDetails: JSON.stringify({ ...campaignDetails, body_text: value })
         },
         { method: "post" }
       );
