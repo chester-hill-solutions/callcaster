@@ -186,7 +186,7 @@ export const useSupabaseRealtime = ({
 
   const handleSetDisposition = useCallback(
     (value: string) => {
-      setRecentAttempt((cur: OutreachAttempt) => ({
+      setRecentAttempt((cur: OutreachAttempt | null) => ({
         ...cur!,
         disposition: value,
       }));

@@ -1213,6 +1213,7 @@ export type Json =
             last_name: string | null
             organization: number | null
             username: string
+            verified_audio_numbers: string[] | null
           }
           Insert: {
             access_level?: string | null
@@ -1223,6 +1224,7 @@ export type Json =
             last_name?: string | null
             organization?: number | null
             username?: string
+            verified_audio_numbers?: string[] | null
           }
           Update: {
             access_level?: string | null
@@ -1233,6 +1235,7 @@ export type Json =
             last_name?: string | null
             organization?: number | null
             username?: string
+            verified_audio_numbers?: string[] | null
           }
           Relationships: []
         }
@@ -1487,6 +1490,41 @@ export type Json =
               referencedRelation: "workspace"
               referencedColumns: ["id"]
             },
+          ]
+        }
+        phone_verification: {
+          Row: {
+            id: string
+            user_id: string
+            phone_number: string
+            pin: string
+            expires_at: string
+            created_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            phone_number: string
+            pin: string
+            expires_at: string
+            created_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            phone_number?: string
+            pin?: string
+            expires_at?: string
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "phone_verification_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "users"
+              referencedColumns: ["id"]
+            }
           ]
         }
       }

@@ -32,7 +32,7 @@ async function getNextContact(supabase: SupabaseClient, campaign_id: number, use
 
 async function createOutreachAttempt(
   supabase: SupabaseClient,
-  contactRecord: { contact_id: number, queue_id: number },
+  contactRecord: { queue_id: number, contact_id: number, contact_phone: string }, 
   campaign_id: number,
   workspace_id: string,
   user_id: string,
@@ -51,7 +51,7 @@ async function createOutreachAttempt(
   return outreachAttempt;
 }
 
-async function createTwilioCall(twilio: Twilio, toNumber: string, fromNumber: string, user_id: string) {
+async function createTwilioCall(twilio: Twilio, toNumber: string, fromNumber: string, user_id: string, selected_device: string) {
   return await twilio.calls.create({
     to: toNumber,
     from: fromNumber,
@@ -90,7 +90,7 @@ export const action = async ({ request }: { request: Request }) => {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_KEY!,
   );
-  const { user_id, campaign_id, workspace_id } = await request.json();
+  const { user_id, campaign_id, workspace_id, selected_device } = await request.json();
   const twilio = await createWorkspaceTwilioInstance({
     supabase,
     workspace_id,
@@ -99,8 +99,8 @@ export const action = async ({ request }: { request: Request }) => {
 
   try {
     const contactRecord = await getNextContact(supabase, campaign_id, user_id);
-
     if (contactRecord) {
+      console.log(contactRecord);
       const toNumber = normalizePhoneNumber(contactRecord.contact_phone);
 
       const outreach_attempt_id = await createOutreachAttempt(
@@ -110,13 +110,25 @@ export const action = async ({ request }: { request: Request }) => {
         workspace_id,
         user_id,
       );
+
       const call = await createTwilioCall(
         twilio,
         toNumber,
         contactRecord.caller_id,
         user_id,
+        selected_device,
       );
 
+      const { error } = await supabase.rpc("dequeue_contact", {
+        passed_contact_id: contactRecord.contact_id,
+        group_on_household: true,
+        dequeued_by_id: user_id,
+        dequeued_reason_text: "Predictive Dialer called contact"
+      });
+      if (error) {
+        console.error("Error dequeing contact", error);
+        throw error;
+      } 
       realtime.send({
         type: "broadcast",
         event: "message",

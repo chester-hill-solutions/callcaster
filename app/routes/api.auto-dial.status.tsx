@@ -16,7 +16,8 @@ const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
       .from("call")
       .update(update)
       .eq("sid", sid)
-      .select();
+      .select()
+      .single();
     if (error) throw error;
     return data;
   } catch (error) {
@@ -34,7 +35,8 @@ const updateOutreachAttempt = async (
       .from("outreach_attempt")
       .update(update)
       .eq("id", id)
-      .select();
+      .select()
+      .single();
     if (error) throw error;
     return data;
   } catch (error) {
@@ -100,15 +102,15 @@ const handleCallStatus = async (
       duration: duration.toString()
     });
     const outreachStatus = await updateOutreachAttempt(
-      callUpdate[0].outreach_attempt_id,
+      callUpdate.outreach_attempt_id,
       { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
     );
-    const transaction = await updateTransaction(callUpdate[0], duration);
+    await updateTransaction(callUpdate, duration);
 
     const { error } = await supabase.rpc("dequeue_contact", {
-      passed_contact_id: outreachStatus[0].contact_id,
+      passed_contact_id: outreachStatus.contact_id,
       group_on_household: true,
-      dequeued_by_id: callUpdate[0].user_id,
+      dequeued_by_id: callUpdate.conference_id,
       dequeued_reason_text: `Call ${status?.toLowerCase()}`
     });
     if (error) {
@@ -118,10 +120,10 @@ const handleCallStatus = async (
     realtime.send({
       type: "broadcast",
       event: "message",
-      payload: { contact_id: outreachStatus[0].contact_id, status },
+      payload: { contact_id: outreachStatus.contact_id, status },
     });
     const conferences = await twilio.conferences.list({
-      friendlyName: callUpdate[0].conference_id,
+      friendlyName: callUpdate.conference_id,
       status: "in-progress",
     });
     if (conferences.length && status !== "completed") {
@@ -165,30 +167,19 @@ const handleParticipantLeave = async (
     });
     const { data: outreachStatus, error: outreachError } = await supabase
       .from('outreach_attempt')
-      .select('*, campaign_queue!inner(campaign!inner(group_household_queue))')
-      .eq('id', dbCall[0].outreach_attempt_id)
+      .select('*')
+      .eq('id', dbCall.outreach_attempt_id)
       .single();
     if (outreachError) {
       console.error("Error fetching outreach status", outreachError);
       throw outreachError;
     }
 
-    const { error } = await supabase.rpc("dequeue_contact", {
-      passed_contact_id: outreachStatus.contact_id,
-      group_on_household: outreachStatus.campaign_queue.campaign.group_household_queue,
-      dequeued_by_id: dbCall[0].user_id,
-      dequeued_reason_text: "Participant left call"
-    });
-    if (error) {
-      console.error("Error dequeing contact", error);
-      throw error;
-    }
-
     realtime.send({
       type: "broadcast",
       event: "message",
       payload: {
-        contact_id: outreachStatus[0].contact_id,
+        contact_id: outreachStatus.contact_id,
         status: "completed",
       },
     });
@@ -224,14 +215,15 @@ const handleParticipantJoin = async (
         `${dbCall.outreach_attempt_id}`,
         { disposition: "in-progress", answered_at: new Date().toISOString() },
       );
-      await updateCampaignQueue(outreachStatus[0].contact_id, {
+      await updateCampaignQueue(outreachStatus.contact_id, {
         status: parsedBody.FriendlyName,
       });
+
       realtime.send({
         type: "broadcast",
         event: "message",
         payload: {
-          contact_id: outreachStatus[0].contact_id,
+          contact_id: outreachStatus.contact_id,
           status: "connected",
         },
       });
