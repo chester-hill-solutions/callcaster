@@ -3,8 +3,7 @@ import Twilio from 'twilio';
 export const action = async ({ request, params }) => {
     const twiml = new Twilio.twiml.VoiceResponse();
     const formData = await request.formData();
-    console.log(params, Object.fromEntries(formData.entries()))
-    const number = params.number;
+        const number = params.number;
     try {
         const dial = twiml.dial({
             callerId: formData.get('From'),

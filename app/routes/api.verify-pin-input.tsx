@@ -1,5 +1,3 @@
-import { json } from "@remix-run/node";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
 import Twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
 

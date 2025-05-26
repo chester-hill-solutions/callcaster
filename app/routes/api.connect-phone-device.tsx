@@ -3,7 +3,9 @@ import { createSupabaseServerClient } from "~/lib/supabase.server";
 import { twilio } from "~/twilio.server";
 
 export const action = async ({ request }: { request: Request }) => {
-    const { supabaseClient: supabase, headers, user } = await createSupabaseServerClient(request);
+    const { supabaseClient: supabase, headers } = await createSupabaseServerClient(request);
+    const { data, error } = await supabase.auth.getUser();
+    const user = data.user;
     if (!user) {
         return json({ error: "Unauthorized" }, { status: 401 });
     }
