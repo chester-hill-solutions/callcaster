@@ -66,7 +66,7 @@ export default function Workspace() {
   const context = useOutletContext<ContextType>();
 
   return (
-    <main className="container mx-auto flex min-h-[80vh] flex-col py-10">
+    <main className="container mx-auto flex min-h-[80vh] flex-col pt-10 pb-20">
       <Suspense fallback={<div>Loading workspace...</div>}>
         <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
           {(resolvedData: any) => {
@@ -101,7 +101,7 @@ export default function Workspace() {
                       />
                     </div>
                   </div>
-                  <div className="flex flex-auto flex-col contain-content overflow-hidden">
+                  <div className="flex flex-auto flex-col contain-content">
                     {!outlet ? (
                       <CampaignEmptyState
                         hasAccess={Boolean(userRole === "admin" || userRole === "owner")}

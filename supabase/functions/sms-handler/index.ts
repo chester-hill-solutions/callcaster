@@ -6,6 +6,149 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+
+// Link shortening function using TinyURL API
+async function shortenUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    if (response.ok) {
+      const shortenedUrl = await response.text();
+      return shortenedUrl;
+    }
+  } catch (error) {
+    console.error('Error shortening URL:', error);
+  }
+  return url; // Return original URL if shortening fails
+}
+
+// Process URLs in text and shorten them
+async function processUrls(text: string): Promise<string> {
+  // Regex to match URLs
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  
+  let processedText = text;
+  const urlMatches = text.match(urlRegex);
+  
+  if (urlMatches) {
+    for (const url of urlMatches) {
+      const shortenedUrl = await shortenUrl(url);
+      processedText = processedText.replace(url, shortenedUrl);
+    }
+  }
+  
+  return processedText;
+}
+
+function processTemplateTags(text: string, contact: any): string {
+  if (!text || !contact) return text;
+
+  const processBraces = (input: string): string => {
+    // First, handle {{field|"fallback"}} pattern with quoted fallback
+    let result = input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"([^"]+)"\s*\}\}/g, (match, field, fallback) => {
+      let value = '';
+      switch (field) {
+        case 'firstname':
+          value = contact.firstname || '';
+          break;
+        case 'surname':
+          value = contact.surname || '';
+          break;
+        case 'fullname':
+          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
+          break;
+        case 'phone':
+          value = contact.phone || '';
+          break;
+        case 'email':
+          value = contact.email || '';
+          break;
+        case 'address':
+          value = contact.address || '';
+          break;
+        case 'city':
+          value = contact.city || '';
+          break;
+        case 'province':
+          value = contact.province || '';
+          break;
+        case 'postal':
+          value = contact.postal || '';
+          break;
+        case 'country':
+          value = contact.country || '';
+          break;
+        case 'external_id':
+          value = contact.external_id || '';
+          break;
+        default:
+          value = '';
+      }
+      if (!value && typeof fallback === 'string') {
+        return fallback.trim();
+      }
+      return value || '';
+    });
+    
+    // Then, handle {{field}} pattern (without fallback)
+    result = result.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, field) => {
+      let value = '';
+      switch (field) {
+        case 'firstname':
+          value = contact.firstname || '';
+          break;
+        case 'surname':
+          value = contact.surname || '';
+          break;
+        case 'fullname':
+          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
+          break;
+        case 'phone':
+          value = contact.phone || '';
+          break;
+        case 'email':
+          value = contact.email || '';
+          break;
+        case 'address':
+          value = contact.address || '';
+          break;
+        case 'city':
+          value = contact.city || '';
+          break;
+        case 'province':
+          value = contact.province || '';
+          break;
+        case 'postal':
+          value = contact.postal || '';
+          break;
+        case 'country':
+          value = contact.country || '';
+          break;
+        case 'external_id':
+          value = contact.external_id || '';
+          break;
+        default:
+          value = '';
+      }
+      return value || '';
+    });
+    
+    return result;
+  };
+
+  const processFunctions = (input: string): string => {
+     return input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
+      const processed = processBraces(inner);
+      try {
+        return btoa(processed);
+      } catch (e) {
+        return '';
+      }
+    });
+  };
+  let result = processFunctions(text);
+  result = processBraces(result);
+  return result;
+}
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 const functionHeaders = {
   Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
@@ -129,8 +272,11 @@ const sendMessage = async ({
       throw new Error("Failed to create outreach attempt");
     }
 
+    // Process URLs in the message body to shorten them
+    const processedBody = await processUrls(body);
+
     const message = await twilio.messages.create({
-      body,
+      body: processedBody,
       to,
       from,
       statusCallback: `${baseUrl}sms-status`,
@@ -256,6 +402,24 @@ Deno.serve(async (req) => {
 
     if (detailsError) throw detailsError;
 
+    // Fetch contact data for template tag processing
+    const { data: contact, error: contactError } = await supabase
+      .from("contact")
+      .select("*")
+      .eq("id", contact_id)
+      .single();
+
+    if (contactError) {
+      console.error("Error fetching contact:", contactError);
+      // Continue without template processing if contact fetch fails
+    }
+
+    // Process template tags in the message body
+    let processedBody = campaignDetails.body_text;
+    if (contact && campaignDetails.body_text) {
+      processedBody = processTemplateTags(campaignDetails.body_text, contact);
+    }
+
     const media = campaignDetails.message_media?.length
       ? await Promise.all(
         campaignDetails.message_media.map((mediaItem: string) =>
@@ -268,7 +432,7 @@ Deno.serve(async (req) => {
       : [];
 
     const result = await sendMessage({
-      body: campaignDetails.body_text,
+      body: processedBody,
       media: media.filter(Boolean) as string[],
       to: normalizePhoneNumber(to_number),
       from: caller_id,

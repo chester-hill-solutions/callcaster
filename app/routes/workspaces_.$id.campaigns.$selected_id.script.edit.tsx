@@ -329,7 +329,7 @@ export default function ScriptEditor() {
 
   return (
     <>
-      <div className="relative flex h-full flex-col overflow-visible">
+      <div className="relative flex h-full flex-col">
         {isChanged && (
           <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
             <Button

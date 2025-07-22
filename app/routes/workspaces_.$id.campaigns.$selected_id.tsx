@@ -187,6 +187,7 @@ export default function CampaignScreen() {
     : !campaignData?.caller_id
       ? "No outbound phone number selected"
       : null;
+  console.log(joinDisabled, scheduleDisabled);
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
