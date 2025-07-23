@@ -249,6 +249,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label htmlFor={questionId}>{question.question_text}</Label>
             <Input
+              className="bg-white text-black"
               id={questionId}
               value={currentAnswer || ""}
               onChange={(e) => handleAnswerChange(questionId, e.target.value)}
@@ -263,6 +264,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label htmlFor={questionId}>{question.question_text}</Label>
             <Textarea
+              className="bg-white text-black"
               id={questionId}
               value={currentAnswer || ""}
               onChange={(e) => handleAnswerChange(questionId, e.target.value)}
@@ -317,7 +319,7 @@ export default function SurveyPage() {
                       
                       debouncedSave(questionId, answerValue);
                     }}
-                    className="w-full"
+                    className="w-full bg-white text-black"
                   />
                 </div>
               )}
@@ -380,7 +382,7 @@ export default function SurveyPage() {
                       
                       debouncedSave(questionId, processedValues);
                     }}
-                    className="w-full"
+                    className="w-full bg-white text-black"
                   />
                 </div>
               )}
