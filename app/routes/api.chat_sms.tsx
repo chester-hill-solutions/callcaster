@@ -2,6 +2,39 @@ import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance } from '../lib/database.server';
 import { Database } from '~/lib/database.types';
 import { verifyAuth } from '~/lib/supabase.server';
+import { processTemplateTags } from '~/lib/utils';
+
+// Link shortening function using TinyURL API
+async function shortenUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    if (response.ok) {
+      const shortenedUrl = await response.text();
+      return shortenedUrl;
+    }
+  } catch (error) {
+    console.error('Error shortening URL:', error);
+  }
+  return url; // Return original URL if shortening fails
+}
+
+// Process URLs in text and shorten them
+async function processUrls(text: string): Promise<string> {
+  // Regex to match URLs
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  
+  let processedText = text;
+  const urlMatches = text.match(urlRegex);
+  
+  if (urlMatches) {
+    for (const url of urlMatches) {
+      const shortenedUrl = await shortenUrl(url);
+      processedText = processedText.replace(url, shortenedUrl);
+    }
+  }
+  
+  return processedText;
+}
 
 const normalizePhoneNumber = (input: string) => {
     let cleaned = input.replace(/[^0-9+]/g, '');
@@ -25,8 +58,11 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
     const mediaData = media && JSON.parse(media);
     const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: workspace });
     try {
+        // Process URLs in the message body to shorten them
+        const processedBody = await processUrls(body);
+        
         const message = await twilio.messages.create({
-            body,
+            body: processedBody,
             to,
             from,
             statusCallback: `${process.env.BASE_URL}/api/sms/status`,
@@ -119,8 +155,8 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
                 }
                 
             }
-            return { message, data, webhook };
         }
+        return { message, data, webhook };
     } catch (error) {
         console.log(`Error sending message: ${error}`);
         return { error: 'Failed to send message' };
@@ -144,8 +180,22 @@ export const action = async ({ request }: { request: Request }) => {
     }
 
     try {
+        // Fetch contact data for template tag processing
+        let processedBody = body || " ";
+        if (contact_id && body) {
+            const { data: contact, error: contactError } = await supabaseClient
+                .from("contact")
+                .select("*")
+                .eq("id", Number(contact_id))
+                .single();
+
+            if (!contactError && contact) {
+                processedBody = processTemplateTags(body, contact);
+            }
+        }
+
         const { message, data } = await sendMessage({
-            body: body || " ",
+            body: processedBody,
             media,
             to,
             from: caller_id,

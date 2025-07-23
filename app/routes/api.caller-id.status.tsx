@@ -18,7 +18,7 @@ interface Capabilities {
 
 export const action: ActionFunction = async ({ request }) => {
   const formData = await request.formData();
-  const parsedBody: FormData = Object.fromEntries(formData);
+  const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
   const supabase: SupabaseClient = createClient(
     process.env.SUPABASE_URL!,
@@ -36,7 +36,7 @@ export const action: ActionFunction = async ({ request }) => {
       };
 
       const { data: numberRequest, error: numberError } = await supabase
-        .from<WorkspaceNumbers>('workspace_number')
+        .from('workspace_number')
         .update({ capabilities })
         .eq('phone_number', parsedBody.To)
         .select();

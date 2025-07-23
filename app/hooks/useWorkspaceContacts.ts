@@ -63,18 +63,18 @@ export function useRealtimeData<T>(supabase: SupabaseClient, workspace_id: strin
                 }, handlePayload)
                 .subscribe(async (status) => {
                     if (status === 'SUBSCRIBED') {
-                        console.log(`Successfully subscribed to ${table} changes`);
+                        // console.log(`Successfully subscribed to ${table} changes`);
                     } else if (status === 'CLOSED') {
-                        console.log(`${table} subscription closed`);
+                        // console.log(`${table} subscription closed`);
                     } else if (status === 'CHANNEL_ERROR') {
-                        console.error(`Error subscribing to ${table} changes`);
+                        // console.error(`Error subscribing to ${table} changes`);
                         setState(prev => ({ ...prev, error: new Error('Failed to subscribe to realtime updates') }));
                     }
                 });
         }
 
         function handlePayload(payload: any) {
-            console.log('Realtime payload:', payload);
+            // console.log('Realtime payload:', payload);
             try {
                 switch (payload.eventType) {
                     case 'INSERT':

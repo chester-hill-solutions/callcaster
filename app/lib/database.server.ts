@@ -12,6 +12,7 @@ import {
   Call,
   Campaign,
   CampaignAudience,
+  CampaignSchedule,
   Contact,
   OutreachAttempt,
   Script,
@@ -1905,9 +1906,11 @@ export async function cancelQueuedMessages(twilio: typeof Twilio, supabase: Supa
   };
 }
 
-export function checkSchedule(campaignData: { start_date: string, end_date: string, schedule: { [key: string]: { active: boolean, intervals: { start: string, end: string }[] } } } | null) {
+export function checkSchedule(campaignData: Campaign) {
   if (!campaignData) return false;
   const { start_date, end_date, schedule } = campaignData;
+  if (!schedule) return false;  
+  const scheduleObject = typeof schedule === "string" ? JSON.parse(schedule) : schedule as unknown as CampaignSchedule;
   const now = new Date();
   const utcNow = new Date(Date.UTC(
     now.getUTCFullYear(),
@@ -1918,8 +1921,7 @@ export function checkSchedule(campaignData: { start_date: string, end_date: stri
     now.getUTCSeconds()
   ));
 
-
-  if (!(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
+  if (!start_date || !end_date || !(utcNow > new Date(start_date) && utcNow < new Date(end_date))) {
     return false;
   }
 
@@ -1932,16 +1934,14 @@ export function checkSchedule(campaignData: { start_date: string, end_date: stri
     "thursday",
     "friday",
     "saturday",
-  ];
-  if (!schedule || !Object.keys(schedule).length) return false;
-
-  const todaySchedule = schedule[daysOfWeek[currentDay]];
+  ] 
+  const todaySchedule = scheduleObject[daysOfWeek[currentDay]];
   if (!todaySchedule.active) {
     return false;
   }
 
   const currentTime = utcNow.toISOString().slice(11, 16);
-  return todaySchedule.intervals.some((interval) => {
+  return todaySchedule.intervals.some((interval: { start: string, end: string }) => {
     if (interval.end < interval.start) {
       return currentTime >= interval.start || currentTime < interval.end;
     }

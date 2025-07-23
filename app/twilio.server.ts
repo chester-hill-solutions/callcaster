@@ -1,4 +1,4 @@
-import * as Twilio from 'twilio';
+import Twilio from 'twilio';
 
 export const twilio: Twilio = singleton<Twilio>(
   'twilio',

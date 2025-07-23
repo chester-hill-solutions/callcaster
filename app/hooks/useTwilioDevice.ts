@@ -17,7 +17,7 @@ interface TwilioDeviceHook {
   deviceIsBusy: boolean;
 }
 
-export function useTwilioDevice(token: string, workspaceId: string, send: (action: { type: string }) => void): TwilioDeviceHook {
+export function useTwilioDevice(token: string, selectedDevice: string, workspaceId: string, send: (action: { type: string }) => void): TwilioDeviceHook {
     const deviceRef = useRef<Device | null>(null);
     const [status, setStatus] = useState<string>('disconnected');
     const [error, setError] = useState<Error | null>(null);
@@ -130,9 +130,7 @@ export function useTwilioDevice(token: string, workspaceId: string, send: (actio
             return;
         }
 
-        const device = new Device(token, {
-            debug: true
-        });
+        const device = new Device(token);
         deviceRef.current = device;
 
         const eventHandlers: { [key: string]: (...args: any[]) => void } = {

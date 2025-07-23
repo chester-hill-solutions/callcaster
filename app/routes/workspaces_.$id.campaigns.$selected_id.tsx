@@ -126,7 +126,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchQueueCounts(supabaseClient, selected_id),
     fetchCampaignData(supabaseClient, selected_id),
-    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id })
+    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id }),
   ]);
   if (!campaignType || !campaignType.data) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -235,7 +235,7 @@ export default function CampaignScreen() {
           campaignDetails,
           scheduleDisabled,
           phoneNumbers,
-          workspace
+          workspace,
         }}
       />
     </div>

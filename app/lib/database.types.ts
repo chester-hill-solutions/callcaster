@@ -1213,6 +1213,7 @@ export type Json =
             last_name: string | null
             organization: number | null
             username: string
+            verified_audio_numbers: string[] | null
           }
           Insert: {
             access_level?: string | null
@@ -1223,6 +1224,7 @@ export type Json =
             last_name?: string | null
             organization?: number | null
             username?: string
+            verified_audio_numbers?: string[] | null
           }
           Update: {
             access_level?: string | null
@@ -1233,6 +1235,7 @@ export type Json =
             last_name?: string | null
             organization?: number | null
             username?: string
+            verified_audio_numbers?: string[] | null
           }
           Relationships: []
         }
@@ -1487,6 +1490,289 @@ export type Json =
               referencedRelation: "workspace"
               referencedColumns: ["id"]
             },
+          ]
+        }
+        phone_verification: {
+          Row: {
+            id: string
+            user_id: string
+            phone_number: string
+            pin: string
+            expires_at: string
+            created_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            phone_number: string
+            pin: string
+            expires_at: string
+            created_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            phone_number?: string
+            pin?: string
+            expires_at?: string
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "phone_verification_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "users"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        survey: {
+          Row: {
+            id: number
+            survey_id: string
+            title: string
+            workspace: string
+            is_active: boolean
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: number
+            survey_id: string
+            title?: string
+            workspace: string
+            is_active?: boolean
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: number
+            survey_id?: string
+            title?: string
+            workspace?: string
+            is_active?: boolean
+            created_at?: string
+            updated_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "survey_workspace_fkey"
+              columns: ["workspace"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        survey_page: {
+          Row: {
+            id: number
+            survey_id: number
+            page_id: string
+            title: string
+            page_order: number
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: number
+            survey_id: number
+            page_id: string
+            title: string
+            page_order: number
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: number
+            survey_id?: number
+            page_id?: string
+            title?: string
+            page_order?: number
+            created_at?: string
+            updated_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "survey_page_survey_fkey"
+              columns: ["survey_id"]
+              isOneToOne: false
+              referencedRelation: "survey"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        survey_question: {
+          Row: {
+            id: number
+            page_id: number
+            question_id: string
+            question_text: string
+            question_type: string
+            is_required: boolean
+            question_order: number
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: number
+            page_id: number
+            question_id: string
+            question_text: string
+            question_type: string
+            is_required?: boolean
+            question_order: number
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: number
+            page_id?: number
+            question_id?: string
+            question_text?: string
+            question_type?: string
+            is_required?: boolean
+            question_order?: number
+            created_at?: string
+            updated_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "survey_question_page_fkey"
+              columns: ["page_id"]
+              isOneToOne: false
+              referencedRelation: "survey_page"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        question_option: {
+          Row: {
+            id: number
+            question_id: number
+            option_value: string
+            option_label: string
+            option_order: number
+            created_at: string
+          }
+          Insert: {
+            id?: number
+            question_id: number
+            option_value: string
+            option_label: string
+            option_order: number
+            created_at?: string
+          }
+          Update: {
+            id?: number
+            question_id?: number
+            option_value?: string
+            option_label?: string
+            option_order?: number
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "question_option_question_fkey"
+              columns: ["question_id"]
+              isOneToOne: false
+              referencedRelation: "survey_question"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        survey_response: {
+          Row: {
+            id: number
+            survey_id: number
+            result_id: string
+            contact_id: number | null
+            started_at: string
+            completed_at: string | null
+            last_page_completed: string | null
+            created_at: string
+            updated_at: string
+          }
+          Insert: {
+            id?: number
+            survey_id: number
+            result_id: string
+            contact_id?: number | null
+            started_at?: string
+            completed_at?: string | null
+            last_page_completed?: string | null
+            created_at?: string
+            updated_at?: string
+          }
+          Update: {
+            id?: number
+            survey_id?: number
+            result_id?: string
+            contact_id?: number | null
+            started_at?: string
+            completed_at?: string | null
+            last_page_completed?: string | null
+            created_at?: string
+            updated_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "survey_response_survey_fkey"
+              columns: ["survey_id"]
+              isOneToOne: false
+              referencedRelation: "survey"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "survey_response_contact_fkey"
+              columns: ["contact_id"]
+              isOneToOne: false
+              referencedRelation: "contact"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        response_answer: {
+          Row: {
+            id: number
+            response_id: number
+            question_id: number
+            answer_value: string
+            answered_at: string
+            created_at: string
+          }
+          Insert: {
+            id?: number
+            response_id: number
+            question_id: number
+            answer_value: string
+            answered_at?: string
+            created_at?: string
+          }
+          Update: {
+            id?: number
+            response_id?: number
+            question_id?: number
+            answer_value?: string
+            answered_at?: string
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "response_answer_response_fkey"
+              columns: ["response_id"]
+              isOneToOne: false
+              referencedRelation: "survey_response"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "response_answer_question_fkey"
+              columns: ["question_id"]
+              isOneToOne: false
+              referencedRelation: "survey_question"
+              referencedColumns: ["id"]
+            }
           ]
         }
       }

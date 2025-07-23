@@ -173,10 +173,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { error: deleteError } = await supabaseClient
       .from("contact_audience")
       .delete()
-      .in("contact_id", [contactId])
+      .in("contact_id", [Number(contactId)])
       .in(
         "audience_id",
-        deletions.map((d) => d?.audience_id),
+        deletions.map((d) => Number(d?.audience_id)),
       );
     if (deleteError) {
       console.error("Error deleting contact audiences:", deleteError);
