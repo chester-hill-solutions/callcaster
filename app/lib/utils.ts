@@ -3,6 +3,7 @@ import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
 import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
 import { OutreachExportData } from "./database.server";
+import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -503,8 +504,6 @@ export function flattenRow(row, users) {
   return flattenedRow;
 }
 
-
-
 export function generateCSVContent(headers: string[], data: Record<string, any>[]) {
   let csvContent = "\ufeff";
   csvContent += headers.map(escapeCSV).join(",") + "\n";
@@ -560,3 +559,84 @@ export const days = [
   "Saturday",
   "Sunday",
 ];
+
+/**
+ * Process template tags in message text by replacing them with contact data, supporting:
+ * - {field} and {field|fallback}
+ * - function calls like btoa(...), e.g. btoa({phone}:{external_id})
+ * - arbitrary text and multiple tags inside function calls
+ *
+ * @param text - The message text containing template tags
+ * @param contact - The contact object with field data
+ * @returns The processed text with template tags replaced
+ */
+export function processTemplateTags(text: string, contact: Contact): string {
+  if (!text || !contact) return text;
+
+  // Helper to process {field} and {field|fallback} inside a string
+  const processBraces = (input: string): string => {
+    return input.replace(/\{\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}/g, (match, field, fallback) => {
+      let value = '';
+      switch (field) {
+        case 'firstname':
+          value = contact.firstname || '';
+          break;
+        case 'surname':
+          value = contact.surname || '';
+          break;
+        case 'fullname':
+          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
+          break;
+        case 'phone':
+          value = contact.phone || '';
+          break;
+        case 'email':
+          value = contact.email || '';
+          break;
+        case 'address':
+          value = contact.address || '';
+          break;
+        case 'city':
+          value = contact.city || '';
+          break;
+        case 'province':
+          value = contact.province || '';
+          break;
+        case 'postal':
+          value = contact.postal || '';
+          break;
+        case 'country':
+          value = contact.country || '';
+          break;
+        case 'external_id':
+          value = contact.external_id || '';
+          break;
+        default:
+          value = '';
+      }
+      if (!value && typeof fallback === 'string') {
+        return fallback.trim();
+      }
+      return value || '';
+    });
+  };
+
+  // Process function calls like btoa(...)
+  const processFunctions = (input: string): string => {
+    // Support btoa(...) with nested {field} tags and text
+    return input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
+      const processed = processBraces(inner);
+      try {
+        return typeof window !== 'undefined' && window.btoa ? window.btoa(processed) : Buffer.from(processed, 'utf-8').toString('base64');
+      } catch (e) {
+        return '';
+      }
+    });
+  };
+
+  // First, process all function calls (which will process their inner {field} tags)
+  let result = processFunctions(text);
+  // Then, process any remaining {field} tags outside of function calls
+  result = processBraces(result);
+  return result;
+}

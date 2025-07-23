@@ -8,7 +8,6 @@ import {
   Links,
   LiveReload,
   Meta,
-  NavigateFunction,
   Outlet,
   Params,
   Scripts,
@@ -16,23 +15,17 @@ import {
   json,
   redirect,
   useLoaderData,
-  useLocation,
   useNavigate,
-  useRevalidator,
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect } from "react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
-import { ThemeProvider } from "./components/theme-provider";
-
 import Navbar from "~/components/Navbar";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
 import stylesheet from "~/tailwind.css";
-import { getUserWorkspaces } from "./lib/database.server";
 import { Database } from "./lib/database.types";
 
-import { Toaster } from "sonner";
 import { Session } from "@supabase/supabase-js";
 
 
@@ -61,9 +54,28 @@ export const links: LinksFunction = () => [
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const env: ENV = {
     SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_KEY: process.env.SUPABASE_ANON_KEY,
+    SUPABASE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
     BASE_URL: process.env.BASE_URL,
   };
+  
+  const url = new URL(request.url);
+  const qParam = url.searchParams.get('q');
+
+  // Check if this is a survey link with encoded contact and survey info
+  if (qParam) {
+    try {
+      const decoded = atob(qParam);
+      const [contactId, surveyId] = decoded.split(':');
+        
+      if (contactId && surveyId) {
+        return redirect(`/survey/${surveyId}?contact=${contactId}`);
+      }
+    } catch (error) {
+      // If decoding fails, continue with normal flow
+      console.error('Failed to decode survey link:', error);
+    }
+  }
+  
   const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
   const { data: { session } } = await supabase.auth.getSession();
   const user = await supabase.auth.getUser();
@@ -108,7 +120,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 export default function App() {
   const { env, session, workspaces, user, params } = useLoaderData<LoaderData>();
-  const { revalidate } = useRevalidator();
 
   const supabase = createBrowserClient<Database>(
     env.SUPABASE_URL!,
@@ -120,7 +131,7 @@ export default function App() {
 
   async function signOut(): Promise<TypedResponse<{ success: string | null; error: string | null }>> {
     const { error: signOutError } = await supabase.auth.signOut();
-    revalidate();
+
     if (signOutError) {
       return json({ success: null, error: signOutError.message });
     }
@@ -138,7 +149,7 @@ export default function App() {
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [serverAccessToken, supabase, revalidate]);
+  }, [serverAccessToken, supabase]);
 
   return (
     <html lang="en">

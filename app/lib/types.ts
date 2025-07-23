@@ -27,13 +27,79 @@ export type WorkspaceNumbers = Tables<"workspace_number"> | null;
 export type LiveCampaign = Tables<"live_campaign">;
 export type IVRCampaign = Tables<"ivr_campaign"> | null;
 export type MessageCampaign = Tables<"message_campaign"> | null;
-export type Script = {
-  id: number;
-  title: string;
-  content: Json;
-  created_at: string;
-  workspace: string;
+
+// Survey types
+export type Survey = Tables<"survey">;
+export type SurveyPage = Tables<"survey_page">;
+export type SurveyQuestion = Tables<"survey_question">;
+export type QuestionOption = Tables<"question_option">;
+export type SurveyResponse = Tables<"survey_response">;
+export type ResponseAnswer = Tables<"response_answer">;
+
+// Extended survey types with relationships
+export type SurveyWithPages = Survey & {
+  pages: SurveyPageWithQuestions[];
 };
+
+export type SurveyPageWithQuestions = SurveyPage & {
+  questions: SurveyQuestionWithOptions[];
+};
+
+export type SurveyQuestionWithOptions = SurveyQuestion & {
+  options: QuestionOption[];
+};
+
+export type SurveyResponseWithAnswers = SurveyResponse & {
+  answers: ResponseAnswer[];
+  contact?: Contact | null;
+};
+
+// Survey question types enum
+export type SurveyQuestionType = "text" | "radio" | "checkbox" | "textarea";
+
+// Survey form types
+export interface SurveyFormData {
+  survey_id: string;
+  title: string;
+  is_active: boolean;
+  pages: SurveyPageFormData[];
+}
+
+export interface SurveyPageFormData {
+  page_id: string;
+  title: string;
+  page_order: number;
+  questions: SurveyQuestionFormData[];
+}
+
+export interface SurveyQuestionFormData {
+  question_id: string;
+  question_text: string;
+  question_type: SurveyQuestionType;
+  is_required: boolean;
+  question_order: number;
+  options?: QuestionOptionFormData[];
+}
+
+export interface QuestionOptionFormData {
+  option_value: string;
+  option_label: string;
+  option_order: number;
+}
+
+// Survey response types
+export interface SurveyResponseData {
+  survey_id: number;
+  result_id: string;
+  contact_id?: number | null;
+  answers: SurveyAnswerData[];
+}
+
+export interface SurveyAnswerData {
+  question_id: number;
+  answer_value: string;
+}
+export type Script = Tables<"script">;
 export type QueueItem = Tables<"campaign_queue"> & {
   contact: Contact;
 };
@@ -216,15 +282,7 @@ export interface CallQuestionnaireProps {
   disabled: boolean;
 }
 
-export type ActiveCall = {
-  parameters: {
-    CallSid: string;
-    [key: string]: any;
-  };
-  mute: (state: boolean) => void;
-  _setInputTracksFromStream: (stream: MediaStream) => Promise<void>;
-  sendDigits: (digits: string) => void;
-};
+
 
 export interface CampaignSchedule {
   start_date: string;
@@ -297,25 +355,13 @@ export interface BaseCall {
   parameters?: CallParameters;
 }
 
-export interface Call extends BaseCall {
-  mute?: (state: boolean) => void;
-  _setInputTracksFromStream?: (stream: MediaStream) => Promise<void>;
-  sendDigits?: (digits: string) => void;
-}
+
 
 export interface ActiveCall extends Call {
   parameters: CallParameters;
   mute: (state: boolean) => void;
   _setInputTracksFromStream: (stream: MediaStream) => Promise<void>;
   sendDigits: (digits: string) => void;
-}
-
-export interface Script {
-  id: number;
-  title: string;
-  content: Json;
-  created_at: string;
-  workspace: string;
 }
 
 export interface CampaignDetails {
@@ -341,44 +387,6 @@ export interface CampaignSchedule {
   };
 }
 
-export interface QueueItem {
-  id: number;
-  campaign_id: number;
-  contact_id: string;
-  status: string;
-  attempts: number;
-  queue_order: number;
-  created_at: string;
-  contact: Contact;
-}
-
-export interface Contact {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  email: string | null;
-  address: string | null;
-  city: string | null;
-  state: string | null;
-  zip: string | null;
-  created_at: string;
-  updated_at: string | null;
-  workspace: string;
-}
-
-export interface OutreachAttempt {
-  id: number;
-  campaign_id: number;
-  contact_id: string;
-  user_id: string;
-  disposition: string | null;
-  notes: string | null;
-  created_at: string;
-  call_id: string | null;
-  call: Call | null;
-}
-
 export interface UseSupabaseRealtimeProps {
   user: AppUser;
   supabase: SupabaseClient<Database>;
@@ -400,15 +408,9 @@ export interface UseSupabaseRealtimeProps {
   setUpdate: (update: Record<string, unknown> | null) => void;
 }
 
-export interface Campaign {
-  id: number;
-  title: string;
-  dial_type: "predictive" | "call";
-  caller_id: string;
-  voicemail_file: string | null;
-  group_household_queue: boolean;
+// Utility function to generate survey links
+export function generateSurveyLink(contactId: number, surveyId: string, baseUrl: string): string {
+  const encoded = btoa(`${contactId}:${surveyId}`);
+  return `${baseUrl}/?q=${encoded}`;
 }
-
-// Re-export types from database.types.ts
-export type { OutreachAttempt, Campaign } from "./database.types";
     

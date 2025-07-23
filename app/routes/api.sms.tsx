@@ -3,6 +3,39 @@ import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
 } from "../lib/database.server";
+import { processTemplateTags } from "~/lib/utils";
+
+// Link shortening function using TinyURL API
+async function shortenUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
+    if (response.ok) {
+      const shortenedUrl = await response.text();
+      return shortenedUrl;
+    }
+  } catch (error) {
+    console.error('Error shortening URL:', error);
+  }
+  return url; // Return original URL if shortening fails
+}
+
+// Process URLs in text and shorten them
+async function processUrls(text: string): Promise<string> {
+  // Regex to match URLs
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  
+  let processedText = text;
+  const urlMatches = text.match(urlRegex);
+  
+  if (urlMatches) {
+    for (const url of urlMatches) {
+      const shortenedUrl = await shortenUrl(url);
+      processedText = processedText.replace(url, shortenedUrl);
+    }
+  }
+  
+  return processedText;
+}
 
 const normalizePhoneNumber = (input: string): string => {
   const cleaned = (input.replace(/[^0-9+]/g, ""))
@@ -70,9 +103,12 @@ const sendMessage = async ({
     workspace_id: workspace,
   });
 
+  // Process URLs in the message body to shorten them
+  const processedBody = await processUrls(body);
+
   const [message, outreachAttempt] = await Promise.all([
     twilio.messages.create({
-      body,
+      body: processedBody,
       to,
       from,
       statusCallback: `${process.env.BASE_URL}/api/sms/status`,
@@ -219,9 +255,15 @@ export const action = async ({ request }: { request: Request }) => {
     for (let i = 0; i < audience.length; i += BATCH_SIZE) {
       const batch = audience.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
-        batch.map(member => 
-          sendMessage({
-            body: campaign.body_text,
+        batch.map(async member => {
+          // Process template tags for this specific contact
+          let processedBody = campaign.body_text;
+          if (member.contact && campaign.body_text) {
+            processedBody = processTemplateTags(campaign.body_text, member.contact);
+          }
+          
+          return sendMessage({
+            body: processedBody,
             media: media.filter(Boolean) as string[],
             to: normalizePhoneNumber(member.contact?.phone || ''),
             from: caller_id,
@@ -234,8 +276,8 @@ export const action = async ({ request }: { request: Request }) => {
           }).then(
             result => ({ [member.contact_id]: { success: true, ...result }}),
             error => ({ [member.contact_id]: { success: false, error: error.message }})
-          )
-        )
+          );
+        })
       );
       results.push(...batchResults);
     }
