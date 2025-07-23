@@ -11,7 +11,7 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./CampaignDetailed.Live.Switches";
-import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script } from "~/lib/types";
+import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script, Survey } from "~/lib/types";
 import { AlertCircle } from "lucide-react";
 import { Tables } from "~/lib/database.types";
 
@@ -32,6 +32,8 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
   scheduleDisabled,
+  surveys,
+  handleNavigate,
 }: {
   campaignData: NonNullable<Campaign>,
   handleInputChange: (name: string, value: any) => void,
@@ -45,6 +47,8 @@ export const CampaignTypeSpecificSettings = ({
   isBusy: boolean,
   joinDisabled: string | null,
   scheduleDisabled: string | boolean,
+  surveys: Pick<Survey, "survey_id" | "title">[],
+  handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void,
 }) => {
   const isScriptRequired = !('script_id' in details) && !('body_text' in details);
 
@@ -121,7 +125,9 @@ export const CampaignTypeSpecificSettings = ({
             details={details as MessageCampaignDetails}
             campaignData={campaignData}
             onChange={handleInputChange}
-          />
+            surveys={surveys}
+            handleNavigate={handleNavigate}
+            />
           {isScriptRequired && (
             <p className="text-sm text-destructive flex items-center gap-1">
               <AlertCircle className="h-4 w-4" />

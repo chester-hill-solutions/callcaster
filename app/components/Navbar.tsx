@@ -121,10 +121,8 @@ export default function Navbar({
       setMobileMenuOpen(false);
       setLoc(location);
     }
-  }, [loc, location]);
-
-  
-  return loc.pathname.endsWith("call") ? (
+  }, [loc, location]);  
+  return loc.pathname.endsWith("call") || loc.pathname.includes("survey") && !loc.pathname.includes("workspaces") ? (
     <div></div>
   ) : (
     <header className={`w-full ${className}`}>

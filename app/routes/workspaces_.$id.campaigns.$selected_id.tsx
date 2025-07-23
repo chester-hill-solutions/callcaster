@@ -126,7 +126,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchQueueCounts(supabaseClient, selected_id),
     fetchCampaignData(supabaseClient, selected_id),
-    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id })
+    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id }),
   ]);
   if (!campaignType || !campaignType.data) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -187,7 +187,6 @@ export default function CampaignScreen() {
     : !campaignData?.caller_id
       ? "No outbound phone number selected"
       : null;
-  console.log(joinDisabled, scheduleDisabled);
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
@@ -236,7 +235,7 @@ export default function CampaignScreen() {
           campaignDetails,
           scheduleDisabled,
           phoneNumbers,
-          workspace
+          workspace,
         }}
       />
     </div>

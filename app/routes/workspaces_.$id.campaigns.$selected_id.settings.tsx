@@ -15,6 +15,7 @@ import {
   LiveCampaign,
   MessageCampaign,
   IVRCampaign,
+  Survey,
 } from "~/lib/types";
 import { Button } from "~/components/ui/button";
 import { useState } from "react";
@@ -39,7 +40,7 @@ type Context = {
   campaignDetails: CampaignDetails;
   scheduleDisabled: string | boolean;
   phoneNumbers: WorkspaceNumbers[];
-  workspace: WorkspaceData;
+  workspace: WorkspaceData; 
 };
 
 type ActionData = {
@@ -267,6 +268,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!selected_id || !workspace_id) return redirect("/");
 
   const campaignWithAudience = await fetchCampaignAudience(supabaseClient, selected_id, workspace_id);
+  const { data: surveys } = await supabaseClient.from('survey').select('survey_id, title').eq('workspace', workspace_id).eq('is_active', true);
   const { data: mediaData } = await supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`);
   const mediaLinksPromise = Promise.resolve(mediaData?.map((media) => media.name))
     .then((mediaNames) => mediaNames?.filter((media) => !media.startsWith("voicemail-")));
@@ -281,6 +283,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
     user: user,
     mediaLinks: mediaLinksPromise,
+    surveys,
   });
 };
 
@@ -293,7 +296,7 @@ export default function CampaignSettingsRoute() {
     campaignDetails,
     phoneNumbers,
     workspace,
-    scheduleDisabled
+    scheduleDisabled,
   } = useOutletContext<Context>();
 
   const {
@@ -306,6 +309,7 @@ export default function CampaignSettingsRoute() {
     mediaData,
     user,
     mediaLinks,
+    surveys,
   } = useLoaderData<typeof loader>();
 
   const navigate = useNavigate();
@@ -434,6 +438,7 @@ export default function CampaignSettingsRoute() {
         confirmStatus={confirmStatus}
         flags={{}}
         isChanged={false}
+        surveys={surveys || []}
       />
     </>
   );

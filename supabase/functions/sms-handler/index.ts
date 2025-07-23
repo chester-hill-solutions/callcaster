@@ -80,6 +80,9 @@ function processTemplateTags(text: string, contact: any): string {
         case 'external_id':
           value = contact.external_id || '';
           break;
+        case 'contact_id':
+          value = contact.id?.toString() || '';
+          break;
         default:
           value = '';
       }
@@ -126,6 +129,9 @@ function processTemplateTags(text: string, contact: any): string {
         case 'external_id':
           value = contact.external_id || '';
           break;
+        case 'contact_id':
+          value = contact.id?.toString() || '';
+          break;
         default:
           value = '';
       }
@@ -136,7 +142,8 @@ function processTemplateTags(text: string, contact: any): string {
   };
 
   const processFunctions = (input: string): string => {
-     return input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
+    // Process btoa functions
+    let result = input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
       const processed = processBraces(inner);
       try {
         return btoa(processed);
@@ -144,6 +151,27 @@ function processTemplateTags(text: string, contact: any): string {
         return '';
       }
     });
+    
+    // Process survey functions
+    result = result.replace(/survey\(([^)]*)\)/g, (match, inner) => {
+      const processed = processBraces(inner);
+      // Expected format: contact_id, "survey_id"
+      const parts = processed.split(',').map(part => part.trim());
+      if (parts.length >= 2) {
+        const contactId = parts[0];
+        const surveyId = parts[1].replace(/"/g, ''); // Remove quotes
+        
+        if (contactId && surveyId) {
+          // Generate the survey link
+          const encoded = btoa(`${contactId}:${surveyId}`);
+          const baseUrl = "https://callcaster.com";
+          return `${baseUrl}/?q=${encoded}`;
+        }
+      }
+      return ''; // Return empty string if parsing fails
+    });
+    
+    return result;
   };
   let result = processFunctions(text);
   result = processBraces(result);

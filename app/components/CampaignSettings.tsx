@@ -15,6 +15,7 @@ import {
   CampaignAudience,
   Flags,
   Schedule,
+  Survey,
   Script,
   WorkspaceNumbers,
 } from "~/lib/types";
@@ -62,6 +63,7 @@ export type CampaignSettingsProps = {
   handleConfirmStatus: (status: "play" | "archive" | "none" | "queue") => void;
   confirmStatus: "play" | "archive" | "none" | "queue";
   credits: number;
+  surveys: Pick<Survey, "survey_id" | "title">[];
 };
 
 export const CampaignSettings = ({
@@ -88,7 +90,8 @@ export const CampaignSettings = ({
   handleNavigate,
   scheduleDisabled,
   handleConfirmStatus,
-  confirmStatus,
+  confirmStatus,  
+  surveys,  
 }: CampaignSettingsProps) => {
   const nav = useNavigation();
 
@@ -244,6 +247,8 @@ export const CampaignSettings = ({
                 isBusy={formFetcher.state !== "idle"}
                 joinDisabled={joinDisabled}
                 scheduleDisabled={scheduleDisabled}
+                surveys={surveys}
+                handleNavigate={handleNavigate}
               />
             </section>
 

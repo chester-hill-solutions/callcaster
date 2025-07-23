@@ -57,6 +57,25 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     SUPABASE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
     BASE_URL: process.env.BASE_URL,
   };
+  
+  const url = new URL(request.url);
+  const qParam = url.searchParams.get('q');
+
+  // Check if this is a survey link with encoded contact and survey info
+  if (qParam) {
+    try {
+      const decoded = atob(qParam);
+      const [contactId, surveyId] = decoded.split(':');
+        
+      if (contactId && surveyId) {
+        return redirect(`/survey/${surveyId}?contact=${contactId}`);
+      }
+    } catch (error) {
+      // If decoding fails, continue with normal flow
+      console.error('Failed to decode survey link:', error);
+    }
+  }
+  
   const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
   const { data: { session } } = await supabase.auth.getSession();
   const user = await supabase.auth.getUser();
