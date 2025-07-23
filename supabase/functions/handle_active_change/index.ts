@@ -144,6 +144,16 @@ const handlePauseCampaign = async (
           .in('sid', calls.map((call) => call.sid))
         if (callUpdateError) console.error('Error marking calls as cancelled', callUpdateError);
         
+        // Update outreach_attempt timestamps for canceled calls
+        const { error: outreachUpdateError } = await supabase
+          .from('outreach_attempt')
+          .update({ 
+            ended_at: new Date().toISOString(),
+            disposition: 'canceled'
+          })
+          .in('id', calls.map((call) => call.outreach_attempt_id).filter(Boolean))
+        if (outreachUpdateError) console.error('Error updating outreach attempt timestamps', outreachUpdateError);
+        
         // Re-queue any which did not get sent for the next run.
         const { error: queueUpdateError } = await supabase
           .from("campaign_queue")

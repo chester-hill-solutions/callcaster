@@ -315,7 +315,10 @@ const sendMessage = async ({
       // Update outreach attempt as failed
       await supabase
         .from("outreach_attempt")
-        .update({ disposition: "failed" })
+        .update({ 
+          disposition: "failed",
+          ended_at: new Date().toISOString()
+        })
         .eq("id", outreachAttemptId);
       throw message.error;
     }
@@ -353,7 +356,10 @@ const sendMessage = async ({
       // Update outreach attempt as failed if message insert fails
       await supabase
         .from("outreach_attempt")
-        .update({ disposition: "failed" })
+        .update({ 
+          disposition: "failed",
+          ended_at: new Date().toISOString()
+        })
         .eq("id", outreachAttemptId);
       throw messageInsertError;
     }
@@ -363,7 +369,10 @@ const sendMessage = async ({
     if (outreachAttemptId) {
       await supabase
         .from("outreach_attempt")
-        .update({ disposition: "failed" })
+        .update({ 
+          disposition: "failed",
+          ended_at: new Date().toISOString()
+        })
         .eq("id", outreachAttemptId);
     }
     console.error("Error in SMS handler:", error);

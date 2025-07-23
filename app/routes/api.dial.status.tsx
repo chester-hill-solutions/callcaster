@@ -31,14 +31,21 @@ export const action:ActionFunction = async ({ request }: ActionFunctionArgs) => 
         if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
             try {
                 if (data && data.signedUrl) {
-                    const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'voicemail' }).eq('id', dbCall.outreach_attempt_id).select();
+                    const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ 
+                        disposition: 'voicemail',
+                        answered_at: new Date().toISOString(),
+                        ended_at: new Date().toISOString()
+                    }).eq('id', dbCall.outreach_attempt_id).select();
                     if (outreachError) throw outreachError
                     call.update({
                         twiml: `<Response><Pause length="5"/><Play>${data.signedUrl}</Play></Response>`
                     })
                     return json({ success: true });
                 } else {
-                    const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ disposition: 'no-answer' }).eq('id', dbCall.outreach_attempt_id).select();
+                    const { data: outreachStatus, error: outreachError } = await supabase.from('outreach_attempt').update({ 
+                        disposition: 'no-answer',
+                        ended_at: new Date().toISOString()
+                    }).eq('id', dbCall.outreach_attempt_id).select();
                     if (outreachError) throw outreachError
                     call.update({
                         twiml: `<Response><Hangup/></Response>`
@@ -52,7 +59,16 @@ export const action:ActionFunction = async ({ request }: ActionFunctionArgs) => 
         } else {
             const { data, error } = await supabase.from('call').upsert({ sid: parsedBody.CallSid, answered_by: answeredBy }, { onConflict: 'sid' }).select();
             if (error) throw { callError: error }
-            const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update({ answered_at: new Date() }).eq('id', dbCall.outreach_attempt_id).select();
+            
+            // Update outreach attempt with answered_at timestamp
+            const outreachUpdate: any = { answered_at: new Date().toISOString() };
+            
+            // Set ended_at if call is completed, failed, busy, or no-answer
+            if (callStatus && ["completed", "failed", "busy", "no-answer", "canceled"].includes(callStatus)) {
+                outreachUpdate.ended_at = new Date().toISOString();
+            }
+            
+            const { data: attempt, error: attemptError } = await supabase.from('outreach_attempt').update(outreachUpdate).eq('id', dbCall.outreach_attempt_id).select();
             if (attemptError) throw { attemptError };
             return json({ success: true, data, attempt });
         }

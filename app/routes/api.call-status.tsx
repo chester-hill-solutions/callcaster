@@ -1,12 +1,12 @@
 import { json } from '@remix-run/react';
 import { createClient } from '@supabase/supabase-js';
 
-function toUnderCase(str) {
+function toUnderCase(str: string) {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
 }
 
-function convertKeysToUnderCase(obj) {
-    const newObj = {};
+function convertKeysToUnderCase(obj: any) {
+    const newObj: { [key: string]: any } = {};
     for (const key in obj) {
         if (obj.hasOwnProperty(key)) {
             newObj[toUnderCase(key)] = obj[key];
@@ -15,12 +15,12 @@ function convertKeysToUnderCase(obj) {
     return newObj;
 }
 
-export const action = async ({ request }) => {
+export const action = async ({ request }: { request: Request }) => {
     const formData = await request.formData();
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     const userId = formData.get('CalledVia').split(":")[1];
     const realtime = supabase.realtime.channel(userId)
-    const parsedBody = {};
+    const parsedBody: { [key: string]: string } = {};
 
     for (const pair of formData.entries()) {
         parsedBody[pair[0]] = pair[1];
@@ -76,15 +76,37 @@ export const action = async ({ request }) => {
     });
     
     if (["initiated", "ringing", "in-progress", "idle"].includes(underCaseData.call_status)) {
+        const updateData: any = { disposition: underCaseData.call_status };
+        
+        // Set answered_at when call is answered (in-progress status)
+        if (underCaseData.call_status === 'in-progress') {
+            updateData.answered_at = new Date().toISOString();
+        }
+        
         const { data: updateAttempt, error: updateError } = await supabase
             .from('outreach_attempt')
-            .update({ disposition: underCaseData.call_status })
+            .update(updateData)
             .eq('id', data[0].outreach_attempt_id)
             .select();
 
         if (updateError) {
             console.error('Error updating attempt:', updateError);
             return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
+        }
+    }
+    
+    // Update ended_at when call is completed, failed, no-answer, or busy
+    if (["completed", "failed", "no-answer", "busy", "canceled"].includes(underCaseData.call_status)) {
+        const { error: endTimeError } = await supabase
+            .from('outreach_attempt')
+            .update({ 
+                ended_at: new Date().toISOString(),
+                disposition: underCaseData.call_status
+            })
+            .eq('id', data[0].outreach_attempt_id);
+
+        if (endTimeError) {
+            console.error('Error updating attempt end time:', endTimeError);
         }
     }
     const onePerSixty = (duration) => {

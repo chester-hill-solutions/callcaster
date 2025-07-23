@@ -101,9 +101,20 @@ const handleCallStatus = async (
       status: status?.toLowerCase() as Tables<"call">["status"],
       duration: duration.toString()
     });
+    
+    // Update outreach attempt with disposition and ended_at timestamp
+    const outreachUpdate: any = { 
+      disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] 
+    };
+    
+    // Set ended_at when call is completed, failed, busy, or no-answer
+    if (["completed", "failed", "busy", "no-answer", "canceled"].includes(status?.toLowerCase() || "")) {
+      outreachUpdate.ended_at = new Date().toISOString();
+    }
+    
     const outreachStatus = await updateOutreachAttempt(
       callUpdate.outreach_attempt_id,
-      { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
+      outreachUpdate,
     );
     await updateTransaction(callUpdate, duration);
 
@@ -165,6 +176,22 @@ const handleParticipantLeave = async (
       duration: Math.max(Number(parsedBody.Duration), Number(parsedBody.CallDuration)).toString(),
       status: parsedBody?.CallStatus?.toLowerCase() as Tables<"call">["status"]
     });
+    
+    // Update outreach attempt with ended_at timestamp
+    if (dbCall.outreach_attempt_id) {
+      const { error: outreachError } = await supabase
+        .from('outreach_attempt')
+        .update({ 
+          ended_at: new Date().toISOString(),
+          disposition: 'completed'
+        })
+        .eq('id', dbCall.outreach_attempt_id);
+        
+      if (outreachError) {
+        console.error("Error updating outreach attempt end time", outreachError);
+      }
+    }
+    
     const { data: outreachStatus, error: outreachError } = await supabase
       .from('outreach_attempt')
       .select('*')

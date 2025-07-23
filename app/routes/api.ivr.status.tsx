@@ -71,7 +71,11 @@ function findVoicemailPage(pagesObject: Script['steps']['pages'] | undefined): S
 
 const handleVoicemail = async (twilio: Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
     const call = twilio.calls(callSid);
-    await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date() });
+    await updateResult(supabase, dbCall.outreach_attempt_id?.toString(), { 
+        disposition: 'voicemail', 
+        answered_at: new Date().toISOString(),
+        ended_at: new Date().toISOString()
+    });
     const step = findVoicemailPage(campaign.ivr_campaign.script?.steps?.pages);
     if (!step) {
         await call.update({
@@ -101,9 +105,16 @@ const handleVoicemail = async (twilio: Twilio, callSid: string, dbCall: Call, ca
 };
 
 const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: string | undefined, disposition: string): Promise<void> => {
+    const outreachUpdate: any = { disposition };
+    
+    // Set ended_at when call is completed, failed, or no-answer
+    if (["completed", "failed", "no-answer", "busy", "canceled"].includes(status)) {
+        outreachUpdate.ended_at = new Date().toISOString();
+    }
+    
     await Promise.all([
         updateCallStatus(supabase, callSid, status, timestamp),
-        updateResult(supabase, outreach_attempt_id, { disposition })
+        updateResult(supabase, outreach_attempt_id, outreachUpdate)
     ]);
 };
 

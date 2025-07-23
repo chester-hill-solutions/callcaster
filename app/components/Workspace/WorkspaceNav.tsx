@@ -12,6 +12,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { name: "Campaigns", path: "", end: true },
+  { name: "Analytics", path: "analytics" },
   { name: "Chats", path: "chats" },
   { name: "Scripts", path: "scripts", callerHidden: true },
   { name: "Audio", path: "audios", callerHidden: true },

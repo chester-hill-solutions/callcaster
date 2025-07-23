@@ -67,20 +67,54 @@ const updateCallStatus = async (
   status: string,
   duration?: string
 ) => {
-  const updateData: Record<string, any> = { status };
-
-  if (duration) {
-    updateData.duration = parseInt(duration);
-  }
-
   const { error } = await supabase
     .from("call")
-    .update(updateData)
+    .update({
+      status,
+      duration,
+      date_updated: new Date().toISOString(),
+    })
     .eq("sid", callSid);
 
   if (error) {
     log('error', 'Failed to update call status', { error, callSid, status });
     throw error;
+  }
+
+  // Update outreach_attempt timestamps based on call status
+  const { data: callData } = await supabase
+    .from("call")
+    .select("outreach_attempt_id")
+    .eq("sid", callSid)
+    .single();
+
+  if (callData?.outreach_attempt_id) {
+    const updateData: any = {};
+    
+    // Set answered_at when call is answered (either 'answered' or 'in-progress' status)
+    if (status === 'answered' || status === 'in-progress') {
+      updateData.answered_at = new Date().toISOString();
+    }
+    
+    // Set ended_at when call is completed, failed, busy, no-answer, or canceled
+    if (['completed', 'failed', 'busy', 'no-answer', 'canceled'].includes(status)) {
+      updateData.ended_at = new Date().toISOString();
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      const { error: outreachError } = await supabase
+        .from("outreach_attempt")
+        .update(updateData)
+        .eq("id", callData.outreach_attempt_id);
+
+      if (outreachError) {
+        log('error', 'Failed to update outreach attempt timestamps', { 
+          error: outreachError, 
+          outreach_attempt_id: callData.outreach_attempt_id,
+          status 
+        });
+      }
+    }
   }
 };
 
