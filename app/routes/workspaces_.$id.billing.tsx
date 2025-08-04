@@ -85,8 +85,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     ],
     mode: "payment",
-    success_url: `${process.env.BASE_URL}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.BASE_URL}/workspaces/${workspaceId}/settings/credits?canceled=true`,
+    success_url: `https://callcaster.ca/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `https://callcaster.ca/workspaces/${workspaceId}/settings/credits?canceled=true`,
     metadata: {
       workspaceId,
       creditAmount: amount,
