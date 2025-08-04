@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { verifyAuth } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
 import { User } from "~/lib/types";
@@ -25,6 +25,10 @@ import type { AnalyticsMetrics } from "~/lib/analytics.types";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+  const pageSize = Math.min(100, Math.max(10, parseInt(url.searchParams.get("pageSize") || "25")));
+  const offset = (page - 1) * pageSize;
 
   if (!workspaceId) {
     throw new Response("Workspace ID is required", { status: 400 });
@@ -56,11 +60,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq('type', 'ivr')
     .order('created_at', { ascending: false });
 
-  // Fetch IVR calls for the last 7 days
+  // Fetch IVR calls for the last 7 days with pagination
   const lastWeek = new Date();
   lastWeek.setDate(lastWeek.getDate() - 7);
   
-  const { data: ivrCalls } = await supabaseClient
+  const { data: ivrCalls, count: totalCalls } = await supabaseClient
     .from('call')
     .select(`
       *,
@@ -73,11 +77,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         ended_at,
         result
       )
-    `)
+    `, { count: "exact" }
+    )
     .eq('workspace', workspaceId)
     .eq('campaign.type', 'ivr')
     .gte('date_created', lastWeek.toISOString())
-    .order('date_created', { ascending: false });
+    .order('date_created', { ascending: false })
+    .range(offset, offset + pageSize - 1);
 
   // Fetch IVR outreach attempts for metrics
   const { data: outreachAttempts } = await supabaseClient
@@ -109,8 +115,40 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .gte('created_at', lastWeek.toISOString())
     .order('created_at', { ascending: false });
 
+  // Fetch all scripts from IVR campaigns in this workspace to get questions
+  const { data: scriptsData } = await supabaseClient
+    .from("script")
+    .select(`
+      *,
+      ivr_campaign!inner(id, campaign!inner(id, workspace))
+    `)
+    .eq("ivr_campaign.campaign.workspace", workspaceId);
+
+  // Extract all unique questions from the script data
+  const allQuestions = new Set<string>();
+  (scriptsData || []).forEach(script => {
+    if (script.steps) {
+      try {
+        const steps = typeof script.steps === 'string' ? JSON.parse(script.steps) : script.steps;
+        if (steps && steps.pages) {
+          Object.values(steps.pages).forEach((page: any) => {
+            if (page.blocks) {
+              Object.values(page.blocks).forEach((block: any) => {
+                if (block.type === 'question' && block.question) {
+                  allQuestions.add(block.question);
+                }
+              });
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing script steps:', error);
+      }
+    }
+  });
+
   // Calculate IVR-specific metrics
-  const totalIVRCalls = (ivrCalls || []).length;
+  const totalIVRCalls = totalCalls || 0;
   const completedIVRCalls = (ivrCalls || []).filter(call => call.status === 'completed').length;
   const failedIVRCalls = (ivrCalls || []).filter(call => ['failed', 'busy', 'no-answer'].includes(call.status || '')).length;
   const voicemailIVRCalls = (ivrCalls || []).filter(call => call.answered_by === 'machine').length;
@@ -139,6 +177,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ivrCalls: (ivrCalls || []) as any,
     outreachAttempts: (outreachAttempts || []) as any,
     metrics,
+    allQuestions: Array.from(allQuestions),
+    pagination: {
+      currentPage: page,
+      pageSize,
+      totalCalls: totalCalls || 0,
+      totalPages: Math.ceil((totalCalls || 0) / pageSize),
+    },
     ivrMetrics: {
       totalIVRCalls,
       completedIVRCalls,
@@ -151,7 +196,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function IVRAnalyticsRoute() {
-  const { campaigns, ivrCalls, outreachAttempts, metrics, ivrMetrics } = useLoaderData<typeof loader>();
+  const { campaigns, ivrCalls, outreachAttempts, metrics, ivrMetrics, pagination, allQuestions } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const handlePageChange = (page: number) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("page", page.toString());
+    setSearchParams(newSearchParams);
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("pageSize", pageSize.toString());
+    newSearchParams.set("page", "1"); // Reset to first page when changing page size
+    setSearchParams(newSearchParams);
+  };
 
   const getStatusBadge = (status: string | null | undefined) => {
     if (!status) return <Badge variant="secondary">Unknown</Badge>;
@@ -398,65 +457,119 @@ export default function IVRAnalyticsRoute() {
             <span>Recent IVR Activity</span>
           </CardTitle>
           <CardDescription>
-            Recent IVR call activity from the last 7 days
+            {pagination ? (
+              <span className="text-muted-foreground">
+                Showing {ivrCalls.length} of {pagination.totalCalls} total calls
+              </span>
+            ) : (
+              <span>Recent IVR call activity from the last 7 days</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {ivrCalls.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No recent IVR activity</p>
+              <p>
+                {pagination && pagination.totalCalls === 0
+                  ? "No recent IVR activity" 
+                  : "No calls match your current filters"}
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Answered By</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Insights</TableHead>
-                  <TableHead>Started</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {ivrCalls.slice(0, 20).map((call) => (
-                  <TableRow key={call.sid}>
-                    <TableCell className="font-medium">
-                      {formatContactName(call.contact?.firstname, call.contact?.surname)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatPhoneNumber(call.contact?.phone)}
-                    </TableCell>
-                    <TableCell>
-                      {call.campaign?.title || 'Unknown'}
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(call.status)}
-                    </TableCell>
-                    <TableCell>
-                      {getAnsweredByBadge(call.answered_by)}
-                    </TableCell>
-                    <TableCell>
-                      {call.call_duration ? formatDuration(call.call_duration) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {Array.isArray(getIVRInsights(call)) ? 
-                          getIVRInsights(call) : 
-                          getIVRInsights(call)
-                        }
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(call.date_created), { addSuffix: true })}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Answered By</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Insights</TableHead>
+                    <TableHead>Started</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {ivrCalls.map((call) => (
+                    <TableRow key={call.sid}>
+                      <TableCell className="font-medium">
+                        {formatContactName(call.contact?.firstname, call.contact?.surname)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatPhoneNumber(call.contact?.phone)}
+                      </TableCell>
+                      <TableCell>
+                        {call.campaign?.title || 'Unknown'}
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(call.status)}
+                      </TableCell>
+                      <TableCell>
+                        {getAnsweredByBadge(call.answered_by)}
+                      </TableCell>
+                      <TableCell>
+                        {call.call_duration ? formatDuration(call.call_duration) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.isArray(getIVRInsights(call)) ? 
+                            getIVRInsights(call) : 
+                            getIVRInsights(call)
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(call.date_created), { addSuffix: true })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">Show:</span>
+                    <select
+                      value={pagination.pageSize}
+                      onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-muted-foreground">per page</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage - 1)}
+                        disabled={pagination.currentPage === 1}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage + 1)}
+                        disabled={pagination.currentPage === pagination.totalPages}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

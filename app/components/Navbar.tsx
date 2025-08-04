@@ -122,7 +122,7 @@ export default function Navbar({
       setLoc(location);
     }
   }, [loc, location]);  
-  return loc.pathname.endsWith("call") || loc.pathname.includes("survey") && !loc.pathname.includes("workspaces") ? (
+  return loc.pathname.endsWith("call") && !loc.pathname.includes("workspaces") || loc.pathname.includes("survey") && !loc.pathname.includes("workspaces") ? (
     <div></div>
   ) : (
     <header className={`w-full ${className}`}>

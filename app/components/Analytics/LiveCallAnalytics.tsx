@@ -15,6 +15,13 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
 import {
   Phone,
@@ -47,12 +54,17 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import { DataTableWithFilters, type FilterConfig, type FilterValues } from "./DataTableFilters";
+import TablePagination from "~/components/TablePagination";
 import { useMemo } from "react";
 
 export function LiveCallAnalytics({
   liveCalls,
   recentCalls,
   metrics,
+  pagination,
+  allQuestions: serverAllQuestions,
+  onPageChange,
+  onPageSizeChange,
 }: LiveCallAnalyticsProps) {
   // Filter configurations for live calls
   const liveCallFilterConfigs: FilterConfig[] = [
@@ -91,6 +103,17 @@ export function LiveCallAnalytics({
       key: "date",
       label: "Date",
       type: "date",
+    },
+    {
+      key: "question",
+      label: "Question",
+      type: "select",
+    },
+    {
+      key: "answer",
+      label: "Answer",
+      type: "search",
+      placeholder: "Search answers...",
     },
   ];
 
@@ -132,6 +155,17 @@ export function LiveCallAnalytics({
       label: "Date",
       type: "date",
     },
+    {
+      key: "question",
+      label: "Question",
+      type: "select",
+    },
+    {
+      key: "answer",
+      label: "Answer",
+      type: "search",
+      placeholder: "Search answers...",
+    },
   ];
 
   const getLiveCallFilterOptions = (data: Call[]) => {
@@ -140,11 +174,24 @@ export function LiveCallAnalytics({
     const campaigns = [...new Set(data.map(call => call.campaign?.title).filter(Boolean))] as string[];
     const answeredBy = [...new Set(data.map(call => call.answered_by).filter(Boolean))] as string[];
 
+    // Get all unique questions from the data
+    const allQuestions = new Set<string>();
+    data.forEach(call => {
+      const callQuestions = parseQuestionsAndAnswers(call);
+      callQuestions.forEach(q => {
+        // Only add questions that have actual content and aren't just IDs
+        if (q.question && !q.question.startsWith('page_') && !q.question.startsWith('block_')) {
+          allQuestions.add(q.question);
+        }
+      });
+    });
+
     return {
       status: statuses,
       user: users,
       campaign: campaigns,
       answeredBy: answeredBy,
+      question: Array.from(allQuestions),
     };
   };
 
@@ -154,11 +201,24 @@ export function LiveCallAnalytics({
     const campaigns = [...new Set(data.map(call => call.campaign?.title).filter(Boolean))] as string[];
     const answeredBy = [...new Set(data.map(call => call.answered_by).filter(Boolean))] as string[];
 
+    // Get all unique questions from the data
+    const allQuestions = new Set<string>();
+    data.forEach(call => {
+      const callQuestions = parseQuestionsAndAnswers(call);
+      callQuestions.forEach(q => {
+        // Only add questions that have actual content and aren't just IDs
+        if (q.question && !q.question.startsWith('page_') && !q.question.startsWith('block_')) {
+          allQuestions.add(q.question);
+        }
+      });
+    });
+
     return {
       status: statuses,
       user: users,
       campaign: campaigns,
       answeredBy: answeredBy,
+      question: Array.from(allQuestions),
     };
   };
 
@@ -221,31 +281,83 @@ export function LiveCallAnalytics({
       }
     }
 
+    // Question filter
+    if (filters.question) {
+      const callQuestions = parseQuestionsAndAnswers(call);
+      const hasQuestion = callQuestions.some(q => q.question === filters.question);
+      if (!hasQuestion) {
+        return false;
+      }
+    }
+
+    // Answer filter
+    if (filters.answer) {
+      const searchTerm = filters.answer.toLowerCase();
+      const callQuestions = parseQuestionsAndAnswers(call);
+      const hasMatchingAnswer = callQuestions.some(q => {
+        const answerText = formatAnswer(q.answer, q.questionType).toLowerCase();
+        return answerText.includes(searchTerm);
+      });
+      if (!hasMatchingAnswer) {
+        return false;
+      }
+    }
+
     return true;
   };
 
   // Get all unique questions from calls
   const getAllQuestions = () => {
+    // If server provided all questions, use those for consistent column headers
+    if (serverAllQuestions && serverAllQuestions.length > 0) {
+      return serverAllQuestions;
+    }
+    
+    // Fallback to extracting questions from current data
     const allQuestions = new Set<string>();
     
-    [...liveCalls, ...recentCalls].forEach(call => {
+    // For live calls, we can use all data since it's not paginated
+    liveCalls.forEach(call => {
       const callQuestions = parseQuestionsAndAnswers(call);
       callQuestions.forEach(q => {
-        allQuestions.add(q.question);
+        // Only add questions that have actual content and aren't just IDs
+        if (q.question && !q.question.startsWith('page_') && !q.question.startsWith('block_')) {
+          allQuestions.add(q.question);
+        }
+      });
+    });
+    
+    // For recent calls, we only have the current page data due to server-side pagination
+    // So we'll only show questions that exist in the current page
+    // Note: This means question columns may vary between pages
+    recentCalls.forEach(call => {
+      const callQuestions = parseQuestionsAndAnswers(call);
+      callQuestions.forEach(q => {
+        // Only add questions that have actual content and aren't just IDs
+        if (q.question && !q.question.startsWith('page_') && !q.question.startsWith('block_')) {
+          allQuestions.add(q.question);
+        }
       });
     });
     
     return Array.from(allQuestions);
   };
 
-  const questions: string[] = getAllQuestions();
+  const questions: string[] = getAllQuestions() || [];
 
   // Helper function to get answer for a specific question
   const getAnswerForQuestion = (call: Call, questionKey: string) => {
-    const callQuestions = parseQuestionsAndAnswers(call);
-    const question = callQuestions.find(q => q.question === questionKey);
-    return question ? formatAnswer(question.answer, question.questionType) : "-";
+    try {
+      const callQuestions = parseQuestionsAndAnswers(call);
+      const question = callQuestions.find(q => q.question === questionKey);
+      return question ? formatAnswer(question.answer, question.questionType) : "-";
+    } catch (error) {
+      console.error('Error getting answer for question:', error);
+      return "-";
+    }
   };
+
+
 
   // Helper function to get status badge
   const getStatusBadge = (status: CallStatus | null | undefined) => {
@@ -277,7 +389,10 @@ export function LiveCallAnalytics({
   const getDispositionBadge = (disposition?: string | null) => {
     if (!disposition) return <Badge variant="secondary">Unknown</Badge>;
 
-    switch (disposition.toLowerCase()) {
+    // Handle case where disposition might be an object
+    const dispositionStr = typeof disposition === 'string' ? disposition : String(disposition);
+
+    switch (dispositionStr.toLowerCase()) {
       case "answered":
         return <Badge variant="default">Answered</Badge>;
       case "no-answer":
@@ -290,8 +405,10 @@ export function LiveCallAnalytics({
         return <Badge variant="secondary">Voicemail</Badge>;
       case "hangup":
         return <Badge variant="secondary">Hangup</Badge>;
+      case "completed":
+        return <Badge variant="default">Completed</Badge>;
       default:
-        return <Badge variant="secondary">{disposition}</Badge>;
+        return <Badge variant="secondary">{dispositionStr}</Badge>;
     }
   };
 
@@ -405,10 +522,12 @@ export function LiveCallAnalytics({
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableHead>Phone</TableHead>
                 <TableHead>Campaign</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Call Status</TableHead>
+                <TableHead>Outcome</TableHead>
                 <TableHead>Answered By</TableHead>
-                <TableHead>Duration</TableHead>
+                <TableHead>Total Duration</TableHead>
                 <TableHead>Connected Time</TableHead>
                 <TableHead>Started</TableHead>
                 {questions.map((q, index) => (
@@ -431,22 +550,24 @@ export function LiveCallAnalytics({
                 return (
                   <TableRow key={call.sid}>
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {call.outreach_attempt?.user_id?.username ||
+                      <span className="font-medium">
+                        {call.outreach_attempt?.user_id?.username ||
+                          "Unknown"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-medium">
+                        {call.contact?.firstname && call.contact?.surname
+                          ? `${call.contact.firstname} ${call.contact.surname}`
+                          : call.contact?.firstname ||
+                            call.contact?.surname ||
                             "Unknown"}
-                        </span>
-                        <span className="font-medium">
-                          {call.contact?.firstname && call.contact?.surname
-                            ? `${call.contact.firstname} ${call.contact.surname}`
-                            : call.contact?.firstname ||
-                              call.contact?.surname ||
-                              "Unknown"}
-                        </span>
-                        <span className="text-sm text-muted-foreground">
-                          {call.contact?.phone || "No phone"}
-                        </span>
-                      </div>
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground">
+                        {call.contact?.phone || "No phone"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <span className="font-medium">
@@ -454,6 +575,9 @@ export function LiveCallAnalytics({
                       </span>
                     </TableCell>
                     <TableCell>{getStatusBadge(call.status)}</TableCell>
+                    <TableCell>
+                      {getDispositionBadge(call.outreach_attempt?.disposition)}
+                    </TableCell>
                     <TableCell>
                       {getAnsweredByBadge(call.answered_by)}
                     </TableCell>
@@ -533,11 +657,16 @@ export function LiveCallAnalytics({
           )}
         </CardTitle>
         <CardDescription>
-          Call activity from the last 24 hours
-          {filteredData.length !== recentCalls.length && (
-            <span className="ml-2 text-muted-foreground">
-              (filtered from {recentCalls.length} total)
+          {pagination ? (
+            <span className="text-muted-foreground">
+              Showing {filteredData.length} of {pagination.totalCalls} total calls
             </span>
+          ) : (
+            filteredData.length !== recentCalls.length && (
+              <span className="text-muted-foreground">
+                (filtered from {recentCalls.length} total)
+              </span>
+            )
           )}
         </CardDescription>
       </CardHeader>
@@ -575,116 +704,153 @@ export function LiveCallAnalytics({
           <div className="py-8 text-center text-muted-foreground">
             <Clock className="mx-auto mb-4 h-12 w-12 opacity-50" />
             <p>
-              {recentCalls.length === 0 
+              {pagination && pagination.totalCalls === 0
                 ? "No recent calls found" 
                 : "No calls match your current filters"}
             </p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Campaign</TableHead>
-                <TableHead>Call Status</TableHead>
-                <TableHead>Outcome</TableHead>
-                <TableHead>Answered By</TableHead>
-                <TableHead>Total Duration</TableHead>
-                <TableHead>Connected Time</TableHead>
-                <TableHead>Started</TableHead>
-                {questions.map((q, index) => (
-                  <TableHead key={index} className="max-w-32">
-                    <div
-                      className="truncate text-xs font-medium"
-                      title={q}
-                    >
-                      {q}
-                    </div>
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.slice(0, 10).map((call) => {
-                return (
-                  <TableRow key={call.sid}>
-                    <TableCell className="font-medium">
-                      {call.outreach_attempt?.user_id?.username ||
-                        "Unknown"}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatContactName(
-                        call.contact?.firstname,
-                        call.contact?.surname,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatPhoneNumber(call.contact?.phone)}
-                    </TableCell>
-                    <TableCell>
-                      {call.campaign?.title || "Unknown"}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(call.status)}</TableCell>
-                    <TableCell>
-                      {getDispositionBadge(
-                        call.outreach_attempt?.disposition,
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {getAnsweredByBadge(call.answered_by)}
-                    </TableCell>
-                    <TableCell>
-                      {call.call_duration
-                        ? formatDuration(call.call_duration)
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {call.outreach_attempt?.answered_at &&
-                      call.outreach_attempt?.ended_at ? (
-                        <span className="flex items-center gap-1">
-                          <Timer className="h-3 w-3" />
-                          {Math.floor(getConnectedTime(call) / 60)}:
-                          {getConnectedTime(call) % 60 < 10 ? "0" : ""}
-                          {getConnectedTime(call) % 60}
-                        </span>
-                      ) : (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <span className="text-muted-foreground">-</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Not connected</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {call.date_created ? (
-                        <span>
-                          {formatDistanceToNow(new Date(call.date_created), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    {questions.map((question, index) => (
-                      <TableCell key={`question-${index}-${question}`} className="max-w-32">
-                        <div className="truncate text-xs">
-                          {getAnswerForQuestion(call, question)}
-                        </div>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Campaign</TableHead>
+                  <TableHead>Call Status</TableHead>
+                  <TableHead>Outcome</TableHead>
+                  <TableHead>Answered By</TableHead>
+                  <TableHead>Total Duration</TableHead>
+                  <TableHead>Connected Time</TableHead>
+                  <TableHead>Started</TableHead>
+                  {questions.map((q, index) => (
+                    <TableHead key={index} className="max-w-32">
+                      <div
+                        className="truncate text-xs font-medium"
+                        title={q}
+                      >
+                        {q}
+                      </div>
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.map((call) => {
+                  return (
+                    <TableRow key={call.sid}>
+                      <TableCell className="font-medium">
+                        {call.outreach_attempt?.user_id?.username ||
+                          "Unknown"}
                       </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      <TableCell className="font-medium">
+                        {formatContactName(
+                          call.contact?.firstname,
+                          call.contact?.surname,
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatPhoneNumber(call.contact?.phone)}
+                      </TableCell>
+                      <TableCell>
+                        {call.campaign?.title || "Unknown"}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(call.status)}</TableCell>
+                      <TableCell>
+                        {getDispositionBadge(
+                          call.outreach_attempt?.disposition,
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {getAnsweredByBadge(call.answered_by)}
+                      </TableCell>
+                      <TableCell>
+                        {call.call_duration
+                          ? formatDuration(call.call_duration)
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {call.outreach_attempt?.answered_at &&
+                        call.outreach_attempt?.ended_at ? (
+                          <span className="flex items-center gap-1">
+                            <Timer className="h-3 w-3" />
+                            {Math.floor(getConnectedTime(call) / 60)}:
+                            {getConnectedTime(call) % 60 < 10 ? "0" : ""}
+                            {getConnectedTime(call) % 60}
+                          </span>
+                        ) : (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <span className="text-muted-foreground">-</span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Not connected</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {call.date_created ? (
+                          <span>
+                            {formatDistanceToNow(new Date(call.date_created), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      {questions.map((question, index) => (
+                        <TableCell key={`question-${index}-${question}`} className="max-w-32">
+                          <div className="truncate text-xs">
+                            {getAnswerForQuestion(call, question)}
+                          </div>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            
+            {/* Pagination */}
+            {pagination && onPageChange && pagination.totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Show:</span>
+                  <Select
+                    value={pagination.pageSize.toString()}
+                    onValueChange={(value) => onPageSizeChange?.(parseInt(value))}
+                  >
+                    <SelectTrigger className="w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-sm text-muted-foreground">per page</span>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">
+                    Page {pagination.currentPage} of {pagination.totalPages}
+                  </span>
+                  <TablePagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={onPageChange}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
@@ -777,6 +943,7 @@ export function LiveCallAnalytics({
         customFilterLogic={callFilterLogic}
         title="Recent Calls Filters"
         renderTable={renderRecentCallsTable}
+        disableClientSideFiltering={true}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, useSearchParams } from "@remix-run/react";
 import { verifyAuth } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
 import { User } from "~/lib/types";
@@ -22,6 +22,10 @@ import type { AnalyticsMetrics } from "~/lib/analytics.types";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
+  const url = new URL(request.url);
+  const page = Math.max(1, parseInt(url.searchParams.get("page") || "1"));
+  const pageSize = Math.min(100, Math.max(10, parseInt(url.searchParams.get("pageSize") || "25")));
+  const offset = (page - 1) * pageSize;
 
   if (!workspaceId) {
     throw new Response("Workspace ID is required", { status: 400 });
@@ -53,11 +57,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq('type', 'sms')
     .order('created_at', { ascending: false });
 
-  // Fetch SMS outreach attempts for the last 7 days
+  // Fetch SMS outreach attempts for the last 7 days with pagination
   const lastWeek = new Date();
   lastWeek.setDate(lastWeek.getDate() - 7);
   
-  const { data: outreachAttempts } = await supabaseClient
+  const { data: outreachAttempts, count: totalAttempts } = await supabaseClient
     .from('outreach_attempt')
     .select(`
       id,
@@ -78,14 +82,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         first_name,
         last_name
       )
-    `)
+    `, { count: "exact" }
+    )
     .eq('workspace', workspaceId)
     .eq('campaign.type', 'sms')
     .gte('created_at', lastWeek.toISOString())
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + pageSize - 1);
 
   // Calculate SMS-specific metrics
-  const totalSMS = (outreachAttempts || []).length;
+  const totalSMS = totalAttempts || 0;
   const deliveredSMS = (outreachAttempts || []).filter(attempt => attempt.disposition === 'delivered').length;
   const failedSMS = (outreachAttempts || []).filter(attempt => ['failed', 'undelivered'].includes(attempt.disposition || '')).length;
   const pendingSMS = (outreachAttempts || []).filter(attempt => ['queued', 'sending'].includes(attempt.disposition || '')).length;
@@ -110,6 +116,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     campaigns: (campaigns || []) as any,
     outreachAttempts: (outreachAttempts || []) as any,
     metrics,
+    pagination: {
+      currentPage: page,
+      pageSize,
+      totalAttempts: totalAttempts || 0,
+      totalPages: Math.ceil((totalAttempts || 0) / pageSize),
+    },
     smsMetrics: {
       totalSMS,
       deliveredSMS,
@@ -121,7 +133,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function SMSAnalyticsRoute() {
-  const { campaigns, outreachAttempts, metrics, smsMetrics } = useLoaderData<typeof loader>();
+  const { campaigns, outreachAttempts, metrics, smsMetrics, pagination } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const handlePageChange = (page: number) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("page", page.toString());
+    setSearchParams(newSearchParams);
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set("pageSize", pageSize.toString());
+    newSearchParams.set("page", "1"); // Reset to first page when changing page size
+    setSearchParams(newSearchParams);
+  };
 
   const getDispositionBadge = (disposition?: string | null) => {
     if (!disposition) return <Badge variant="outline">Unknown</Badge>;
@@ -315,52 +341,106 @@ export default function SMSAnalyticsRoute() {
             <span>Recent SMS Activity</span>
           </CardTitle>
           <CardDescription>
-            Recent SMS delivery activity from the last 7 days
+            {pagination ? (
+              <span className="text-muted-foreground">
+                Showing {outreachAttempts.length} of {pagination.totalAttempts} total attempts
+              </span>
+            ) : (
+              <span>Recent SMS delivery activity from the last 7 days</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {outreachAttempts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No recent SMS activity</p>
+              <p>
+                {pagination && pagination.totalAttempts === 0
+                  ? "No recent SMS activity" 
+                  : "No attempts match your current filters"}
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Sent</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {outreachAttempts.slice(0, 20).map((attempt) => (
-                  <TableRow key={attempt.id}>
-                    <TableCell className="font-medium">
-                      {formatContactName(attempt.contact?.firstname, attempt.contact?.surname)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatPhoneNumber(attempt.contact?.phone)}
-                    </TableCell>
-                    <TableCell>
-                      {attempt.campaign?.title || 'Unknown'}
-                    </TableCell>
-                    <TableCell>
-                      {getDispositionBadge(attempt.disposition)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {attempt.user?.username || 'Unknown'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(attempt.created_at), { addSuffix: true })}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Campaign</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Sent</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {outreachAttempts.map((attempt) => (
+                    <TableRow key={attempt.id}>
+                      <TableCell className="font-medium">
+                        {formatContactName(attempt.contact?.firstname, attempt.contact?.surname)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatPhoneNumber(attempt.contact?.phone)}
+                      </TableCell>
+                      <TableCell>
+                        {attempt.campaign?.title || 'Unknown'}
+                      </TableCell>
+                      <TableCell>
+                        {getDispositionBadge(attempt.disposition)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {attempt.user?.username || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(attempt.created_at), { addSuffix: true })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination */}
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">Show:</span>
+                    <select
+                      value={pagination.pageSize}
+                      onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                    <span className="text-sm text-muted-foreground">per page</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-muted-foreground">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage - 1)}
+                        disabled={pagination.currentPage === 1}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage + 1)}
+                        disabled={pagination.currentPage === pagination.totalPages}
+                        className="px-3 py-1 text-sm border rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

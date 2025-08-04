@@ -259,6 +259,7 @@ export interface DataTableWithFiltersProps<T> {
   className?: string;
   renderTable: (filteredData: T[]) => React.ReactNode;
   renderMetrics?: (filteredData: T[], totalData: T[]) => React.ReactNode;
+  disableClientSideFiltering?: boolean;
 }
 
 export function DataTableWithFilters<T>({
@@ -270,6 +271,7 @@ export function DataTableWithFilters<T>({
   className = "",
   renderTable,
   renderMetrics,
+  disableClientSideFiltering = false,
 }: DataTableWithFiltersProps<T>) {
   const [filters, setFilters] = useState<FilterValues>({});
   const [isExpanded, setIsExpanded] = useState(false);
@@ -287,9 +289,12 @@ export function DataTableWithFilters<T>({
 
   // Apply filters to data
   const filteredData = useMemo(() => {
+    if (disableClientSideFiltering) {
+      return data; // Return all data when client-side filtering is disabled
+    }
     const filterLogic = customFilterLogic || defaultFilterLogic;
     return data.filter(item => filterLogic(item, filters));
-  }, [data, filters, customFilterLogic]);
+  }, [data, filters, customFilterLogic, disableClientSideFiltering]);
 
   // Clear all filters
   const clearFilters = () => {
