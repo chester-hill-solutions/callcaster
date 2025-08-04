@@ -52,17 +52,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspace?.stripe_id) {
     throw new Error("Workspace has no Stripe ID");
   }
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error("Stripe secret key is not set");
+  }
+  if (!process.env.BASE_URL) {
+    throw new Error("Base URL is not set");
+  }
+  if (!workspaceId) {
+    throw new Error("Workspace ID is not set");
+  }
+  if (!amount) {
+    throw new Error("Amount is not set");
+  }
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
   const priceInCents = Math.round(amount * 0.003 * 100);
-  console.log(priceInCents);
   const session = await stripe.checkout.sessions.create({
     customer: workspace.stripe_id,
     payment_method_types: ["card"],
     line_items: [
       {
         price_data: {
-          currency: "usd",
+          currency: "cad",
           product_data: {
             name: "Credits",
             description: `${amount} credits for your workspace`,
@@ -74,8 +85,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     ],
     mode: "payment",
-    success_url: `${process.env.BASE_URL}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.BASE_URL}/workspaces/${workspaceId}/settings/credits?canceled=true`,
+    success_url: `https://callcaster.ca/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `https://callcaster.ca/workspaces/${workspaceId}/settings/credits?canceled=true`,
     metadata: {
       workspaceId,
       creditAmount: amount,
