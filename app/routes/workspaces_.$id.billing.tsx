@@ -86,7 +86,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     ],
     mode: "payment",
     success_url: `https://callcaster.ca/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `https://callcaster.ca/workspaces/${workspaceId}/settings/credits?canceled=true`,
+    cancel_url: `https://callcaster.ca/workspaces/${workspaceId}/billing?canceled=true`,
     metadata: {
       workspaceId,
       creditAmount: amount,
@@ -219,7 +219,7 @@ export default function Credits() {
               {credits.history.map((transaction) => (
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
-                  <td className="py-2 px-2 max-w-xs text-xs">{transaction.note}</td>
+                  <td className="py-2 px-2 max-w-xs text-xs">{transaction.type === "CREDIT" ? "Credits Reloaded" : "Credits Used"} - {transaction.note ?? ""}</td>
                   <td className={`py-2 text-right ${transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
                     }`}>
                     {transaction.amount}
