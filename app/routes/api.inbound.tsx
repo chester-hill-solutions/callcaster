@@ -28,10 +28,17 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
         inbound_action: string | null;
         inbound_audio: string | null;
         type: string | null;
-        workspace: string | null;
-        twilio_data: {
-          account_sid: string;
-          auth_token: string;
+        workspace: {
+          id: string;
+          twilio_data: {
+            account_sid: string;
+            auth_token: string;
+          } | null;
+          webhook: Array<{
+            events: Array<{
+              category: string;
+            }>;
+          }>;
         } | null;
       } | null;
       error: Error | null;
@@ -74,12 +81,12 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
   }
 
   // Send webhook notification for inbound call
-  const callWebhook = number.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_call")).flat()
+  const callWebhook = number.workspace?.webhook?.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_call")).flat() || []
   if (callWebhook.length > 0) {
     await sendWebhookNotification({
       eventCategory: "inbound_call",
       eventType: "INSERT",
-      workspaceId: number.workspace || "",
+      workspaceId: number.workspace?.id || "",
       payload: {
         call_sid: call.sid,
         from: call.from,
