@@ -1,12 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
-import MailService from "npm:@sendgrid/mail@^8.1.3";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 );
-
-MailService.setApiKey(Deno.env.get("SENDGRID_API_KEY")!);
 
 interface InviteData {
   workspaceId: string;
@@ -51,45 +48,81 @@ async function sendInviteEmail(
   email: string,
   workspaceName: string,
   linkData?: { hashed_token: string },
-): Promise<[any, any]> {
-  const msg = {
-    template_id: "d-7690cb26e5464c19a4a1c3f27c64c439",
-    from: "info@callcaster.ca",
-    personalizations: [
-      {
-        to: [{ email, name: "" }],
-        dynamic_template_data: {
-          workspace_name: workspaceName,
-          signup_link: linkData?.hashed_token
-            ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=invite&email=${encodeURIComponent(email)}`
-            : `${Deno.env.get("SITE_URL")}/accept-invite`,
-        },
-      },
-    ],
-  };
-  return await MailService.send(msg);
+): Promise<any> {
+  const signupLink = linkData?.hashed_token
+    ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=invite&email=${encodeURIComponent(email)}`
+    : `${Deno.env.get("SITE_URL")}/accept-invite`;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Callcaster <info@callcaster.ca>",
+      to: [email],
+      subject: `You've been invited to join ${workspaceName} on Callcaster`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>You've been invited to join ${workspaceName}</h2>
+          <p>You've been invited to join the workspace "${workspaceName}" on Callcaster.</p>
+          <p><a href="${signupLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Accept Invitation</a></p>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>${signupLink}</p>
+        </div>
+      `,
+      text: `
+        You've been invited to join ${workspaceName}
+        
+        You've been invited to join the workspace "${workspaceName}" on Callcaster.
+        
+        Accept invitation: ${signupLink}
+      `,
+    }),
+  });
+
+  return await response.json();
 }
 async function sendMagicEmail(
   email: string,
   workspaceName: string,
   linkData?: { hashed_token: string },
-): Promise<[any, any]> {
-  const msg = {
-    template_id: "d-7690cb26e5464c19a4a1c3f27c64c439",
-    from: "info@callcaster.ca",
-    personalizations: [
-      {
-        to: [{ email, name: "" }],
-        dynamic_template_data: {
-          workspace_name: workspaceName,
-          signup_link: linkData?.hashed_token
-            ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=magiclink&email=${encodeURIComponent(email)}`
-            : `${Deno.env.get("SITE_URL")}/accept-invite`,
-        },
-      },
-    ],
-  };
-  return await MailService.send(msg);
+): Promise<any> {
+  const signupLink = linkData?.hashed_token
+    ? `${Deno.env.get("SITE_URL")}/accept-invite?token_hash=${linkData.hashed_token}&type=magiclink&email=${encodeURIComponent(email)}`
+    : `${Deno.env.get("SITE_URL")}/accept-invite`;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${Deno.env.get("RESEND_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Callcaster <info@callcaster.ca>",
+      to: [email],
+      subject: `You've been invited to join ${workspaceName} on Callcaster`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>You've been invited to join ${workspaceName}</h2>
+          <p>You've been invited to join the workspace "${workspaceName}" on Callcaster.</p>
+          <p><a href="${signupLink}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Accept Invitation</a></p>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p>${signupLink}</p>
+        </div>
+      `,
+      text: `
+        You've been invited to join ${workspaceName}
+        
+        You've been invited to join the workspace "${workspaceName}" on Callcaster.
+        
+        Accept invitation: ${signupLink}
+      `,
+    }),
+  });
+
+  return await response.json();
 }
 
 async function inviteNewUser(
