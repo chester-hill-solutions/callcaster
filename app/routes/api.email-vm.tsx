@@ -1,10 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
-import MailService from "@sendgrid/mail";
+import { Resend } from "resend";
 import { ActionFunctionArgs, json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 import { Workspace, WorkspaceNumber } from "~/lib/types";
-import { MailDataRequired } from "@sendgrid/mail";
 import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
@@ -32,7 +33,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         workspace (id, twilio_data, name, webhook(*))
       `)
       .eq("phone_number", call.to)
-      .single<WorkspaceNumber & { workspace: Workspace }>();
+      .single<WorkspaceNumber & { workspace: Workspace & { webhook: any[] } }>();
 
     if (numberError) throw new Error(`Error fetching workspace number: ${numberError.message}`);
     if (!number.workspace) throw new Error(`Workspace not found`);
@@ -72,31 +73,33 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const signedUrl = signedUrlData.signedUrl;
 
     // Send email notification
-    MailService.setApiKey(process.env.SENDGRID_API_KEY!);
-    const msg: MailDataRequired = {
-      templateId: "d-8f12a98fe1af438cae0efdced5eeb512",
-      from: {
-        email: "info@callcaster.ca",
-        name: "Callcaster"
-      },
-      personalizations: [
-        {
-          to: [{
-            email: action?.toString() || '',
-            name: ""
-          }],
-          dynamicTemplateData: {
-            caller_number: call.from,
-            to_number: call.to,
-            workspace_name: number.workspace.name,
-            workspace_link: `${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails`,
-            voicemail_url: signedUrl,
-          },
-        },
-      ],
-    };
-
-    const result = await MailService.send(msg);
+    const result = await resend.emails.send({
+      from: "Callcaster <info@callcaster.ca>",
+      to: [action?.toString() || ''],
+      subject: `New Voicemail from ${call.from}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>New Voicemail Received</h2>
+          <p><strong>From:</strong> ${call.from}</p>
+          <p><strong>To:</strong> ${call.to}</p>
+          <p><strong>Workspace:</strong> ${number.workspace.name}</p>
+          <p><strong>Date:</strong> ${now.toLocaleString()}</p>
+          <p><a href="${signedUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Listen to Voicemail</a></p>
+          <p><a href="${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
+        </div>
+      `,
+      text: `
+        New Voicemail Received
+        
+        From: ${call.from}
+        To: ${call.to}
+        Workspace: ${number.workspace.name}
+        Date: ${now.toLocaleString()}
+        
+        Listen to voicemail: ${signedUrl}
+        View in workspace: ${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails
+      `,
+    });
 
     // Send webhook notification
     const voicemailWebhook = number.workspace.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "voicemail")).flat()
