@@ -1,5 +1,5 @@
 import { TableHeader } from "@/components/call-list/records/TableHeader";
-import QueueContact from "@/components/call-list/records/CallContact/CallContact";
+import QueueContact from "@/components/call-list/records/participant/CallContact";
 import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
