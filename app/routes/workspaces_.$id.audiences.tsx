@@ -1,7 +1,7 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, json, useLoaderData, useNavigate } from "@remix-run/react";
-import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
-import { audienceColumns } from "@/components/workspace/WorkspaceTable/columns";
+import { DataTable } from "@/components/workspace/tables/DataTable";
+import { audienceColumns } from "@/components/workspace/tables/columns";
 import { Button } from "@/components/ui/button";
 import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";

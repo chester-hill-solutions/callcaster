@@ -1,6 +1,6 @@
 import { json, ActionFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
-import { sendWebhookNotification } from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const supabase = createClient(

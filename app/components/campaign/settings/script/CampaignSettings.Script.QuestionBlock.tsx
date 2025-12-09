@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import Result from "@/components/call-list/CallList/CallContact/Result";
+import Result from "@/components/call-list/records/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
 import { ArrowDown, ArrowUp } from "lucide-react";

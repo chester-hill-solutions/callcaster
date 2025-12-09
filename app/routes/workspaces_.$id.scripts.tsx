@@ -8,7 +8,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { MdDownload, MdEdit } from "react-icons/md";
-import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
+import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
 import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";

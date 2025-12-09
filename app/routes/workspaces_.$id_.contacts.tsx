@@ -10,7 +10,7 @@ import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
-import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
+import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

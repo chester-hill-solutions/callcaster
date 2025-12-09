@@ -1,5 +1,5 @@
 import { ActionFunction, json } from "@remix-run/node";
-import { testWebhook } from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils";
 
 export const action: ActionFunction = async ({ request }) => {
   const {event, destination_url, custom_headers} = await request.json()
