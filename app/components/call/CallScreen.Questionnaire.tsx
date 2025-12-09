@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigation } from "@remix-run/react";
-import Result from "@/components/call-list/records/CallContact/Result";
+import Result from "@/components/call-list/records/participant/Result";
 import { Button } from "@/components/ui/button";
 import { Tables } from "@/lib/database.types";
 import { Block, BlockOption } from "@/lib/types";
