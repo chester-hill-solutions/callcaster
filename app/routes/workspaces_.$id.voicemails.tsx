@@ -7,7 +7,7 @@ import { getUserRole } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
 import { Workspace, User } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-
+import type { FileObject } from "@supabase/storage-js";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
@@ -54,7 +54,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
     )?.signedUrl;
     if (url) {
-      media["signedUrl"] = url;
+      (media as any)["signedUrl"] = url;
     }
   }
 
@@ -66,7 +66,7 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
   const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+" || "voicemail-undefined"));
+  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined")) as FileObject[];
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

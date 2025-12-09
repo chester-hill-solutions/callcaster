@@ -93,8 +93,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   for (const media of mediaData) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
-    ).signedUrl;
-    media["signedUrl"] = url;
+    )?.signedUrl;
+    if (url) {
+      (media as any)["signedUrl"] = url;
+    }
   }
 
   return json(
