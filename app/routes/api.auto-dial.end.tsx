@@ -2,7 +2,7 @@ import { json, type ActionFunctionArgs } from "@remix-run/node";
 
 import { verifyAuth } from "../lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import type { Tables } from "~/lib/database.types";
+import type { Tables } from "@/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);

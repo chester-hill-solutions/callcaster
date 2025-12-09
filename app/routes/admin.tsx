@@ -1,16 +1,16 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, json } from "@remix-run/node";
 import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { Button } from "~/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { toast, Toaster } from "sonner";
-import { Input } from "~/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { AdminAsyncExportButton } from "~/components/campaign/home/CampaignHomeScreen/AdminAsyncExportButton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AdminAsyncExportButton } from "@/components/campaign/home/CampaignHomeScreen/AdminAsyncExportButton";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

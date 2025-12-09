@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "@remix-run/react";
-import BgImage from "~/components/shared/TransparentBGImage";
-import { Button } from "~/components/ui/button";
-import { Card, CardHeader } from "~/components/ui/card";
+import BgImage from "@/components/shared/TransparentBGImage";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader } from "@/components/ui/card";
 
 const CampaignEmptyState = ({hasAccess = false, type}:{hasAccess:boolean; type: "number" | "campaign"}) => {
     const loc = useLocation();

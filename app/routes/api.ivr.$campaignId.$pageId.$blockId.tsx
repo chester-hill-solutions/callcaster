@@ -1,9 +1,9 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import type { Database } from "~/lib/database.types";
+import type { Database } from "@/lib/database.types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;

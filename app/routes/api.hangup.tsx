@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
     const {supabaseClient:supabase, user} = await verifyAuth(request);

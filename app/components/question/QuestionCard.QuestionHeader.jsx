@@ -1,4 +1,4 @@
-import { VoxTypeSelector } from "~/components/settings/Settings.VoxTypeSelector";
+import { VoxTypeSelector } from "@/components/settings/Settings.VoxTypeSelector";
 import { MdBubbleChart, MdMic } from "react-icons/md";
 
 export const QuestionHeader = ({ question, edit, onNameChange, onSpeechTypeChange }) => {

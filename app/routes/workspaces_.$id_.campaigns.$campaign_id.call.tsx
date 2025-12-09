@@ -19,28 +19,28 @@ import {
   handleConference,
   handleContact,
   handleQueue,
-} from "~/lib/callscreenActions";
-import { checkSchedule, getUserRole } from "~/lib/database.server";
-import { playTone } from "~/lib/utils";
+} from "@/lib/callscreenActions";
+import { checkSchedule, getUserRole } from "@/lib/database.server";
+import { playTone } from "@/lib/utils";
 import { generateToken } from "./api.token";
 
 // Component imports
-import { QueueList } from "~/components/call/CallScreen.QueueList";
-import { CallArea } from "~/components/call/CallScreen.CallArea";
-import { CallQuestionnaire } from "~/components/call/CallScreen.Questionnaire";
-import { Household } from "~/components/call/CallScreen.Household";
-import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
-import { CampaignHeader } from "~/components/call/CallScreen.Header";
-import { PhoneKeypad } from "~/components/call/CallScreen.DTMFPhone";
-import { CampaignDialogs } from "~/components/call/CallScreen.Dialogs";
+import { QueueList } from "@/components/call/CallScreen.QueueList";
+import { CallArea } from "@/components/call/CallScreen.CallArea";
+import { CallQuestionnaire } from "@/components/call/CallScreen.Questionnaire";
+import { Household } from "@/components/call/CallScreen.Household";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { CampaignHeader } from "@/components/call/CallScreen.Header";
+import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
+import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
 
 // Hook imports
-import { useSupabaseRealtime } from "~/hooks/realtime/useSupabaseRealtime";
-import useDebouncedSave from "~/hooks/utils/useDebouncedSave";
-import useSupabaseRoom from "~/hooks/call/useSupabaseRoom";
-import { useTwilioDevice } from "~/hooks/call/useTwilioDevice";
-import { useStartConferenceAndDial } from "~/hooks/call/useStartConferenceAndDial";
-import { useCallState } from "~/hooks/call/useCallState";
+import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
+import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
+import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
+import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
+import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
+import { useCallState } from "@/hooks/call/useCallState";
 
 // Type imports
 import type {
@@ -52,9 +52,9 @@ import type {
   BaseUser,
   ActiveCall,
   CampaignDetails
-} from "~/lib/types";
-import { Tables } from "~/lib/database.types";
-import { MemberRole } from "~/components/workspace/TeamMember";
+} from "@/lib/types";
+import { Tables } from "@/lib/database.types";
+import { MemberRole } from "@/components/workspace/TeamMember";
 
 export { ErrorBoundary };
 

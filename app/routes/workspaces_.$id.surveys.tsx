@@ -1,11 +1,11 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { getUserRole } from "~/lib/database.server";
-import { Survey, User } from "~/lib/types";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
+import { verifyAuth } from "@/lib/supabase.server";
+import { getUserRole } from "@/lib/database.server";
+import { Survey, User } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar, Users, CheckCircle, XCircle } from "lucide-react";
 import { Link } from "@remix-run/react";
 

@@ -1,10 +1,10 @@
 import React from "react";
 import { NavLink } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
-import { Card, CardHeader } from "~/components/ui/card";
-import { MemberRole } from "~/components/workspace/TeamMember";
-import { Badge } from "~/components/ui/badge";
-import { Campaign } from "~/lib/types";
+import { Card, CardHeader } from "@/components/ui/card";
+import { MemberRole } from "@/components/workspace/TeamMember";
+import { Badge } from "@/components/ui/badge";
+import { Campaign } from "@/lib/types";
 
 const handleNavlinkStyles = ({ isActive, isPending }: { isActive: boolean; isPending: boolean }) =>
   `flex justify-between bg-gray-100 border-2 dark:bg-zinc-900 items-center py-2 text-sm font-medium transition-colors transition-borders font-Zilla-Slab ${

@@ -1,7 +1,7 @@
-import { Tooltip, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
-import { Button } from "~/components/ui/button";
+import { Tooltip, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { TooltipContent } from "@radix-ui/react-tooltip";
-import { Campaign } from "~/lib/types";
+import { Campaign } from "@/lib/types";
 
 export default function ActivateButtons({
   joinDisabled,

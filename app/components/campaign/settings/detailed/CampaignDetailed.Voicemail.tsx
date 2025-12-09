@@ -1,11 +1,11 @@
-import { Label } from "~/components/ui/label";
+import { Label } from "@/components/ui/label";
 import {
   SelectValue,
   Select,
   SelectTrigger,
   SelectContent,
   SelectItem,
-} from "~/components/ui/select";
+} from "@/components/ui/select";
 
 interface MediaItem {
   name: string;

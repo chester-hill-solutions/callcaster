@@ -11,9 +11,9 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
-import { verifyAuth } from "~/lib/supabase.server";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, headers } = await verifyAuth(request);

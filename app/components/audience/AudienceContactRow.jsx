@@ -1,5 +1,5 @@
 import { MdEdit, MdRemoveCircleOutline } from "react-icons/md";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { NavLink } from "react-router-dom";
 
 export const AudienceContactRow = ({ 

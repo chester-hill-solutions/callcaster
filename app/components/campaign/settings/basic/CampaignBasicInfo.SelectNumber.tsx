@@ -1,13 +1,13 @@
 import { NavLink } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { WorkspaceNumbers } from "~/lib/types";
+} from "@/components/ui/select";
+import { WorkspaceNumbers } from "@/lib/types";
 
 interface SelectNumberProps {
   handleInputChange: (name: string, value: string) => void;

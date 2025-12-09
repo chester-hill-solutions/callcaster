@@ -1,12 +1,12 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, json, useLoaderData } from "@remix-run/react";
-import { mediaColumns } from "~/components/media/columns";
+import { mediaColumns } from "@/components/media/columns";
 
-import { DataTable } from "~/components/workspace/WorkspaceTable/DataTable";
-import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { User } from "~/lib/types";
+import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
+import { Button } from "@/components/ui/button";
+import { getUserRole } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { User } from "@/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

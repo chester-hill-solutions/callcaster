@@ -1,10 +1,10 @@
 import { useEffect, useState, FormEvent } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { ImportIcon, Download, Search, X } from "lucide-react";
 import { useSearchParams, useSubmit } from "@remix-run/react";
-import TablePagination from "~/components/shared/TablePagination";
-import { Input } from "~/components/ui/input";
+import TablePagination from "@/components/shared/TablePagination";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -12,8 +12,8 @@ import {
   TableHead,
   TableHeader,
   TableRow
-} from "~/components/ui/table";
-import { Checkbox } from "~/components/ui/checkbox";
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,16 +21,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { Database } from "~/lib/database.types";
-import { Contact } from "~/lib/types";
+} from "@/components/ui/dropdown-menu";
+import { Database } from "@/lib/database.types";
+import { Contact } from "@/lib/types";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@/components/ui/select";
 
 type AudienceTableProps = {
   contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;

@@ -5,8 +5,8 @@ import {
   SelectTrigger,
   SelectContent,
   SelectItem,
-} from "~/components/ui/select";
-import { IVRCampaign, MessageCampaign, LiveCampaign, Script, Campaign } from "~/lib/types";
+} from "@/components/ui/select";
+import { IVRCampaign, MessageCampaign, LiveCampaign, Script, Campaign } from "@/lib/types";
 
 export default function SelectScript({
   selectedScript,

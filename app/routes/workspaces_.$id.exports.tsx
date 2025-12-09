@@ -1,7 +1,7 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useRevalidator } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card } from "~/components/ui/card";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
 import {
@@ -11,9 +11,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "~/components/ui/table";
-import { Button } from "~/components/ui/button";
-import { Progress } from "~/components/ui/progress";
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 interface ExportItem {
   id: string;

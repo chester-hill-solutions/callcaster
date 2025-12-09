@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from '@remix-run/react';
-import { Script, LiveCampaign, IVRCampaign } from '~/lib/types';
-import { useScriptState } from '~/hooks/campaign/useScriptState';
-import Sidebar from '~/components/script/Script.Sidebar';
-import ScriptMainContent from '~/components/script/Script.MainContent';
+import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
+import { useScriptState } from '@/hooks/campaign/useScriptState';
+import Sidebar from '@/components/script/Script.Sidebar';
+import ScriptMainContent from '@/components/script/Script.MainContent';
 
 type PageData = {
   campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };

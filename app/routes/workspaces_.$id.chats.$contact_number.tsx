@@ -1,13 +1,13 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { json, useLoaderData, useOutletContext, useParams } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useChatRealTime } from "~/hooks/realtime/useChatRealtime";
-import { useIntersectionObserver } from "~/hooks/utils/useIntersectionObserver";
-import MessageList from "~/components/chat/ChatMessages";
-import { Message, Workspace, WorkspaceNumber } from "~/lib/types";
-import { normalizePhoneNumber } from "~/lib/utils";
+import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
+import { useIntersectionObserver } from "@/hooks/utils/useIntersectionObserver";
+import MessageList from "@/components/chat/ChatMessages";
+import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
+import { normalizePhoneNumber } from "@/lib/utils";
 
 const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
   return Promise.all(

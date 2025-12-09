@@ -1,6 +1,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import type { FileObject } from "@supabase/storage-js";
-import { formatDateToLocale } from "~/lib/utils";
+import { formatDateToLocale } from "@/lib/utils";
 
 export const mediaColumns: ColumnDef<FileObject>[] = [
   {

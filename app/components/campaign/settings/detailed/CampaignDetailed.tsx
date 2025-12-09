@@ -1,7 +1,7 @@
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { NavLink } from "@remix-run/react";
 import { MdAdd } from "react-icons/md";
-import { MessageSettings } from "~/components/settings/MessageSettings";
+import { MessageSettings } from "@/components/settings/MessageSettings";
 import { FileObject } from "@supabase/storage-js";
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";
@@ -11,9 +11,9 @@ import {
   DialTypeSwitch,
   HouseholdSwitch,
 } from "./live/CampaignDetailed.Live.Switches";
-import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script, Survey, Schedule } from "~/lib/types";
+import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script, Survey, Schedule } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
-import { Tables } from "~/lib/database.types";
+import { Tables } from "@/lib/database.types";
 
 type LiveCampaignDetails = Tables<"live_campaign"> & { script: Script };
 type MessageCampaignDetails = Tables<"message_campaign">;

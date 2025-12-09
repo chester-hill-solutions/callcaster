@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   MdMic,
   MdMicOff,

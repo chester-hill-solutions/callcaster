@@ -1,4 +1,4 @@
-import { DispositionResult } from "~/lib/types";
+import { DispositionResult } from "@/lib/types";
 
 export const KeyMetrics = ({
   results,

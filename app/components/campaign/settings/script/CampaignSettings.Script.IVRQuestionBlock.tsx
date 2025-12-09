@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { TextInput as Input } from "~/components/forms/Inputs";
+import { Button } from "@/components/ui/button";
+import { TextInput as Input } from "@/components/forms/Inputs";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Page, IVROption, IVRBlock } from "~/lib/types";
-import { AddIcon } from "~/components/shared/Icons";
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Page, IVROption, IVRBlock } from "@/lib/types";
+import { AddIcon } from "@/components/shared/Icons";
 import {
   MdAdd,
   MdAddCircle,
@@ -20,7 +20,7 @@ import {
   MdRemove,
 } from "react-icons/md";
 import { NavLink } from "@remix-run/react";
-import { EditResponseModal } from "~/components/question/QuestionCard.ResponseTable.EditModal";
+import { EditResponseModal } from "@/components/question/QuestionCard.ResponseTable.EditModal";
 const questionTypes = [
   { value: "synthetic", label: "Synthetic" },
   { value: "recorded", label: "Audio File" },

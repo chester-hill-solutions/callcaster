@@ -6,8 +6,8 @@ import {
   useLoaderData,
   useNavigation,
 } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Phone,
   Zap,
@@ -18,7 +18,7 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

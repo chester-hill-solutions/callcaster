@@ -1,8 +1,8 @@
 import { json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { parseCSV } from "../lib/csv";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "~/lib/database.types";
+import type { Database, Tables } from "@/lib/database.types";
 
 interface StorageBucket {
   id: string;

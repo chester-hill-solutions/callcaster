@@ -23,10 +23,10 @@ You can import hooks using either explicit file paths or directory imports (via 
 
 ```typescript
 // Explicit file path
-import { useCallState } from '~/hooks/call/useCallState';
+import { useCallState } from '@/hooks/call/useCallState';
 
 // Directory import (via index.ts)
-import { useCallState, useTwilioDevice } from '~/hooks/call';
+import { useCallState, useTwilioDevice } from '@/hooks/call';
 ```
 
 ### Hook Categories

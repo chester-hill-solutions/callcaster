@@ -1,9 +1,9 @@
 import { Form } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ChangeEvent, FormEvent, useState } from "react";
-import { Database } from "~/lib/database.types";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { Database } from "@/lib/database.types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 interface AudienceFormProps {
   audienceInfo: Database["public"]["Tables"]["audience"]["Row"] | null;
   handleSaveAudience: (e: FormEvent<HTMLFormElement>) => Promise<void>;

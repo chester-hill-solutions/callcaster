@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import SupportButton from "./SupportButton";
 import { iconMapping, IconType } from "./Result.IconMap";
-import { Block, BlockOption } from "~/lib/types";
+import { Block, BlockOption } from "@/lib/types";
 
 type BlockOptionWithIcon = BlockOption & {
   Icon?: string;

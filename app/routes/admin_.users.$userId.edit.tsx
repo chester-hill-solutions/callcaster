@@ -1,11 +1,11 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, json } from "@remix-run/node";
 import { useLoaderData, useActionData, Form, Link } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
 

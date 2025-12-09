@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Device } from "@twilio/voice-sdk";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@/components/ui/select";
 import { MdVolumeOff, MdVolumeUp } from "react-icons/md";
 import DeviceSelector from "./AudioSelector";
 

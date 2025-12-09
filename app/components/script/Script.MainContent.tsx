@@ -1,9 +1,9 @@
 import React from "react";
 import { MdRemoveCircleOutline } from "react-icons/md";
-import { Button } from "~/components/ui/button";
-import { Toggle } from "~/components/forms/Inputs";
-import MergedQuestionBlock from "~/components/script/ScriptBlock";
-import { Script } from "~/lib/types";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/forms/Inputs";
+import MergedQuestionBlock from "@/components/script/ScriptBlock";
+import { Script } from "@/lib/types";
 
 type MainContentProps = {
   script: Script;

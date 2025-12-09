@@ -1,7 +1,7 @@
 import { ActionFunctionArgs, json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { createClient } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
+import { Database } from "@/lib/database.types";
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);

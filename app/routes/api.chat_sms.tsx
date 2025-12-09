@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance } from '../lib/database.server';
-import { Database } from '~/lib/database.types';
-import { verifyAuth } from '~/lib/supabase.server';
-import { processTemplateTags } from '~/lib/utils';
+import { Database } from '@/lib/database.types';
+import { verifyAuth } from '@/lib/supabase.server';
+import { processTemplateTags } from '@/lib/utils';
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {

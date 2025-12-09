@@ -1,7 +1,7 @@
 import { SupabaseClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useEffect, useState, useCallback, useRef } from "react";
-import type { Message } from "~/lib/types";
-import type { Database, Tables } from "~/lib/database.types";
+import type { Message } from "@/lib/types";
+import type { Database, Tables } from "@/lib/database.types";
 import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;

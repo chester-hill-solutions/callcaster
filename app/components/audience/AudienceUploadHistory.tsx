@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { useOutletContext } from "@remix-run/react";
 import { formatDistanceToNow } from "date-fns";
-import { useSupabaseRealtimeSubscription } from "~/hooks/realtime/useSupabaseRealtime";
+import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { Loader2 } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
+import { Database } from "@/lib/database.types";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { TypedResponse } from "@remix-run/node";
 import { Link, NavLink, Params, useLocation } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
+import { Button } from "@/components/ui/button";
+import { User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,10 +10,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import { FaBars, FaUserAlt } from "react-icons/fa";
 import { MdOutlineLogout } from "react-icons/md";
-import { capitalize } from "~/lib/utils";
+import { capitalize } from "@/lib/utils";
 import { MobileMenu } from "./Navbar.MobileMenu";
 
 type NavbarProps = {

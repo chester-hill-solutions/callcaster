@@ -1,8 +1,8 @@
 import { User } from "@supabase/supabase-js";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Tables } from "~/lib/database.types";
-import { sortQueue, createHouseholdMap } from "~/lib/utils";
-import { Contact, QueueItem } from "~/lib/types";
+import { Tables } from "@/lib/database.types";
+import { sortQueue, createHouseholdMap } from "@/lib/utils";
+import { Contact, QueueItem } from "@/lib/types";
 
 interface UseQueueProps {
   initialQueue: QueueItem[];

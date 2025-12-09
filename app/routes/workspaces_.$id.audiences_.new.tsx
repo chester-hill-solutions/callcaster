@@ -2,11 +2,11 @@ import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
-import { Card, CardContent, CardTitle } from "~/components/shared/CustomCard";
-import { Button } from "~/components/ui/button";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import AudienceUploader from "~/components/audience/AudienceUploader";
+import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { Button } from "@/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AudienceUploader from "@/components/audience/AudienceUploader";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

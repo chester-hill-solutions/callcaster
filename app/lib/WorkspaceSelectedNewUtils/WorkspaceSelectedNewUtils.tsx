@@ -3,7 +3,7 @@ import { redirect } from "react-router";
 import { parseCSV } from "../utils";
 import { bulkCreateContacts } from "../database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Contact } from "~/lib/types";
+import { Contact } from "@/lib/types";
 import { Database } from "../database.types";
 
 type CampaignType = "live_call" | "message" | "robocall";

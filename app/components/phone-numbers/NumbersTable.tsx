@@ -2,8 +2,8 @@ import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import { Form } from "@remix-run/react";
 import { useState, useCallback, useEffect } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { User, WorkspaceNumbers } from "~/lib/types";
+import { Button } from "@/components/ui/button";
+import { User, WorkspaceNumbers } from "@/lib/types";
 
 export const NumbersTable = ({
   phoneNumbers,

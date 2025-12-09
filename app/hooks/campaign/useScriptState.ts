@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Script, LiveCampaign, IVRCampaign } from '~/lib/types';
+import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
 
 type PageData = {
   campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };

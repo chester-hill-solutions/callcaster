@@ -4,8 +4,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
-import { Flags } from "~/lib/types";
+} from "@/components/ui/select";
+import { Flags } from "@/lib/types";
 
 interface CampaignData {
   type?: string;

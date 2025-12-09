@@ -41,7 +41,7 @@ function log(level: LogLevel, message: string, ...args: unknown[]): void {
  * Server-side logger
  * 
  * Usage:
- *   import { logger } from '~/lib/logger.server';
+ *   import { logger } from '@/lib/logger.server';
  *   logger.debug('Debug message');
  *   logger.info('Info message');
  *   logger.warn('Warning message');

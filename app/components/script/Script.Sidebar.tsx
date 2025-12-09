@@ -1,8 +1,8 @@
 import React from 'react';
 import { FaPlus } from 'react-icons/fa';
-import { Button } from '~/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select';
-import { Script } from '~/lib/types';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Script } from '@/lib/types';
 
 type SidebarProps = {
   scriptData: Script['steps'];

@@ -1,14 +1,14 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
 import { Suspense, useState } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Spinner } from "~/components/ui/spinner";
-import { Button } from "~/components/ui/button";
-import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign } from "~/lib/types";
-import { Contact } from "~/lib/types";
-import { QueueContent } from "~/components/queue/QueueContent";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Spinner } from "@/components/ui/spinner";
+import { Button } from "@/components/ui/button";
+import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign } from "@/lib/types";
+import { Contact } from "@/lib/types";
+import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ContactSearchDialog } from "~/components/queue/ContactSearchDialog";
+import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;

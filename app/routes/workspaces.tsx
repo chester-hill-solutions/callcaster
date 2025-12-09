@@ -9,11 +9,11 @@ import {
   useNavigation,
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
-import { Button } from "~/components/ui/button";
-import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
+import { Button } from "@/components/ui/button";
+import { createNewWorkspace, forceTokenRefresh } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { Toaster, toast } from "sonner";
-import { handleRoleTextStyles, MemberRole } from "~/components/workspace/TeamMember";
+import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import {
   Dialog,
   DialogClose,
@@ -21,9 +21,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import { Session } from "@supabase/supabase-js";  
-export { ErrorBoundary } from "~/components/shared/ErrorBoundary";
+export { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 interface Workspace {
   id: string;

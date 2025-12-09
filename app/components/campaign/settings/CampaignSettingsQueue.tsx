@@ -1,6 +1,6 @@
 import { NavLink } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { Tables } from "~/lib/database.types";
+import { Button } from "@/components/ui/button";
+import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

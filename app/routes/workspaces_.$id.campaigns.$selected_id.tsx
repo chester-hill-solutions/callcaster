@@ -8,7 +8,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { Suspense, useEffect } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 import {
   fetchBasicResults,
@@ -21,22 +21,22 @@ import {
   getUserRole,
   getWorkspaceUsers,
   processOutreachExportData,
-} from "~/lib/database.server";
-import { MemberRole } from "~/components/workspace/TeamMember";
+} from "@/lib/database.server";
+import { MemberRole } from "@/components/workspace/TeamMember";
 import {
   ResultsDisplay,
   NoResultsYet,
   ErrorLoadingResults,
   LoadingResults,
-} from "~/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
-import { CampaignInstructions } from "~/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
-import { CampaignHeader } from "~/components/campaign/home/CampaignHomeScreen/CampaignHeader";
-import { NavigationLinks } from "~/components/campaign/home/CampaignHomeScreen/CampaignNav";
-import { downloadCsv } from "~/lib/csvDownload";
-import { generateCSVContent } from "~/lib/utils";
-import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
+} from "@/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
+import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
+import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
+import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
+import { downloadCsv } from "@/lib/csvDownload";
+import { generateCSVContent } from "@/lib/utils";
+import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "@/lib/types";
 import { SupabaseClient, User } from "@supabase/supabase-js";
-import { useRealtimeData } from "~/hooks/realtime/useRealtimeData";
+import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 
 export type CampaignState = {
   campaign_id: string;

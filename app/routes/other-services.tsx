@@ -1,4 +1,4 @@
-import ServiceCard from "~/components/other-services/ServiceCard";
+import ServiceCard from "@/components/other-services/ServiceCard";
 
 export default function OtherServices() {
   return (

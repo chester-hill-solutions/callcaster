@@ -1,7 +1,7 @@
 import { json } from "@remix-run/node";
-import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import Twilio from "twilio";
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 
 
 function normalizePhoneNumber(input: string) {

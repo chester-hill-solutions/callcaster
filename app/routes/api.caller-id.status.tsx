@@ -1,6 +1,6 @@
 import { json, ActionFunction } from '@remix-run/node';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { WorkspaceNumbers } from '~/lib/types';
+import { WorkspaceNumbers } from '@/lib/types';
 
 interface FormData {
   VerificationStatus: string;

@@ -1,9 +1,9 @@
 import { NavigateFunction } from "@remix-run/react";
 import { Fetcher, SubmitFunction } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { Audience, CampaignAudience, Schedule, Script } from "~/lib/types";
-import { deepEqual } from "~/lib/utils";
-import { Tables, Database } from "~/lib/database.types";
+import { Audience, CampaignAudience, Schedule, Script } from "@/lib/types";
+import { deepEqual } from "@/lib/utils";
+import { Tables, Database } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

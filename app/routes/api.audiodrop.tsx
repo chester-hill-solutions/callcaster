@@ -1,5 +1,5 @@
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();

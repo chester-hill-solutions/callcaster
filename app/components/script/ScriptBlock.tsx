@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -9,13 +9,13 @@ import {
   SelectValue,
   SelectGroup,
   SelectLabel,
-} from "~/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { NavLink } from "@remix-run/react";
-import { Block, BlockOption, IVRBlock, IVROption, Page } from "~/lib/database.types";
-import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
+import { Block, BlockOption, IVRBlock, IVROption, Page } from "@/lib/database.types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MdDialpad } from "react-icons/md";
 
 type ResponseType = "speech" | "dtmf" | "dtmf-speech";

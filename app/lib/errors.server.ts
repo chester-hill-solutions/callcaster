@@ -1,5 +1,5 @@
 import { json, redirect } from "@remix-run/node";
-import { logger } from "~/lib/logger.server";
+import { logger } from "@/lib/logger.server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
 /**

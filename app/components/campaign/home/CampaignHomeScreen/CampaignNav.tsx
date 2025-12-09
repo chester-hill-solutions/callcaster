@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavLink } from "@remix-run/react";
-import { handleNavlinkStyles } from "~/lib/utils";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip';
-import { Campaign } from "~/lib/types";
+import { handleNavlinkStyles } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Campaign } from "@/lib/types";
 
 export const NavigationLinks = ({ hasAccess, data, joinDisabled, }: { hasAccess: boolean, data: Campaign | null | undefined, joinDisabled: string | null }) => (
   <div className="flex gap-2 h-full py-4 max-w-[280px]">

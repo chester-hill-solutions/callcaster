@@ -7,8 +7,8 @@ import {
 } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
-import { Button } from "~/components/ui/button";
-import { verifyAuth } from "~/lib/supabase.server";
+import { Button } from "@/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
 import { LoaderFunctionArgs } from "@remix-run/node";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

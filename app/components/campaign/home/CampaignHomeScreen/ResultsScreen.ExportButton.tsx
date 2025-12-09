@@ -1,4 +1,4 @@
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Form } from "@remix-run/react";
 
 export const ExportButton = ({isBusy}:{isBusy:boolean;}) => (

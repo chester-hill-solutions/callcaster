@@ -2,15 +2,15 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSubmit, useFetcher } from "@remix-run/react";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck, MdArrowForward } from "react-icons/md";
-import { Button } from "~/components/ui/button";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "~/components/ui/table";
-import { Progress } from "~/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
-import { useSupabaseRealtimeSubscription } from "~/hooks/realtime/useSupabaseRealtime";
-import { Contact } from "~/lib/types";
+import { Button } from "@/components/ui/button";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { Contact } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/lib/database.types";
-import { useInterval } from "~/hooks/utils/useInterval";
+import type { Database } from "@/lib/database.types";
+import { useInterval } from "@/hooks/utils/useInterval";
 
 const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
 

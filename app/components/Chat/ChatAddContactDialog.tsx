@@ -3,10 +3,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { ContactForm } from "~/components/contact/ContactForm";
+} from "@/components/ui/dialog";
+import { ContactForm } from "@/components/contact/ContactForm";
 import { useEffect, useState } from "react";
-import { Contact } from "~/lib/types";
+import { Contact } from "@/lib/types";
 
 const getDisplayName = (contact: Partial<Contact>) => {
   if (contact.firstname && contact.surname) {

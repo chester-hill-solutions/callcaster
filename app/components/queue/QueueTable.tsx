@@ -1,6 +1,6 @@
-import { Audience, Contact, QueueItem } from "~/lib/types";
+import { Audience, Contact, QueueItem } from "@/lib/types";
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useSearchParams, useNavigation, Form, useSubmit, useFetcher } from "@remix-run/react";
 import {
     useReactTable,
@@ -12,9 +12,9 @@ import {
     RowSelectionState,
     SortingState,
 } from "@tanstack/react-table";
-import { Checkbox } from "~/components/ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
-import { Input } from "~/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { StatusDropdown } from "./StatusDropdown";
 import { QueueTablePagination } from "./QueueTablePagination";
 

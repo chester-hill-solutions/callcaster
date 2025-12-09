@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { ActionFunctionArgs, json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
-import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "~/lib/types";
-import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
-import type { Database } from "~/lib/database.types";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
+import { sendWebhookNotification } from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import type { Database } from "@/lib/database.types";
 
 const resend = new Resend(env.RESEND_API_KEY());
 

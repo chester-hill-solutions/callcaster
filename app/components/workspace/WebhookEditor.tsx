@@ -1,7 +1,7 @@
 import { Form, useFetcher } from "@remix-run/react";
 import { useRef, useState, FormEvent } from "react";
-import { Button } from "~/components/ui/button";
-import { Checkbox } from "~/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type EventCategory = 
   | "inbound_call" 

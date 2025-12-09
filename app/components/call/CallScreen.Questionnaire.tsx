@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigation } from "@remix-run/react";
-import Result from "~/components/call-list/CallList/CallContact/Result";
-import { Button } from "~/components/ui/button";
-import { Tables } from "~/lib/database.types";
-import { Block, BlockOption } from "~/lib/types";
+import Result from "@/components/call-list/CallList/CallContact/Result";
+import { Button } from "@/components/ui/button";
+import { Tables } from "@/lib/database.types";
+import { Block, BlockOption } from "@/lib/types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

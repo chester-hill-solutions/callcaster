@@ -1,12 +1,12 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { isEmail, isPhoneNumber } from "~/lib/utils";
-import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
-import type { TwilioInboundCallWebhook, WebhookEvent } from "~/lib/twilio.types";
-import type { Database } from "~/lib/database.types";
+import { isEmail, isPhoneNumber } from "@/lib/utils";
+import { sendWebhookNotification } from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import type { TwilioInboundCallWebhook, WebhookEvent } from "@/lib/twilio.types";
+import type { Database } from "@/lib/database.types";
 
 interface WorkspaceNumberData {
   inbound_action: string | null;

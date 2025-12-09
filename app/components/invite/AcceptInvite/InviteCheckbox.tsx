@@ -1,5 +1,5 @@
-import { Checkbox } from "~/components/ui/checkbox";
-import { Label } from "~/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 interface InviteCheckboxProps {
   invite: {
     created_at: string;

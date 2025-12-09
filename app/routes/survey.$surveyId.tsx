@@ -1,16 +1,16 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Progress } from "~/components/ui/progress";
-import { SurveyQuestionType, SurveyAnswerData, SurveyQuestionWithOptions, ResponseAnswer } from "~/lib/types";
-import { useDebounce } from "~/hooks/utils/useDebounce";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { SurveyQuestionType, SurveyAnswerData, SurveyQuestionWithOptions, ResponseAnswer } from "@/lib/types";
+import { useDebounce } from "@/hooks/utils/useDebounce";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { surveyId } = params;
