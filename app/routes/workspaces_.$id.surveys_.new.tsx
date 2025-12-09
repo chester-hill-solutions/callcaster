@@ -12,7 +12,7 @@ import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Plus, Trash2, Save } from "lucide-react";
-import { SurveyFormData, SurveyQuestionType } from "~/lib/types";
+import { SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -187,11 +187,11 @@ export default function NewSurveyPage() {
     }));
   };
 
-  const updateField = (field: keyof SurveyFormData, value: any) => {
+  const updateField = (field: keyof SurveyFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const updatePageField = (pageIndex: number, field: string, value: any) => {
+  const updatePageField = (pageIndex: number, field: keyof SurveyPageFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, index) => 
@@ -200,7 +200,7 @@ export default function NewSurveyPage() {
     }));
   };
 
-  const updateQuestionField = (pageIndex: number, questionIndex: number, field: string, value: any) => {
+  const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyQuestionFormData, value: string | boolean | SurveyQuestionType) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, pIndex) => 
@@ -216,7 +216,7 @@ export default function NewSurveyPage() {
     }));
   };
 
-  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: string, value: any) => {
+  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof QuestionOptionFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, pIndex) => 

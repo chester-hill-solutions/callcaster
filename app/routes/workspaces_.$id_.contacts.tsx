@@ -10,8 +10,8 @@ import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
 import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
-import { DataTable } from "~/components/WorkspaceTable/DataTable";
-import TablePagination from "~/components/TablePagination";
+import { DataTable } from "~/components/Workspace/WorkspaceTable/DataTable";
+import TablePagination from "~/components/shared/TablePagination";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { getUserRole } from "~/lib/database.server";
@@ -394,8 +394,10 @@ export default function WorkspaceContacts() {
                   const displayItems = otherData.slice(0, 2);
                   const hasMore = otherData.length > 2;
                   
-                  const formatOtherData = (data: any[]) => {
-                    return data.map((item: any, i: number) => {
+                  type OtherDataItem = { key: string; value: unknown } | Record<string, unknown>;
+                  
+                  const formatOtherData = (data: OtherDataItem[]) => {
+                    return data.map((item: OtherDataItem, i: number) => {
                       let key, value;
                       
                       // Debug: Log each item to understand its structure

@@ -3,9 +3,9 @@ import { json, useLoaderData, useOutletContext, useParams } from "@remix-run/rea
 import { verifyAuth } from "~/lib/supabase.server";
 import { useEffect, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useChatRealTime } from "~/hooks/useChatRealtime";
-import { useIntersectionObserver } from "~/hooks/useIntersectionOverserver";
-import MessageList from "~/components/Chat/ChatMessages";
+import { useChatRealTime } from "~/hooks/realtime/useChatRealtime";
+import { useIntersectionObserver } from "~/hooks/utils/useIntersectionObserver";
+import MessageList from "~/components/chat/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "~/lib/types";
 import { normalizePhoneNumber } from "~/lib/utils";
 
@@ -202,35 +202,31 @@ export default function ChatScreen() {
     }
   };
 
-  const observer = useIntersectionObserver(observerCallback);
+  const { observe, unobserve } = useIntersectionObserver(observerCallback, { threshold: 0.5 });
 
   // Handle intersection observer setup once
   useEffect(() => {
-    if (!observer) return;
-
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
-    messageElements.forEach((el) => observer.observe(el));
+    messageElements.forEach((el) => observe(el));
 
     return () => {
-      messageElements.forEach((el) => observer.unobserve(el));
+      messageElements.forEach((el) => unobserve(el));
     };
-  }, [observer]); // Only re-run when observer changes
+  }, [observe, unobserve]); // Only re-run when observe/unobserve change
 
   // Handle new message elements
   useEffect(() => {
-    if (!observer) return;
-
     // Only observe new messages
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
     const newMessages = Array.from(messageElements).slice(lastMessageCountRef.current);
     
-    newMessages.forEach((el) => observer.observe(el));
+    newMessages.forEach((el) => observe(el));
     lastMessageCountRef.current = messageElements.length;
 
     return () => {
-      newMessages.forEach((el) => observer.unobserve(el));
+      newMessages.forEach((el) => unobserve(el));
     };
-  }, [messages, observer]);
+  }, [messages, observe, unobserve]);
 
   // Intelligent scroll handling
   useEffect(() => {

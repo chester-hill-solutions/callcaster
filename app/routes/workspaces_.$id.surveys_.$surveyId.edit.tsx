@@ -3,7 +3,7 @@ import { useLoaderData, useSubmit, useNavigate } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
-import { User, SurveyFormData, SurveyQuestionType } from "~/lib/types";
+import { User, SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "~/lib/types";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -59,17 +59,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     survey_id: survey.survey_id,
     title: survey.title,
     is_active: survey.is_active,
-    pages: survey.survey_page?.map((page: any) => ({
+    pages: survey.survey_page?.map((page: SurveyPage & { survey_question?: Array<SurveyQuestion & { question_option?: QuestionOption[] }> }) => ({
       page_id: page.page_id,
       title: page.title,
       page_order: page.page_order,
-      questions: page.survey_question?.map((question: any) => ({
+      questions: page.survey_question?.map((question) => ({
         question_id: question.question_id,
         question_text: question.question_text,
         question_type: question.question_type as SurveyQuestionType,
         is_required: question.is_required,
         question_order: question.question_order,
-        options: question.question_option?.map((option: any) => ({
+        options: question.question_option?.map((option) => ({
           option_value: option.option_value,
           option_label: option.option_label,
           option_order: option.option_order,
@@ -222,11 +222,11 @@ export default function EditSurveyPage() {
     }));
   };
 
-  const updateField = (field: keyof SurveyFormData, value: any) => {
+  const updateField = (field: keyof SurveyFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const updatePageField = (pageIndex: number, field: string, value: any) => {
+  const updatePageField = (pageIndex: number, field: keyof SurveyPageFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, index) => 
@@ -235,7 +235,7 @@ export default function EditSurveyPage() {
     }));
   };
 
-  const updateQuestionField = (pageIndex: number, questionIndex: number, field: string, value: any) => {
+  const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyQuestionFormData, value: string | boolean | SurveyQuestionType) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, pIndex) => 
@@ -251,7 +251,7 @@ export default function EditSurveyPage() {
     }));
   };
 
-  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: string, value: any) => {
+  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof QuestionOptionFormData, value: string | number) => {
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((p, pIndex) => 

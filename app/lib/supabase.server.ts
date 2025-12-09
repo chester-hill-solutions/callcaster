@@ -1,14 +1,15 @@
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { Database } from "./database.types";
 import { redirect } from "@remix-run/node";
+import { env } from "./env.server";
 
 export const createSupabaseServerClient = (request: Request) => {
   const cookies = parse(request.headers.get("Cookie") ?? "");
   const headers = new Headers();
 
   const supabaseClient = createServerClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
+    env.SUPABASE_URL(),
+    env.SUPABASE_PUBLISHABLE_KEY(),
     {
       cookies: {
         get(key) {

@@ -8,6 +8,9 @@ export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const email = formData.get("email");
+  if (typeof email !== "string" || !email) {
+    return json({ data: null, error: { message: "Email is required" } });
+  }
   const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
     email,
     { redirectTo: `${new URL(request.url).origin}/api/auth/callback` },
@@ -18,8 +21,13 @@ export const action = async ({ request }: { request: Request }) => {
   return json({ data, error: null });
 };
 
+type ActionData = {
+  data: unknown;
+  error: { message: string } | null;
+} | undefined;
+
 export default function Remember() {
-  const actionData = useActionData();
+  const actionData = useActionData<ActionData>();
 
   useEffect(() => {
     if (actionData?.data) {

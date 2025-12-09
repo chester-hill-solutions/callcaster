@@ -21,13 +21,15 @@ import { createBrowserClient } from "@supabase/ssr";
 import { useEffect } from "react";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
 
-import Navbar from "~/components/Navbar";
+import Navbar from "~/components/layout/Navbar";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
 import stylesheet from "~/tailwind.css";
 import { Database } from "./lib/database.types";
 
 import { Session } from "@supabase/supabase-js";
-
+import { env as envUtil } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
+import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
 
 type LoaderData = {
   env: ENV;
@@ -53,9 +55,9 @@ export const links: LinksFunction = () => [
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const env: ENV = {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY,
-    BASE_URL: process.env.BASE_URL,
+    SUPABASE_URL: envUtil.SUPABASE_URL(),
+    SUPABASE_KEY: envUtil.SUPABASE_PUBLISHABLE_KEY(),
+    BASE_URL: envUtil.BASE_URL(),
   };
   
   const url = new URL(request.url);
@@ -72,7 +74,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       }
     } catch (error) {
       // If decoding fails, continue with normal flow
-      console.error('Failed to decode survey link:', error);
+      logger.error('Failed to decode survey link:', error);
     }
   }
   
@@ -100,7 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .eq("user_id", user.data.user.id)
     .order("last_accessed", { ascending: false });
   if (workspacesError || userError) {
-    console.error(workspacesError, userError);
+    logger.error("Error loading workspaces or user data", { workspacesError, userError });
   }
   const workspaces = workspaceData?.map((data) => data.workspace);
   
@@ -177,3 +179,5 @@ export default function App() {
     </html>
   );
 }
+
+export { ErrorBoundary };

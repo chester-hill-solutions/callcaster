@@ -3,15 +3,40 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "~/lib/utils";
 import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
+import type { TwilioInboundCallWebhook, WebhookEvent } from "~/lib/twilio.types";
+import type { Database } from "~/lib/database.types";
+
+interface WorkspaceNumberData {
+  inbound_action: string | null;
+  inbound_audio: string | null;
+  type: string | null;
+  workspace: {
+    id: string;
+    twilio_data: {
+      account_sid: string;
+      auth_token: string;
+    } | null;
+    webhook: Array<{
+      events: WebhookEvent[];
+    }>;
+  } | null;
+}
 
 export const action = async ({ request }: LoaderFunctionArgs) => {
   const twiml = new Twilio.twiml.VoiceResponse();
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+  const supabase = createClient<Database>(
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
   );
   const formData = await request.formData();
-  const data = Object.fromEntries(formData);
+  const data = Object.fromEntries(formData) as Partial<TwilioInboundCallWebhook>;
+  
+  if (!data.Called) {
+    throw { status: 400, statusText: "Missing Called parameter" };
+  }
+  
   const { data: number, error: numberError } = await supabase
     .from("workspace_number")
     .select(
@@ -24,30 +49,14 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     )
     .eq("phone_number", data.Called)
     .single() as {
-      data: {
-        inbound_action: string | null;
-        inbound_audio: string | null;
-        type: string | null;
-        workspace: {
-          id: string;
-          twilio_data: {
-            account_sid: string;
-            auth_token: string;
-          } | null;
-          webhook: Array<{
-            events: Array<{
-              category: string;
-            }>;
-          }>;
-        } | null;
-      } | null;
+      data: WorkspaceNumberData | null;
       error: Error | null;
     };
   if (!number) {
     throw { status: 404, statusText: "Not Found" };
   }
   if (numberError) {
-    console.error("Error on function getWorkspacePhoneNumbers", numberError);
+    logger.error("Error on function getWorkspacePhoneNumbers", numberError);
     throw { status: 500, statusText: "Internal Server Error" };
   }
 
@@ -58,30 +67,37 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     : { data: null, error: null };
   
   // Insert call record
+  if (!data.CallSid || typeof data.CallSid !== 'string') {
+    throw { status: 400, statusText: "Missing CallSid" };
+  }
+  
   const { data: call, error: callError } = await supabase
     .from("call")
     .upsert({
       sid: data.CallSid,
-      account_sid: data.AccountSid,
-      to: data.To,
-      from: data.From,
-      status: "completed",
-      start_time: new Date(),
-      direction: data.Direction,
-      api_version: data.ApiVersion,
-      workspace: number.workspace,
-      duration: Math.max(Number(data.Duration), Number(data.CallDuration)),
-    })
+      account_sid: data.AccountSid || null,
+      to: data.To || null,
+      from: data.From || null,
+      status: "completed" as const,
+      start_time: new Date().toISOString(),
+      direction: data.Direction || null,
+      api_version: data.ApiVersion || null,
+      workspace: number.workspace?.id || null,
+      duration: String(Math.max(Number(data.Duration || 0), Number(data.CallDuration || 0))),
+    } as Database['public']['Tables']['call']['Insert'])
     .select()
     .single();
 
   if (callError) {
-    console.error("Error on function insert call", callError);
+    logger.error("Error on function insert call", callError);
     throw { status: 500, statusText: "Internal Server Error" };
   }
 
   // Send webhook notification for inbound call
-  const callWebhook = number.workspace?.webhook?.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_call")).flat() || []
+  const callWebhook = number.workspace?.webhook
+    ?.flatMap((webhook) => 
+      webhook.events.filter((event) => event.category === "inbound_call")
+    ) || [];
   if (callWebhook.length > 0) {
     await sendWebhookNotification({
       eventCategory: "inbound_call",

@@ -33,7 +33,7 @@ import {
 import { toast, Toaster } from "sonner";
 import { capitalize } from "~/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
-import { Card } from "~/components/CustomCard";
+import { Card } from "~/components/shared/CustomCard";
 import WebhookEditor from "~/components/Workspace/WebhookEditor";
 import Workspace from "./workspaces_.$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "~/lib/types";

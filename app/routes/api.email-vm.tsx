@@ -2,24 +2,39 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { ActionFunctionArgs, json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
-import { Workspace, WorkspaceNumber } from "~/lib/types";
+import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "~/lib/types";
 import { sendWebhookNotification } from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
+import type { Database } from "~/lib/database.types";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY());
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const formData = await request.formData();
-    const data = Object.fromEntries(formData);
-    const supabase = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!,
+    const recordingUrl = formData.get("RecordingUrl");
+    const callSid = formData.get("CallSid");
+    const accountSid = formData.get("AccountSid");
+    const recordingSid = formData.get("RecordingSid");
+    const recordingDuration = formData.get("RecordingDuration");
+    
+    if (!recordingUrl || typeof recordingUrl !== 'string') {
+      throw new Error('Missing or invalid RecordingUrl');
+    }
+    if (!callSid || typeof callSid !== 'string') {
+      throw new Error('Missing or invalid CallSid');
+    }
+    
+    const supabase = createClient<Database>(
+      env.SUPABASE_URL(),
+      env.SUPABASE_SERVICE_KEY(),
     );
 
     const { data: call, error: callError } = await supabase
       .from("call")
-      .update({ recording_url: data.RecordingUrl })
-      .eq("sid", data.CallSid)
+      .update({ recording_url: recordingUrl })
+      .eq("sid", callSid)
       .select()
       .single();
 
@@ -33,7 +48,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         workspace (id, twilio_data, name, webhook(*))
       `)
       .eq("phone_number", call.to)
-      .single<WorkspaceNumber & { workspace: Workspace & { webhook: any[] } }>();
+      .single<WorkspaceNumber & { workspace: Workspace & { webhook: (WorkspaceWebhook & { events?: Array<{ category: string }> })[] } }>();
 
     if (numberError) throw new Error(`Error fetching workspace number: ${numberError.message}`);
     if (!number.workspace) throw new Error(`Workspace not found`);
@@ -41,7 +56,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const action = number.inbound_action;
     const now = new Date();
 
-    const recordingResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${data.AccountSid}/Recordings/${data.RecordingSid}.mp3`, {
+    if (!accountSid || typeof accountSid !== 'string') {
+      throw new Error('Missing or invalid AccountSid');
+    }
+    if (!recordingSid || typeof recordingSid !== 'string') {
+      throw new Error('Missing or invalid RecordingSid');
+    }
+    
+    const recordingResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`, {
       headers: {
         'Authorization': `Basic ${Buffer.from(`${number.workspace.twilio_data.sid}:${number.workspace.twilio_data.authToken}`).toString('base64')}`
       }
@@ -85,7 +107,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           <p><strong>Workspace:</strong> ${number.workspace.name}</p>
           <p><strong>Date:</strong> ${now.toLocaleString()}</p>
           <p><a href="${signedUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Listen to Voicemail</a></p>
-          <p><a href="${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
+          <p><a href="${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails" style="color: #007bff;">View in Workspace</a></p>
         </div>
       `,
       text: `
@@ -97,12 +119,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         Date: ${now.toLocaleString()}
         
         Listen to voicemail: ${signedUrl}
-        View in workspace: ${process.env.BASE_URL}/workspaces/${number.workspace.id}/voicemails
+        View in workspace: ${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails
       `,
     });
 
     // Send webhook notification
-    const voicemailWebhook = number.workspace.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "voicemail")).flat()
+    const voicemailWebhook = number.workspace.webhook
+      .map((webhook) => 
+        webhook.events?.filter((event) => event.category === "voicemail") || []
+      )
+      .flat();
     if (voicemailWebhook.length > 0) {
       await sendWebhookNotification({
         eventCategory: "voicemail",
@@ -113,7 +139,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           from: call.from,
           to: call.to,
           recording_url: signedUrl,
-          duration: data.RecordingDuration,
+          duration: recordingDuration ? String(recordingDuration) : undefined,
           timestamp: now.toISOString(),
         },
         supabaseClient: supabase,
@@ -122,7 +148,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     return json({ success: true, message: "Voicemail processed and email sent", result });
   } catch (error) {
-    console.error('Error processing voicemail:', error);
+    logger.error('Error processing voicemail:', error);
     return json({ error: 'Failed to process voicemail' }, { status: 500 });
   }
 };

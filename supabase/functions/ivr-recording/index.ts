@@ -22,9 +22,35 @@ const log = (level: string, message: string, data = {}) => {
 };
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 
+interface CallDataWithOutreach {
+  outreach_attempt: {
+    id: number;
+  };
+  [key: string]: unknown;
+}
+
+interface ScriptBlock {
+  id: string;
+  options?: Array<{
+    value: string;
+    next?: string;
+  }>;
+  [key: string]: unknown;
+}
+
+interface ScriptPage {
+  blocks: string[];
+  [key: string]: unknown;
+}
+
+interface Script {
+  pages: Record<string, ScriptPage>;
+  [key: string]: unknown;
+}
+
 const createAndUploadRecording = async (
   supabase: SupabaseClient,
-  callData: any,
+  callData: CallDataWithOutreach,
   recordingUrl: string,
   workspace: WorkspaceData,
   stepName: string,
@@ -105,9 +131,9 @@ const getCallWithScript = async (supabase: SupabaseClient, callSid: string) => {
   return data;
 };
 
-const findNextStep = (currentBlock: any, userInput: any, script: any, pageId: string) => {
+const findNextStep = (currentBlock: ScriptBlock, userInput: unknown, script: Script, pageId: string): string => {
   if (currentBlock.options && currentBlock.options.length > 0) {
-    const matchedOption = currentBlock.options.find((option: any) => {
+    const matchedOption = currentBlock.options.find((option) => {
       const optionValue = String(option.value).trim();
       const input = userInput !== undefined ? String(userInput).trim() : '';
       return optionValue === input || (input.length > 0 && optionValue === 'vx-any');
@@ -124,7 +150,7 @@ const findNextStep = (currentBlock: any, userInput: any, script: any, pageId: st
   return 'hangup';
 };
 
-const findNextBlock = (script: any, currentPageId: string, currentBlockId: string) => {
+const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
   const currentPage = script.pages[currentPageId];
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
   if (currentBlockIndex < currentPage.blocks.length - 1) {

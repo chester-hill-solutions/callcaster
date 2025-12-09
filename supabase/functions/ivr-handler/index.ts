@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
         machineDetectionSpeechEndThreshold: 1200,
         statusCallbackEvent: ["initiated", "answered", "completed"],
         statusCallback: `${baseUrl}/ivr-status`,
-      }).catch((callError: any) => {
+      }).catch((callError: unknown) => {
         console.error('Error placing call to Twilio', callError);
         return null;
       });

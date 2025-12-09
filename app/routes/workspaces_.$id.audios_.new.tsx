@@ -11,7 +11,7 @@ import {
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Toaster, toast } from "sonner";
-import { Card, CardActions, CardContent, CardTitle } from "~/components/CustomCard";
+import { Card, CardActions, CardContent, CardTitle } from "~/components/shared/CustomCard";
 import { Button } from "~/components/ui/button";
 import { verifyAuth } from "~/lib/supabase.server";
 

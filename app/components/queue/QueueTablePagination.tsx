@@ -1,10 +1,10 @@
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 import {
     Pagination,
     PaginationContent,
     PaginationItem,
     PaginationEllipsis,
-} from "../ui/pagination";
+} from "~/components/ui/pagination";
 
 interface QueueTablePaginationProps {
     currentPage: number;

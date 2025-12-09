@@ -5,9 +5,10 @@ import { Card } from "~/components/ui/card";
 import { useState } from "react";
 import { verifyAuth } from "~/lib/supabase.server";
 import Stripe from "stripe";
+import { env } from "~/lib/env.server";
 
 async function getStripeCustomerHistory(stripeCustomerId: string) {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY());
   const history = await stripe.checkout.sessions.list({
     customer: stripeCustomerId,
   });
@@ -52,12 +53,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspace?.stripe_id) {
     throw new Error("Workspace has no Stripe ID");
   }
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error("Stripe secret key is not set");
-  }
-  if (!process.env.BASE_URL) {
-    throw new Error("Base URL is not set");
-  }
   if (!workspaceId) {
     throw new Error("Workspace ID is not set");
   }
@@ -65,7 +60,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     throw new Error("Amount is not set");
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY());
   const priceInCents = Math.round(amount * 0.003 * 100);
   const session = await stripe.checkout.sessions.create({
     customer: workspace.stripe_id,

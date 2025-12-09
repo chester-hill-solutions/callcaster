@@ -5,6 +5,7 @@ export default {
   // assetsBuildDirectory: "public/build",
   // publicPath: "/build/",
   // serverBuildPath: "build/index.js",
+  serverModuleFormat: 'esm',
   browserNodeBuiltinsPolyfill: {
     modules: {
       util: true, // Provide a JSPM polyfill
@@ -17,7 +18,6 @@ export default {
       events: true,
       window: true
     },
-    serverModuleFormat: 'esm',
     globals: {
       Buffer: true,
     }

@@ -71,7 +71,26 @@ const findNextStep = (currentBlock, userInput, script, pageId) => {
   return 'hangup';
 };
 
-const findNextBlock = (script: any, currentPageId: string, currentBlockId: string) => {
+interface ScriptBlock {
+  id: string;
+  options?: Array<{
+    value: string;
+    next?: string;
+  }>;
+  [key: string]: unknown;
+}
+
+interface ScriptPage {
+  blocks: string[];
+  [key: string]: unknown;
+}
+
+interface Script {
+  pages: Record<string, ScriptPage>;
+  [key: string]: unknown;
+}
+
+const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
   const currentPage = script.pages[currentPageId];
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
   if (currentBlockIndex < currentPage.blocks.length - 1) {

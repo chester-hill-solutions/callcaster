@@ -235,7 +235,7 @@ export async function handleUpdateWebhook(
 }
 
 export async function testWebhook(
-  testData: string | any,
+  testData: string | Record<string, unknown>,
   destination_url: string,
   custom_headers: string | Record<string, string>,
 ) {
@@ -302,7 +302,7 @@ export async function sendWebhookNotification({
   eventCategory: string;
   eventType: "INSERT" | "UPDATE";
   workspaceId: string;
-  payload: any;
+  payload: Record<string, unknown>;
   supabaseClient: SupabaseClient<Database>;
 }) {
   try {
@@ -319,9 +319,12 @@ export async function sendWebhookNotification({
     }
 
     // Check if this event type is enabled in the events array
-    const webhookAny = webhook as any;
-    const hasMatchingEvent = webhookAny.events && Array.isArray(webhookAny.events) && 
-      webhookAny.events.some((event: any) => 
+    type WebhookWithEvents = Tables<"webhook"> & {
+      events?: Array<{ category: string; type: string }>;
+    };
+    const webhookWithEvents = webhook as WebhookWithEvents;
+    const hasMatchingEvent = webhookWithEvents.events && Array.isArray(webhookWithEvents.events) && 
+      webhookWithEvents.events.some((event) => 
         event.category === eventCategory && event.type === eventType
       );
     

@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { MdClose } from "react-icons/md";
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 
-export default function MessagesImages({ selectedImages, onRemove }) {
-    const [highlighted, setHighlighted] = useState(null);
+interface MessagesImagesProps {
+  selectedImages: (string | null)[];
+  onRemove: (image: string) => void;
+}
+
+export default function MessagesImages({ selectedImages, onRemove }: MessagesImagesProps) {
+    const [highlighted, setHighlighted] = useState<number | null>(null);
     return (<div className="flex gap-2 overflow-x-scroll">
         {selectedImages.filter(Boolean).map((image, i) => {
             const isHighlighted = highlighted === i;

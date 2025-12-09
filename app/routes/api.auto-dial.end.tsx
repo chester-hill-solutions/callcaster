@@ -1,11 +1,11 @@
+import { json, type ActionFunctionArgs } from "@remix-run/node";
+
 import { verifyAuth } from "../lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { Call, OutreachAttempt } from "~/lib/types";
-import { ActionFunctionArgs } from "@remix-run/node";
+import type { Tables } from "~/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, user } =
-    await verifyAuth(request);
+  const { supabaseClient, user } = await verifyAuth(request);
   const { workspaceId: workspace_id } = await request.json();
   const twilio = await createWorkspaceTwilioInstance({
     supabase: supabaseClient,
@@ -14,10 +14,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const updateOutreachAttempt = async (
     id: string,
-    update: Partial<OutreachAttempt>,
-  ): Promise<OutreachAttempt> => {
+    update: Partial<Tables<"outreach_attempt">>,
+  ): Promise<Tables<"outreach_attempt">> => {
     try {
-      if (!update) throw new Error("Update is required");
       const { data: outreachData, error } = await supabaseClient
         .from("outreach_attempt")
         .update(update)
@@ -35,7 +34,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const conferences = await twilio.conferences.list({
       friendlyName: user.id,
-      status: ["in-progress"],
+      status: "in-progress" as const,
     });
     await Promise.all(
       conferences.map(async (conf) => {
@@ -49,12 +48,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           console.log(data);
           if (error) throw error;
           if (!data || !data.length) return;
+          type CallRecord = Pick<
+            Tables<"call">,
+            "sid" | "outreach_attempt_id" | "contact_id"
+          >;
+          const calls = data.filter(
+            (call): call is CallRecord =>
+              call !== null &&
+              typeof call.sid === "string" &&
+              call.sid.length > 0,
+          );
           await Promise.all(
-            data.map(async (call: Partial<Call>) => {
-              if (!call || !call.sid || !call.outreach_attempt_id) return;
+            calls.map(async (call) => {
+              if (!call.outreach_attempt_id) return;
               try {
-
-                if (call.outreach_attempt_id) {
                   await updateOutreachAttempt(
                     call.outreach_attempt_id.toString(),
                     { disposition: "completed" },
@@ -62,7 +69,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                   await twilio
                     .calls(call.sid)
                     .update({ twiml: `<Response><Hangup/></Response>` });
-                }
               } catch (callError) {
                 console.error(`Error updating call ${call.sid}:`, callError);
               }
@@ -73,10 +79,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
       }),
     );
-  } catch (e: any) {
-    console.error("Error listing or updating conferences:", e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error occurred";
+    console.error("Error listing or updating conferences:", error);
+    return json({ error: message }, { status: 500 });
   }
 
-  return { success: true };
+  return json({ success: true });
 };

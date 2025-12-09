@@ -4,10 +4,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { ContactForm } from "~/components/ContactForm";
+import { ContactForm } from "~/components/contact/ContactForm";
 import { useEffect, useState } from "react";
+import { Contact } from "~/lib/types";
 
-const getDisplayName = (contact) => {
+const getDisplayName = (contact: Partial<Contact>) => {
   if (contact.firstname && contact.surname) {
     return `${contact.firstname} ${contact.surname}`;
   } else if (contact.firstname) {
@@ -19,14 +20,22 @@ const getDisplayName = (contact) => {
   }
 };
 
+interface ChatAddContactDialogProps {
+  isDialogOpen: boolean;
+  setDialog: (open: boolean | null) => void;
+  contact_number: string;
+  workspace_id: string;
+  existingContact?: Contact | null;
+}
+
 const ChatAddContactDialog = ({
   isDialogOpen,
   setDialog,
   contact_number,
   workspace_id,
   existingContact,
-}) => {
-  const [contact, setContact] = useState(
+}: ChatAddContactDialogProps) => {
+  const [contact, setContact] = useState<Partial<Contact>>(
     existingContact || { phone: contact_number },
   );
 
@@ -34,13 +43,14 @@ const ChatAddContactDialog = ({
     setContact(existingContact || { phone: contact_number });
   }, [existingContact, contact_number]);
 
-  const handleUpdateContact = (e) => {
+  const handleUpdateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((curr) => ({
       ...curr,
       [e.target.name]: e.target.value,
     }));
   };
-  const handleSaveContact = (e) => {
+  const handleSaveContact = (e: React.FormEvent) => {
+    e.preventDefault();
     setDialog(false);
   };
   return (
