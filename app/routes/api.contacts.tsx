@@ -31,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (err instanceof Error && err.message === 'Unsupported content type') {
       return json({ error: 'Unsupported content type' }, { status: 415 });
     }
-    return handleError(err, 'An unexpected error occurred');
+    return handleError(err instanceof Error ? err : new Error(String(err)), 'An unexpected error occurred');
   }
 };
 
@@ -89,6 +89,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return json({ contacts });
     }
   } catch (err) {
-    return handleError(err, 'Error searching contacts');
+    return handleError(err instanceof Error ? err : new Error(String(err)), 'Error searching contacts');
   }
 };

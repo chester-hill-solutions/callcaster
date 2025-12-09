@@ -2,6 +2,8 @@ import { type LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
 import { User } from "~/lib/types";
+import type { Tables } from "~/lib/database.types";
+import type { ResponseAnswer, Contact } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -73,13 +75,36 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Error fetching responses", { status: 500 });
   }
 
+type SurveyPageWithQuestions = {
+  survey_question?: Array<{
+    id: number;
+    question_id: string;
+    question_text: string;
+    question_type: string;
+  }>;
+};
+
+type ResponseAnswerWithQuestion = ResponseAnswer & {
+  survey_question?: {
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    question_option?: Array<{ option_label: string }>;
+  };
+};
+
+type SurveyResponseWithContact = Tables<"survey_response"> & {
+  contact?: Pick<Contact, "firstname" | "surname" | "phone" | "email"> | null;
+  response_answer?: ResponseAnswerWithQuestion[];
+};
+
   // Get all questions from the survey structure
   const allQuestions =
-    survey.survey_page?.flatMap((page: any) => page.survey_question || []) ||
+    (survey as Tables<"survey"> & { survey_page?: SurveyPageWithQuestions[] }).survey_page?.flatMap((page) => page.survey_question || []) ||
     [];
 
   // Generate CSV data
-  const formatAnswer = (answer: any) => {
+  const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
     if (!answer) return "-";
 
     if (answer.survey_question?.question_type === "checkbox") {
@@ -93,7 +118,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return answer.answer_value;
   };
 
-  const getContactName = (response: any) => {
+  const getContactName = (response: SurveyResponseWithContact) => {
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
     }
@@ -106,15 +131,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (response: any, questionId: string) => {
+  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
     const question = allQuestions.find(
-      (q: any) => q.question_id === questionId,
+      (q) => q.question_id === questionId,
     );
     if (!question) return "-";
 
     // Find the answer by the database question ID
     const answer = response.response_answer?.find(
-      (a: any) => a.question_id === question.id,
+      (a) => a.question_id === question.id,
     );
     return answer ? formatAnswer(answer) : "-";
   };
@@ -126,17 +151,17 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     "Started",
     "Completed",
     "Last Page",
-    ...allQuestions.map((question: any) => question.question_text),
+    ...allQuestions.map((question) => question.question_text),
   ];
 
   // Create CSV rows
-  const rows = (responses || []).map((response: any) => [
+  const rows = ((responses || []) as SurveyResponseWithContact[]).map((response) => [
     getContactName(response),
     response.completed_at ? "Completed" : "In Progress",
     new Date(response.started_at).toLocaleDateString(),
     response.completed_at ? new Date(response.completed_at).toLocaleDateString() : "-",
     response.last_page_completed || "-",
-    ...allQuestions.map((question: any) => 
+    ...allQuestions.map((question) => 
       getAnswerForQuestion(response, question.question_id)
     ),
   ]);

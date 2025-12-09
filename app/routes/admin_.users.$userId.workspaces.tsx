@@ -8,6 +8,7 @@ import { Badge } from "~/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
+import type { Tables } from "~/lib/database.types";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request);
@@ -127,7 +128,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .insert({
                 user_id: userId,
                 workspace_id: workspaceId,
-                role
+                role: role as "owner" | "member" | "caller" | "admin" | undefined
             });
 
         if (error) {
@@ -139,7 +140,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (action === "update_role") {
         const workspaceId = formData.get("workspaceId") as string;
-        const role = formData.get("role") as string;
+        const role = formData.get("role") as "owner" | "member" | "caller" | "admin" | undefined;
 
         if (!workspaceId || !role) {
             return json({ error: "Workspace and role are required" });
@@ -147,7 +148,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
         const { error } = await supabaseClient
             .from("workspace_users")
-            .update({ role })
+            .update({ role: role as "owner" | "member" | "caller" | "admin" | undefined })
             .eq("user_id", userId)
             .eq("workspace_id", workspaceId);
 
@@ -206,7 +207,7 @@ export default function UserWorkspaces() {
 
     // Filter out workspaces the user is already a member of
     const availableWorkspaces = allWorkspaces.filter(
-        workspace => !userWorkspaces.some(uw => uw.workspace_id === workspace.id)
+        (workspace: Tables<"workspace">) => !userWorkspaces.some((uw: { workspace_id: string }) => uw.workspace_id === workspace.id)
     );
 
     useEffect(() => {
@@ -257,7 +258,7 @@ export default function UserWorkspaces() {
                                             <SelectValue placeholder="Select workspace" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {availableWorkspaces.map(workspace => (
+                                            {availableWorkspaces.map((workspace: Tables<"workspace">) => (
                                                 <SelectItem key={workspace.id} value={workspace.id}>
                                                     {workspace.name}
                                                 </SelectItem>
@@ -309,7 +310,7 @@ export default function UserWorkspaces() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {userWorkspaces.map(userWorkspace => (
+                                    {userWorkspaces.map((userWorkspace: { workspace_id: string; user_id: string; role: string; workspace?: Tables<"workspace"> | null }) => (
                                         <TableRow key={`${userWorkspace.workspace_id}-${userWorkspace.user_id}`}>
                                             <TableCell className="font-medium">
                                                 {userWorkspace.workspace?.name || 'Unknown Workspace'}
@@ -376,7 +377,7 @@ export default function UserWorkspaces() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {pendingInvites.map(invite => (
+                                    {pendingInvites.map((invite: { id: string; workspace?: Tables<"workspace"> | null; role: string; created_at: string }) => (
                                         <TableRow key={invite.id}>
                                             <TableCell className="font-medium">
                                                 {invite.workspace?.name || 'Unknown Workspace'}

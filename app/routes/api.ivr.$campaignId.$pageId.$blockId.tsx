@@ -1,7 +1,16 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
+import type { ActionFunctionArgs } from "@remix-run/node";
+import type { Database } from "~/lib/database.types";
 
-const getCampaignData = async (supabase, campaign_id) => {
+interface Script {
+  pages: Record<string, { blocks: string[] }>;
+  blocks: Record<string, { id: string; type: string; audioFile: string; options?: Array<{ value: string; next?: string }> }>;
+}
+
+const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase
     .from("campaign")
     .select(`*, ivr_campaign(*, script(*))`)
@@ -11,7 +20,7 @@ const getCampaignData = async (supabase, campaign_id) => {
   return campaign;
 };
 
-const handleAudio = async (supabase, twiml, block, workspace) => {
+const handleAudio = async (supabase: SupabaseClient<Database>, twiml: Twilio.twiml.VoiceResponse, block: { type: string; audioFile: string }, workspace: string) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
     const { data: signedUrlData, error: signedUrlError } =
@@ -25,7 +34,7 @@ const handleAudio = async (supabase, twiml, block, workspace) => {
   }
 };
 
-const findNextBlock = (script, currentPageId, currentBlockId) => {
+const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
   const currentPage = script.pages[currentPageId];
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
 
@@ -46,23 +55,23 @@ const findNextBlock = (script, currentPageId, currentBlockId) => {
   return null;
 };
 
-const handleOptions = (twiml, block, campaignId, pageId, blockId, script) => {
+const handleOptions = (twiml: Twilio.twiml.VoiceResponse, block: { options?: Array<{ value: string; next?: string }> }, campaignId: string, pageId: string, blockId: string, script: Script) => {
   if (block.options && block.options.length > 0) {
     const gather = twiml.gather({
-      action: `${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
+      action: `${env.BASE_URL()}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
       input: "dtmf speech",
       speechTimeout: "auto",
       speechModel: "phone_call",
       timeout: 5,
     });
     twiml.redirect(
-      `${process.env.BASE_URL}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
+      `${env.BASE_URL()}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
     );
   } else {
     const nextLocation = findNextBlock(script, pageId, blockId);
     if (nextLocation) {
       twiml.redirect(
-        `${process.env.BASE_URL}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
+        `${env.BASE_URL()}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
       );
     } else {
       twiml.hangup();
@@ -71,32 +80,39 @@ const handleOptions = (twiml, block, campaignId, pageId, blockId, script) => {
 };
 
 const handleBlock = async (
-  supabase,
-  twiml,
-  block,
-  campaignId,
-  pageId,
-  blockId,
-  script,
-  workspace,
+  supabase: SupabaseClient<Database>,
+  twiml: Twilio.twiml.VoiceResponse,
+  block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
+  campaignId: string,
+  pageId: string,
+  blockId: string,
+  script: Script,
+  workspace: string,
 ) => {
   await handleAudio(supabase, twiml, block, workspace);
   handleOptions(twiml, block, campaignId, pageId, blockId, script);
 };
 
-export const action = async ({ params, request }) => {
+export const action = async ({ params, request }: ActionFunctionArgs) => {
   const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
   );
   const twiml = new Twilio.twiml.VoiceResponse();
 
-  const { pageId, blockId, campaignId } = params;
+  const { pageId, blockId, campaignId } = params as { pageId: string; blockId: string; campaignId: string };
+  
+  if (!campaignId || !pageId || !blockId) {
+    return new Response("Missing required parameters", { status: 400 });
+  }
 
   try {
     const campaignData = await getCampaignData(supabase, campaignId);
-    const script = campaignData.ivr_campaign[0].script.steps;
-    const workspace = campaignData.workspace;
+    const script = (campaignData.ivr_campaign[0]?.script?.steps as unknown) as Script;
+    if (!script || !script.blocks || !script.pages) {
+      throw new Error("Invalid script structure");
+    }
+    const workspace = campaignData.workspace as string;
     const currentBlock = script.blocks[blockId];
 
     if (currentBlock) {
@@ -115,7 +131,7 @@ export const action = async ({ params, request }) => {
       twiml.hangup();
     }
   } catch (e) {
-    console.error("IVR Error:", e);
+    logger.error("IVR Error:", e);
     twiml.say("An error occurred. Please try again later.");
     twiml.hangup();
   }

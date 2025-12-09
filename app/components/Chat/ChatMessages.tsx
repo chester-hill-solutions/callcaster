@@ -1,4 +1,19 @@
-export default function MessageList({ messages, messagesEndRef }) {
+interface Message {
+  sid?: string;
+  status?: string;
+  direction?: string;
+  body?: string;
+  signedUrls?: string[];
+  outbound_media?: string[];
+  date_created: string | Date;
+}
+
+interface MessageListProps {
+  messages?: Message[];
+  messagesEndRef: React.RefObject<HTMLDivElement>;
+}
+
+export default function MessageList({ messages, messagesEndRef }: MessageListProps) {
   return (
     <div className="h-full overflow-y-auto p-4">
       {messages?.length > 0 ? (

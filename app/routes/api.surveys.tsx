@@ -1,23 +1,35 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
 import { getUserRole } from "~/lib/database.server";
-import { User } from "~/lib/types";
+import { User, SurveyFormData } from "~/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/lib/database.types";
+import { logger } from "~/lib/logger.server";
+import { createErrorResponse, AppError, ErrorCode, handleDatabaseError } from "~/lib/errors.server";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
-  
-  if (request.method === "POST") {
-    return handleCreateSurvey(request, supabaseClient, user);
-  } else if (request.method === "PATCH") {
-    return handleUpdateSurvey(request, supabaseClient, user);
-  } else if (request.method === "DELETE") {
-    return handleDeleteSurvey(request, supabaseClient, user);
-  }
+  try {
+    const { supabaseClient, user } = await verifyAuth(request);
+    
+    if (request.method === "POST") {
+      return await handleCreateSurvey(request, supabaseClient, user);
+    } else if (request.method === "PATCH") {
+      return await handleUpdateSurvey(request, supabaseClient, user);
+    } else if (request.method === "DELETE") {
+      return await handleDeleteSurvey(request, supabaseClient, user);
+    }
 
-  return json({ error: "Method not allowed" }, { status: 405 });
+    throw new AppError("Method not allowed", 405, ErrorCode.INVALID_OPERATION);
+  } catch (error) {
+    return createErrorResponse(error, "Failed to process survey request");
+  }
 }
 
-async function handleCreateSurvey(request: Request, supabaseClient: any, user: any) {
+async function handleCreateSurvey(
+  request: Request,
+  supabaseClient: SupabaseClient<Database>,
+  user: User
+) {
   try {
     const formData = await request.formData();
     const surveyData = JSON.parse(formData.get("surveyData") as string);
@@ -27,10 +39,20 @@ async function handleCreateSurvey(request: Request, supabaseClient: any, user: a
       return json({ error: "Workspace ID is required" }, { status: 400 });
     }
 
-    // Check user role
+    // Check user role - convert Supabase Auth User to database User type
+    const { data: dbUser, error: dbUserError } = await supabaseClient
+      .from("user")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    
+    if (dbUserError || !dbUser) {
+      return json({ error: "User not found" }, { status: 404 });
+    }
+    
     const userRole = await getUserRole({ 
       supabaseClient, 
-      user: user as unknown as User, 
+      user: dbUser, 
       workspaceId 
     });
 
@@ -51,8 +73,7 @@ async function handleCreateSurvey(request: Request, supabaseClient: any, user: a
       .single();
 
     if (surveyError) {
-      console.error("Error creating survey:", surveyError);
-      return json({ error: "Failed to create survey" }, { status: 500 });
+      handleDatabaseError(surveyError, "Error creating survey");
     }
 
     // Create pages and questions
@@ -71,7 +92,7 @@ async function handleCreateSurvey(request: Request, supabaseClient: any, user: a
           .single();
 
         if (pageError) {
-          console.error("Error creating page:", pageError);
+          logger.error("Error creating page:", pageError);
           continue;
         }
 
@@ -93,7 +114,7 @@ async function handleCreateSurvey(request: Request, supabaseClient: any, user: a
               .single();
 
             if (questionError) {
-              console.error("Error creating question:", questionError);
+              logger.error("Error creating question:", questionError);
               continue;
             }
 
@@ -117,12 +138,15 @@ async function handleCreateSurvey(request: Request, supabaseClient: any, user: a
 
     return json({ success: true, survey });
   } catch (error) {
-    console.error("Error in handleCreateSurvey:", error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    throw error; // Let the action handler catch it
   }
 }
 
-async function handleUpdateSurvey(request: Request, supabaseClient: any, user: any) {
+async function handleUpdateSurvey(
+  request: Request,
+  supabaseClient: SupabaseClient<Database>,
+  user: User
+) {
   try {
     const formData = await request.formData();
     const surveyData = JSON.parse(formData.get("surveyData") as string);
@@ -166,18 +190,22 @@ async function handleUpdateSurvey(request: Request, supabaseClient: any, user: a
       .single();
 
     if (surveyError) {
-      console.error("Error updating survey:", surveyError);
+      logger.error("Error updating survey:", surveyError);
       return json({ error: "Failed to update survey" }, { status: 500 });
     }
 
     return json({ success: true, survey });
   } catch (error) {
-    console.error("Error in handleUpdateSurvey:", error);
+    logger.error("Error in handleUpdateSurvey:", error);
     return json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-async function handleDeleteSurvey(request: Request, supabaseClient: any, user: any) {
+async function handleDeleteSurvey(
+  request: Request,
+  supabaseClient: SupabaseClient<Database>,
+  user: User
+) {
   try {
     const formData = await request.formData();
     const surveyId = formData.get("surveyId") as string;
@@ -215,13 +243,13 @@ async function handleDeleteSurvey(request: Request, supabaseClient: any, user: a
       .eq("survey_id", surveyId);
 
     if (deleteError) {
-      console.error("Error deleting survey:", deleteError);
+      logger.error("Error deleting survey:", deleteError);
       return json({ error: "Failed to delete survey" }, { status: 500 });
     }
 
     return json({ success: true });
   } catch (error) {
-    console.error("Error in handleDeleteSurvey:", error);
+    logger.error("Error in handleDeleteSurvey:", error);
     return json({ error: "Internal server error" }, { status: 500 });
   }
 } 

@@ -4,6 +4,8 @@ import {
   getCampaignQueueById,
 } from "../lib/database.server";
 import { processTemplateTags } from "~/lib/utils";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {
@@ -14,7 +16,7 @@ async function shortenUrl(url: string): Promise<string> {
       return shortenedUrl;
     }
   } catch (error) {
-    console.error('Error shortening URL:', error);
+    logger.error('Error shortening URL:', error);
   }
   return url; // Return original URL if shortening fails
 }
@@ -223,8 +225,8 @@ const createOutreachAttempt = async ({
 
 export const action = async ({ request }: { request: Request }) => {
   const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
   );
 
   try {

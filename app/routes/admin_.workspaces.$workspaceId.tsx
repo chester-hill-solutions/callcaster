@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
-import WorkspaceOverview from "../components/WorkspaceOverview";
+import WorkspaceOverview from "~/components/Workspace/WorkspaceOverview";
 
 interface TwilioPhoneNumber {
     sid: string;
@@ -207,7 +207,11 @@ export default function WorkspaceDetails() {
                     </TabsTrigger>
                 </TabsList>
                 {getActiveTab() === "overview" ? (
-                 <WorkspaceOverview workspace={workspace} workspaceUsers={workspaceUsers} phoneNumbers={phoneNumbers}    />
+                 <WorkspaceOverview 
+                    workspace={workspace as any} 
+                    workspaceUsers={workspaceUsers} 
+                    phoneNumbers={phoneNumbers}    
+                 />
                 ) : (
                     <Outlet context={{ workspace, workspaceUsers, phoneNumbers }} />
                 )}

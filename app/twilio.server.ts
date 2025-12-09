@@ -1,9 +1,10 @@
 import Twilio from 'twilio';
+import { env } from './lib/env.server';
 
-export const twilio: Twilio = singleton<Twilio>(
+export const twilio: Twilio.Twilio = singleton<Twilio.Twilio>(
   'twilio',
   () =>
-    new Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN),
+    new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN()),
 );
 
 export async function sendSms(request: {

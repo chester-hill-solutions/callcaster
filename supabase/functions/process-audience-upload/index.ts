@@ -25,7 +25,8 @@ interface Contact {
   other_data: Array<Record<string, string>>;
   firstname?: string;
   surname?: string;
-  [key: string]: any;
+  upload_id?: number;
+  [key: string]: unknown;
 }
 
 // Process CSV data with proper handling of quoted fields

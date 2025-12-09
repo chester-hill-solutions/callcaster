@@ -32,7 +32,7 @@ interface Contact {
   country?: string | null;
   created_by?: string | null;
   date_updated?: string | null;
-  other_data?: any;
+  other_data?: Record<string, unknown> | null;
 }
 
 interface ContactWithPhonePatterns extends Contact {
@@ -77,7 +77,7 @@ interface OutreachAttempt {
   contact_id: number | string;
   campaign_id: number;
   disposition?: string | null;
-  result?: any;
+  result?: Record<string, unknown> | string | null;
   created_at?: string | null;
 }
 
@@ -529,9 +529,8 @@ const processCallCampaignExport = async (
       throw new Error(scriptError.message || "Error fetching script");
     }
     
-    // First cast to any to bypass type checking, then to Script
-    // This is safe because we know the structure matches our Script interface
-    const script = (scriptData?.script as any) as Script;
+    // Cast to Script - this is safe because we know the structure matches our Script interface
+    const script = (scriptData?.script as unknown) as Script;
 
     const campaign = campaignData as Campaign;
 
@@ -675,21 +674,21 @@ const processCallCampaignExport = async (
           // Extract responses from the attempt result
           if (item.result) {
             try {
-              let resultObj: any;
+              let resultObj: Record<string, unknown>;
               
               // Parse result if it's a string
               if (typeof item.result === 'string') {
-                resultObj = JSON.parse(item.result);
+                resultObj = JSON.parse(item.result) as Record<string, unknown>;
               } else {
-                resultObj = item.result;
+                resultObj = item.result as Record<string, unknown>;
               }
 
-              Object.entries(resultObj).forEach(([pageId, pageData]: [string, any]) => {
+              Object.entries(resultObj).forEach(([pageId, pageData]) => {
                 if (typeof pageData === 'object' && pageData !== null) {
                   visitedPages.add(pageId);
                   
                   // Extract responses directly from the page data
-                  Object.entries(pageData).forEach(([key, value]: [string, any]) => {
+                  Object.entries(pageData as Record<string, unknown>).forEach(([key, value]) => {
                     // Store response by the key directly - we'll match with script questions later
                     responses[key] = String(value);
                    
@@ -822,7 +821,7 @@ const processCallCampaignExport = async (
 };
 
 // Helper function to escape CSV fields
-const escapeCsvField = (value: any): string => {
+const escapeCsvField = (value: unknown): string => {
   if (value === null || value === undefined) return '';
 
   const stringValue = String(value);

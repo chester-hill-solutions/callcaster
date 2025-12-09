@@ -7,7 +7,7 @@ import {
   useLocation,
   useOutletContext,
 } from "@remix-run/react";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { verifyAuth } from "~/lib/supabase.server";
 
 import {
@@ -28,15 +28,15 @@ import {
   NoResultsYet,
   ErrorLoadingResults,
   LoadingResults,
-} from "~/components/CampaignHomeScreen/CampaignResultDisplay";
-import { CampaignInstructions } from "~/components/CampaignHomeScreen/CampaignInstructions";
-import { CampaignHeader } from "~/components/CampaignHomeScreen/CampaignHeader";
-import { NavigationLinks } from "~/components/CampaignHomeScreen/CampaignNav";
-import { useCsvDownload } from "~/hooks/useCsvDownload";
+} from "~/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
+import { CampaignInstructions } from "~/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
+import { CampaignHeader } from "~/components/campaign/home/CampaignHomeScreen/CampaignHeader";
+import { NavigationLinks } from "~/components/campaign/home/CampaignHomeScreen/CampaignNav";
+import { downloadCsv } from "~/lib/csvDownload";
 import { generateCSVContent } from "~/lib/utils";
 import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { SupabaseClient, User } from "@supabase/supabase-js";
-import { useRealtimeData } from "~/hooks/useWorkspaceContacts";
+import { useRealtimeData } from "~/hooks/realtime/useRealtimeData";
 
 export type CampaignState = {
   campaign_id: string;
@@ -170,7 +170,17 @@ export default function CampaignScreen() {
   const isCampaignParentRoute = route.length === 5;
   const { data: campaignDetailsArray, isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails])
   const campaignDetails = campaignDetailsArray?.[0];
-  useCsvDownload(csvData as { csvContent: string, filename: string });
+  
+  // Handle CSV download when csvData is available
+  useEffect(() => {
+    if (csvData?.csvContent && csvData?.filename) {
+      try {
+        downloadCsv(csvData.csvContent, csvData.filename);
+      } catch (error) {
+        console.error('Failed to download CSV:', error);
+      }
+    }
+  }, [csvData]);
 
   const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
     ? "No script selected"

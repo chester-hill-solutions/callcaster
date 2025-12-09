@@ -1,5 +1,8 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/lib/database.types";
+import { logger } from "~/lib/logger.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { supabaseClient } = createSupabaseServerClient(request);
@@ -11,7 +14,10 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ error: "Method not allowed" }, { status: 405 });
 }
 
-async function handleCompleteSurvey(request: Request, supabaseClient: any) {
+async function handleCompleteSurvey(
+  request: Request,
+  supabaseClient: SupabaseClient<Database>
+) {
   try {
     const formData = await request.formData();
     const resultId = formData.get("resultId") as string;
@@ -47,7 +53,7 @@ async function handleCompleteSurvey(request: Request, supabaseClient: any) {
       .eq("result_id", resultId);
 
     if (updateError) {
-      console.error("Error completing survey:", updateError);
+      logger.error("Error completing survey:", updateError);
       return json({ error: "Failed to complete survey" }, { status: 500 });
     }
 
@@ -56,7 +62,7 @@ async function handleCompleteSurvey(request: Request, supabaseClient: any) {
       result_id: resultId 
     });
   } catch (error) {
-    console.error("Error in handleCompleteSurvey:", error);
+    logger.error("Error in handleCompleteSurvey:", error);
     return json({ error: "Internal server error" }, { status: 500 });
   }
 } 

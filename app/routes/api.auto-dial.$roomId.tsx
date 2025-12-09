@@ -3,6 +3,7 @@ import Twilio from "twilio";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { Call } from "~/lib/types";
+import { Database, Tables } from "~/lib/database.types";
 const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
@@ -46,7 +47,7 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
     }
 };
 
-const updateOutreachAttempt = async (attemptId: string, update: any) => {
+const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"outreach_attempt">>) => {
     const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', attemptId).select();
     if (error) throw new Error(`Error updating outreach attempt: ${error.message}`);
     return data;
@@ -60,18 +61,23 @@ const triggerAutoDialer = async (conferenceId: string, campaignId: string, works
     });
 };
 
+type OutreachStatusItem = {
+  user_id: string | number;
+  campaign_id: string | number;
+};
+
 const handleMachineAnswer = async (
     call: CallContext,
-    twilio: any,
+    twilio: Twilio.Twilio,
     dbCall: NonNullable<Partial<Call>>,
-    campaign: any,
+    campaign: NonNullable<Partial<Tables<"campaign">>>,
     signedUrl: string,
-    outreachStatus: any
+    outreachStatus: OutreachStatusItem[]
 ) => {
     const twiml = new Twilio.twiml.VoiceResponse();
-    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue, outreachStatus[0].user_id);
+    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, outreachStatus[0].user_id?.toString() ?? '');
 
-    const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id, status: 'in-progress' });
+    const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id?.toString() ?? '', status: 'in-progress' });
     if (conferences.length) {
         await triggerAutoDialer(outreachStatus[0].user_id?.toString() ?? '', outreachStatus[0].campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
     }

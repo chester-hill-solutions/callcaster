@@ -140,13 +140,18 @@ export type Flags = {
   [key: string]: NestedFlags;
 };
 
-type ScheduleInterval = {
+export type ScheduleInterval = {
   start: string;
   end: string;
 };
 
+export type ScheduleDay = {
+  active: boolean;
+  intervals: ScheduleInterval[];
+};
+
 export type Schedule = {
-  [key: string]: {
+  [key: string]: ScheduleDay | {
     start: string;
     end: string;
   };
@@ -233,7 +238,7 @@ export type LoaderData = {
   campaign: Campaign;
   attempts: OutreachAttempt[];
   user: NonNullable<User>;
-  audiences: any[];
+  audiences: Audience[];
   campaignDetails: CampaignDetails;
   credits: number;
   workspaceId: string;
@@ -252,7 +257,7 @@ export type LoaderData = {
 };
 
 export interface CallAreaProps {
-  conference: any;
+  conference: { parameters: { Sid: string } } | null;
   isBusy: boolean;
   predictive: boolean;
   nextRecipient: QueueItem | null;
@@ -261,7 +266,7 @@ export interface CallAreaProps {
   handleVoiceDrop: () => void;
   hangUp: () => void;
   displayState: string;
-  dispositionOptions: any[];
+  dispositionOptions: string[];
   handleDialNext: () => void;
   handleDequeueNext: () => void;
   disposition: string;
@@ -313,7 +318,7 @@ export interface AppUser extends BaseUser {}
 
 export interface CallParameters {
   CallSid: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface BaseCall {

@@ -1,10 +1,12 @@
 import Twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
 
 export const action = async ({ request }: { request: Request }) => {
     const supabase = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_KEY!,
+        env.SUPABASE_URL(),
+        env.SUPABASE_SERVICE_KEY(),
       );
     
     const formData = await request.formData();
@@ -12,7 +14,7 @@ export const action = async ({ request }: { request: Request }) => {
     const to = formData.get('To');
 
     const twiml = new Twilio.twiml.VoiceResponse();
-    console.log(digits, to)
+    logger.debug("PIN verification request", { digits, to });
     if (!digits || !to) {
         twiml.say('Invalid request. Missing required parameters.');
         twiml.hangup();

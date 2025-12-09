@@ -1,6 +1,8 @@
 import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
 import Stripe from "stripe";
+import { env } from "~/lib/env.server";
+import { logger } from "~/lib/logger.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabaseClient } = await verifyAuth(request);
@@ -11,7 +13,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect("/workspaces");
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const stripe = new Stripe(env.STRIPE_SECRET_KEY());
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -44,7 +46,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`/workspaces/${workspaceId}/settings/credits?success=true`);
 
   } catch (error) {
-    console.error("Payment confirmation error:", error);
+    logger.error("Payment confirmation error:", error);
     
     // If we have the workspaceId in the session metadata, use it for redirect
     const workspaceId = sessionId ? 

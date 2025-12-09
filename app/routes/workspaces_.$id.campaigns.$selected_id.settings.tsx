@@ -1,7 +1,7 @@
 import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
 import { verifyAuth } from "~/lib/supabase.server";
-import { CampaignSettings } from "../components/CampaignSettings";
+import { CampaignSettings } from "~/components/campaign/settings/CampaignSettings";
 import { fetchCampaignAudience } from "~/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -50,11 +50,18 @@ type ActionData = {
   campaignDetails?: CampaignDetails;
 };
 
+type CampaignUpdateFields = {
+  script_id?: number;
+  body_text?: string;
+  message_media?: string | null;
+  [key: string]: unknown;
+};
+
 async function handleCampaignUpdate(
   supabaseClient: SupabaseClient,
   selected_id: string,
   workspace_id: string,
-  updates: Record<string, any>
+  updates: CampaignUpdateFields
 ) {
   if (updates["script_id"] || updates["body_text"] || updates["message_media"]) {
     const { data: campaign, error: getCampaignError } = await supabaseClient
@@ -187,7 +194,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   switch (intent) {
     case "update": {
-      const updates: Record<string, any> = {};
+      const updates: CampaignUpdateFields = {};
       const campaignDataStr = formData.get("campaignData") as string;
       const campaignDetailsStr = formData.get("campaignDetails") as string;
       const campaignData = JSON.parse(campaignDataStr || "{}");
@@ -204,7 +211,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         if (campaignDetailsStr) {
           const tableKey = getCampaignTableKey(campaignData.type);
           await supabaseClient
-            .from(tableKey as any)
+            .from(tableKey as "live_campaign" | "ivr_campaign" | "message_campaign")
             .update({ script_id })
             .eq("campaign_id", Number(selected_id));
         }
@@ -216,7 +223,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const body_text = formData.get("body_text") as string;
         const tableKey = getCampaignTableKey(campaignData.type);
         await supabaseClient
-          .from(tableKey as any)
+          .from(tableKey as "live_campaign" | "ivr_campaign" | "message_campaign")
           .update({ body_text })
           .eq("campaign_id", Number(selected_id));
         return { success: true };
@@ -353,7 +360,7 @@ export default function CampaignSettingsRoute() {
     setConfirmStatus(status);
   };
 
-  const handleInputChange = (name: string, value: any) => {
+  const handleInputChange = (name: string, value: string | number | null | undefined) => {
     if (name === "script_id") {
       // For script selection, we need to update both campaign data and details
       fetcher.submit(
