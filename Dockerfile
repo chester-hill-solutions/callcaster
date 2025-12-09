@@ -6,8 +6,10 @@ ARG CACHE_BUST=1
 RUN echo "Cache bust: $CACHE_BUST"
 
 # Copy package files first for better layer caching
-COPY package*.json ./
-RUN npm ci
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm install
 
 # Copy source code
 COPY . .
