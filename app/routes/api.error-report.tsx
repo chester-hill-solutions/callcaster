@@ -4,6 +4,8 @@ import { verifyAuth } from "@/lib/supabase.server";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const resend = new Resend(process.env.RESEND_API_KEY);
+
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
   try {
     const error = await request.json();
