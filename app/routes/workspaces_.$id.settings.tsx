@@ -1,4 +1,4 @@
-import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
+import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
 
 import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
@@ -34,7 +34,7 @@ import { toast, Toaster } from "sonner";
 import { capitalize } from "~/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "~/components/shared/CustomCard";
-import WebhookEditor from "~/components/Workspace/WebhookEditor";
+import WebhookEditor from "~/components/workspace/WebhookEditor";
 import Workspace from "./workspaces_.$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "~/lib/types";
 
@@ -154,14 +154,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
   const memberRoleArray = Object.values(MemberRole);
 
+  const aRole = a.role as MemberRole;
+  const bRole = b.role as MemberRole;
+
   if (
-    memberRoleArray.indexOf(a.role) <
-    memberRoleArray.indexOf(b.role)
+    memberRoleArray.indexOf(aRole) <
+    memberRoleArray.indexOf(bRole)
   )
     return -1;
   if (
-    memberRoleArray.indexOf(a.role) >
-    memberRoleArray.indexOf(b.role)
+    memberRoleArray.indexOf(aRole) >
+    memberRoleArray.indexOf(bRole)
   )
     return 1;
   return 0;
@@ -188,7 +191,7 @@ export default function WorkspaceSettings() {
     if (actionData && actionData?.error) {
       toast.error(JSON.stringify(actionData.error));
     }
-    if (actionData && (actionData?.data || actionData?.success)) {
+    if (actionData && (('data' in actionData && actionData.data) || ('success' in actionData && actionData.success))) {
       toast.success("Action completed succesfully!");
       formRef?.current?.reset();
     }
@@ -331,15 +334,16 @@ export default function WorkspaceSettings() {
                     </li>
                   );
                 })}
-                {pendingInvites?.map((invite: WorkspaceInvite) => {
+                {pendingInvites?.map((invite) => {
                   if (!invite) {
                     return <></>;
                   }
+                  const inviteWithUser = invite as WorkspaceInvite & {user?: Partial<User>};
                   return (
                     <li key={invite.id} className="w-full">
                       <TeamMember
                         member={{
-                          ...invite.user,
+                          ...(inviteWithUser.user || {}),
                           role: "invited",
                         } as UserWithRole}
                         userRole={userRole}
@@ -430,8 +434,13 @@ export default function WorkspaceSettings() {
               Manage Webhook
             </h3>
             <div className="flex flex-col py-4">
-              {hasAccess && workspace?.id ? (
-                <WebhookEditor initialWebhook={webhook || null} userId={activeUserId} workspaceId={workspace.id} />
+              {hasAccess && workspace && 'id' in workspace && typeof workspace.id === 'string' ? (
+                <WebhookEditor initialWebhook={webhook ? {
+                  id: String(webhook.id || ''),
+                  destination_url: webhook.destination_url || '',
+                  events: Array.isArray(webhook.event) ? webhook.event.map((e: string) => ({ category: 'inbound_call' as const, type: e as 'INSERT' | 'UPDATE' })) : [],
+                  custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
+                } : undefined} userId={activeUserId} workspaceId={workspace.id} />
               ) : (
                 <p className="text-center text-gray-600">
                   You don't have permission to manage webhooks.

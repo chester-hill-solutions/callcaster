@@ -8,7 +8,7 @@ import {
   useFetcher,
 } from "@remix-run/react";
 import { LoaderFunction, ActionFunction } from "@remix-run/node";
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
@@ -53,7 +53,8 @@ import type {
   ActiveCall,
   CampaignDetails
 } from "~/lib/types";
-import { MemberRole } from "~/components/Workspace/TeamMember";
+import { Tables } from "~/lib/database.types";
+import { MemberRole } from "~/components/workspace/TeamMember";
 
 export { ErrorBoundary };
 
@@ -402,7 +403,7 @@ const { saveData, isSaving } = useDebouncedSave({
   campaign,
   workspaceId,
   disposition,
-  toast,
+  toast: toast as unknown as { success: (message: React.ReactNode, data?: unknown) => string | number; error: (message: React.ReactNode, data?: unknown) => string | number; warning: (message: React.ReactNode, data?: unknown) => string | number },
 });
 
 // Callback handlers
@@ -486,7 +487,7 @@ const handleDequeueNext = useCallback(() => {
   } else if (campaign.dial_type === "call") {
     saveData();
     dequeue({ contact: nextRecipient });
-    fetchMore({ householdMap: new Map(Object.entries(householdMap)) });
+    fetchMore({ householdMap });
     handleNextNumber(campaign?.group_household_queue || false);
     send({ type: "HANG_UP" });
     setRecentAttempt(null);
@@ -552,15 +553,15 @@ const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectE
         if (activeCall) {
           activeCall._setInputTracksFromStream(newStream).then(() => {
             console.log("Active call input tracks updated with new microphone");
-          }).catch((error) => {
+          }).catch((error: unknown) => {
             console.error("Error updating active call input tracks:", error);
           });
         }
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error("Error getting stream from new microphone:", error);
       });
-  }).catch((error) => {
+  }).catch((error: unknown) => {
     console.error("Error setting microphone:", error);
   });
 }, [device, activeCall]);
@@ -571,7 +572,7 @@ const handleSpeakerChange = useCallback((event: React.ChangeEvent<HTMLSelectElem
   setOutput(selectedSpeaker);
   device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
     console.log("Speaker set to", selectedSpeaker);
-  }).catch((error) => {
+  }).catch((error: unknown) => {
     console.error("Error setting speaker:", error);
   });
 }, [device]);
@@ -859,7 +860,7 @@ return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       <div className="space-y-6">
         <CallArea
-          conference={conference}
+          conference={conference ? { parameters: { Sid: conference } } : null}
           isBusy={isBusy || deviceIsBusy}
           predictive={campaign.dial_type === "predictive"}
           nextRecipient={nextRecipient}
@@ -870,7 +871,7 @@ return (
             campaign.dial_type === "predictive"
               ? () => handleConferenceEnd({
                 activeCall: activeCall as unknown as ActiveCall,
-                setConference: setConference,
+                setConference: () => setConference(null),
                 workspaceId,
               })
               : () => {
@@ -891,16 +892,21 @@ return (
         <Household
           isBusy={isBusy}
           house={house}
-          switchQuestionContact={switchQuestionContact}
+          switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact.contact })}
           attemptList={attemptList as unknown as (Tables<"outreach_attempt"> & { result?: { status?: string } })[]}
           questionContact={questionContact}
         />
       </div>
       <CallQuestionnaire
         isBusy={isBusy}
-        handleResponse={handleResponse}
-        campaignDetails={campaignDetails as unknown as CampaignDetails}
-        update={update || {}}
+        handleResponse={(response: { pageId: string; blockId: string; value: string | number | boolean | string[] | null | undefined }) => {
+          const value = response.value;
+          if (value !== undefined && value !== null) {
+            handleResponse({ blockId: response.blockId, value: typeof value === 'string' || Array.isArray(value) ? value : String(value) });
+          }
+        }}
+        campaignDetails={campaignDetails as unknown as CampaignDetails & { script: { steps: { pages?: Record<string, { id: string; title: string; blocks: string[] }>; blocks?: Record<string, { id: string; type: string; title: string; content: string; options?: Array<{ value: string; label: string; next: string }>; audioFile: string }> } } }}
+        update={(update || {}) as Record<string, Record<string, string | number | boolean | string[] | null | undefined>>}
         nextRecipient={questionContact}
         handleQuickSave={saveData}
         disabled={!questionContact}
@@ -912,7 +918,7 @@ return (
         queue={campaign.dial_type === "call" ? queue : predictiveQueue}
         handleNextNumber={handleNextNumber}
         nextRecipient={nextRecipient}
-        handleQueueButton={() => fetchMore({ householdMap: new Map(Object.entries(householdMap)) })}
+        handleQueueButton={() => fetchMore({ householdMap })}
         predictive={campaign.dial_type === "predictive"}
         count={count}
         completed={completed}

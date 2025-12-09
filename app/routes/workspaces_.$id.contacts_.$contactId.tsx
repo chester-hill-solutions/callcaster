@@ -9,7 +9,7 @@ import { getUserRole } from "~/lib/database.server";
 import ContactDetails from "~/components/contact/ContactDetails";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
-import { MemberRole } from "~/components/Workspace/TeamMember";
+import { MemberRole } from "~/components/workspace/TeamMember";
 
 interface AudienceChanges {
   additions: ContactAudience[];

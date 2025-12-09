@@ -1,4 +1,4 @@
-import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
+import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
 
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "@remix-run/node";
 import {
@@ -223,7 +223,7 @@ const WorkspaceSettings = () => {
     user,
     workspace: workspaceId,
     init: {
-      phoneNumbers: initNumbers,
+      phoneNumbers: Array.isArray(initNumbers) ? initNumbers : (initNumbers ? [initNumbers] : []),
       queue: [],
       callsList: [],
       predictiveQueue: [],
@@ -288,7 +288,7 @@ const WorkspaceSettings = () => {
         <div className="flex flex-wrap p-4 gap-4">
           <Panel className="flex-grow flex-shrink-0 basis-full lg:basis-[calc(66.666%-1rem)]">
             <NumbersTable
-              phoneNumbers={phoneNumbers}
+              phoneNumbers={phoneNumbers || []}
               users={users}
               mediaNames={mediaNames}
               onIncomingActivityChange={handleIncomingActivityChange}

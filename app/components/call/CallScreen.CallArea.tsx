@@ -28,7 +28,7 @@ interface CallAreaProps {
   handleDialNext: () => void;
   handleDequeueNext: () => void;
   disposition: string;
-  dispositionOptions: string[];
+  dispositionOptions: Array<{ value: string; label: string }> | string[];
   setDisposition: (disposition: string) => void;
   recentAttempt: Attempt | null;
   predictive: boolean;
@@ -211,11 +211,15 @@ export const CallArea: React.FC<CallAreaProps> = ({
               }}
             >
               <option value="idle">Select a disposition</option>
-              {dispositionOptions?.map(({ value, label }, i) => (
-                <option value={value} key={i}>
-                  {label}
-                </option>
-              ))}
+              {dispositionOptions?.map((option, i) => {
+                const value = typeof option === 'string' ? option : option.value;
+                const label = typeof option === 'string' ? option : option.label;
+                return (
+                  <option value={value} key={i}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
             <button
               disabled={isBusy || disposition === "idle"}
