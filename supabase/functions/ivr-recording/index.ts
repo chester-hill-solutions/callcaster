@@ -1,7 +1,6 @@
-import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
-import { SupabaseClient } from "@supabase/supabase-js";
 
 interface TwilioEventData {
   CallSid?: string;
