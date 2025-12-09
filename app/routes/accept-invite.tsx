@@ -23,8 +23,8 @@ import {
   getInvitesByUserId,
 } from "@/lib/database.server";
 import { Button } from "@/components/ui/button";
-import { NewUserSignup } from "@/components/invite/AcceptInvite/NewUserSignUp";
-import { ExistingUserInvites } from "@/components/invite/AcceptInvite/ExistingUserInvites";
+import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
+import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
 import { toast, Toaster } from "sonner";
 import { useEffect } from "react";
 import type { Database } from "@/lib/database.types";

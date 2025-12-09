@@ -28,7 +28,7 @@ import {
   handleUpdateWebhook,
   removeInvite,
   testWebhook,
-} from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+} from "@/lib/workspace-settings/WorkspaceSettingUtils";
 
 import { toast, Toaster } from "sonner";
 import { capitalize } from "@/lib/utils";
