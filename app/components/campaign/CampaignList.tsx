@@ -2,7 +2,7 @@ import React from "react";
 import { NavLink } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
 import { Card, CardHeader } from "~/components/ui/card";
-import { MemberRole } from "~/components/workspace/TeamMember";
+import { MemberRole } from "~/components/Workspace/TeamMember";
 import { Badge } from "~/components/ui/badge";
 import { Campaign } from "~/lib/types";
 
