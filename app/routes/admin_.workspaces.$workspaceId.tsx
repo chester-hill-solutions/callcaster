@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
 import { createWorkspaceTwilioInstance } from "~/lib/database.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
-import WorkspaceOverview from "~/components/Workspace/WorkspaceOverview";
+import WorkspaceOverview from "~/components/workspace/WorkspaceOverview";
 
 interface TwilioPhoneNumber {
     sid: string;

@@ -9,8 +9,8 @@ import {
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
-import { DataTable } from "~/components/Workspace/WorkspaceTable/DataTable";
+import WorkspaceNav from "~/components/workspace/WorkspaceNav";
+import { DataTable } from "~/components/workspace/WorkspaceTable/DataTable";
 import TablePagination from "~/components/shared/TablePagination";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -383,7 +383,7 @@ export default function WorkspaceContacts() {
                 header: "Other Data",
                 cell: ({ row }) => {
                   const otherData = row.original.other_data;
-                  if (!otherData || otherData.length === 0) {
+                  if (!otherData || !Array.isArray(otherData) || otherData.length === 0) {
                     return <div className="text-gray-400">-</div>;
                   }
                   
@@ -391,14 +391,18 @@ export default function WorkspaceContacts() {
                   console.log('other_data structure:', otherData);
                   
                   // Show first 2 items, then indicate if there are more
-                  const displayItems = otherData.slice(0, 2);
-                  const hasMore = otherData.length > 2;
+                  const validItems = otherData.filter((item): item is NonNullable<typeof item> => item !== null && item !== undefined);
+                  const displayItems = validItems.slice(0, 2);
+                  const hasMore = validItems.length > 2;
                   
-                  type OtherDataItem = { key: string; value: unknown } | Record<string, unknown>;
+                  type OtherDataItem = { key: string; value: unknown } | Record<string, unknown> | string | number | boolean;
                   
-                  const formatOtherData = (data: OtherDataItem[]) => {
-                    return data.map((item: OtherDataItem, i: number) => {
-                      let key, value;
+                  const formatOtherData = (data: unknown[]) => {
+                    return data.filter((item): item is OtherDataItem => {
+                      if (item === null || item === undefined) return false;
+                      return typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || typeof item === 'object';
+                    }).map((item: OtherDataItem, i: number) => {
+                      let key: string | undefined, value: unknown;
                       
                       // Debug: Log each item to understand its structure
                       console.log('Processing item:', item, 'Type:', typeof item);
@@ -406,7 +410,7 @@ export default function WorkspaceContacts() {
                       // Try to extract key and value based on common patterns
                       if (typeof item === 'object' && item !== null) {
                         // Check if it has explicit key/value properties
-                        if (item.key !== undefined && item.value !== undefined) {
+                        if ('key' in item && typeof item.key === 'string' && 'value' in item) {
                           key = item.key;
                           value = item.value;
                         }
@@ -453,7 +457,7 @@ export default function WorkspaceContacts() {
                   return (
                     <div className="group relative">
                       <div className="space-y-1">
-                        {formatOtherData(displayItems)}
+                        {formatOtherData(displayItems as unknown[])}
                         {hasMore && (
                           <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
                             +{otherData.length - 2} more
@@ -468,7 +472,7 @@ export default function WorkspaceContacts() {
                             All Additional Data:
                           </div>
                           <div className="space-y-1">
-                            {formatOtherData(otherData)}
+                            {formatOtherData(otherData as unknown[])}
                           </div>
                           {/* Debug: Show raw data structure */}
                           <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">

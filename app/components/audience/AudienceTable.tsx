@@ -150,7 +150,7 @@ export function AudienceTable({
       headers.join(","),
       ...contacts.map(contact =>
         headers.map(header =>
-          JSON.stringify((contact.contact as Record<string, unknown>)[header] || "")
+          JSON.stringify((contact as Record<string, unknown>)[header] || "")
         ).join(",")
       )
     ].join("\n");

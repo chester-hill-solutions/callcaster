@@ -151,23 +151,23 @@ const IVRQuestionBlock = ({
         next: value,
       };
     });
-    handleChange("options", newOptions);
+    handleChange("options", newOptions as IVROption[]);
   };
 
   const handleOptionChange = (index: number, newOption: IVROption) => {
     const newOptions = [...localBlock.options];
     newOptions[index] = newOption;
-    handleChange("options", newOptions);
+    handleChange("options", newOptions as IVROption[]);
   };
 
   const handleAddOption = () => {
     const newOptions = [...localBlock.options, { content: "", next: "" }];
-    handleChange("options", newOptions);
+    handleChange("options", newOptions as IVROption[]);
   };
 
   const handleRemoveOption = (index: number) => {
     const newOptions = localBlock.options.filter((_, i) => i !== index);
-    handleChange("options", newOptions);
+    handleChange("options", newOptions as IVROption[]);
   };
 
   return (

@@ -10,7 +10,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import WorkspaceNav from "~/components/Workspace/WorkspaceNav";
+import WorkspaceNav from "~/components/workspace/WorkspaceNav";
 import { Button } from "~/components/ui/button";
 import {
   getUserRole,

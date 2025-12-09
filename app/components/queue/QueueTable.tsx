@@ -347,7 +347,10 @@ export function QueueTable({
             ),
         },
         {
-            accessorFn: (row) => row.contact?.audiences?.map(a => a.name).join(', ') || '-',
+            accessorFn: (row) => {
+                const contact = row.contact as Contact & { audiences?: Array<{ name: string }> };
+                return contact?.audiences?.map((a: { name: string }) => a.name).join(', ') || '-';
+            },
             id: 'audiences',
             header: ({ column }) => (
                 <div className="space-y-1">
@@ -466,7 +469,10 @@ export function QueueTable({
             ),
         },
         {
-            accessorFn: (row) => row.contact?.outreach_attempt[0]?.disposition || '-',
+            accessorFn: (row) => {
+                const contact = row.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
+                return contact?.outreach_attempt?.[0]?.disposition || '-';
+            },
             id: 'status',
             header: ({ column }) => {
                 return (
@@ -486,7 +492,8 @@ export function QueueTable({
                 )
             },
             cell: ({ row }) => {
-                const disposition: 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' = row.original.contact?.outreach_attempt[0]?.disposition;
+                const contact = row.original.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
+                const disposition: 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' = contact?.outreach_attempt?.[0]?.disposition as 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' || 'unknown';
                 const badgeClass = disposition === 'completed' ? 'bg-green-500/10 text-green-800' : disposition === 'failed' ? 'bg-red-500/20 text-red-800' : disposition === 'no-answer' ? 'bg-yellow-500/20 text-yellow-800' : disposition === 'voicemail' ? 'bg-blue-500/10 text-blue-800' : 'bg-gray-500/10 text-gray-800';
                 return (
                     <span className={`text-center w-full text-[8px] px-2 py-1 rounded-full ${badgeClass}`}>{disposition?.trim().toUpperCase() || '-'}</span   >

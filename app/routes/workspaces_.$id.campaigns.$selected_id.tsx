@@ -22,7 +22,7 @@ import {
   getWorkspaceUsers,
   processOutreachExportData,
 } from "~/lib/database.server";
-import { MemberRole } from "~/components/Workspace/TeamMember";
+import { MemberRole } from "~/components/workspace/TeamMember";
 import {
   ResultsDisplay,
   NoResultsYet,

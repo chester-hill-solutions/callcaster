@@ -1,8 +1,8 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect, useLoaderData, useOutletContext } from "@remix-run/react";
-import { mediaColumns } from "~/components/Media/columns";
+import { mediaColumns } from "~/components/media/columns";
 
-import { DataTable } from "~/components/Workspace/WorkspaceTable/DataTable";
+import { DataTable } from "~/components/workspace/WorkspaceTable/DataTable";
 import { getUserRole } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
 import { Workspace, User } from "~/lib/types";
