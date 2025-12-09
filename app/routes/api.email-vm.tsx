@@ -10,8 +10,6 @@ import type { Database } from "@/lib/database.types";
 
 const resend = new Resend(env.RESEND_API_KEY());
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   try {
     const formData = await request.formData();
