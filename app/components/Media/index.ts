@@ -1,0 +1,2 @@
+export { mediaColumns } from "./columns";
+
