@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { WorkspaceNumbers } from "~/lib/types";
+import { WorkspaceNumbers } from "@/lib/types";
 
 /**
  * Hook for managing workspace phone numbers state

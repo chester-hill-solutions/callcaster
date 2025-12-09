@@ -11,10 +11,10 @@ import {
 
 import { MdAdd, MdClose } from "react-icons/md";
 import { Toaster, toast } from "sonner";
-import { Button } from "~/components/ui/button";
-import { verifyAuth } from "~/lib/supabase.server";
-import { CardContent } from "~/components/ui/card";
-import { Card, CardActions, CardTitle } from "~/components/shared/CustomCard";
+import { Button } from "@/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import { CardContent } from "@/components/ui/card";
+import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

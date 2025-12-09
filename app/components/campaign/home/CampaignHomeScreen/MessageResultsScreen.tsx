@@ -1,4 +1,4 @@
-import { ResultsScreenProps, DispositionResult } from "~/lib/types";
+import { ResultsScreenProps, DispositionResult } from "@/lib/types";
 import { TotalMessages } from "./ResultsScreen.TotalCalls";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";

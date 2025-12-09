@@ -1,6 +1,6 @@
 import { json } from "@remix-run/node";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { twilio } from "~/twilio.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { twilio } from "@/twilio.server";
 
 export const action = async ({ request }: { request: Request }) => {
     const { supabaseClient: supabase, headers } = await createSupabaseServerClient(request);

@@ -11,9 +11,9 @@ import {
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { Toaster, toast } from "sonner";
-import { Card, CardActions, CardContent, CardTitle } from "~/components/shared/CustomCard";
-import { Button } from "~/components/ui/button";
-import { verifyAuth } from "~/lib/supabase.server";
+import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { Button } from "@/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

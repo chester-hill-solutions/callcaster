@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { env } from "~/lib/env.server";
+import { env } from "@/lib/env.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import type { Database } from "~/lib/database.types";
+import type { Database } from "@/lib/database.types";
 
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase

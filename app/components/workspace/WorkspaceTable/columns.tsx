@@ -1,9 +1,9 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import type { Audience, Campaign, Contact } from "~/lib/types";
-import { formatDateToLocale, formatTableText } from "~/lib/utils";
-import { Progress } from "~/components/ui/progress";
+import type { Audience, Campaign, Contact } from "@/lib/types";
+import { formatDateToLocale, formatTableText } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 import { MdDownload, MdEdit, MdRemoveCircle } from "react-icons/md";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { NavLink, useFetcher, useSubmit } from "@remix-run/react";
 import { useEffect } from "react";
 

@@ -8,10 +8,10 @@ import {
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Button } from "~/components/ui/button";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card, CardContent, CardTitle } from "~/components/shared/CustomCard";
-import { handleNewAudience } from "~/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
+import { Button } from "@/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { handleNewAudience } from "@/lib/WorkspaceSelectedNewUtils/WorkspaceSelectedNewUtils";
 import { MdAdd, MdClose } from "react-icons/md";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

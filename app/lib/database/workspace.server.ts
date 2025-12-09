@@ -10,7 +10,7 @@ import {
   User,
 } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
-import { MemberRole } from "~/components/workspace/TeamMember";
+import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";

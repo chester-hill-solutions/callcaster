@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -8,9 +8,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import { Form, NavLink, useFetcher, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
-import { QueueItem } from "~/lib/types";
+import { QueueItem } from "@/lib/types";
 
 type HouseholdMap = Record<string, QueueItem[]>;
 

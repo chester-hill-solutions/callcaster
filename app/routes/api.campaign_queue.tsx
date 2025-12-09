@@ -1,7 +1,7 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { parseRequestData } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { CampaignQueue } from "~/lib/types";
+import { parseRequestData } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { CampaignQueue } from "@/lib/types";
 import { filteredSearch } from "./workspaces_.$id.campaigns.$selected_id.queue";
 
 export const action = async ({ request }: ActionFunctionArgs) => {

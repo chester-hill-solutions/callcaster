@@ -1,14 +1,14 @@
 import { json, redirect, LoaderFunctionArgs, ActionFunctionArgs  } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import { useState, useEffect } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
-import CampaignSettingsScript from "~/components/campaign/settings/script/CampaignSettings.Script";
-import { deepEqual } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { getUserRole, listMedia } from "~/lib/database.server";
-import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
-import { Script, WorkspaceData, User } from "~/lib/types";
-import { MemberRole } from "~/components/workspace/TeamMember";
+import { verifyAuth } from "@/lib/supabase.server";
+import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
+import { deepEqual } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { getUserRole, listMedia } from "@/lib/database.server";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { Script, WorkspaceData, User } from "@/lib/types";
+import { MemberRole } from "@/components/workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
   
 type LoaderDataProps = Promise<{

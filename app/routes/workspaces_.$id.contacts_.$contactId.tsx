@@ -2,14 +2,14 @@ import { FaPlus } from "react-icons/fa";
 import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { deepEqual } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
-import ContactDetails from "~/components/contact/ContactDetails";
+import { verifyAuth } from "@/lib/supabase.server";
+import { deepEqual } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { getUserRole } from "@/lib/database.server";
+import ContactDetails from "@/components/contact/ContactDetails";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
-import { MemberRole } from "~/components/workspace/TeamMember";
+import { MemberRole } from "@/components/workspace/TeamMember";
 
 interface AudienceChanges {
   additions: ContactAudience[];

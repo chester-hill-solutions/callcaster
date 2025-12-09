@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { logger } from '~/lib/logger.client';
+import { logger } from '@/lib/logger.client';
 
 // Types - Device and Call instances are passed as parameters or created dynamically
 type Device = any;

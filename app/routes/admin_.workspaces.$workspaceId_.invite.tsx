@@ -2,19 +2,19 @@ import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, json, useActionData, useLoaderData } from "@remix-run/react";
 import { useEffect, useRef } from "react";
 import { toast, Toaster } from "sonner";
-import { Button } from "~/components/ui/button";
-import { Card } from "~/components/shared/CustomCard";
-import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
-import { verifyAuth } from "~/lib/supabase.server";
-import { capitalize } from "~/lib/utils";
-import type { Database, Tables } from "~/lib/database.types";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/shared/CustomCard";
+import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
+import { verifyAuth } from "@/lib/supabase.server";
+import { capitalize } from "@/lib/utils";
+import type { Database, Tables } from "@/lib/database.types";
 import {
   handleAddUser,
   handleDeleteSelf,
   handleDeleteUser,
   handleUpdateUser,
   removeInvite,
-} from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+} from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 

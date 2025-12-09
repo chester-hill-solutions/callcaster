@@ -1,14 +1,14 @@
 import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
 import { useLoaderData, Link, Outlet, useLocation } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
-import WorkspaceOverview from "~/components/workspace/WorkspaceOverview";
+import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
 
 interface TwilioPhoneNumber {
     sid: string;

@@ -1,7 +1,7 @@
-import { Button } from "~/components/ui/button";
-import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "~/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Select, SelectItem, SelectTrigger, SelectValue, SelectContent } from "@/components/ui/select";
 import { FaTimes } from "react-icons/fa";
-import type { Audience } from "~/lib/types";
+import type { Audience } from "@/lib/types";
 
 interface QueueHeaderProps {
     totalCount: number;

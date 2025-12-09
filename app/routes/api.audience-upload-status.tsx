@@ -1,5 +1,5 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);

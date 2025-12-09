@@ -1,7 +1,7 @@
 import { json } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request, params }) => {
   const formData = await request.formData();

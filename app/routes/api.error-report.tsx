@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 

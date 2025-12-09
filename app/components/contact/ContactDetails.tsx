@@ -4,13 +4,13 @@ import {
   CardHeader,
   CardContent,
   CardFooter,
-} from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { FaEdit, FaSave } from "react-icons/fa";
 import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
 import RecentContacts from "./RecentContacts";
-import { Audience, Contact, ContactAudience } from "~/lib/types";
+import { Audience, Contact, ContactAudience } from "@/lib/types";
 
 const ContactDetails = ({
   contact,

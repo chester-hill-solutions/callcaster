@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { Trash } from "lucide-react";
 
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { AudienceContactRow } from "./AudienceContactRow";
 import { ContactForm } from "./ContactForm";
-import { Contact } from "~/lib/types";
-import { Json } from "~/lib/database.types";
+import { Contact } from "@/lib/types";
+import { Json } from "@/lib/database.types";
 
 // Types
 interface ContactTableProps {

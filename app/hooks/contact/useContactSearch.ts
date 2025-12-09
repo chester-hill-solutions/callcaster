@@ -1,7 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { MutableRefObject, useEffect, useState, useCallback } from "react";
-import { Contact } from "~/lib/types";
-import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "~/lib/utils/phone";
+import { Contact } from "@/lib/types";
+import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
 
 interface UseContactSearchProps {
   supabase: SupabaseClient;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ImportIcon, XIcon } from "lucide-react";
 import 'tailwindcss/tailwind.css';
 

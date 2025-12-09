@@ -1,6 +1,6 @@
-import { TableHeader } from "~/components/call-list/CallList/TableHeader";
-import QueueContact from "~/components/call-list/CallList/CallContact/CallContact";
-import { Tables } from "~/lib/database.types";
+import { TableHeader } from "@/components/call-list/CallList/TableHeader";
+import QueueContact from "@/components/call-list/CallList/CallContact/CallContact";
+import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

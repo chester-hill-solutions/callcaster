@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import WeeklyScheduleTable from "./CampaignBasicInfo.Schedule";
-import { Button } from "~/components/ui/button";
-import { DateTimePicker } from "~/components/ui/datetime";
-import { Label } from "~/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { DateTimePicker } from "@/components/ui/datetime";
+import { Label } from "@/components/ui/label";
 import { Clock } from "lucide-react";
 import {
   Campaign,
@@ -13,7 +13,7 @@ import {
   ScheduleDay,
   ScheduleInterval,
   Script,
-} from "~/lib/types";
+} from "@/lib/types";
 import { FetcherWithComponents, useSubmit } from "@remix-run/react";
 
 type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';

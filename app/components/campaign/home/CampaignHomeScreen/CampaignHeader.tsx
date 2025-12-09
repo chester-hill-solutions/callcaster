@@ -1,7 +1,7 @@
 import { NavLink } from "@remix-run/react";
 import { MdCampaign } from "react-icons/md";
-import { Badge } from "~/components/ui/badge";
-import { Enums } from "~/lib/database.types";
+import { Badge } from "@/components/ui/badge";
+import { Enums } from "@/lib/database.types";
 
 type HeaderProps = {
   title: string;

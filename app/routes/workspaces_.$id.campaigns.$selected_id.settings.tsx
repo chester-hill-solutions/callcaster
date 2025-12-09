@@ -1,8 +1,8 @@
 import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { CampaignSettings } from "~/components/campaign/settings/CampaignSettings";
-import { fetchCampaignAudience } from "~/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
+import { fetchCampaignAudience } from "@/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
   Audience,
@@ -16,10 +16,10 @@ import {
   MessageCampaign,
   IVRCampaign,
   Survey,
-} from "~/lib/types";
-import { Button } from "~/components/ui/button";
+} from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { getCampaignTableKey } from "~/lib/database.server";
+import { getCampaignTableKey } from "@/lib/database.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 

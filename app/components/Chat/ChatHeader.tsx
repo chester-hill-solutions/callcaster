@@ -1,7 +1,7 @@
 import React, { RefObject, useState } from "react";
 import { MdEdit, MdExpandMore } from "react-icons/md";
-import { Contact } from "~/lib/types";
-import { Button } from "~/components/ui/button";
+import { Contact } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 
 const getSortableName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {

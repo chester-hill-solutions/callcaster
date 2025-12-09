@@ -1,4 +1,4 @@
-import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
+import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
@@ -11,13 +11,13 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { useEffect, useRef } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   getUserRole,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
-} from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
+} from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import {
   handleAddUser,
   handleDeleteSelf,
@@ -28,15 +28,15 @@ import {
   handleUpdateWebhook,
   removeInvite,
   testWebhook,
-} from "~/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
+} from "@/lib/WorkspaceSettingUtils/WorkspaceSettingUtils";
 
 import { toast, Toaster } from "sonner";
-import { capitalize } from "~/lib/utils";
+import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
-import { Card } from "~/components/shared/CustomCard";
-import WebhookEditor from "~/components/workspace/WebhookEditor";
+import { Card } from "@/components/shared/CustomCard";
+import WebhookEditor from "@/components/workspace/WebhookEditor";
 import Workspace from "./workspaces_.$id";
-import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "~/lib/types";
+import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 
 type UserWithRole = Partial<User> & { role: string };
 

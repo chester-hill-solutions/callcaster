@@ -1,4 +1,4 @@
-import { TwilioAccountData } from "~/lib/types";
+import { TwilioAccountData } from "@/lib/types";
 export type Json =
   | string
   | number

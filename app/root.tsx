@@ -19,17 +19,17 @@ import {
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect } from "react";
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 
-import Navbar from "~/components/layout/Navbar";
-import type { ENV, User, WorkspaceData, WorkspaceInvite } from "~/lib/types";
-import stylesheet from "~/tailwind.css";
+import Navbar from "@/components/layout/Navbar";
+import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
+import stylesheet from "@/tailwind.css";
 import { Database } from "./lib/database.types";
 
 import { Session } from "@supabase/supabase-js";
-import { env as envUtil } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
-import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
+import { env as envUtil } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 type LoaderData = {
   env: ENV;

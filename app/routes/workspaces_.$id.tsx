@@ -10,20 +10,20 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { FaChevronDown, FaChevronUp } from "react-icons/fa";
-import WorkspaceNav from "~/components/workspace/WorkspaceNav";
-import { Button } from "~/components/ui/button";
+import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import { Button } from "@/components/ui/button";
 import {
   getUserRole,
   getWorkspaceInfoWithDetails,
   type WorkspaceInfoWithDetails,
-} from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { useRealtimeData } from "~/hooks/realtime/useRealtimeData";
-import CampaignEmptyState from "~/components/campaign/CampaignEmptyState";
-import CampaignsList from "~/components/campaign/CampaignList";
-import { Campaign, ContextType, User } from "~/lib/types";
+} from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
+import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
+import CampaignsList from "@/components/campaign/CampaignList";
+import { Campaign, ContextType, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {

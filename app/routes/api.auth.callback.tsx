@@ -1,7 +1,7 @@
 import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
+import { Database } from "@/lib/database.types";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);

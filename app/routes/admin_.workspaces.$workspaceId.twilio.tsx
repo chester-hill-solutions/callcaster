@@ -1,12 +1,12 @@
 import { LoaderFunctionArgs, defer, redirect } from "@remix-run/node";
 import { Await, useLoaderData, useOutletContext } from "@remix-run/react";
 import { Suspense } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { createWorkspaceTwilioInstance } from "~/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Phone, MessageSquare, RefreshCw, Image, FileText, Loader2 } from "lucide-react";
 
 interface TwilioPhoneNumber {

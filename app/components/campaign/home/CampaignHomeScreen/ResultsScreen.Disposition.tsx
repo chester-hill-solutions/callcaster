@@ -1,4 +1,4 @@
-import { DispositionResult } from "~/lib/types";
+import { DispositionResult } from "@/lib/types";
 
 const dispositionColors: Record<string, string> = {
   voicemail: "bg-blue-500",

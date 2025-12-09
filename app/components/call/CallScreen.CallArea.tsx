@@ -1,7 +1,7 @@
-import { Tables } from "~/lib/database.types";
-import { QueueItem } from "~/lib/types";
-import { formatTime } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
+import { Tables } from "@/lib/database.types";
+import { QueueItem } from "@/lib/types";
+import { formatTime } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;

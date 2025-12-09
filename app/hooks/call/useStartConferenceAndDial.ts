@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { BaseUser } from "~/lib/types";
-import { startConferenceAndDial } from "~/lib/services/hooks-api";
+import { BaseUser } from "@/lib/types";
+import { startConferenceAndDial } from "@/lib/services/hooks-api";
 
 /**
  * Hook for starting a Twilio conference and initiating a dial

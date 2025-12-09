@@ -9,15 +9,15 @@ import {
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import { useState, useMemo } from "react";
-import WorkspaceNav from "~/components/workspace/WorkspaceNav";
-import { DataTable } from "~/components/workspace/WorkspaceTable/DataTable";
-import TablePagination from "~/components/shared/TablePagination";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { getUserRole } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { User } from "~/lib/types";
-import { formatDateToLocale } from "~/lib/utils";
+import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
+import TablePagination from "@/components/shared/TablePagination";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { getUserRole } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { User } from "@/lib/types";
+import { formatDateToLocale } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;

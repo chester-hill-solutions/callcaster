@@ -1,6 +1,6 @@
 import { FetcherWithComponents, Form, NavLink, useNavigation, useNavigationType, useSubmit } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Audience,
   Campaign,
@@ -18,14 +18,14 @@ import {
   Survey,
   Script,
   WorkspaceNumbers,
-} from "~/lib/types";
+} from "@/lib/types";
 import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
-import { SaveBar } from "~/components/shared/SaveBar";
+import { SaveBar } from "@/components/shared/SaveBar";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
-import { Tables } from "~/lib/database.types";
-import { CampaignState } from "~/routes/workspaces_.$id.campaigns.$selected_id";
+import { Tables } from "@/lib/database.types";
+import { CampaignState } from "@/routes/workspaces_.$id.campaigns.$selected_id";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };

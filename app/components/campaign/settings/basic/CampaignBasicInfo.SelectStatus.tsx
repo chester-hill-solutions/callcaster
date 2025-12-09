@@ -1,11 +1,11 @@
-import { Label } from "~/components/ui/label";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@/components/ui/select";
 
 interface SelectStatusProps {
   handleInputChange: (name: string, value: string) => void;

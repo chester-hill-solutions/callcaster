@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "~/lib/supabase.server";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { redirect, json } from "@remix-run/node";
 import twilio from "twilio";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";

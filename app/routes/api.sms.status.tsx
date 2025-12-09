@@ -2,12 +2,12 @@ import { ActionFunction } from "@remix-run/node";
 import { json } from "@remix-run/react";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { cancelQueuedMessages } from "~/lib/database.server";
-import { Database } from "~/lib/database.types";
-import { Campaign, OutreachAttempt } from "~/lib/types";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
-import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "~/lib/twilio.types";
+import { cancelQueuedMessages } from "@/lib/database.server";
+import { Database } from "@/lib/database.types";
+import { Campaign, OutreachAttempt } from "@/lib/types";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
 
 export const action: ActionFunction = async ({ request }) => {
   const supabase = createClient<Database>(

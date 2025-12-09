@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MdClose } from "react-icons/md";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 interface MessagesImagesProps {
   selectedImages: (string | null)[];

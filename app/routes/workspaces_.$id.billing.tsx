@@ -1,11 +1,11 @@
 import { json, type LoaderFunctionArgs, redirect, type ActionFunctionArgs } from "@remix-run/node";
 import { useLoaderData, Form, useActionData } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
-import { Card } from "~/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useState } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import Stripe from "stripe";
-import { env } from "~/lib/env.server";
+import { env } from "@/lib/env.server";
 
 async function getStripeCustomerHistory(stripeCustomerId: string) {
   const stripe = new Stripe(env.STRIPE_SECRET_KEY());

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "~/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 
 export const EditResponseModal = ({ isOpen, onClose, onSave, initialInput }) => {
   const [input, setInput] = useState(initialInput || '');

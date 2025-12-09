@@ -2,8 +2,8 @@ import { json, redirect } from "@remix-run/node";
 import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
-import { Button } from "~/components/ui/button";
-import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
+import { Button } from "@/components/ui/button";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);

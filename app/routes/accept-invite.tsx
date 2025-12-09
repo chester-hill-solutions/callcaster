@@ -17,17 +17,17 @@ import { EmailOtpType } from "@supabase/supabase-js";
 import {
   createSupabaseServerClient,
   verifyAuth,
-} from "~/lib/supabase.server";
+} from "@/lib/supabase.server";
 import {
   acceptWorkspaceInvitations,
   getInvitesByUserId,
-} from "~/lib/database.server";
-import { Button } from "~/components/ui/button";
-import { NewUserSignup } from "~/components/invite/AcceptInvite/NewUserSignUp";
-import { ExistingUserInvites } from "~/components/invite/AcceptInvite/ExistingUserInvites";
+} from "@/lib/database.server";
+import { Button } from "@/components/ui/button";
+import { NewUserSignup } from "@/components/invite/AcceptInvite/NewUserSignUp";
+import { ExistingUserInvites } from "@/components/invite/AcceptInvite/ExistingUserInvites";
 import { toast, Toaster } from "sonner";
 import { useEffect } from "react";
-import type { Database } from "~/lib/database.types";
+import type { Database } from "@/lib/database.types";
 
 type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
 type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];

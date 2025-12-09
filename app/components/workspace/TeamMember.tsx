@@ -1,8 +1,8 @@
 import { clsx } from "clsx";
 import { useTheme } from "next-themes";
 import { GrUserSettings } from "react-icons/gr";
-import { Button } from "~/components/ui/button";
-import { capitalize } from "~/lib/utils";
+import { Button } from "@/components/ui/button";
+import { capitalize } from "@/lib/utils";
 import {
   Sheet,
   SheetContent,
@@ -10,11 +10,11 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "~/components/ui/sheet";
+} from "@/components/ui/sheet";
 
 import { Form } from "@remix-run/react";
 import { MdCancel } from "react-icons/md";
-import { User } from "~/lib/types";
+import { User } from "@/lib/types";
 
 export enum MemberRole {
   Owner = "owner",

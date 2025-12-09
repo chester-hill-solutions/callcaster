@@ -1,8 +1,8 @@
 import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import Stripe from "stripe";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabaseClient } = await verifyAuth(request);

@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect } from "react";
-import Result from "~/components/call-list/CallList/CallContact/Result";
+import Result from "@/components/call-list/CallList/CallContact/Result";
 import QuestionBlockOption from "./CampaignSettings.Script.QuestionBlock.Option";
 import { GrAddCircle, GrSubtractCircle } from "react-icons/gr";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { Block, BlockOption } from "~/lib/types";
+import { Block, BlockOption } from "@/lib/types";
 
 const questionTypes = [
   { value: "textarea", label: "Text Input" },

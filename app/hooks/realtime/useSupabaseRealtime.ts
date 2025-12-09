@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { SupabaseClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { useQueue } from "~/hooks/queue/useQueue";
-import { useAttempts } from "~/hooks/queue/useAttempts";
-import { useCalls } from "~/hooks/queue/useCalls";
-import { usePhoneNumbers } from "~/hooks/phone/usePhoneNumbers";
-import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "~/lib/types";
-import { Database, Tables } from "~/lib/database.types";
+import { useQueue } from "@/hooks/queue/useQueue";
+import { useAttempts } from "@/hooks/queue/useAttempts";
+import { useCalls } from "@/hooks/queue/useCalls";
+import { usePhoneNumbers } from "@/hooks/phone/usePhoneNumbers";
+import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
+import { Database, Tables } from "@/lib/database.types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 
 type RealtimeChangePayload<T extends Record<string, unknown> = Record<string, unknown>> = RealtimePostgresChangesPayload<T>;

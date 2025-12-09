@@ -1,5 +1,5 @@
 import { Form } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { NameFields } from "./NameFields";
 import { EmailField } from "./EmailField";
 import { PasswordFields } from "./PasswordFields";

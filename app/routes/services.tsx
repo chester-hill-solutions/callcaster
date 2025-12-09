@@ -1,5 +1,5 @@
 import React from 'react';
-import ServiceCard from "~/components/other-services/ServiceCard";
+import ServiceCard from "@/components/other-services/ServiceCard";
 
 const services = [
   { title: "Data Management", description: "Organize, optimize, and analyze all your campaign data in one place" },

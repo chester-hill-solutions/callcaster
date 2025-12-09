@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { hangupCall } from '~/lib/services/hooks-api';
-import { logger } from '~/lib/logger.client';
+import { hangupCall } from '@/lib/services/hooks-api';
+import { logger } from '@/lib/logger.client';
 
 // Types - Device and Call instances are passed as parameters, not instantiated here
 type Device = any;

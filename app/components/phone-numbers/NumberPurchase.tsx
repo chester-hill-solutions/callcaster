@@ -1,5 +1,5 @@
 import { NumbersEmptyState } from "./NumbersPurchase.EmptyState";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Fetcher, FetcherWithComponents, Link, NavLink, useFetcher } from "@remix-run/react";
 import {
   Dialog,
@@ -7,7 +7,7 @@ import {
   DialogContent,
   DialogFooter,
   DialogHeader,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 
 import { AvailableNumber, FetcherData } from "../routes/workspaces_.$id_.settings_.numbers";

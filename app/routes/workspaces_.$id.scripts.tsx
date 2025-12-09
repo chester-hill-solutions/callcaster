@@ -8,15 +8,15 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { MdDownload, MdEdit } from "react-icons/md";
-import { DataTable } from "~/components/workspace/WorkspaceTable/DataTable";
-import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { formatDateToLocale } from "~/lib/utils";
+import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
+import { Button } from "@/components/ui/button";
+import { getUserRole } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { formatDateToLocale } from "@/lib/utils";
 import { useEffect } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
-import { Json } from "~/lib/supabase.types";
-import { User } from "~/lib/types";
+import { Json } from "@/lib/supabase.types";
+import { User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 type ScriptSteps = {

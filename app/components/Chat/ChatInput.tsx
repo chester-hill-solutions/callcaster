@@ -1,7 +1,7 @@
 import { MdSend, MdImage } from "react-icons/md";
 import MessagesImages from "./ChatImages";
-import type { Contact } from "~/lib/types";
-import type { Database } from "~/lib/database.types";
+import type { Contact } from "@/lib/types";
+import type { Database } from "@/lib/database.types";
 import type { useFetcher } from "@remix-run/react";
 
 type WorkspaceNumber = {

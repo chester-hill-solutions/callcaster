@@ -1,5 +1,5 @@
 import React from "react";
-import { TextInput } from "~/components/forms/Inputs";
+import { TextInput } from "@/components/forms/Inputs";
 
 const ContactFields = ({ contact, editMode, onInputChange }) => {
   const fields = [

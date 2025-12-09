@@ -1,8 +1,8 @@
 import React from "react";
 import { NavLink } from "@remix-run/react";
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
-import { Button } from "~/components/ui/button";
-import { CampaignSettingsData } from "~/hooks/campaign/useCampaignSettings";
+import { Button } from "@/components/ui/button";
+import { CampaignSettingsData } from "@/hooks/campaign/useCampaignSettings";
 
 export const CampaignInstructions = ({ campaignData, totalCalls, expectedTotal, joinDisabled }: { campaignData: CampaignSettingsData, totalCalls: number, expectedTotal: number, joinDisabled: string | null }) => (
   <div className="flex">

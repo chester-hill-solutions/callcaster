@@ -1,8 +1,8 @@
 import { json } from "@remix-run/react";
 import { verifyAuth } from "../lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { logger } from "~/lib/logger.server";
-import type { Database } from "~/lib/database.types";
+import { logger } from "@/lib/logger.server";
+import type { Database } from "@/lib/database.types";
 
 interface SupabaseResponse {
     supabaseClient: SupabaseClient<Database>;

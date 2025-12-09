@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { TextInput } from "~/components/forms/Inputs";
-import { Button } from "~/components/ui/button";
+import { TextInput } from "@/components/forms/Inputs";
+import { Button } from "@/components/ui/button";
 import { FaPlus, FaTrash } from "react-icons/fa";
 
 type ContactUpdate = {

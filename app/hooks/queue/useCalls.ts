@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Tables } from "~/lib/database.types";
+import { Tables } from "@/lib/database.types";
 
 type Call = Tables<"call">
 type Attempt = Tables<"outreach_attempt">

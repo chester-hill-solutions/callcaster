@@ -5,10 +5,10 @@ import {
   TableHead,
   TableRow,
   TableCell,
-} from "~/components/ui/table";
-import { Checkbox } from "~/components/ui/checkbox";
-import { days } from "~/lib/utils";
-import InfoHover from "~/components/shared/InfoPopover";
+} from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
+import { days } from "@/lib/utils";
+import InfoHover from "@/components/shared/InfoPopover";
 
 interface TimeInterval {
   start: string; // Format: "HH:mm"

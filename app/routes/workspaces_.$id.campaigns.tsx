@@ -4,11 +4,11 @@ import {
   useOutlet,
   useOutletContext,
 } from "@remix-run/react";
-import CampaignEmptyState from "~/components/campaign/CampaignEmptyState";
-import { MemberRole } from "~/components/workspace/TeamMember";
-import { Audience, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
-import { Campaign } from "~/lib/types";
-import { verifyAuth } from "~/lib/supabase.server";
+import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
+import { MemberRole } from "@/components/workspace/TeamMember";
+import { Audience, WorkspaceData, WorkspaceNumbers } from "@/lib/types";
+import { Campaign } from "@/lib/types";
+import { verifyAuth } from "@/lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

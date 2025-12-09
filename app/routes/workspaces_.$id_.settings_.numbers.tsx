@@ -1,4 +1,4 @@
-import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
+import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "@remix-run/node";
 import {
@@ -11,7 +11,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   getUserRole,
   getWorkspacePhoneNumbers,
@@ -19,20 +19,20 @@ import {
   removeWorkspacePhoneNumber,
   updateCallerId,
   updateWorkspacePhoneNumber,
-} from "~/lib/database.server";
-import { verifyAuth } from "~/lib/supabase.server";
-import { useSupabaseRealtime } from "~/hooks/realtime/useSupabaseRealtime";
+} from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
-import { NumbersTable } from "~/components/phone-numbers/NumbersTable";
-import { NumberCallerId } from "~/components/phone-numbers/NumberCallerId";
-import { NumberPurchase } from "~/components/phone-numbers/NumberPurchase";
-import { User, WorkspaceNumbers } from "~/lib/types";
+} from "@/components/ui/dialog";
+import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
+import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
+import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
+import { User, WorkspaceNumbers } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 type LoaderData = {

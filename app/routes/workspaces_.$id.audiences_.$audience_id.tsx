@@ -8,14 +8,14 @@ import {
   useRevalidator
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { AudienceTable } from "~/components/audience/AudienceTable";
-import AudienceUploadHistory from "~/components/audience/AudienceUploadHistory";
-import AudienceUploader from "~/components/audience/AudienceUploader";
-import { Button } from "~/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Database } from "~/lib/database.types";
-import { useInterval } from "~/hooks/utils/useInterval";
+import { AudienceTable } from "@/components/audience/AudienceTable";
+import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
+import AudienceUploader from "@/components/audience/AudienceUploader";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Database } from "@/lib/database.types";
+import { useInterval } from "@/hooks/utils/useInterval";
 
 type LoaderData = {
   contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;

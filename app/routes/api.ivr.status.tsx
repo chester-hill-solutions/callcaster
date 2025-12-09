@@ -2,8 +2,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Twilio } from "twilio";
 import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "~/lib/types";
-import { env } from "~/lib/env.server";
+import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
+import { env } from "@/lib/env.server";
 
 export interface CallEvent {
     Called: string;
@@ -59,7 +59,7 @@ const updateCallStatus = async (supabase: SupabaseClient, callSid: string, statu
     if (error) throw error;
 };
 
-import type { Block } from "~/lib/types";
+import type { Block } from "@/lib/types";
 
 interface ScriptSteps {
     pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;

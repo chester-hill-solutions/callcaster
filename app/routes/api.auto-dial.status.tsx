@@ -1,8 +1,8 @@
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { Tables } from "~/lib/database.types";
-import { OutreachAttempt } from "~/lib/types";
+import { Tables } from "@/lib/database.types";
+import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
 
 const supabase = createClient(

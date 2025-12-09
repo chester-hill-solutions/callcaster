@@ -1,12 +1,12 @@
-import InfoHover from "~/components/shared/InfoPopover";
-import { Label } from "~/components/ui/label";
+import InfoHover from "@/components/shared/InfoPopover";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "~/components/ui/select";
+} from "@/components/ui/select";
 
 interface MediaItem {
   name: string;

@@ -1,6 +1,6 @@
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Button } from "~/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 import { Archive, Pause, Play, Calendar, Copy, TimerIcon, Clock, AlertCircle } from "lucide-react";
 import {
@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "~/components/ui/tooltip";
+} from "@/components/ui/tooltip";
 import { FetcherWithComponents } from "@remix-run/react";
 import {
   Campaign,
@@ -18,7 +18,7 @@ import {
   MessageCampaign,
   Script,
   WorkspaceNumbers,
-} from "~/lib/types";
+} from "@/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";

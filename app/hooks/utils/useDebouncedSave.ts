@@ -1,7 +1,7 @@
 import { useFetcher } from '@remix-run/react';
 import { useEffect, useRef, useCallback } from 'react';
-import { deepEqual } from '~/lib/utils';
-import type { QueueItem, OutreachAttempt, Campaign } from '~/lib/types';
+import { deepEqual } from '@/lib/utils';
+import type { QueueItem, OutreachAttempt, Campaign } from '@/lib/types';
 
 type ToastType = {
     success: (message: string | React.ReactNode, data?: unknown) => string | number;

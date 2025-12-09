@@ -1,6 +1,6 @@
-import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "~/lib/types";
+import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "@/lib/types";
 import { QueueHeader } from "./QueueHeader";
-import { QueueTable } from "~/components/queue/QueueTable";
+import { QueueTable } from "@/components/queue/QueueTable";
 import SupabaseClient from "@supabase/supabase-js/dist/module/SupabaseClient";
 import { useEffect, useState, useRef } from "react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";

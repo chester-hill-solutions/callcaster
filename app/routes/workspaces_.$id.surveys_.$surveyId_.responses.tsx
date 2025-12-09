@@ -1,18 +1,18 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { getUserRole } from "~/lib/database.server";
-import { User } from "~/lib/types";
-import { Button } from "~/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import { getUserRole } from "@/lib/database.server";
+import { User } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar,
   Users,
@@ -25,9 +25,9 @@ import {
 } from "lucide-react";
 import { Link } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { Label } from "~/components/ui/label";
-import type { Tables } from "~/lib/database.types";
-import type { SurveyQuestion, ResponseAnswer, Contact } from "~/lib/types";
+import { Label } from "@/components/ui/label";
+import type { Tables } from "@/lib/database.types";
+import type { SurveyQuestion, ResponseAnswer, Contact } from "@/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Card, CardContent } from "~/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, Clipboard, ChevronRight, ChevronDown } from "lucide-react";
-import { Contact, OutreachAttempt, QueueItem } from "~/lib/types";
+import { Contact, OutreachAttempt, QueueItem } from "@/lib/types";
 
 const ResultItem = ({ label, value }) => (
   <li className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">

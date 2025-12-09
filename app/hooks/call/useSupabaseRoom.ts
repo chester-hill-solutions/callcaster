@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
-import { logger } from "~/lib/logger.client";
+import { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 const PRESENCE_UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
 

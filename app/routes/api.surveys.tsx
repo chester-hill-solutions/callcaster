@@ -1,11 +1,11 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
-import { getUserRole } from "~/lib/database.server";
-import { User, SurveyFormData } from "~/lib/types";
+import { verifyAuth } from "@/lib/supabase.server";
+import { getUserRole } from "@/lib/database.server";
+import { User, SurveyFormData } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/lib/database.types";
-import { logger } from "~/lib/logger.server";
-import { createErrorResponse, AppError, ErrorCode, handleDatabaseError } from "~/lib/errors.server";
+import type { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
+import { createErrorResponse, AppError, ErrorCode, handleDatabaseError } from "@/lib/errors.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   try {

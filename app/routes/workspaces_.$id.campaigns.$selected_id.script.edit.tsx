@@ -1,10 +1,10 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
 import { useState, useEffect } from "react";
-import { verifyAuth } from "~/lib/supabase.server";
-import CampaignSettingsScript from "~/components/campaign/settings/script/CampaignSettings.Script";
-import { deepEqual } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
+import { verifyAuth } from "@/lib/supabase.server";
+import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
+import { deepEqual } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   getMedia,
   getRecordingFileNames,
@@ -12,8 +12,8 @@ import {
   getUserRole,
   getWorkspaceScripts,
   listMedia,
-} from "~/lib/database.server";
-import { MessageSettings } from "~/components/settings/MessageSettings";
+} from "@/lib/database.server";
+import { MessageSettings } from "@/components/settings/MessageSettings";
 import {
   Dialog,
   DialogContent,
@@ -21,9 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "~/components/ui/dialog";
+} from "@/components/ui/dialog";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import type { IVRCampaign, LiveCampaign, MessageCampaign, Script, User } from "~/lib/types";
+import type { IVRCampaign, LiveCampaign, MessageCampaign, Script, User } from "@/lib/types";
 import type { ActionFunctionArgs } from "@remix-run/node";
 
 type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";

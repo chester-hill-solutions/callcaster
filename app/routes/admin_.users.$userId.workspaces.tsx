@@ -1,14 +1,14 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, json } from "@remix-run/node";
 import { useLoaderData, useActionData, Form, Link } from "@remix-run/react";
-import { verifyAuth } from "~/lib/supabase.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "~/components/ui/table";
-import { Badge } from "~/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { verifyAuth } from "@/lib/supabase.server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
-import type { Tables } from "~/lib/database.types";
+import type { Tables } from "@/lib/database.types";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request);

@@ -1,9 +1,9 @@
 import { Form, Link, useActionData } from "@remix-run/react";
-import { Button } from "~/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
 import { Toaster, toast } from "sonner";
-import { verifyAuth } from "~/lib/supabase.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect } from "react";
 export async function loader({ request }: LoaderFunctionArgs) {
   return {};

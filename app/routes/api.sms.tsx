@@ -3,9 +3,9 @@ import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
 } from "../lib/database.server";
-import { processTemplateTags } from "~/lib/utils";
-import { env } from "~/lib/env.server";
-import { logger } from "~/lib/logger.server";
+import { processTemplateTags } from "@/lib/utils";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {
