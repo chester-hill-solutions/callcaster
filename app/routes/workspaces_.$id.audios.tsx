@@ -1,6 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, json, useLoaderData } from "@remix-run/react";
-import { mediaColumns } from "@/components/media";
+import { mediaColumns } from "@/components/media/columns";
 
 import { DataTable } from "@/components/workspace/WorkspaceTable/DataTable";
 import { Button } from "@/components/ui/button";
