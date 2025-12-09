@@ -33,7 +33,7 @@ import { Card } from "@/components/ui/card";
 import { useConversationSummaryRealTime, phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatInput from "@/components/chat/ChatInput";
-import ChatAddContactDialog from "@/components/chat/ChatAddContactDialog";
+import ChatAddContactDialog from "@/components/chat/ChatAddContactDialog";  
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
 import {
   Select,
@@ -45,7 +45,7 @@ import {
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign } from "@/lib/types";
+import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign, BaseUser } from "@/lib/types";
 import { sendMessage } from "./api.chat_sms";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
@@ -247,7 +247,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     supabase: supabaseClient,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
-    user: user as unknown as User,
+    user: user as unknown as BaseUser,
   });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
@@ -627,7 +627,7 @@ export default function ChatsList() {
           potentialContacts={potentialContacts}
           phoneNumber={phoneNumber}
           contactNumber={contact_number}
-          handlePhoneChange={handlePhoneChangeAdapter}
+          handlePhoneChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePhoneChange(e.target.value as string)}
           isValid={isValid}
           selectedContact={selectedContact}
           contacts={contacts}
@@ -638,7 +638,7 @@ export default function ChatsList() {
           searchError={searchError || undefined}
           existingConversation={existingConversation as unknown as Chat}
           handleExistingConversationClick={handleExistingConversationClickAdapter}
-          setDialog={setDialogAdapter}
+          setDialog={(contact: Partial<Contact>) => setDialog(contact as Contact)}
         />
         <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
           <Outlet context={{ supabase, workspace, workspaceNumbers }} />
@@ -660,7 +660,7 @@ export default function ChatsList() {
       <ChatAddContactDialog
         existingContact={dialogContact}
         isDialogOpen={Boolean(dialogContact?.phone)}
-        setDialog={setDialog}
+        setDialog={(open: boolean | null) => setDialog(open ? dialogContact : null)}
         contact_number={contact_number}
         workspace_id={workspace.id}
       />
