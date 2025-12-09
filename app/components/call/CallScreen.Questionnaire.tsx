@@ -92,7 +92,13 @@ const CallQuestionnaire = ({
         questions={block as Block}
         key={`questions-${blockId}`}
         questionId={blockId}
-        initResult={localUpdate[blockId] || null}
+        initResult={(() => {
+          const value = localUpdate[blockId];
+          if (value === undefined || value === null) return null;
+          if (typeof value === 'boolean') return value;
+          if (Array.isArray(value)) return value;
+          return String(value);
+        })()}
       />
       </div>
     );

@@ -108,8 +108,12 @@ const validateRequiredFields = (
     errors.push("Calling hours are required");
   }
   
-  if (!details?.script_id && !details?.body_text) {
+  if ('script_id' in details && !details.script_id && 'body_text' in details && !details.body_text) {
     errors.push("Script or message content is required");
+  } else if ('script_id' in details && !details.script_id) {
+    errors.push("Script is required");
+  } else if ('body_text' in details && !details.body_text) {
+    errors.push("Message content is required");
   }
   
   return errors;
@@ -118,7 +122,7 @@ const validateRequiredFields = (
 // Component Props Interface
 interface CampaignBasicInfoProps {
   campaignData: Campaign;
-  handleInputChange: (name: string, value: string | number) => void;
+  handleInputChange: (name: string, value: string | number | null) => void;
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
 

@@ -5,7 +5,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import CampaignEmptyState from "~/components/campaign/CampaignEmptyState";
-import { MemberRole } from "~/components/Workspace/TeamMember";
+import { MemberRole } from "~/components/workspace/TeamMember";
 import { Audience, WorkspaceData, WorkspaceNumbers } from "~/lib/types";
 import { Campaign } from "~/lib/types";
 import { verifyAuth } from "~/lib/supabase.server";

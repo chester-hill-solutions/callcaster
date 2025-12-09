@@ -13,7 +13,7 @@ import { Button } from "~/components/ui/button";
 import { createNewWorkspace, forceTokenRefresh } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
 import { Toaster, toast } from "sonner";
-import { handleRoleTextStyles, MemberRole } from "~/components/Workspace/TeamMember";
+import { handleRoleTextStyles, MemberRole } from "~/components/workspace/TeamMember";
 import {
   Dialog,
   DialogClose,

@@ -8,7 +8,7 @@ import { Button } from "~/components/ui/button";
 import { getUserRole, listMedia } from "~/lib/database.server";
 import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
 import { Script, WorkspaceData, User } from "~/lib/types";
-import { MemberRole } from "~/components/Workspace/TeamMember";
+import { MemberRole } from "~/components/workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
   
 type LoaderDataProps = Promise<{

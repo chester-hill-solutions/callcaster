@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { toast, Toaster } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/shared/CustomCard";
-import TeamMember, { MemberRole } from "~/components/Workspace/TeamMember";
+import TeamMember, { MemberRole } from "~/components/workspace/TeamMember";
 import { verifyAuth } from "~/lib/supabase.server";
 import { capitalize } from "~/lib/utils";
 import type { Database, Tables } from "~/lib/database.types";

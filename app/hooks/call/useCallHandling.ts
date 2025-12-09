@@ -167,10 +167,10 @@ export function useCallHandling({
     }
     
     const connection = device.connect(params);
-    connection.then((call) => {
+    connection.then((call: unknown) => {
       updateActiveCall(call);
       updateCallState('dialing');
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       console.error('Error making call:', err);
       onError?.(err instanceof Error ? err : new Error('Failed to make call'));
     });

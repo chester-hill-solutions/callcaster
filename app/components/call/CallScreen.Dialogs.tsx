@@ -57,10 +57,10 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     fetcher.submit(
-      {
+      JSON.stringify({
         errorDescription,
         currentState,
-      },
+      }),
       {
         action: "/api/error-report",
         method: "POST",
