@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Session } from "@supabase/supabase-js";  
-export { ErrorBoundary } from "~/components/ErrorBoundary";
+export { ErrorBoundary } from "~/components/shared/ErrorBoundary";
 
 interface Workspace {
   id: string;

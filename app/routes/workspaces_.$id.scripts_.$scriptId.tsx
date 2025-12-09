@@ -2,11 +2,11 @@ import { json, redirect, LoaderFunctionArgs, ActionFunctionArgs  } from "@remix-
 import { useLoaderData } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "~/lib/supabase.server";
-import CampaignSettingsScript from "../components/CampaignSettings.Script";
+import CampaignSettingsScript from "~/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole, listMedia } from "~/lib/database.server";
-import { ErrorBoundary } from "~/components/ErrorBoundary";
+import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
 import { Script, WorkspaceData, User } from "~/lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -123,20 +123,32 @@ export default function ScriptEditor() {
     setChanged(false);
   };
 
-  const handlePageDataChange = (newPageData: any) => {
+  type PageData = {
+    campaignDetails: { script: Script };
+  };
+
+  const handlePageDataChange = (newPageData: PageData) => {
     setScript(newPageData.campaignDetails.script);
-    const obj1 = script;
+    const obj1 = { campaignDetails: { script } };
     const obj2 = newPageData;
-    delete obj1.campaignDetails?.script?.updated_at;
-    delete obj2.campaignDetails?.script?.updated_at;
+    if (obj1.campaignDetails?.script?.updated_at) {
+      delete (obj1.campaignDetails.script as Partial<Script>).updated_at;
+    }
+    if (obj2.campaignDetails?.script?.updated_at) {
+      delete (obj2.campaignDetails.script as Partial<Script>).updated_at;
+    }
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
-    const obj1 = script;
-    const obj2 = initScript;
-    delete obj1.updated_at;
-    delete obj2.updated_at;
+    const obj1 = { ...script };
+    const obj2 = { ...initScript };
+    if (obj1.updated_at) {
+      delete (obj1 as Partial<Script>).updated_at;
+    }
+    if (obj2.updated_at) {
+      delete (obj2 as Partial<Script>).updated_at;
+    }
     setChanged(!deepEqual(obj1, obj2));
   }, [initScript, script]);
 
@@ -163,8 +175,8 @@ export default function ScriptEditor() {
       )}
       <div className="h-full flex-grow p-4">
         <CampaignSettingsScript
-          pageData={{ campaignDetails: { script } }}
-          onPageDataChange={(newData: any) => {
+          pageData={{ campaignDetails: { script } } as PageData}
+          onPageDataChange={(newData: PageData) => {
             handlePageDataChange(newData);
           }}
           mediaNames={mediaNames}

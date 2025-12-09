@@ -20,6 +20,16 @@ interface WorkspaceData {
   };
 }
 
+interface CallData {
+  sid: string;
+  workspace: string;
+  outreach_attempt_id: number;
+  campaign: {
+    name: string;
+  };
+  [key: string]: unknown;
+}
+
 const log = (level: string, message: string, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
@@ -67,7 +77,7 @@ const updateCallStatus = async (
   status: string,
   duration?: string
 ) => {
-  const updateData: Record<string, any> = { status };
+  const updateData: Record<string, string | number> = { status };
 
   if (duration) {
     updateData.duration = parseInt(duration);
@@ -86,7 +96,7 @@ const updateCallStatus = async (
 
 const handleCallCompletion = async (
   supabase: SupabaseClient,
-  callData: any,
+  callData: CallData,
   CallDuration?: string,
   CallStatus?: string
 ) => {
@@ -170,7 +180,7 @@ const checkWorkspaceCredits = async (
   workspaceId: string,
   campaignId: string,
   callSid: string,
-  twilioClient: any
+  twilioClient: Twilio
 ): Promise<boolean> => {
   const { data: workspaceCredits, error: workspaceCreditsError } = await supabase
     .from('workspace')

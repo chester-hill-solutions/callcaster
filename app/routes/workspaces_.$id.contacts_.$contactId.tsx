@@ -6,7 +6,7 @@ import { verifyAuth } from "~/lib/supabase.server";
 import { deepEqual } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { getUserRole } from "~/lib/database.server";
-import ContactDetails from "~/components/ContactDetails";
+import ContactDetails from "~/components/contact/ContactDetails";
 import { Session, SupabaseClient } from "@supabase/supabase-js";
 import { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
 import { MemberRole } from "~/components/Workspace/TeamMember";

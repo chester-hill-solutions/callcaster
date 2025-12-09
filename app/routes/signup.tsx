@@ -150,16 +150,29 @@ function FormSecondPage() {
   return <></>;
 }
 
+type ActionData = {
+  emailError?: string | null;
+  passwordError?: string | null;
+  error?: string;
+  data?: {
+    user?: unknown;
+  };
+} | undefined;
+
+type FetcherData = {
+  success?: boolean;
+} | undefined;
+
 export default function SignUp() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<ActionData>();
   const firstPage = FormFirstPage();
   const secondPage = FormSecondPage();
   const [formPage, setFormPage] = useState<ReactNode>(secondPage);
   const [isFirstPage, setIsFirstPage] = useState<boolean>(false);
   const { state } = useNavigation();
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<FetcherData>();
   const navigate = useNavigate();
-  const formRef = useRef(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const paginationHandler = (page: ReactNode) => {
     setFormPage(page);
   };
@@ -338,7 +351,13 @@ export default function SignUp() {
     </main>
   );
 }
-const ContactForm = ({ isBusy, formRef, fetcher }) => (
+interface ContactFormProps {
+  isBusy: boolean;
+  formRef: React.RefObject<HTMLFormElement>;
+  fetcher: ReturnType<typeof useFetcher<FetcherData>>;
+}
+
+const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
     <div className="flex flex-wrap gap-8">
       <Card className="min-w-[400px] flex-initial bg-secondary py-8 dark:bg-zinc-800">

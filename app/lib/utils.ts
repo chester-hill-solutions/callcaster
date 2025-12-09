@@ -35,10 +35,10 @@ export const isRecent = (date: string): boolean => {
 };
 
 export function deepEqual(
-  obj1: any,
-  obj2: any,
+  obj1: unknown,
+  obj2: unknown,
   path: string = "root",
-  seen = new WeakMap(),
+  seen = new WeakMap<unknown, unknown>(),
 ): boolean {
   function log(message: string) {
     //console.log(`[${path}] ${message}`);
@@ -482,10 +482,10 @@ export function flattenRow(row, users) {
 
   // Process other_data array
   if (row.contact?.other_data && Array.isArray(row.contact.other_data)) {
-    row.contact.other_data.forEach((item: any, index: number) => {
-      if (typeof item === "object") {
+    row.contact.other_data.forEach((item: unknown, index: number) => {
+      if (typeof item === "object" && item !== null) {
         Object.keys(item).forEach(key => {
-          flattenedRow[`other_data_${index}_${key}`] = item[key];
+          flattenedRow[`other_data_${index}_${key}`] = (item as Record<string, unknown>)[key];
         });
       }
     });
@@ -504,7 +504,7 @@ export function flattenRow(row, users) {
   return flattenedRow;
 }
 
-export function generateCSVContent(headers: string[], data: Record<string, any>[]) {
+export function generateCSVContent(headers: string[], data: Record<string, unknown>[]) {
   let csvContent = "\ufeff";
   csvContent += headers.map(escapeCSV).join(",") + "\n";
 
@@ -518,7 +518,7 @@ export function generateCSVContent(headers: string[], data: Record<string, any>[
   return csvContent;
 }
 
-export function getAllKeys(obj: any, prefix: string = "", target: Set<string> | Record<string, any> = new Set()) {
+export function getAllKeys(obj: unknown, prefix: string = "", target: Set<string> | Record<string, unknown> = new Set()) {
   Object.keys(obj).forEach(key => {
     const value = obj[key];
     const fullKey = `${prefix}${key}`;

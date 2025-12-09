@@ -1,15 +1,22 @@
 import { json } from "@remix-run/react";
 import { verifyAuth } from "../lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "~/lib/logger.server";
+import type { Database } from "~/lib/database.types";
 
 interface SupabaseResponse {
-    supabaseClient: SupabaseClient;
+    supabaseClient: SupabaseClient<Database>;
     headers: Headers;
 }
 
+interface OtherDataItem {
+    key: string;
+    value: string | number | boolean;
+}
+
 interface AudienceData {
-    id: string;
-    [key: string]: string | number | boolean;
+    id: number;
+    [key: string]: string | number | boolean | null | undefined;
 }
 
 export const action = async ({ request }: { request: Request }) => {
@@ -18,36 +25,48 @@ export const action = async ({ request }: { request: Request }) => {
 
     const method = request.method;
 
-    let response: any;
+    let response: AudienceData[] | { success: boolean } | null | undefined;
 
     if (method === 'PATCH') {
         const formData = await request.formData();
-        const data: AudienceData = { id: '' };
+        const data: Partial<AudienceData> = {};
         for (let [key, value] of formData.entries()) {
-            data[key] = value.toString();
+            if (key === 'id') {
+                data.id = parseInt(value.toString(), 10);
+            } else {
+                data[key] = value.toString();
+            }
+        }
+
+        if (!data.id) {
+            return json({ error: 'Missing id' }, { status: 400, headers });
         }
 
         const { data: update, error } = await supabaseClient
             .from('audience')
-            .upsert(data)
+            .upsert(data as Database['public']['Tables']['audience']['Update'])
             .eq('id', data.id)
             .select();
-        response = update;
+        response = update || null;
     }
     
     if (method === "DELETE") {
         const formData = await request.formData();
-        const data: AudienceData = { id: '' };
-        for (let [key, value] of formData.entries()) {
-            data[key] = value.toString();
+        const idStr = formData.get('id');
+        if (!idStr) {
+            return json({ error: 'Missing id' }, { status: 400, headers });
+        }
+        const id = parseInt(idStr.toString(), 10);
+        if (isNaN(id)) {
+            return json({ error: 'Invalid id' }, { status: 400, headers });
         }
 
         const { error } = await supabaseClient
             .from('audience')
             .delete()
-            .eq('id', data.id);
+            .eq('id', id);
         if (error){
-            console.log(error);
+            logger.error("Error deleting audience:", error);
         }
         response = { success: true };
     }
@@ -65,20 +84,26 @@ export const loader = async ({ request }: { request: Request }) => {
     if (returnType === 'csv') {
         const query = supabaseClient.from('contact_audience').select(`*,...contact!inner(*)`);
         if (audienceId) {
-            query.eq('audience_id', audienceId);
+            const id = parseInt(audienceId, 10);
+            if (!isNaN(id)) {
+                query.eq('audience_id', id);
+            }
         }
         const { data: rawData, error } = await query;
         if (error) {
-            console.error(error);
+            logger.error("Error fetching contact audience data:", error);
             throw error;
         }
 
         // Process the raw data to flatten nested objects
         const processedData = rawData?.map((row) => {
-            const flatRow = { ...row };
-            if (row.other_data?.length > 0) {
-                row.other_data.forEach((item: any) => {
-                    Object.assign(flatRow, item);
+            const flatRow: Record<string, unknown> = { ...row };
+            if (row.other_data && Array.isArray(row.other_data) && row.other_data.length > 0) {
+                const otherData = row.other_data as unknown as OtherDataItem[];
+                otherData.forEach((item) => {
+                    if (item && typeof item === 'object' && 'key' in item && 'value' in item) {
+                        flatRow[item.key] = item.value;
+                    }
                 });
             }
             delete flatRow.other_data;
@@ -97,11 +122,13 @@ export const loader = async ({ request }: { request: Request }) => {
         // Add data rows
         processedData?.forEach((row) => {
             const values = rowHeaders.map(header => {
-                const val = row[header];
+                const val = (row as Record<string, unknown>)[header];
                 // Handle values that need escaping
-                return typeof val === 'string' && val.includes(',') 
-                    ? `"${val}"` 
-                    : val;
+                if (val === null || val === undefined) {
+                    return '';
+                }
+                const strVal = String(val);
+                return strVal.includes(',') ? `"${strVal}"` : strVal;
             });
             csvRows.push(values.join(','));
         });
@@ -127,12 +154,15 @@ export const loader = async ({ request }: { request: Request }) => {
     // Handle regular JSON response
     const query = supabaseClient.from('contact_audience').select(`*,...contact!inner(*)`);
     if (audienceId) {
-        query.eq('audience_id', audienceId);
+        const id = parseInt(audienceId, 10);
+        if (!isNaN(id)) {
+            query.eq('audience_id', id);
+        }
     }
 
     const { data, error } = await query;
     if (error) {
-        console.error(error);
+        logger.error("Error fetching contact audience data:", error);
         throw error;
     }
 

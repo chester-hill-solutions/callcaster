@@ -26,6 +26,8 @@ import {
 import { Link } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { Label } from "~/components/ui/label";
+import type { Tables } from "~/lib/database.types";
+import type { SurveyQuestion, ResponseAnswer, Contact } from "~/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -121,10 +123,37 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 
 
+type SurveyPageWithQuestions = {
+  survey_question?: Array<{
+    id: number;
+    question_id: string;
+    question_text: string;
+    question_type: string;
+  }>;
+};
+
+type SurveyWithPages = Tables<"survey"> & {
+  survey_page?: SurveyPageWithQuestions[];
+};
+
+type ResponseAnswerWithQuestion = ResponseAnswer & {
+  survey_question?: {
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    question_option?: Array<{ option_label: string }>;
+  };
+};
+
+type SurveyResponseWithContact = Tables<"survey_response"> & {
+  contact?: Pick<Contact, "firstname" | "surname" | "phone" | "email"> | null;
+  response_answer?: ResponseAnswerWithQuestion[];
+};
+
 export default function SurveyResponsesPage() {
   const { survey, responses, workspaceId, stats } =
     useLoaderData<typeof loader>();
-  const [selectedResponse, setSelectedResponse] = useState<any>(null);
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
   const exportFetcher = useFetcher();
 
   useEffect(() => {
@@ -143,10 +172,10 @@ export default function SurveyResponsesPage() {
   }, [exportFetcher.data, survey.title]);
 
   const allQuestions =
-    survey.survey_page?.flatMap((page: any) => page.survey_question || []) ||
+    (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
     [];
 
-  const formatAnswer = (answer: any) => {
+  const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
     if (!answer) return "-";
 
     if (answer.survey_question?.question_type === "checkbox") {
@@ -160,7 +189,7 @@ export default function SurveyResponsesPage() {
     return answer.answer_value;
   };
 
-  const getContactName = (response: any) => {
+  const getContactName = (response: SurveyResponseWithContact) => {
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
     }
@@ -173,15 +202,15 @@ export default function SurveyResponsesPage() {
     return "Anonymous";
   };
 
-  const getAnswerForQuestion = (response: any, questionId: string) => {
+  const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
     const question = allQuestions.find(
-      (q: any) => q.question_id === questionId,
+      (q) => q.question_id === questionId,
     );
     if (!question) return "-";
 
     // Find the answer by the database question ID
     const answer = response.response_answer?.find(
-      (a: any) => a.question_id === question.id,
+      (a) => a.question_id === question.id,
     );
     return answer ? formatAnswer(answer) : "-";
   };
@@ -309,7 +338,7 @@ export default function SurveyResponsesPage() {
                   <p className="text-muted-foreground">No responses yet</p>
                 ) : (
                   <div className="space-y-4">
-                    {responses.map((response: any) => (
+                    {(responses as SurveyResponseWithContact[]).map((response) => (
                       <div
                         key={response.id}
                         className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50"
@@ -385,7 +414,7 @@ export default function SurveyResponsesPage() {
                           <th className="w-24 border border-gray-300 px-4 py-2 text-left font-medium">
                             Started
                           </th>
-                          {allQuestions.map((question: any) => (
+                          {allQuestions.map((question) => (
                             <th
                               key={question.question_id}
                               className="w-48 border border-gray-300 px-4 py-2 text-left font-medium"
@@ -396,7 +425,7 @@ export default function SurveyResponsesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {responses.map((response: any, index: number) => {
+                        {(responses as SurveyResponseWithContact[]).map((response, index) => {
                           return (
                             <tr
                               key={response.id}
@@ -426,7 +455,7 @@ export default function SurveyResponsesPage() {
                                   response.started_at,
                                 ).toLocaleDateString()}
                               </td>
-                              {allQuestions.map((question: any) => (
+                              {allQuestions.map((question) => (
                                 <td
                                   key={question.question_id}
                                   className="truncate border border-gray-300 px-4 py-2"
@@ -513,7 +542,7 @@ export default function SurveyResponsesPage() {
                       <Label className="text-sm font-medium">Answers</Label>
                       <div className="mt-2 space-y-4">
                         {selectedResponse.response_answer?.map(
-                          (answer: any) => (
+                          (answer) => (
                             <div
                               key={answer.id}
                               className="rounded-lg border p-4"

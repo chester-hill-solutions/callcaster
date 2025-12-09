@@ -25,22 +25,22 @@ import { playTone } from "~/lib/utils";
 import { generateToken } from "./api.token";
 
 // Component imports
-import { QueueList } from "../components/CallScreen.QueueList";
-import { CallArea } from "../components/CallScreen.CallArea";
-import { CallQuestionnaire } from "../components/CallScreen.Questionnaire";
-import { Household } from "~/components/CallScreen.Household";
-import { ErrorBoundary } from "~/components/ErrorBoundary";
-import { CampaignHeader } from "~/components/CallScreen.Header";
-import { PhoneKeypad } from "~/components/CallScreen.DTMFPhone";
-import { CampaignDialogs } from "~/components/CallScreen.Dialogs";
+import { QueueList } from "~/components/call/CallScreen.QueueList";
+import { CallArea } from "~/components/call/CallScreen.CallArea";
+import { CallQuestionnaire } from "~/components/call/CallScreen.Questionnaire";
+import { Household } from "~/components/call/CallScreen.Household";
+import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
+import { CampaignHeader } from "~/components/call/CallScreen.Header";
+import { PhoneKeypad } from "~/components/call/CallScreen.DTMFPhone";
+import { CampaignDialogs } from "~/components/call/CallScreen.Dialogs";
 
 // Hook imports
-import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
-import useDebouncedSave from "../hooks/useDebouncedSave";
-import useSupabaseRoom from "../hooks/useSupabaseRoom";
-import { useTwilioDevice } from "../hooks/useTwilioDevice";
-import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
-import { useCallState } from "~/hooks/useCallState";
+import { useSupabaseRealtime } from "~/hooks/realtime/useSupabaseRealtime";
+import useDebouncedSave from "~/hooks/utils/useDebouncedSave";
+import useSupabaseRoom from "~/hooks/call/useSupabaseRoom";
+import { useTwilioDevice } from "~/hooks/call/useTwilioDevice";
+import { useStartConferenceAndDial } from "~/hooks/call/useStartConferenceAndDial";
+import { useCallState } from "~/hooks/call/useCallState";
 
 // Type imports
 import type {
@@ -372,7 +372,7 @@ const fetcher = useFetcher<{ creditsError?: boolean }>()
 const queueFetcher = useFetcher<{ queueError?: boolean }>()
 const submit = fetcher.submit;
 const creditsError = fetcher.data?.creditsError || conferenceCreditsError;
-const verifyFetcher = useFetcher<{ verificationId: string, callSid: string, pin: string, error?: any }>()
+const verifyFetcher = useFetcher<{ verificationId: string, callSid: string, pin: string, error?: string }>()
 const pin = verifyFetcher.data?.pin;
 
 const { startCall } = handleCall({ submit });
@@ -523,9 +523,9 @@ const requestMicrophoneAccess = useCallback(async () => {
 
     setStream(mediaStream);
     setPermissionError(null);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error accessing microphone:", error);
-    if (error.name === "NotAllowedError") {
+    if (error instanceof Error && error.name === "NotAllowedError") {
       setPermissionError(
         "Microphone access was denied. Please grant permission to use this feature.",
       );
@@ -878,7 +878,7 @@ return (
               }
           }
           displayState={displayState}
-          dispositionOptions={(campaignDetails as any).disposition_options as any[]}
+          dispositionOptions={(campaignDetails.disposition_options as unknown) as string[]}
           handleDialNext={handleDialButton}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}
@@ -892,7 +892,7 @@ return (
           isBusy={isBusy}
           house={house}
           switchQuestionContact={switchQuestionContact}
-          attemptList={attemptList}
+          attemptList={attemptList as unknown as (Tables<"outreach_attempt"> & { result?: { status?: string } })[]}
           questionContact={questionContact}
         />
       </div>

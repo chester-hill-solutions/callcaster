@@ -53,9 +53,13 @@ export const action: ActionFunction = async ({ request }) => {
 
     const workspaceData = data as WorkspaceData;
 
+    if (!workspaceData.twilio_data) {
+      throw new Error("Workspace twilio_data not found");
+    }
+
     const twilio = new Twilio.Twilio(
-      workspaceData.key,
-      workspaceData.token,
+      workspaceData.twilio_data.sid,
+      workspaceData.twilio_data.authToken,
       {accountSid: workspaceData.twilio_data.sid}
     );
 

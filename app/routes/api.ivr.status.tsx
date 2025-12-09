@@ -2,7 +2,8 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Twilio } from "twilio";
 import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "~/lib/types"
+import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "~/lib/types";
+import { env } from "~/lib/env.server";
 
 export interface CallEvent {
     Called: string;
@@ -39,7 +40,7 @@ export interface CallEvent {
     FromState: string;
   }
 
-  const updateResult = async (supabase: SupabaseClient, outreach_attempt_id: string | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
+  const updateResult = async (supabase: SupabaseClient, outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
     if (!outreach_attempt_id) {
         throw new Error("outreach_attempt_id is undefined");
     }
@@ -58,7 +59,14 @@ const updateCallStatus = async (supabase: SupabaseClient, callSid: string, statu
     if (error) throw error;
 };
 
-function findVoicemailPage(pagesObject: Script['steps']['pages'] | undefined): Script['steps']['pages'][string] | null {
+import type { Block } from "~/lib/types";
+
+interface ScriptSteps {
+    pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
+    blocks?: Record<string, Block>;
+}
+
+function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }> | undefined): { title: string; blocks: string[]; speechType?: string; say?: string } | null {
     if (!pagesObject) return null;
     for (const pageId in pagesObject) {
         const page = pagesObject[pageId];
@@ -69,10 +77,11 @@ function findVoicemailPage(pagesObject: Script['steps']['pages'] | undefined): S
     return null;
 }
 
-const handleVoicemail = async (twilio: Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
+const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date() });
-    const step = findVoicemailPage(campaign.ivr_campaign.script?.steps?.pages);
+    const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
+    const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
         await call.update({
             twiml: `<Response><Hangup/></Response>`
@@ -100,7 +109,7 @@ const handleVoicemail = async (twilio: Twilio, callSid: string, dbCall: Call, ca
     }
 };
 
-const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: string | undefined, disposition: string): Promise<void> => {
+const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: number | null | undefined, disposition: string): Promise<void> => {
     await Promise.all([
         updateCallStatus(supabase, callSid, status, timestamp),
         updateResult(supabase, outreach_attempt_id, { disposition })
@@ -108,7 +117,7 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
 };
 
 export const action = async ({ request }: { request: Request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
     
     const parsedBody = Object.fromEntries(formData.entries()) as unknown as CallEvent;
@@ -123,18 +132,18 @@ export const action = async ({ request }: { request: Request }) => {
         if (callError) throw callError;
         if (!dbCall) throw new Error("Call not found");
 
-        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace});
+        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
         
         const callStatus = parsedBody.CallStatus;
-        const timestamp = parsedBody.Timestamp;
+        const timestamp = String(parsedBody.Timestamp || '');
 
         if (callStatus === 'failed' || callStatus === 'no-answer') {
             const disposition = callStatus === 'failed' ? 'failed' : 'no-answer';
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, disposition);
+            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id as number | null, disposition);
         } else if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && callStatus !== 'completed') {
             await handleVoicemail(twilio, callSid, dbCall as Call, dbCall.campaign as Campaign & {ivr_campaign: IVRCampaign & {script: Script}}, supabase);
         } else if (callStatus === 'completed'){
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id, 'completed');
+            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id as number | null, 'completed');
         }
     } catch (error) {
         console.error(error);

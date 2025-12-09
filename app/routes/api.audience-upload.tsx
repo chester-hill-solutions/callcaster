@@ -1,6 +1,8 @@
 import { json } from "@remix-run/node";
 import { verifyAuth } from "~/lib/supabase.server";
 import { parseCSV } from "../lib/csv";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database, Tables } from "~/lib/database.types";
 
 interface StorageBucket {
   id: string;
@@ -21,12 +23,12 @@ interface MappedContact {
   created_by: string;
   firstname?: string;
   surname?: string;
-  other_data?: Array<{ key: string; value: any }>; // JSONB array of key-value pairs
-  [key: string]: any;
+  other_data?: Array<{ key: string; value: unknown }>; // JSONB array of key-value pairs
+  [key: string]: unknown;
 }
 
 // Type guard for other_data array
-function isOtherDataArray(value: any): value is Array<{ key: string; value: any }> {
+function isOtherDataArray(value: unknown): value is Array<{ key: string; value: unknown }> {
   return Array.isArray(value) && value.every(item => 
     typeof item === 'object' && 
     item !== null && 
@@ -44,7 +46,7 @@ const generateUniqueId = () => {
 
 // Process audience upload in background
 const processAudienceUpload = async (
-  supabaseClient: any,
+  supabaseClient: SupabaseClient<Database>,
   uploadId: number,
   audienceId: number,
   workspaceId: string,
@@ -199,7 +201,7 @@ const processAudienceUpload = async (
       // Insert contacts
       const { data: insertedContacts, error: insertError } = await supabaseClient
         .from("contact")
-        .insert(mappedContacts)
+        .insert(mappedContacts as unknown as Partial<Tables<"contact">>[])
         .select('id, firstname, surname, other_data');
 
       if (insertError) {

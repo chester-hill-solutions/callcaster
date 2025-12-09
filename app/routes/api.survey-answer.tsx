@@ -1,5 +1,8 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/lib/database.types";
+import { logger } from "~/lib/logger.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   const { supabaseClient } = createSupabaseServerClient(request);
@@ -11,7 +14,10 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ error: "Method not allowed" }, { status: 405 });
 }
 
-async function handleSaveAnswer(request: Request, supabaseClient: any) {
+async function handleSaveAnswer(
+  request: Request,
+  supabaseClient: SupabaseClient<Database>
+) {
   try {
     const formData = await request.formData();
     const surveyId = formData.get("surveyId") as string;
@@ -26,10 +32,15 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
     }
     
     // Get survey to verify it exists and is active
+    const surveyIdNum = parseInt(surveyId, 10);
+    if (isNaN(surveyIdNum)) {
+      return json({ error: "Invalid survey ID" }, { status: 400 });
+    }
+    
     const { data: survey, error: surveyError } = await supabaseClient
       .from("survey")
       .select("id, is_active")
-      .eq("survey_id", surveyId)
+      .eq("id", surveyIdNum)
       .single();
 
     if (surveyError || !survey) {
@@ -49,12 +60,17 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
 
     if (responseError || !surveyResponse) {
       // Create new survey response
+      const contactIdNum = contactId ? parseInt(contactId, 10) : null;
+      if (contactId && isNaN(contactIdNum!)) {
+        return json({ error: "Invalid contact ID" }, { status: 400 });
+      }
+      
       const { data: newResponse, error: createError } = await supabaseClient
         .from("survey_response")
         .insert({
           survey_id: survey.id,
           result_id: resultId,
-          contact_id: contactId || null,
+          contact_id: contactIdNum,
           started_at: new Date().toISOString(),
           last_page_completed: pageId,
         })
@@ -62,7 +78,7 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
         .single();
 
       if (createError) {
-        console.error("Error creating survey response:", createError);
+        logger.error("Error creating survey response:", createError);
         return json({ error: "Failed to create survey response" }, { status: 500 });
       }
 
@@ -78,7 +94,7 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
         .eq("id", surveyResponse.id);
 
       if (updateError) {
-        console.error("Error updating survey response:", updateError);
+        logger.error("Error updating survey response:", updateError);
       }
     }
 
@@ -90,7 +106,7 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
       .single();
 
     if (questionError || !question) {
-      console.error("Question not found:", questionId);
+      logger.error("Question not found:", questionId);
       return json({ error: "Question not found" }, { status: 404 });
     }
 
@@ -113,7 +129,7 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
         .eq("id", existingAnswer.id);
 
       if (updateError) {
-        console.error("Error updating answer:", updateError);
+        logger.error("Error updating answer:", updateError);
         return json({ error: "Failed to update answer" }, { status: 500 });
       }
     } else {
@@ -127,12 +143,12 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
           answered_at: new Date().toISOString(),
         });
 
-      console.log(newAnswer);
-
       if (insertError) {
-        console.error("Error creating answer:", insertError);
+        logger.error("Error creating answer:", insertError);
         return json({ error: "Failed to save answer" }, { status: 500 });
       }
+      
+      logger.debug("Created new answer:", newAnswer);
     }
 
     return json({ 
@@ -141,7 +157,7 @@ async function handleSaveAnswer(request: Request, supabaseClient: any) {
       result_id: resultId 
     });
   } catch (error) {
-    console.error("Error in handleSaveAnswer:", error);
+    logger.error("Error in handleSaveAnswer:", error);
     return json({ error: "Internal server error" }, { status: 500 });
   }
 } 

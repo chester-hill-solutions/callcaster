@@ -30,11 +30,11 @@ import { verifyAuth } from "~/lib/supabase.server";
 import { normalizePhoneNumber } from "~/lib/utils";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "~/components/ui/card";
-import { useConversationSummaryRealTime, phoneNumbersMatch } from "~/hooks/useChatRealtime";
-import ChatHeader from "~/components/Chat/ChatHeader";
-import ChatInput from "~/components/Chat/ChatInput";
-import { useContactSearch } from "~/hooks/useContactSearch";
-import ChatAddContactDialog from "~/components/Chat/ChatAddContactDialog";
+import { useConversationSummaryRealTime, phoneNumbersMatch } from "~/hooks/realtime/useChatRealtime";
+import ChatHeader from "~/components/chat/ChatHeader";
+import ChatInput from "~/components/chat/ChatInput";
+import { useContactSearch } from "~/hooks/contact/useContactSearch";
+import ChatAddContactDialog from "~/components/chat/ChatAddContactDialog";
 import {
   Select,
   SelectContent,
@@ -45,7 +45,7 @@ import {
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/lib/database.types";
-import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace } from "~/lib/types";
+import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign } from "~/lib/types";
 import { sendMessage } from "./api.chat_sms";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
@@ -67,10 +67,10 @@ type WorkspaceContextType = {
 };
 
 type LoaderData = {
-  campaigns: any[];
+  campaigns: Campaign[];
   chatsPromise: Promise<{
     chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
-    chatsError: any;
+    chatsError: Error | null;
   }>;
   potentialContacts: Contact[];
   contact: Contact | null;
@@ -89,7 +89,7 @@ type ImageFetcherData = {
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
 type ChatsData = {
   chats: ConversationSummary[];
-  chatsError: any;
+  chatsError: Error | null;
 };
 
 type Chat = {
@@ -531,7 +531,7 @@ export default function ChatsList() {
             </div>
           }>
             <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
-              {(chatsData: any) => {
+              {(chatsData) => {
                 const { chats } = chatsData as ChatsData;
                 const chatNumbers = Array.from(
                   new Set(

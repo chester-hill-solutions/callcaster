@@ -18,8 +18,13 @@ export const action = async ({ request }: { request: Request }) => {
  if (!audio) {
   console.error('No audio found');
   twilio.calls(call.sid).update({status: 'completed'})
+  return {success: false, error: 'No audio found'};
  };
   if (voicemailError) throw {'voicemail': voicemailError}
+  if (!audio.signedUrl) {
+    console.error('No signed URL found');
+    return {success: false, error: 'No signed URL found'};
+  }
   twilio.calls(call.sid).update({
     twiml:`<Response><Play>${audio.signedUrl}</Play></Response>`
   })

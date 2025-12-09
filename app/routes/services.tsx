@@ -10,13 +10,21 @@ const services = [
   { title: "Texting (SMS)", description: "Broadcast your message and interact with your list on their preferred platform" },
 ];
 
-const SectionTitle = ({ children }) => (
+interface SectionTitleProps {
+  children: React.ReactNode;
+}
+
+const SectionTitle = ({ children }: SectionTitleProps) => (
   <h1 className="text-center font-Tabac-Slab text-3xl font-bold md:text-left">
     {children}
   </h1>
 );
 
-const SectionText = ({ children }) => (
+interface SectionTextProps {
+  children: React.ReactNode;
+}
+
+const SectionText = ({ children }: SectionTextProps) => (
   <p className="font-Zilla-Slab text-xl font-semibold">
     {children}
   </p>

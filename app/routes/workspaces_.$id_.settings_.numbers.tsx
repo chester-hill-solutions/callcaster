@@ -21,7 +21,7 @@ import {
   updateWorkspacePhoneNumber,
 } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
-import { useSupabaseRealtime } from "~/hooks/useSupabaseRealtime";
+import { useSupabaseRealtime } from "~/hooks/realtime/useSupabaseRealtime";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -29,9 +29,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { NumbersTable } from "~/components/NumbersTable";
-import { NumberCallerId } from "~/components/NumberCallerId";
-import { NumberPurchase } from "~/components/NumberPurchase";
+import { NumbersTable } from "~/components/phone-numbers/NumbersTable";
+import { NumberCallerId } from "~/components/phone-numbers/NumberCallerId";
+import { NumberPurchase } from "~/components/phone-numbers/NumberPurchase";
 import { User, WorkspaceNumbers } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
@@ -43,10 +43,14 @@ type LoaderData = {
   user: User;
 };
 
-export type FetcherData = {
-  data: WorkspaceNumbers[] | [];
-  error?: string;
+export type AvailableNumber = {
+  phoneNumber: string;
+  friendlyName: string;
+  region?: string;
+  capabilities: Record<string, boolean>;
 };
+
+export type FetcherData = AvailableNumber[] | { error: string } | undefined;
 export type ActionData = {
   data: {
     validationRequest?: ValidationRequest;
@@ -70,8 +74,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .from("workspaceAudio")
     .list(workspaceId);
   if (user) {
-    const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
-    const hasAccess = userRole !== MemberRole.Caller;
+    const userRole = await getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
+    const hasAccess = userRole?.role !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
     return json(
       {

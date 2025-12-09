@@ -1,5 +1,22 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 
+interface OutreachAttemptRecord {
+  workspace: string;
+  type: 'call' | 'sms';
+  [key: string]: unknown;
+}
+
+interface WebhookEvent {
+  category: string;
+  type: string;
+}
+
+interface Webhook {
+  destination_url: string;
+  custom_headers?: Record<string, string>;
+  events?: WebhookEvent[];
+}
+
 const initSupabaseClient = () => {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -7,7 +24,7 @@ const initSupabaseClient = () => {
   );
 };
 
-const fetchWebhook = async (record: any) => {
+const fetchWebhook = async (record: OutreachAttemptRecord): Promise<Webhook[] | null> => {
   const supabase = initSupabaseClient();
   const { data, error } = await supabase
     .from("webhook")
@@ -20,7 +37,15 @@ const fetchWebhook = async (record: any) => {
   return data;
 };
 
-const getResult = async ({ type, record, old_record }: { type: string, record: any, old_record: any }) => {
+const getResult = async ({ 
+  type, 
+  record, 
+  old_record 
+}: { 
+  type: string; 
+  record: OutreachAttemptRecord; 
+  old_record: OutreachAttemptRecord | null 
+}): Promise<unknown> => {
   const webhooks = await fetchWebhook(record);
   if (webhooks && webhooks.length > 0) {
     const webhook = webhooks[0];
@@ -32,7 +57,7 @@ const getResult = async ({ type, record, old_record }: { type: string, record: a
 
     const hasMatchingEvent = webhook.events &&
       Array.isArray(webhook.events) &&
-      webhook.events.some((event: any) =>
+      webhook.events.some((event: WebhookEvent) =>
         event.category === category && event.type === type
       );
 
@@ -87,10 +112,11 @@ Deno.serve(async (req: Request) => {
         headers: { "Content-Type": "application/json" },
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Server error:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message, status: "error" }),
+      JSON.stringify({ error: errorMessage, status: "error" }),
       {
         headers: { "Content-Type": "application/json" },
         status: 500,

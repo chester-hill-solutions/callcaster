@@ -39,7 +39,23 @@ async function processUrls(text: string): Promise<string> {
   return processedText;
 }
 
-function processTemplateTags(text: string, contact: any): string {
+interface ContactData {
+  id?: number;
+  firstname?: string | null;
+  surname?: string | null;
+  fullname?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postal?: string | null;
+  country?: string | null;
+  external_id?: string | null;
+  [key: string]: unknown;
+}
+
+function processTemplateTags(text: string, contact: ContactData): string {
   if (!text || !contact) return text;
 
   const processBraces = (input: string): string => {

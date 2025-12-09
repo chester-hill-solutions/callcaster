@@ -15,13 +15,15 @@ import { Button } from "~/components/ui/button";
 import {
   getUserRole,
   getWorkspaceInfoWithDetails,
+  type WorkspaceInfoWithDetails,
 } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
-import { useRealtimeData } from "~/hooks/useWorkspaceContacts";
-import CampaignEmptyState from "~/components/CampaignEmptyState";
-import CampaignsList from "~/components/CampaignList";
+import { useRealtimeData } from "~/hooks/realtime/useRealtimeData";
+import CampaignEmptyState from "~/components/campaign/CampaignEmptyState";
+import CampaignsList from "~/components/campaign/CampaignList";
 import { Campaign, ContextType, User } from "~/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { ErrorBoundary } from "~/components/shared/ErrorBoundary";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
@@ -69,7 +71,7 @@ export default function Workspace() {
     <main className="container mx-auto flex min-h-[80vh] flex-col pt-10 pb-20">
       <Suspense fallback={<div>Loading workspace...</div>}>
         <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
-          {(resolvedData: any) => {
+          {(resolvedData: WorkspaceInfoWithDetails) => {
             const { workspace, audiences, campaigns, phoneNumbers } = resolvedData;
             const { data: workspaceData, isSyncing: workspaceSyncing, error: workspaceError } = useRealtimeData(context.supabase, workspace.id, 'workspace', [workspace]);
             const { data: campaignsData, isSyncing: campaignsSyncing, error: campaignsError } = useRealtimeData(context.supabase, workspace.id, 'campaign', campaigns);
@@ -129,3 +131,5 @@ export default function Workspace() {
     </main>
   );
 }
+
+export { ErrorBoundary };

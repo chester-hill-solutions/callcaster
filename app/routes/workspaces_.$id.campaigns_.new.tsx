@@ -6,7 +6,7 @@ import {
   CardActions,
   CardContent,
   CardTitle,
-} from "~/components/CustomCard";
+} from "~/components/shared/CustomCard";
 import { Button } from "~/components/ui/button";
 import { verifyAuth } from "~/lib/supabase.server";
 import { Flags } from "~/lib/types";

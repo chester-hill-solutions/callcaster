@@ -10,7 +10,7 @@ const getAttemptCalls = ({ attempt, calls }:{attempt:OutreachAttempt, calls:Call
   return calls.filter((call) => call.outreach_attempt_id === attempt.id);
 };
 
-export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents<any>["submit"], begin:() => void}) => {
+export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents<unknown>["submit"], begin:() => void}) => {
   const handleConferenceStart = () => {
     begin();
   };
@@ -39,7 +39,7 @@ export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents
   return { handleConferenceStart, handleConferenceEnd };
 };
 
-export const handleCall = ({ submit }:{submit:FetcherWithComponents<any>["submit"]}) => {
+export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["submit"]}) => {
   const startCall = ({
     contact,
     campaign,
@@ -140,7 +140,7 @@ export const handleQueue = ({
   workspaceId,
   setQueue,
 }:{
-  submit: FetcherWithComponents<any>["submit"];  
+  submit: FetcherWithComponents<unknown>["submit"];  
   groupByHousehold: boolean;
   campaign: Campaign;
   workspaceId: string;
@@ -166,9 +166,9 @@ export const handleQueue = ({
     });
   };
 
-  const updateQueue = (newContacts) => {
+  const updateQueue = (newContacts: QueueItem[]) => {
     setQueue((prevQueue) => {
-      const existingHouseholds = new Map();
+      const existingHouseholds = new Map<string, QueueItem[]>();
       prevQueue?.forEach((contact) => {
         const address = contact.contact.address;
         if (!existingHouseholds.has(address)) {
@@ -192,7 +192,7 @@ export const handleQueue = ({
     });
   };
 
-  const fetchMore = async ({ householdMap }) => {
+  const fetchMore = async ({ householdMap }: { householdMap: Record<string, QueueItem[]> }) => {
     const map = { ...householdMap };
     const length = Math.max(0, 10 - Object.keys(map).length);
     const res = await fetch(

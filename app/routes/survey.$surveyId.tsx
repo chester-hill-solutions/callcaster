@@ -9,8 +9,8 @@ import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Progress } from "~/components/ui/progress";
-import { SurveyQuestionType, SurveyAnswerData } from "~/lib/types";
-import { useDebounce } from "~/hooks/useDebounce";
+import { SurveyQuestionType, SurveyAnswerData, SurveyQuestionWithOptions, ResponseAnswer } from "~/lib/types";
+import { useDebounce } from "~/hooks/utils/useDebounce";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { surveyId } = params;
@@ -84,8 +84,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     if (!responseError && response) {
       existingResponse = response;
       // Convert answers to the format expected by the component
-      existingAnswers = response.response_answer?.reduce((acc: any, answer: any) => {
-        acc[answer.survey_question.question_id.toString()] = answer.answer_value;
+      existingAnswers = response.response_answer?.reduce((acc: Record<string, string | string[]>, answer: ResponseAnswer & { survey_question: SurveyQuestionWithOptions }) => {
+        const questionId = answer.survey_question.question_id.toString();
+        acc[questionId] = answer.answer_value as string | string[];
         return acc;
       }, {}) || {};
     }
@@ -106,7 +107,7 @@ export default function SurveyPage() {
   const completeFetcher = useFetcher();
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>(existingAnswers);
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>(existingAnswers);
   const [isCompleted, setIsCompleted] = useState(false);
 
   const currentPage = survey.survey_page[currentPageIndex];
@@ -114,7 +115,7 @@ export default function SurveyPage() {
   const progress = ((currentPageIndex + 1) / totalPages) * 100;
 
   // Create a debounced save function for text fields
-  const debouncedSave = useDebounce((questionId: string, value: any) => {
+  const debouncedSave = useDebounce((questionId: string, value: string | string[]) => {
     const formData = new FormData();
     formData.append("surveyId", survey.survey_id);
     formData.append("questionId", questionId);
@@ -129,7 +130,7 @@ export default function SurveyPage() {
     });
   }, 1000); // 1 second delay
 
-  const handleAnswerChange = (questionId: string, value: any) => {
+  const handleAnswerChange = (questionId: string, value: string | string[]) => {
     setAnswers(prev => ({
       ...prev,
       [questionId]: value
@@ -141,7 +142,7 @@ export default function SurveyPage() {
     }
 
     // Use debounced save for text fields, immediate save for others
-    const currentQuestion = currentPage.survey_question?.find((q: any) => q.question_id === questionId);
+    const currentQuestion = currentPage.survey_question?.find((q: SurveyQuestionWithOptions) => q.question_id === questionId);
     const isTextField = currentQuestion?.question_type === "text" || currentQuestion?.question_type === "textarea";
     
     if (isTextField) {
@@ -192,7 +193,7 @@ export default function SurveyPage() {
     setIsCompleted(true);
   };
 
-  const renderQuestion = (question: any) => {
+  const renderQuestion = (question: SurveyQuestionWithOptions) => {
     const questionId = question.question_id;
     const currentAnswer = answers[questionId];
     
@@ -202,10 +203,11 @@ export default function SurveyPage() {
       if (answerFetcher.state === "submitting" && formData?.get("questionId") === questionId) {
         return 'saving';
       }
-      if (answerFetcher.state === "idle" && (answerFetcher.data as any)?.success && formData?.get("questionId") === questionId) {
+      const fetcherData = answerFetcher.data as { success?: boolean; error?: string } | null;
+      if (answerFetcher.state === "idle" && fetcherData?.success && formData?.get("questionId") === questionId) {
         return 'saved';
       }
-      if (answerFetcher.state === "idle" && (answerFetcher.data as any)?.error && formData?.get("questionId") === questionId) {
+      if (answerFetcher.state === "idle" && fetcherData?.error && formData?.get("questionId") === questionId) {
         return 'error';
       }
       return null;
@@ -280,7 +282,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label>{question.question_text}</Label>
             <div className="space-y-2">
-              {question.question_option?.map((option: any) => {
+              {question.question_option?.map((option) => {
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
@@ -301,7 +303,7 @@ export default function SurveyPage() {
                 );
               })}
               {/* Write-in field for options with (write in) */}
-              {question.question_option?.some((option: any) => 
+              {question.question_option?.some((option) => 
                 option.option_label?.toLowerCase().includes("(write in)")
               ) && currentAnswer && (
                 <div className="ml-6 mt-2">
@@ -333,7 +335,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label>{question.question_text}</Label>
             <div className="space-y-2">
-              {question.question_option?.map((option: any) => {
+              {question.question_option?.map((option) => {
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
@@ -356,7 +358,7 @@ export default function SurveyPage() {
                 );
               })}
               {/* Write-in field for options with (write in) */}
-              {question.question_option?.some((option: any) => 
+              {question.question_option?.some((option) => 
                 option.option_label?.toLowerCase().includes("(write in)")
               ) && currentAnswer && currentAnswer.length > 0 && (
                 <div className="ml-6 mt-2">
@@ -373,7 +375,7 @@ export default function SurveyPage() {
                       const currentValues = currentAnswer || [];
                       const processedValues = currentValues.map((v: string) => {
                         // Find if any selected option has (write in)
-                        const selectedOption = question.question_option?.find((opt: any) => opt.option_value === v);
+                        const selectedOption = question.question_option?.find((opt) => opt.option_value === v);
                         if (selectedOption?.option_label?.toLowerCase().includes("(write in)")) {
                           return writeInText ? `${v}: ${writeInText}` : v;
                         }
@@ -439,7 +441,7 @@ export default function SurveyPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentPage.survey_question?.map((question: any) => (
+          {currentPage.survey_question?.map((question: SurveyQuestionWithOptions) => (
             <div key={question.id} className="space-y-4">
               {renderQuestion(question)}
             </div>

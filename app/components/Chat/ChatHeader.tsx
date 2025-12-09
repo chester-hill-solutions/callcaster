@@ -1,9 +1,9 @@
 import React, { RefObject, useState } from "react";
 import { MdEdit, MdExpandMore } from "react-icons/md";
 import { Contact } from "~/lib/types";
-import { Button } from "../ui/button";
+import { Button } from "~/components/ui/button";
 
-const getSortableName = (contact) => {
+const getSortableName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {
     return `${contact.firstname} ${contact.surname}`;
   } else if (contact.firstname) {
@@ -14,7 +14,7 @@ const getSortableName = (contact) => {
     return contact.phone || "";
   }
 };
-const getDisplayName = (contact) => {
+const getDisplayName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {
     return `${contact.firstname} ${contact.surname}`;
   } else if (contact.firstname) {
@@ -35,25 +35,24 @@ type Chat = {
   unread_count: number
 }
 
-type ChatHeaderParams = {
-  contact?: Contact | null,
-  outlet: boolean,
-  phoneNumber?: string,
-  handlePhoneChange: (e:string | null) => null;
+interface ChatHeaderParams {
+  contact?: Contact | null;
+  outlet: boolean;
+  phoneNumber?: string;
+  handlePhoneChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isValid: boolean;
   selectedContact?: Contact | null;
   contacts: Contact[];
-  toggleContactMenu: () => null;
+  toggleContactMenu: () => void;
   isContactMenuOpen: boolean;
-  handleContactSelect: (e:Contact) => null;
+  handleContactSelect: (contact: Contact) => void;
   dropdownRef: RefObject<HTMLElement | null>;
   searchError?: string;
-  existingConversation: Chat;
-  handleExistingConversationClick: (phoneNumber:string) => null;
+  existingConversation?: Chat & { phoneNumber?: string; latestMessage?: string; date?: string } | null;
+  handleExistingConversationClick: (phoneNumber: string) => void;
   potentialContacts: Contact[];
   contactNumber?: string;
-  setDialog: (contact: Contact)  => null;
-
+  setDialog: (contact: Partial<Contact>) => void;
 }
 
 export default function ChatHeader({

@@ -14,7 +14,7 @@ import { Toaster, toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { verifyAuth } from "~/lib/supabase.server";
 import { CardContent } from "~/components/ui/card";
-import { Card, CardActions, CardTitle } from "~/components/CustomCard";
+import { Card, CardActions, CardTitle } from "~/components/shared/CustomCard";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -65,23 +65,27 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   const formData = await request.formData();
-  const name = formData.get("script-name");
-  const type = formData.get("type") || "ivr";
-  const stepsFile = formData.get("steps") as File;
-  const ref = formData.get("ref") as string;
+  const nameValue = formData.get("script-name");
+  const typeValue = formData.get("type");
+  const stepsFileValue = formData.get("steps");
+  const refValue = formData.get("ref");
 
-  if (!name) {
+  if (!nameValue || typeof nameValue !== "string") {
     return json(
       { success: false, error: "Script name is required" },
       { headers },
     );
   }
 
-  let steps = {};
-  if (stepsFile.size > 0) {
+  const name = nameValue;
+  const type = typeof typeValue === "string" ? typeValue : "ivr";
+  const ref = typeof refValue === "string" ? refValue : null;
+
+  let steps: Record<string, unknown> = {};
+  if (stepsFileValue instanceof File && stepsFileValue.size > 0) {
     try {
-      const stepsContent = await stepsFile.text();
-      steps = JSON.parse(stepsContent);
+      const stepsContent = await stepsFileValue.text();
+      steps = JSON.parse(stepsContent) as Record<string, unknown>;
     } catch (error) {
       return json(
         { success: false, error: "Invalid JSON file for steps" },
@@ -94,26 +98,37 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const { data, error } = await supabaseClient
     .from("script")
     .insert({
-      name: name as string  ,
+      name,
       type,
       steps,
       created_by: user?.id,
       workspace: workspaceId,
     })
     .select();
-  if (ref) {
+  if (ref && data && data.length > 0) {
     const tableKey = type === "script" ? "live_campaign" : "ivr_campaign";
-    const { data: update, error: updateError } = await supabaseClient
+    const { error: updateError } = await supabaseClient
       .from(tableKey)
       .update({ script_id: data[0].id })
       .eq("campaign_id", Number(ref) || 0)
       .select();
-    if (updateError) console.error(updateError);
-    console.log(update)
+    if (updateError) {
+      return json(
+        { success: false, error: updateError },
+        { headers },
+      );
+    }
   }
 
   if (error) {
     return json({ success: false, error: error }, { headers });
+  }
+
+  if (!data || data.length === 0) {
+    return json(
+      { success: false, error: "Failed to create script" },
+      { headers },
+    );
   }
 
   return json({ data, success: true, error: null }, { headers });
@@ -127,14 +142,20 @@ export default function NewScript() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (actionData?.success) {
+    if (actionData?.success && actionData.data && actionData.data.length > 0) {
       toast.success("Script successfully added to your workspace!");
       setTimeout(
         () => navigate(`../${actionData.data[0].id}`, { relative: "path" }),
         750,
       );
     } else if (actionData?.error) {
-      toast.error(`Error: ${actionData.error.message || actionData.error}`);
+      const errorMessage =
+        actionData.error instanceof Error
+          ? actionData.error.message
+          : typeof actionData.error === "string"
+            ? actionData.error
+            : "An error occurred";
+      toast.error(`Error: ${errorMessage}`);
     }
   }, [actionData, navigate]);
 
@@ -166,7 +187,12 @@ export default function NewScript() {
     >
       {actionData?.error != null && (
         <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-          Error: {actionData.error.message}
+          Error:{" "}
+          {actionData.error instanceof Error
+            ? actionData.error.message
+            : typeof actionData.error === "string"
+              ? actionData.error
+              : "An error occurred"}
         </p>
       )}
       <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
