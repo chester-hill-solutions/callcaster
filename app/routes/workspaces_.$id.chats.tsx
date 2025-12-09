@@ -31,10 +31,10 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { useConversationSummaryRealTime, phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
-import ChatHeader from "@/components/chat/ChatHeader";
-import ChatInput from "@/components/chat/ChatInput";
+import ChatHeader from "@/components/chat/ChatHeader.tsx";
+import ChatInput from "@/components/chat/ChatInput.tsx";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
-import ChatAddContactDialog from "@/components/chat/ChatAddContactDialog";
+import ChatAddContactDialog from "@/components/chat/ChatAddContactDialog.tsx";
 import {
   Select,
   SelectContent,
