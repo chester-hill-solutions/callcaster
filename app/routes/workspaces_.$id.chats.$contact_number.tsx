@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import { useIntersectionObserver } from "@/hooks/utils/useIntersectionObserver";
-import MessageList from "@/components/chat/ChatMessages.tsx";
+import MessageList from "../../components/chat/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 
