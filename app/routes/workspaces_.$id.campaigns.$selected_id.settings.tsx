@@ -91,7 +91,7 @@ async function handleCampaignUpdate(
   } else {
     if (updates["schedule"]) {
       const parseUpdate = JSON.parse(updates["schedule"])
-      updates.schedule = parseUpdate
+      updates["schedule"] = parseUpdate
     }
     const { error } = await supabaseClient
       .from("campaign")
@@ -360,13 +360,17 @@ export default function CampaignSettingsRoute() {
     setConfirmStatus(status);
   };
 
+<<<<<<< HEAD
   const handleInputChange = (name: string, value: string | number | null | undefined) => {
+=======
+  const handleInputChange = (name: string, value: string | number | boolean | Schedule | null) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     if (name === "script_id") {
       // For script selection, we need to update both campaign data and details
       fetcher.submit(
         { 
           intent: "update", 
-          script_id: value,
+          script_id: value?.toString() || "",
           campaignData: JSON.stringify({ ...campaignData, script_id: value }),
           campaignDetails: JSON.stringify({ ...campaignDetails, script_id: value })
         },
@@ -377,7 +381,7 @@ export default function CampaignSettingsRoute() {
       fetcher.submit(
         {
           intent: "update",
-          body_text: value,
+          body_text: value?.toString() || "",
           campaignData: JSON.stringify({ ...campaignData}),
           campaignDetails: JSON.stringify({ ...campaignDetails, body_text: value })
         },
@@ -385,7 +389,7 @@ export default function CampaignSettingsRoute() {
       );
     } else {
       fetcher.submit(
-        { intent: "update", [name]: value },
+        { intent: "update", [name]: value?.toString() || "" },
         { method: "post" }
       );
     }

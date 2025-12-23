@@ -10,7 +10,6 @@ import {
 
 interface MediaItem {
   name: string;
-  signedUrl?: string;
 }
 
 interface SelectVoiceDropProps {
@@ -19,7 +18,7 @@ interface SelectVoiceDropProps {
     voicemail_file?: string;
   };
   handleInputChange: (name: string, value: string) => void;
-  mediaData?: MediaItem[];
+  mediaData: MediaItem[];
 }
 
 export default function SelectVoiceDrop({campaignData, handleInputChange, mediaData}: SelectVoiceDropProps) {

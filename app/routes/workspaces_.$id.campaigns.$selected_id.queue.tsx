@@ -8,11 +8,16 @@ import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campai
 import { Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
+<<<<<<< HEAD
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
+=======
+import { ContactSearchDialog } from "~/components/queue/ContactSearchDialog";
+import { AppError } from "~/lib/types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
-    queueError: any;
+    queueError: AppError | null;
     totalCount: number | null;
     unfilteredCount: number | null;
     queuedCount: number | null;
@@ -144,58 +149,127 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+    const { selected_id } = params;
     const { supabaseClient, user } = await verifyAuth(request);
-    const { id: workspace_id, selected_id } = params;
 
     if (!user) throw redirect("/signin");
-
     if (!selected_id) throw redirect("../../");
 
-    if (request.method === "POST") {
-        const { ids, newStatus } = await request.json();
-        const url = new URL(request.url);
-        const searchParams = url.searchParams;
-        const nameFilter = searchParams.get("name") || "";
-        const phoneFilter = searchParams.get("phone") || "";
-        const statusFilter = searchParams.get("status") || "";
-        const audiencesFilter = searchParams.get("audiences") || "";
-        const emailFilter = searchParams.get("email") || "";
-        const addressFilter = searchParams.get("address") || "";
-        if (!ids || !newStatus) throw new Error("Missing ids or newStatus");
-        let updateIds = ids;
-        if (ids === 'all') {
-            updateIds = [];
-        }
+    const formData = await request.formData();
+    const intent = formData.get("intent") as string;
 
-        let updateQuery = supabaseClient
-            .from("campaign_queue")
-            .update({ status: newStatus })
-            .eq('campaign_id', Number(selected_id));
+    if (intent === "update_status") {
+        const ids = formData.get("ids") as string;
+        const newStatus = formData.get("status") as string;
+        const isAllSelected = formData.get("isAllSelected") === "true";
 
-        if (ids === 'all') {
-            let searchQuery = filteredSearch(nameFilter, {
-                name: nameFilter,
-                phone: phoneFilter,
-                status: statusFilter,
-                audiences: audiencesFilter,
-                email: emailFilter,
-                address: addressFilter
-            }, supabaseClient, ['id', 'contact!inner(*)'], selected_id);
-            const { data: ids, error: searchError } = await searchQuery;
-            if (searchError) return json({ error: searchError.message });
-            updateIds = ids?.map((item: any) => item.id) || [];
-            updateQuery = updateQuery.in('id', updateIds);
+        if (isAllSelected) {
+            const { error } = await supabaseClient
+                .from("campaign_queue")
+                .update({ status: newStatus })
+                .eq("campaign_id", parseInt(selected_id));
+
+            if (error) {
+                return json({ success: false, error: error.message });
+            }
         } else {
-            updateQuery = updateQuery.in('id', ids);
+            const updateIds = JSON.parse(ids).map((item: { id: string }) => item.id) || [];
+            
+            if (updateIds.length > 0) {
+                const { error } = await supabaseClient
+                    .from("campaign_queue")
+                    .update({ status: newStatus })
+                    .in("id", updateIds);
+
+                if (error) {
+                    return json({ success: false, error: error.message });
+                }
+            }
         }
 
-        const { error } = await updateQuery;
+        return json({ success: true });
+    }
+
+    if (intent === "add_from_audience") {
+        const audienceId = parseInt(formData.get("audienceId") as string);
+        const { data: contacts, error } = await supabaseClient
+            .from("contact_audience")
+            .select("contact_id")
+            .eq("audience_id", audienceId);
 
         if (error) {
-            throw new Error(error.message);
+            return json({ success: false, error: error.message });
         }
+
+        const contactIds = contacts.map((contact) => contact.contact_id);
+        const queueItems = contactIds.map((contactId) => ({
+            campaign_id: parseInt(selected_id),
+            contact_id: contactId,
+            status: "queued",
+        }));
+
+        const { error: insertError } = await supabaseClient
+            .from("campaign_queue")
+            .insert(queueItems);
+
+        if (insertError) {
+            return json({ success: false, error: insertError.message });
+        }
+
+        return json({ success: true });
     }
-    return { success: true };
+
+    if (intent === "add_contacts") {
+        const contacts = JSON.parse(formData.get("contacts") as string) as Contact[];
+        const queueItems = contacts.map((contact) => ({
+            campaign_id: parseInt(selected_id),
+            contact_id: contact.id,
+            status: "queued",
+        }));
+
+        const { error } = await supabaseClient
+            .from("campaign_queue")
+            .insert(queueItems);
+
+        if (error) {
+            return json({ success: false, error: error.message });
+        }
+
+        return json({ success: true });
+    }
+
+    if (intent === "remove_contacts") {
+        const ids = formData.get("ids") as string;
+        const isAllSelected = formData.get("isAllSelected") === "true";
+
+        if (isAllSelected) {
+            const { error } = await supabaseClient
+                .from("campaign_queue")
+                .delete()
+                .eq("campaign_id", parseInt(selected_id));
+
+            if (error) {
+                return json({ success: false, error: error.message });
+            }
+        } else {
+            const removeIds = JSON.parse(ids).map((item: { id: string }) => item.id) || [];
+            
+            if (removeIds.length > 0) {
+                const { error } = await supabaseClient
+                    .from("campaign_queue")
+                    .delete()
+                    .in("id", removeIds);
+
+                if (error) {
+                    return json({ success: false, error: error.message });
+                }
+            }
+        }
+
+        return json({ success: true });
+    }
+
+    return json({ success: false, error: "Invalid intent" });
 };
 
 

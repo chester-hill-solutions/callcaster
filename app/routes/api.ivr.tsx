@@ -3,9 +3,9 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { ActionFunctionArgs } from "@remix-run/node";
 
 export const action = async ({ request }:ActionFunctionArgs) => {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-  const baseUrl = process.env.BASE_URL;
+  const supabaseUrl = process.env['SUPABASE_URL'];
+  const supabaseServiceKey = process.env['SUPABASE_SERVICE_KEY'];
+  const baseUrl = process.env['BASE_URL'];
 
   if (!supabaseUrl || !supabaseServiceKey || !baseUrl) {
     throw new Error("Missing required environment variables");
@@ -56,7 +56,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     });
 
     
-    const {data: insertData, error: insertError } = await supabase.from("call").insert({
+    const { error: insertError } = await supabase.from("call").insert({
       sid: call.sid,
       to: to_number,
       from: caller_id,
@@ -85,33 +85,11 @@ export const action = async ({ request }:ActionFunctionArgs) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error: any) {
-    console.error("Error processing call:", error);
-
-    if (outreachAttemptId) {
-      const { error: outreachUpdateError } = await supabase
-        .from("outreach_attempt")
-        .update({ disposition: "failed" })
-        .eq("id", outreachAttemptId);
-      if (outreachUpdateError) throw outreachUpdateError;
-    }
-    if (call && call.sid) {
-      try {
-        await twilio.calls(call.sid).update({ status: "canceled" });
-      } catch (cancelError) {
-        console.error("Error canceling Twilio call:", cancelError);
-      }
-    }
-
+  } catch (error: unknown) {
+    console.error("Error processing IVR request:", error);
     return new Response(
-      JSON.stringify({
-        error: "There was an error processing your call.",
-        details: error.message,
-      }),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json" },
-      },
+      `Error processing IVR request: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { status: 500 }
     );
   }
 };

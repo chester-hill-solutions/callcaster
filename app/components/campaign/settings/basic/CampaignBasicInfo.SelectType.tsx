@@ -7,19 +7,17 @@ import {
 } from "@/components/ui/select";
 import { Flags } from "@/lib/types";
 
-interface CampaignData {
-  type?: string;
+interface CampaignBasicInfoSelectTypeProps {
+  campaignData: Campaign;
+  handleInputChange: (name: string, value: string | number | boolean) => void;
+  flags: Record<string, boolean>;
 }
 
 export default function SelectType({
   handleInputChange,
   campaignData,
   flags,
-}: {
-  handleInputChange: (key: string, value: string) => void;
-  campaignData: CampaignData;
-  flags: Flags;
-}) {
+}: CampaignBasicInfoSelectTypeProps) {
   const isLiveCallEnabled = true;
   const isMessageEnabled = true;
   const isRobocallEnabled = true;

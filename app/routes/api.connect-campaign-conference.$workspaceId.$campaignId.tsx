@@ -1,6 +1,7 @@
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
+import type { LoaderFunctionArgs } from "@remix-run/node";
 
-export const loader = async ({ params }: { params: { workspaceId: string, campaignId: string } }) => {
+export const loader = async ({ params }: LoaderFunctionArgs) => {
     const twiml = new VoiceResponse();
     
     twiml.say('Welcome to the campaign. You will be connected to calls through your phone.');

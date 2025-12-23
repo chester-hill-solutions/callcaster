@@ -37,8 +37,8 @@ type BaseCampaignDetails = {
   script?: Script;
   mediaLinks?: { [key: string]: string }[];
   message_media?: string[];
-  disposition_options?: unknown;
-  questions?: unknown;
+  disposition_options?: Record<string, unknown>;
+  questions?: Record<string, unknown>;
   voicedrop_audio?: string | null;
 };
 

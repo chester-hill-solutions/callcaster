@@ -1,3 +1,4 @@
+<<<<<<< HEAD:app/components/workspace/WorkspaceOverview.tsx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/lib/database.types";
@@ -14,6 +15,19 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
     const users = workspaceUsers ?? [];
     const numbers = phoneNumbers ?? [];
     const campaigns = Array.isArray(workspace.campaign) ? workspace.campaign : [];
+=======
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Workspace, WorkspaceNumber } from "~/lib/types";
+
+interface WorkspaceOverviewProps {
+  workspace: Workspace | null;
+  workspaceUsers: Array<{ id: string; email: string; role: string }>;
+  phoneNumbers: WorkspaceNumber[];
+}
+
+export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumbers }: WorkspaceOverviewProps) {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/WorkspaceOverview.tsx
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -26,25 +40,25 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
                     <dl className="space-y-4">
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">ID</dt>
-                            <dd className="mt-1 text-sm font-mono">{workspace.id}</dd>
+                            <dd className="mt-1 text-sm font-mono">{workspace?.id}</dd>
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Name</dt>
-                            <dd className="mt-1 text-sm">{workspace.name}</dd>
+                            <dd className="mt-1 text-sm">{workspace?.name}</dd>
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Credits</dt>
-                            <dd className="mt-1 text-sm">{workspace.credits}</dd>
+                            <dd className="mt-1 text-sm">{workspace?.credits}</dd>
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Created</dt>
-                            <dd className="mt-1 text-sm">{new Date(workspace.created_at).toLocaleString()}</dd>
+                            <dd className="mt-1 text-sm">{workspace?.created_at ? new Date(workspace.created_at).toLocaleString() : ''}</dd>
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Status</dt>
                             <dd className="mt-1 text-sm">
-                                <Badge variant={workspace.disabled ? "destructive" : "secondary"}>
-                                    {workspace.disabled ? "Disabled" : "Active"}
+                                <Badge variant={workspace?.disabled ? "destructive" : "secondary"}>
+                                    {workspace?.disabled ? "Disabled" : "Active"}
                                 </Badge>
                             </dd>
                         </div>
@@ -61,7 +75,11 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
                     <dl className="space-y-4">
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Total Campaigns</dt>
+<<<<<<< HEAD:app/components/workspace/WorkspaceOverview.tsx
                             <dd className="mt-1 text-sm">{campaigns.length}</dd>
+=======
+                            <dd className="mt-1 text-sm">0</dd>
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/WorkspaceOverview.tsx
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Total Users</dt>

@@ -395,6 +395,7 @@ export default function WorkspaceContacts() {
                   const displayItems = validItems.slice(0, 2);
                   const hasMore = validItems.length > 2;
                   
+<<<<<<< HEAD
                   type OtherDataItem = { key: string; value: unknown } | Record<string, unknown> | string | number | boolean;
                   
                   const formatOtherData = (data: unknown[]) => {
@@ -422,36 +423,20 @@ export default function WorkspaceContacts() {
                             key = keys[0];
                             value = values[0];
                           }
+=======
+                  const formatOtherData = (data: unknown[]) => {
+                    return data.map((item: unknown, i: number) => {
+                      if (typeof item === 'object' && item !== null) {
+                        const keys = Object.keys(item as Record<string, unknown>);
+                        if (keys.length > 0) {
+                          const key = keys[0];
+                          const value = (item as Record<string, unknown>)[key];
+                          return `${key}: ${String(value)}`;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                         }
                       }
-                      // Handle string format like "key:value"
-                      else if (typeof item === 'string') {
-                        if (item.includes(':')) {
-                          const parts = item.split(':');
-                          key = parts[0]?.trim();
-                          value = parts.slice(1).join(':').trim();
-                        } else {
-                          key = item;
-                          value = '';
-                        }
-                      }
-                      
-                      if (!key) {
-                        console.warn('Could not extract key from item:', item);
-                        return null;
-                      }
-                      
-                      return (
-                        <div key={`${row.original.id}-other-data-${i}`} className="text-xs">
-                          <span className="font-medium text-gray-600 dark:text-gray-300">
-                            {key}:
-                          </span>{" "}
-                          <span className="text-gray-800 dark:text-gray-200">
-                            {value !== undefined && value !== null ? String(value) : ''}
-                          </span>
-                        </div>
-                      );
-                    });
+                      return String(item);
+                    }).join(', ');
                   };
                   
                   return (

@@ -1,30 +1,41 @@
 import { json } from "@remix-run/node";
-import { createSupabaseServerClient, getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 
-export const loader = async ({ request, params }) => {
-    const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
+interface DequeueRequest {
+  contact_id: number;
+  household: boolean;
+}
+
+interface ResetRequest {
+  userId: string;
+  campaignId: string;
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
     const url = new URL(request.url);
     const searchParams = url.searchParams;
     const campaign_id = searchParams.get('campaign_id');
-    const limit = searchParams.get('limit') ?? 10;
+    const limit = searchParams.get('limit') ?? '10';
     if (parseInt(limit) === 0) {
         return json([]);
     }
-    const { data: newQueue, error: newQueueError } = await supabase.rpc('select_and_update_campaign_contacts', {p_campaign_id:campaign_id, p_initial_limit:limit})
+    const { data: newQueue } = await supabase.rpc('select_and_update_campaign_contacts', { p_campaign_id: Number(campaign_id), p_initial_limit: parseInt(limit) })
     
-    if (newQueueError || !newQueue.length) return json([]);
-    const {data: queueItems, error: queueItemsError} = await supabase.from('campaign_queue').select('*, contact(*)').in('id', newQueue.map((i) => i.queue_id));
+    if (!newQueue || !newQueue.length) return json([]);
+    const { data: queueItems } = await supabase.from('campaign_queue').select('*, contact(*)').in('id', newQueue.map((i: { queue_id: number }) => i.queue_id));
     return json(queueItems);
 };
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
     const user = serverSession?.user;
 
     if (request.method === 'POST') {
-        const { contact_id, household } = await request.json();
+        const { contact_id, household }: DequeueRequest = await request.json();
         const { data, error } = await supabase.rpc('dequeue_contact', { 
-            passed_contact_id: contact_id, 
+            passed_contact_id: Number(contact_id), 
             group_on_household: household,
             dequeued_by_id: user?.id,
             dequeued_reason_text: "Manually dequeued by user"
@@ -35,13 +46,13 @@ export const action = async ({ request, params }) => {
         }
         return json(data);
     } 
-    else if (request.method === 'DELETE') {
-        const { userId, campaignId } = await request.json();
+else if (request.method === 'DELETE') {
+        const { campaignId }: ResetRequest = await request.json();
         const { data, error } = await supabase
             .from('campaign_queue')
             .update({ status: 'queued' })
-            .eq('status', userId)
-            .eq('campaign_id', campaignId)
+            // Reset all items for campaign
+            .eq('campaign_id', Number(campaignId))
             .select();
 
         if (error) {

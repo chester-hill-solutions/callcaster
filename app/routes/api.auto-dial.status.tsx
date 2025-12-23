@@ -4,6 +4,7 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
+import type { ActionFunctionArgs } from "@remix-run/node";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -39,9 +40,12 @@ const updateOutreachAttempt = async (
       .single();
     if (error) throw error;
     return data;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error updating outreach attempt:", error);
-    throw error;
+    return new Response(
+      `Error updating outreach attempt: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { status: 500 }
+    );
   }
 };
 
@@ -234,7 +238,7 @@ const handleParticipantJoin = async (
   }
 };
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
 
   let realtime;
   try {
@@ -281,10 +285,10 @@ export const action = async ({ request }: { request: Request }) => {
     }
 
     return json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error processing action:", error);
     return json(
-      { error: "Failed to process action: " + error.message },
+      { error: "Failed to process action: " + (error instanceof Error ? error.message : "Unknown error") },
       { status: 500 },
     );
   } finally {

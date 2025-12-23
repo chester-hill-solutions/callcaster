@@ -2,8 +2,27 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json } from "@remix-run/react";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import type { ActionFunctionArgs } from "@remix-run/node";
 
-const getCampaignData = async (supabase, campaign_id) => {
+interface CampaignData {
+  voicemail_file?: string;
+  [key: string]: any;
+}
+
+interface CallData {
+  campaign_id: string;
+  outreach_attempt_id: string;
+  workspace: string;
+}
+
+interface ParsedBody {
+  CallSid: string;
+  AnsweredBy?: string;
+  CallStatus?: string;
+  [key: string]: any;
+}
+
+const getCampaignData = async (supabase: any, campaign_id: string): Promise<CampaignData> => {
     const { data: campaign, error } = await supabase
         .from('campaign')
         .select(`*,
@@ -15,7 +34,7 @@ const getCampaignData = async (supabase, campaign_id) => {
     return campaign;
 };
 
-const updateResult = async (supabase, outreach_attempt_id, update) => {
+const updateResult = async (supabase: any, outreach_attempt_id: string, update: any) => {
     const { error } = await supabase
         .from('outreach_attempt')
         .update(update)
@@ -23,7 +42,7 @@ const updateResult = async (supabase, outreach_attempt_id, update) => {
     if (error) throw error;
 };
 
-const handleVoicemail = async (twilio, callSid, dbCall, script, supabase) => {
+const handleVoicemail = async (twilio: any, callSid: string, dbCall: CallData, script: CampaignData, supabase: any) => {
     const call = twilio.calls(callSid);
     await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail' });
     const vm = script.voicemail_file;
@@ -42,12 +61,12 @@ const handleVoicemail = async (twilio, callSid, dbCall, script, supabase) => {
     }
 };
 
-export const action = async ({ request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
     const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
     const formData = await request.formData();
 
     try {
-        const parsedBody = Object.fromEntries(formData.entries());
+        const parsedBody: ParsedBody = Object.fromEntries(formData.entries()) as ParsedBody;
         const callSid = parsedBody.CallSid;
 
         const { data: dbCall, error: callError } = await supabase
@@ -58,10 +77,10 @@ export const action = async ({ request }) => {
         if (callError) throw callError;
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: dbCall.workspace });
 
-        const campaignDetails = getCampaignData(supabase, dbCall.campaign_id);
+        const campaignDetails = await getCampaignData(supabase, dbCall.campaign_id);
         const call = twilio.calls(callSid);
 
-        const updateCallAndAttempt = async (answeredBy) => {
+        const updateCallAndAttempt = async (answeredBy: string) => {
             const firstStepUrl = `${process.env.BASE_URL}/api/ivr/${dbCall.campaign_id}/1`;
             await call.update({ url: firstStepUrl });
 
@@ -92,7 +111,7 @@ export const action = async ({ request }) => {
         } else if (parsedBody.AnsweredBy === 'human' || parsedBody.AnsweredBy === 'unknown') {
             updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy));
         } else {
-            updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy));
+            updateOperations.push(updateCallAndAttempt(parsedBody.AnsweredBy || 'unknown'));
         }
 
         await Promise.all(updateOperations);

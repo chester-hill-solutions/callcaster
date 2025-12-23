@@ -33,14 +33,14 @@ export const CampaignTypeSpecificSettings = ({
   joinDisabled,
   scheduleDisabled,
   surveys,
-  handleNavigate,
+  handleNavigate: _handleNavigate,
 }: {
   campaignData: NonNullable<Campaign>,
   handleInputChange: (name: string, value: string | boolean | number | null | Schedule) => void,
   mediaData: FileObject[],
   scripts: Script[],
   handleActivateButton: (type: "play" | "pause" | "archive" | "schedule") => void,
-  handleScheduleButton: (e: React.MouseEvent<HTMLButtonElement>) => void,
+  handleScheduleButton: () => void,
   details: LiveCampaignDetails | MessageCampaignDetails | IVRCampaignDetails,
   mediaLinks: string[],
   isChanged: boolean,
@@ -57,11 +57,13 @@ export const CampaignTypeSpecificSettings = ({
       {campaignData.type !== "message" && (
         <div className="flex flex-wrap gap-4">
           <div className="flex items-end gap-2">
-            <SelectVoicemail
-              handleInputChange={handleInputChange}
-              mediaData={mediaData}
-              campaignData={campaignData}
-            />
+              <SelectVoicemail
+                handleInputChange={handleInputChange}
+                mediaData={mediaData}
+                campaignData={{
+                  ...(campaignData.voicemail_file && { voicemail_file: campaignData.voicemail_file }),
+                }}
+              />
             <Button variant="outline" asChild size="icon" disabled={isBusy}>
               <NavLink to="../../../audios/new">
                 <MdAdd />
@@ -94,7 +96,7 @@ export const CampaignTypeSpecificSettings = ({
             joinDisabled={joinDisabled}
             scheduleDisabled={scheduleDisabled}
             isBusy={isBusy}
-            handleScheduleButton={(e) => handleScheduleButton(e)}
+            handleScheduleButton={() => handleScheduleButton()}
           />
         </div>
       )}
@@ -105,15 +107,24 @@ export const CampaignTypeSpecificSettings = ({
             <SelectVoiceDrop
               handleInputChange={handleInputChange}
               mediaData={mediaData}
-              campaignData={campaignData}
+              campaignData={{
+                ...('voicedrop_audio' in details && details.voicedrop_audio && { voicedrop_audio: details.voicedrop_audio }),
+                ...(campaignData.voicemail_file && { voicemail_file: campaignData.voicemail_file }),
+              }}
             />
             <HouseholdSwitch
               handleInputChange={handleInputChange}
-              campaignData={campaignData}
+              campaignData={{
+                group_household_queue: campaignData.group_household_queue,
+                dial_type: campaignData.dial_type || "call",
+              }}
             />
             <DialTypeSwitch
               handleInputChange={handleInputChange}
-              campaignData={campaignData}
+              campaignData={{
+                group_household_queue: campaignData.group_household_queue,
+                dial_type: campaignData.dial_type || "call",
+              }}
             />
           </div>
         </>
@@ -123,11 +134,9 @@ export const CampaignTypeSpecificSettings = ({
           <MessageSettings
             mediaLinks={mediaLinks}
             details={details as MessageCampaignDetails}
-            campaignData={campaignData}
             onChange={handleInputChange}
             surveys={surveys}
-            handleNavigate={handleNavigate}
-            />
+          />
           {isScriptRequired && (
             <p className="text-sm text-destructive flex items-center gap-1">
               <AlertCircle className="h-4 w-4" />
@@ -153,7 +162,7 @@ export const CampaignTypeSpecificSettings = ({
             <Button
               type="button"
               disabled={!!scheduleDisabled || isBusy}
-              onClick={(e) => handleScheduleButton(e)}
+              onClick={() => handleScheduleButton()}
             >
               Schedule Campaign
             </Button>

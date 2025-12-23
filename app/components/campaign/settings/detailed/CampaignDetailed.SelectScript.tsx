@@ -8,15 +8,17 @@ import {
 } from "@/components/ui/select";
 import { IVRCampaign, MessageCampaign, LiveCampaign, Script, Campaign } from "@/lib/types";
 
+interface CampaignDetailedSelectScriptProps {
+  selectedScript: number | string;
+  handleInputChange: (name: string, value: string | number | boolean) => void;
+  scripts: Script[];
+}
+
 export default function SelectScript({
   selectedScript,
   handleInputChange,
   scripts,
-}: {
-  selectedScript: number | string;
-  handleInputChange: (name: string, value: number | string) => void;
-  scripts: Script[];
-}) {
+}: CampaignDetailedSelectScriptProps) {
   return (
     <div className="space-y-2">
       <Label >Script</Label>

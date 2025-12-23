@@ -1,9 +1,16 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher } from "@remix-run/react";
+<<<<<<< HEAD
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import { User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+=======
+import { verifyAuth } from "~/lib/supabase.server";
+import { getUserRole } from "~/lib/database.server";
+import { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "~/lib/types";
+import { Button } from "~/components/ui/button";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import {
   Card,
   CardContent,
@@ -28,6 +35,44 @@ import { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/database.types";
 import type { SurveyQuestion, ResponseAnswer, Contact } from "@/lib/types";
+
+// Type definitions for survey responses
+interface SurveyQuestion {
+  id: number;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  question_option?: Array<{ option_label: string }>;
+}
+
+interface SurveyPage {
+  survey_question?: SurveyQuestion[];
+}
+
+interface SurveyWithPages extends Survey {
+  survey_page?: SurveyPage[];
+}
+
+interface ResponseAnswerWithQuestion extends ResponseAnswer {
+  survey_question?: {
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    question_option?: Array<{ option_label: string }>;
+  };
+}
+
+interface ContactPartial {
+  firstname: string | null;
+  surname: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+interface SurveyResponseWithDetails extends SurveyResponse {
+  contact?: ContactPartial | null;
+  response_answer?: ResponseAnswerWithQuestion[];
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -153,7 +198,11 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
 export default function SurveyResponsesPage() {
   const { survey, responses, workspaceId, stats } =
     useLoaderData<typeof loader>();
+<<<<<<< HEAD
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
+=======
+  const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithDetails | null>(null);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   const exportFetcher = useFetcher();
 
   useEffect(() => {
@@ -172,7 +221,11 @@ export default function SurveyResponsesPage() {
   }, [exportFetcher.data, survey.title]);
 
   const allQuestions =
+<<<<<<< HEAD
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
+=======
+    survey.survey_page?.flatMap((page: SurveyPage) => page.survey_question || []) ||
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     [];
 
   const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
@@ -189,7 +242,11 @@ export default function SurveyResponsesPage() {
     return answer.answer_value;
   };
 
+<<<<<<< HEAD
   const getContactName = (response: SurveyResponseWithContact) => {
+=======
+  const getContactName = (response: SurveyResponseWithDetails) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
     }
@@ -202,15 +259,25 @@ export default function SurveyResponsesPage() {
     return "Anonymous";
   };
 
+<<<<<<< HEAD
   const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
     const question = allQuestions.find(
       (q) => q.question_id === questionId,
+=======
+  const getAnswerForQuestion = (response: SurveyResponseWithDetails, questionId: string) => {
+    const question = allQuestions.find(
+      (q: SurveyQuestion) => q.question_id === questionId,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     );
     if (!question) return "-";
 
     // Find the answer by the database question ID
     const answer = response.response_answer?.find(
+<<<<<<< HEAD
       (a) => a.question_id === question.id,
+=======
+      (a: ResponseAnswerWithQuestion) => a.question_id === question.id,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     );
     return answer ? formatAnswer(answer) : "-";
   };
@@ -338,7 +405,11 @@ export default function SurveyResponsesPage() {
                   <p className="text-muted-foreground">No responses yet</p>
                 ) : (
                   <div className="space-y-4">
+<<<<<<< HEAD
                     {(responses as SurveyResponseWithContact[]).map((response) => (
+=======
+                    {responses.map((response: SurveyResponseWithDetails) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                       <div
                         key={response.id}
                         className="flex items-center justify-between rounded-lg border p-4 hover:bg-gray-50"
@@ -414,7 +485,11 @@ export default function SurveyResponsesPage() {
                           <th className="w-24 border border-gray-300 px-4 py-2 text-left font-medium">
                             Started
                           </th>
+<<<<<<< HEAD
                           {allQuestions.map((question) => (
+=======
+                          {allQuestions.map((question: SurveyQuestion) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                             <th
                               key={question.question_id}
                               className="w-48 border border-gray-300 px-4 py-2 text-left font-medium"
@@ -425,7 +500,11 @@ export default function SurveyResponsesPage() {
                         </tr>
                       </thead>
                       <tbody>
+<<<<<<< HEAD
                         {(responses as SurveyResponseWithContact[]).map((response, index) => {
+=======
+                        {responses.map((response: SurveyResponseWithDetails, index: number) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                           return (
                             <tr
                               key={response.id}
@@ -455,7 +534,11 @@ export default function SurveyResponsesPage() {
                                   response.started_at,
                                 ).toLocaleDateString()}
                               </td>
+<<<<<<< HEAD
                               {allQuestions.map((question) => (
+=======
+                              {allQuestions.map((question: SurveyQuestion) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                                 <td
                                   key={question.question_id}
                                   className="truncate border border-gray-300 px-4 py-2"
@@ -542,7 +625,11 @@ export default function SurveyResponsesPage() {
                       <Label className="text-sm font-medium">Answers</Label>
                       <div className="mt-2 space-y-4">
                         {selectedResponse.response_answer?.map(
+<<<<<<< HEAD
                           (answer) => (
+=======
+                          (answer: ResponseAnswerWithQuestion) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                             <div
                               key={answer.id}
                               className="rounded-lg border p-4"

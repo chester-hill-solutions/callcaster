@@ -1,7 +1,33 @@
 import { Form } from "@remix-run/react";
+<<<<<<< HEAD:app/components/contact/ContactForm.tsx
 import { Button } from "@/components/ui/button";
+=======
+import { Button } from "./ui/button";
+import type { Contact } from "~/lib/types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactForm.tsx
 
-const ContactForm = ({
+// Enhanced type definitions
+export interface ContactFormProps {
+  isNew: boolean;
+  newContact: Partial<Contact>;
+  handleInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSaveContact: (event: React.FormEvent<HTMLFormElement>) => void;
+  workspace_id: string;
+  audience_id: string;
+}
+
+export interface ContactFormData {
+  id?: number;
+  firstname?: string;
+  surname?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  workspace: string;
+  audience_id: string;
+}
+
+const ContactForm: React.FC<ContactFormProps> = ({
   isNew,
   newContact,
   handleInputChange,
@@ -16,13 +42,13 @@ const ContactForm = ({
     navigate={false}
     className="space-y-2"
   >
-    <input hidden name="id" value={newContact.id} type="hidden"/>
+    <input hidden name="id" value={newContact.id || ''} type="hidden"/>
     <div className="flex space-x-2">
       <input
         type="text"
         name="firstname"
         placeholder="First Name"
-        value={newContact.firstname}
+        value={newContact.firstname || ''}
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
@@ -30,7 +56,7 @@ const ContactForm = ({
         type="text"
         name="surname"
         placeholder="Last Name"
-        value={newContact.surname}
+        value={newContact.surname || ''}
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
@@ -40,7 +66,7 @@ const ContactForm = ({
         type="tel"
         name="phone"
         placeholder="Phone Number"
-        value={newContact.phone}
+        value={newContact.phone || ''}
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
@@ -48,7 +74,7 @@ const ContactForm = ({
         type="email"
         name="email"
         placeholder="Email Address"
-        value={newContact.email}
+        value={newContact.email || ''}
         onChange={handleInputChange}
         className="w-full px-2 py-1"
       />
@@ -57,7 +83,7 @@ const ContactForm = ({
       type="text"
       name="address"
       placeholder="Street Address"
-      value={newContact.address}
+      value={newContact.address || ''}
       onChange={handleInputChange}
       className="w-full px-2 py-1"
     />

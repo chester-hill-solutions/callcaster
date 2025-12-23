@@ -1,16 +1,19 @@
-import { Form, Link, useActionData } from "@remix-run/react";
+import { Form, useActionData } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
 
-import { LoaderFunctionArgs, ActionFunctionArgs, json } from "@remix-run/node";
+import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Toaster, toast } from "sonner";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect } from "react";
 export async function loader({ request }: LoaderFunctionArgs) {
-  return {};
+  const { supabaseClient } = await verifyAuth(request);
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) return redirect("/remember");
+  return json({});
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { supabaseClient, user, headers } = await verifyAuth(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
   const newPasswordRaw = formData.get("password") as string;

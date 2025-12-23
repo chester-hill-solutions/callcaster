@@ -1,4 +1,5 @@
 import { CheckCircleIcon } from "lucide-react";
+<<<<<<< HEAD:app/components/call/CallScreen.Household.tsx
 import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
@@ -11,12 +12,33 @@ interface HouseholdProps {
   house: QueueItem[];
   switchQuestionContact: (args: { contact: QueueItem }) => void;
   attemptList: Attempt[];
+=======
+import { Contact, OutreachAttempt, QueueItem } from "~/lib/types";
+
+interface HouseholdProps {
+  house: QueueItem[];
+  switchQuestionContact: (params: { contact: QueueItem }) => void;
+  attemptList: OutreachAttempt[];
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CallScreen.Household.tsx
   questionContact: QueueItem | null;
   isBusy: boolean;
 }
 
+<<<<<<< HEAD:app/components/call/CallScreen.Household.tsx
 export const Household = ({ house, switchQuestionContact, attemptList, questionContact, isBusy }: HouseholdProps) => {
   const isSelected = house?.find((contact) => contact?.id === questionContact?.id)
+=======
+export const Household = ({
+  house,
+  switchQuestionContact,
+  attemptList,
+  questionContact,
+  isBusy,
+}: HouseholdProps) => {
+  const isSelected = house?.find(
+    (queueItem) => queueItem?.contact?.id === questionContact?.contact?.id,
+  );
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CallScreen.Household.tsx
   return (
     <div
       style={{
@@ -48,21 +70,37 @@ export const Household = ({ house, switchQuestionContact, attemptList, questionC
           Household Members
         </div>
       </div>
-      {house?.filter(Boolean).map((contact) => (
+      {house?.filter(Boolean).map((queueItem: QueueItem) => (
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
-          key={contact.id}
-          className={`flex justify-center p-2 m-1 rounded-2xl  ${isSelected?.id === contact?.id ? "bg-gray-100 border-primary border-2" : 'bg-secondary'} hover:shadow-inner-lg hover:opacity-85 hover:bg-gray-100 transition-all`}
-          onClick={() => !isBusy && switchQuestionContact({ contact })}
+          key={queueItem.contact.id}
+          className={`m-1 flex justify-center rounded-2xl p-2  ${isSelected?.contact?.id === queueItem.contact?.id ? "border-2 border-primary bg-gray-100" : "bg-secondary"} hover:shadow-inner-lg transition-all hover:bg-gray-100 hover:opacity-85`}
+          onClick={() =>
+            !isBusy && switchQuestionContact({ contact: queueItem })
+          }
         >
-          <div className="flex flex-auto items-center justify-between font-semibold font-Zilla-Slab text-lg dark:text-slate-800">
+          <div className="flex flex-auto items-center justify-between font-Zilla-Slab text-lg font-semibold dark:text-slate-800">
             <div>
-              {contact.contact.firstname} {contact.contact.surname}
+              {queueItem.contact.firstname} {queueItem.contact.surname}
             </div>
             <div>
-              {attemptList.find(
-                (attempt) => attempt.contact_id === contact.contact_id,
-              )?.result.status && <CheckCircleIcon size={"16px"} />}
+              {(() => {
+                const attempt = attemptList.find(
+                  (attempt: OutreachAttempt) =>
+                    attempt.contact_id === queueItem.contact.id,
+                );
+                if (
+                  attempt?.result &&
+                  typeof attempt.result === "object" &&
+                  !Array.isArray(attempt.result)
+                ) {
+                  const resultObject = attempt.result as Record<string, unknown>;
+                  if ("status" in resultObject && resultObject.status) {
+                    return <CheckCircleIcon size={"16px"} />;
+                  }
+                }
+                return null;
+              })()}
             </div>
           </div>
         </div>

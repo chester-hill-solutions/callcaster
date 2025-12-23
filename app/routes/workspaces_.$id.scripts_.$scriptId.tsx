@@ -123,6 +123,7 @@ export default function ScriptEditor() {
     setChanged(false);
   };
 
+<<<<<<< HEAD
   type PageData = {
     campaignDetails: { script: Script };
   };
@@ -138,6 +139,11 @@ export default function ScriptEditor() {
       delete (obj2.campaignDetails.script as Partial<Script>).updated_at;
     }
     setChanged(!deepEqual(obj1, obj2));
+=======
+  const handlePageDataChange = (newPageData: Record<string, unknown>) => {
+    // Implementation for handling page data changes
+    console.log('Page data changed:', newPageData);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   };
 
   useEffect(() => {
@@ -175,9 +181,16 @@ export default function ScriptEditor() {
       )}
       <div className="h-full flex-grow p-4">
         <CampaignSettingsScript
+<<<<<<< HEAD
           pageData={{ campaignDetails: { script } } as PageData}
           onPageDataChange={(newData: PageData) => {
             handlePageDataChange(newData);
+=======
+          pageData={{ campaignDetails: { script } }}
+          onPageDataChange={(newData: Record<string, unknown>) => {
+            // Implementation for page data change handler
+            console.log('Page data updated:', newData);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           }}
           mediaNames={mediaNames}
           scripts={[]}

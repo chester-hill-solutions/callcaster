@@ -1,4 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
+<<<<<<< HEAD
 import { useLoaderData, useSubmit, useNavigate } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -11,46 +12,104 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+=======
+import { useLoaderData, useSubmit, useNavigate, Link } from "@remix-run/react";
+import { useState } from "react";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Switch } from "~/components/ui/switch";
+import { Textarea } from "~/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import { Plus, Trash2, Save, ArrowLeft } from "lucide-react";
-import { Link } from "@remix-run/react";
+import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
+import { getUserRole } from "~/lib/database.server";
+import type { Database } from "~/lib/database.types";
+import type { User } from "~/lib/types";
+
+// Type-safe interfaces for survey data
+interface SurveyPage {
+  page_id: string;
+  title: string;
+  page_order: number;
+  survey_question?: SurveyQuestion[];
+}
+
+interface SurveyQuestion {
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  is_required: boolean;
+  question_order: number;
+  question_option?: SurveyQuestionOption[];
+}
+
+interface SurveyQuestionOption {
+  option_value: string;
+  option_label: string;
+  option_order: number;
+}
+
+interface SurveyFormData {
+  survey_id: string;
+  title: string;
+  is_active: boolean;
+  pages: SurveyFormPage[];
+}
+
+interface SurveyFormPage {
+  page_id: string;
+  title: string;
+  page_order: number;
+  questions: SurveyFormQuestion[];
+}
+
+interface SurveyFormQuestion {
+  question_id: string;
+  question_text: string;
+  question_type: SurveyQuestionType;
+  is_required: boolean;
+  question_order: number;
+  options: SurveyFormOption[];
+}
+
+interface SurveyFormOption {
+  option_value: string;
+  option_label: string;
+  option_order: number;
+}
+
+type SurveyQuestionType = "text" | "textarea" | "radio" | "checkbox" | "dropdown";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 
   if (!workspaceId || !surveyId) {
-    throw new Response("Workspace ID and Survey ID are required", { status: 400 });
+    throw new Response("Missing required parameters", { status: 400 });
   }
 
-  // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user as unknown as User, 
-    workspaceId 
-  });
+  const userRole = await getUserRole({ supabaseClient, user: user as User, workspaceId });
 
-  if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  // Get survey with pages and questions
-  const { data: survey, error: surveyError } = await supabaseClient
+  const { data: survey, error } = await supabaseClient
     .from("survey")
     .select(`
       *,
-      survey_page(
+      survey_page (
         *,
-        survey_question(
+        survey_question (
           *,
-          question_option(*)
+          question_option (*)
         )
       )
     `)
     .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
     .single();
 
-  if (surveyError || !survey) {
+  if (error || !survey) {
     throw new Response("Survey not found", { status: 404 });
   }
 
@@ -59,17 +118,29 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     survey_id: survey.survey_id,
     title: survey.title,
     is_active: survey.is_active,
+<<<<<<< HEAD
     pages: survey.survey_page?.map((page: SurveyPage & { survey_question?: Array<SurveyQuestion & { question_option?: QuestionOption[] }> }) => ({
       page_id: page.page_id,
       title: page.title,
       page_order: page.page_order,
       questions: page.survey_question?.map((question) => ({
+=======
+    pages: survey.survey_page?.map((page: SurveyPage) => ({
+      page_id: page.page_id,
+      title: page.title,
+      page_order: page.page_order,
+      questions: page.survey_question?.map((question: SurveyQuestion) => ({
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
         question_id: question.question_id,
         question_text: question.question_text,
         question_type: question.question_type as SurveyQuestionType,
         is_required: question.is_required,
         question_order: question.question_order,
+<<<<<<< HEAD
         options: question.question_option?.map((option) => ({
+=======
+        options: question.question_option?.map((option: SurveyQuestionOption) => ({
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           option_value: option.option_value,
           option_label: option.option_label,
           option_order: option.option_order,
@@ -134,6 +205,8 @@ export default function EditSurveyPage() {
 
   const addQuestion = (pageIndex: number) => {
     const page = formData.pages[pageIndex];
+    if (!page) return;
+    
     const newQuestionId = `question-${page.questions.length + 1}`;
     
     setFormData(prev => ({
@@ -223,53 +296,77 @@ export default function EditSurveyPage() {
   };
 
   const updateField = (field: keyof SurveyFormData, value: string | boolean) => {
+<<<<<<< HEAD
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const updatePageField = (pageIndex: number, field: keyof SurveyPageFormData, value: string | number) => {
+=======
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, index) => 
-        index === pageIndex ? { ...p, [field]: value } : p
+      [field]: value
+    }));
+  };
+
+  const updatePageField = (pageIndex: number, field: keyof SurveyFormPage, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      pages: prev.pages.map((page, index) => 
+        index === pageIndex 
+          ? { ...page, [field]: value }
+          : page
       )
     }));
   };
 
+<<<<<<< HEAD
   const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyQuestionFormData, value: string | boolean | SurveyQuestionType) => {
+=======
+  const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyFormQuestion, value: string | boolean | SurveyQuestionType) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, pIndex) => 
+      pages: prev.pages.map((page, pIndex) => 
         pIndex === pageIndex 
           ? {
-              ...p,
-              questions: p.questions.map((q, qIndex) => 
-                qIndex === questionIndex ? { ...q, [field]: value } : q
+              ...page,
+              questions: page.questions.map((question, qIndex) => 
+                qIndex === questionIndex 
+                  ? { ...question, [field]: value }
+                  : question
               )
             }
-          : p
+          : page
       )
     }));
   };
 
+<<<<<<< HEAD
   const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof QuestionOptionFormData, value: string | number) => {
+=======
+  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof SurveyFormOption, value: string | number) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, pIndex) => 
+      pages: prev.pages.map((page, pIndex) => 
         pIndex === pageIndex 
           ? {
-              ...p,
-              questions: p.questions.map((q, qIndex) => 
+              ...page,
+              questions: page.questions.map((question, qIndex) => 
                 qIndex === questionIndex 
                   ? {
-                      ...q,
-                      options: q.options?.map((o, oIndex) => 
-                        oIndex === optionIndex ? { ...o, [field]: value } : o
-                      ) || []
+                      ...question,
+                      options: question.options.map((option, oIndex) => 
+                        oIndex === optionIndex 
+                          ? { ...option, [field]: value }
+                          : option
+                      )
                     }
-                  : q
+                  : question
               )
             }
-          : p
+          : page
       )
     }));
   };
@@ -328,7 +425,7 @@ export default function EditSurveyPage() {
               <Switch
                 id="is_active"
                 checked={formData.is_active}
-                onCheckedChange={(checked) => updateField("is_active", checked)}
+                onCheckedChange={(checked: boolean) => updateField("is_active", checked)}
               />
               <Label htmlFor="is_active">Active</Label>
             </div>

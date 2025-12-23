@@ -9,26 +9,52 @@ import {
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx
   Schedule,
   ScheduleDay,
   ScheduleInterval,
   Script,
 } from "@/lib/types";
 import { FetcherWithComponents, useSubmit } from "@remix-run/react";
+=======
+  Script,
+  Campaign,
+} from "~/lib/types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.Dates.tsx
 
+// Schedule type matching the WeeklyScheduleTable component
 type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+interface TimeInterval {
+  start: string;
+  end: string;
+}
+
+interface Day {
+  active: boolean;
+  intervals: TimeInterval[];
+}
+
+type Schedule = Record<DayName, Day>;
+import { FetcherWithComponents, useSubmit } from "@remix-run/react";
 const WEEKDAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAYS_OF_WEEK: DayName[] = [...WEEKDAYS, 'saturday', 'sunday'];
 
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx
 interface SelectDatesProps {
   campaignData: Campaign;
   handleInputChange: (name: string, value: string | number | null) => void;
+=======
+interface CampaignBasicInfoDatesProps {
+  campaignData: Campaign;
+  handleInputChange: (name: string, value: string | number | boolean) => void;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.Dates.tsx
 }
 
 export default function SelectDates({
   campaignData,
   handleInputChange,
-}: SelectDatesProps) {
+}: CampaignBasicInfoDatesProps) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() => {
     const defaultSchedule = {

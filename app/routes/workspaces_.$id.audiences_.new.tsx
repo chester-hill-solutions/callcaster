@@ -2,11 +2,21 @@ import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "@remix-run/react";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
+<<<<<<< HEAD
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
+=======
+import { Card, CardContent, CardTitle } from "~/components/CustomCard";
+import { Button } from "~/components/ui/button";
+import { verifyAuth } from "~/lib/supabase.server";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import AudienceUploader from "~/components/AudienceUploader";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "@/types/supabase";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -83,7 +93,7 @@ export default function AudiencesNew() {
   const [audienceName, setAudienceName] = useState("");
   
   // Get the Supabase client from context
-  const { supabase } = useOutletContext<{ supabase: any }>();
+  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
 
   const handleCreateAudience = (e: React.FormEvent) => {
     e.preventDefault();

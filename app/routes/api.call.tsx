@@ -1,9 +1,10 @@
 import Twilio from 'twilio';
+import type { ActionFunctionArgs } from "@remix-run/node";
 
-export const action = async ({ request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
-  const toNumber = formData.get('To');
-  const baseUrl = process.env.BASE_URL
+  const toNumber = formData.get('To') as string;
+  const baseUrl = process.env.BASE_URL;
   let twiml = new Twilio.twiml.VoiceResponse();
 
   if (isAValidPhoneNumber(toNumber)) {
@@ -27,6 +28,6 @@ export const action = async ({ request }) => {
   });
 };
 
-function isAValidPhoneNumber(number) {
+function isAValidPhoneNumber(number: string): boolean {
   return /^[\d\+\-\(\) ]+$/.test(number);
 }

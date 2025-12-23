@@ -2,10 +2,16 @@ import { json, redirect } from "@remix-run/node";
 import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
+<<<<<<< HEAD
 import { Button } from "@/components/ui/button";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+=======
+import { Button } from "~/components/ui/button";
+import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const requestUrl = new URL(request.url);
   const next = requestUrl.searchParams.get('next');
@@ -29,7 +35,7 @@ export const action = async ({ request }: { request: Request }) => {
   return json({ error: error.message });
 };
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {supabaseClient, headers} = createSupabaseServerClient(request);
   const { data: { user } } = await supabaseClient.auth.getUser();
 

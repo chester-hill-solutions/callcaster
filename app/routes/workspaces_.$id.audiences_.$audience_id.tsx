@@ -8,6 +8,7 @@ import {
   useRevalidator
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
+<<<<<<< HEAD
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
@@ -16,6 +17,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
+=======
+import { AudienceTable } from "~/components/AudienceTable";
+import AudienceUploadHistory from "~/components/AudienceUploadHistory";
+import AudienceUploader from "~/components/AudienceUploader";
+import { Button } from "~/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { verifyAuth } from "~/lib/supabase.server";
+import { Database } from "~/lib/database.types";
+import { useInterval } from "~/hooks/useInterval";
+import { SupabaseClient } from "@supabase/supabase-js";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 type LoaderData = {
   contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;
@@ -142,14 +154,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         sortDirection
       },
       latestUpload: latestUpload ? {
-        id: latestUpload.id,
-        status: latestUpload.status,
-        progress: latestUpload.processed_contacts && latestUpload.total_contacts 
-          ? Math.round((latestUpload.processed_contacts / latestUpload.total_contacts) * 100)
+        id: latestUpload['id'],
+        status: latestUpload['status'] || 'unknown',
+        progress: latestUpload['processed_contacts'] && latestUpload['total_contacts'] 
+          ? Math.round((latestUpload['processed_contacts'] / latestUpload['total_contacts']) * 100)
           : 0,
-        total_contacts: latestUpload.total_contacts || 0,
-        processed_contacts: latestUpload.processed_contacts || 0,
-        error_message: latestUpload.error_message
+        total_contacts: latestUpload['total_contacts'] || 0,
+        processed_contacts: latestUpload['processed_contacts'] || 0,
+        error_message: latestUpload['error_message']
       } : null
     },
     { headers },
@@ -160,7 +172,7 @@ export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
     useLoaderData<typeof loader>();
   const navigate = useNavigate();
-  const { supabase } = useOutletContext<{ supabase: any }>();
+  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const revalidator = useRevalidator();

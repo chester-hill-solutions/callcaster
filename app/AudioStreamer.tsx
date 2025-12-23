@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 const AudioStreamer = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [socket, setSocket] = useState(null);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:3000');
@@ -20,7 +20,7 @@ const AudioStreamer = () => {
       const recorder = new MediaRecorder(stream);
       setMediaRecorder(recorder);
 
-      recorder.ondataavailable = (event) => {
+      recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data.size > 0 && socket && socket.readyState === WebSocket.OPEN) {
           socket.send(event.data);
         }
@@ -36,7 +36,7 @@ const AudioStreamer = () => {
   const stopRecording = () => {
     if (mediaRecorder) {
       mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      mediaRecorder.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       setIsRecording(false);
     }
   };

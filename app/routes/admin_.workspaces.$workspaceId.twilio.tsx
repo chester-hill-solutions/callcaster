@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Phone, MessageSquare, RefreshCw, Image, FileText, Loader2 } from "lucide-react";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Database } from "~/lib/database.types";
 
 interface TwilioPhoneNumber {
     sid: string;
@@ -79,7 +81,7 @@ interface TwilioData {
     }[];
 }
 
-async function loadTwilioData(supabaseClient: any, workspaceId: string): Promise<TwilioData> {
+async function loadTwilioData(supabaseClient: SupabaseClient<Database>, workspaceId: string): Promise<TwilioData> {
     let twilioAccountInfo: TwilioData['twilioAccountInfo'] = null;
     let twilioNumbers: TwilioData['twilioNumbers'] = [];
     let twilioUsage: TwilioData['twilioUsage'] = [];

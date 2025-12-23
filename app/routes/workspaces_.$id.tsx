@@ -23,7 +23,19 @@ import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import CampaignsList from "@/components/campaign/CampaignList";
 import { Campaign, ContextType, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
+<<<<<<< HEAD
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+=======
+import { Database } from "~/lib/database.types";
+
+interface WorkspaceData {
+  workspace: Database['public']['Tables']['workspace']['Row'];
+  user: Database['public']['Tables']['user']['Row'];
+  audiences: Database['public']['Tables']['audience']['Row'][];
+  campaigns: Database['public']['Tables']['campaign']['Row'][];
+  phoneNumbers: (Database['public']['Tables']['workspace_number']['Row'] | null)[];
+}
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   try {
@@ -71,7 +83,11 @@ export default function Workspace() {
     <main className="container mx-auto flex min-h-[80vh] flex-col pt-10 pb-20">
       <Suspense fallback={<div>Loading workspace...</div>}>
         <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
+<<<<<<< HEAD
           {(resolvedData: WorkspaceInfoWithDetails) => {
+=======
+          {(resolvedData: WorkspaceData) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
             const { workspace, audiences, campaigns, phoneNumbers } = resolvedData;
             const { data: workspaceData, isSyncing: workspaceSyncing, error: workspaceError } = useRealtimeData(context.supabase, workspace.id, 'workspace', [workspace]);
             const { data: campaignsData, isSyncing: campaignsSyncing, error: campaignsError } = useRealtimeData(context.supabase, workspace.id, 'campaign', campaigns);

@@ -8,10 +8,17 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page, IVROption, IVRBlock } from "@/lib/types";
 import { AddIcon } from "@/components/shared/Icons";
+=======
+} from "~/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Page, IVROption, IVRBlock } from "~/lib/types";
+import { AddIcon } from "./Icons";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
 import {
   MdAdd,
   MdAddCircle,
@@ -30,7 +37,11 @@ type AudioFile = {
   created_at: Date;
   id: string;
   last_accessed_at: Date;
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
   metadata: Record<string, unknown> | null;
+=======
+  metadata: unknown;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   name: string;
   updated_at: Date;
 };
@@ -137,12 +148,25 @@ const IVRQuestionBlock = ({
     setLocalBlock(block);
   }, [block]);
 
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
   const handleChange = (field: keyof IVRBlock, value: string | IVROption[] | "recorded" | "synthetic" | "dtmf" | "speech" | "dtmf speech" | null) => {
+=======
+  const handleChange = (field: string, value: string) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
     const updatedBlock = { ...localBlock, [field]: value };
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
 
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
+=======
+  const handleOptionsChange = (newOptions: IVROption[]) => {
+    const updatedBlock = { ...localBlock, options: newOptions };
+    setLocalBlock(updatedBlock);
+    onUpdate(updatedBlock);
+  };
+
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   const handleNextChange = (index: number, value: string) => {
     const newOptions = localBlock.options.map((opt, i) => {
       if (i !== index) return opt;
@@ -151,23 +175,39 @@ const IVRQuestionBlock = ({
         next: value,
       };
     });
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
+=======
+    handleOptionsChange(newOptions as IVROption[]);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleOptionChange = (index: number, newOption: IVROption) => {
     const newOptions = [...localBlock.options];
     newOptions[index] = newOption;
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
+=======
+    handleOptionsChange(newOptions as IVROption[]);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleAddOption = () => {
     const newOptions = [...localBlock.options, { content: "", next: "" }];
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
+=======
+    handleOptionsChange(newOptions as IVROption[]);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleRemoveOption = (index: number) => {
     const newOptions = localBlock.options.filter((_, i) => i !== index);
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
+=======
+    handleOptionsChange(newOptions as IVROption[]);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   return (
@@ -196,9 +236,13 @@ const IVRQuestionBlock = ({
             <Input
               name="title"
               value={localBlock.title}
-              onChange={(e) => handleChange("title", e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("title", e.target.value)}
               placeholder="Block Title"
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
               className=""
+=======
+              className="w-full"
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
               disabled={false}
             />
             <Select
@@ -224,7 +268,7 @@ const IVRQuestionBlock = ({
                 value={localBlock.audioFile}
                 onChange={(e) => handleChange("audioFile", e.target.value)}
                 placeholder="Your synthetic greeting"
-                rows={Math.max(3, Math.ceil((localBlock?.audioFile || 1) / 40))}
+                rows={Math.max(3, Math.ceil((localBlock?.audioFile || 1) as number / 40))}
                 className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100"
               />
             )}
@@ -265,8 +309,8 @@ const IVRQuestionBlock = ({
             </div>
             {localBlock.options.map((option, index) => (
               <IVRQuestionBlockOption
-                key={option.id}
-                option={option}
+                key={option.value || index }
+                option={option as IVROption}
                 index={index}
                 onRemove={handleRemoveOption}
                 onChange={handleOptionChange}

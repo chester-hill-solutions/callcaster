@@ -1,9 +1,18 @@
+<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.tsx
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from '@remix-run/react';
 import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
 import { useScriptState } from '@/hooks/campaign/useScriptState';
 import Sidebar from '@/components/script/Script.Sidebar';
 import ScriptMainContent from '@/components/script/Script.MainContent';
+=======
+import { useCallback, useState } from "react";
+import { useNavigate } from "@remix-run/react";
+import { LiveCampaign, IVRCampaign, Script } from "~/lib/types";
+import ScriptMainContent from "./Script.MainContent";
+import Sidebar from "./Script.Sidebar";
+import { isObject, isString } from "../lib/type-utils";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.tsx
 
 type PageData = {
   campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };
@@ -16,95 +25,196 @@ type ScriptPageProps = {
   mediaNames: string[];
 };
 
+interface ScriptData {
+  pages: Record<string, ScriptPage>;
+  blocks: Record<string, ScriptBlock>;
+}
+
+interface ScriptPage {
+  id: string;
+  title: string;
+  blocks: string[];
+}
+
+interface ScriptBlock {
+  id: string;
+  type: string;
+  content?: unknown;
+  [key: string]: unknown;
+}
+
+interface BlockUpdate {
+  id: string;
+  type?: string;
+  content?: unknown;
+  [key: string]: unknown;
+}
+
+// Type guard for script data
+function isScriptData(data: unknown): data is ScriptData {
+  if (!isObject(data)) return false;
+  const scriptData = data as Record<string, unknown>;
+  return (
+    isObject(scriptData.pages) &&
+    isObject(scriptData.blocks)
+  );
+}
+
+// Type guard for script page
+function isScriptPage(data: unknown): data is ScriptPage {
+  if (!isObject(data)) return false;
+  const page = data as Record<string, unknown>;
+  return (
+    isString(page.id) &&
+    isString(page.title) &&
+    Array.isArray(page.blocks)
+  );
+}
+
+// Type guard for block update
+function isBlockUpdate(data: unknown): data is BlockUpdate {
+  if (!isObject(data)) return false;
+  const update = data as Record<string, unknown>;
+  return isString(update.id);
+}
+
 export default function CampaignSettingsScript({
   pageData,
   onPageDataChange,
   scripts,
   mediaNames = [],
 }: ScriptPageProps) {
-  const { script, scriptData, updateScript, updateScriptData } = useScriptState(pageData, onPageDataChange);
-  const [currentPage, setCurrentPage] = useState(getFirstPageId(scriptData));
-  const [openBlock, setOpenBlock] = useState<string | null>(null);
   const navigate = useNavigate();
+  const [currentPage, setCurrentPage] = useState<string | null>(null);
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
 
-  const changeType = useCallback((newType: string) => {
-    updateScript((prevScript) => ({ ...prevScript, type: newType }));
-  }, [updateScript]);
+  const script = pageData.campaignDetails.script;
+  const scriptData = script.steps;
 
-  const handleTitle = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    updateScript((prevScript) => ({ ...prevScript, name: event.target.value }));
-  }, [updateScript]);
-
-  const addBlock = useCallback(() => {
-    const newBlockId = `block_${Object.keys(scriptData.blocks || {}).length + 1}`;
-    updateScriptData((prevScriptData) => {
-      const newBlock = {
-        id: newBlockId,
-        title: "New Block",
-        type: "textarea",
-        content: "",
-        options: [],
-      };
-      return {
-        ...prevScriptData,
-        blocks: { ...prevScriptData.blocks, [newBlockId]: newBlock },
-        pages: {
-          ...prevScriptData.pages,
-          [currentPage]: {
-            ...prevScriptData.pages[currentPage],
-            blocks: [...(prevScriptData.pages[currentPage].blocks || []), newBlockId],
-          },
-        },
-      };
+  const updateScript = useCallback((newScript: Script | ((prev: Script) => Script)) => {
+    onPageDataChange({
+      ...pageData,
+      campaignDetails: {
+        ...pageData.campaignDetails,
+        script: typeof newScript === "function" ? newScript(script) : newScript,
+      },
     });
-    setOpenBlock(newBlockId);
-    return newBlockId;
-  }, [currentPage, scriptData, updateScriptData]);
+  }, [onPageDataChange, pageData, script]);
 
-  const removeBlock = useCallback((id: string) => {
+  const updateScriptData = useCallback((newScriptData: ScriptData | ((prev: ScriptData) => ScriptData)) => {
+    const updatedScriptData = typeof newScriptData === "function" ? newScriptData(scriptData) : newScriptData;
+    
+    if (!isScriptData(updatedScriptData)) {
+      console.error('Invalid script data format');
+      return;
+    }
+    
+    updateScript({
+      ...script,
+      steps: updatedScriptData,
+    });
+  }, [script, updateScript]);
+
+  const addBlock = useCallback((type: string) => {
+    if (!currentPage) return;
+    
+    const blockId = `block_${Date.now()}`;
+    updateScriptData((prevScriptData) => ({
+      ...prevScriptData,
+      blocks: {
+        ...prevScriptData.blocks,
+        [blockId]: {
+          id: blockId,
+          type,
+        },
+      },
+      pages: {
+        ...prevScriptData.pages,
+        [currentPage]: {
+          ...prevScriptData.pages[currentPage],
+          blocks: [...(prevScriptData.pages[currentPage]?.blocks || []), blockId],
+        },
+      },
+    }));
+    setOpenBlock(blockId);
+  }, [currentPage, updateScriptData]);
+
+  const removeBlock = useCallback((blockId: string) => {
     updateScriptData((prevScriptData) => {
-      const updatedBlocks = { ...prevScriptData.blocks };
-      delete updatedBlocks[id];
-      const updatedPages = { ...prevScriptData.pages };
-      Object.keys(updatedPages).forEach((pageId) => {
-        updatedPages[pageId].blocks = updatedPages[pageId].blocks.filter(
-          (blockId) => blockId !== id
+      const newScriptData = { ...prevScriptData };
+      
+      // Remove block from all pages
+      Object.keys(newScriptData.pages).forEach((pageId) => {
+        newScriptData.pages[pageId].blocks = newScriptData.pages[pageId].blocks.filter(
+          (id) => id !== blockId
         );
       });
-      return { ...prevScriptData, blocks: updatedBlocks, pages: updatedPages };
+      
+      // Remove block definition
+      delete newScriptData.blocks[blockId];
+      
+      return newScriptData;
     });
+    setOpenBlock(null);
   }, [updateScriptData]);
 
-  const moveBlock = useCallback((id: string, direction: number) => {
+  const moveBlock = useCallback((blockId: string, targetPageId: string) => {
     updateScriptData((prevScriptData) => {
-      const currentPageBlocks = prevScriptData.pages[currentPage].blocks;
-      const currentIndex = currentPageBlocks.indexOf(id);
-      if (
-        (direction === -1 && currentIndex === 0) ||
-        (direction === 1 && currentIndex === currentPageBlocks.length - 1)
-      ) {
-        return prevScriptData;
+      const newScriptData = { ...prevScriptData };
+      
+      // Remove block from current page
+      if (currentPage) {
+        newScriptData.pages[currentPage].blocks = newScriptData.pages[currentPage].blocks.filter(
+          (id) => id !== blockId
+        );
       }
-      const newIndex = currentIndex + direction;
-      const newBlocksOrder = [...currentPageBlocks];
-      [newBlocksOrder[currentIndex], newBlocksOrder[newIndex]] = [
-        newBlocksOrder[newIndex],
-        newBlocksOrder[currentIndex],
-      ];
-      return {
-        ...prevScriptData,
-        pages: {
-          ...prevScriptData.pages,
-          [currentPage]: {
-            ...prevScriptData.pages[currentPage],
-            blocks: newBlocksOrder,
-          },
-        },
-      };
+      
+      // Add block to target page
+      if (!newScriptData.pages[targetPageId]) {
+        newScriptData.pages[targetPageId] = {
+          id: targetPageId,
+          title: `Section ${Object.keys(newScriptData.pages).length + 1}`,
+          blocks: [],
+        };
+      }
+      newScriptData.pages[targetPageId].blocks.push(blockId);
+      
+      return newScriptData;
     });
   }, [currentPage, updateScriptData]);
 
-  const updateBlock = useCallback((id: string, newBlockData: Partial<Script['steps']['blocks'][string]>) => {
+  const handleTitle = useCallback((blockId: string, title: string) => {
+    updateScriptData((prevScriptData) => ({
+      ...prevScriptData,
+      blocks: {
+        ...prevScriptData.blocks,
+        [blockId]: {
+          ...prevScriptData.blocks[blockId],
+          title,
+        },
+      },
+    }));
+  }, [updateScriptData]);
+
+  const changeType = useCallback((blockId: string, newType: string) => {
+    updateScriptData((prevScriptData) => ({
+      ...prevScriptData,
+      blocks: {
+        ...prevScriptData.blocks,
+        [blockId]: {
+          ...prevScriptData.blocks[blockId],
+          type: newType,
+        },
+      },
+    }));
+  }, [updateScriptData]);
+
+  const updateBlock = useCallback((id: string, newBlockData: BlockUpdate) => {
+    if (!isBlockUpdate(newBlockData)) {
+      console.error('Invalid block update format');
+      return;
+    }
+    
     updateScriptData((prevScriptData) => ({
       ...prevScriptData,
       blocks: {
@@ -118,7 +228,7 @@ export default function CampaignSettingsScript({
   }, [updateScriptData]);
 
   const addPage = useCallback(() => {
-    const newPageId = `page_${Object.keys(scriptData.pages || {}).length + 1}`;
+    const newPageId = `page_${Object.keys(scriptData?.pages || {}).length + 1}`;
     updateScriptData((prevScriptData) => ({
       ...prevScriptData,
       pages: {
@@ -145,7 +255,7 @@ export default function CampaignSettingsScript({
     if (value === `create-new-${scripts.length + 1}`) {
       navigate("../../../../scripts/new");
     } else {
-      const newScript = scripts.find((script) => script.id === value);
+      const newScript = scripts.find((script) => script.id === parseInt(value));
       if (newScript) {
         updateScript(() => newScript);
         updateScriptData(() => newScript.steps);
@@ -229,8 +339,20 @@ export default function CampaignSettingsScript({
   );
 }
 
-function getFirstPageId(scriptData: Script['steps']) {
-  return Object.values(scriptData?.pages || {}).length > 0
-    ? Object.values(scriptData.pages)[0].id
-    : null;
+function getFirstPageId(scriptData: unknown): string | null {
+  if (!isScriptData(scriptData)) {
+    return null;
+  }
+  
+  const pages = scriptData.pages || {};
+  const pageValues = Object.values(pages);
+  
+  if (pageValues.length > 0) {
+    const firstPage = pageValues[0];
+    if (isScriptPage(firstPage)) {
+      return firstPage.id || Object.keys(pages)[0];
+    }
+  }
+  
+  return Object.keys(pages)[0] || null;
 }

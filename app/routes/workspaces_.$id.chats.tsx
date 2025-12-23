@@ -44,33 +44,56 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
+<<<<<<< HEAD
 import type { Database } from "@/lib/database.types";
 import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign, BaseUser } from "@/lib/types";
+=======
+import type { Database } from "~/lib/database.types";
+import type { Contact, Workspace } from "~/lib/types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import { sendMessage } from "./api.chat_sms";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
+interface Campaign {
+  id: number;
+  title: string;
+  type: string;
+  status: string;
+  created_at: string;
+}
+
 interface WorkspaceNumber {
   id: string;
   phone_number: string;
 }
 
-type WorkspaceContextType = {
-  supabase: SupabaseClient<Database>;
-  workspace: {
-    id: string;
-    name: string;
-    owner: string | null;
-    users: string[] | null;
-    workspace_number?: WorkspaceNumber[];
-    created_at: string;
-  };
-};
+interface ConversationSummary {
+  contact_phone: string;
+  user_phone: string;
+  conversation_start: string;
+  conversation_last_update: string;
+  message_count: number;
+  unread_count: number;
+}
+
+interface Chat {
+  contact_phone: string;
+  user_phone: string;
+  conversation_start: string;
+  conversation_last_update: string;
+  message_count: number;
+  unread_count: number;
+}
 
 type LoaderData = {
   campaigns: Campaign[];
   chatsPromise: Promise<{
     chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
+<<<<<<< HEAD
     chatsError: Error | null;
+=======
+    chatsError: string | null;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   }>;
   potentialContacts: Contact[];
   contact: Contact | null;
@@ -86,19 +109,25 @@ type ImageFetcherData = {
   error?: string;
 };
 
-type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
 type ChatsData = {
   chats: ConversationSummary[];
+<<<<<<< HEAD
   chatsError: Error | null;
+=======
+  chatsError: string | null;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 };
 
-type Chat = {
-  contact_phone: string;
-  user_phone: string;
-  conversation_start: string;
-  conversation_last_update: string;
-  message_count: number;
-  unread_count: number;
+type WorkspaceContextType = {
+  supabase: SupabaseClient<Database>;
+  workspace: {
+    id: string;
+    name: string;
+    owner: string | null;
+    users: string[] | null;
+    workspace_number?: WorkspaceNumber[];
+    created_at: string;
+  };
 };
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
@@ -186,7 +215,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
-  const contact_number = params.contact_number;
+  const contact_number = params["contact_number"];
 
   if (!workspaceId) {
     throw redirect("/workspaces");
@@ -232,22 +261,27 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const workspaceId = params.id;
+  const workspaceId = params["id"];
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
   const contact_number = normalizePhoneNumber(
-    params.contact_number || data.contact_number as string,
+    params["contact_number"] || (data["contact_number"] as string),
   );
 
   const responseData = await sendMessage({
-    body: data.body as string,
+    body: data["body"] as string,
     to: contact_number as string,
-    from: data.from as string,
-    media: data.media as string,
+    from: data["from"] as string,
+    media: data["media"] as string,
     supabase: supabaseClient,
     workspace: workspaceId as string,
+<<<<<<< HEAD
     contact_id: data.contact_id as string,
     user: user as unknown as BaseUser,
+=======
+    contact_id: data["contact_id"] as string,
+    user: user as unknown as User,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
@@ -270,7 +304,7 @@ export default function ChatsList() {
   const [conversationData, setConversationData] = useState<ConversationSummary[]>([]);
 
   // Initialize the conversation summary hook with the state
-  const { conversations, refreshConversations, markConversationAsRead } = useConversationSummaryRealTime({
+  const { conversations, refreshConversations } = useConversationSummaryRealTime({
     supabase,
     initial: conversationData,
     workspace: workspace.id,
@@ -392,19 +426,7 @@ export default function ChatsList() {
   );
 
   // Adapter functions to match ChatHeader's expected types
-  const handlePhoneChangeAdapter = useCallback(
-    (value: string | null) => {
-      if (value !== null && typeof handlePhoneChange === 'function') {
-        // Create a synthetic event to match the handler's expectations
-        const syntheticEvent = {
-          target: { value }
-        } as unknown as React.ChangeEvent<HTMLInputElement>;
-        handlePhoneChange(syntheticEvent);
-      }
-      return null;
-    },
-    [handlePhoneChange]
-  );
+  // use the handler directly since it already matches the expected signature
 
   const toggleContactMenuAdapter = useCallback(() => {
     toggleContactMenu();
@@ -479,7 +501,7 @@ export default function ChatsList() {
         </Button>
         <div className="flex">
           <Select
-            defaultValue={searchParams.get("campaign_id") || undefined}
+            defaultValue={searchParams.get("campaign_id") || ""}
             onValueChange={(val) => {
               setSearchParams((prev) => {
                 prev.set("campaign_id", val);
@@ -531,8 +553,14 @@ export default function ChatsList() {
             </div>
           }>
             <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
+<<<<<<< HEAD
               {(chatsData) => {
                 const { chats } = chatsData as ChatsData;
+=======
+              {(value) => {
+                const chatsData = value as ChatsData;
+                const { chats } = chatsData;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 const chatNumbers = Array.from(
                   new Set(
                     chats
@@ -590,13 +618,7 @@ export default function ChatsList() {
                           <MdChat size={20} />
                         </div>
                         <div className="ml-4">
-                          <div className="font-medium">
-                            {chat.contact_firstname || chat.contact_surname
-                              ? `${chat.contact_firstname || ""} ${
-                                  chat.contact_surname || ""
-                                }`
-                              : chat.contact_phone}
-                          </div>
+                          <div className="font-medium">{chat.contact_phone}</div>
                           <div className="text-sm text-gray-500 line-clamp-1">
                             {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? 'message' : 'messages'}
                           </div>

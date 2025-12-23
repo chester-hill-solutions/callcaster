@@ -1,7 +1,7 @@
 import { verifyAuth } from "../lib/supabase.server";
 import { json } from "@remix-run/node";
 
-function sanitizeFilename(filename) {
+function sanitizeFilename(filename: string) {
     const decodedFilename = decodeURIComponent(filename);
     const sanitized = decodedFilename.replace(/[^a-zA-Z0-9-_\.]/g, '')
         .replace(/\s+/g, '_');
@@ -13,10 +13,11 @@ function sanitizeFilename(filename) {
     return `${name}.${ext}`;
 }
 
-export async function action({ request, params }) {
+import type { ActionFunctionArgs } from "@remix-run/node";
 
-    const { supabaseClient, headers, user } =
-        await verifyAuth(request);
+export async function action({ request }: ActionFunctionArgs) {
+
+    const { supabaseClient, headers } = await verifyAuth(request);
     const method = request.method;
     const formData = await request.formData();
     const workspaceId = formData.get('workspaceId')
@@ -27,19 +28,21 @@ export async function action({ request, params }) {
         );
     }
     if (method === "POST") {
-        const mediaToUpload = formData.get("image");
-        const mediaName = formData.get("fileName");
+        const mediaToUpload = formData.get("image") as File | string | null;
+        const mediaNameRaw = formData.get("fileName");
+        const mediaName = typeof mediaNameRaw === 'string' ? mediaNameRaw : String(mediaNameRaw ?? '');
         const encodedMediaName = encodeURI(mediaName);
-        const campaignId = formData.get("campaignId");
+        const campaignIdRaw = formData.get("campaignId");
+        const campaignId = campaignIdRaw == null ? null : Number(campaignIdRaw);
         const safeFileName = sanitizeFilename(encodedMediaName);
 
         const { error: uploadError } = await supabaseClient.storage
             .from("messageMedia")
-            .upload(`${workspaceId}/${safeFileName}`, mediaToUpload, {
+            .upload(`${workspaceId}/${safeFileName}`, mediaToUpload as any, {
                 cacheControl: "60",
                 upsert: false,
             });
-        if (uploadError && uploadError.statusCode !== '409') {
+        if (uploadError && (uploadError as any).statusCode !== '409') {
             console.log({ uploadError })
             return json({ success: false, error: uploadError }, { headers });
         }
@@ -47,7 +50,7 @@ export async function action({ request, params }) {
             const { data: campaign, error } = await supabaseClient
                 .from('message_campaign')
                 .select('id, message_media')
-                .eq('campaign_id', campaignId)
+                .eq('campaign_id', campaignId as number)
                 .single();
             if (error) {
                 console.log('Campaign Error', error);
@@ -56,9 +59,9 @@ export async function action({ request, params }) {
             const { data: campaignUpdate, error: updateError } = await supabaseClient
                 .from('message_campaign')
                 .update({
-                    message_media: [...(campaign.message_media || []), safeFileName]
+                    message_media: [...((campaign?.message_media ?? []) as string[]), safeFileName]
                 })
-                .eq('campaign_id', campaignId)
+                .eq('campaign_id', campaignId as number)
                 .select()
             if (updateError) {
                 console.log(updateError)
@@ -72,13 +75,15 @@ export async function action({ request, params }) {
             return json({ success: true, error: null, url: data.signedUrl }, { headers });
         }
     } else if (method === "DELETE") {
-        const campaignId = formData.get("campaignId");
-        const mediaName = formData.get("fileName");
+        const campaignIdRaw = formData.get("campaignId");
+        const campaignId = campaignIdRaw == null ? null : Number(campaignIdRaw);
+        const mediaNameRaw = formData.get("fileName");
+        const mediaName = typeof mediaNameRaw === 'string' ? mediaNameRaw : String(mediaNameRaw ?? '');
         const encodedMediaName = encodeURI(mediaName);
         const { data: campaign, error } = await supabaseClient
             .from("message_campaign")
             .select("id, message_media")
-            .eq("campaign_id", campaignId)
+            .eq("campaign_id", campaignId as number)
             .single();
         if (error) {
             console.log("Campaign Error", error);
@@ -88,16 +93,17 @@ export async function action({ request, params }) {
         const { data: campaignUpdate, error: updateError } = await supabaseClient
             .from("message_campaign")
             .update({
-                message_media: campaign.message_media.filter(
+                message_media: (campaign.message_media ?? []).filter(
                     (med) => med !== encodedMediaName,
                 ),
             })
-            .eq("campaign_id", campaignId)
+            .eq("campaign_id", campaignId as number)
             .select();
 
         if (updateError) {
             return json({ success: false, error: updateError }, { headers });
         }
-        return json({ success: false, error: updateError }, { headers });
+        return json({ success: true, error: null, campaignUpdate }, { headers });
     }
+    return json({ success: false, error: 'Method not allowed' }, { status: 405 });
 }

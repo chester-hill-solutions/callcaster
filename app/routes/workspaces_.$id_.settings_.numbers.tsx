@@ -106,6 +106,7 @@ type ValidationRequest = {
   phoneNumber: string;
   validationCode: string;
 };
+
 type NumberCapabilities = {
   fax: boolean;
   mms: boolean;
@@ -113,6 +114,7 @@ type NumberCapabilities = {
   voice: boolean;
   verification_status: boolean;
 };
+
 type NumberRequest = Array<{
   id: bigint;
   created_at: string;
@@ -121,23 +123,34 @@ type NumberRequest = Array<{
   phone_number: string;
   capabilities: NumberCapabilities;
 }>;
+
 type CallerIDResponse = {
   validationRequest: ValidationRequest;
   numberRequest: NumberRequest;
   error?: string;
 };
 
+interface FormData {
+  formName: string;
+  numberId?: string;
+  incomingActivity?: string;
+  incomingVoiceMessage?: string;
+  callerId?: string;
+  [key: string]: unknown;
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const data = Object.fromEntries(await request.formData());
+  const rawData = Object.fromEntries(await request.formData());
+  const data = rawData as FormData;
   const formName = data.formName;
   const workspace_id = params.id;
   if (!workspace_id) return { error: "Workspace ID is required" };
 
   if (formName === "caller-id") {
     delete data.formName;
-    const res = await fetch(`${process.env.BASE_URL}/api/caller-id`, {
+    const res = await fetch(`${process.env['BASE_URL']}/api/caller-id`, {
       body: JSON.stringify({ ...data, workspace_id }),
       headers: {
         "Content-Type": "application/json",
@@ -153,7 +166,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     delete data.formName;
     const { error } = await removeWorkspacePhoneNumber({
       supabaseClient,
-      numberId: data.numberId as unknown as bigint,
+      numberId: BigInt(data.numberId || '0'),
       workspaceId: workspace_id as string,
     });
     if (error) return { error };

@@ -8,7 +8,12 @@ import {
   useFetcher,
 } from "@remix-run/react";
 import { LoaderFunction, ActionFunction } from "@remix-run/node";
+<<<<<<< HEAD
 import React, { useEffect, useState, useCallback, useRef } from "react";
+=======
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { useEffect, useState, useCallback, useRef } from "react";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
@@ -35,6 +40,7 @@ import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
 
 // Hook imports
+<<<<<<< HEAD
 import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
@@ -42,6 +48,14 @@ import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
 
+=======
+import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
+import useDebouncedSave from "../hooks/useDebouncedSave";
+import useSupabaseRoom from "../hooks/useSupabaseRoom";
+import { useTwilioDevice } from "../hooks/useTwilioDevice";
+import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
+import { useCallState } from "~/hooks/useCallState";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 // Type imports
 import type {
   LoaderData,
@@ -51,10 +65,16 @@ import type {
   AppUser,
   BaseUser,
   ActiveCall,
+<<<<<<< HEAD
   CampaignDetails
 } from "@/lib/types";
 import { Tables } from "@/lib/database.types";
 import { MemberRole } from "@/components/workspace/TeamMember";
+=======
+  CampaignDetails,
+} from "~/lib/types";
+import { MemberRole } from "~/components/Workspace/TeamMember";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 export { ErrorBoundary };
 
@@ -179,7 +199,7 @@ function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
   return attempts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 }
 
-export const loader: LoaderFunction = async ({ request, params }) => {
+export const loader: LoaderFunction = async ({ request, params }: LoaderFunctionArgs) => {
   const { campaign_id: id, id: workspaceId } = params;
   const {
     supabaseClient: supabase,
@@ -197,7 +217,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
     twilioApiSecret: workspaceData.token as string,
     identity: user.id,
   });
-  const nextRecipient = getNextRecipient(queue, campaign.data?.dial_type, user.id);
+  const nextRecipient = getNextRecipient(queue, campaign?.dial_type, user.id);
   const initalCallsList = getInitialCallsList(attempts || []);
   const initialRecentCall = getInitialRecentCall(attempts || []);
   const initialRecentAttempt = getInitialRecentAttempt(attempts || []);
@@ -233,7 +253,7 @@ export const loader: LoaderFunction = async ({ request, params }) => {
   }
 };
 
-export const action: ActionFunction = async ({ request, params }) => {
+export const action: ActionFunction = async ({ request, params }: ActionFunctionArgs) => {
   const { campaign_id } = params;
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -311,7 +331,7 @@ const CallScreen: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-  } = useTwilioDevice(token, selectedDevice, workspaceId, send as (action: { type: string }) => void);
+  } = useTwilioDevice({ token, selectedDevice, workspaceId, send });
 
   const {
     status: liveStatus,
@@ -418,7 +438,7 @@ const handleDialButton = useCallback(() => {
   if (!campaign) return;
 
   if (campaign.dial_type === "predictive") {
-    if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
+    if (deviceIsBusy || incomingCall || deviceStatus !== "registered") {
       console.log("Device Busy", deviceStatus, device?.calls.length);
       return;
     }
@@ -459,7 +479,7 @@ const handleNextNumber = useCallback(
     nextNumber({
       skipHousehold,
       queue,
-      householdMap: new Map(Object.entries(householdMap)),
+      householdMap,
       nextRecipient,
       groupByHousehold,
     });
@@ -656,12 +676,7 @@ const displayState =
             activeCall as unknown as ActiveCall,
           );
 
-const house =
-  householdMap[
-  Object.keys(householdMap).find(
-    (house) => house === nextRecipient?.contact?.address,
-  ) || ""
-  ];
+const house = householdMap[nextRecipient?.contact?.address || ""];
 
 const displayColor =
   displayState === "failed"
@@ -693,7 +708,7 @@ useEffect(() => {
 
 useEffect(() => {
   audioContextRef.current = new (window.AudioContext ||
-    (window as any).webkitAudioContext)();
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
   return () => {
     if (audioContextRef.current) {
       audioContextRef.current.close();
@@ -859,19 +874,28 @@ return (
     </div>
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       <div className="space-y-6">
+<<<<<<< HEAD
         <CallArea
           conference={conference ? { parameters: { Sid: conference } } : null}
+=======
+          <CallArea
+            conference={conference}
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           isBusy={isBusy || deviceIsBusy}
           predictive={campaign.dial_type === "predictive"}
           nextRecipient={nextRecipient}
-          activeCall={activeCall as unknown as ActiveCall}
+            activeCall={activeCall as unknown as ActiveCall}
           recentCall={recentCall}
           handleVoiceDrop={handleVoiceDrop}
           hangUp={
             campaign.dial_type === "predictive"
               ? () => handleConferenceEnd({
                 activeCall: activeCall as unknown as ActiveCall,
+<<<<<<< HEAD
                 setConference: () => setConference(null),
+=======
+                setConference,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 workspaceId,
               })
               : () => {
@@ -879,7 +903,11 @@ return (
               }
           }
           displayState={displayState}
+<<<<<<< HEAD
           dispositionOptions={(campaignDetails.disposition_options as unknown) as string[]}
+=======
+            dispositionOptions={(campaignDetails as { disposition_options?: Array<{ value: string; label: string }> }).disposition_options || []}
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           handleDialNext={handleDialButton}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}
@@ -899,6 +927,7 @@ return (
       </div>
       <CallQuestionnaire
         isBusy={isBusy}
+<<<<<<< HEAD
         handleResponse={(response: { pageId: string; blockId: string; value: string | number | boolean | string[] | null | undefined }) => {
           const value = response.value;
           if (value !== undefined && value !== null) {
@@ -907,6 +936,11 @@ return (
         }}
         campaignDetails={campaignDetails as unknown as CampaignDetails & { script: { steps: { pages?: Record<string, { id: string; title: string; blocks: string[] }>; blocks?: Record<string, { id: string; type: string; title: string; content: string; options?: Array<{ value: string; label: string; next: string }>; audioFile: string }> } } }}
         update={(update || {}) as Record<string, Record<string, string | number | boolean | string[] | null | undefined>>}
+=======
+        handleResponse={handleResponse}
+        campaignDetails={campaignDetails}
+        update={update || {}}
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
         nextRecipient={questionContact}
         handleQuickSave={saveData}
         disabled={!questionContact}

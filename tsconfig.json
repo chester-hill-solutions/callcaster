@@ -9,7 +9,11 @@
     "build",
     "public/build",
     "**/*.test.ts",
-    "**/*.test.tsx"
+    "**/*.test.tsx",
+    "supabase/functions/**",
+    "app/routes/archive/**",
+    "app/routes/old.*",
+    "twilio-serverless/**"
   ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
@@ -27,6 +31,19 @@
     "paths": {
       "@/*": ["./app/*"]
     },
+
+    // Enhanced type safety options
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitOverride": true,
+
+    // Remix takes care of building everything in `remix build`.
     "noEmit": true
   }
 }

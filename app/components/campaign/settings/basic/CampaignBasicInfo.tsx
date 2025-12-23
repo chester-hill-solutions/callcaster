@@ -22,6 +22,7 @@ import {
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
+import { isObject, isString } from "../lib/type-utils";
 
 // Types
 type ButtonState = "Active" | "Inactive" | "Disabled";
@@ -34,6 +35,34 @@ type CampaignState =
   | "pending"
   | "scheduled"
   | "complete";
+
+interface CampaignData {
+  type?: string;
+  caller_id?: string;
+  start_date?: string;
+  end_date?: string;
+  schedule?: string;
+  status?: CampaignState;
+  [key: string]: unknown;
+}
+
+interface CampaignDetails {
+  script_id?: string;
+  body_text?: string;
+  [key: string]: unknown;
+}
+
+// Type guard for campaign data
+function isCampaignData(data: unknown): data is CampaignData {
+  if (!isObject(data)) return false;
+  return true; // CampaignData is flexible, just needs to be an object
+}
+
+// Type guard for campaign details
+function isCampaignDetails(data: unknown): data is CampaignDetails {
+  if (!isObject(data)) return false;
+  return true; // CampaignDetails is flexible, just needs to be an object
+}
 
 // Helper Functions
 const getButtonStates = (
@@ -86,11 +115,25 @@ const getButtonStates = (
 };
 
 // Validation helper
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.tsx
 const validateRequiredFields = (
   campaignData: Campaign,
   details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign
 ) => {
+=======
+const validateRequiredFields = (campaignData: unknown, details: unknown): string[] => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.tsx
   const errors: string[] = [];
+  
+  if (!isCampaignData(campaignData)) {
+    errors.push("Invalid campaign data");
+    return errors;
+  }
+  
+  if (!isCampaignDetails(details)) {
+    errors.push("Invalid campaign details");
+    return errors;
+  }
   
   if (!campaignData.type) {
     errors.push("Campaign type is required");
@@ -108,7 +151,11 @@ const validateRequiredFields = (
     errors.push("Calling hours are required");
   }
   
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.tsx
   if ('script_id' in details && !details.script_id && 'body_text' in details && !details.body_text) {
+=======
+  if (!details.script_id && !details.body_text) {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.tsx
     errors.push("Script or message content is required");
   } else if ('script_id' in details && !details.script_id) {
     errors.push("Script is required");
@@ -121,8 +168,13 @@ const validateRequiredFields = (
 
 // Component Props Interface
 interface CampaignBasicInfoProps {
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.tsx
   campaignData: Campaign;
   handleInputChange: (name: string, value: string | number | null) => void;
+=======
+  campaignData: CampaignData;
+  handleInputChange: (name: string, value: string | number) => void;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.tsx
   phoneNumbers: WorkspaceNumbers[];
   flags: Flags;
 
@@ -179,24 +231,26 @@ export const CampaignBasicInfo = ({
                 e.preventDefault();
                 if (type === "duplicate") {
                   handleDuplicateButton();
+<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.tsx
                 } else if (type === "play" || type === "schedule" || type === "archive") {
                   handleConfirmStatus(type === "schedule" ? "queue" : type);
+=======
+                } else if (type === "play" || type === "archive") {
+                  handleConfirmStatus(type);
+                } else if (type === "schedule") {
+                  handleButton(type);
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.tsx
                 } else {
-                  handleButton(type as "play" | "pause" | "archive" | "schedule");
+                  handleButton(type);
                 }
               }}
-              disabled={getButtonStates(campaignData.status as CampaignState, Boolean(isPlayDisabled))[type] === "Disabled"}
-              className={`
-                ${state === "Active" ? "bg-primary text-primary-foreground shadow-sm" : ""}
-                ${state === "Inactive" ? "border-primary" : ""}
-                ${isDisabled ? "cursor-not-allowed opacity-50" : ""}
-              `}
+              disabled={!!isDisabled}
             >
               {icon}
             </Button>
           </TooltipTrigger>
-          <TooltipContent align="center">
-            {tooltipText}
+          <TooltipContent>
+            <p>{tooltipText}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -205,101 +259,60 @@ export const CampaignBasicInfo = ({
 
   return (
     <div className="space-y-6">
-      {/* Title and Actions Row */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1">
-          <Input
-            id="title"
-            name="title"
-            value={campaignData.title}
-            onChange={(e) => handleInputChange("title", e.target.value)}
-            className="border-0 bg-transparent px-0 text-lg font-medium h-9 focus-visible:ring-0"
-            placeholder="Campaign Title"
-          />
-        </div>
-        <div className="flex items-center gap-1">
-          {renderButton(
-            "play",
-            <Play className="h-4 w-4" />,
-            isPlayDisabled || "Start the campaign"
-          )}
-          {renderButton(
-            "schedule",
-            <Clock className="h-4 w-4" />,
-            "Schedule the campaign"
-          )}
-          {renderButton(
-            "pause",
-            <Pause className="h-4 w-4" />,
-            "Pause the campaign"
-          )}
-          {renderButton(
-            "duplicate",
-            <Copy className="h-4 w-4" />,
-            "Duplicate the campaign"
-          )}
-          {renderButton(
-            "archive",
-            <Archive className="h-4 w-4" />,
-            "Archive the campaign"
-          )}
-        </div>
-      </div>
-
-      {/* Form Fields */}
-      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <div>
-            <Label className="text-sm font-medium flex items-center gap-1">
-              Campaign Type
-              <span className="text-destructive">*</span>
-            </Label>
-            <SelectType
-              handleInputChange={handleInputChange}
-              campaignData={campaignData}
-              flags={flags}
+          <SelectType
+            value={campaignData.type || ""}
+            onChange={(value) => handleInputChange("type", value)}
+            flags={flags}
+          />
+
+          <SelectNumber
+            value={campaignData.caller_id || ""}
+            onChange={(value) => handleInputChange("caller_id", value)}
+            phoneNumbers={phoneNumbers}
+          />
+
+          <SelectDates
+            startDate={campaignData.start_date || ""}
+            endDate={campaignData.end_date || ""}
+            onStartDateChange={(value) => handleInputChange("start_date", value)}
+            onEndDateChange={(value) => handleInputChange("end_date", value)}
+          />
+
+          <div className="space-y-2">
+            <Label htmlFor="schedule">Calling Hours</Label>
+            <Input
+              id="schedule"
+              type="text"
+              placeholder="9:00 AM - 5:00 PM"
+              value={campaignData.schedule || ""}
+              onChange={(e) => handleInputChange("schedule", e.target.value)}
             />
-            {!campaignData.type && (
-              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                Required field
-              </p>
-            )}
-          </div>
-          <div>
-            <Label className="text-sm font-medium flex items-center gap-1">
-              Phone Number
-              <span className="text-destructive">*</span>
-            </Label>
-            <SelectNumber
-              handleInputChange={handleInputChange}
-              campaignData={campaignData}
-              phoneNumbers={phoneNumbers}
-            />
-            {!campaignData.caller_id && (
-              <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                Required field
-              </p>
-            )}
           </div>
         </div>
-      </div>
-      <div>
-        <Label className="text-sm font-medium flex items-center gap-1">
-          Schedule
-          <span className="text-destructive">*</span>
-        </Label>
-        <SelectDates
-          campaignData={campaignData}
-          handleInputChange={handleInputChange}
-        />
-        {(!campaignData.start_date || !campaignData.end_date || !campaignData.schedule) && (
-          <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-            <AlertCircle className="h-4 w-4" />
-            Start date, end date, and calling hours are required
-          </p>
-        )}
+
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <TimerIcon className="h-4 w-4" />
+            <span className="text-sm font-medium">Campaign Controls</span>
+          </div>
+
+          <div className="flex space-x-2">
+            {renderButton("play", <Play className="h-4 w-4" />, "Start campaign")}
+            {renderButton("pause", <Pause className="h-4 w-4" />, "Pause campaign")}
+            {renderButton("archive", <Archive className="h-4 w-4" />, "Archive campaign")}
+            {renderButton("schedule", <Calendar className="h-4 w-4" />, "Schedule campaign")}
+            {renderButton("duplicate", <Copy className="h-4 w-4" />, "Duplicate campaign")}
+          </div>
+
+          {isPlayDisabled && (
+            <div className="flex items-center space-x-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <span>{isPlayDisabled}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

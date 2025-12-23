@@ -191,50 +191,62 @@ export default function NewSurveyPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+<<<<<<< HEAD
   const updatePageField = (pageIndex: number, field: keyof SurveyPageFormData, value: string | number) => {
+=======
+  const updatePageField = (pageIndex: number, field: string, value: string | number) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, index) => 
-        index === pageIndex ? { ...p, [field]: value } : p
+      pages: prev.pages.map((page, index) =>
+        index === pageIndex ? { ...page, [field]: value } : page
       )
     }));
   };
 
+<<<<<<< HEAD
   const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyQuestionFormData, value: string | boolean | SurveyQuestionType) => {
+=======
+  const updateQuestionField = (pageIndex: number, questionIndex: number, field: string, value: string | boolean | number) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, pIndex) => 
-        pIndex === pageIndex 
+      pages: prev.pages.map((page, pIndex) =>
+        pIndex === pageIndex
           ? {
-              ...p,
-              questions: p.questions.map((q, qIndex) => 
-                qIndex === questionIndex ? { ...q, [field]: value } : q
+              ...page,
+              questions: page.questions.map((question, qIndex) =>
+                qIndex === questionIndex ? { ...question, [field]: value } : question
               )
             }
-          : p
+          : page
       )
     }));
   };
 
+<<<<<<< HEAD
   const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof QuestionOptionFormData, value: string | number) => {
+=======
+  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: string, value: string | number) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
-      pages: prev.pages.map((p, pIndex) => 
-        pIndex === pageIndex 
+      pages: prev.pages.map((page, pIndex) =>
+        pIndex === pageIndex
           ? {
-              ...p,
-              questions: p.questions.map((q, qIndex) => 
-                qIndex === questionIndex 
+              ...page,
+              questions: page.questions.map((question, qIndex) =>
+                qIndex === questionIndex
                   ? {
-                      ...q,
-                      options: q.options?.map((o, oIndex) => 
-                        oIndex === optionIndex ? { ...o, [field]: value } : o
-                      ) || []
+                      ...question,
+                      options: question.options?.map((option, oIndex) =>
+                        oIndex === optionIndex ? { ...option, [field]: value } : option
+                      )
                     }
-                  : q
+                  : question
               )
             }
-          : p
+          : page
       )
     }));
   };

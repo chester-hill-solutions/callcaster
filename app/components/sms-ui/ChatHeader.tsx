@@ -32,10 +32,18 @@ type Chat = {
   conversation_start: string;
   conversation_last_update: string;
   message_count: number;
-  unread_count: number
+  unread_count: number;
+  phoneNumber?: string;
+  latestMessage?: {
+    date: string;
+  };
 }
 
+<<<<<<< HEAD:app/components/sms-ui/ChatHeader.tsx
 interface ChatHeaderParams {
+=======
+type ChatHeaderParams = {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatHeader.tsx
   contact?: Contact | null;
   outlet: boolean;
   phoneNumber?: string;
@@ -46,6 +54,7 @@ interface ChatHeaderParams {
   toggleContactMenu: () => void;
   isContactMenuOpen: boolean;
   handleContactSelect: (contact: Contact) => void;
+<<<<<<< HEAD:app/components/sms-ui/ChatHeader.tsx
   dropdownRef: RefObject<HTMLElement | null>;
   searchError?: string;
   existingConversation?: Chat & { phoneNumber?: string; latestMessage?: string; date?: string } | null;
@@ -53,6 +62,15 @@ interface ChatHeaderParams {
   potentialContacts: Contact[];
   contactNumber?: string;
   setDialog: (contact: Partial<Contact>) => void;
+=======
+  dropdownRef: RefObject<HTMLDivElement>;
+  searchError?: string;
+  existingConversation: Chat;
+  handleExistingConversationClick: (phoneNumber: string) => void;
+  potentialContacts: Contact[];
+  contactNumber?: string;
+  setDialog: (contact: Contact) => void;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatHeader.tsx
 }
 
 export default function ChatHeader({
@@ -112,7 +130,7 @@ export default function ChatHeader({
                 } shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50`}
                 placeholder="Enter phone number"
               />
-              {!isValid && phoneNumber?.length > 9 && (
+              {!isValid && phoneNumber && phoneNumber.length > 9 && (
                 <p className="absolute mt-1 text-sm text-red-500">
                   Please enter a valid phone number
                 </p>
@@ -129,7 +147,7 @@ export default function ChatHeader({
                 <button
                   onClick={() =>
                     handleExistingConversationClick(
-                      existingConversation.phoneNumber,
+                      existingConversation.phoneNumber || existingConversation.contact_phone,
                     )
                   }
                   className="ml-2 rounded-md bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
@@ -139,10 +157,10 @@ export default function ChatHeader({
                 <div className="mt-2 rounded-md bg-gray-100 dark:bg-zinc-700 p-2 text-sm">
                   <p>
                     <strong>Latest message:</strong>{" "}
-                    {existingConversation.latestMessage}
+                    {existingConversation.latestMessage?.date || "No messages"}
                   </p>
                   <p>
-                    <strong>Date:</strong> {existingConversation.date}
+                    <strong>Date:</strong> {existingConversation.conversation_last_update}
                   </p>
                 </div>
               </div>
@@ -232,7 +250,7 @@ export default function ChatHeader({
             )}
           </div>
         ):(
-          <Button onClick={() => setDialog({phone: phoneNumber})}>Add {phoneNumber}</Button>
+          <Button onClick={() => setDialog({phone: phoneNumber || "", firstname: "", surname: ""} as Contact)}>Add {phoneNumber}</Button>
         )}
       </div>
     </div>

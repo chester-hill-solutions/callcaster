@@ -1,12 +1,5 @@
-import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Form,
-  Link,
-  NavLink,
-  json,
-  useActionData,
-  useLoaderData,
-} from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, json } from "@remix-run/node";
+import { Form, Link, NavLink, useActionData, useLoaderData } from "@remix-run/react";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
@@ -15,9 +8,16 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { formatDateToLocale } from "@/lib/utils";
 import { useEffect } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
+<<<<<<< HEAD
 import { Json } from "@/lib/supabase.types";
 import { User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
+=======
+import type { Json } from "~/lib/database.types";
+import type { User } from "~/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "~/lib/database.types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;
@@ -45,23 +45,30 @@ type Workspace = {
   name: string;
 };
 
-type LoaderData = 
-  | { workspace: null; error: string; userRole: null; scripts?: undefined }
-  | { scripts: null; error: string; userRole: any; workspace?: undefined }
-  | { scripts: Script[] | null; workspace: Workspace | null; error: null; userRole: any };
+type LoaderData =
+  | {
+      scripts: null;
+      error: string;
+      userRole: Database["public"]["Enums"]["workspace_role"] | null;
+      workspace?: undefined;
+    }
+  | {
+      scripts: Script[] | null;
+      workspace: Workspace | null;
+      error: null;
+      userRole: Database["public"]["Enums"]["workspace_role"];
+    };
 
-type ActionData = 
-  | { error: string }
-  | { fileContent: string; fileName: string; contentType: string };
+// ActionData inferred from action's return via typeof action
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const workspaceId = params.id;
+  const workspaceId = params["id"];
   if (workspaceId == null) {
     return json<LoaderData>(
       {
-        workspace: null,
+        scripts: null,
         error: "Workspace does not exist",
         userRole: null,
       },
@@ -69,7 +76,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
+  const roleResult = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
   const { data: workspace, error: workspaceError } = await supabaseClient
     .from("workspace")
     .select()
@@ -91,32 +98,30 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       {
         scripts: null,
         error: errorMessage,
-        userRole,
+        userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null,
       },
       { headers },
     );
   }
 
-  return json<LoaderData>(
-    { scripts, workspace, error: null, userRole },
-    { headers },
-  );
+  return json<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+export async function action({ request }: ActionFunctionArgs) {
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
   const data = Object.fromEntries(formData.entries());
 
-  if (!data.id) {
+  const idValue = data["id"];
+  if (!idValue) {
     return json({ error: "Script ID is required" }, { status: 400 });
   }
 
   const { data: script, error: scriptError } = await supabaseClient
     .from("script")
     .select("name, steps")
-    .eq("id", Number(data.id) || 0)
+    .eq("id", Number(idValue) || 0)
     .single();
 
   if (scriptError) {
@@ -155,8 +160,8 @@ export default function WorkspaceScripts() {
   const actionData = useActionData<typeof action>();
 
   // Narrow the type of loaderData
-  const { error, userRole } = loaderData;
-  const workspace = 'workspace' in loaderData ? loaderData.workspace : null;
+  const { error } = loaderData;
+  // const workspace = 'workspace' in loaderData ? loaderData.workspace : null;
   const rawScripts = 'scripts' in loaderData ? loaderData.scripts : null;
 
   // Parse the steps for each script

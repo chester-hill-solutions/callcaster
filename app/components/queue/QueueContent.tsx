@@ -4,8 +4,10 @@ import { QueueTable } from "@/components/queue/QueueTable";
 import SupabaseClient from "@supabase/supabase-js/dist/module/SupabaseClient";
 import { useEffect, useState, useRef } from "react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { AppError } from "~/lib/types";
 
 interface QueueContentProps {
+<<<<<<< HEAD
     queueValue: {
         queueData: QueueItem[] | null;
         queueError: Error | null;
@@ -38,6 +40,29 @@ interface QueueContentProps {
     removeContactsFromQueue: (ids: string[] | 'all') => void;
     supabase: SupabaseClient;
     selectedAudienceIds:number[]
+=======
+  queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
+  queueError: AppError | null;
+  totalCount: number | null;
+  unfilteredCount: number | null;
+  queuedCount: number | null;
+  currentPage: number;
+  pageSize: number;
+  filters: {
+    name: string;
+    phone: string;
+    email: string;
+    address: string;
+    audiences: string;
+    status: string;
+  };
+  onFilterChange: (key: string, value: string) => void;
+  onClearFilter: () => void;
+  onStatusChange: (ids: string[], newStatus: string, isAllSelected: boolean) => void;
+  onAddFromAudience: (audienceId: number) => void;
+  onAddContactToQueue: (contacts: Contact[]) => void;
+  onRemoveContactsFromQueue: (ids: string[] | 'all') => void;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 }
 
 export function QueueContent({

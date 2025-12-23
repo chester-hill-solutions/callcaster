@@ -13,7 +13,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect("/workspaces");
   }
 
+<<<<<<< HEAD
   const stripe = new Stripe(env.STRIPE_SECRET_KEY());
+=======
+  const stripe = new Stripe(process.env['STRIPE_SECRET_KEY'] ?? '');
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   try {
     const session = await stripe.checkout.sessions.retrieve(sessionId);
@@ -22,8 +26,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("Payment not completed");
     }
 
-    const workspaceId = session.metadata?.workspaceId;
-    const creditAmount = Number(session.metadata?.creditAmount);
+    const workspaceId = session.metadata?.['workspaceId'];
+    const creditAmount = Number(session.metadata?.['creditAmount']);
 
     if (!workspaceId || !creditAmount) {
       throw new Error("Invalid session metadata");
@@ -50,7 +54,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     
     // If we have the workspaceId in the session metadata, use it for redirect
     const workspaceId = sessionId ? 
-      (await stripe.checkout.sessions.retrieve(sessionId)).metadata?.workspaceId : 
+      (await stripe.checkout.sessions.retrieve(sessionId)).metadata?.['workspaceId'] : 
       null;
 
     if (workspaceId) {

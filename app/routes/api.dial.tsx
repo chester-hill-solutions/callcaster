@@ -1,9 +1,23 @@
 import Twilio from 'twilio';
 import { createSupabaseServerClient } from '../lib/supabase.server';
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
-export const action = async ({ request }) => {
+import type { ActionFunctionArgs } from "@remix-run/node";
+
+interface DialRequest {
+  to_number: string;
+  user_id: string;
+  campaign_id: string;
+  contact_id: string;
+  workspace_id: string;
+  queue_id: string;
+  outreach_id?: string;
+  caller_id: string;
+  selected_device?: string;
+}
+
+export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id, selected_device } = await request.json();
+    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id, selected_device }: DialRequest = await request.json();
 
     const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
     if (error) throw error;
@@ -13,7 +27,7 @@ export const action = async ({ request }) => {
             creditsError: true,
         }
     }
-    function normalizePhoneNumber(input) {
+    function normalizePhoneNumber(input: string): string {
         let cleaned = input.replace(/[^0-9+]/g, '');
 
         if (cleaned.indexOf('+') > 0) {

@@ -1,16 +1,26 @@
 import { useEffect, useState } from "react";
 import SupportButton from "./SupportButton";
 import { iconMapping, IconType } from "./Result.IconMap";
-import { Block, BlockOption } from "@/lib/types";
+import {
+  Block,
+  BlockOption,
+  IVROption,
+} from "~/lib/types";
 
-type BlockOptionWithIcon = BlockOption & {
+// Extended types for the Result component
+type ScriptBlock = Block & {
+  text?: string;
+};
+
+// Extend BlockOption so Icon is a discriminant for rendering
+type ResultOption = BlockOption & {
   Icon?: string;
 };
 
 interface ResultProps {
   action: (response: { column: string; value: string | boolean | string[] }) => void;
   initResult: string | boolean | string[] | null;
-  questions: Block;
+  questions: ScriptBlock;
   questionId: string;
   disabled: boolean;
 }
@@ -45,37 +55,34 @@ const Result = ({
     action({ column: id, value: newArr });
   };
 
-  const renderIcon = (option: BlockOptionWithIcon) => {
-    const optionValue = option.value || "";
-    const optionContent = option.content || "";
-    
+  const renderIcon = (option: ResultOption) => {
     if (option.Icon === "SupportButton") {
       return (
         <SupportButton
-          key={optionValue}
-          option={option}
-          handleChange={() => handleChange(questions.id, optionValue)}
-          current={result as string}
+          key={option.value}
+          option={{ value: option.value || "", content: option.content || "" }}
+          handleChange={() => handleChange(questions.id, option.value || "")}
+          current={typeof result === 'string' ? result : ''}
         />
       );
     }
 
-    const IconComponent = option.Icon ? iconMapping[option.Icon as IconType] : null;
+    const iconKey = (option.Icon || "") as IconType;
+    const IconComponent = iconMapping[iconKey];
     if (!IconComponent) {
-      //console.error(`Icon component ${option.Icon} is not found in iconMapping`);
       return (
         <SupportButton
-          key={optionValue}
-          option={option}
-          handleChange={() => handleChange(questions.id, optionValue)}
-          current={result as string}
+          key={option.value}
+          option={{ value: option.value || "", content: option.content || "" }}
+          handleChange={() => handleChange(questions.id, option.value || "")}
+          current={typeof result === 'string' ? result : ''}
         />
       );
     }
 
     return (
       <button
-        key={optionValue}
+        key={option.value}
         className="result-button column align-center justify-start"
         style={{
           display: "flex",
@@ -83,13 +90,13 @@ const Result = ({
           alignItems: "center",
           minWidth: "40px",
         }}
-        onClick={() => handleChange(questions.id, optionValue)}
+        onClick={() => handleChange(questions.id, option.value || "")}
         type="button"
       >
         <IconComponent
           size="20px"
           color={
-            result === optionValue
+            result === option.value
               ? "hsl(var(--brand-primary))"
               : "hsl(var(--muted-foreground))"
           }
@@ -99,10 +106,10 @@ const Result = ({
           style={{
             fontSize: "10px",
             textAlign: "center",
-            color: result === optionValue ? "hsl(var(--primary))" : "#333",
+            color: result === option.value ? "hsl(var(--primary))" : "#333",
           }}
         >
-          {optionContent}
+          {option.content}
         </div>
       </button>
     );
@@ -111,27 +118,24 @@ const Result = ({
   const renderQuestionContent = () => {
     switch (questions.type) {
       case "radio":
-        return (questions.options as BlockOptionWithIcon[]).map((option) => {
-          const optionValue = option.value || "";
-          const optionContent = option.content || "";
-          const optionIcon = option.Icon;
-          
-          return optionIcon === "SupportButton" ? (
-            <SupportButton
-              key={optionValue}
-              option={option}
-              handleChange={() => handleChange(questions.id, optionValue)}
-              current={result}
-            />
-          ) : (
-            renderIcon(option)
-          );
+        return questions.options.map((option: BlockOption | IVROption) => {
+          const opt = option as ResultOption;
+          return opt.Icon === "SupportButton"
+            ? (
+                <SupportButton
+                  key={String(opt.value)}
+                  option={{ value: String(opt.value), content: opt.content || "" }}
+                  handleChange={() => handleChange(questions.id, String(opt.value))}
+                  current={typeof result === 'string' ? result : ''}
+                />
+              )
+            : renderIcon(opt);
         });
       case "boolean":
         return (
           <div className="flex items-center justify-between gap-2">
             <label htmlFor={questions.title}>
-              {questions.content}
+              {questions.text || questions.content}
             </label>
             <input
               disabled={disabled}
@@ -139,7 +143,7 @@ const Result = ({
               type="checkbox"
               name={questions.title}
               onChange={(e) => handleChange(questions.id, e.target.checked)}
-              checked={result as boolean}
+              checked={typeof result === 'boolean' ? result : false}
             />
           </div>
         );
@@ -148,31 +152,24 @@ const Result = ({
           <select
           disabled={disabled}
             name={questions.title}
-            value={result as string}
+            value={typeof result === 'string' ? result : ''}
             onChange={(e) => handleChange(questions.id, e.currentTarget.value)}
             className="px-2 py-1"
           >
             <option value="">---</option>
-            {(questions.options as BlockOption[]).map((option) => {
-              const optionValue = option.value || "";
-              const optionContent = option.content || "";
-              return (
-                <option
-                  key={`question-${questionId}-select-${optionValue}`}
-                  value={optionValue}
-                >
-                  {optionContent}
-                </option>
-              );
-            })}
+            {questions.options.map((option: BlockOption | IVROption) => (
+              <option
+                key={`question-${questionId}-select-${String(option.value)}`}
+                value={String(option.value)}
+              >
+                {option.content}
+              </option>
+            ))}
           </select>
         );
       case "multi":
-        return (questions.options as BlockOption[]).map((option) => {
-          const optionValue = option.value || "";
-          const optionContent = option.content || "";
-          const inputId = `${questionId}-select-${optionValue}`;
-          const resultArray = Array.isArray(result) ? result : [];
+        return questions.options.map((option: BlockOption | IVROption) => {
+          const inputId = `${questionId}-select-${String(option.value)}`;
           return (
             <div
               key={inputId}
@@ -184,12 +181,12 @@ const Result = ({
                 name={inputId}
                 type="checkbox"
                 onChange={(e) =>
-                  handleMultiChange(questions.id, optionValue, e.target.checked)
+                  handleMultiChange(questions.id, String(option.value), e.target.checked)
                 }
-                checked={resultArray.includes(optionValue)}
+                checked={Array.isArray(result) ? result.includes(String(option.value)) : false}
               />
               <label htmlFor={inputId} className="ml-2">
-                {optionContent}
+                {option.content}
               </label>
             </div>
           );

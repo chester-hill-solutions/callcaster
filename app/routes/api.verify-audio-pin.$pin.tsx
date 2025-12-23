@@ -1,6 +1,6 @@
 import Twilio from "twilio";
 
-export const loader = async ({ params }: { params: { pin: string } }) => {
+export const loader = async () => {
     const twiml = new Twilio.twiml.VoiceResponse();
 
     twiml.say('Welcome to the phone verification system.');
@@ -8,7 +8,7 @@ export const loader = async ({ params }: { params: { pin: string } }) => {
     twiml.say('Please enter the 6 digit code shown on your screen');
     twiml.gather({
         numDigits: 6,
-        action: `${process.env.BASE_URL}/api/verify-pin-input`,
+        action: `${process.env['BASE_URL']}/api/verify-pin-input`,
         method: 'POST',
         timeout: 30
     });

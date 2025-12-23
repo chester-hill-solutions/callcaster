@@ -55,7 +55,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const workspaceId = params.id;
+  const workspaceId = params["id"];
   if (!workspaceId) {
     return json({ error: "Missing workspace ID" }, { status: 400 });
   }
@@ -121,16 +121,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       .filter((exp): exp is ExportItem => exp !== null)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    return json<LoaderData>({ exports: validExports.map(exp => ({
-      ...exp,
-      createdAt: exp.createdAt.toISOString(),
-      expiresAt: exp.expiresAt.toISOString()
-    })) });
+    return json<LoaderData>({
+      exports: validExports.map((exp) => ({
+        ...exp,
+        createdAt: exp.createdAt.toISOString(),
+        expiresAt: exp.expiresAt.toISOString(),
+      })),
+    });
   } catch (error) {
     console.error("Error fetching exports:", error);
-    return json({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
-    }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return json({ error: message }, { status: 500 });
   }
 };
 

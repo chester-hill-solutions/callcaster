@@ -1,18 +1,25 @@
 import { verifyAuth } from '../lib/supabase.server';
 import { normalizePhoneNumber } from '../lib/utils';
+import type { ActionFunctionArgs } from "@remix-run/node";
 
-export const action = async ({ request, params }) => {
-    const { campaign_id, user_id, workspace_id } = await request.json()
+interface InitiateIVRRequest {
+  campaign_id: number;
+  user_id: { id: string };
+  workspace_id: string;
+}
+
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+    const { campaign_id, user_id, workspace_id }: InitiateIVRRequest = await request.json();
     const { supabaseClient: supabase } = await verifyAuth(request);
     const { data, error } = await supabase
-        .rpc('get_campaign_queue', { campaign_id_pro: campaign_id })
+        .rpc('get_campaign_queue', { campaign_id_pro: campaign_id });
     if (error) throw error;
     console.log(data)
     for (let i = 0; i < data?.length; i++) {
         let contact = data[i];
         const formData = new FormData();
         formData.append('user_id', user_id.id);
-        formData.append('campaign_id', Number(campaign_id)  );
+        formData.append('campaign_id', String(campaign_id));
         formData.append('workspace_id', workspace_id);
         formData.append('queue_id', contact.id);
         formData.append('contact_id', contact.contact_id);

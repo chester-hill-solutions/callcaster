@@ -1,6 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
+import type { ActionFunctionArgs } from "@remix-run/node";
 
-const getCampaignData = async (supabase, campaign_id) => {
+interface CampaignData {
+  ivr_campaign: Array<{
+    script: {
+      steps: {
+        pages: Record<string, any>;
+        blocks: Record<string, any>;
+      };
+    };
+  }>;
+}
+
+interface Block {
+  options?: Array<{
+    value: string;
+    content: string;
+    next: string;
+  }>;
+}
+
+interface Result {
+  visitedPages?: string[];
+  [key: string]: any;
+}
+
+const getCampaignData = async (supabase: any, campaign_id: string): Promise<CampaignData> => {
     const { data: campaign, error } = await supabase
         .from('campaign')
         .select(`*, ivr_campaign(*, script(*))`)
@@ -10,7 +35,7 @@ const getCampaignData = async (supabase, campaign_id) => {
     return campaign;
 };
 
-const updateResult = async (supabase, outreach_attempt_id, result) => {
+const updateResult = async (supabase: any, outreach_attempt_id: string, result: Result) => {
     const { error } = await supabase
         .from('outreach_attempt')
         .update({ result })
@@ -18,17 +43,17 @@ const updateResult = async (supabase, outreach_attempt_id, result) => {
     if (error) throw error;
 };
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
     const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
     
     const formData = await request.formData();
-    const userInput = formData.get('Digits') || formData.get('SpeechResult');
+    const userInput = (formData.get('Digits') || formData.get('SpeechResult')) as string;
     const { campaignId, pageId, responseId } = params;
 
     try {
-        const campaignData = await getCampaignData(supabase, campaignId);
+        const campaignData = await getCampaignData(supabase, campaignId!);
         const script = campaignData.ivr_campaign[0].script.steps;
-        const currentPage = script.pages[pageId];
+        const currentPage = script.pages[pageId!];
 
         const { data: existing } = await supabase
             .from('outreach_attempt')
@@ -36,16 +61,16 @@ export const action = async ({ request, params }) => {
             .eq('id', responseId)
             .single();
 
-        const updatedResult = { 
+        const updatedResult: Result = { 
             ...existing?.result, 
-            [pageId]: userInput,
-            visitedPages: [...(existing?.result?.visitedPages || []), pageId]
+            [pageId!]: userInput,
+            visitedPages: [...(existing?.result?.visitedPages || []), pageId!]
         };
-        await updateResult(supabase, responseId, updatedResult);
+        await updateResult(supabase, responseId!, updatedResult);
 
-        let nextPageId = null;
+        let nextPageId: string | null = null;
         for (const blockId of currentPage.blocks) {
-            const currentBlock = script.blocks[blockId];
+            const currentBlock = script.blocks[blockId] as Block;
             if (currentBlock.options && currentBlock.options.length > 0) {
                 const matchedOption = currentBlock.options.find(option => 
                     (userInput && option.value === userInput) || 
@@ -59,7 +84,7 @@ export const action = async ({ request, params }) => {
             }
         }
         
-        if (nextPageId && !updatedResult.visitedPages.includes(nextPageId)) {
+        if (nextPageId && !updatedResult.visitedPages?.includes(nextPageId)) {
             return Response.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/${nextPageId}/${responseId}`, 303);
         } else {
             return Response.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/end/${responseId}`, 303);

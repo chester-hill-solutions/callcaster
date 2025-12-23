@@ -1,9 +1,20 @@
-import { json } from "@remix-run/react";
-import { verifyAuth } from "../lib/supabase.server";
+import { json } from "@remix-run/node";
+import { verifyAuth } from "~/lib/supabase.server";
+import type { ActionFunctionArgs } from "@remix-run/node";
+import type { Json } from "~/lib/database.types";
 
-export const action = async ({ request }) => {
+interface RequestData {
+  update?: Json;
+  contact_id: number;
+  campaign_id: number;
+  workspace: string;
+  disposition: string;
+  queue_id: number;
+}
+
+export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient, headers, user } = await verifyAuth(request);
-    const { update, contact_id, campaign_id, workspace, disposition, queue_id } = await request.json();
+    const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await request.json();
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentOutreach, error: searchError } = await supabaseClient
         .from('outreach_attempt')
@@ -20,13 +31,13 @@ export const action = async ({ request }) => {
         return json({ error: searchError }, { status: 500, headers });
     }
 
-    let outreachAttempt;
+    let outreachAttemptId: number | null = null;
 
     if (recentOutreach) {
         const { data, error } = await supabaseClient
             .from('outreach_attempt')
             .update({
-                ...(update && { result: update }),
+                ...(update !== undefined ? { result: update as Json } : {}),
                 disposition,
                 user_id: user.id
             })
@@ -37,7 +48,7 @@ export const action = async ({ request }) => {
             console.error(error);
             return json({ error }, { status: 500, headers });
         }
-        outreachAttempt = data[0];
+        outreachAttemptId = data[0]?.id ?? null;
     } else {
         const { data, error } = await supabaseClient.rpc('create_outreach_attempt', {
             con_id: contact_id,
@@ -51,15 +62,15 @@ export const action = async ({ request }) => {
             console.error(error);
             return json({ error }, { status: 500, headers });
         }
-        outreachAttempt = {id: data};
+        outreachAttemptId = typeof data === 'number' ? data : Number(data);
     }
     const { data: updatedOutreach, error: updateError } = await supabaseClient
         .from('outreach_attempt')
         .update({
-            ...(update && { result: update }),
+            ...(update !== undefined ? { result: update as Json } : {}),
             disposition
         })
-        .eq('id', (outreachAttempt.id))
+        .eq('id', outreachAttemptId as number)
         .select();
 
     if (updateError) {

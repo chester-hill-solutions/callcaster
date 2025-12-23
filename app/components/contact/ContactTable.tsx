@@ -5,22 +5,19 @@ import { Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AudienceContactRow } from "./AudienceContactRow";
 import { ContactForm } from "./ContactForm";
+<<<<<<< HEAD:app/components/contact/ContactTable.tsx
 import { Contact } from "@/lib/types";
 import { Json } from "@/lib/database.types";
+=======
+import type { Contact } from "~/lib/types";
+import type { Json } from "~/lib/database.types";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactTable.tsx
 
-// Types
-interface ContactTableProps {
+// Enhanced type definitions
+export interface ContactTableProps {
   contacts: Contact[];
   audience_id: string | number;
-  newContact: {
-    name: string;
-    phone: string;
-    email: string;
-    address: string;
-    firstname?: string;
-    surname?: string;
-    id?: number;
-  };
+  newContact: Partial<Contact>;
   handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleSaveContact: () => Promise<void>;
   workspace_id: string;
@@ -28,7 +25,7 @@ interface ContactTableProps {
   onBulkDeleteComplete?: (deletedIds: number[]) => void;
 }
 
-interface BulkDeleteResponse {
+export interface BulkDeleteResponse {
   success?: boolean;
   message?: string;
   removed_count?: number;
@@ -36,7 +33,11 @@ interface BulkDeleteResponse {
   error?: string;
 }
 
-const ContactTable = ({
+export interface ContactTableState {
+  selectedContacts: number[];
+}
+
+const ContactTable: React.FC<ContactTableProps> = ({
   contacts,
   audience_id,
   newContact,
@@ -45,17 +46,17 @@ const ContactTable = ({
   workspace_id,
   handleRemoveContact,
   onBulkDeleteComplete,
-}: ContactTableProps) => {
+}) => {
   const [selectedContacts, setSelectedContacts] = useState<number[]>([]);
   const fetcher = useFetcher<BulkDeleteResponse>();
 
-  // Extract unique headers from other_data
+  // Extract unique headers from other_data with better type safety
   const otherDataHeaders = Array.from(
     new Set(
       contacts.flatMap((contact) =>
         contact.other_data.flatMap((data: Json) => {
           if (data && typeof data === 'object' && !Array.isArray(data)) {
-            return Object.keys(data);
+            return Object.keys(data as Record<string, unknown>);
           }
           return [];
         }),
@@ -73,8 +74,8 @@ const ContactTable = ({
     }
   }, [fetcher.state, fetcher.data, onBulkDeleteComplete, selectedContacts]);
 
-  // Contact selection handlers
-  const handleSelectContact = (contactId: number, isSelected: boolean) => {
+  // Contact selection handlers with better type safety
+  const handleSelectContact = (contactId: number, isSelected: boolean): void => {
     if (isSelected) {
       setSelectedContacts(prev => [...prev, contactId]);
     } else {
@@ -82,7 +83,7 @@ const ContactTable = ({
     }
   };
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>): void => {
     if (e.target.checked) {
       setSelectedContacts(contacts.map(contact => contact.id));
     } else {
@@ -90,123 +91,100 @@ const ContactTable = ({
     }
   };
 
-  // Bulk delete handler
-  const handleBulkDelete = () => {
+  // Bulk delete handler with better error handling
+  const handleBulkDelete = (): void => {
     if (selectedContacts.length === 0) return;
 
-    const formData = new FormData();
-    formData.append('audience_id', audience_id.toString());
-    selectedContacts.forEach(contactId => {
-      formData.append('contact_ids[]', contactId.toString());
-    });
+    try {
+      const formData = new FormData();
+      formData.append('audience_id', audience_id.toString());
+      selectedContacts.forEach(contactId => {
+        formData.append('contact_ids[]', contactId.toString());
+      });
 
-    fetcher.submit(formData, {
-      action: '/api/contact-audience/bulk-delete',
-      method: "DELETE",
-      encType: "multipart/form-data"
-    });
+      fetcher.submit(formData, {
+        method: 'POST',
+        action: '/api/contact-audience/bulk-delete',
+      });
+    } catch (error) {
+      console.error('Error initiating bulk delete:', error);
+    }
   };
 
-  // Render bulk action bar when contacts are selected
-  const renderBulkActionBar = () => {
+  const renderBulkActionBar = (): JSX.Element | null => {
     if (selectedContacts.length === 0) return null;
 
     return (
-      <div className="mb-4 p-2 bg-gray-100 rounded flex justify-between items-center">
-        <span className="text-sm font-medium">
-          {selectedContacts.length} contacts selected
-        </span>
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleBulkDelete}
-          className="flex items-center gap-1"
-          disabled={fetcher.state !== 'idle'}
-        >
-          {fetcher.state !== 'idle' ? (
-            'Deleting...'
-          ) : (
-            <>
-              <Trash size={16} />
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-medium text-blue-900">
+              {selectedContacts.length} contact{selectedContacts.length !== 1 ? 's' : ''} selected
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={handleBulkDelete}
+              disabled={fetcher.state !== 'idle'}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <Trash className="w-4 h-4 mr-2" />
               Delete Selected
-            </>
-          )}
-        </Button>
+            </Button>
+          </div>
+        </div>
       </div>
     );
   };
 
-  // Table header cell component
-  const TableHeader = ({ children }: { children: React.ReactNode }) => (
-    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+  const TableHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
       {children}
-    </th>
+    </div>
   );
 
   return (
-    <div className="w-full">
+    <div className="space-y-4">
       {renderBulkActionBar()}
+      
+      <div className="bg-white rounded-lg shadow">
+        <TableHeader>
+          <div className="flex items-center space-x-4">
+            <input
+              type="checkbox"
+              checked={selectedContacts.length === contacts.length && contacts.length > 0}
+              onChange={handleSelectAll}
+              className="rounded border-gray-300"
+            />
+            <span className="font-medium">Contacts ({contacts.length})</span>
+          </div>
+        </TableHeader>
 
-      <div className="overflow-x-auto">
-        <table className="divide-y divide-gray-200 min-w-full">
-          <thead className="sticky top-0 bg-primary">
-            <tr>
-              <th className="whitespace-nowrap px-3 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                <input
-                  type="checkbox"
-                  onChange={handleSelectAll}
-                  checked={selectedContacts.length > 0 && selectedContacts.length === contacts.length}
-                  className="rounded border-gray-300"
-                  disabled={fetcher.state !== 'idle'}
-                />
-              </th>
-              <TableHeader>ID</TableHeader>
-              <TableHeader>External ID</TableHeader>
-              <TableHeader>First Name</TableHeader>
-              <TableHeader>Last Name</TableHeader>
-              <TableHeader>Phone</TableHeader>
-              <TableHeader>Email</TableHeader>
-              <TableHeader>Address</TableHeader>
-              <TableHeader>City</TableHeader>
-              <TableHeader>Date Created</TableHeader>
+        <div className="divide-y divide-gray-200">
+          {contacts.map((contact) => (
+            <AudienceContactRow
+              key={contact.id}
+              contact={contact}
+              audience_id={audience_id}
+              isSelected={selectedContacts.includes(contact.id)}
+              onSelect={handleSelectContact}
+              onRemove={handleRemoveContact}
+              otherDataHeaders={otherDataHeaders}
+            />
+          ))}
+        </div>
+      </div>
 
-              {otherDataHeaders.map((header) => (
-                <TableHeader key={header}>{header}</TableHeader>
-              ))}
-
-              <TableHeader>Remove</TableHeader>
-              <TableHeader>Edit</TableHeader>
-            </tr>
-          </thead>
-
-          <tbody className="divide-y divide-gray-200">
-            {contacts.map((contact) => (
-              <AudienceContactRow
-                key={contact.id}
-                contact={contact}
-                otherDataHeaders={otherDataHeaders}
-                handleRemoveContact={handleRemoveContact}
-                isSelected={selectedContacts.includes(contact.id)}
-                onSelectContact={handleSelectContact}
-                disabled={fetcher.state !== 'idle'}
-              />
-            ))}
-
-            {/* Hidden row for contact form */}
-            <tr hidden>
-              <td colSpan={4}>
-                <ContactForm
-                  isNew={true}
-                  newContact={newContact}
-                  handleInputChange={handleInputChange}
-                  handleSaveContact={handleSaveContact}
-                  workspace_id={workspace_id}
-                  audience_id={audience_id}
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="bg-white rounded-lg shadow p-4">
+        <h3 className="text-lg font-medium mb-4">Add New Contact</h3>
+        <ContactForm
+          isNew={true}
+          newContact={newContact}
+          handleInputChange={handleInputChange}
+          handleSaveContact={handleSaveContact}
+          workspace_id={workspace_id}
+          audience_id={audience_id.toString()}
+        />
       </div>
     </div>
   );

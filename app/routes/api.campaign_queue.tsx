@@ -3,6 +3,23 @@ import { parseRequestData } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignQueue } from "@/lib/types";
 import { filteredSearch } from "./workspaces_.$id.campaigns.$selected_id.queue";
+import { safeNumber, safeString } from "~/lib/type-utils";
+
+interface ContactMapping {
+  id: number;
+  contact_id: number;
+  campaign_id: number;
+  status: string;
+  created_at: string;
+  contact: {
+    id: number;
+    firstname: string | null;
+    surname: string | null;
+    phone: string | null;
+    email: string | null;
+    [key: string]: unknown;
+  };
+}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request);
@@ -54,7 +71,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (lookupError) throw lookupError;
 
             const results = [];
-            const ids = contactsToDelete.map((contact: any) => contact.id);
+            const contacts = contactsToDelete?.map((item: ContactMapping) => ({
+              id: item.id,
+              contact_id: item.contact_id,
+              campaign_id: item.campaign_id,
+              status: item.status,
+              created_at: item.created_at,
+              contact: item.contact
+            })) || [];
+
+            const ids = contacts.map((contact: unknown) => {
+              if (contact && typeof contact === 'object' && 'id' in contact) {
+                return safeNumber((contact as { id: unknown }).id);
+              }
+              return 0;
+            }).filter(id => id > 0);
 
             // Delete in batches
             for (let i = 0; i < ids.length; i += BATCH_SIZE) {

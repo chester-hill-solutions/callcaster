@@ -1,5 +1,6 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+<<<<<<< HEAD
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import { User, SurveyWithPages } from "@/lib/types";
@@ -7,6 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+=======
+import { verifyAuth } from "~/lib/supabase.server";
+import { getUserRole } from "~/lib/database.server";
+import type { User } from "~/lib/types";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import { 
   Calendar, 
   Users, 
@@ -15,9 +25,56 @@ import {
   Edit, 
   Trash2, 
   Copy,
-  ExternalLink 
+  ExternalLink,
+  MessageSquare
 } from "lucide-react";
 import { Link } from "@remix-run/react";
+
+// Type-safe interfaces for survey data
+interface SurveyPage {
+  id: number;
+  page_id: string;
+  title: string;
+  page_order: number;
+  survey_question?: SurveyQuestion[];
+}
+
+interface SurveyQuestion {
+  id: number;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  is_required: boolean;
+  question_order: number;
+  question_option?: SurveyQuestionOption[];
+}
+
+interface SurveyQuestionOption {
+  id: number;
+  option_value: string;
+  option_label: string;
+  option_order: number;
+}
+
+interface SurveyResponse {
+  id: number;
+  created_at: string;
+  completed_at?: string;
+  last_page_completed?: number;
+  contact?: {
+    firstname?: string;
+    surname?: string;
+    phone?: string;
+  };
+}
+
+interface Survey {
+  survey_id: string;
+  title: string;
+  is_active: boolean;
+  created_at: string;
+  survey_page?: SurveyPage[];
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -175,7 +232,7 @@ export default function SurveyDetailPage() {
         </TabsList>
 
         <TabsContent value="structure" className="space-y-4">
-          {survey.survey_page?.map((page: any) => (
+          {survey.survey_page?.map((page: SurveyPage) => (
             <Card key={page.id}>
               <CardHeader>
                 <CardTitle className="text-lg">{page.title}</CardTitle>
@@ -184,7 +241,7 @@ export default function SurveyDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {page.survey_question?.map((question: any) => (
+                {page.survey_question?.map((question: SurveyQuestion) => (
                   <div key={question.id} className="mb-4 p-4 border rounded-lg">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-medium">{question.question_text}</h4>
@@ -199,7 +256,7 @@ export default function SurveyDetailPage() {
                       <div className="mt-2">
                         <p className="text-sm text-muted-foreground mb-1">Options:</p>
                         <ul className="list-disc list-inside text-sm">
-                          {question.question_option.map((option: any) => (
+                          {question.question_option.map((option: SurveyQuestionOption) => (
                             <li key={option.id}>
                               {option.option_label} ({option.option_value})
                             </li>
@@ -227,7 +284,7 @@ export default function SurveyDetailPage() {
                 <p className="text-muted-foreground">No responses yet</p>
               ) : (
                 <div className="space-y-4">
-                  {recentResponses.map((response: any) => (
+                  {recentResponses.map((response: SurveyResponse) => (
                     <div key={response.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">

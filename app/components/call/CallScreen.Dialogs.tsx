@@ -27,8 +27,8 @@ interface CampaignDialogsProps {
     voicemail_file: boolean;
   };
   currentState: Record<string, unknown>;
-  fetchMore: (params: { householdMap: HouseholdMap }) => void;
-  householdMap: HouseholdMap;
+  fetchMore: (params: Record<string, unknown>) => void;
+  householdMap: Record<string, QueueItem[]>;
   isActive: boolean;
   creditsError?: boolean;
   hasAccess: boolean;

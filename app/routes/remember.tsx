@@ -1,26 +1,38 @@
-import { Form, json, useActionData, useOutletContext } from "@remix-run/react";
+import { Form, useActionData } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
+<<<<<<< HEAD
 import { Button } from "@/components/ui/button";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
+=======
+import { Button } from "~/components/ui/button";
+import { createSupabaseServerClient } from "~/lib/supabase.server";
+import type { ActionFunctionArgs } from "@remix-run/node";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
+<<<<<<< HEAD
   const email = formData.get("email");
   if (typeof email !== "string" || !email) {
     return json({ data: null, error: { message: "Email is required" } });
   }
+=======
+  const email = formData.get("email") as string;
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
     email,
     { redirectTo: `${new URL(request.url).origin}/api/auth/callback` },
   );
   if (error) {
-    return json({ data: null, error });
+    return json({ data: null, error: error.message }, { headers });
   }
-  return json({ data, error: null });
+  return json({ data, error: null }, { headers });
 };
 
+<<<<<<< HEAD
 type ActionData = {
   data: unknown;
   error: { message: string } | null;
@@ -28,12 +40,19 @@ type ActionData = {
 
 export default function Remember() {
   const actionData = useActionData<ActionData>();
+=======
+interface RememberData {
+  data: Record<string, unknown>;
+  error: string | null;
+}
+
+export default function Remember() {
+  const actionData = useActionData<RememberData>();
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   useEffect(() => {
-    if (actionData?.data) {
-      toast.success("Reset email sent");
-    } else if (actionData?.error) {
-      toast.error(actionData.error.message);
+    if (actionData?.error) {
+      toast.error(actionData.error);
     }
   }, [actionData]);
   return (

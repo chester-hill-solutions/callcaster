@@ -11,7 +11,7 @@ import type { FileObject } from "@supabase/storage-js";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const workspaceId = params.id;
+  const workspaceId = params["id"];
   if (!workspaceId) {
    return redirect("/workspaces") 
   }
@@ -49,6 +49,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     };
   }
 
+<<<<<<< HEAD
   for (let media of mediaData) {
     const url = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
@@ -57,8 +58,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       (media as any)["signedUrl"] = url;
     }
   }
+=======
+  // augment each media entry with a signedUrl in a type-safe way
+  const mediaWithUrls = mediaData.map((m) => {
+    const found = signedUrls.find((u) => u.path === `${workspaceId}/${m.name}`);
+    return { ...m, signedUrl: found?.signedUrl } as typeof m & { signedUrl?: string };
+  });
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
-  return { audioMedia: mediaData, error: null };
+  return { audioMedia: mediaWithUrls, error: null };
 }
 
 export default function WorkspaceAudio() {
@@ -66,7 +74,13 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
   const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
+<<<<<<< HEAD
   const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined")) as FileObject[];
+=======
+  const voicemails = audioMedia?.filter(
+    (media) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined"),
+  );
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

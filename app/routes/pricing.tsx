@@ -1,13 +1,13 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+// no server args used
 import { BsChatLeftText } from "react-icons/bs";
 import { FaPhoneVolume, FaMicrophone } from "react-icons/fa6";
-import React, { ReactNode } from "react";
+import type { ReactNode } from "react";
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader() {
   return {};
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action() {
   return {};
 }
 

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import React from 'react';
 import ServiceCard from "@/components/other-services/ServiceCard";
+=======
+import type { ReactNode } from 'react';
+import ServiceCard from "~/components/OtherServices/ServiceCard";
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 const services = [
   { title: "Data Management", description: "Organize, optimize, and analyze all your campaign data in one place" },
@@ -10,21 +15,31 @@ const services = [
   { title: "Texting (SMS)", description: "Broadcast your message and interact with your list on their preferred platform" },
 ];
 
+<<<<<<< HEAD
 interface SectionTitleProps {
   children: React.ReactNode;
 }
 
 const SectionTitle = ({ children }: SectionTitleProps) => (
+=======
+interface ChildrenProps { children: ReactNode }
+
+const SectionTitle = ({ children }: ChildrenProps) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   <h1 className="text-center font-Tabac-Slab text-3xl font-bold md:text-left">
     {children}
   </h1>
 );
 
+<<<<<<< HEAD
 interface SectionTextProps {
   children: React.ReactNode;
 }
 
 const SectionText = ({ children }: SectionTextProps) => (
+=======
+const SectionText = ({ children }: ChildrenProps) => (
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   <p className="font-Zilla-Slab text-xl font-semibold">
     {children}
   </p>

@@ -1,13 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { useNavigation } from "@remix-run/react";
+import { useEffect, useState } from "react";
 import Result from "@/components/call-list/records/participant/Result";
 import { Button } from "@/components/ui/button";
 import { Tables } from "@/lib/database.types";
-import { Block, BlockOption } from "@/lib/types";
+import { CampaignDetails, Block } from "@/lib/types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
-type CampaignDetails = Tables<"live_campaign">;
 
 interface Script {
   steps?: {
@@ -19,28 +17,20 @@ interface Script {
       };
     };
     blocks?: {
-      [key: string]: {
-        id: string;
-        type: string;
-        title: string;
-        content: string;
-        options?: BlockOption[];
-        audioFile: string;
-      };
+      [key: string]: Block;
     };
   };
 }
 
-type BlockResponseValue = string | number | boolean | string[] | null | undefined;
 
 interface CallQuestionnaireProps {
   handleResponse: (response: {
     pageId: string;
     blockId: string;
-    value: BlockResponseValue;
+    value: string | boolean | string[];
   }) => void;
-  campaignDetails: CampaignDetails & { script: Script };
-  update: Record<string, Record<string, BlockResponseValue>>;
+  campaignDetails: CampaignDetails;
+  update: Record<string, unknown>;
   nextRecipient: QueueItem | null;
   handleQuickSave: () => void;
   disabled: boolean;
@@ -55,9 +45,10 @@ const CallQuestionnaire = ({
   disabled,
   isBusy
 }: CallQuestionnaireProps) => {
-  const navigation = useNavigation();
-  const [currentPageId, setCurrentPageId] = useState(
-    Object.keys(campaignDetails.script?.steps?.pages || {})?.[0]
+  const scriptSteps = campaignDetails.script?.steps as Script['steps'] | undefined;
+  const pageKeys = Object.keys(scriptSteps?.pages || {});
+  const [currentPageId, setCurrentPageId] = useState<string | undefined>(
+    pageKeys[0] || undefined
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
@@ -65,11 +56,13 @@ const CallQuestionnaire = ({
     setLocalUpdate(update || {});
       }, [update]);
 
-  const handleBlockResponse = (blockId: string, value: BlockResponseValue) => {
+  const handleBlockResponse = (blockId: string, value: string | boolean | string[]) => {
+    if (!currentPageId) return;
+    
     const newUpdate = {
       ...localUpdate,
       [currentPageId]: {
-        ...(localUpdate[currentPageId] || {}),
+        ...(localUpdate[currentPageId] as Record<string, unknown> || {}),
         [blockId]: value,
       },
     };
@@ -78,27 +71,22 @@ const CallQuestionnaire = ({
   };
 
   const renderBlock = (blockId: string) => {
-    const block = campaignDetails.script?.steps?.blocks?.[blockId];
+    const block = scriptSteps?.blocks?.[blockId];
     
-    if (!block) {
-      return null;
-    }
+    if (!block) return null;
+    
+    const pageUpdate = currentPageId ? (localUpdate[currentPageId] as Record<string, unknown> | undefined) : undefined;
+    const blockValue = pageUpdate?.[blockId];
     
     return (
       <div key={`questions-${blockId}`}>
       <Result
         disabled={disabled}
         action={(response) => handleBlockResponse(blockId, response.value)}
-        questions={block as Block}
+        questions={block}
         key={`questions-${blockId}`}
         questionId={blockId}
-        initResult={(() => {
-          const value = localUpdate[blockId];
-          if (value === undefined || value === null) return null;
-          if (typeof value === 'boolean') return value;
-          if (Array.isArray(value)) return value;
-          return String(value);
-        })()}
+        initResult={(blockValue as string | boolean | string[] | null | undefined) || null}
       />
       </div>
     );
@@ -139,14 +127,14 @@ const CallQuestionnaire = ({
       </div>
       <div className="p-4">
         <div className="flex flex-col gap-4">
-          {campaignDetails.script?.steps?.pages?.[currentPageId]?.blocks.map(
+          {currentPageId && scriptSteps?.pages?.[currentPageId]?.blocks.map(
             renderBlock,
           )}
         </div>
-        {campaignDetails.script?.steps?.pages && <div className="mt-4 flex justify-between">
+        {scriptSteps?.pages && currentPageId && <div className="mt-4 flex justify-between">
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps?.pages || {});
+              const pageIds = Object.keys(scriptSteps?.pages || {});
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex > 0) {
                 setCurrentPageId(pageIds[currentIndex - 1]);
@@ -154,15 +142,15 @@ const CallQuestionnaire = ({
             }}
             disabled={
               isBusy ||
-              currentPageId ===
-              Object.keys(campaignDetails.script?.steps?.pages || {})?.[0]
+              !currentPageId ||
+              currentPageId === pageKeys[0]
             }
           >
             Previous Page
           </Button>
           <Button
             onClick={() => {
-              const pageIds = Object.keys(campaignDetails.script?.steps?.pages || {});
+              const pageIds = Object.keys(scriptSteps?.pages || {});
               const currentIndex = pageIds.indexOf(currentPageId);
               if (currentIndex < pageIds.length - 1) {
                 setCurrentPageId(pageIds[currentIndex + 1]);
@@ -170,10 +158,8 @@ const CallQuestionnaire = ({
             }}
             disabled={
               isBusy ||
-              currentPageId ===
-              Object.keys(campaignDetails.script?.steps?.pages || {})[
-                Object.keys(campaignDetails.script?.steps?.pages || {}).length - 1
-              ]
+              !currentPageId ||
+              currentPageId === pageKeys[pageKeys.length - 1]
             }
           >
             Next Page

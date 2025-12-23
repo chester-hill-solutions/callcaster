@@ -1,4 +1,5 @@
 interface Message {
+<<<<<<< HEAD:app/components/sms-ui/ChatMessages.tsx
   sid?: string;
   status?: string;
   direction?: string;
@@ -10,6 +11,19 @@ interface Message {
 
 interface MessageListProps {
   messages?: Message[];
+=======
+  sid: string;
+  direction: "inbound" | "outbound";
+  status: string;
+  body: string;
+  date_created: string;
+  signedUrls?: string[];
+  outbound_media?: string[];
+}
+
+interface MessageListProps {
+  messages: Message[];
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatMessages.tsx
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 
@@ -17,7 +31,7 @@ export default function MessageList({ messages, messagesEndRef }: MessageListPro
   return (
     <div className="h-full overflow-y-auto p-4">
       {messages?.length > 0 ? (
-        messages.map((message, index) => (
+        messages.map((message: Message, index: number) => (
           <div
             key={index}
             className={`message-item mb-4 flex ${
@@ -34,7 +48,7 @@ export default function MessageList({ messages, messagesEndRef }: MessageListPro
               }`}
             >
               <p className="text-sm">{message.body}</p>
-              {message.signedUrls?.map((url, i) => (
+              {message.signedUrls?.map((url: string, i: number) => (
                 <img
                   key={i}
                   src={url}
@@ -42,7 +56,7 @@ export default function MessageList({ messages, messagesEndRef }: MessageListPro
                   className="mt-2 h-auto max-w-full rounded"
                 />
               ))}
-              {message.outbound_media?.map((url, i) => (
+              {message.outbound_media?.map((url: string, i: number) => (
                 <img
                   key={i}
                   src={url}

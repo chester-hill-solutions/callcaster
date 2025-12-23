@@ -1,7 +1,7 @@
-import { redirect } from '@remix-run/node'
+import { redirect, type LoaderFunctionArgs } from '@remix-run/node'
 import { createServerClient, parse, serialize } from '@supabase/ssr'
 
-export async function loader({ request }) {
+export async function loader({ request }: LoaderFunctionArgs) {
     const requestUrl = new URL(request.url);
     const token_hash = requestUrl.searchParams.get('token_hash');
     const type = requestUrl.searchParams.get('type');
@@ -11,7 +11,7 @@ export async function loader({ request }) {
     if (token_hash && type) {
         const cookies = parse(request.headers.get('Cookie') ?? '')
 
-        const supabase = createServerClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+        const supabase = createServerClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_ANON_KEY'] ?? '', {
             cookies: {
                 get(key) {
                     return cookies[key]
@@ -26,7 +26,7 @@ export async function loader({ request }) {
         })
 
         const { error } = await supabase.auth.verifyOtp({
-            type,
+            type: (type as any),
             token_hash,
         })
 

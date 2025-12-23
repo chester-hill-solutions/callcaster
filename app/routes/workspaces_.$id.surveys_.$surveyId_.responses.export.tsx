@@ -1,9 +1,54 @@
+<<<<<<< HEAD
 import { type LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import { User } from "@/lib/types";
 import type { Tables } from "@/lib/database.types";
 import type { ResponseAnswer, Contact } from "@/lib/types";
+=======
+import { json, type LoaderFunctionArgs } from "@remix-run/node";
+import { verifyAuth } from "~/lib/supabase.server";
+import { getUserRole } from "~/lib/database.server";
+import { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "~/lib/types";
+
+// Type definitions for survey responses
+interface SurveyQuestion {
+  id: number;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  question_option?: Array<{ option_label: string }>;
+}
+
+interface SurveyPage {
+  survey_question?: SurveyQuestion[];
+}
+
+interface SurveyWithPages extends Survey {
+  survey_page?: SurveyPage[];
+}
+
+interface ResponseAnswerWithQuestion extends ResponseAnswer {
+  survey_question?: {
+    question_id: string;
+    question_text: string;
+    question_type: string;
+    question_option?: Array<{ option_label: string }>;
+  };
+}
+
+interface ContactPartial {
+  firstname: string | null;
+  surname: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+interface SurveyResponseWithDetails extends SurveyResponse {
+  contact?: ContactPartial | null;
+  response_answer?: ResponseAnswerWithQuestion[];
+}
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -100,7 +145,11 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
 
   // Get all questions from the survey structure
   const allQuestions =
+<<<<<<< HEAD
     (survey as Tables<"survey"> & { survey_page?: SurveyPageWithQuestions[] }).survey_page?.flatMap((page) => page.survey_question || []) ||
+=======
+    survey.survey_page?.flatMap((page: SurveyPage) => page.survey_question || []) ||
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     [];
 
   // Generate CSV data
@@ -118,7 +167,11 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
     return answer.answer_value;
   };
 
+<<<<<<< HEAD
   const getContactName = (response: SurveyResponseWithContact) => {
+=======
+  const getContactName = (response: SurveyResponseWithDetails) => {
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     if (response.contact?.firstname && response.contact?.surname) {
       return `${response.contact.firstname} ${response.contact.surname}`;
     }
@@ -131,21 +184,32 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
     return "Anonymous";
   };
 
+<<<<<<< HEAD
   const getAnswerForQuestion = (response: SurveyResponseWithContact, questionId: string) => {
     const question = allQuestions.find(
       (q) => q.question_id === questionId,
+=======
+  const getAnswerForQuestion = (response: SurveyResponseWithDetails, questionId: string) => {
+    const question = allQuestions.find(
+      (q: SurveyQuestion) => q.question_id === questionId,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     );
     if (!question) return "-";
 
     // Find the answer by the database question ID
     const answer = response.response_answer?.find(
+<<<<<<< HEAD
       (a) => a.question_id === question.id,
+=======
+      (a: ResponseAnswerWithQuestion) => a.question_id === question.id,
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     );
     return answer ? formatAnswer(answer) : "-";
   };
 
   // Create CSV headers
   const headers = [
+<<<<<<< HEAD
     "Respondent",
     "Status",
     "Started",
@@ -162,6 +226,22 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
     response.completed_at ? new Date(response.completed_at).toLocaleDateString() : "-",
     response.last_page_completed || "-",
     ...allQuestions.map((question) => 
+=======
+    "Response ID",
+    "Contact Name",
+    "Started At",
+    "Completed At",
+    ...allQuestions.map((question: SurveyQuestion) => question.question_text),
+  ];
+
+  // Create CSV rows
+  const rows = (responses || []).map((response: SurveyResponseWithDetails) => [
+    response.result_id,
+    getContactName(response),
+    response.started_at,
+    response.completed_at,
+    ...allQuestions.map((question: SurveyQuestion) =>
+>>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
       getAnswerForQuestion(response, question.question_id)
     ),
   ]);

@@ -28,7 +28,7 @@ interface CallAreaProps {
   handleDialNext: () => void;
   handleDequeueNext: () => void;
   disposition: string;
-  dispositionOptions: Array<{ value: string; label: string }> | string[];
+  dispositionOptions: Array<{ value: string; label: string }>;
   setDisposition: (disposition: string) => void;
   recentAttempt: Attempt | null;
   predictive: boolean;

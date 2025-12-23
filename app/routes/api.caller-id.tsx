@@ -1,8 +1,11 @@
 import Twilio from "twilio";
-import { json, ActionFunction } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { ActionFunctionArgs } from "@remix-run/node";
 
 interface WorkspaceData {
+  key: string;
+  token: string;
   twilio_data: {
     sid: string;
     authToken: string;
@@ -34,7 +37,7 @@ function normalizePhoneNumber(input: string): string {
   return cleaned;
 }
 
-export const action: ActionFunction = async ({ request }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const supabase: SupabaseClient = createClient(
       process.env.SUPABASE_URL!,

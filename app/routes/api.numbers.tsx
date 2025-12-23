@@ -1,17 +1,21 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance, getWorkspaceUsers } from '../lib/database.server';
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 
-export const loader = async ({ request }) => {
-    const twilio = new Twilio.Twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+interface FormData {
+  phoneNumber: string;
+  workspace_id: string;
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const twilio = new Twilio.Twilio(process.env['TWILIO_SID'] ?? '', process.env['TWILIO_AUTH_TOKEN'] ?? '');
     const url = new URL(request.url);
     const params = url.searchParams;
     const areaCode = params.get('areaCode')
     try {
-        const locals = await twilio.availablePhoneNumbers('CA').local.list({
-            areaCode,
-            limit: 10
-        })
+        const listParams = areaCode ? { areaCode: Number(areaCode), limit: 10 } : { limit: 10 };
+        const locals = await twilio.availablePhoneNumbers('CA').local.list(listParams as any)
         return new Response(JSON.stringify(locals), {
             headers: {
                 "Content-Type": "application/json"
@@ -30,16 +34,19 @@ export const loader = async ({ request }) => {
     }
 }
 
-export const action = async ({ request }) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+export const action = async ({ request }: ActionFunctionArgs) => {
+    const supabase = createClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_SERVICE_KEY'] ?? '');
     const formData = await request.formData();
-    const { phoneNumber, workspace_id } = Object.fromEntries(formData);
+    const { phoneNumber, workspace_id } = Object.fromEntries(formData) as unknown as FormData;
     try {
         const { data: users, error } = await getWorkspaceUsers({
             supabaseClient: supabase,
             workspaceId: workspace_id,
         });
         if (error) throw error;
+        if (!users) {
+            return new Response(JSON.stringify({ error: 'No users found for workspace' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
         const owner = users.find((user) => user.user_workspace_role === "owner");
         const {data: workspaceCredits, error: workspaceCreditsError} = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
         if (workspaceCreditsError) throw workspaceCreditsError;
@@ -55,10 +62,10 @@ export const action = async ({ request }) => {
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
-            statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
+            statusCallback: `${process.env['BASE_URL']}/api/caller-id/status`,
             statusCallbackMethod:"POST",
-            voiceUrl: `${process.env.BASE_URL}/api/inbound`,
-            smsUrl: `${process.env.BASE_URL}/api/inbound-sms`
+            voiceUrl: `${process.env['BASE_URL']}/api/inbound`,
+            smsUrl: `${process.env['BASE_URL']}/api/inbound-sms`
         }).catch((error) => {
             console.error(error);
             throw error;
@@ -70,7 +77,7 @@ export const action = async ({ request }) => {
                 friendly_name: number.friendlyName,
                 phone_number: number.phoneNumber,
                 capabilities: {verification_status:((number.capabilities.mms && number.capabilities.sms && number.capabilities.voice) ? "success" : "pending") , ...number.capabilities},
-                inbound_action: owner.username,
+                inbound_action: owner?.username ?? null,
                 type: "rented"
             })
             .select().single();
