@@ -1,10 +1,12 @@
 import { json } from "@remix-run/node";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "../lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, user } =
     await verifyAuth(request);
-  const data = await request.json();
+  const data = await safeParseJson(request);
   const {
     id,
     name,
@@ -51,7 +53,7 @@ export const action = async ({ request }: { request: Request }) => {
     return json({ script: updatedScript[0] });
 
   } catch (error) {
-    console.error("Error updating/creating script:", error);
+    logger.error("Error updating/creating script:", error);
     return json({ error: (error as Error).message }, { status: 500 });
   }
 };

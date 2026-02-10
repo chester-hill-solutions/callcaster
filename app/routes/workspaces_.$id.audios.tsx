@@ -1,11 +1,12 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, json, useLoaderData } from "@remix-run/react";
+import { json, LoaderFunctionArgs } from "@remix-run/node";
+import { Link, useLoaderData } from "@remix-run/react";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
 import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 import { User } from "@/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -49,7 +50,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .list(workspaceId);
 
   if (mediaError) {
-    console.log("Media Error: ", mediaError);
+    logger.warn("Media Error:", mediaError);
     return json(
       {
         audioMedia: null,
@@ -62,7 +63,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   if (mediaData.length === 0) {
-    console.log("No workspace folder exists");
+    logger.debug("No workspace folder exists");
     return json(
       {
         audioMedia: null,
@@ -81,7 +82,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .createSignedUrls(mediaPaths, 60);
 
   if (signedUrlsError) {
-    console.log("SignedUrls Error: ", signedUrlsError);
+    logger.warn("SignedUrls Error:", signedUrlsError);
     return json({
       audioMedia: null,
       workspace: workspaceData,

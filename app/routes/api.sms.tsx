@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
+  safeParseJson,
 } from "../lib/database.server";
 import { processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";
@@ -113,7 +114,7 @@ const sendMessage = async ({
       body: processedBody,
       to,
       from,
-      statusCallback: `${process.env.BASE_URL}/api/sms/status`,
+      statusCallback: `${env.BASE_URL()}/api/sms/status`,
       ...(media?.length && { mediaUrl: media }),
     }).catch(e => ({ error: e })),
     createOutreachAttempt({
@@ -185,7 +186,7 @@ const updateOutreach = async ({ supabase, id, status }: { supabase: SupabaseClie
     .update({ disposition: status })
     .eq("id", id);
   if (error) {
-    console.error("Error updating outreach attempt", error);
+    logger.error("Error updating outreach attempt", error);
     throw error;
   }
   return data;
@@ -217,7 +218,7 @@ const createOutreachAttempt = async ({
     },
   );
   if (outreachError) {
-    console.error(outreachError);
+    logger.error("Error creating outreach attempt:", outreachError);
     throw outreachError;
   }
   return outreachAttempt;
@@ -230,7 +231,7 @@ export const action = async ({ request }: { request: Request }) => {
   );
 
   try {
-    const { campaign_id, workspace_id, caller_id, user_id } = await request.json();
+    const { campaign_id, workspace_id, caller_id, user_id } = await safeParseJson(request);
     
     const [campaign, audience] = await Promise.all([
       getCampaignData({ supabase, campaign_id }),
@@ -289,7 +290,7 @@ export const action = async ({ request }: { request: Request }) => {
       status: 200,
     });
   } catch (error) {
-    console.error("Error in action:", error);
+    logger.error("Error in action:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), 
       {

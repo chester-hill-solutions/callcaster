@@ -1,6 +1,6 @@
 import { Form } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
-import { ChangeEvent, FormEvent, useState } from "react";
+import { FormEvent, useState } from "react";
 import { Database } from "@/lib/database.types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,7 @@ const AudienceForm = ({
   audience_id,
   workspace_id
 }: AudienceFormProps) => {
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [name, setName] = useState<string>(audienceInfo?.name || "");
   const handleSave = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

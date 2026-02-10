@@ -2,9 +2,11 @@ import { json } from "@remix-run/node";
 import { redirect } from "react-router";
 import { parseCSV } from "../utils";
 import { bulkCreateContacts } from "../database.server";
+import { enqueueContactsForCampaign } from "../queue.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Contact } from "@/lib/types";
 import { Database } from "../database.types";
+import { logger } from "@/lib/logger.server";
 
 type CampaignType = "live_call" | "message" | "robocall";
 
@@ -95,13 +97,23 @@ export async function handleNewAudience({
 
     // Add contacts if provided - these are already mapped from the CSV UI
     if (contacts && contacts.length > 0) {
-      await bulkCreateContacts(
+      const { insert } = await bulkCreateContacts(
         supabaseClient,
         contacts,
         workspaceId,
         createAudienceData.id.toString(),
         userId
       );
+      // Enqueue contacts for campaign when audience is linked to campaign
+      if (campaignId && insert?.length) {
+        const contactIds = insert.map((c) => c.id);
+        await enqueueContactsForCampaign(
+          supabaseClient,
+          parseInt(campaignId, 10),
+          contactIds,
+          { requeue: false }
+        );
+      }
     }
 
     return redirect(
@@ -109,7 +121,7 @@ export async function handleNewAudience({
       { headers },
     );
   } catch (error) {
-    console.error("Error in handleNewAudience:", error);
+    logger.error("Error in handleNewAudience:", error);
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
     return json(
       {
@@ -129,7 +141,7 @@ export async function handleNewCampaign({
 }: NewCampaignParams) {
   const newCampaignName = formData.get("campaign-name") as string;
   const newCampaignType = formData.get("campaign-type") as CampaignType;
-  console.log("Campaign Type: ", newCampaignType);
+  logger.debug("Campaign Type: ", newCampaignType);
 
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")

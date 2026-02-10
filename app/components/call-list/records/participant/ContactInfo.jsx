@@ -1,5 +1,5 @@
 
-import { Contact } from "~/lib/types";
+import { Contact } from "@/lib/types";
 
 interface ContactInfoProps {
   handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;

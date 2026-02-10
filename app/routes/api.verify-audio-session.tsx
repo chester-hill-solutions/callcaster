@@ -2,6 +2,8 @@ import { json } from "@remix-run/node";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import Twilio from "twilio";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
 
 
 function normalizePhoneNumber(input: string) {
@@ -62,7 +64,7 @@ export const loader = async ({ request }: { request: Request }) => {
         const call = await twilio.calls.create({
             to: phoneNumber,
             from: fromNumber,
-            url: `${process.env.BASE_URL}/api/verify-audio-pin/${verificationData.pin}`,
+            url: `${env.BASE_URL()}/api/verify-audio-pin/${verificationData.pin}`,
             method: 'GET',
         });
 
@@ -73,7 +75,7 @@ export const loader = async ({ request }: { request: Request }) => {
             pin: verificationData.pin
         }, { headers });
     } catch (error: any) {
-        console.error('Error initiating verification call:', error);
+        logger.error('Error initiating verification call:', error);
         
         // Clean up the verification record if call fails
         await supabase
@@ -95,7 +97,7 @@ export const action = async ({ request }: { request: Request }) => {
     
     twiml.gather({
         numDigits: 6,
-        action: `${process.env.BASE_URL}/api/verify-pin-input`,
+        action: `${env.BASE_URL()}/api/verify-pin-input`,
         method: 'POST',
         timeout: 30
     });

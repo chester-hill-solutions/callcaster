@@ -1,7 +1,7 @@
-import { ActionFunction } from "@remix-run/node";
-import { json } from "@remix-run/react";
+import { ActionFunction, json } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
+import { validateTwilioWebhook } from "@/twilio.server";
 import { cancelQueuedMessages } from "@/lib/database.server";
 import { Database } from "@/lib/database.types";
 import { Campaign, OutreachAttempt } from "@/lib/types";
@@ -20,8 +20,9 @@ export const action: ActionFunction = async ({ request }) => {
   );
 
   try {
-    const formData = await request.formData();
-    const payload = Object.fromEntries(formData.entries()) as Partial<TwilioSmsStatusWebhook>;
+    const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
+    if (validation instanceof Response) return validation;
+    const payload = validation.params as Partial<TwilioSmsStatusWebhook>;
     const { SmsSid: sid, SmsStatus: status } = payload;
 
     if (!sid || !status) {

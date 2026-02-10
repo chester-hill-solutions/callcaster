@@ -1,4 +1,5 @@
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { parseActionRequest } from "../lib/database.server";
 import { verifyAuth } from "../lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger.server";
@@ -28,13 +29,13 @@ export const action = async ({ request }: { request: Request }) => {
     let response: AudienceData[] | { success: boolean } | null | undefined;
 
     if (method === 'PATCH') {
-        const formData = await request.formData();
+        const raw = await parseActionRequest(request);
         const data: Partial<AudienceData> = {};
-        for (let [key, value] of formData.entries()) {
+        for (const [key, value] of Object.entries(raw)) {
             if (key === 'id') {
-                data.id = parseInt(value.toString(), 10);
-            } else {
-                data[key] = value.toString();
+                data.id = parseInt(String(value ?? ""), 10);
+            } else if (value != null && typeof value !== "object") {
+                data[key] = String(value);
             }
         }
 
@@ -51,8 +52,8 @@ export const action = async ({ request }: { request: Request }) => {
     }
     
     if (method === "DELETE") {
-        const formData = await request.formData();
-        const idStr = formData.get('id');
+        const raw = await parseActionRequest(request);
+        const idStr = raw.id != null ? String(raw.id) : "";
         if (!idStr) {
             return json({ error: 'Missing id' }, { status: 400, headers });
         }

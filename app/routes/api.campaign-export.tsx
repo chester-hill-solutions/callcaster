@@ -2,6 +2,7 @@ import { ActionFunctionArgs, json } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);
@@ -450,7 +451,7 @@ const processMessageCampaignExport = async (
     }
 
   } catch (error) {
-    console.error("Export error:", error);
+    logger.error("Export error:", error);
     try {
       // Update status to error
       const { error: errorStatusError } = await supabaseClient.storage
@@ -465,10 +466,10 @@ const processMessageCampaignExport = async (
         }), { upsert: true });
 
       if (errorStatusError) {
-        console.error("Error updating error status:", errorStatusError);
+        logger.error("Error updating error status:", errorStatusError);
       }
     } catch (statusError) {
-      console.error("Error writing error status:", statusError);
+      logger.error("Error writing error status:", statusError);
     }
   }
 };
@@ -697,7 +698,7 @@ const processCallCampaignExport = async (
               });
 
             } catch (e) {
-              console.error('Error parsing result:', e, 'Raw result:', item.result);
+              logger.error('Error parsing result:', e, 'Raw result:', item.result);
             }
           }
 
@@ -801,7 +802,7 @@ const processCallCampaignExport = async (
       }), { upsert: true });
 
   } catch (error) {
-    console.error("Export error:", error);
+    logger.error("Export error:", error);
     try {
       // Update status to error
       await supabaseClient.storage
@@ -815,7 +816,7 @@ const processCallCampaignExport = async (
           stage: "Export failed"
         }), { upsert: true });
     } catch (statusError) {
-      console.error("Error writing error status:", statusError);
+      logger.error("Error writing error status:", statusError);
     }
   }
 };
@@ -924,7 +925,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`
     });
   } catch (error) {
-    console.error("Export request error:", error);
+    logger.error("Export request error:", error);
     return json({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500 });

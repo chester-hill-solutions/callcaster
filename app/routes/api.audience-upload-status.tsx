@@ -1,5 +1,6 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -56,7 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }, { headers });
 
   } catch (error) {
-    console.error("Error fetching upload status:", error);
+    logger.error("Error fetching upload status:", error);
     return json({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });

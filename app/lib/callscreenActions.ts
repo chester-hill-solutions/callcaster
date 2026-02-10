@@ -2,6 +2,7 @@ import { FetcherWithComponents } from "@remix-run/react";
 import { getNextContact } from "./getNextContact";
 import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
+import { logger } from "@/lib/logger.client";
 
 const getRecentAttempt = ({ attempts, contact }:{attempts:OutreachAttempt[], contact:Contact}) => {
   return attempts.find((call) => call.contact_id === contact?.contact?.id) || {};
@@ -200,7 +201,7 @@ export const handleQueue = ({
     )
       .then((res) => res.json())
       .then((json) => updateQueue(json))
-      .catch((error) => console.log("Unable to fetch queue: ", error));
+      .catch((error) => logger.error("Unable to fetch queue: ", error));
   };
   return { dequeue, fetchMore };
 };

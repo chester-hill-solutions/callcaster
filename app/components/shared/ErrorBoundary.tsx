@@ -1,27 +1,7 @@
-<<<<<<< HEAD:app/components/shared/ErrorBoundary.tsx
-import React, { useEffect, useState } from "react";
-import {
-  isRouteErrorResponse,
-  useFetcher,
-  useNavigate,
-  useRouteError,
-} from "@remix-run/react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { AlertCircle } from "lucide-react";
-import { toast } from "sonner";
-=======
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import type { AppError } from '~/lib/types';
-import { createAppError } from '~/lib/type-utils';
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ErrorBoundary.tsx
+import type { AppError } from '@/lib/types';
+import { createAppError } from '@/lib/type-utils';
+import { logger } from '@/lib/logger.client';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -70,8 +50,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     );
 
     // Log the error
-    console.error('ErrorBoundary caught an error:', appError);
-    console.error('Error info:', errorInfo);
+    logger.error('ErrorBoundary caught an error:', appError);
+    logger.error('Error info:', errorInfo);
 
     // Call the onError callback if provided
     this.props.onError?.(appError, errorInfo);
@@ -150,7 +130,7 @@ export function useErrorHandler() {
       }
     );
 
-    console.error('Error handled by useErrorHandler:', appError);
+    logger.error('Error handled by useErrorHandler:', appError);
     
     // You can add additional error reporting logic here
     // For example, sending to an error reporting service

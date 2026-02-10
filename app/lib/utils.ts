@@ -4,6 +4,7 @@ import { twMerge } from "tailwind-merge";
 import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
 import { OutreachExportData } from "./database.server";
 import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
+import { logger } from "@/lib/logger.server";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -262,7 +263,7 @@ export const parseCSV = (csvString: string) => {
 
     return { headers, contacts };
   } catch (error) {
-    console.error("Error parsing CSV:", error);
+    logger.error("Error parsing CSV:", error);
     throw new Error("Failed to parse CSV file");
   }
 };

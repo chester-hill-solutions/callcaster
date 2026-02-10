@@ -1,10 +1,7 @@
 import React from "react";
-<<<<<<< HEAD:app/components/contact/ContactDetailsFields.tsx
 import { TextInput } from "@/components/forms/Inputs";
-=======
-import { TextInput } from "./Inputs";
-import type { Contact } from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetailsFields.tsx
+import type { Contact } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
 export interface ContactFieldsProps {
@@ -44,7 +41,7 @@ const ContactFields: React.FC<ContactFieldsProps> = ({
       const value = contact[fieldName];
       return value != null ? String(value) : '';
     } catch (error) {
-      console.error(`Error getting field value for ${String(fieldName)}:`, error);
+      logger.error(`Error getting field value for ${String(fieldName)}:`, error);
       return '';
     }
   };
@@ -54,7 +51,7 @@ const ContactFields: React.FC<ContactFieldsProps> = ({
     try {
       return field.type || 'text';
     } catch (error) {
-      console.error('Error getting field type:', error);
+      logger.error('Error getting field type:', error);
       return 'text';
     }
   };

@@ -2,6 +2,7 @@ import { useFetcher } from '@remix-run/react';
 import { useEffect, useRef, useCallback } from 'react';
 import { deepEqual } from '@/lib/utils';
 import type { QueueItem, OutreachAttempt, Campaign } from '@/lib/types';
+import { logger } from "@/lib/logger.client";
 
 type ToastType = {
     success: (message: string | React.ReactNode, data?: unknown) => string | number;
@@ -106,7 +107,7 @@ const useDebouncedSave = ({
                 }
             );
         } else {
-            console.warn("Cannot save: nextRecipient.contact.id is missing");
+            logger.warn("Cannot save: nextRecipient.contact.id is missing");
             toast.warning("Cannot save at this time. Some data is missing.");
         }
     }, [fetcher, update, recentAttempt?.id, workspaceId, nextRecipient, campaign?.id, disposition, toast]);
@@ -141,7 +142,7 @@ const useDebouncedSave = ({
             if (fetcher.data.id) {
                 toast.success("Saved successfully");
             } else {
-                console.error("Save failed:", fetcher.data.error);
+                logger.error("Save failed:", fetcher.data.error);
                 toast.error(`Save failed: ${fetcher.data.error || 'Unknown error'}`);
             }
         }

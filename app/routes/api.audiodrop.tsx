@@ -1,5 +1,6 @@
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: { request: Request }) => {
   const formData = await request.formData();
@@ -16,13 +17,13 @@ export const action = async ({ request }: { request: Request }) => {
 
   const { data: audio, error: voicemailError } = data.voicedrop_audio ? await supabaseClient.storage.from(`workspaceAudio`).createSignedUrl(`${workspaceId}/${data.voicedrop_audio}`, 3600) : {data:null, error:null}
  if (!audio) {
-  console.error('No audio found');
+  logger.error('No audio found for voicemail drop');
   twilio.calls(call.sid).update({status: 'completed'})
   return {success: false, error: 'No audio found'};
  };
   if (voicemailError) throw {'voicemail': voicemailError}
   if (!audio.signedUrl) {
-    console.error('No signed URL found');
+    logger.error('No signed URL found for audio');
     return {success: false, error: 'No signed URL found'};
   }
   twilio.calls(call.sid).update({
@@ -30,7 +31,7 @@ export const action = async ({ request }: { request: Request }) => {
   })
   }
   catch (error){
-    console.error(error);
+    logger.error("Error in audiodrop:", error);
     return {success: false, error};
   }
   return {success: true}

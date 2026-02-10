@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
 
@@ -140,7 +141,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             }));
         }
     } catch (error) {
-        console.error("Error fetching Twilio information:", error);
+        logger.error("Error fetching Twilio information:", error);
     }
 
     return json({ 

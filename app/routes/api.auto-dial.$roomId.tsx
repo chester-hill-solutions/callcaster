@@ -4,7 +4,9 @@ import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { Call } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
     const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
@@ -54,7 +56,7 @@ const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"
 };
 
 const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string) => {
-    await fetch(`${process.env.BASE_URL}/api/auto-dial/dialer`, {
+    await fetch(`${env.BASE_URL()}/api/auto-dial/dialer`, {
         method: 'POST',
         headers: { "Content-Type": 'application/json' },
         body: JSON.stringify({ user_id: conferenceId, campaign_id: campaignId, workspace_id: workspaceId })
@@ -116,7 +118,7 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
     const dial = twiml.dial();
     dial.conference({
         beep: 'false',
-        statusCallback: `${process.env.BASE_URL}/api/auto-dial/status`,
+        statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
         statusCallbackEvent: ['join', 'leave', 'modify'],
         endConferenceOnExit: false,
     }, conferenceId);
@@ -188,7 +190,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
             }
         }
     } catch (error) {
-        console.error('General error:', error);
+        logger.error('General error:', error);
         response = new Response(`<Response><Hangup/></Response>`, {
             headers: { 'Content-Type': 'text/xml' }
         });

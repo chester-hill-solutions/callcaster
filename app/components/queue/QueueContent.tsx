@@ -1,68 +1,46 @@
 import { Audience, CampaignQueue, Contact, Queue, QueueItem } from "@/lib/types";
 import { QueueHeader } from "./QueueHeader";
 import { QueueTable } from "@/components/queue/QueueTable";
-import SupabaseClient from "@supabase/supabase-js/dist/module/SupabaseClient";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { useEffect, useState, useRef } from "react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
-import { AppError } from "~/lib/types";
 
 interface QueueContentProps {
-<<<<<<< HEAD
-    queueValue: {
-        queueData: QueueItem[] | null;
-        queueError: Error | null;
-        totalCount: number | null;
-        unfilteredCount: number | null;
-        currentPage: number;
-        pageSize: number;
-        filters: {
-            name: string;
-            phone: string;
-            email: string;
-            address: string;
-            audiences: string;
-            status: string;
-        }
+  queueValue: {
+    queueData: QueueItem[] | null;
+    queueError: Error | null;
+    totalCount: number | null;
+    unfilteredCount: number | null;
+    currentPage: number;
+    pageSize: number;
+    filters: {
+      name: string;
+      phone: string;
+      email: string;
+      address: string;
+      audiences: string;
+      disposition: string;
+      queueStatus: string;
     };
-    handleFilterChange: (key: string, value: string) => void;
-    clearFilter: () => void;
-    audiences: Audience[];
-    isSelectingAudience: boolean;
-    selectedAudience: number | null;
-    setIsSelectingAudience: (value: boolean) => void;
-    setSelectedAudience: (value: number | null) => void;
-    handleAddFromAudience: (value: number) => void;
-    handleAddContact: () => void;
-    onStatusChange: (ids: string[], newStatus: string) => void;
-    isAllFilteredSelected: boolean;
-    setIsAllFilteredSelected: (value: boolean) => void;
-    addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
-    removeContactsFromQueue: (ids: string[] | 'all') => void;
-    supabase: SupabaseClient;
-    selectedAudienceIds:number[]
-=======
-  queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
-  queueError: AppError | null;
-  totalCount: number | null;
-  unfilteredCount: number | null;
-  queuedCount: number | null;
-  currentPage: number;
-  pageSize: number;
-  filters: {
-    name: string;
-    phone: string;
-    email: string;
-    address: string;
-    audiences: string;
-    status: string;
   };
-  onFilterChange: (key: string, value: string) => void;
-  onClearFilter: () => void;
-  onStatusChange: (ids: string[], newStatus: string, isAllSelected: boolean) => void;
-  onAddFromAudience: (audienceId: number) => void;
-  onAddContactToQueue: (contacts: Contact[]) => void;
-  onRemoveContactsFromQueue: (ids: string[] | 'all') => void;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+  handleFilterChange: (key: string, value: string) => void;
+  clearFilter: () => void;
+  audiences: Audience[];
+  isSelectingAudience: boolean;
+  selectedAudience: number | null;
+  setIsSelectingAudience: (value: boolean) => void;
+  setSelectedAudience: (value: number | null) => void;
+  handleAddFromAudience: (value: number) => void;
+  handleAddContact: () => void;
+  onStatusChange: (ids: string[], newStatus: string) => void;
+  isAllFilteredSelected: boolean;
+  setIsAllFilteredSelected: (value: boolean) => void;
+  addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
+  removeContactsFromQueue: (ids: string[] | 'all') => void;
+  supabase: SupabaseClient;
+  selectedAudienceIds: number[];
+  campaignId: string;
+  queueFetcher: ReturnType<typeof import("@remix-run/react").useFetcher>;
 }
 
 export function QueueContent({
@@ -82,7 +60,9 @@ export function QueueContent({
     addContactToQueue,
     removeContactsFromQueue,
     supabase,
-    selectedAudienceIds
+    selectedAudienceIds,
+    campaignId,
+    queueFetcher,
 }: QueueContentProps) {
     if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
     const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
@@ -102,24 +82,36 @@ export function QueueContent({
     }
 
     const handleAddRealtimeQueue = async (payload: RealtimePostgresChangesPayload<CampaignQueue>) => {
+        const campaignIdNum = Number(campaignId);
+        if (payload.new && (payload.new as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
+        if (payload.old && (payload.old as CampaignQueue & { campaign_id?: number }).campaign_id !== campaignIdNum) return;
+
         if (payload.eventType === 'INSERT') {
-            if (queueData.length >= 50) return;
             const contact = await fetchContactById(payload.new.contact_id);
             if (contact) {
-                setQueueData(curr => [...curr, { ...payload.new, contact }].slice(0, 50));
+                setQueueData(curr => (curr.length >= 50 ? curr : [...curr, { ...payload.new, contact }].slice(0, 50)));
             }
         }
         if (payload.eventType === 'DELETE') {
             setQueueData(curr => curr.filter(item => item.id !== payload.old.id));
         }
+        if (payload.eventType === 'UPDATE' && payload.new) {
+            setQueueData(curr => {
+                const idx = curr.findIndex(item => item.id === payload.new.id);
+                if (idx < 0) return curr;
+                const updated = { ...curr[idx], ...payload.new };
+                return [...curr.slice(0, idx), updated, ...curr.slice(idx + 1)];
+            });
+        }
     }
 
     useEffect(() => {
-        const channel = supabase.channel('campaign_queue')
-            .on('postgres_changes', {
+        const channel = supabase.channel(`campaign_queue_${campaignId}`)
+            .on('postgres_changes' as const, {
                 event: '*',
                 schema: 'public',
                 table: 'campaign_queue',
+                filter: `campaign_id=eq.${campaignId}`,
             }, (payload: RealtimePostgresChangesPayload<CampaignQueue>) => {
                 setQueueCount(curr => {
                     if (payload.eventType === 'DELETE') {
@@ -138,7 +130,7 @@ export function QueueContent({
             pendingUpdates.current.clear();
             supabase.removeChannel(channel);
         }
-    }, []);
+    }, [campaignId, supabase]);
 
     // Update queue data when parent data changes
     useEffect(() => {
@@ -174,6 +166,7 @@ export function QueueContent({
                 addContactToQueue={addContactToQueue}
                 removeContactsFromQueue={removeContactsFromQueue}
                 clearFilter={clearFilter}
+                queueFetcher={queueFetcher}
             />
         </div>
     );

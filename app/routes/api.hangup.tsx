@@ -1,10 +1,11 @@
 import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: { request: Request }) => {
     const {supabaseClient:supabase, user} = await verifyAuth(request);
-    const data = await request.json();
+    const data = await safeParseJson(request);
     try {
         const realtime = supabase.realtime.channel(data.conference_id)
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: data.workspaceId});
@@ -30,7 +31,7 @@ export const action = async ({ request }: { request: Request }) => {
         return json({ success: true });
    
     } catch (error) {
-        console.error('Error hanging up call:', error);
+        logger.error('Error hanging up call:', error);
         if (error instanceof Error && (error.message.includes('Call is not in-progress'))) {
             return json({ success: false, message: 'Call is already completed or not in progress' }, { status: 400 });
         } else {

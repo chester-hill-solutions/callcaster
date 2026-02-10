@@ -1,5 +1,5 @@
 import { FetcherWithComponents } from "@remix-run/react";
-import { Audience } from "~/lib/types";
+import { Audience } from "@/lib/types";
 
 interface NewContact {
   firstname: string;

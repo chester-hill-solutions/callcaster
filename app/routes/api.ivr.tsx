@@ -1,17 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }:ActionFunctionArgs) => {
-  const supabaseUrl = process.env['SUPABASE_URL'];
-  const supabaseServiceKey = process.env['SUPABASE_SERVICE_KEY'];
-  const baseUrl = process.env['BASE_URL'];
-
-  if (!supabaseUrl || !supabaseServiceKey || !baseUrl) {
-    throw new Error("Missing required environment variables");
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const formData = await request.formData();
 
   const to_number = formData.get("to_number") as string;
@@ -49,10 +43,10 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     call = await twilio.calls.create({
       to: to_number,
       from: caller_id,
-      url: `${baseUrl}/api/ivr/${campaign_id}/page_1/`,
+      url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
       machineDetection: "Enable",
       statusCallbackEvent: ["answered", "completed"],
-      statusCallback: `${baseUrl}/api/ivr/status`,
+      statusCallback: `${env.BASE_URL()}/api/ivr/status`,
     });
 
     
@@ -86,7 +80,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    console.error("Error processing IVR request:", error);
+    logger.error("Error processing IVR request:", error);
     return new Response(
       `Error processing IVR request: ${error instanceof Error ? error.message : "Unknown error"}`,
       { status: 500 }

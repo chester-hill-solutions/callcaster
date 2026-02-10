@@ -1,7 +1,6 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData, useFetcher, useNavigate } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
-<<<<<<< HEAD
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,39 +11,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SurveyQuestionType, SurveyAnswerData, SurveyQuestionWithOptions, ResponseAnswer } from "@/lib/types";
 import { useDebounce } from "@/hooks/utils/useDebounce";
-=======
-import { createSupabaseServerClient } from "~/lib/supabase.server";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
-import { Checkbox } from "~/components/ui/checkbox";
-import { Progress } from "~/components/ui/progress";
-import { SurveyQuestionType, SurveyAnswerData, SurveyWithPages, Contact, SurveyResponse, ResponseAnswer } from "~/lib/types";
-import type { Tables } from "~/lib/database.types";
-import { useDebounce } from "~/hooks/useDebounce";
-import { safeString, safeNumber, safeBoolean } from "~/lib/type-utils";
-
-interface SurveyQuestionOption {
-  id: number;
-  option_value: string;
-  option_label: string;
-  question_id: number;
-}
-
-interface SurveyQuestion {
-  id: number;
-  question_text: string;
-  question_type: string;
-  is_required: boolean;
-  question_option?: SurveyQuestionOption[];
-}
-
-interface SurveyAnswer {
-  [key: string]: string | string[] | number | boolean;
-}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { surveyId } = params;
@@ -118,14 +84,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     if (!responseError && response) {
       existingResponse = response;
       // Convert answers to the format expected by the component
-<<<<<<< HEAD
       existingAnswers = response.response_answer?.reduce((acc: Record<string, string | string[]>, answer: ResponseAnswer & { survey_question: SurveyQuestionWithOptions }) => {
         const questionId = answer.survey_question.question_id.toString();
         acc[questionId] = answer.answer_value as string | string[];
-=======
-      existingAnswers = response.response_answer?.reduce((acc: Record<string, string>, answer: ResponseAnswer) => {
-        acc[answer.question_id.toString()] = answer.answer_value;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
         return acc;
       }, {}) || {};
     }
@@ -146,11 +107,7 @@ export default function SurveyPage() {
   const completeFetcher = useFetcher();
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-<<<<<<< HEAD
   const [answers, setAnswers] = useState<Record<string, string | string[]>>(existingAnswers);
-=======
-  const [answers, setAnswers] = useState<SurveyAnswer>(existingAnswers);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   const [isCompleted, setIsCompleted] = useState(false);
 
   const currentPage = survey.survey_page?.[currentPageIndex];
@@ -190,7 +147,6 @@ export default function SurveyPage() {
       ...prev,
       [questionId]: value
     }));
-<<<<<<< HEAD
 
     // Don't save write-in fields separately
     if (questionId.endsWith('_writein')) {
@@ -200,8 +156,6 @@ export default function SurveyPage() {
     // Use debounced save for text fields, immediate save for others
     const currentQuestion = currentPage.survey_question?.find((q: SurveyQuestionWithOptions) => q.question_id === questionId);
     const isTextField = currentQuestion?.question_type === "text" || currentQuestion?.question_type === "textarea";
-=======
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     
     debouncedSave(questionId, value);
   };
@@ -235,11 +189,7 @@ export default function SurveyPage() {
     setIsCompleted(true);
   };
 
-<<<<<<< HEAD
   const renderQuestion = (question: SurveyQuestionWithOptions) => {
-=======
-  const renderQuestion = (question: Tables<"survey_question"> & { question_option?: Array<{ option_value: string; option_label: string }> }) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     const questionId = question.question_id;
     const currentAnswer = answers[questionId] as string | string[] | undefined;
     
@@ -328,11 +278,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label>{question.question_text}</Label>
             <div className="space-y-2">
-<<<<<<< HEAD
               {question.question_option?.map((option) => {
-=======
-              {question.question_option?.map((option: SurveyQuestionOption) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
@@ -353,11 +299,7 @@ export default function SurveyPage() {
                 );
               })}
               {/* Write-in field for options with (write in) */}
-<<<<<<< HEAD
               {question.question_option?.some((option) => 
-=======
-              {question.question_option?.some((option: SurveyQuestionOption) => 
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 option.option_label?.toLowerCase().includes("(write in)")
               ) && currentAnswer && (
                 <div className="ml-6 mt-2">
@@ -389,11 +331,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label>{question.question_text}</Label>
             <div className="space-y-2">
-<<<<<<< HEAD
               {question.question_option?.map((option) => {
-=======
-              {question.question_option?.map((option: SurveyQuestionOption) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 const isWriteIn = option.option_label?.toLowerCase().includes("(write in)");
                 const cleanLabel = isWriteIn ? option.option_label.replace(/\(write in\)/i, "").trim() : option.option_label;
                 
@@ -416,11 +354,7 @@ export default function SurveyPage() {
                 );
               })}
               {/* Write-in field for options with (write in) */}
-<<<<<<< HEAD
               {question.question_option?.some((option) => 
-=======
-              {question.question_option?.some((option: SurveyQuestionOption) => 
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 option.option_label?.toLowerCase().includes("(write in)")
               ) && currentAnswer && Array.isArray(currentAnswer) && currentAnswer.length > 0 && (
                 <div className="ml-6 mt-2">
@@ -437,11 +371,7 @@ export default function SurveyPage() {
                       const currentValues = Array.isArray(currentAnswer) ? currentAnswer : [];
                       const processedValues = currentValues.map((v: string) => {
                         // Find if any selected option has (write in)
-<<<<<<< HEAD
                         const selectedOption = question.question_option?.find((opt) => opt.option_value === v);
-=======
-                        const selectedOption = question.question_option?.find((opt: SurveyQuestionOption) => opt.option_value === v);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                         if (selectedOption?.option_label?.toLowerCase().includes("(write in)")) {
                           return `${v}: ${writeInText}`;
                         }
@@ -507,11 +437,7 @@ export default function SurveyPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-<<<<<<< HEAD
           {currentPage.survey_question?.map((question: SurveyQuestionWithOptions) => (
-=======
-          {currentPage.survey_question?.map((question: SurveyQuestion) => (
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
             <div key={question.id} className="space-y-4">
               {renderQuestion(question)}
             </div>

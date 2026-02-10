@@ -32,7 +32,16 @@ async function handleCreateSurvey(
 ) {
   try {
     const formData = await request.formData();
-    const surveyData = JSON.parse(formData.get("surveyData") as string);
+    const surveyDataRaw = formData.get("surveyData") as string | null;
+    if (!surveyDataRaw) {
+      return json({ error: "Survey data is required" }, { status: 400 });
+    }
+    let surveyData: unknown;
+    try {
+      surveyData = JSON.parse(surveyDataRaw) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Invalid survey data format" }, { status: 400 });
+    }
     const workspaceId = formData.get("workspaceId") as string;
 
     if (!workspaceId) {
@@ -149,7 +158,16 @@ async function handleUpdateSurvey(
 ) {
   try {
     const formData = await request.formData();
-    const surveyData = JSON.parse(formData.get("surveyData") as string);
+    const surveyDataRaw = formData.get("surveyData") as string | null;
+    if (!surveyDataRaw) {
+      return json({ error: "Survey data is required" }, { status: 400 });
+    }
+    let surveyData: unknown;
+    try {
+      surveyData = JSON.parse(surveyDataRaw) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Invalid survey data format" }, { status: 400 });
+    }
     const surveyId = formData.get("surveyId") as string;
 
     if (!surveyId) {

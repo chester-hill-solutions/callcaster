@@ -1,5 +1,6 @@
 import { verifyAuth } from "../lib/supabase.server";
 import { json } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
 
 function sanitizeFilename(filename: string) {
     const decodedFilename = decodeURIComponent(filename);
@@ -43,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 upsert: false,
             });
         if (uploadError && (uploadError as any).statusCode !== '409') {
-            console.log({ uploadError })
+            logger.error("Message media upload error:", uploadError);
             return json({ success: false, error: uploadError }, { headers });
         }
         if (campaignId) {
@@ -53,7 +54,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 .eq('campaign_id', campaignId as number)
                 .single();
             if (error) {
-                console.log('Campaign Error', error);
+                logger.error('Campaign Error', error);
                 return json({ success: false, error: error }, { headers });
             }
             const { data: campaignUpdate, error: updateError } = await supabaseClient
@@ -64,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 .eq('campaign_id', campaignId as number)
                 .select()
             if (updateError) {
-                console.log(updateError)
+                logger.error("Error updating campaign with media:", updateError);
                 return json({ success: false, error: updateError }, { headers });
             }
 
@@ -86,7 +87,7 @@ export async function action({ request }: ActionFunctionArgs) {
             .eq("campaign_id", campaignId as number)
             .single();
         if (error) {
-            console.log("Campaign Error", error);
+            logger.error("Campaign Error", error);
             return json({ success: false, error: error }, { headers });
         }
 

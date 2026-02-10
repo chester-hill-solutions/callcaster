@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger.client";
 import {
   Mic,
   MicOff,
@@ -46,7 +47,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   campaign,
   count,
   completed,
-  mediaStream,
+  mediaStream: _mediaStream,
   availableMicrophones,
   availableSpeakers,
   onLeaveCampaign,
@@ -70,7 +71,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   onVerifyNewNumber,
   pin
 }) => {
-  console.log(verifiedNumbers)
+  logger.debug("Verified numbers", verifiedNumbers);
   return (
     <div className="flex flex-col gap-6 p-6 w-full">
       <div className="flex justify-between items-center">
@@ -124,7 +125,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={microphone.deviceId}
                 value={microphone.deviceId}
-                selected={microphone.deviceId === availableMicrophones[0].deviceId}
+                selected={microphone.deviceId === availableMicrophones[0]?.deviceId}
               >
                 {microphone.label}
               </option>
@@ -144,7 +145,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={speaker.deviceId}
                 value={speaker.deviceId}
-                selected={speaker.deviceId === availableSpeakers[0].deviceId}
+                selected={speaker.deviceId === availableSpeakers[0]?.deviceId}
               >
                 {speaker.label}
               </option>

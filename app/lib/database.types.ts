@@ -1290,6 +1290,47 @@ export type Json =
             },
           ]
         }
+        workspace_api_key: {
+          Row: {
+            id: string
+            workspace_id: string
+            name: string
+            key_prefix: string
+            key_hash: string
+            created_by: string | null
+            created_at: string
+            last_used_at: string | null
+          }
+          Insert: {
+            id?: string
+            workspace_id: string
+            name: string
+            key_prefix: string
+            key_hash: string
+            created_by?: string | null
+            created_at?: string
+            last_used_at?: string | null
+          }
+          Update: {
+            id?: string
+            workspace_id?: string
+            name?: string
+            key_prefix?: string
+            key_hash?: string
+            created_by?: string | null
+            created_at?: string
+            last_used_at?: string | null
+          }
+          Relationships: [
+            {
+              foreignKeyName: "workspace_api_key_workspace_id_fkey"
+              columns: ["workspace_id"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+          ]
+        }
         workspace: {
           Row: {
             created_at: string

@@ -1,12 +1,13 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 
 import { verifyAuth } from "../lib/supabase.server";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.server";
 import type { Tables } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
-  const { workspaceId: workspace_id } = await request.json();
+  const { workspaceId: workspace_id } = await safeParseJson(request);
   const twilio = await createWorkspaceTwilioInstance({
     supabase: supabaseClient,
     workspace_id,
@@ -25,7 +26,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (error) throw error;
       return outreachData;
     } catch (error) {
-      console.error("Error updating outreach attempt:", error);
+      logger.error("Error updating outreach attempt:", error);
       throw error;
     }
   };
@@ -45,7 +46,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .from("call")
             .select("sid, outreach_attempt_id, contact_id")
             .eq("conference_id", conf.sid);
-          console.log(data);
+          logger.debug("Conference calls data:", data);
           if (error) throw error;
           if (!data || !data.length) return;
           type CallRecord = Pick<
@@ -70,19 +71,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .calls(call.sid)
                     .update({ twiml: `<Response><Hangup/></Response>` });
               } catch (callError) {
-                console.error(`Error updating call ${call.sid}:`, callError);
+                logger.error(`Error updating call ${call.sid}:`, callError);
               }
             }),
           );
         } catch (confError) {
-          console.error(`Error updating conference ${conf.sid}:`, confError);
+          logger.error(`Error updating conference ${conf.sid}:`, confError);
         }
       }),
     );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown error occurred";
-    console.error("Error listing or updating conferences:", error);
+    logger.error("Error listing or updating conferences:", error);
     return json({ error: message }, { status: 500 });
   }
 

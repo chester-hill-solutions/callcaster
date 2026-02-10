@@ -1,7 +1,9 @@
 import Twilio from 'twilio';
-import { createSupabaseServerClient } from '../lib/supabase.server';
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createSupabaseServerClient, verifyAuth } from '../lib/supabase.server';
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from "../lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface DialRequest {
   to_number: string;
@@ -17,7 +19,10 @@ interface DialRequest {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id, selected_device }: DialRequest = await request.json();
+    const { to_number, user_id, campaign_id, contact_id, workspace_id, queue_id, outreach_id, caller_id, selected_device }: DialRequest = await safeParseJson(request);
+    const { user } = await verifyAuth(request);
+    if (!user) throw new Response("Unauthorized", { status: 401 });
+    await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace_id });
 
     const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
     if (error) throw error;
@@ -57,7 +62,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const call = await twilio.calls.create({
             to: selected_device && selected_device !== 'computer' ? selected_device : `client:${user_id}`,
             from: caller_id,
-            url: `${process.env.BASE_URL}/api/dial/${encodeURIComponent(to)}`,
+            url: `${env.BASE_URL()}/api/dial/${encodeURIComponent(to)}`,
 
         })
         let outreach_attempt_id;
@@ -105,9 +110,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         Object.keys(callData).forEach(key => callData[key] === undefined && delete callData[key]);
 
         const { error } = await supabase.from('call').upsert({ ...callData });
-        if (error) console.error('Error saving the call to the database:', error);
+        if (error) logger.error('Error saving the call to the database:', error);
     } catch (error) {
-        console.error('Error placing call:', error);
+        logger.error('Error placing call:', error);
         twiml.say('There was an error placing your call. Please try again later.');
     }
 

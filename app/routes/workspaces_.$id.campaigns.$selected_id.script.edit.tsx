@@ -25,6 +25,8 @@ import {
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import type { IVRCampaign, LiveCampaign, MessageCampaign, Script, User } from "@/lib/types";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
+import { logger as loggerClient } from "@/lib/logger.client";
 
 type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
 
@@ -82,7 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .single();
 
   if (campaignError) {
-    console.error(campaignError);
+    logger.error("Error fetching campaign data", campaignError);
     throw new Response("Error fetching campaign data", { status: 500 });
   }
 
@@ -204,7 +206,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .single();
 
   if (error) {
-    console.log("Campaign Error", error);
+    logger.error("Campaign Error", error);
     return json({ success: false, error: error }, { headers });
   }
 
@@ -250,7 +252,7 @@ export default function ScriptEditor() {
       setChanged(false);
       setShowSaveModal(false);
     } catch (error) {
-      console.error("Error saving update:", error);
+      loggerClient.error("Error saving update:", error);
     }
   };
 

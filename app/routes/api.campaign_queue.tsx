@@ -1,9 +1,10 @@
 import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { parseRequestData } from "@/lib/database.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignQueue } from "@/lib/types";
 import { filteredSearch } from "./workspaces_.$id.campaigns.$selected_id.queue";
-import { safeNumber, safeString } from "~/lib/type-utils";
+import { safeNumber } from "@/lib/type-utils";
 
 interface ContactMapping {
   id: number;
@@ -28,23 +29,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (request.method === "POST") {
         const { ids, campaign_id, startOrder = 0, requeue = false } = data;
-        const BATCH_SIZE = 100;
-        const results = [];
-        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-            const batch = ids.slice(i, i + BATCH_SIZE);
-            const { data: newContacts, error } = await supabaseClient
-                .rpc('handle_campaign_queue_entry', batch.map((contactId: string, index: number) => ({
-                    p_contact_id: contactId,
-                    p_campaign_id: Number(campaign_id),
-                    p_queue_order: startOrder + i + index,
-                    p_requeue: requeue
-                })))
-                .select();
-            if (error) throw error;
-            results.push((newContacts as CampaignQueue[]));
-        }
-
-        return json({ data: results });
+        const contactIds = ids.map((id: string | number) =>
+            typeof id === "string" ? parseInt(id, 10) : id
+        );
+        await enqueueContactsForCampaign(
+            supabaseClient,
+            Number(campaign_id),
+            contactIds,
+            { startOrder, requeue }
+        );
+        return json({ success: true });
     }
     if (request.method === "DELETE") {
         const { ids, campaign_id, filters } = data;
@@ -62,16 +56,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .in('id', batch)
                     .select();
 
-                if (error) throw error;
+                if (error) return json({ error: error.message }, { status: 500 });
                 results.push(...(deletedContacts as CampaignQueue[]));
             }
             return json({ data: results });
         } else {
             const { data: contactsToDelete, error: lookupError } = await filteredSearch('', filters, supabaseClient, ['id'], campaign_id);
-            if (lookupError) throw lookupError;
+            if (lookupError) return json({ error: lookupError.message }, { status: 500 });
 
             const results = [];
-            const contacts = contactsToDelete?.map((item: ContactMapping) => ({
+            const contacts = (contactsToDelete as unknown as ContactMapping[] | null)?.map((item) => ({
               id: item.id,
               contact_id: item.contact_id,
               campaign_id: item.campaign_id,
@@ -96,10 +90,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .in('id', batch)
                     .select();
 
-                if (error) throw error;
+                if (error) return json({ error: error.message }, { status: 500 });
                 results.push(...(deletedContacts as CampaignQueue[]));
             }
             return json({ data: results });
         }
     }
-}
+    return json({ error: "Method not allowed" }, { status: 405 });
+};

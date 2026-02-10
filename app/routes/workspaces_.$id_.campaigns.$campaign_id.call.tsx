@@ -6,14 +6,10 @@ import {
   useNavigation,
   useNavigate,
   useFetcher,
+  useRevalidator,
 } from "@remix-run/react";
-import { LoaderFunction, ActionFunction } from "@remix-run/node";
-<<<<<<< HEAD
-import React, { useEffect, useState, useCallback, useRef } from "react";
-=======
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toast, Toaster } from "sonner";
 
@@ -40,22 +36,19 @@ import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
 
 // Hook imports
-<<<<<<< HEAD
-import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
+import { useSupabaseRealtime, useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
+import { useCallStatusPolling } from "@/hooks/call/useCallStatusPolling";
+import {
+  normalizeProviderStatus,
+  getStateMachineAction,
+} from "@/lib/call-status";
+import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 
-=======
-import { useSupabaseRealtime } from "../hooks/useSupabaseRealtime";
-import useDebouncedSave from "../hooks/useDebouncedSave";
-import useSupabaseRoom from "../hooks/useSupabaseRoom";
-import { useTwilioDevice } from "../hooks/useTwilioDevice";
-import { useStartConferenceAndDial } from "~/hooks/useStartConferenceAndDial";
-import { useCallState } from "~/hooks/useCallState";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 // Type imports
 import type {
   LoaderData,
@@ -65,16 +58,11 @@ import type {
   AppUser,
   BaseUser,
   ActiveCall,
-<<<<<<< HEAD
   CampaignDetails
 } from "@/lib/types";
 import { Tables } from "@/lib/database.types";
 import { MemberRole } from "@/components/workspace/TeamMember";
-=======
-  CampaignDetails,
-} from "~/lib/types";
-import { MemberRole } from "~/components/Workspace/TeamMember";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import { logger } from "@/lib/logger.client";
 
 export { ErrorBoundary };
 
@@ -123,7 +111,7 @@ async function getCallScreenData(supabase: SupabaseClient, campaignId: string, w
   ].filter(Boolean);
 
   if (errors.length) {
-    console.error(errors);
+    logger.error("Error fetching campaign data:", errors);
     throw "Error fetching campaign data";
   }
   return {
@@ -143,7 +131,7 @@ async function getVerifiedNumbers(supabase: SupabaseClient, userId: string) {
     .eq('id', userId)
     .single();
   if (error) {
-    console.error(error);
+    logger.error("Error fetching verified numbers:", error);
     throw error;
   }
   return data?.verified_audio_numbers || [];
@@ -155,12 +143,12 @@ async function getQueueByDialType(supabase: SupabaseClient, campaignId: string, 
       .from('campaign_queue')
       .select('*, contact(*)')
       .eq('campaign_id', parseInt(campaignId))
-      .eq('status', 'queued')
+      .eq('status', QUEUE_STATUS_QUEUED)
       .order('attempts', { ascending: true })
       .order('queue_order', { ascending: true })
       .limit(50);
     if (error) {
-      console.error(error);
+      logger.error("Error fetching predictive queue:", error);
       throw error;
     }
     queue = data as unknown as QueueItem[];
@@ -172,7 +160,7 @@ async function getQueueByDialType(supabase: SupabaseClient, campaignId: string, 
       .eq('status', userId)
       .limit(50);
     if (error) {
-      console.error(error);
+      logger.error("Error fetching call queue:", error);
       throw error;
     }
     queue = data as unknown as QueueItem[];
@@ -267,7 +255,7 @@ export const action: ActionFunction = async ({ request, params }: ActionFunction
     .eq("campaign_id", parseInt(campaign_id))
     .select();
   if (update.error) {
-    console.error(update.error);
+    logger.error("Error updating campaign queue:", update.error);
     throw update.error;
   }
   return redirect("/workspaces");
@@ -297,6 +285,13 @@ const CallScreen: React.FC = () => {
     hasAccess,
     verifiedNumbers,
   } = useLoaderData<LoaderData>();
+  const revalidator = useRevalidator();
+  useSupabaseRealtimeSubscription({
+    supabase,
+    table: "campaign",
+    filter: campaign?.id ? `id=eq.${campaign.id}` : "id=eq.-1",
+    onChange: () => revalidator.revalidate(),
+  });
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -379,6 +374,31 @@ const CallScreen: React.FC = () => {
     setUpdate,
   } as UseSupabaseRealtimeProps);
 
+  const callSid =
+    (activeCall?.parameters?.CallSid as string | undefined) ??
+    recentCall?.sid ??
+    null;
+  const pollingEnabled =
+    !!callSid &&
+    !!workspaceId &&
+    (state === "dialing" || state === "connected");
+  useCallStatusPolling({
+    callSid,
+    workspaceId,
+    enabled: pollingEnabled,
+    intervalMs: 5000,
+    onStatus: (status) => {
+      const normalized = normalizeProviderStatus(status);
+      if (normalized) {
+        setDisposition(normalized);
+        const action = getStateMachineAction(normalized);
+        if (action === "CONNECT") send({ type: "CONNECT" });
+        else if (action === "HANG_UP") send({ type: "HANG_UP" });
+        else if (action === "FAIL") send({ type: "FAIL" });
+      }
+    },
+  });
+
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
     {
       userId: user.id,
@@ -439,7 +459,7 @@ const handleDialButton = useCallback(() => {
 
   if (campaign.dial_type === "predictive") {
     if (deviceIsBusy || incomingCall || deviceStatus !== "registered") {
-      console.log("Device Busy", deviceStatus, device?.calls.length);
+      logger.debug("Device Busy", { deviceStatus, callCount: device?.calls.length });
       return;
     }
     begin();
@@ -545,7 +565,7 @@ const requestMicrophoneAccess = useCallback(async () => {
     setStream(mediaStream);
     setPermissionError(null);
   } catch (error: unknown) {
-    console.error("Error accessing microphone:", error);
+    logger.error("Error accessing microphone:", error);
     if (error instanceof Error && error.name === "NotAllowedError") {
       setPermissionError(
         "Microphone access was denied. Please grant permission to use this feature.",
@@ -560,40 +580,40 @@ const requestMicrophoneAccess = useCallback(async () => {
 }, []);
 
 const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { console.error('No device'); return };
+  if (!device) { logger.error('No device available'); return };
   const selectedMicrophone = event.target.value;
   let audio = device.audio;
   audio?.setInputDevice(selectedMicrophone).then(() => {
     setIsMicrophoneMuted(false);
     setMicrophone(selectedMicrophone);
-    console.log("Microphone set to", selectedMicrophone);
+    logger.debug("Microphone set to", selectedMicrophone);
 
     navigator.mediaDevices.getUserMedia({ audio: { deviceId: selectedMicrophone } })
       .then((newStream) => {
         if (activeCall) {
           activeCall._setInputTracksFromStream(newStream).then(() => {
-            console.log("Active call input tracks updated with new microphone");
+            logger.debug("Active call input tracks updated with new microphone");
           }).catch((error: unknown) => {
-            console.error("Error updating active call input tracks:", error);
+            logger.error("Error updating active call input tracks:", error);
           });
         }
       })
       .catch((error: unknown) => {
-        console.error("Error getting stream from new microphone:", error);
+        logger.error("Error getting stream from new microphone:", error);
       });
   }).catch((error: unknown) => {
-    console.error("Error setting microphone:", error);
+    logger.error("Error setting microphone:", error);
   });
 }, [device, activeCall]);
 
 const handleSpeakerChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { console.error('No device'); return };
+  if (!device) { logger.error('No device available'); return };
   const selectedSpeaker = event.target.value;
   setOutput(selectedSpeaker);
   device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
-    console.log("Speaker set to", selectedSpeaker);
+    logger.debug("Speaker set to", selectedSpeaker);
   }).catch((error: unknown) => {
-    console.error("Error setting speaker:", error);
+    logger.error("Error setting speaker:", error);
   });
 }, [device]);
 
@@ -603,7 +623,7 @@ const handleMuteMicrophone = useCallback(() => {
   setIsMicrophoneMuted(newMuteState);
   device.audio.incoming(newMuteState);
   if (activeCall) {
-    console.log("Mute active call", newMuteState);
+    logger.debug("Mute active call", newMuteState);
     activeCall.mute(newMuteState);
   }
 }, [device, activeCall, isMicrophoneMuted]);
@@ -803,7 +823,7 @@ const handlePhoneDeviceSelection = async (phoneNumber: string) => {
     toast.success('Connected to your phone. You can now make calls.');
 
   } catch (error) {
-    console.error('Error connecting phone device:', error);
+    logger.error('Error connecting phone device:', error);
     toast.error('Failed to connect to your phone. Please try again.');
     setPhoneConnectionStatus('disconnected');
     setSelectedDevice('computer');
@@ -874,13 +894,8 @@ return (
     </div>
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       <div className="space-y-6">
-<<<<<<< HEAD
         <CallArea
           conference={conference ? { parameters: { Sid: conference } } : null}
-=======
-          <CallArea
-            conference={conference}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           isBusy={isBusy || deviceIsBusy}
           predictive={campaign.dial_type === "predictive"}
           nextRecipient={nextRecipient}
@@ -891,11 +906,7 @@ return (
             campaign.dial_type === "predictive"
               ? () => handleConferenceEnd({
                 activeCall: activeCall as unknown as ActiveCall,
-<<<<<<< HEAD
                 setConference: () => setConference(null),
-=======
-                setConference,
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 workspaceId,
               })
               : () => {
@@ -903,11 +914,7 @@ return (
               }
           }
           displayState={displayState}
-<<<<<<< HEAD
           dispositionOptions={(campaignDetails.disposition_options as unknown) as string[]}
-=======
-            dispositionOptions={(campaignDetails as { disposition_options?: Array<{ value: string; label: string }> }).disposition_options || []}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
           handleDialNext={handleDialButton}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}
@@ -927,7 +934,6 @@ return (
       </div>
       <CallQuestionnaire
         isBusy={isBusy}
-<<<<<<< HEAD
         handleResponse={(response: { pageId: string; blockId: string; value: string | number | boolean | string[] | null | undefined }) => {
           const value = response.value;
           if (value !== undefined && value !== null) {
@@ -936,11 +942,6 @@ return (
         }}
         campaignDetails={campaignDetails as unknown as CampaignDetails & { script: { steps: { pages?: Record<string, { id: string; title: string; blocks: string[] }>; blocks?: Record<string, { id: string; type: string; title: string; content: string; options?: Array<{ value: string; label: string; next: string }>; audioFile: string }> } } }}
         update={(update || {}) as Record<string, Record<string, string | number | boolean | string[] | null | undefined>>}
-=======
-        handleResponse={handleResponse}
-        campaignDetails={campaignDetails}
-        update={update || {}}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
         nextRecipient={questionContact}
         handleQuickSave={saveData}
         disabled={!questionContact}

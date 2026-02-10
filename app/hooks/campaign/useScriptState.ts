@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
+import { logger } from '@/lib/logger.client';
 
 type PageData = {
   campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };
@@ -65,12 +66,12 @@ export function useScriptState(initialPageData: PageData, onPageDataChange: (dat
     try {
       setScript((prevScript) => {
         if (!prevScript) {
-          console.error('Cannot update script: script is null or undefined');
+          logger.error('Cannot update script: script is null or undefined');
           return prevScript;
         }
         const newScript = updater(prevScript);
         if (!newScript) {
-          console.error('Script updater returned null or undefined');
+          logger.error('Script updater returned null or undefined');
           return prevScript;
         }
         onPageDataChange({
@@ -83,7 +84,7 @@ export function useScriptState(initialPageData: PageData, onPageDataChange: (dat
         return newScript;
       });
     } catch (error) {
-      console.error('Error updating script:', error);
+      logger.error('Error updating script:', error);
     }
   }, [initialPageData, onPageDataChange]);
 
@@ -91,12 +92,12 @@ export function useScriptState(initialPageData: PageData, onPageDataChange: (dat
     try {
       setScriptData((prevScriptData) => {
         if (!prevScriptData) {
-          console.error('Cannot update script data: scriptData is null or undefined');
+          logger.error('Cannot update script data: scriptData is null or undefined');
           return prevScriptData;
         }
         const newScriptData = updater(prevScriptData);
         if (!newScriptData) {
-          console.error('Script data updater returned null or undefined');
+          logger.error('Script data updater returned null or undefined');
           return prevScriptData;
         }
         onPageDataChange({
@@ -112,7 +113,7 @@ export function useScriptState(initialPageData: PageData, onPageDataChange: (dat
         return newScriptData;
       });
     } catch (error) {
-      console.error('Error updating script data:', error);
+      logger.error('Error updating script data:', error);
     }
   }, [initialPageData, onPageDataChange]);
 

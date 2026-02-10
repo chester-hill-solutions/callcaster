@@ -22,14 +22,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });
 
   if (mediaError) {
-    console.log("Media Error: ", mediaError);
+    logger.error("Media Error: ", mediaError);
     return {
       audioMedia: null,
       error: mediaError.message,
     }
   }
   if (mediaData.length === 0) {
-    console.log("No workspace folder exists");
+    logger.debug("No workspace folder exists");
     return {
       audioMedia: null,
       error: "No Audio in Workspace",
@@ -49,22 +49,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     };
   }
 
-<<<<<<< HEAD
-  for (let media of mediaData) {
-    const url = signedUrls.find(
-      (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
-    )?.signedUrl;
-    if (url) {
-      (media as any)["signedUrl"] = url;
-    }
-  }
-=======
   // augment each media entry with a signedUrl in a type-safe way
   const mediaWithUrls = mediaData.map((m) => {
     const found = signedUrls.find((u) => u.path === `${workspaceId}/${m.name}`);
     return { ...m, signedUrl: found?.signedUrl } as typeof m & { signedUrl?: string };
   });
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   return { audioMedia: mediaWithUrls, error: null };
 }
@@ -74,13 +63,9 @@ export default function WorkspaceAudio() {
     useLoaderData<typeof loader>();
   const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-<<<<<<< HEAD
-  const voicemails = audioMedia?.filter((media) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined")) as FileObject[];
-=======
   const voicemails = audioMedia?.filter(
     (media) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined"),
   );
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">

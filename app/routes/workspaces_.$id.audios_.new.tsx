@@ -14,6 +14,7 @@ import { Toaster, toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -52,7 +53,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const mediaName = formData.get("media-name") as string;
   const mediaToUpload = formData.get("media");
 
-  console.log("Media To Upload: ", mediaToUpload);
+  logger.debug("Media To Upload:", mediaToUpload);
 
   const { data: uploadData, error: uploadError } = await supabaseClient.storage
     .from("workspaceAudio")

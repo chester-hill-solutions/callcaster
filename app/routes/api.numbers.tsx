@@ -2,6 +2,8 @@ import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance, getWorkspaceUsers } from '../lib/database.server';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface FormData {
   phoneNumber: string;
@@ -24,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         })
 
     } catch (error) {
-        console.error('Fetching numbers failed', error);
+        logger.error('Fetching numbers failed', error);
         return new Response(JSON.stringify({ error }), {
             headers: {
                 'Content-Type': 'application/json'
@@ -35,7 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const supabase = createClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_SERVICE_KEY'] ?? '');
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
     const { phoneNumber, workspace_id } = Object.fromEntries(formData) as unknown as FormData;
     try {
@@ -62,12 +64,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
         const number = await twilio.incomingPhoneNumbers.create({
             phoneNumber,
-            statusCallback: `${process.env['BASE_URL']}/api/caller-id/status`,
+            statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
             statusCallbackMethod:"POST",
-            voiceUrl: `${process.env['BASE_URL']}/api/inbound`,
-            smsUrl: `${process.env['BASE_URL']}/api/inbound-sms`
+            voiceUrl: `${env.BASE_URL()}/api/inbound`,
+            smsUrl: `${env.BASE_URL()}/api/inbound-sms`
         }).catch((error) => {
-            console.error(error);
+            logger.error("Error creating Twilio number:", error);
             throw error;
         });
         const { data: newNumber, error: newNumberError } = await supabase
@@ -97,7 +99,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             status: 201
         })
     } catch (error) {
-        console.error('Failed to register number', error);
+        logger.error('Failed to register number', error);
         return new Response(JSON.stringify({ error }), {
             headers: {
                 'Content-Type': 'application/json'

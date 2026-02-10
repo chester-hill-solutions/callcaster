@@ -1,5 +1,7 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import twilio from "twilio";
+import { safeParseJson } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
 
 type DisconnectRequestBody = {
   call?: {
@@ -26,14 +28,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { TWILIO_SID, TWILIO_AUTH_TOKEN } = process.env;
 
   if (!TWILIO_SID || !TWILIO_AUTH_TOKEN) {
-    console.error("Missing Twilio credentials.");
+    logger.error("Missing Twilio credentials.");
     return json(
       { error: "Twilio credentials are not configured." },
       { status: 500 },
     );
   }
 
-  const body = (await request.json()) as unknown;
+  const body = await safeParseJson<unknown>(request);
   const callSid = getCallSid(body);
 
   if (!callSid) {
@@ -46,7 +48,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await client.calls(callSid).update({ twiml: TWIML_PAUSE_RESPONSE });
     return json({ success: true });
   } catch (error) {
-    console.error("Failed to update call status", error);
+    logger.error("Failed to update call status", error);
     return json(
       { error: "Failed to pause the call." },
       { status: 500 },

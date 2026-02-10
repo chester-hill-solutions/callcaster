@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { Tables } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 type Call = Tables<"call">
 type Attempt = Tables<"outreach_attempt">
@@ -67,7 +68,7 @@ export const useCalls = (
   const [recentCall, setRecentCall] = useState<Call | null>(initialRecentCall);
 
   const updateCalls = useCallback((
-    payload: { new: Call }, 
+    payload: { new: Call; eventType?: 'INSERT' | 'UPDATE' }, 
     currentQueue: QueueItem[], 
     recentAttempt: Attempt | null, 
     setNextRecipient: (recipient: QueueItem | null) => void, 
@@ -76,25 +77,43 @@ export const useCalls = (
   ) => {
     // Validate payload
     if (!payload || !payload.new) {
-      console.error('Invalid call update payload: payload or payload.new is missing');
+      logger.error('Invalid call update payload: payload or payload.new is missing');
       return;
     }
 
     if (!payload.new.id) {
-      console.error('Invalid call update payload: payload.new.id is missing');
+      logger.error('Invalid call update payload: payload.new.id is missing');
       return;
     }
 
     try {
       const attemptId = payload.new.outreach_attempt_id;
       const updatedCall = payload.new;
-    
+      const isUpdate = payload.eventType === 'UPDATE';
+
     if (attemptId) {
-      setCalls((currentCalls) => [...currentCalls, updatedCall]);
-      setRecentCall(updatedCall);
-      setRecentAttempt(null);
-      
-      if (!isPredictive) {
+      setCalls((currentCalls) => {
+        const byId = currentCalls.findIndex((c) => c.id === updatedCall.id);
+        const bySid = updatedCall.sid
+          ? currentCalls.findIndex((c) => c.sid === updatedCall.sid)
+          : -1;
+        const idx = byId >= 0 ? byId : bySid;
+        if (isUpdate && idx >= 0) {
+          const next = currentCalls.slice();
+          next[idx] = updatedCall;
+          return next;
+        }
+        return [...currentCalls, updatedCall];
+      });
+      setRecentCall((prev) =>
+        prev && (prev.id === updatedCall.id || prev.sid === updatedCall.sid)
+          ? updatedCall
+          : prev ?? updatedCall
+      );
+      if (!isUpdate) {
+        setRecentAttempt(null);
+      }
+      if (!isPredictive && !isUpdate) {
         const newRecipient = currentQueue.find((item) => updatedCall.contact_id === item.contact.id);
         if (newRecipient) {
           setNextRecipient(newRecipient);
@@ -105,12 +124,22 @@ export const useCalls = (
         }
       }
       } else if (payload.new.contact_id) {
-        // Call without attempt_id - could be tracked separately if needed in the future
-        // For now, we just add it to the calls list
-        setCalls((currentCalls) => [...currentCalls, updatedCall]);
+        setCalls((currentCalls) => {
+          const byId = currentCalls.findIndex((c) => c.id === updatedCall.id);
+          const bySid = updatedCall.sid
+            ? currentCalls.findIndex((c) => c.sid === updatedCall.sid)
+            : -1;
+          const idx = byId >= 0 ? byId : bySid;
+          if (isUpdate && idx >= 0) {
+            const next = currentCalls.slice();
+            next[idx] = updatedCall;
+            return next;
+          }
+          return [...currentCalls, updatedCall];
+        });
       }
     } catch (error) {
-      console.error('Error updating calls:', error);
+      logger.error('Error updating calls:', error);
     }
   }, [isPredictive]);
   

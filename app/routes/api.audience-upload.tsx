@@ -3,6 +3,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { parseCSV } from "../lib/csv";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 
 interface StorageBucket {
   id: string;
@@ -132,7 +133,7 @@ const processAudienceUpload = async (
       
       // Map the contacts according to the header mapping
       const mappedContacts = chunk.map((contact: CSVContact) => {
-        console.log('Processing contact:', contact);
+        logger.debug('Processing contact:', contact);
         
         const mappedContact: MappedContact = {
           workspace: workspaceId,
@@ -156,7 +157,7 @@ const processAudienceUpload = async (
           // Get the actual header with correct case from CSV
           const actualHeader = headerLookup.get(csvHeader.toLowerCase());
           if (!actualHeader) {
-            console.warn(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
+            logger.warn(`Warning: CSV header "${csvHeader}" not found in file. Available headers:`, headers);
             return;
           }
 
@@ -185,17 +186,18 @@ const processAudienceUpload = async (
           delete mappedContact.other_data;
         }
 
-        console.log('Final mapped contact:', mappedContact);
+        logger.debug('Final mapped contact:', mappedContact);
         return mappedContact;
       });
 
       // Log the first contact's transformation
       if (i === 0) {
-        console.log('First chunk transformation:');
-        console.log('Raw CSV row:', chunk[0]);
-        console.log('Available headers:', headers);
-        console.log('Header mapping used:', headerMapping);
-        console.log('Mapped result:', mappedContacts[0]);
+        logger.debug('First chunk transformation:', {
+          rawCsvRow: chunk[0],
+          availableHeaders: headers,
+          headerMapping,
+          mappedResult: mappedContacts[0]
+        });
       }
 
       // Insert contacts
@@ -205,7 +207,7 @@ const processAudienceUpload = async (
         .select('id, firstname, surname, other_data');
 
       if (insertError) {
-        console.error("Insert error details:", {
+        logger.error("Insert error details:", {
           error: insertError,
           firstContact: mappedContacts[0],
           mappingUsed: headerMapping,
@@ -218,7 +220,7 @@ const processAudienceUpload = async (
         throw new Error(`Error inserting contacts: ${insertError.message}`);
       }
 
-      console.log('Inserted contacts sample:', insertedContacts[0]);
+      logger.debug('Inserted contacts sample:', insertedContacts[0]);
 
       // Link contacts to audience
       const { error: linkError } = await supabaseClient
@@ -289,7 +291,7 @@ const processAudienceUpload = async (
       }), { upsert: true });
 
   } catch (error) {
-    console.error("Upload processing error:", error);
+    logger.error("Upload processing error:", error);
     
     // Update audience status to error
     await supabaseClient
@@ -446,7 +448,7 @@ export const action = async ({ request }: { request: Request }) => {
       headerMapping ? JSON.parse(headerMapping) : {},
       splitNameColumn || null
     ).catch(error => {
-      console.error("Background processing error:", error);
+      logger.error("Background processing error:", error);
     });
 
     // Return the audience ID and upload ID immediately
@@ -463,7 +465,7 @@ export const action = async ({ request }: { request: Request }) => {
     );
 
   } catch (error) {
-    console.error("Upload request error:", error);
+    logger.error("Upload request error:", error);
     return json({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });

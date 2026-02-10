@@ -28,6 +28,7 @@ import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInv
 import { toast, Toaster } from "sonner";
 import { useEffect } from "react";
 import type { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 
 type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
 type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];
@@ -223,7 +224,7 @@ async function handleTokenVerification(
       { headers },
     );
   } catch (error) {
-    console.error("Unhandled error during token verification", error);
+    logger.error("Unhandled error during token verification", error);
     const message =
       error instanceof Error ? error.message : "An unexpected error occurred while verifying.";
     return json<LoaderData>(
@@ -316,7 +317,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         { headers },
       );
     } catch (error) {
-      console.error("Error in updateUser:", error);
+      logger.error("Error in updateUser:", error);
       const message =
         error instanceof Error ? error.message : "An unexpected error occurred";
       return json<ActionData>(

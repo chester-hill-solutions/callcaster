@@ -1,7 +1,8 @@
-import { json, redirect } from "@remix-run/react";
+import { json, redirect } from "@remix-run/node";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "../database.types";
 import { getWorkspaceUsers } from "../database.server";
+import { logger } from "@/lib/logger.server";
 
 export async function handleAddUser(
   formData: FormData,
@@ -100,7 +101,7 @@ export async function handleDeleteSelf(
     .select()
     .single();
   if (errorDeletingSelf) {
-    console.error(errorDeletingSelf);
+    logger.error(errorDeletingSelf);
     return { data: null, error: errorDeletingSelf.message };
   }
 
@@ -164,7 +165,7 @@ export async function handleDeleteWorkspace({
       .select();
 
   if (deleteWorkspaceError) {
-    console.error("Error deleting workspace: ", deleteWorkspaceError);
+    logger.error("Error deleting workspace: ", deleteWorkspaceError);
     return { data: null, error: deleteWorkspaceError };
   }
 
@@ -189,7 +190,7 @@ export async function removeInvite({
     .eq("workspace", workspaceId)
     .eq("user_id", userId as string);
   if (error) {
-    console.error("Error removing invite: ", error);
+    logger.error("Error removing invite: ", error);
     return { data: null, error };
   }
   return { data, error: null };
@@ -227,7 +228,7 @@ export async function handleUpdateWebhook(
     .upsert(updateData)
     .select();
   if (webhookError) {
-    console.error("Error updating webhook", webhookError);
+    logger.error("Error updating webhook", webhookError);
     return json({ data: null, error: webhookError.message }, { headers });
   }
   
@@ -279,7 +280,7 @@ export async function testWebhook(
       error: null 
     };
   } catch (error: unknown) {
-    console.error("Error sending test data", error);
+    logger.error("Error sending test data", error);
     return { 
       data: null, 
       status: 500,
@@ -314,7 +315,7 @@ export async function sendWebhookNotification({
       .single();
     
     if (webhookError || !webhook) {
-      console.error(`No webhook configured for workspace ${workspaceId}`);
+      logger.error(`No webhook configured for workspace ${workspaceId}`);
       return { success: false, error: webhookError?.message || "No webhook configured" };
     }
 
@@ -329,7 +330,7 @@ export async function sendWebhookNotification({
       );
     
     if (!hasMatchingEvent) {
-      console.warn(`Webhook not configured for ${eventCategory}/${eventType} events`);
+      logger.warn(`Webhook not configured for ${eventCategory}/${eventType} events`);
       return { success: false, error: "Event type not enabled for this webhook" };
     }
 
@@ -355,13 +356,13 @@ export async function sendWebhookNotification({
     });
 
     if (!result.ok) {
-      console.error(`Webhook delivery failed: ${result.status} ${result.statusText}`);
+      logger.error(`Webhook delivery failed: ${result.status} ${result.statusText}`);
       return { success: false, error: `Webhook delivery failed: ${result.status} ${result.statusText}` };
     }
 
     return { success: true, error: null };
   } catch (error: unknown) {
-    console.error("Error sending webhook notification", error);
+    logger.error("Error sending webhook notification", error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

@@ -39,11 +39,7 @@ type Chat = {
   };
 }
 
-<<<<<<< HEAD:app/components/sms-ui/ChatHeader.tsx
 interface ChatHeaderParams {
-=======
-type ChatHeaderParams = {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatHeader.tsx
   contact?: Contact | null;
   outlet: boolean;
   phoneNumber?: string;
@@ -54,7 +50,6 @@ type ChatHeaderParams = {
   toggleContactMenu: () => void;
   isContactMenuOpen: boolean;
   handleContactSelect: (contact: Contact) => void;
-<<<<<<< HEAD:app/components/sms-ui/ChatHeader.tsx
   dropdownRef: RefObject<HTMLElement | null>;
   searchError?: string;
   existingConversation?: Chat & { phoneNumber?: string; latestMessage?: string; date?: string } | null;
@@ -62,15 +57,6 @@ type ChatHeaderParams = {
   potentialContacts: Contact[];
   contactNumber?: string;
   setDialog: (contact: Partial<Contact>) => void;
-=======
-  dropdownRef: RefObject<HTMLDivElement>;
-  searchError?: string;
-  existingConversation: Chat;
-  handleExistingConversationClick: (phoneNumber: string) => void;
-  potentialContacts: Contact[];
-  contactNumber?: string;
-  setDialog: (contact: Contact) => void;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatHeader.tsx
 }
 
 export default function ChatHeader({

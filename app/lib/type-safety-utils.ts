@@ -6,6 +6,7 @@
  */
 
 import type { Database } from './database.types';
+import { logger } from '@/lib/logger.client';
 
 // Type-safe error handling
 export interface AppError {
@@ -270,7 +271,7 @@ export function measurePerformance<T>(
       timestamp: Date.now(),
     };
     
-    console.log(`Performance: ${name}`, metrics);
+    logger.debug(`Performance: ${name}`, metrics);
     
     return { result, metrics };
   });

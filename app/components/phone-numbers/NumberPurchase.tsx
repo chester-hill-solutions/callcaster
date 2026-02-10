@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 
-import { AvailableNumber, FetcherData } from "../routes/workspaces_.$id_.settings_.numbers";
+import { AvailableNumber, FetcherData } from "@/routes/workspaces_.$id_.settings_.numbers";
+
+type PurchaseFetcherData = { newNumber?: string; creditsError?: boolean };
 
 export const NumberPurchase = ({ fetcher, workspaceId }: { fetcher: FetcherWithComponents<FetcherData>, workspaceId: string }) => {
-  const purchaseFetcher = useFetcher<{ newNumber: string }>();
+  const purchaseFetcher = useFetcher<PurchaseFetcherData>();
   const complete = purchaseFetcher.state === "idle" && Boolean(purchaseFetcher.data?.newNumber);
   const [openNumber, setOpenNumber] = useState<string | null>(null)
 
@@ -145,7 +147,7 @@ export const NumberPurchase = ({ fetcher, workspaceId }: { fetcher: FetcherWithC
                                   </DialogClose>
                                   {purchaseFetcher.data?.creditsError ? 
                                   <Button asChild>
-                                    <NavLink to="../credits" relative="path">Buy Credits</NavLink>
+                                    <NavLink to="../../billing" relative="path">Buy Credits</NavLink>
                                   </Button> : 
                                   <Button type="submit">Purchase</Button>}
                                 </DialogFooter>

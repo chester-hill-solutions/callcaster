@@ -35,6 +35,7 @@ import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
+import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import Workspace from "./workspaces_.$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 
@@ -428,6 +429,9 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
+        {hasAccess && (
+          <ApiKeysSection workspaceId={workspace?.id ?? ""} hasAccess={hasAccess} />
+        )}
         {hasAccess && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">

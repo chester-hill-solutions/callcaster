@@ -1,33 +1,20 @@
 import { CheckCircleIcon } from "lucide-react";
-<<<<<<< HEAD:app/components/call/CallScreen.Household.tsx
 import { Tables } from "@/lib/database.types";
 
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+type ContactRow = Tables<"contact">;
+type QueueItemRow = Tables<"campaign_queue"> & { contact: ContactRow };
 type Attempt = Tables<"outreach_attempt"> & {
   result?: { status?: string };
 };
 
 interface HouseholdProps {
-  house: QueueItem[];
-  switchQuestionContact: (args: { contact: QueueItem }) => void;
+  house: QueueItemRow[];
+  switchQuestionContact: (args: { contact: QueueItemRow }) => void;
   attemptList: Attempt[];
-=======
-import { Contact, OutreachAttempt, QueueItem } from "~/lib/types";
-
-interface HouseholdProps {
-  house: QueueItem[];
-  switchQuestionContact: (params: { contact: QueueItem }) => void;
-  attemptList: OutreachAttempt[];
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CallScreen.Household.tsx
-  questionContact: QueueItem | null;
+  questionContact: QueueItemRow | null;
   isBusy: boolean;
 }
 
-<<<<<<< HEAD:app/components/call/CallScreen.Household.tsx
-export const Household = ({ house, switchQuestionContact, attemptList, questionContact, isBusy }: HouseholdProps) => {
-  const isSelected = house?.find((contact) => contact?.id === questionContact?.id)
-=======
 export const Household = ({
   house,
   switchQuestionContact,
@@ -38,7 +25,6 @@ export const Household = ({
   const isSelected = house?.find(
     (queueItem) => queueItem?.contact?.id === questionContact?.contact?.id,
   );
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CallScreen.Household.tsx
   return (
     <div
       style={{
@@ -70,7 +56,7 @@ export const Household = ({
           Household Members
         </div>
       </div>
-      {house?.filter(Boolean).map((queueItem: QueueItem) => (
+      {house?.filter(Boolean).map((queueItem: QueueItemRow) => (
         // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
         <div
           key={queueItem.contact.id}
@@ -86,8 +72,8 @@ export const Household = ({
             <div>
               {(() => {
                 const attempt = attemptList.find(
-                  (attempt: OutreachAttempt) =>
-                    attempt.contact_id === queueItem.contact.id,
+                  (a: Attempt) =>
+                    a.contact_id === queueItem.contact.id,
                 );
                 if (
                   attempt?.result &&
@@ -95,7 +81,7 @@ export const Household = ({
                   !Array.isArray(attempt.result)
                 ) {
                   const resultObject = attempt.result as Record<string, unknown>;
-                  if ("status" in resultObject && resultObject.status) {
+                  if ("status" in resultObject && resultObject["status"]) {
                     return <CheckCircleIcon size={"16px"} />;
                   }
                 }

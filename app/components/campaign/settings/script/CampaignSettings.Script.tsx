@@ -1,18 +1,11 @@
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.tsx
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from '@remix-run/react';
 import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
 import { useScriptState } from '@/hooks/campaign/useScriptState';
 import Sidebar from '@/components/script/Script.Sidebar';
 import ScriptMainContent from '@/components/script/Script.MainContent';
-=======
-import { useCallback, useState } from "react";
-import { useNavigate } from "@remix-run/react";
-import { LiveCampaign, IVRCampaign, Script } from "~/lib/types";
-import ScriptMainContent from "./Script.MainContent";
-import Sidebar from "./Script.Sidebar";
-import { isObject, isString } from "../lib/type-utils";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.tsx
+import { logger } from '@/lib/logger.client';
+import { isObject, isString } from '@/lib/type-utils';
 
 type PageData = {
   campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };
@@ -89,7 +82,9 @@ export default function CampaignSettingsScript({
   const [openBlock, setOpenBlock] = useState<string | null>(null);
 
   const script = pageData.campaignDetails.script;
-  const scriptData = script.steps;
+  const scriptData: ScriptData = isScriptData(script.steps)
+    ? script.steps
+    : { pages: {}, blocks: {} };
 
   const updateScript = useCallback((newScript: Script | ((prev: Script) => Script)) => {
     onPageDataChange({
@@ -105,13 +100,13 @@ export default function CampaignSettingsScript({
     const updatedScriptData = typeof newScriptData === "function" ? newScriptData(scriptData) : newScriptData;
     
     if (!isScriptData(updatedScriptData)) {
-      console.error('Invalid script data format');
+      logger.error('Invalid script data format');
       return;
     }
     
     updateScript({
       ...script,
-      steps: updatedScriptData,
+      steps: updatedScriptData as unknown as NonNullable<Script["steps"]>,
     });
   }, [script, updateScript]);
 
@@ -126,14 +121,16 @@ export default function CampaignSettingsScript({
         [blockId]: {
           id: blockId,
           type,
-        },
+        } as ScriptBlock,
       },
       pages: {
         ...prevScriptData.pages,
         [currentPage]: {
           ...prevScriptData.pages[currentPage],
+          id: currentPage,
+          title: prevScriptData.pages[currentPage]?.title ?? "",
           blocks: [...(prevScriptData.pages[currentPage]?.blocks || []), blockId],
-        },
+        } as ScriptPage,
       },
     }));
     setOpenBlock(blockId);
@@ -145,9 +142,8 @@ export default function CampaignSettingsScript({
       
       // Remove block from all pages
       Object.keys(newScriptData.pages).forEach((pageId) => {
-        newScriptData.pages[pageId].blocks = newScriptData.pages[pageId].blocks.filter(
-          (id) => id !== blockId
-        );
+        const page = newScriptData.pages[pageId];
+        if (page) page.blocks = page.blocks.filter((id) => id !== blockId);
       });
       
       // Remove block definition
@@ -164,9 +160,8 @@ export default function CampaignSettingsScript({
       
       // Remove block from current page
       if (currentPage) {
-        newScriptData.pages[currentPage].blocks = newScriptData.pages[currentPage].blocks.filter(
-          (id) => id !== blockId
-        );
+        const page = newScriptData.pages[currentPage];
+        if (page) page.blocks = page.blocks.filter((id) => id !== blockId);
       }
       
       // Add block to target page
@@ -190,8 +185,10 @@ export default function CampaignSettingsScript({
         ...prevScriptData.blocks,
         [blockId]: {
           ...prevScriptData.blocks[blockId],
+          id: blockId,
+          type: prevScriptData.blocks[blockId]?.type ?? "textblock",
           title,
-        },
+        } as ScriptBlock,
       },
     }));
   }, [updateScriptData]);
@@ -203,15 +200,17 @@ export default function CampaignSettingsScript({
         ...prevScriptData.blocks,
         [blockId]: {
           ...prevScriptData.blocks[blockId],
+          id: blockId,
           type: newType,
-        },
+          title: prevScriptData.blocks[blockId]?.title ?? "",
+        } as ScriptBlock,
       },
     }));
   }, [updateScriptData]);
 
   const updateBlock = useCallback((id: string, newBlockData: BlockUpdate) => {
     if (!isBlockUpdate(newBlockData)) {
-      console.error('Invalid block update format');
+      logger.error('Invalid block update format');
       return;
     }
     
@@ -222,7 +221,8 @@ export default function CampaignSettingsScript({
         [id]: {
           ...prevScriptData.blocks[id],
           ...newBlockData,
-        },
+          id,
+        } as ScriptBlock,
       },
     }));
   }, [updateScriptData]);
@@ -256,9 +256,9 @@ export default function CampaignSettingsScript({
       navigate("../../../../scripts/new");
     } else {
       const newScript = scripts.find((script) => script.id === parseInt(value));
-      if (newScript) {
+      if (newScript && isScriptData(newScript.steps)) {
         updateScript(() => newScript);
-        updateScriptData(() => newScript.steps);
+        updateScriptData(() => newScript.steps as unknown as ScriptData);
         setCurrentPage(getFirstPageId(newScript.steps));
         setOpenBlock(null);
       }
@@ -273,14 +273,17 @@ export default function CampaignSettingsScript({
           ...prevScriptData.pages,
           [currentPage]: {
             ...prevScriptData.pages[currentPage],
+            id: currentPage,
             title: event.target.value,
-          },
+            blocks: prevScriptData.pages[currentPage]?.blocks ?? [],
+          } as ScriptPage,
         },
       }));
     }
   }, [currentPage, updateScriptData]);
 
   const handleReorder = useCallback((draggedId: string, targetId: string, dropPosition: 'top' | 'bottom') => {
+    if (!currentPage) return;
     updateScriptData((prevScriptData) => {
       const currentPageBlocks = prevScriptData.pages[currentPage].blocks;
       const draggedIndex = currentPageBlocks.indexOf(draggedId);
@@ -293,14 +296,17 @@ export default function CampaignSettingsScript({
       const newTargetIndex = dropPosition === "top" ? targetIndex : targetIndex + 1;
       newBlocksOrder.splice(newTargetIndex, 0, draggedId);
 
+      const curPage = prevScriptData.pages[currentPage];
       return {
         ...prevScriptData,
         pages: {
           ...prevScriptData.pages,
           [currentPage]: {
-            ...prevScriptData.pages?.[currentPage],
+            ...curPage,
+            id: currentPage,
+            title: curPage?.title ?? "",
             blocks: newBlocksOrder,
-          },
+          } as ScriptPage,
         },
       };
     });

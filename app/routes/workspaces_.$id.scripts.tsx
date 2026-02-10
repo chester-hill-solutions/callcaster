@@ -8,16 +8,11 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { formatDateToLocale } from "@/lib/utils";
 import { useEffect } from "react";
 import type { PostgrestError } from "@supabase/supabase-js";
-<<<<<<< HEAD
-import { Json } from "@/lib/supabase.types";
-import { User } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
-=======
-import type { Json } from "~/lib/database.types";
-import type { User } from "~/lib/types";
+import { logger } from "@/lib/logger.server";
+import type { Json } from "@/lib/database.types";
+import type { User } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "~/lib/database.types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import type { Database } from "@/lib/database.types";
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;
@@ -125,7 +120,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .single();
 
   if (scriptError) {
-    console.error("Error fetching script:", scriptError);
+    logger.error("Error fetching script:", scriptError);
     return json({ error: "Error fetching script" }, { status: 500 });
   }
 

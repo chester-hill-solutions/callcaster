@@ -1,8 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface CampaignData {
   voicemail_file?: string;
@@ -62,7 +64,7 @@ const handleVoicemail = async (twilio: any, callSid: string, dbCall: CallData, s
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
 
     try {
@@ -81,7 +83,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const call = twilio.calls(callSid);
 
         const updateCallAndAttempt = async (answeredBy: string) => {
-            const firstStepUrl = `${process.env.BASE_URL}/api/ivr/${dbCall.campaign_id}/1`;
+            const firstStepUrl = `${env.BASE_URL()}/api/ivr/${dbCall.campaign_id}/1`;
             await call.update({ url: firstStepUrl });
 
             const updates = [
@@ -116,7 +118,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         await Promise.all(updateOperations);
     } catch (error) {
-        console.error(error);
+        logger.error("IVR campaign error:", error);
         return json({ success: false, error });
     }
     return json({ success: true });

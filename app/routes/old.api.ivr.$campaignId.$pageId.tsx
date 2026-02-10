@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface CallData {
   sid: string;
@@ -79,7 +81,7 @@ const handleBlock = async (supabase: any, twiml: any, block: Block, dbCall: Call
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const twiml = new Twilio.twiml.VoiceResponse();
     const formData = await request.formData();
     const { campaignId, pageId, blockId } = params;
@@ -113,7 +115,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             }
         }
     } catch (e) {
-        console.error(e);
+        logger.error("IVR page error:", e);
         twiml.say("An error occurred. Please try again later.");
         twiml.hangup();
     }

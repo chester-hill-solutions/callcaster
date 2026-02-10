@@ -1,22 +1,13 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-<<<<<<< HEAD
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
-import { User, SurveyWithPages } from "@/lib/types";
+import type { User, SurveyWithPages } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-=======
-import { verifyAuth } from "~/lib/supabase.server";
-import { getUserRole } from "~/lib/database.server";
-import type { User } from "~/lib/types";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import { logger } from "@/lib/logger.server";
 import { 
   Calendar, 
   Users, 
@@ -129,7 +120,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .limit(10);
 
   if (responsesError) {
-    console.error("Error fetching responses:", responsesError);
+    logger.error("Error fetching responses:", responsesError);
   }
 
   return json({

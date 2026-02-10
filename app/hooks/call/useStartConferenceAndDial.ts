@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { BaseUser } from "@/lib/types";
 import { startConferenceAndDial } from "@/lib/services/hooks-api";
+import { logger } from "@/lib/logger.client";
 
 /**
  * Hook for starting a Twilio conference and initiating a dial
@@ -69,7 +70,7 @@ const useStartConferenceAndDial = ({ userId, campaignId, workspaceId, callerId, 
             if (!selectedDevice) missingParams.push('selectedDevice');
             
             const errorMessage = `Missing required parameters: ${missingParams.join(', ')}`;
-            console.error(errorMessage);
+            logger.error(errorMessage);
             setError(errorMessage);
             return;
         }
@@ -103,14 +104,14 @@ const useStartConferenceAndDial = ({ userId, campaignId, workspaceId, callerId, 
                 setError(null);
             } else {
                 const errorMessage = startConferenceData.error || 'Failed to start conference';
-                console.error('Failed to start conference:', errorMessage);
+                logger.error('Failed to start conference:', errorMessage);
                 setError(errorMessage);
             }
         } catch (error) {
             const errorMessage = error instanceof Error 
                 ? error.message 
                 : 'An unexpected error occurred during conference setup';
-            console.error('Error during conference setup and dialing:', error);
+            logger.error('Error during conference setup and dialing:', error);
             setError(errorMessage);
         } finally {
             setIsLoading(false);

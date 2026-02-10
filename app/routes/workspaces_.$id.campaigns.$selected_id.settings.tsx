@@ -2,8 +2,9 @@ import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
-import { fetchCampaignAudience } from "@/lib/database.server";
+import { fetchCampaignAudience, parseActionRequest } from "@/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger.server";
 import {
   Audience,
   Campaign,
@@ -119,7 +120,7 @@ async function updateCampaignStatus(
     if (status === "paused") update.is_active = false;
   }
 
-  console.log("Server update object:", JSON.stringify(update));
+  logger.debug("Server update object:", update);
   const { error } = await supabaseClient
     .from("campaign")
     .update({ ...update })
@@ -189,19 +190,19 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
-  const formData = await request.formData();
-  const intent = formData.get("intent") as string;
+  const data = await parseActionRequest(request);
+  const intent = String(data.intent ?? "");
 
   switch (intent) {
     case "update": {
       const updates: CampaignUpdateFields = {};
-      const campaignDataStr = formData.get("campaignData") as string;
-      const campaignDetailsStr = formData.get("campaignDetails") as string;
-      const campaignData = JSON.parse(campaignDataStr || "{}");
+      const campaignDataStr = data.campaignData != null ? String(data.campaignData) : "";
+      const campaignDetailsStr = data.campaignDetails != null ? String(data.campaignDetails) : "";
+      const campaignData = campaignDataStr ? JSON.parse(campaignDataStr) : {};
 
       // Handle script_id update
-      if (formData.has("script_id")) {
-        const script_id = Number(formData.get("script_id"));
+      if ("script_id" in data && data.script_id != null) {
+        const script_id = Number(data.script_id);
         if (campaignDataStr) {
           await supabaseClient
             .from("campaign")
@@ -219,8 +220,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
 
       // Handle body_text update
-      if (formData.has("body_text")) {
-        const body_text = formData.get("body_text") as string;
+      if ("body_text" in data && data.body_text != null) {
+        const body_text = String(data.body_text);
         const tableKey = getCampaignTableKey(campaignData.type);
         await supabaseClient
           .from(tableKey as "live_campaign" | "ivr_campaign" | "message_campaign")
@@ -229,13 +230,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return { success: true };
       }
 
-      for (const [key, value] of formData.entries()) {
-        if (key !== "intent") {
-          if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
-            updates[key] = JSON.parse(value);
-          } else {
-            updates[key] = value;
-          }
+      const skipKeys = new Set(["intent", "campaignData", "campaignDetails"]);
+      for (const [key, value] of Object.entries(data)) {
+        if (skipKeys.has(key)) continue;
+        if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
+          updates[key] = JSON.parse(value);
+        } else {
+          updates[key] = value;
         }
       }
 
@@ -247,8 +248,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     case "status": {
-      const status = formData.get("status") as CampaignStatus;
-      const is_active = formData.get("is_active") as string;
+      const status = String(data.status ?? "") as CampaignStatus;
+      const is_active = String(data.is_active ?? "");
       return updateCampaignStatus(
         supabaseClient,
         selected_id,
@@ -258,7 +259,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     case "duplicate": {
-      const campaignData = formData.get("campaignData") as string;
+      const campaignData = data.campaignData != null ? String(data.campaignData) : "";
       return handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
     }
 
@@ -360,11 +361,7 @@ export default function CampaignSettingsRoute() {
     setConfirmStatus(status);
   };
 
-<<<<<<< HEAD
   const handleInputChange = (name: string, value: string | number | null | undefined) => {
-=======
-  const handleInputChange = (name: string, value: string | number | boolean | Schedule | null) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     if (name === "script_id") {
       // For script selection, we need to update both campaign data and details
       fetcher.submit(

@@ -9,6 +9,8 @@ import {
 } from "@remix-run/react";
 import { Suspense, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger as loggerServer } from "@/lib/logger.server";
+import { logger as loggerClient } from "@/lib/logger.client";
 
 import {
   fetchBasicResults,
@@ -90,7 +92,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       prop_workspace_id: workspace_id
     }).csv();
     if (error || !data) {
-      console.error(error);
+      loggerServer.error("Error fetching campaign messages:", error);
       return json({ error: error?.message || "Error fetching campaign messages" }, { status: 500 });
     }
     return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
@@ -99,7 +101,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       p_campaign_id: Number(campaign_id)
     }).csv();
     if (error || !data) {
-      console.error(error);
+      loggerServer.error("Error fetching campaign attempts:", error);
       return json({ error: error?.message || "Error fetching campaign attempts" }, { status: 500 });
     }
     return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
@@ -168,8 +170,22 @@ export default function CampaignScreen() {
   const location = useLocation();
   const route = location.pathname.split("/");
   const isCampaignParentRoute = route.length === 5;
-  const { data: campaignDetailsArray, isSyncing: campaignDetailsSyncing, error: campaignDetailsError } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails])
+  const revalidator = useRevalidator();
+  const lastRevalidateRef = useRef(0);
+  const { data: campaignDetailsArray } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails]);
   const campaignDetails = campaignDetailsArray?.[0];
+
+  useSupabaseRealtimeSubscription({
+    supabase,
+    table: "campaign_queue",
+    filter: selected_id ? `campaign_id=eq.${selected_id}` : "campaign_id=eq.-1",
+    onChange: () => {
+      const now = Date.now();
+      if (now - lastRevalidateRef.current < 2000) return;
+      lastRevalidateRef.current = now;
+      revalidator.revalidate();
+    },
+  });
   
   // Handle CSV download when csvData is available
   useEffect(() => {
@@ -177,7 +193,7 @@ export default function CampaignScreen() {
       try {
         downloadCsv(csvData.csvContent, csvData.filename);
       } catch (error) {
-        console.error('Failed to download CSV:', error);
+        loggerClient.error('Failed to download CSV:', error);
       }
     }
   }, [csvData]);

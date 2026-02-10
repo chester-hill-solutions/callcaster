@@ -1,15 +1,16 @@
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const toNumber = formData.get('To') as string;
-  const baseUrl = process.env.BASE_URL;
+  const baseUrl = env.BASE_URL();
   let twiml = new Twilio.twiml.VoiceResponse();
 
   if (isAValidPhoneNumber(toNumber)) {
     let dial = twiml.dial({
-      callerId: process.env.TWILIO_PHONE_NUMBER,
+      callerId: env.TWILIO_PHONE_NUMBER(),
       record: 'record-from-answer',
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: 'completed',

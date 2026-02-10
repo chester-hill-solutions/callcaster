@@ -3,6 +3,7 @@ import { useLoaderData } from "@remix-run/react";
 import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.client";
 
 interface LoaderData {
   success: boolean;
@@ -40,9 +41,9 @@ export default function Call() {
       `wss://socketserver-production-2306.up.railway.app/${id}`,
     );
 
-    ws.onopen = () => console.log("WebSocket connection established");
-    ws.onerror = (event) => console.error("WebSocket error:", event);
-    ws.onclose = () => console.log("WebSocket connection closed");
+    ws.onopen = () => logger.debug("WebSocket connection established");
+    ws.onerror = (event) => logger.error("WebSocket error:", event);
+    ws.onclose = () => logger.debug("WebSocket connection closed");
 
     ws.onmessage = async (e) => {
       if (e.data) {
@@ -65,7 +66,7 @@ export default function Call() {
   function createWavFileFromBuffers(wavFiles: ArrayBuffer[], sampleRate: number) {
     // Implementation for creating WAV file from buffers
     // This is a placeholder - actual implementation would depend on requirements
-    console.log(`Creating WAV file from ${wavFiles.length} buffers with sample rate ${sampleRate}`);
+    logger.debug(`Creating WAV file from ${wavFiles.length} buffers with sample rate ${sampleRate}`);
     return new ArrayBuffer(0); // Placeholder return
   }
 
@@ -89,7 +90,7 @@ export default function Call() {
           audioBuffer.current = [];
         };
       } catch (error) {
-        console.error("Error decoding audio data:", error);
+        logger.error("Error decoding audio data:", error);
       }
     }
   };
@@ -120,7 +121,7 @@ export default function Call() {
 
       setIsRecording(true);
     } catch (error) {
-      console.error("Error accessing media devices.", error);
+      logger.error("Error accessing media devices.", error);
     }
   };
 

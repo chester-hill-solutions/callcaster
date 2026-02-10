@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useSubmit, useFetcher } from "@remix-run/react";
+import { useParams, useNavigate, useFetcher } from "@remix-run/react";
 import { parse } from "csv-parse/sync";
-import { MdAdd, MdClose, MdCheck, MdArrowForward } from "react-icons/md";
+import { MdAdd, MdClose, MdCheck } from "react-icons/md";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { Contact } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
@@ -27,7 +28,7 @@ const parseCSV = (csvString: string) => {
     const contacts = parseCSVData(records, headers);
     return { headers, contacts };
   } catch (error) {
-    console.error("Error parsing CSV:", error);
+    logger.error("Error parsing CSV:", error);
     throw new Error("Failed to parse CSV file");
   }
 };
@@ -51,13 +52,6 @@ const parseCSVData = (records: CSVRecord[], headers: string[]) => {
   });
 };
 
-const sanitizeValue = (value: unknown): string => {
-  if (value === null || value === undefined) return '';
-  const str = String(value).trim();
-  // Remove null bytes and other problematic characters
-  return str.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\uFFFD]/g, '');
-};
-
 type AudienceUploaderProps = {
   audienceName?: string;
   existingAudienceId?: string;
@@ -75,7 +69,7 @@ export default function AudienceUploader({
   onUploadComplete 
 }: AudienceUploaderProps) {
   const params = useParams();
-  const workspaceId = params.id;
+  const workspaceId = params["id"];
   const navigate = useNavigate();
   
   // File upload state
@@ -107,7 +101,7 @@ export default function AudienceUploader({
   useSupabaseRealtimeSubscription({
     supabase,
     table: "audience",
-    filter: audienceId ? `id=eq.${audienceId}` : undefined,
+    ...(audienceId ? { filter: `id=eq.${audienceId}` } : {}),
     onChange: (payload) => {
       if (payload.eventType === "UPDATE" && payload.new) {
         const newData = payload.new as {
@@ -174,7 +168,7 @@ export default function AudienceUploader({
           }
         }
       } catch (error) {
-        console.error("Error polling status:", error);
+        logger.error("Error polling status:", error);
         setUploadError("Error checking upload status");
         setStatusPollingEnabled(false);
       }
@@ -303,7 +297,7 @@ export default function AudienceUploader({
       setAudienceId(data.audience_id);
       
     } catch (error) {
-      console.error("Upload error:", error);
+      logger.error("Upload error:", error);
       setUploadError(error instanceof Error ? error.message : "An unexpected error occurred");
       setUploadStatus("error");
     }
@@ -337,9 +331,9 @@ export default function AudienceUploader({
       const timer = setTimeout(() => {
         navigate(`/workspaces/${workspaceId}/audiences/${audienceId}`);
       }, 2000);
-      
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [uploadStatus, audienceId, workspaceId, navigate, onUploadComplete]);
 
   return (

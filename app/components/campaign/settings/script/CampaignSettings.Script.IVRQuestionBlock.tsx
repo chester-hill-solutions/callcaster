@@ -8,17 +8,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Page, IVROption, IVRBlock } from "@/lib/types";
 import { AddIcon } from "@/components/shared/Icons";
-=======
-} from "~/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Page, IVROption, IVRBlock } from "~/lib/types";
-import { AddIcon } from "./Icons";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
 import {
   MdAdd,
   MdAddCircle,
@@ -37,11 +30,7 @@ type AudioFile = {
   created_at: Date;
   id: string;
   last_accessed_at: Date;
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
   metadata: Record<string, unknown> | null;
-=======
-  metadata: unknown;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   name: string;
   updated_at: Date;
 };
@@ -63,10 +52,14 @@ const IVRQuestionBlockOption = ({
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleSave = (input: "vx-any" | number) => {
-    onChange(index, { ...option, value: input });
+  const handleSave = (input: string, _nextAction: string) => {
+    const value = input === "vx-any" ? "vx-any" : Number(input);
+    onChange(index, { ...option, value });
     setIsModalOpen(false);
   };
+
+  const initialInput =
+    option.value === "vx-any" ? "vx-any" : option.value != null ? String(option.value) : null;
 
   return (
     <>
@@ -74,7 +67,7 @@ const IVRQuestionBlockOption = ({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSave}
-        initialInput={option.value}
+        initialInput={initialInput}
       />
       <div className="mb-2 flex items-center space-x-2">
         <div className="flex flex-col">
@@ -148,25 +141,12 @@ const IVRQuestionBlock = ({
     setLocalBlock(block);
   }, [block]);
 
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
   const handleChange = (field: keyof IVRBlock, value: string | IVROption[] | "recorded" | "synthetic" | "dtmf" | "speech" | "dtmf speech" | null) => {
-=======
-  const handleChange = (field: string, value: string) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
     const updatedBlock = { ...localBlock, [field]: value };
     setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
 
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
-=======
-  const handleOptionsChange = (newOptions: IVROption[]) => {
-    const updatedBlock = { ...localBlock, options: newOptions };
-    setLocalBlock(updatedBlock);
-    onUpdate(updatedBlock);
-  };
-
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   const handleNextChange = (index: number, value: string) => {
     const newOptions = localBlock.options.map((opt, i) => {
       if (i !== index) return opt;
@@ -175,39 +155,23 @@ const IVRQuestionBlock = ({
         next: value,
       };
     });
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
-=======
-    handleOptionsChange(newOptions as IVROption[]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleOptionChange = (index: number, newOption: IVROption) => {
     const newOptions = [...localBlock.options];
     newOptions[index] = newOption;
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
-=======
-    handleOptionsChange(newOptions as IVROption[]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleAddOption = () => {
     const newOptions = [...localBlock.options, { content: "", next: "" }];
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
-=======
-    handleOptionsChange(newOptions as IVROption[]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   const handleRemoveOption = (index: number) => {
     const newOptions = localBlock.options.filter((_, i) => i !== index);
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
     handleChange("options", newOptions as IVROption[]);
-=======
-    handleOptionsChange(newOptions as IVROption[]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
   };
 
   return (
@@ -238,11 +202,7 @@ const IVRQuestionBlock = ({
               value={localBlock.title}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("title", e.target.value)}
               placeholder="Block Title"
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.IVRQuestionBlock.tsx
-              className=""
-=======
               className="w-full"
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.IVRQuestionBlock.tsx
               disabled={false}
             />
             <Select

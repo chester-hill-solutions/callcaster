@@ -2,14 +2,10 @@ import { json, redirect } from "@remix-run/node";
 import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
 import { toast, Toaster } from "sonner";
-<<<<<<< HEAD
 import { Button } from "@/components/ui/button";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
-=======
-import { Button } from "~/components/ui/button";
-import { createSupabaseServerClient, verifyAuth } from "~/lib/supabase.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
@@ -31,7 +27,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     return redirect("/workspaces", { headers });
   }
-  console.log(error);
+  logger.error("Sign-in error", error);
   return json({ error: error.message });
 };
 

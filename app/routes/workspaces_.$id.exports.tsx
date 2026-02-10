@@ -4,6 +4,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
+import { logger } from "@/lib/logger.server";
 import {
   Table,
   TableBody,
@@ -86,7 +87,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           .download(`${workspaceId}/${file.name}`);
 
         if (downloadError) {
-          console.error(`Error downloading status file ${file.name}:`, downloadError);
+          logger.error(`Error downloading status file ${file.name}:`, downloadError);
           return null;
         }
 
@@ -111,7 +112,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
         return exportItem;
       } catch (error) {
-        console.error(`Error processing file ${file.name}:`, error);
+        logger.error(`Error processing file ${file.name}:`, error);
         return null;
       }
     }));
@@ -129,7 +130,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       })),
     });
   } catch (error) {
-    console.error("Error fetching exports:", error);
+    logger.error("Error fetching exports:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return json({ error: message }, { status: 500 });
   }

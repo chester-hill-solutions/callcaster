@@ -1,7 +1,8 @@
 import { Audience, Contact, QueueItem } from "@/lib/types";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { useSearchParams, useNavigation, Form, useSubmit, useFetcher } from "@remix-run/react";
+import { useSearchParams, useNavigation, Form, useFetcher } from "@remix-run/react";
+import { useOptimisticMutation } from "@/hooks/utils/useOptimisticMutation";
 import {
     useReactTable,
     getCoreRowModel,
@@ -33,7 +34,8 @@ interface QueueTableProps {
         email: string;
         address: string;
         audiences: string;
-        status: string;
+        disposition: string;
+        queueStatus: string;
     };
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
@@ -42,6 +44,7 @@ interface QueueTableProps {
     isAllFilteredSelected: boolean;
     addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
     removeContactsFromQueue: (ids: string[] | 'all') => void;
+    queueFetcher?: ReturnType<typeof useFetcher>;
 }
 
 export function QueueTable({
@@ -59,18 +62,20 @@ export function QueueTable({
     clearFilter,
     addContactToQueue,
     removeContactsFromQueue,
+    queueFetcher,
 }: QueueTableProps) {
     const navigation = useNavigation();
     const fetcher = useFetcher();
     const isLoading = navigation.state === "loading";
-    const isFiltered = defaultFilters.name !== '' || defaultFilters.phone !== '' || defaultFilters.status !== '' || defaultFilters.audiences !== '' || defaultFilters.address !== '' || defaultFilters.email !== '';
+    const isFiltered = defaultFilters.name !== '' || defaultFilters.phone !== '' || defaultFilters.disposition !== '' || defaultFilters.queueStatus !== '' || defaultFilters.audiences !== '' || defaultFilters.address !== '' || defaultFilters.email !== '';
     const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
     const [sorting, setSorting] = useState<SortingState>([]);
     // Optimistic state for queue items
     const [optimisticQueue, setOptimisticQueue] = useState(queue);
 
     // Add these state hooks at the top of your component
-    const [optimisticStatus, setOptimisticStatus] = useState(defaultFilters.status || "");
+    const [optimisticQueueStatus, setOptimisticQueueStatus] = useState("");
+    const [optimisticDisposition, setOptimisticDisposition] = useState(defaultFilters.disposition || "");
     const [optimisticAudience, setOptimisticAudience] = useState(defaultFilters.audiences || "");
     const [optimisticInputs, setOptimisticInputs] = useState({
         name: defaultFilters.name || "",
@@ -83,6 +88,17 @@ export function QueueTable({
         setOptimisticQueue(queue);
     }, [queue]);
 
+    const snapshotRef = useRef<QueueItem[]>(queue ?? []);
+    const fallbackFetcher = useFetcher();
+    useOptimisticMutation({
+        fetcher: queueFetcher ?? fallbackFetcher,
+        isError: (d) => Boolean(d && typeof d === "object" && "error" in d && d.error),
+        onRollback: useCallback(() => {
+            setOptimisticQueue(snapshotRef.current ?? []);
+        }, []),
+        errorMessage: "Queue update failed. Changes reverted.",
+    });
+
     useEffect(() => {
         setOptimisticInputs({
             name: defaultFilters.name || "",
@@ -90,6 +106,7 @@ export function QueueTable({
             email: defaultFilters.email || "",
             address: defaultFilters.address || ""
         });
+        setOptimisticDisposition(defaultFilters.disposition || "");
     }, [defaultFilters]);
 
     const selectAllVisible = useCallback(() => {
@@ -137,6 +154,7 @@ export function QueueTable({
 
     // Optimistic update handlers
     const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: typeof STATUS_OPTIONS[number]) => {
+        snapshotRef.current = optimisticQueue ?? [];
         setOptimisticQueue(prev =>
             prev?.map(item =>
                 selectedIds.includes(item.id.toString())
@@ -145,9 +163,10 @@ export function QueueTable({
             ) || []
         );
         onStatusChange?.(selectedIds, newStatus);
-    }, [onStatusChange]);
+    }, [onStatusChange, optimisticQueue]);
 
     const handleRemoveContactsOptimistic = useCallback((ids: string[] | 'all') => {
+        snapshotRef.current = optimisticQueue ?? [];
         if (ids === 'all') {
             setOptimisticQueue([]);
         } else {
@@ -157,7 +176,7 @@ export function QueueTable({
         }
         removeContactsFromQueue(ids);
         clearSelection();
-    }, [removeContactsFromQueue, clearSelection]);
+    }, [removeContactsFromQueue, clearSelection, optimisticQueue]);
 
     const columns = useMemo<ColumnDef<QueueItem & { contact: Contact }>[]>(() => [
         {
@@ -430,14 +449,14 @@ export function QueueTable({
                         </div>
                         <select
                             name="status"
-                            value={selectedRows.length > 0 ? "" : optimisticStatus}
+                            value={selectedRows.length > 0 ? "" : optimisticQueueStatus}
                             onChange={(e) => {
                                 const newValue = e.target.value;
                                 if (selectedRows.length > 0 || isAllFilteredSelected) {
                                     handleStatusChangeOptimistic(selectedRows, newValue as typeof STATUS_OPTIONS[number]);
                                 } else {
-                                    setOptimisticStatus(newValue);
-                                    handleFilterChange('status', newValue);
+                                    setOptimisticQueueStatus(newValue);
+                                    handleFilterChange('queueStatus', newValue);
                                 }
                             }}
                             className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs"
@@ -473,7 +492,7 @@ export function QueueTable({
                 const contact = row.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
                 return contact?.outreach_attempt?.[0]?.disposition || '-';
             },
-            id: 'status',
+            id: 'disposition',
             header: ({ column }) => {
                 return (
                     <div className="flex flex-col items-center px-1 space-y-1">
@@ -481,7 +500,7 @@ export function QueueTable({
                             <span className="font-medium text-xs">Attempt</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <select name="status" className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs" defaultValue={defaultFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                            <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
                                 <option value="">Select...</option>
                                 {ATTEMPT_OPTIONS.map((attempt) => (
                                     <option key={attempt} value={attempt}>{attempt}</option>
@@ -500,7 +519,7 @@ export function QueueTable({
                 )
             },
         }
-    ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection]);
+    ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection, optimisticDisposition, optimisticQueueStatus]);
 
     const table = useReactTable({
         data: optimisticQueue || [],

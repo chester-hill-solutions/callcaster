@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
 import type { Database, Tables } from "@/lib/database.types";
 import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
+import { logger } from "@/lib/logger.client";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
 
@@ -95,40 +96,72 @@ export const useChatRealTime = ({
   }, [contact_number]);
 
   const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Tables<"message">>) => {
-    if (payload.eventType === 'INSERT' && payload.new?.workspace === workspace) {
-      if (payload.new.status === "failed") return;
-      
-      // If contact_number is provided, only add messages for this contact
-      const currentContactNumber = contactNumberRef.current;
-      if (currentContactNumber) {
-        const isFromContact = phoneNumbersMatch(payload.new.from, currentContactNumber);
-        const isToContact = phoneNumbersMatch(payload.new.to, currentContactNumber);
-        
-        if (!isFromContact && !isToContact) {
-          // Message is not related to this contact
-          return;
-        }
-      }
-      
+    const newRow = payload.new as Tables<"message"> | null;
+    if (!newRow?.workspace || newRow.workspace !== workspace) return;
+
+    const currentContactNumber = contactNumberRef.current;
+    const isForContact = !currentContactNumber ||
+      phoneNumbersMatch(newRow.from, currentContactNumber) ||
+      phoneNumbersMatch(newRow.to, currentContactNumber);
+    if (!isForContact) return;
+
+    if (payload.eventType === "INSERT") {
+      if (newRow.status === "failed") return;
       setMessages((curr) => {
-        const newMessage = payload.new as Message;
+        const newMessage = newRow as Message;
         if (!newMessage?.sid || messageIdsRef.current.has(newMessage.sid)) {
           return curr;
         }
         messageIdsRef.current.add(newMessage.sid);
-        return [...curr, newMessage];
+        // Replace pending message with same body/from/to if present
+        const withoutMatchingPending = curr.filter((m) => {
+          if (!m?.sid?.startsWith?.("pending-")) return true;
+          return !(
+            m.body === newMessage.body &&
+            phoneNumbersMatch(m.from, newMessage.from) &&
+            phoneNumbersMatch(m.to, newMessage.to)
+          );
+        });
+        return [...withoutMatchingPending, newMessage];
       });
+    } else if (payload.eventType === "UPDATE" && newRow?.sid) {
+      setMessages((curr) =>
+        curr.map((m) =>
+          m?.sid === newRow?.sid ? (newRow as Message) : m
+        )
+      );
     }
-  }, [workspace]); // Remove contact_number dependency since we use the ref
+  }, [workspace]);
+
+  const addOptimisticMessage = useCallback(
+    (params: { body: string; from: string; to: string; media?: string }) => {
+      const mediaArr = params.media ? JSON.parse(params.media || "[]") : [];
+      const pending = {
+        sid: `pending-${Date.now()}`,
+        body: params.body,
+        from: params.from,
+        to: params.to,
+        workspace,
+        direction: "outbound",
+        status: "sending",
+        date_created: new Date().toISOString(),
+        inbound_media: [],
+        num_media: String(mediaArr.length),
+        outreach_attempt_id: null,
+      } as unknown as Message;
+      setMessages((curr) => [...curr, pending]);
+    },
+    [workspace]
+  );
 
   useSupabaseRealtimeSubscription({
     supabase,
     table: "message",
     filter: `workspace=eq.${workspace}`,
-    onChange: handleMessageChange
+    onChange: handleMessageChange as (p: RealtimePostgresChangesPayload<Record<string, unknown>>) => void
   });
 
-  return { messages, setMessages };
+  return { messages, setMessages, addOptimisticMessage };
 };
 
 /**
@@ -213,7 +246,7 @@ export const useConversationSummaryRealTime = ({
         p_workspace: workspace,
       });
       if (error) {
-        console.error("Error fetching conversation summary:", error);
+        logger.error("Error fetching conversation summary:", error);
         // Don't throw, just return early to prevent breaking the UI
         // The error is logged for debugging purposes
         return;
@@ -414,13 +447,13 @@ export const useConversationSummaryRealTime = ({
         .or(`from.eq.${contactPhone},to.eq.${contactPhone}`);
       
       if (error) {
-        console.error("Error marking conversation as read:", error);
+        logger.error("Error marking conversation as read:", error);
       } else {
         // Force refresh conversation summary to update unread counts
         fetchConversationSummary(true);
       }
     } catch (err) {
-      console.error("Error in markConversationAsRead:", err);
+      logger.error("Error in markConversationAsRead:", err);
     }
   }, [supabase, workspace, fetchConversationSummary]);
 

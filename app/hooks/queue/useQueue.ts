@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Tables } from "@/lib/database.types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 interface UseQueueProps {
   initialQueue: QueueItem[];
@@ -96,12 +97,12 @@ export const useQueue = ({
     (payload: { new: Tables<"campaign_queue"> & { contact: Contact } }) => {
       // Validate payload
       if (!payload || !payload.new) {
-        console.error('Invalid queue update payload: payload or payload.new is missing');
+        logger.error('Invalid queue update payload: payload or payload.new is missing');
         return;
       }
 
       if (!payload.new.id) {
-        console.error('Invalid queue update payload: payload.new.id is missing');
+        logger.error('Invalid queue update payload: payload.new.id is missing');
         return;
       }
 

@@ -1,7 +1,9 @@
 import { json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
-import type { Json } from "~/lib/database.types";
+import type { Json } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 
 interface RequestData {
   update?: Json;
@@ -14,7 +16,8 @@ interface RequestData {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient, headers, user } = await verifyAuth(request);
-    const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await request.json();
+    const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await safeParseJson(request);
+    await requireWorkspaceAccess({ supabaseClient, user, workspaceId: workspace });
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: recentOutreach, error: searchError } = await supabaseClient
         .from('outreach_attempt')
@@ -27,7 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .single();
 
     if (searchError && searchError.code !== 'PGRST116') {
-        console.error(searchError);
+        logger.error("Error searching for recent outreach:", searchError);
         return json({ error: searchError }, { status: 500, headers });
     }
 
@@ -45,7 +48,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .select();
 
         if (error) {
-            console.error(error);
+            logger.error("Error updating outreach attempt:", error);
             return json({ error }, { status: 500, headers });
         }
         outreachAttemptId = data[0]?.id ?? null;
@@ -59,7 +62,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         if (error) {
-            console.error(error);
+            logger.error("Error creating outreach attempt:", error);
             return json({ error }, { status: 500, headers });
         }
         outreachAttemptId = typeof data === 'number' ? data : Number(data);
@@ -74,7 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .select();
 
     if (updateError) {
-        console.error(updateError);
+        logger.error("Error updating outreach attempt:", updateError);
         return json({ error: updateError }, { status: 500, headers });
     }
 

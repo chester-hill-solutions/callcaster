@@ -1,5 +1,7 @@
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { parseActionRequest, removeContactFromAudience } from "../lib/database.server";
 import { verifyAuth } from "../lib/supabase.server";
+import { createErrorResponse } from "@/lib/errors.server";
 
 export const action = async ({ request }: { request: Request }) => {
     const { supabaseClient, headers } =
@@ -9,17 +11,19 @@ export const action = async ({ request }: { request: Request }) => {
 
     let response;
     if (method === 'DELETE'){
-        const formData = await request.formData();
-        const contactId = formData.get('contact_id') as string;
-        const audienceId = formData.get('audience_id') as string;
-    
-        const {data: update, error: updateError} = await supabaseClient
-        .from('contact_audience')
-        .delete()
-        .eq('contact_id', Number(contactId))
-        .eq('audience_id', Number(audienceId));
-        if (updateError) console.log(updateError)
-            response = update
+        const data = await parseActionRequest(request);
+        const contactId = Number(data.contact_id);
+        const audienceId = Number(data.audience_id);
+
+        if (!contactId || !audienceId) {
+            return json({ error: "contact_id and audience_id are required" }, { status: 400, headers });
         }
+
+        try {
+            response = await removeContactFromAudience(supabaseClient, contactId, audienceId);
+        } catch (updateError) {
+            return createErrorResponse(updateError, "Failed to remove contact from audience", 500);
+        }
+    }
     return json(response, {headers});
 };

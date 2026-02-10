@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Download } from "lucide-react";
+import { logger } from "@/lib/logger.client";
 
 interface AsyncExportButtonProps {
   campaignId: string;
@@ -47,7 +48,7 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
             clearInterval(intervalId);
           }
         } catch (error) {
-          console.error("Error checking export status:", error);
+          logger.error("Error checking export status:", error);
         }
       }, 2000); // Check every 2 seconds
     }
@@ -60,16 +61,13 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
   // Display toast message when it changes
   useEffect(() => {
     if (toastMessage) {
-      // In a real implementation, you would use your toast system here
-      console.log(`Toast: ${toastMessage.title} - ${toastMessage.description}`);
-      
-      // Clear the toast message after displaying it
+      logger.debug(`Toast: ${toastMessage.title} - ${toastMessage.description}`);
       const timeoutId = setTimeout(() => {
         setToastMessage(null);
       }, 3000);
-      
       return () => clearTimeout(timeoutId);
     }
+    return undefined;
   }, [toastMessage]);
 
   const startExport = async () => {
@@ -111,7 +109,7 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
         description: "An error occurred while starting the export.",
         type: "error"
       });
-      console.error("Export error:", error);
+      logger.error("Export error:", error);
     }
   };
 

@@ -1,9 +1,11 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Twilio } from "twilio";
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
 import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export interface CallEvent {
     Called: string;
@@ -119,10 +121,10 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
 export const action = async ({ request }: { request: Request }) => {
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
-    
-    const parsedBody = Object.fromEntries(formData.entries()) as unknown as CallEvent;
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const parsedBody = params as unknown as CallEvent;
     const callSid = parsedBody.CallSid;
-    
+
     try {
         const { data: dbCall, error: callError } = await supabase
             .from('call')
@@ -131,6 +133,14 @@ export const action = async ({ request }: { request: Request }) => {
             .single();
         if (callError) throw callError;
         if (!dbCall) throw new Error("Call not found");
+
+        const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
+        const authToken = workspace.data?.twilio_data?.authToken;
+        if (!authToken) throw new Error("Workspace auth token not found");
+        const signature = request.headers.get("x-twilio-signature");
+        const url = new URL(request.url).href;
+        const isValid = validateTwilioWebhookParams(params, signature, url, authToken);
+        if (!isValid) return json({ error: "Invalid Twilio signature" }, { status: 403 });
 
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
         
@@ -146,7 +156,7 @@ export const action = async ({ request }: { request: Request }) => {
             await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id as number | null, 'completed');
         }
     } catch (error) {
-        console.error(error);
+        logger.error("Error processing IVR status:", error);
         return json({ success: false, error });
     }
     return json({ success: true });

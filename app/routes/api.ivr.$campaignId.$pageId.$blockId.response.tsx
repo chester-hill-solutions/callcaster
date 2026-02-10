@@ -1,8 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { env } from "@/lib/env.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import type { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
 
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase
@@ -104,9 +106,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   const formData = await request.formData();
-  const digitsValue = formData.get("Digits");
-  const speechResultValue = formData.get("SpeechResult");
-  const callSidValue = formData.get("CallSid");
+  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const digitsValue = formParams.Digits;
+  const speechResultValue = formParams.SpeechResult;
+  const callSidValue = formParams.CallSid;
 
   const userInput =
     typeof digitsValue === "string"
@@ -125,6 +128,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       supabase.from("call").select("*").eq("sid", callSid).single(),
       getCampaignData(supabase, campaignId),
     ]);
+    const workspace = call?.workspace
+      ? (await supabase.from("workspace").select("twilio_data").eq("id", call.workspace).single()).data?.twilio_data
+      : null;
+    const authToken = workspace?.authToken ?? env.TWILIO_AUTH_TOKEN();
+    const signature = request.headers.get("x-twilio-signature");
+    const url = new URL(request.url).href;
+    if (!validateTwilioWebhookParams(formParams, signature, url, authToken)) {
+      return new Response("Invalid Twilio signature", { status: 403 });
+    }
 
     if (!call) {
       throw new Error("Call not found");
@@ -175,7 +187,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   } catch (e) {
     const errorMessage =
       e instanceof Error ? e.message : "An error occurred. Please try again later.";
-    console.error("IVR Error:", e);
+    logger.error("IVR Error:", e);
     twiml.say(errorMessage);
     twiml.hangup();
   }

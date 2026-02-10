@@ -1,7 +1,10 @@
 import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface WorkspaceData {
   key: string;
@@ -40,11 +43,11 @@ function normalizePhoneNumber(input: string): string {
 export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const supabase: SupabaseClient = createClient(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!,
+      env.SUPABASE_URL(),
+      env.SUPABASE_SERVICE_KEY(),
     );
     const { phoneNumber, workspace_id, friendlyName }: RequestBody =
-      await request.json();
+      await safeParseJson(request);
 
     const { data, error } = await supabase
       .from("workspace")
@@ -69,8 +72,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const validationRequest = await twilio.validationRequests.create({
       friendlyName,
       phoneNumber,
-      statusCallback: `${process.env.BASE_URL}/api/caller-id/status`,
-    }).catch((error) => console.log(error));
+      statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
+    }).catch((error) => logger.error('Twilio validation request error:', error));
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase
@@ -102,7 +105,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return json({ validationRequest, numberRequest });
   } catch (error) {
-    console.error("Action error:", error);
+    logger.error("Action error:", error);
     return json({ error: (error as Error).message }, { status: 500 });
   }
 };

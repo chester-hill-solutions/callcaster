@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger.client";
+
 /**
  * Utility function to download CSV content as a file
  * @param csvContent - The CSV content string
@@ -24,7 +26,7 @@ export function downloadCsv(csvContent: string, filename: string): void {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
     } catch (error) {
-        console.error('Error downloading CSV:', error);
+        logger.error('Error downloading CSV:', error);
         throw new Error(`Failed to download CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }

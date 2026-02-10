@@ -5,4 +5,5 @@ export { default as useSupabaseRoom } from './useSupabaseRoom';
 export { useCallDuration } from './useCallDuration';
 export { useTwilioConnection } from './useTwilioConnection';
 export { useCallHandling } from './useCallHandling';
+export { useCallStatusPolling } from './useCallStatusPolling';
 

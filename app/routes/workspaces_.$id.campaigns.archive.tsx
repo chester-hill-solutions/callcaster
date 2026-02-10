@@ -1,6 +1,7 @@
 import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 import { Campaign } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +30,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching archived campaigns:", error);
+    logger.error("Error fetching archived campaigns:", error);
   }
 
   return json(

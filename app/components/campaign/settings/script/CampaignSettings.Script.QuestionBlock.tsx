@@ -31,19 +31,7 @@ const QuestionHeader = ({
   isOpen,
   moveUp,
   moveDown,
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
 }: QuestionHeaderProps) => (
-=======
-}: {
-  questionId: bigint;
-  removeQuestion: (id: bigint) => void;
-  title: string;
-  onClick: (id: bigint | null) => void;
-  isOpen: boolean;
-  moveUp: (id: bigint) => void;
-  moveDown: (id: bigint) => void;
-}) => (
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
   <div className="flex items-center">
     <div className="item-center flex flex-auto items-center gap-2">
       <div className="flex flex-col justify-center">
@@ -58,11 +46,7 @@ const QuestionHeader = ({
         className="flex min-h-10 flex-auto items-center"
         onClick={() => onClick(isOpen ? null : questionId)}
       >
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
         <h3 className="font-Zilla-Slab text-xl">{title || String(questionId)}</h3>
-=======
-        <h3 className="font-Zilla-Slab text-xl">{title || questionId.toString()}</h3>
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
       </div>
     </div>
     <button
@@ -74,41 +58,13 @@ const QuestionHeader = ({
   </div>
 );
 
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
-type Question = Block & {
+type Question = Omit<Block, "id"> & {
   id: bigint;
   title: string;
   content: string;
   type: Block["type"];
-  options?: BlockOption[];
+  options?: (BlockOption & { Icon?: string })[];
 };
-=======
-// Type definitions that match the QuestionBlockOption component
-interface Block {
-  id: string;
-  type: string;
-}
-
-interface Option {
-  value: string;
-  content: string;
-  next: string;
-  Icon?: string;
-}
-
-interface ScriptData {
-  pages: Record<string, { title: string; blocks: string[] }>;
-  blocks: Record<string, { title: string; id: string }>;
-}
-
-interface Question {
-  id: bigint;
-  title: string;
-  content: string;
-  type: string;
-  options?: Option[];
-}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
 
 interface QuestionInputsProps {
   question: Question;
@@ -185,20 +141,7 @@ const OptionsSection = ({
   scriptData,
   addNewBlock,
   handleNextChange,
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
 }: OptionsSectionProps) =>
-=======
-}: {
-  question: Question;
-  handleAddOption: () => void;
-  handleRemoveOption: (option: Option) => void;
-  handleOptionChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleIconChange: ({ index, iconName }: { index: number; iconName: string }) => void;
-  scriptData: ScriptData;
-  addNewBlock: () => Promise<string>;
-  handleNextChange: (index: number, value: string) => void;
-}) =>
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
   question.options && (
     <div>
       <div className="flex items-center gap-2">
@@ -208,7 +151,7 @@ const OptionsSection = ({
         </button>
       </div>
       <div>
-        {question.options.map((option: Option, i: number) => (
+        {question.options.map((option: BlockOption, i: number) => (
           <QuestionBlockOption
             key={`${question.id}-option-${i}`}
             index={i}
@@ -225,7 +168,6 @@ const OptionsSection = ({
       </div>
     </div>
   );
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
 interface PreviewSectionProps {
   question: Question;
 }
@@ -236,32 +178,10 @@ const PreviewSection = ({ question }: PreviewSectionProps) => (
       <Result
         action={() => null}
         initResult={null}
-        questions={question}
-        questionId={question.id}
+        questions={{ ...question, id: String(question.id) }}
+        questionId={String(question.id)}
+        disabled={false}
       />
-=======
-
-const PreviewSection = ({ question }: { question: Question }) => (
-  <div className="w-1/2">
-    <h4>Preview</h4>
-    <div className="border rounded p-4">
-      <h5>{question.title}</h5>
-      <p>{question.content}</p>
-      {question.options && (
-        <div className="mt-4">
-          {question.options.map((option, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input
-                type={question.type === "radio" ? "radio" : "checkbox"}
-                name="preview"
-                disabled
-              />
-              <span>{option.content}</span>
-            </div>
-          ))}
-        </div>
-      )}
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
     </div>
   </div>
 );
@@ -272,7 +192,7 @@ interface CampaignSettingsScriptQuestionBlockProps {
   moveUp: (questionId: bigint) => void;
   moveDown: (questionId: bigint) => void;
   dispatchState: (question: Question) => void;
-  openQuestion: string | null;
+  openQuestion: bigint | null;
   setOpenQuestion: (questionId: bigint | null) => void;
   scriptData: ScriptData;
   addNewBlock: () => void;
@@ -290,7 +210,6 @@ export default function CampaignSettingsScriptQuestionBlock({
   scriptData,
   addNewBlock,
   handleNextChange,
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
 }: CampaignSettingsScriptQuestionBlockProps) {
   const [question, setQuestion] = useState(initQuestion);
   const focusedInputRef = useRef(null);
@@ -304,47 +223,18 @@ export default function CampaignSettingsScriptQuestionBlock({
     const val = e.currentTarget.value;
     const newState = {
       ...question,
-      type: val,
+      type: val as Block["type"],
       options:
         val === "radio" || val === "multi" || val === "dropdown"
-          ? question?.options || [{ content: "", value: "", next: 0 }]
-          : [{ next: 0 }],
+          ? question?.options || [{ content: "", value: "", next: "" }]
+          : [{ next: "" }],
     };
     setQuestion(newState);
     dispatchState(newState);
-=======
-}: {
-  question: Question;
-  removeQuestion: (id: bigint) => void;
-  moveUp: (id: bigint) => void;
-  moveDown: (id: bigint) => void;
-  dispatchState: (question: Question) => void;
-  openQuestion: bigint | null;
-  setOpenQuestion: (id: bigint | null) => void;
-  scriptData: ScriptData;
-  addNewBlock: () => Promise<string>;
-  handleNextChange: (index: number, value: string) => void;
-}) {
-  const [question, setQuestion] = useState<Question>(initQuestion);
-  const focusedInputRef = useRef(null);
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    const updatedQuestion = { ...question, [name]: value };
-    setQuestion(updatedQuestion);
-    dispatchState(updatedQuestion);
-  };
-
-  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { value } = e.target;
-    const updatedQuestion = { ...question, type: value };
-    setQuestion(updatedQuestion);
-    dispatchState(updatedQuestion);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
   };
 
   const handleAddOption = () => {
-    const newOption: Option = {
+    const newOption: BlockOption & { Icon?: string } = {
       value: `option_${question.options?.length || 0}`,
       content: `Option ${(question.options?.length || 0) + 1}`,
       next: "",
@@ -355,7 +245,6 @@ export default function CampaignSettingsScriptQuestionBlock({
     dispatchState(updatedQuestion);
   };
 
-<<<<<<< HEAD:app/components/campaign/settings/script/CampaignSettings.Script.QuestionBlock.tsx
   const handleRemoveOption = (optionToRemove: BlockOption) => {
     const newState = {
       ...question,
@@ -366,9 +255,13 @@ export default function CampaignSettingsScriptQuestionBlock({
   };
 
   const handleIconChange = ({ index, iconName }: { index: number; iconName: string }) => {
-    const newOptions = [...question.options];
+    const newOptions = [...(question.options || [])];
+    const prev = newOptions[index];
     newOptions[index] = {
-      ...newOptions[index],
+      ...prev,
+      value: prev?.value ?? "",
+      content: prev?.content ?? "",
+      next: prev?.next ?? "",
       Icon: iconName,
     };
     const newState = { ...question, options: newOptions };
@@ -379,43 +272,17 @@ export default function CampaignSettingsScriptQuestionBlock({
   const handleOptionChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const newContent = e.target.value;
     const newValue = newContent?.toLowerCase().replace(/ /g, "-");
-    const newOptions = [...question.options];
+    const newOptions = [...(question.options || [])];
+    const prev = newOptions[index];
     newOptions[index] = {
-      ...newOptions[index],
+      ...prev,
       content: newContent,
       value: newValue,
+      next: prev?.next ?? "",
     };
     const newState = { ...question, options: newOptions };
     setQuestion(newState);
     dispatchState(newState);
-=======
-  const handleRemoveOption = (optionToRemove: Option) => {
-    const updatedOptions = question.options?.filter(
-      (option) => option.value !== optionToRemove.value
-    );
-    const updatedQuestion = { ...question, options: updatedOptions };
-    setQuestion(updatedQuestion);
-    dispatchState(updatedQuestion);
-  };
-
-  const handleIconChange = ({ index, iconName }: { index: number; iconName: string }) => {
-    if (!question.options) return;
-    const updatedOptions = [...question.options];
-    updatedOptions[index] = { ...updatedOptions[index], Icon: iconName };
-    const updatedQuestion = { ...question, options: updatedOptions };
-    setQuestion(updatedQuestion);
-    dispatchState(updatedQuestion);
-  };
-
-  const handleOptionChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!question.options) return;
-    const { name, value } = e.target;
-    const updatedOptions = [...question.options];
-    updatedOptions[index] = { ...updatedOptions[index], [name]: value };
-    const updatedQuestion = { ...question, options: updatedOptions };
-    setQuestion(updatedQuestion);
-    dispatchState(updatedQuestion);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignSettings.Script.QuestionBlock.tsx
   };
 
   useEffect(() => {

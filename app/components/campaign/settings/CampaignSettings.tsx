@@ -45,7 +45,7 @@ export type CampaignSettingsProps = {
   campaign_id: string;
   isChanged: boolean;
   phoneNumbers: WorkspaceNumbers[];
-  handleInputChange: (name: string, value: string | boolean | number | null | Schedule) => void;
+  handleInputChange: (name: string, value: unknown) => void;
   handleDuplicateButton: () => void;
   handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   handleScheduleButton: () => void;

@@ -8,19 +8,7 @@ import { ContactForm } from "@/components/contact/ContactForm";
 import { useEffect, useState } from "react";
 import { Contact } from "@/lib/types";
 
-<<<<<<< HEAD:app/components/sms-ui/ChatAddContactDialog.tsx
 const getDisplayName = (contact: Partial<Contact>) => {
-=======
-interface Contact {
-  id?: number;
-  firstname?: string;
-  surname?: string;
-  phone?: string;
-  [key: string]: string | number | boolean | null | undefined;
-}
-
-const getDisplayName = (contact: Contact) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatAddContactDialog.tsx
   if (contact.firstname && contact.surname) {
     return `${contact.firstname} ${contact.surname}`;
   } else if (contact.firstname) {
@@ -34,17 +22,10 @@ const getDisplayName = (contact: Contact) => {
 
 interface ChatAddContactDialogProps {
   isDialogOpen: boolean;
-<<<<<<< HEAD:app/components/sms-ui/ChatAddContactDialog.tsx
   setDialog: (open: boolean | null) => void;
   contact_number: string;
   workspace_id: string;
   existingContact?: Contact | null;
-=======
-  setDialog: (value: boolean | null) => void;
-  contact_number: string;
-  workspace_id: string;
-  existingContact?: Contact;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatAddContactDialog.tsx
 }
 
 const ChatAddContactDialog = ({
@@ -54,11 +35,7 @@ const ChatAddContactDialog = ({
   workspace_id,
   existingContact,
 }: ChatAddContactDialogProps) => {
-<<<<<<< HEAD:app/components/sms-ui/ChatAddContactDialog.tsx
   const [contact, setContact] = useState<Partial<Contact>>(
-=======
-  const [contact, setContact] = useState(
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatAddContactDialog.tsx
     existingContact || { phone: contact_number },
   );
 
@@ -67,21 +44,13 @@ const ChatAddContactDialog = ({
   }, [existingContact, contact_number]);
 
   const handleUpdateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
-<<<<<<< HEAD:app/components/sms-ui/ChatAddContactDialog.tsx
     setContact((curr) => ({
-=======
-    setContact((curr: Contact) => ({
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatAddContactDialog.tsx
       ...curr,
       [e.target.name]: e.target.value,
     }));
   };
-<<<<<<< HEAD:app/components/sms-ui/ChatAddContactDialog.tsx
   const handleSaveContact = (e: React.FormEvent) => {
     e.preventDefault();
-=======
-  const handleSaveContact = (e: React.FormEvent<HTMLFormElement>) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatAddContactDialog.tsx
     setDialog(false);
   };
   return (

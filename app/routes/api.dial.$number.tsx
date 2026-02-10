@@ -1,5 +1,7 @@
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const twiml = new Twilio.twiml.VoiceResponse();
@@ -14,12 +16,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
         dial.number({
             machineDetection: 'Enable',
-            amdStatusCallback: `${process.env.BASE_URL}/api/dial/status`,
+            amdStatusCallback: `${env.BASE_URL()}/api/dial/status`,
             statusCallback: '/api/call-status/',
             statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
         }, number!);
     } catch (e) {
-        console.log(e)
+        logger.error("Error in dial route:", e);
         throw (e)
     }
     return new Response(twiml.toString(), {

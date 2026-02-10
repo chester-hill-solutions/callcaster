@@ -1,9 +1,11 @@
 import { NavigateFunction } from "@remix-run/react";
 import { Fetcher, SubmitFunction } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Audience, CampaignAudience, Schedule, Script } from "@/lib/types";
 import { deepEqual } from "@/lib/utils";
 import { Tables, Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
@@ -26,6 +28,28 @@ export type CampaignSettingsData = {
         script?: string;
     };
     [key: string]: any;
+};
+
+export type CampaignState = {
+    campaign_id: string;
+    workspace: string;
+    title: string;
+    status: string;
+    type: "message" | "robocall" | "live_call" | "simple_ivr" | "complex_ivr" | "email";
+    dial_type: "call" | "predictive" | null;
+    group_household_queue: boolean;
+    start_date: string;
+    end_date: string;
+    caller_id: string | null;
+    voicemail_file: string | null;
+    script_id: number | null;
+    audiences: NonNullable<Audience>[];
+    body_text: string | null;
+    message_media: string[] | null;
+    voicedrop_audio: string | null;
+    schedule: Schedule | null;
+    is_active: boolean;
+    details: LiveCampaign | MessageCampaign | IVRCampaign;
 };
 
 /**
@@ -84,7 +108,7 @@ export function useCampaignSettings({
 }: {
     initialState: CampaignState;
     navigate: NavigateFunction;
-    fetcher: Fetcher<{success?: boolean, campaign?: Partial<CampaignState>, campaignDetails?: CampaignState['details']}> & { submit: SubmitFunction };
+    fetcher: Fetcher<{ success?: boolean; campaign?: Partial<CampaignState>; campaignDetails?: CampaignState["details"]; error?: string }> & { submit: SubmitFunction };
 }) {
     // Validate required parameters
     if (!initialState) {
@@ -104,8 +128,8 @@ export function useCampaignSettings({
         scheduleDisabled: false,
         joinDisabled: null,
     });
+    const snapshotRef = useRef<CampaignState | null>(null);
 
-    // Expose loading state from fetcher
     const isLoading = fetcher.state === 'submitting' || fetcher.state === 'loading';
 
     useEffect(() => {
@@ -142,6 +166,7 @@ export function useCampaignSettings({
             return;
         }
         if (type === "pause") {
+            snapshotRef.current = state;
             const updatedState = {
                 ...state,
                 status: "paused",
@@ -166,13 +191,13 @@ export function useCampaignSettings({
             const newStatus = uiState.confirmStatus === "play" ? "running" :
                             uiState.confirmStatus === "archive" ? "archived" :
                             state.status;
-            
+
+            snapshotRef.current = state;
             const updatedState = {
                 ...state,
                 status: newStatus,
                 is_active: newStatus === "running"
             };
-
             setState(updatedState);
             fetcher.submit(
                 {
@@ -186,6 +211,7 @@ export function useCampaignSettings({
     };
 
     const handleSave = () => {
+        snapshotRef.current = state;
         fetcher.submit(
             {
                 campaignData: JSON.stringify(state),
@@ -199,6 +225,7 @@ export function useCampaignSettings({
         const data = fetcher.data;
         if (fetcher.state === 'idle' && data) {
             if (data.success && data.campaign && data.campaignDetails) {
+                snapshotRef.current = null;
                 setUIState(prev => ({ ...prev, isChanged: false }));
                 setState(prevState => ({
                     ...prevState,
@@ -206,9 +233,13 @@ export function useCampaignSettings({
                     details: data.campaignDetails as CampaignState['details']
                 }));
             } else if (data.error || (!data.success && data.campaign === undefined)) {
-                // Handle API failure
-                console.error('Campaign update failed:', data.error || 'Unknown error');
-                // Optionally show error to user or revert state
+                logger.error('Campaign update failed:', data.error || 'Unknown error');
+                if (snapshotRef.current) {
+                    setState(snapshotRef.current);
+                    setUIState(prev => ({ ...prev, confirmStatus: "none" }));
+                    snapshotRef.current = null;
+                    toast.error("Campaign update failed. Changes reverted.");
+                }
             }
         }
     }, [fetcher.state, fetcher.data]);

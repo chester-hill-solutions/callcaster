@@ -1,5 +1,5 @@
-import { json, type LoaderFunctionArgs, redirect, type ActionFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Form, useActionData } from "@remix-run/react";
+import { json, redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
@@ -24,16 +24,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   //  const stripeCustomerHistory = await getStripeCustomerHistory(workspace?.stripe_id || "");
 
   if (workspaceError) throw workspaceError;
+  const history = workspace?.transaction_history ?? [];
+  const sortedHistory = Array.isArray(history)
+    ? [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    : [];
   return json({
     credits: {
-      balance: workspace?.credits || 0,
-      history: workspace?.transaction_history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) || [],
+      balance: workspace?.credits ?? 0,
+      history: sortedHistory,
     },
   });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { supabaseClient } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
 
@@ -53,13 +57,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (!workspace?.stripe_id) {
     throw new Error("Workspace has no Stripe ID");
   }
-  if (!workspaceId) {
-    throw new Error("Workspace ID is not set");
-  }
-  if (!amount) {
-    throw new Error("Amount is not set");
-  }
 
+  const baseUrl = new URL(request.url).origin;
   const stripe = new Stripe(env.STRIPE_SECRET_KEY());
   const priceInCents = Math.round(amount * 0.003 * 100);
   const session = await stripe.checkout.sessions.create({
@@ -80,8 +79,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     ],
     mode: "payment",
-    success_url: `https://callcaster.ca/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `https://callcaster.ca/workspaces/${workspaceId}/billing?canceled=true`,
+    success_url: `${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/workspaces/${workspaceId}/billing?canceled=true`,
     metadata: {
       workspaceId,
       creditAmount: amount,
@@ -93,10 +92,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function Credits() {
   const { credits } = useLoaderData<typeof loader>();
+  const [searchParams] = useSearchParams();
+  const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
   const actionData = useActionData<typeof action>();
+
+  const success = searchParams.get("success") === "true";
+  const error = searchParams.get("error") === "true";
+  const canceled = searchParams.get("canceled") === "true";
+  const isSubmitting = navigation.state === "submitting";
   const creditPackages = [
     { amount: 1667, price: 5 },
     { amount: 5000, price: 15 },
@@ -113,6 +119,22 @@ export default function Credits() {
   return (
     <div className="container mx-auto p-6">
       <h1 className="mb-8 text-3xl font-bold">Credits</h1>
+
+      {success && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 p-4 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+          Payment completed. Your credits have been added.
+        </div>
+      )}
+      {error && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+          Something went wrong confirming your payment. Please contact support if your card was charged.
+        </div>
+      )}
+      {canceled && (
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          Checkout was canceled. You were not charged.
+        </div>
+      )}
 
       {/* Current Balance */}
       <Card className="mb-8 p-6">
@@ -192,8 +214,9 @@ export default function Credits() {
           <Button
             type="submit"
             className="mt-4"
+            disabled={isSubmitting}
           >
-            Purchase Credits
+            {isSubmitting ? "Redirecting to checkout…" : "Purchase Credits"}
           </Button>
         </Form>
       </Card>

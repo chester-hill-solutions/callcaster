@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MdEdit, MdAddCircle } from "react-icons/md";
-import {EditResponseModal} from './QuestionCard.ResponseTable.EditModal';
+import { EditResponseModal } from "@/components/question/QuestionCard.ResponseTable.EditModal";
 
 interface Question {
   id: string;

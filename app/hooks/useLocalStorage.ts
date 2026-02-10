@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logger } from "@/lib/logger.client";
 
 export interface UseLocalStorageOptions<T> {
   defaultValue?: T;
@@ -27,7 +28,7 @@ export function useLocalStorage<T>(
       return deserializer(item);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error(`Error reading localStorage key "${key}":`, err);
+      logger.error(`Error reading localStorage key "${key}":`, err);
       onError?.(err);
       return defaultValue;
     }
@@ -44,7 +45,7 @@ export function useLocalStorage<T>(
         setStoredValue(value);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error setting localStorage key "${key}":`, err);
+        logger.error(`Error setting localStorage key "${key}":`, err);
         onError?.(err);
       }
     },
@@ -57,7 +58,7 @@ export function useLocalStorage<T>(
       setStoredValue(null);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error(`Error removing localStorage key "${key}":`, err);
+      logger.error(`Error removing localStorage key "${key}":`, err);
       onError?.(err);
     }
   }, [key, onError]);
@@ -70,7 +71,7 @@ export function useLocalStorage<T>(
           setStoredValue(deserializer(e.newValue));
         } catch (error) {
           const err = error instanceof Error ? error : new Error(String(error));
-          console.error(`Error parsing localStorage value for key "${key}":`, err);
+          logger.error(`Error parsing localStorage value for key "${key}":`, err);
           onError?.(err);
         }
       } else if (e.key === key && e.newValue === null) {
@@ -117,7 +118,7 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error setting localStorage key "${String(key)}":`, err);
+        logger.error(`Error setting localStorage key "${String(key)}":`, err);
         setErrors(prev => ({ ...prev, [String(key)]: err }));
         options.onError?.(err);
       }
@@ -154,7 +155,7 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error removing localStorage key "${String(key)}":`, err);
+        logger.error(`Error removing localStorage key "${String(key)}":`, err);
         setErrors(prev => ({ ...prev, [String(key)]: err }));
         options.onError?.(err);
       }
@@ -185,7 +186,7 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error reading localStorage key "${String(key)}":`, err);
+        logger.error(`Error reading localStorage key "${String(key)}":`, err);
         setErrors(prev => ({ ...prev, [String(key)]: err }));
         options.onError?.(err);
       }
@@ -225,7 +226,7 @@ export function useSessionStorage<T>(
       return deserializer(item);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error(`Error reading sessionStorage key "${key}":`, err);
+      logger.error(`Error reading sessionStorage key "${key}":`, err);
       onError?.(err);
       return defaultValue;
     }
@@ -242,7 +243,7 @@ export function useSessionStorage<T>(
         setStoredValue(value);
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error setting sessionStorage key "${key}":`, err);
+        logger.error(`Error setting sessionStorage key "${key}":`, err);
         onError?.(err);
       }
     },
@@ -255,7 +256,7 @@ export function useSessionStorage<T>(
       setStoredValue(null);
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error(`Error removing sessionStorage key "${key}":`, err);
+      logger.error(`Error removing sessionStorage key "${key}":`, err);
       onError?.(err);
     }
   }, [key, onError]);

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
 
 interface CallData {
   current_question: number;
@@ -12,12 +13,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const twiml = new Twilio.twiml.VoiceResponse();
 
     try {
-        const supabase = createClient(process.env.SUPABASE_URL, process.env.SKEY);
+        const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
         const formData = await request.formData();
         const CallSid = formData.get('CallSid') as string;
         const toNumber = formData.get('To') as string;
         const fromNumber = formData.get('From') as string;
-        const baseUrl = process.env.BASE_URL
+        const baseUrl = env.BASE_URL();
 
         let { data, error } = await supabase.from('calls').select('*').eq('id', CallSid).single();
 
@@ -54,7 +55,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             twiml.say({ voice: 'Polly.Amy-Neural' }, 'Thank you very much! Have a great rest of your day.');
         }
     } catch (e) {
-        console.error('Error processing the call:', e);
+        logger.error('Error processing the call:', e);
         twiml.say({ voice: 'Polly.Amy' }, 'We encountered an error. Please try again later.');
     }
 

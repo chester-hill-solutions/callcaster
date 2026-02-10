@@ -70,7 +70,7 @@ export function useTwilioConnection({
 
   useEffect(() => {
     if (!token) {
-      console.error('No token provided');
+      logger.error('No token provided');
       updateError(new Error('No token provided'));
       return;
     }
@@ -114,7 +114,7 @@ export function useTwilioConnection({
     };
 
     const handleError = (err: Error) => {
-      console.error('Twilio Device Error:', err);
+      logger.error('Twilio Device Error:', err);
       onDeviceBusyChange?.(false);
       updateStatus('Error');
       updateError(err);
@@ -136,7 +136,7 @@ export function useTwilioConnection({
 
     device.register()
       .catch((err: Error) => {
-        console.error('Failed to register device:', err);
+        logger.error('Failed to register device:', err);
         updateError(err);
         updateStatus('RegistrationFailed');
         onCallStateChange?.('failed');
@@ -144,7 +144,7 @@ export function useTwilioConnection({
 
     return () => {
       if (device.state === 'registered') {
-        device.unregister().catch(console.error);
+        device.unregister().catch((err) => logger.error('Error unregistering device:', err));
       }
       device.removeAllListeners('registered');
       device.removeAllListeners('unregistered');

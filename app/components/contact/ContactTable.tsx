@@ -5,13 +5,9 @@ import { Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AudienceContactRow } from "./AudienceContactRow";
 import { ContactForm } from "./ContactForm";
-<<<<<<< HEAD:app/components/contact/ContactTable.tsx
-import { Contact } from "@/lib/types";
-import { Json } from "@/lib/database.types";
-=======
-import type { Contact } from "~/lib/types";
-import type { Json } from "~/lib/database.types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactTable.tsx
+import type { Contact } from "@/lib/types";
+import type { Json } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
 export interface ContactTableProps {
@@ -107,7 +103,7 @@ const ContactTable: React.FC<ContactTableProps> = ({
         action: '/api/contact-audience/bulk-delete',
       });
     } catch (error) {
-      console.error('Error initiating bulk delete:', error);
+      logger.error('Error initiating bulk delete:', error);
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger.client";
 import {
   Select,
   SelectContent,
@@ -103,9 +104,9 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
   const testDevice = () => {
     if (device?.audio?.speakerDevices) {
       device.audio.speakerDevices.test();
-      console.log("Testing device:", selectedDeviceId);
+      logger.debug("Testing device:", selectedDeviceId);
     } else {
-      console.error("Speaker devices not available for testing");
+      logger.error("Speaker devices not available for testing");
     }
   };
 

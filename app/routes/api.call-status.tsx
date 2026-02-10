@@ -1,7 +1,10 @@
-import { json } from '@remix-run/react';
+import { json } from "@remix-run/node";
 import { createClient } from '@supabase/supabase-js';
 import type { ActionFunctionArgs } from "@remix-run/node";
-import type { Database, TablesInsert } from "~/lib/database.types";
+import type { Database, TablesInsert } from "@/lib/database.types";
+import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -19,16 +22,24 @@ function convertKeysToUnderCase(obj: Record<string, unknown>): Record<string, un
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
-    const supabase = createClient<Database>(process.env['SUPABASE_URL']!, process.env['SUPABASE_SERVICE_KEY']!);
-    const calledVia = formData.get('CalledVia') as string;
-    const userId = calledVia ? calledVia.split(":")[1] : '';
-    const realtime = supabase.realtime.channel(userId || 'default')
-    const parsedBody: Record<string, unknown> = {};
-
-    for (const pair of formData.entries()) {
-        parsedBody[pair[0]] = pair[1];
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const callSidRaw = params.CallSid ?? params.call_sid;
+    const supabase = createClient<Database>(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+    const { data: existingCall } = await supabase.from("call").select("workspace").eq("sid", callSidRaw).single();
+    let authToken = env.TWILIO_AUTH_TOKEN();
+    if (existingCall?.workspace) {
+      const { data: ws } = await supabase.from("workspace").select("twilio_data").eq("id", existingCall.workspace).single();
+      if (ws?.twilio_data?.authToken) authToken = ws.twilio_data.authToken;
     }
-
+    const signature = request.headers.get("x-twilio-signature");
+    const url = new URL(request.url).href;
+    if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
+      return json({ error: "Invalid Twilio signature" }, { status: 403 });
+    }
+    const calledVia = params.CalledVia ?? params.called_via;
+    const userId = calledVia ? calledVia.split(":")[1] : '';
+    const realtime = supabase.realtime.channel(userId || 'default');
+    const parsedBody: Record<string, unknown> = params;
     const underCaseData = convertKeysToUnderCase(parsedBody);
 
     const getString = (v: unknown): string | null => {
@@ -66,7 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     };
     const { data, error } = await supabase.from('call').upsert([updateData], { onConflict: 'sid' }).select();
     if (error) {
-        console.error('Error updating call:', error);
+        logger.error('Error updating call:', error);
         return json({ success: false, error: 'Failed to update call' }, { status: 500 });
     }
     const { data: currentAttempt, error: fetchError } = await supabase
@@ -75,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .eq('id', data?.[0]?.outreach_attempt_id as number)
         .single();
     if (fetchError) {
-        console.error('Error fetching current attempt:', fetchError);
+        logger.error('Error fetching current attempt:', fetchError);
         return json({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
     }
     realtime.send({
@@ -93,7 +104,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .select();
 
         if (updateError) {
-            console.error('Error updating attempt:', updateError);
+            logger.error('Error updating attempt:', updateError);
             return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
         }
     }
@@ -109,10 +120,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             note: `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${data?.[0]?.outreach_attempt_id}`
         }).select();
         if (transactionError) {
-            console.error('Error creating transaction:', transactionError);
+            logger.error('Error creating transaction:', transactionError);
             return json({ success: false, error: 'Failed to create transaction' }, { status: 500 });
         }
-        console.log("transaction", transaction)
+        logger.debug("Transaction created:", transaction)
     }
     return json({ success: true })
 }

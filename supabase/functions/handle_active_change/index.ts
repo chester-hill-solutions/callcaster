@@ -4,6 +4,7 @@ import Twilio from "npm:twilio@5.3.0";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { encode } from "https://deno.land/std@0.177.0/encoding/base64.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
 // Timeout wrapper for async operations
@@ -407,10 +408,7 @@ const handleInitiateCampaign = async (
         `${baseUrl}/queue-next`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`
-          },
+          headers: getFunctionHeaders(),
           body: JSON.stringify({ campaign_id: id, owner: owner.id })
         }
       ),

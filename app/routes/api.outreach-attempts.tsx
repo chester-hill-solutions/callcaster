@@ -1,5 +1,6 @@
 import { json } from "@remix-run/node";
-import { verifyAuth } from "~/lib/supabase.server";
+import { safeParseJson } from "@/lib/database.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 
 interface OutreachAttemptRequest {
@@ -10,7 +11,7 @@ interface OutreachAttemptRequest {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
-    const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest = await request.json();
+    const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest = await safeParseJson(request);
 
     const { data, error } = await supabase.rpc('create_outreach_attempt', {
       con_id: Number(contact_id),

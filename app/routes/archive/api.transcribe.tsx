@@ -1,5 +1,7 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
 
 async function transcribeAudio(audioBuffer: ArrayBuffer) {
     const openAiUrl = 'https://api.openai.com/v1/audio/transcriptions';
@@ -7,7 +9,7 @@ async function transcribeAudio(audioBuffer: ArrayBuffer) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+            'Authorization': `Bearer ${env.OPENAI_API_KEY() ?? ''}`
         },
         body: JSON.stringify({
             model: "whisper-1",
@@ -24,10 +26,10 @@ async function transcribeAudio(audioBuffer: ArrayBuffer) {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const baseUrl = process.env.BASE_URL
+    const baseUrl = env.BASE_URL();
     const formData = await request.formData();
     const text = formData.get('TranscriptionText');
-    console.log(request, text)
+    logger.debug("Transcribe request", { text })
  /*    const audioFile = formData.get('audio');
     if (!audioFile || typeof audioFile !== 'File') {
         return new Response("Invalid audio data", { status: 400 });

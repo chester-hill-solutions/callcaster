@@ -1,16 +1,10 @@
-<<<<<<< HEAD:app/components/contact/RecentContacts.tsx
-import React, { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Calendar, Clipboard, ChevronRight, ChevronDown } from "lucide-react";
-import { Contact, OutreachAttempt, QueueItem } from "@/lib/types";
-=======
 import React, { useState, useCallback, useRef } from 'react';
-import { Card, CardContent } from '~/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Clipboard, ChevronDown } from 'lucide-react';
-import type { Contact, OutreachAttempt } from '~/lib/types';
-import type { Json } from '~/lib/database.types';
-import { safeString, formatDate, isObject, isArray } from '~/lib/type-utils';
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/RecentContacts.tsx
+import type { Contact, OutreachAttempt } from '@/lib/types';
+import type { Json } from '@/lib/database.types';
+import { safeString, formatDate, isObject, isArray } from '@/lib/type-utils';
+import { logger } from '@/lib/logger.client';
 
 // Enhanced type definitions
 export interface ResultItemProps {
@@ -41,7 +35,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ label, value }) => {
       if (isObject(val) || isArray(val)) return JSON.stringify(val);
       return safeString(val);
     } catch (error) {
-      console.error('Error formatting value:', error);
+      logger.error('Error formatting value:', error);
       return 'Error';
     }
   };
@@ -51,7 +45,7 @@ const ResultItem: React.FC<ResultItemProps> = ({ label, value }) => {
     try {
       return label.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     } catch (error) {
-      console.error('Error formatting label:', error);
+      logger.error('Error formatting label:', error);
       return label;
     }
   };
@@ -82,7 +76,7 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
     try {
       return attempt.campaign?.title || 'Unknown Campaign';
     } catch (error) {
-      console.error('Error getting campaign title:', error);
+      logger.error('Error getting campaign title:', error);
       return 'Unknown Campaign';
     }
   }, [attempt.campaign]);
@@ -92,7 +86,7 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
     try {
       return attempt.campaign?.type?.replace(/_/g, ' ') || 'Unknown Type';
     } catch (error) {
-      console.error('Error getting campaign type:', error);
+      logger.error('Error getting campaign type:', error);
       return 'Unknown Type';
     }
   }, [attempt.campaign]);
@@ -102,7 +96,7 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
     try {
       return attempt.disposition || 'N/A';
     } catch (error) {
-      console.error('Error getting disposition:', error);
+      logger.error('Error getting disposition:', error);
       return 'N/A';
     }
   }, [attempt.disposition]);
@@ -116,7 +110,7 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
         .map(([key, value]) => ({ key, value }))
         .filter(({ value }) => value != null);
     } catch (error) {
-      console.error('Error extracting result data:', error);
+      logger.error('Error extracting result data:', error);
       return [];
     }
   }, [attempt.result]);
@@ -207,7 +201,7 @@ export const RecentContacts: React.FC<RecentContactsProps> = ({ contact }) => {
       if (!contact?.outreach_attempt?.length) return [];
       return contact.outreach_attempt.slice(-5).reverse();
     } catch (error) {
-      console.error('Error getting recent attempts:', error);
+      logger.error('Error getting recent attempts:', error);
       return [];
     }
   }, [contact]);
@@ -225,7 +219,7 @@ export const RecentContacts: React.FC<RecentContactsProps> = ({ contact }) => {
         return newSet;
       });
     } catch (error) {
-      console.error('Error toggling card:', error);
+      logger.error('Error toggling card:', error);
     }
   }, []);
 
@@ -259,3 +253,5 @@ export const RecentContacts: React.FC<RecentContactsProps> = ({ contact }) => {
     </div>
   );
 };
+
+export default RecentContacts;

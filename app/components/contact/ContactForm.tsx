@@ -1,10 +1,6 @@
 import { Form } from "@remix-run/react";
-<<<<<<< HEAD:app/components/contact/ContactForm.tsx
 import { Button } from "@/components/ui/button";
-=======
-import { Button } from "./ui/button";
-import type { Contact } from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactForm.tsx
+import type { Contact } from "@/lib/types";
 
 // Enhanced type definitions
 export interface ContactFormProps {

@@ -2,17 +2,13 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate, useNavigation, useSubmit } from "@remix-run/react";
+import { Form, NavLink, useFetcher, useNavigate, useNavigation } from "@remix-run/react";
 import { QueueItem } from "@/lib/types";
-
-type HouseholdMap = Record<string, QueueItem[]>;
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
@@ -210,7 +206,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
             </div>
             <DialogFooter>
               <Button asChild>
-                <NavLink to={hasAccess ? "../../../settings/credits" : ".."} relative="path">
+                <NavLink to={hasAccess ? "../../../billing" : ".."} relative="path">
                   {hasAccess ? 'Purchase Credits' : 'Go Back'}
                 </NavLink>
               </Button>

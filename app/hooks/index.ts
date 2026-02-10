@@ -1,7 +1,7 @@
 // Core hooks
 export { useTwilioDevice } from './useTwilioDevice';
 export { useSupabaseRealtime, useSupabaseRealtimeSubscription } from './useSupabaseRealtime';
-export { useChatRealTime, useConversationSummaryRealTime } from './useChatRealtime';
+export { useChatRealTime, useConversationSummaryRealTime } from './realtime/useChatRealtime';
 
 // Utility hooks
 export { useDebounce, useDebouncedValue, useDebouncedState } from './useDebounce';
@@ -34,7 +34,7 @@ export { useSetScript } from './useSetScript';
 export { useCallState } from './useCallState';
 export { useCampaignPage } from './useCampaignPage';
 export { useContactSearch } from './useContactSearch';
-export { useCampaignSettings } from './useCampaignSettings';
+export { useCampaignSettings } from './campaign/useCampaignSettings';
 export { useCsvDownload } from './useCsvDownload';
 export { useQueueRealtime } from './useQueueRealtime';
 

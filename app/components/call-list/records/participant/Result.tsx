@@ -5,7 +5,7 @@ import {
   Block,
   BlockOption,
   IVROption,
-} from "~/lib/types";
+} from "@/lib/types";
 
 // Extended types for the Result component
 type ScriptBlock = Block & {

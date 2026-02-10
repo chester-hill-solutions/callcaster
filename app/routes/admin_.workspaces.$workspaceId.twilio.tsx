@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
 import { Phone, MessageSquare, RefreshCw, Image, FileText, Loader2 } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "~/lib/database.types";
+import { Database } from "@/lib/database.types";
 
 interface TwilioPhoneNumber {
     sid: string;
@@ -149,7 +150,7 @@ async function loadTwilioData(supabaseClient: SupabaseClient<Database>, workspac
             }));
         }
     } catch (error) {
-        console.error("Error fetching Twilio information:", error);
+        logger.error("Error fetching Twilio information:", error);
     }
 
     return { twilioAccountInfo, twilioNumbers, twilioUsage };

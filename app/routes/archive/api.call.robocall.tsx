@@ -1,9 +1,10 @@
 import { json } from '@remix-run/node';
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
 
-const accountSid = process.env.TWILIO_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
+const accountSid = env.TWILIO_SID();
+const authToken = env.TWILIO_AUTH_TOKEN();
 
 interface RobocallRequest {
   to: string;
@@ -11,7 +12,7 @@ interface RobocallRequest {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 
-    const baseUrl = process.env.BASE_URL
+    const baseUrl = env.BASE_URL();
     const client = new Twilio.Twilio(accountSid, authToken);
     const {to: toNumber}: RobocallRequest = await request.json();
 
@@ -22,7 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         const call = await client.calls.create({
             to: toNumber,
-            from: process.env.TWILIO_PHONE_NUMBER,
+            from: env.TWILIO_PHONE_NUMBER(),
             url: `${baseUrl}/api/handle-questions`
         });
         return json({ success: true, message: 'Robocall initiated', callSid: call.sid });

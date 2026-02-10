@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import { createClient } from '@supabase/supabase-js';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
 
 interface CallData {
   id: string;
@@ -11,11 +12,11 @@ interface CallData {
 export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const url = new URL(request.url);
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SKEY);
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const CallSid = formData.get('CallSid') as string;
     const SpeechResult = formData.get('SpeechResult') as string;
     const questionIndex = url.searchParams.get('questionIndex');
-    const baseUrl = process.env.BASE_URL
+    const baseUrl = env.BASE_URL();
     const { data: old, error: oldError } = await supabase
         .from('calls')
         .select()
@@ -23,7 +24,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .single();
 
     if (oldError) {
-        console.error('Error fetching call data:', oldError);
+        logger.error('Error fetching call data:', oldError);
         return json({ status: 'error', message: 'Failed to fetch call data' }, 500);
     }
 
@@ -41,7 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .upsert(update, { returning: "minimal" }); 
 
     if (error) {
-        console.error('Error updating call data:', error);
+        logger.error('Error updating call data:', error);
         return json({ status: 'error', message: 'Failed to update call data' }, 500);
     }
 

@@ -6,6 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {
@@ -194,10 +195,6 @@ function processTemplateTags(text: string, contact: ContactData): string {
   return result;
 }
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
-const functionHeaders = {
-  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-  "Content-Type": "application/json"
-};
 interface SendMessageParams {
   body: string;
   to: string;
@@ -229,7 +226,7 @@ async function processNextMessage(user_id: string, campaign_id: string) {
       `${baseUrl}/queue-next`,
       {
         method: 'POST',
-        headers: functionHeaders,
+        headers: getFunctionHeaders(),
         body: JSON.stringify({
           owner: user_id,
           campaign_id: campaign_id,

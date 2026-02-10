@@ -1,6 +1,8 @@
 import { json, ActionFunction } from '@remix-run/node';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { WorkspaceNumbers } from '@/lib/types';
+import { env } from '@/lib/env.server';
+import { logger } from '@/lib/logger.server';
 
 interface FormData {
   VerificationStatus: string;
@@ -21,8 +23,8 @@ export const action: ActionFunction = async ({ request }) => {
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
   const supabase: SupabaseClient = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY()
   );
 
   try {
@@ -54,7 +56,7 @@ export const action: ActionFunction = async ({ request }) => {
 
     return json(parsedBody);
   } catch (error) {
-    console.error('Error processing request:', error);
+    logger.error('Error processing request:', error);
     return json({ error: 'An error occurred while processing the request' }, { status: 500 });
   }
 };

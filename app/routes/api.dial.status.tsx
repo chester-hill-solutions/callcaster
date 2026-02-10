@@ -1,16 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 import { ActionFunction, ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
   );
   const formData = await request.formData();
-
+  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const callSidValue = formData.get("CallSid");
   const answeredByValue = formData.get("AnsweredBy");
   const callStatusValue = formData.get("CallStatus");
@@ -39,6 +41,17 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
     if (callError) throw callError;
     if (!dbCall) {
       return json({ success: false, error: "Call not found" });
+    }
+
+    const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
+    const authToken = workspace.data?.twilio_data?.authToken;
+    if (!authToken) {
+      return json({ success: false, error: "Workspace auth not found" }, { status: 500 });
+    }
+    const signature = request.headers.get("x-twilio-signature");
+    const url = new URL(request.url).href;
+    if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
+      return json({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
     const twilio = await createWorkspaceTwilioInstance({

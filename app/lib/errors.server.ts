@@ -78,7 +78,8 @@ export class AppError extends Error {
 export function createErrorResponse(
   error: unknown,
   defaultMessage: string = "An error occurred",
-  defaultStatusCode: number = 500
+  defaultStatusCode: number = 500,
+  options?: { headers?: Headers }
 ): Response {
   let errorResponse: ErrorResponse;
 
@@ -111,7 +112,7 @@ export function createErrorResponse(
 
   logger.error("Error response:", errorResponse, error);
 
-  return json(errorResponse, { status: errorResponse.statusCode });
+  return json(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
 }
 
 /**

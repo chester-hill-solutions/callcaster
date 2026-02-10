@@ -1,12 +1,15 @@
 import { Resend } from "resend";
 import { json } from "@remix-run/node";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = new Resend(env.RESEND_API_KEY());
 
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
   try {
-    const error = await request.json();
+    const error = await safeParseJson<unknown>(request);
     const {supabaseClient, user} = await verifyAuth(request);
     
     const result = await resend.emails.send({
@@ -21,8 +24,8 @@ export const action = async ({ request, params }: { request: Request, params: { 
       'Content-Type': 'application/json'
     } });
   } catch (error) {
-    console.error('Error processing voicemail:', error);
-    return json({ error: 'Failed to process voicemail' }, { status: 500, headers: {
+    logger.error('Error processing error report:', error);
+    return json({ error: 'Failed to process error report' }, { status: 500, headers: {
       'Content-Type': 'application/json'
     } });
   }

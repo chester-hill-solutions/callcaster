@@ -10,11 +10,8 @@ import { FaEdit, FaSave } from "react-icons/fa";
 import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
 import RecentContacts from "./RecentContacts";
-<<<<<<< HEAD:app/components/contact/ContactDetails.tsx
-import { Audience, Contact, ContactAudience } from "@/lib/types";
-=======
-import type { Audience, Contact, ContactAudience } from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetails.tsx
+import type { Audience, Contact, ContactAudience } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
 export interface ContactDetailsProps {
@@ -53,7 +50,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
       setIsDirty(true);
       onDirtyChange?.(true);
     } catch (error) {
-      console.error('Error entering edit mode:', error);
+      logger.error('Error entering edit mode:', error);
     }
   }, [onDirtyChange]);
 
@@ -65,7 +62,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
       onDirtyChange?.(false);
       onChangesChange?.(false);
     } catch (error) {
-      console.error('Error saving contact:', error);
+      logger.error('Error saving contact:', error);
     }
   }, [onDirtyChange, onChangesChange]);
 
@@ -78,7 +75,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
       setHasChanges(true);
       onChangesChange?.(true);
     } catch (error) {
-      console.error('Error handling input change:', error);
+      logger.error('Error handling input change:', error);
     }
   }, [onChangesChange]);
 
@@ -91,7 +88,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
       setHasChanges(true);
       onChangesChange?.(true);
     } catch (error) {
-      console.error('Error handling audience change:', error);
+      logger.error('Error handling audience change:', error);
     }
   }, [onChangesChange]);
 
@@ -102,7 +99,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
         (contactAud) => contactAud?.audience_id === audienceId
       ) || false;
     } catch (error) {
-      console.error('Error checking audience membership:', error);
+      logger.error('Error checking audience membership:', error);
       return false;
     }
   }, [contact]);
@@ -112,7 +109,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
     try {
       return audience.name || `Audience ${audience.id}`;
     } catch (error) {
-      console.error('Error getting audience name:', error);
+      logger.error('Error getting audience name:', error);
       return `Audience ${audience.id}`;
     }
   }, []);
@@ -172,7 +169,7 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
               setHasChanges(true);
               onChangesChange?.(true);
             } catch (error) {
-              console.error('Error updating other data:', error);
+              logger.error('Error updating other data:', error);
             }
           }}
         />

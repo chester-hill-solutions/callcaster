@@ -1,14 +1,17 @@
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
-import { json } from "@remix-run/react";
+import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
+import { logger } from "@/lib/logger.server";
 
 const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!,
+  env.SUPABASE_URL(),
+  env.SUPABASE_SERVICE_KEY(),
 );
 
 const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
@@ -22,7 +25,7 @@ const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("Error updating call:", error);
+    logger.error("Error updating call:", error);
     throw error;
   }
 };
@@ -41,7 +44,7 @@ const updateOutreachAttempt = async (
     if (error) throw error;
     return data;
   } catch (error: unknown) {
-    console.error("Error updating outreach attempt:", error);
+    logger.error("Error updating outreach attempt:", error);
     return new Response(
       `Error updating outreach attempt: ${error instanceof Error ? error.message : "Unknown error"}`,
       { status: 500 }
@@ -62,7 +65,7 @@ const updateCampaignQueue = async (
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error("Error updating campaign queue:", error);
+    logger.error("Error updating campaign queue:", error);
     throw error;
   }
 };
@@ -70,7 +73,7 @@ const updateCampaignQueue = async (
 const triggerAutoDialer = async (callData: Tables<"call">) => {
   try {
     const response = await fetch(
-      `${process.env.BASE_URL}/api/auto-dial/dialer`,
+      `${env.BASE_URL()}/api/auto-dial/dialer`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -86,7 +89,7 @@ const triggerAutoDialer = async (callData: Tables<"call">) => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
   } catch (error) {
-    console.error("Error triggering auto dialer:", error);
+    logger.error("Error triggering auto dialer:", error);
     throw error;
   }
 };
@@ -118,7 +121,7 @@ const handleCallStatus = async (
       dequeued_reason_text: `Call ${status?.toLowerCase()}`
     });
     if (error) {
-      console.error("Error dequeing contact", error);
+      logger.error("Error dequeing contact", error);
       throw error;
     }
     realtime.send({
@@ -134,7 +137,7 @@ const handleCallStatus = async (
       await triggerAutoDialer(dbCall);
     }
   } catch (error) {
-    console.error("Error in handleCallStatus:", error);
+    logger.error("Error in handleCallStatus:", error);
     throw error;
   }
 };
@@ -151,7 +154,7 @@ const updateTransaction = async (call: Tables<"call">, duration: number) => {
     note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
   }).select();
   if (transactionError) {
-    console.error("Error creating transaction:", transactionError);
+    logger.error("Error creating transaction:", transactionError);
     throw transactionError;
   }
   return transaction;
@@ -175,7 +178,7 @@ const handleParticipantLeave = async (
       .eq('id', dbCall.outreach_attempt_id)
       .single();
     if (outreachError) {
-      console.error("Error fetching outreach status", outreachError);
+      logger.error("Error fetching outreach status", outreachError);
       throw outreachError;
     }
 
@@ -197,7 +200,7 @@ const handleParticipantLeave = async (
       ),
     );
   } catch (error) {
-    console.error("Error in handleParticipantLeave:", error);
+    logger.error("Error in handleParticipantLeave:", error);
     throw error;
   }
 };
@@ -233,7 +236,7 @@ const handleParticipantJoin = async (
       });
     }
   } catch (error) {
-    console.error("Error in handleParticipantJoin:", error);
+    logger.error("Error in handleParticipantJoin:", error);
     throw error;
   }
 };
@@ -243,7 +246,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   let realtime;
   try {
     const formData = await request.formData();
-    const parsedBody = Object.fromEntries(formData) as { [x: string]: string };
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const parsedBody = params;
 
     const { data: dbCall, error: callError } = await supabase
       .from("call")
@@ -252,6 +256,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       .single();
     if (callError) {
       throw new Error("Failed to fetch call data: " + callError.message);
+    }
+
+    const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
+    const authToken = workspace?.twilio_data?.authToken ?? env.TWILIO_AUTH_TOKEN();
+    const signature = request.headers.get("x-twilio-signature");
+    const url = new URL(request.url).href;
+    if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
+      return json({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
     const twilio = await createWorkspaceTwilioInstance({
@@ -286,7 +298,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return json({ success: true });
   } catch (error: unknown) {
-    console.error("Error processing action:", error);
+    logger.error("Error processing action:", error);
     return json(
       { error: "Failed to process action: " + (error instanceof Error ? error.message : "Unknown error") },
       { status: 500 },

@@ -2,6 +2,8 @@ import { json } from "@remix-run/node";
 import twilio from "twilio";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface GenerateTokenParams {
   twilioAccountSid: string;
@@ -32,7 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const twilioApiSecret = (data.token ?? '') as string;
 
   const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
-    outgoingApplicationSid: process.env['TWILIO_APP_SID'] ?? '',
+    outgoingApplicationSid: env.TWILIO_APP_SID(),
     incomingAllow: true,
   });
   const token = new twilio.jwt.AccessToken(
@@ -42,13 +44,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     { identity: identity ?? '' }
   );
   token.addGrant(voiceGrant);
-  console.log(token)
+  logger.debug("Generated Twilio token");
   return json({ token: token.toJwt() });
 };
 
 export const generateToken = ({ twilioAccountSid, twilioApiKey, twilioApiSecret, identity }: GenerateTokenParams) => {
   const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
-    outgoingApplicationSid: process.env['TWILIO_APP_SID'] ?? '',
+    outgoingApplicationSid: env.TWILIO_APP_SID(),
     incomingAllow: true,
   });
   const token = new twilio.jwt.AccessToken(

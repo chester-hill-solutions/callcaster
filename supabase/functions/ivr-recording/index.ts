@@ -21,7 +21,6 @@ const log = (level: string, message: string, data = {}) => {
 };
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
 
-<<<<<<< HEAD
 interface CallDataWithOutreach {
   outreach_attempt: {
     id: number;
@@ -46,21 +45,11 @@ interface ScriptPage {
 interface Script {
   pages: Record<string, ScriptPage>;
   [key: string]: unknown;
-=======
-interface CallData {
-  outreach_attempt: {
-    id: number;
-  };
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 }
 
 const createAndUploadRecording = async (
   supabase: SupabaseClient,
-<<<<<<< HEAD
   callData: CallDataWithOutreach,
-=======
-  callData: CallData,
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   recordingUrl: string,
   workspace: WorkspaceData,
   stepName: string,
@@ -141,24 +130,9 @@ const getCallWithScript = async (supabase: SupabaseClient, callSid: string) => {
   return data;
 };
 
-<<<<<<< HEAD
 const findNextStep = (currentBlock: ScriptBlock, userInput: unknown, script: Script, pageId: string): string => {
   if (currentBlock.options && currentBlock.options.length > 0) {
     const matchedOption = currentBlock.options.find((option) => {
-=======
-interface BlockOption {
-  value: string | number;
-  next: string;
-}
-
-interface Block {
-  options?: BlockOption[];
-}
-
-const findNextStep = (currentBlock: Block, userInput: unknown, script: unknown, pageId: string) => {
-  if (currentBlock.options && currentBlock.options.length > 0) {
-    const matchedOption = currentBlock.options.find((option: BlockOption) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
       const optionValue = String(option.value).trim();
       const input = userInput !== undefined ? String(userInput).trim() : '';
       return optionValue === input || (input.length > 0 && optionValue === 'vx-any');
@@ -175,17 +149,7 @@ const findNextStep = (currentBlock: Block, userInput: unknown, script: unknown, 
   return 'hangup';
 };
 
-<<<<<<< HEAD
 const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
-=======
-interface Script {
-  pages?: Record<string, {
-    blocks?: Record<string, Block>;
-  }>;
-}
-
-const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   const currentPage = script.pages[currentPageId];
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
   if (currentBlockIndex < currentPage.blocks.length - 1) {

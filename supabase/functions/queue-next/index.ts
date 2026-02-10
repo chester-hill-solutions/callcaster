@@ -1,11 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
-const functionHeaders = {
-  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-  "Content-Type": "application/json"
-};
 
 
 Deno.serve(async (req) => {
@@ -26,6 +23,10 @@ Deno.serve(async (req) => {
         .update({ status: "complete" })
         .eq("id", campaign_id);
       if (campaignUpdateError) throw campaignUpdateError
+      return new Response(
+        JSON.stringify({ status: "queue_empty" }),
+        { headers: { "Content-Type": "application/json" } },
+      )
     }
     const { data: campaign, error: campaignError } = await supabase
       .from("campaign")
@@ -35,7 +36,8 @@ Deno.serve(async (req) => {
     if (campaignError) throw campaignError;
     if (!campaign.is_active) {
       return new Response(
-        JSON.stringify({ status: "campaign_completed" })
+        JSON.stringify({ status: "campaign_completed" }),
+        { headers: { "Content-Type": "application/json" } },
       )
     }
     const contact = data[0];
@@ -62,7 +64,7 @@ Deno.serve(async (req) => {
         `${baseUrl}/ivr-handler`,
         {
           method: 'POST',
-          headers: functionHeaders,
+          headers: getFunctionHeaders(),
           body: JSON.stringify({
             to_number: contact.phone,
             campaign_id: campaign_id,
@@ -89,7 +91,7 @@ Deno.serve(async (req) => {
         `${baseUrl}/sms-handler`,
         {
           method: 'POST',
-          headers: functionHeaders,
+          headers: getFunctionHeaders(),
           body: JSON.stringify({
             to_number: contact.phone,
             campaign_id: campaign_id,
@@ -105,6 +107,10 @@ Deno.serve(async (req) => {
           })
         }
       );
+      return new Response(
+        JSON.stringify(data),
+        { headers: { "Content-Type": "application/json" } },
+      )
     } else {
       throw new Error("Unknown campaign type");
     }

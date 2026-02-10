@@ -1,6 +1,7 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
 import { Suspense, useState } from "react";
+import { parseActionRequest } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,7 @@ import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campai
 import { Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
-<<<<<<< HEAD
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
-=======
-import { ContactSearchDialog } from "~/components/queue/ContactSearchDialog";
-import { AppError } from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -29,7 +25,8 @@ interface QueueResponse {
         email: string;
         address: string;
         audiences: string;
-        status: string;
+        disposition: string;
+        queueStatus: string;
     }
 }
 
@@ -39,7 +36,7 @@ interface LoaderData {
     campaignId: string;
 }
 
-export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, status: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
+export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, disposition: string, queueStatus: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
     let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
     if (query) {
         searchQuery = searchQuery.or(`firstname.ilike.%${query}%,surname.ilike.%${query}%`, { foreignTable: 'contact' });
@@ -50,12 +47,15 @@ export const filteredSearch = (query: string, filters: { name: string, phone: st
     if (filters.phone) {
         searchQuery = searchQuery.ilike('contact.phone', `%${filters.phone}%`);
     }
-    if (filters.status) {
-        if (filters.status === 'unknown') {
+    if (filters.disposition) {
+        if (filters.disposition === 'unknown') {
             searchQuery = searchQuery.is('contact.outreach_attempt.disposition', null);
         } else {
-            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.status);
+            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.disposition);
         }
+    }
+    if (filters.queueStatus) {
+        searchQuery = searchQuery.eq('status', filters.queueStatus);
     }
     if (filters.audiences) {
         const audienceId = Number(filters.audiences);
@@ -92,7 +92,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const filters = {
         name: searchParams.get("name") || "",
         phone: searchParams.get("phone") || "",
-        status: searchParams.get("status") || "",
+        disposition: searchParams.get("disposition") || "",
+        queueStatus: searchParams.get("queueStatus") || "",
         audiences: searchParams.get("audiences") || "",
         email: searchParams.get("email") || "",
         address: searchParams.get("address") || ""
@@ -138,7 +139,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         unfilteredCount: unfilteredCount.count,
         currentPage: page,
         pageSize,
-        filters
+        filters: { ...filters }
     };
 
     return defer({
@@ -155,13 +156,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (!user) throw redirect("/signin");
     if (!selected_id) throw redirect("../../");
 
-    const formData = await request.formData();
-    const intent = formData.get("intent") as string;
+    const data = await parseActionRequest(request);
+    const intent = data.intent as string;
 
     if (intent === "update_status") {
-        const ids = formData.get("ids") as string;
-        const newStatus = formData.get("status") as string;
-        const isAllSelected = formData.get("isAllSelected") === "true";
+        const ids = data.ids;
+        const newStatus = data.status as string;
+        const isAllSelected = data.isAllSelected === true || data.isAllSelected === "true";
 
         if (isAllSelected) {
             const { error } = await supabaseClient
@@ -173,7 +174,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 return json({ success: false, error: error.message });
             }
         } else {
-            const updateIds = JSON.parse(ids).map((item: { id: string }) => item.id) || [];
+            const updateIds = (Array.isArray(ids) ? ids : JSON.parse(ids ?? "[]")).map(
+                (item: string | { id: string }) => (typeof item === "object" ? item.id : item)
+            );
             
             if (updateIds.length > 0) {
                 const { error } = await supabaseClient
@@ -191,7 +194,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === "add_from_audience") {
-        const audienceId = parseInt(formData.get("audienceId") as string);
+        const audienceId = parseInt(String(data.audienceId ?? ""));
         const { data: contacts, error } = await supabaseClient
             .from("contact_audience")
             .select("contact_id")
@@ -220,7 +223,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === "add_contacts") {
-        const contacts = JSON.parse(formData.get("contacts") as string) as Contact[];
+        const contacts = (typeof data.contacts === "string" ? JSON.parse(data.contacts) : data.contacts) as Contact[];
         const queueItems = contacts.map((contact) => ({
             campaign_id: parseInt(selected_id),
             contact_id: contact.id,
@@ -239,8 +242,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (intent === "remove_contacts") {
-        const ids = formData.get("ids") as string;
-        const isAllSelected = formData.get("isAllSelected") === "true";
+        const ids = data.ids;
+        const isAllSelected = data.isAllSelected === true || data.isAllSelected === "true";
 
         if (isAllSelected) {
             const { error } = await supabaseClient
@@ -252,7 +255,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 return json({ success: false, error: error.message });
             }
         } else {
-            const removeIds = JSON.parse(ids).map((item: { id: string }) => item.id) || [];
+            const removeIds = (Array.isArray(ids) ? ids : JSON.parse(ids ?? "[]")).map(
+                (item: string | { id: string }) => (typeof item === "object" ? item.id : item)
+            );
             
             if (removeIds.length > 0) {
                 const { error } = await supabaseClient
@@ -306,7 +311,7 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
     const clearFilter = () => {
         setParams((prev) => {
             const newParams = new URLSearchParams(prev);
-            ['name', 'phone', 'status', 'audiences', 'email', 'address'].forEach(key => {
+            ['name', 'phone', 'disposition', 'queueStatus', 'audiences', 'email', 'address'].forEach(key => {
                 newParams.delete(key);
             });
             return newParams;
@@ -315,7 +320,7 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
 
     const handleStatusChange = (ids: string[], newStatus: string, isAllSelected: boolean) => {
         fetcher.submit(
-            { ids: isAllSelected ? 'all' : ids, newStatus },
+            { intent: "update_status", ids: isAllSelected ? 'all' : ids, status: newStatus, isAllSelected },
             { method: "POST", encType: "application/json" }
         );
     };
@@ -354,7 +359,8 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
         handleStatusChange,
         handleAddFromAudience,
         handleAddContactToQueue,
-        handleRemoveContactsFromQueue
+        handleRemoveContactsFromQueue,
+        queueFetcher: fetcher,
     };
 }
 
@@ -404,11 +410,13 @@ export default function Queue() {
                                 isAllFilteredSelected={isAllFilteredSelected}
                                 setIsAllFilteredSelected={setIsAllFilteredSelected}
                                 selectedAudienceIds={selectedAudienceIds}
+                                campaignId={campaignId}
                                 supabase={supabase}
                                 handleFilterChange={queueActions.handleFilterChange}
                                 clearFilter={queueActions.clearFilter}
                                 addContactToQueue={queueActions.handleAddContactToQueue}
                                 removeContactsFromQueue={queueActions.handleRemoveContactsFromQueue}
+                                queueFetcher={queueActions.queueFetcher}
                             />
                         </>
                     );

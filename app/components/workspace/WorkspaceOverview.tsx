@@ -1,4 +1,3 @@
-<<<<<<< HEAD:app/components/workspace/WorkspaceOverview.tsx
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/lib/database.types";
@@ -15,19 +14,6 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
     const users = workspaceUsers ?? [];
     const numbers = phoneNumbers ?? [];
     const campaigns = Array.isArray(workspace.campaign) ? workspace.campaign : [];
-=======
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Workspace, WorkspaceNumber } from "~/lib/types";
-
-interface WorkspaceOverviewProps {
-  workspace: Workspace | null;
-  workspaceUsers: Array<{ id: string; email: string; role: string }>;
-  phoneNumbers: WorkspaceNumber[];
-}
-
-export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumbers }: WorkspaceOverviewProps) {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/WorkspaceOverview.tsx
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -75,11 +61,7 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
                     <dl className="space-y-4">
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Total Campaigns</dt>
-<<<<<<< HEAD:app/components/workspace/WorkspaceOverview.tsx
                             <dd className="mt-1 text-sm">{campaigns.length}</dd>
-=======
-                            <dd className="mt-1 text-sm">0</dd>
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/WorkspaceOverview.tsx
                         </div>
                         <div className="flex flex-col">
                             <dt className="text-sm font-medium text-gray-500">Total Users</dt>

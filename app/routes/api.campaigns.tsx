@@ -1,31 +1,44 @@
 import { json } from "@remix-run/node";
-import { createCampaign, deleteCampaign, updateCampaign } from "@/lib/database.server";
+import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { createErrorResponse } from "@/lib/errors.server";
+
+function parseJsonField<T>(value: unknown): T {
+  if (typeof value === "string") return JSON.parse(value) as T;
+  return value as T;
+}
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient, headers } = await verifyAuth(request);
-  
+
   try {
-    const formData = await request.formData();
+    const data = await parseActionRequest(request);
+
     if (request.method === "PATCH") {
-      const campaignData = JSON.parse(formData.get("campaignData") as string);
-      const campaignDetails = JSON.parse(formData.get("campaignDetails") as string);
+      const campaignData = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignData"]>(data.campaignData);
+      const campaignDetails = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignDetails"]>(data.campaignDetails);
       const { campaign, campaignDetails: updatedCampaignDetails } =
         await updateCampaign({ supabase: supabaseClient, campaignData, campaignDetails });
       return json({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
+    }
 
-    } else if (request.method === "DELETE") {
-      const campaignId = formData.get("campaignId") as string;
+    if (request.method === "DELETE") {
+      const campaignId = String(data.campaignId ?? "");
       await deleteCampaign({ supabase: supabaseClient, campaignId });
       return json({ success: true }, { headers });
+    }
 
-    } else if (request.method === "POST") {
-      const campaignData = JSON.parse(formData.get("campaignData") as string);
-      const { campaign, campaignDetails: createdCampaignDetails } = await createCampaign({ supabase: supabaseClient, campaignData });
+    if (request.method === "POST") {
+      const campaignData = parseJsonField<Parameters<typeof createCampaign>[0]["campaignData"]>(data.campaignData);
+      const { campaign, campaignDetails: createdCampaignDetails } = await createCampaign({
+        supabase: supabaseClient,
+        campaignData,
+      });
       return json({ campaign, campaignDetails: createdCampaignDetails }, { headers });
     }
+
+    return json({ error: "Method not allowed" }, { status: 405, headers });
   } catch (error) {
-    console.error("Error updating campaign:", error);
-    return json({ error: error instanceof Error ? error.message : "An unknown error occurred" }, { status: 400, headers });
+    return createErrorResponse(error, "Failed to process campaign request", 400, { headers });
   }
 };

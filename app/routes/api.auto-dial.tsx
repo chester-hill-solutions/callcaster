@@ -1,11 +1,13 @@
 import Twilio from 'twilio';
 import { createSupabaseServerClient } from '../lib/supabase.server';
-import { createWorkspaceTwilioInstance } from '../lib/database.server';
+import { createWorkspaceTwilioInstance, safeParseJson } from '../lib/database.server';
 import { CallInstance } from 'twilio/lib/rest/api/v2010/account/call';
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: { request: Request }  ) => {
     const { supabaseClient: supabase } = createSupabaseServerClient(request);
-    const { user_id, caller_id, campaign_id, workspace_id, selected_device } = await request.json();
+    const { user_id, caller_id, campaign_id, workspace_id, selected_device } = await safeParseJson(request);
     const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
     if (error) throw error;
     const credits = data.credits;
@@ -21,7 +23,7 @@ export const action = async ({ request }: { request: Request }  ) => {
         const call: CallInstance = await twilio.calls.create({
             to: selected_device && selected_device !== 'computer' ? selected_device : `client:${user_id}`,
             from: caller_id,
-            url: `${process.env.BASE_URL}/api/auto-dial/${conferenceName}`
+            url: `${env.BASE_URL()}/api/auto-dial/${conferenceName}`
         });
 
         const callData = {
@@ -51,7 +53,7 @@ export const action = async ({ request }: { request: Request }  ) => {
 
         Object.keys(callData).forEach(key => callData[key as keyof typeof callData] === undefined && delete callData[key as keyof typeof callData]);
         const { error } = await supabase.from('call').upsert({ ...callData }).select();
-        if (error) console.error('Error saving the call to the database:', error);
+        if (error) logger.error('Error saving the call to the database:', error);
 
         return new Response(JSON.stringify({ success: true, conferenceName }), {
             headers: {
@@ -59,7 +61,7 @@ export const action = async ({ request }: { request: Request }  ) => {
             }
         });
     } catch (error) {
-        console.error('Error starting conference:', error);
+        logger.error('Error starting conference:', error);
         return new Response(JSON.stringify({ success: false, error: (error as Error).message }), {
             headers: {
                 'Content-Type': 'application/json'

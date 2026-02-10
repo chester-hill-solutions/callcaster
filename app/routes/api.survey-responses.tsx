@@ -20,10 +20,19 @@ async function handleSubmitResponse(
 ) {
   try {
     const formData = await request.formData();
-    const responseData = JSON.parse(formData.get("responseData") as string);
+    const responseDataRaw = formData.get("responseData") as string | null;
+    if (!responseDataRaw) {
+      return json({ error: "Response data is required" }, { status: 400 });
+    }
+    let responseData: unknown;
+    try {
+      responseData = JSON.parse(responseDataRaw) as Record<string, unknown>;
+    } catch {
+      return json({ error: "Invalid response data format" }, { status: 400 });
+    }
     const surveyId = formData.get("surveyId") as string;
 
-    if (!surveyId || !responseData) {
+    if (!surveyId) {
       return json({ error: "Survey ID and response data are required" }, { status: 400 });
     }
 

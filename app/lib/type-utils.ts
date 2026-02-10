@@ -1,4 +1,5 @@
 import type { Json, AppError, ApiResponse } from "./types";
+import { logger } from "@/lib/logger.client";
 
 // Type guards for better runtime type checking
 export function isString(value: unknown): value is string {
@@ -218,7 +219,7 @@ export async function safeAsync<T>(
   try {
     return await operation();
   } catch (error) {
-    console.error("Async operation failed:", error);
+    logger.error("Async operation failed:", error);
     return fallback;
   }
 }

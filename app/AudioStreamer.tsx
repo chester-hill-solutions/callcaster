@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { logger } from '@/lib/logger.client';
 
 const AudioStreamer = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -29,7 +30,7 @@ const AudioStreamer = () => {
       recorder.start(1000); 
       setIsRecording(true);
     } catch (error) {
-      console.error('Error accessing media devices.', error);
+      logger.error('Error accessing media devices.', error);
     }
   };
 

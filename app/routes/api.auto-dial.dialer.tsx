@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.server";
 import Twilio from "twilio";
 import { env } from "../lib/env.server";
 import { logger } from "../lib/logger.server";
@@ -127,12 +127,12 @@ export const action = async ({ request }: { request: Request }) => {
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
-  const body = await request.json() as {
+  const body = await safeParseJson<{
     user_id: string;
     campaign_id: number;
     workspace_id: string;
     selected_device: string;
-  };
+  }>(request);
   const { user_id, campaign_id, workspace_id, selected_device } = body;
   const twilioClient = await createWorkspaceTwilioInstance({
     supabase,

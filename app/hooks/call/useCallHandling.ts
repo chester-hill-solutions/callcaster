@@ -161,7 +161,7 @@ export function useCallHandling({
   // Make an outgoing call
   const makeCall = useCallback((params: CallConnectParams) => {
     if (!device) {
-      console.error('Device is not ready');
+      logger.error('Device is not ready');
       onError?.(new Error('Device is not ready'));
       return;
     }
@@ -171,7 +171,7 @@ export function useCallHandling({
       updateActiveCall(call);
       updateCallState('dialing');
     }).catch((err: unknown) => {
-      console.error('Error making call:', err);
+      logger.error('Error making call:', err);
       onError?.(err instanceof Error ? err : new Error('Failed to make call'));
     });
   }, [device, updateActiveCall, updateCallState, onError]);
@@ -181,7 +181,7 @@ export function useCallHandling({
     onDeviceBusyChange?.(false);
     
     if (!activeCall) {
-      console.error('No active call to hang up');
+      logger.error('No active call to hang up');
       onError?.(new Error('No active call to hang up'));
       return;
     }
@@ -198,7 +198,7 @@ export function useCallHandling({
       updateActiveCall(null);
       updateCallState('completed');
     } catch (err) {
-      console.error('Error hanging up call:', err);
+      logger.error('Error hanging up call:', err);
       if (err instanceof Error && err.message === 'Call is not in-progress. Cannot redirect.') {
         logger.debug('Call was already disconnected');
         onStatusChange?.('Registered');
@@ -217,7 +217,7 @@ export function useCallHandling({
       currentIncomingCall.accept();
       updateCallState('connected');
     } else {
-      console.error('No incoming call to answer');
+      logger.error('No incoming call to answer');
       onError?.(new Error('No incoming call to answer'));
     }
   }, [updateCallState, onError]);
@@ -247,7 +247,7 @@ export function useCallHandling({
       onError?.(err);
       onStatusChange?.('error');
       updateCallState('failed');
-      console.error('Call error:', err);
+      logger.error('Call error:', err);
     };
 
     activeCall.on('accept', handleAccept);

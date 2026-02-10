@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { isRecent, updateAttemptWithCall } from "@/lib/utils";
 import { User } from "@supabase/supabase-js";
 import { Call, OutreachAttempt, QueueItem } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 /**
  * Hook for managing outreach attempts state and updates
@@ -54,17 +55,17 @@ export const useAttempts = (initialAttempts: OutreachAttempt[], initialRecentAtt
   const updateAttempts = useCallback((payload: { new: OutreachAttempt }, user: User, campaign_id: number, callsList: Call[]) => {
     // Validate payload
     if (!payload || !payload.new) {
-      console.error('Invalid attempt update payload: payload or payload.new is missing');
+      logger.error('Invalid attempt update payload: payload or payload.new is missing');
       return;
     }
 
     if (!payload.new.id) {
-      console.error('Invalid attempt update payload: payload.new.id is missing');
+      logger.error('Invalid attempt update payload: payload.new.id is missing');
       return;
     }
 
     if (!user?.id) {
-      console.error('Invalid user: user.id is missing');
+      logger.error('Invalid user: user.id is missing');
       return;
     }
 
@@ -90,7 +91,7 @@ export const useAttempts = (initialAttempts: OutreachAttempt[], initialRecentAtt
         setRecentAttempt(updatedAttempt);
       }
     } catch (error) {
-      console.error('Error updating attempt:', error);
+      logger.error('Error updating attempt:', error);
     }
   }, [nextRecipient]);
 

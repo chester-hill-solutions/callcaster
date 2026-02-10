@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
@@ -17,11 +18,6 @@ interface RequestBody {
   type: string;
   owner: string;
 }
-
-const functionHeaders = {
-  Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-  "Content-Type": "application/json"
-};
 
 async function getTwilioData(supabase, workspace_id) {
   const { data: workspace, error: workspaceError } = await supabase
@@ -62,7 +58,7 @@ async function processNextCall(owner, campaign_id) {
       `${baseUrl}/queue-next`,
       {
         method: 'POST',
-        headers: functionHeaders,
+        headers: getFunctionHeaders(),
         body: JSON.stringify({
           owner,
           campaign_id: campaign_id,

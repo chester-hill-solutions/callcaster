@@ -1,4 +1,5 @@
 import { useReducer, useEffect, useCallback } from 'react';
+import { logger } from "@/lib/logger.client";
 
 /**
  * Call state machine states
@@ -54,7 +55,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'HANG_UP') return 'completed';
       // Invalid transitions from idle
       if (action.type === 'CONNECT' || action.type === 'FAIL') {
-        console.warn(`Invalid transition from 'idle' state: ${action.type}`);
+        logger.warn(`Invalid transition from 'idle' state: ${action.type}`);
         return state;
       }
       break;
@@ -64,7 +65,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'HANG_UP') return 'completed';
       // Invalid transitions from dialing
       if (action.type === 'NEXT') {
-        console.warn(`Invalid transition from 'dialing' state: ${action.type}. Use HANG_UP or FAIL first.`);
+        logger.warn(`Invalid transition from 'dialing' state: ${action.type}. Use HANG_UP or FAIL first.`);
         return state;
       }
       break;
@@ -72,7 +73,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'HANG_UP') return 'completed';
       // Invalid transitions from connected
       if (action.type === 'START_DIALING' || action.type === 'CONNECT' || action.type === 'FAIL' || action.type === 'NEXT') {
-        console.warn(`Invalid transition from 'connected' state: ${action.type}. Use HANG_UP first.`);
+        logger.warn(`Invalid transition from 'connected' state: ${action.type}. Use HANG_UP first.`);
         return state;
       }
       break;
@@ -81,7 +82,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'NEXT') return 'idle';
       // Invalid transitions from failed
       if (action.type === 'CONNECT' || action.type === 'HANG_UP') {
-        console.warn(`Invalid transition from 'failed' state: ${action.type}. Use START_DIALING or NEXT.`);
+        logger.warn(`Invalid transition from 'failed' state: ${action.type}. Use START_DIALING or NEXT.`);
         return state;
       }
       break;
@@ -90,7 +91,7 @@ function callReducer(state: CallState, action: CallAction): CallState {
       if (action.type === 'NEXT') return 'idle';
       // Invalid transitions from completed
       if (action.type === 'CONNECT' || action.type === 'FAIL' || action.type === 'HANG_UP') {
-        console.warn(`Invalid transition from 'completed' state: ${action.type}. Use START_DIALING or NEXT.`);
+        logger.warn(`Invalid transition from 'completed' state: ${action.type}. Use START_DIALING or NEXT.`);
         return state;
       }
       break;

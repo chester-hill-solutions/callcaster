@@ -4,23 +4,17 @@ import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/ui/datetime";
 import { Label } from "@/components/ui/label";
 import { Clock } from "lucide-react";
+import { logger } from "@/lib/logger.client";
 import {
   Campaign,
   IVRCampaign,
   LiveCampaign,
   MessageCampaign,
-<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx
-  Schedule,
   ScheduleDay,
   ScheduleInterval,
   Script,
 } from "@/lib/types";
 import { FetcherWithComponents, useSubmit } from "@remix-run/react";
-=======
-  Script,
-  Campaign,
-} from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.Dates.tsx
 
 // Schedule type matching the WeeklyScheduleTable component
 type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -36,25 +30,19 @@ interface Day {
 }
 
 type Schedule = Record<DayName, Day>;
-import { FetcherWithComponents, useSubmit } from "@remix-run/react";
+
 const WEEKDAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
 const DAYS_OF_WEEK: DayName[] = [...WEEKDAYS, 'saturday', 'sunday'];
 
-<<<<<<< HEAD:app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx
 interface SelectDatesProps {
   campaignData: Campaign;
   handleInputChange: (name: string, value: string | number | null) => void;
-=======
-interface CampaignBasicInfoDatesProps {
-  campaignData: Campaign;
-  handleInputChange: (name: string, value: string | number | boolean) => void;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/CampaignBasicInfo.Dates.tsx
 }
 
 export default function SelectDates({
   campaignData,
   handleInputChange,
-}: CampaignBasicInfoDatesProps) {
+}: SelectDatesProps) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() => {
     const defaultSchedule = {
@@ -75,7 +63,7 @@ export default function SelectDates({
       }
       return campaignData.schedule;
     } catch (e) {
-      console.error('Error parsing schedule:', e);
+      logger.error('Error parsing schedule:', e);
       return defaultSchedule;
     }
   });

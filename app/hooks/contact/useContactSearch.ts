@@ -2,6 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { MutableRefObject, useEffect, useState, useCallback } from "react";
 import { Contact } from "@/lib/types";
 import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
+import { logger } from "@/lib/logger.client";
 
 interface UseContactSearchProps {
   supabase: SupabaseClient;
@@ -145,7 +146,7 @@ export function useContactSearch({
         setSearchError("No contact found. A new contact will be created.");
       }
     } catch (error) {
-      console.error("Contact search error:", error);
+      logger.error("Contact search error:", error);
       setContacts([]);
       setSelectedContact(null);
       const errorMessage = error instanceof Error 
@@ -181,7 +182,7 @@ export function useContactSearch({
         setExistingConversation(null);
       }
     } catch (error) {
-      console.error("Conversation search error:", error);
+      logger.error("Conversation search error:", error);
       // Silently fail for conversation search - it's not critical
       setExistingConversation(null);
     }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger.client";
 import {
   MdMic,
   MdMicOff,
@@ -70,7 +71,7 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
       stream.getTracks().forEach((track) => track.stop());
       setHasPermission(true);
     } catch (err) {
-      console.error("Microphone permission error:", err);
+      logger.error("Microphone permission error:", err);
       setHasPermission(false);
       setError("Microphone permission denied");
     }
@@ -153,7 +154,7 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
 
       setTimeout(() => stopRecording(), 5000);
     } catch (err) {
-      console.error("Error starting recording:", err);
+      logger.error("Error starting recording:", err);
       setError("Failed to start recording");
     }
   };

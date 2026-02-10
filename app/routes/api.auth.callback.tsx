@@ -2,6 +2,8 @@ import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
@@ -13,8 +15,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (token_hash && type) {
     const supabase = createServerClient<Database>(
-      process.env.SUPABASE_URL!,
-      process.env.SUPABASE_ANON_KEY!,
+      env.SUPABASE_URL(),
+      env.SUPABASE_ANON_KEY(),
       {
         cookies: {
           get(key) {
@@ -38,7 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!error) {
       return redirect(next, { headers });
     }
-    console.error(error)
+    logger.error('Auth callback error:', error);
   }
   return redirect("/auth/auth-code-error", { headers });
 }

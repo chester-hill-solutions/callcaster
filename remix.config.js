@@ -1,6 +1,8 @@
 /** @type {import('@remix-run/dev').AppConfig} */
 export default {
   ignoredRouteFiles: ["**/.*", "**/*.test.{js,jsx,ts,tsx}", "**/twilio-serverless/**", "**/*.css"],
+  // Bundle server-only deps so they are available when running the built server
+  serverDependenciesToBundle: ["resend"],
   // appDirectory: "app",
   // assetsBuildDirectory: "public/build",
   // publicPath: "/build/",

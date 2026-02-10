@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 interface NoteProps {
   action: (response: { column: string; value: string }) => void;
   update: string;

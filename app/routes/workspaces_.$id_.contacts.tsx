@@ -18,6 +18,7 @@ import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { User } from "@/lib/types";
 import { formatDateToLocale } from "@/lib/utils";
+import { logger } from "@/lib/logger.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -153,7 +154,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     // Handle database errors
     const errors = [contactError, countError, flagsError].filter(Boolean);
     if (errors.length > 0) {
-      console.error("Database errors:", errors);
+      logger.error("Database errors:", errors);
       return json(
         {
           contacts: null,
@@ -210,7 +211,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }, { headers });
 
   } catch (error) {
-    console.error("Unexpected error in contacts loader:", error);
+    logger.error("Unexpected error in contacts loader:", error);
     return json(
       {
         contacts: null,
@@ -387,26 +388,19 @@ export default function WorkspaceContacts() {
                     return <div className="text-gray-400">-</div>;
                   }
                   
-                  // Debug: Log the structure to understand the format
-                  console.log('other_data structure:', otherData);
-                  
                   // Show first 2 items, then indicate if there are more
                   const validItems = otherData.filter((item): item is NonNullable<typeof item> => item !== null && item !== undefined);
                   const displayItems = validItems.slice(0, 2);
                   const hasMore = validItems.length > 2;
                   
-<<<<<<< HEAD
                   type OtherDataItem = { key: string; value: unknown } | Record<string, unknown> | string | number | boolean;
                   
                   const formatOtherData = (data: unknown[]) => {
                     return data.filter((item): item is OtherDataItem => {
                       if (item === null || item === undefined) return false;
                       return typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || typeof item === 'object';
-                    }).map((item: OtherDataItem, i: number) => {
+                    }).map((item: OtherDataItem) => {
                       let key: string | undefined, value: unknown;
-                      
-                      // Debug: Log each item to understand its structure
-                      console.log('Processing item:', item, 'Type:', typeof item);
                       
                       // Try to extract key and value based on common patterns
                       if (typeof item === 'object' && item !== null) {
@@ -423,19 +417,9 @@ export default function WorkspaceContacts() {
                             key = keys[0];
                             value = values[0];
                           }
-=======
-                  const formatOtherData = (data: unknown[]) => {
-                    return data.map((item: unknown, i: number) => {
-                      if (typeof item === 'object' && item !== null) {
-                        const keys = Object.keys(item as Record<string, unknown>);
-                        if (keys.length > 0) {
-                          const key = keys[0];
-                          const value = (item as Record<string, unknown>)[key];
-                          return `${key}: ${String(value)}`;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                         }
                       }
-                      return String(item);
+                      return key ? `${key}: ${String(value)}` : String(item);
                     }).join(', ');
                   };
                   

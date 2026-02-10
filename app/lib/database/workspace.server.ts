@@ -310,6 +310,30 @@ export async function getUserRole({
   return userRole;
 }
 
+/**
+ * Verify that the user has access to the workspace. Throws AppError with 403 if not.
+ * Use as defense-in-depth when workspace_id comes from request body.
+ */
+export async function requireWorkspaceAccess({
+  supabaseClient,
+  user,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient;
+  user: { id: string };
+  workspaceId: string;
+}): Promise<void> {
+  const { AppError, ErrorCode } = await import("@/lib/errors.server");
+  const role = await getUserRole({
+    supabaseClient,
+    user: user as User,
+    workspaceId,
+  });
+  if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
+    throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
+  }
+}
+
 export async function updateUserWorkspaceAccessDate({
   workspaceId,
   supabaseClient,

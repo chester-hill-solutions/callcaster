@@ -12,6 +12,7 @@ import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { createNewWorkspace, forceTokenRefresh } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 import { Toaster, toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import {
@@ -84,7 +85,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     user_id: userId,
   });
   if (error) {
-    console.log("Error: ", error);
+    logger.error("Error creating workspace:", error);
     return { error: "Failed to create Workspace" };
   }
 

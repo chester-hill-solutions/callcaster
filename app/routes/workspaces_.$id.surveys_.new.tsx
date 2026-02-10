@@ -191,11 +191,7 @@ export default function NewSurveyPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-<<<<<<< HEAD
   const updatePageField = (pageIndex: number, field: keyof SurveyPageFormData, value: string | number) => {
-=======
-  const updatePageField = (pageIndex: number, field: string, value: string | number) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((page, index) =>
@@ -204,11 +200,7 @@ export default function NewSurveyPage() {
     }));
   };
 
-<<<<<<< HEAD
   const updateQuestionField = (pageIndex: number, questionIndex: number, field: keyof SurveyQuestionFormData, value: string | boolean | SurveyQuestionType) => {
-=======
-  const updateQuestionField = (pageIndex: number, questionIndex: number, field: string, value: string | boolean | number) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((page, pIndex) =>
@@ -224,11 +216,7 @@ export default function NewSurveyPage() {
     }));
   };
 
-<<<<<<< HEAD
   const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: keyof QuestionOptionFormData, value: string | number) => {
-=======
-  const updateOptionField = (pageIndex: number, questionIndex: number, optionIndex: number, field: string, value: string | number) => {
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
     setFormData(prev => ({
       ...prev,
       pages: prev.pages.map((page, pIndex) =>

@@ -1,6 +1,9 @@
 // Twilio not used in this endpoint
 import { createClient } from '@supabase/supabase-js';
+import { safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
 
 // unused types removed
 
@@ -23,14 +26,14 @@ interface WorkspaceUpdate {
 // removed unused createSubaccount
 
 const updateWorkspace = async ({ workspace_id, update }: UpdateWorkspaceParams) => {
-    const supabase = createClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_SERVICE_KEY'] ?? '');
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const { data, error } = await supabase.from('workspace').update({ twilio_data: update }).eq('id', workspace_id).select().single();
     if (error) throw { workspace_error: error };
     return data;
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { workspace_id }: WorkspaceRequest = await request.json();
+    const { workspace_id }: WorkspaceRequest = await safeParseJson(request);
     try {
         const update: WorkspaceUpdate = {};
         const updated = await updateWorkspace({ workspace_id, update });
@@ -41,7 +44,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             status: 200
         })
     } catch (error) {
-        console.error('Subaccount failed', error);
+        logger.error('Subaccount failed', error);
         return new Response(JSON.stringify({ error }), {
             headers: {
                 'Content-Type': 'application/json'

@@ -99,12 +99,12 @@ const useSupabaseRoom = ({
 
         try {
             if (!userId) {
-                console.error('Cannot update presence: userId is missing');
+                logger.error('Cannot update presence: userId is missing');
                 return;
             }
 
             if (!workspace) {
-                console.error('Cannot update presence: workspace is missing');
+                logger.error('Cannot update presence: workspace is missing');
                 return;
             }
 
@@ -114,11 +114,11 @@ const useSupabaseRoom = ({
                 .eq('id', userId);
             
             if (error) {
-                console.error('Error updating presence:', error);
+                logger.error('Error updating presence:', error);
                 setStatus('error');
             }
         } catch (error) {
-            console.error('Error updating presence:', error);
+            logger.error('Error updating presence:', error);
             setStatus('error');
         }
     }, [supabase, workspace, campaign, userId]);
@@ -144,31 +144,31 @@ const useSupabaseRoom = ({
             .on('disconnect', handleDisconnect)
             .on('error', (error: Error) => {
                 setStatus('error');
-                console.error(`Error in ${roomName}:`, error);
+                logger.error(`Error in ${roomName}:`, error);
             })
             .on('broadcast', { event: 'message' }, (e) => {
                 try {
                     if (!e || !e.payload) {
-                        console.warn('Invalid broadcast payload received');
+                        logger.warn('Invalid broadcast payload received');
                         return;
                     }
                     setPredictiveState(e.payload as PredictiveState);
                 } catch (error) {
-                    console.error('Error handling broadcast message:', error);
+                    logger.error('Error handling broadcast message:', error);
                 }
             })
             .on('presence', { event: 'sync' }, () => {
                 try {
                     const state = room.presenceState();
                     if (!state) {
-                        console.warn('Presence state is null or undefined');
+                        logger.warn('Presence state is null or undefined');
                         setUsers([]);
                         return;
                     }
                     const usersArray: PresenceUser[] = Object.values(state).flat() as PresenceUser[];
                     setUsers(usersArray);
                 } catch (error) {
-                    console.error('Error handling presence sync:', error);
+                    logger.error('Error handling presence sync:', error);
                     setUsers([]);
                 }
             })
@@ -176,10 +176,10 @@ const useSupabaseRoom = ({
                 if (status === 'SUBSCRIBED') {
                     logger.debug(`Successfully subscribed to ${roomName}`);
                 } else if (status === 'CHANNEL_ERROR') {
-                    console.error(`Failed to subscribe to ${roomName}`);
+                    logger.error(`Failed to subscribe to ${roomName}`);
                     setStatus('error');
                 } else if (status === 'TIMED_OUT') {
-                    console.error(`Subscription to ${roomName} timed out`);
+                    logger.error(`Subscription to ${roomName} timed out`);
                     setStatus('error');
                 } else if (status === 'CLOSED') {
                     logger.debug(`Subscription to ${roomName} closed`);

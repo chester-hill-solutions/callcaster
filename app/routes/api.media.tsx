@@ -1,6 +1,7 @@
 import { verifyAuth } from '../lib/supabase.server';
 import { json } from '@remix-run/node';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
@@ -26,7 +27,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return json(publicUrlData.publicUrl, { status: 201 });
     }
     catch (error) {
-        console.log(error)
+        logger.error("Error uploading media:", error);
         return json({ error }, { status: 500 });
     }
 };

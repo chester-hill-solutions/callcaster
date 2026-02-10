@@ -5,6 +5,7 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import { Loader2 } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
@@ -55,7 +56,7 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
 
       setUploads(data || []);
     } catch (err) {
-      console.error("Error fetching audience uploads:", err);
+      logger.error("Error fetching audience uploads:", err);
       setError(err instanceof Error ? err.message : "An error occurred while fetching uploads");
     } finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
           )
         );
       } else if (payload.eventType === "DELETE") {
-        setUploads(prev => prev.filter(upload => upload.id !== payload.old.id));
+        setUploads(prev => prev.filter(upload => upload["id"] !== (payload.old as { id?: number })["id"]));
       }
     },
   });

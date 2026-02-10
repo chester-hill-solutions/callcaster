@@ -403,6 +403,10 @@ if (result.error) {
 return { success: true, data: result.data };
 ```
 
+### Supabase Edge Functions
+
+- For Edge Function-to-Edge Function calls (e.g. `queue-next`, `ivr-handler`, `sms-handler`), the Edge runtime must have **EDGE_FUNCTION_JWT** set to the **legacy JWT service-role key** (not an `sb_secret_*` key). Set it in the Supabase dashboard or via `supabase secrets set EDGE_FUNCTION_JWT <jwt>`. (Supabase reserves the `SUPABASE_` prefix for built-in env vars.)
+
 ---
 
 ## Client-Side Code
@@ -625,15 +629,24 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 ### Action Pattern
 
-- Parse form data
+- Parse request body (form or JSON)
 - Validate input
 - Perform action
 - Return appropriate response
 
+**Request parsing**: Use `parseActionRequest(request)` from `~/lib/database.server` when the action may receive either FormData (from `<Form>`) or JSON (from `fetcher.submit` with `encType: "application/json"`). This prevents silent failures when callers submit JSON but the action only reads formData.
+
+**Fetcher–action alignment checklist** (for new actions):
+1. Does the caller use `encType: "application/json"`? If yes, the action must handle JSON.
+2. Use `parseActionRequest` to support both form and JSON bodies.
+3. For array fields (e.g. `contact_ids[]`), `parseActionRequest` collects duplicate form keys into arrays.
+
 ```typescript
+import { parseActionRequest } from "~/lib/database.server";
+
 export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.formData();
-  const actionType = String(formData.get("_action") ?? "").trim().toLowerCase();
+  const data = await parseActionRequest(request);
+  const actionType = String(data._action ?? data.intent ?? "").trim().toLowerCase();
   
   if (!actionType) {
     return jsonError({ error: "Missing action." }, 400);
@@ -641,7 +654,7 @@ export async function action({ request }: Route.ActionArgs) {
   
   if (actionType === "create_item") {
     const { profile } = await requireAdmin(request);
-    const name = String(formData.get("name") ?? "").trim();
+    const name = String(data.name ?? "").trim();
     
     if (!name) {
       return jsonError({ error: "Name is required." }, 400);
@@ -658,6 +671,18 @@ export async function action({ request }: Route.ActionArgs) {
   return jsonError({ error: "Unsupported action." }, 400);
 }
 ```
+
+**Routes already using `parseActionRequest`**: api.contact-audience, api.contact-audience.bulk-delete, api.audiences, api.campaigns, workspaces_.$id.campaigns.$selected_id.settings, workspaces_.$id.campaigns.$selected_id.queue.
+
+**Twilio webhooks**: Routes that receive callbacks from Twilio (e.g. api.ivr.status, api.dial.status, api.auto-dial.status, api.call-status, api.sms.status, api.inbound-sms, api.ivr.$campaignId.$pageId, api.ivr.$campaignId.$pageId.$blockId.response, archive/*) receive `application/x-www-form-urlencoded` only. Use `request.formData()` directly. Do not use `parseActionRequest` for these routes—they never receive JSON from our app. **Validate `X-Twilio-Signature`** using `validateTwilioWebhook` or `validateTwilioWebhookParams` from `~/twilio.server` before processing; reject with 403 if invalid.
+
+**JSON parse safety**: For routes that parse JSON, use `safeParseJson(request)` from `~/lib/database.server` instead of `request.json()` to avoid 500s from malformed JSON—it returns 400 on parse errors. Routes that use `parseActionRequest` already benefit from this.
+
+**Error handling**: Use `createErrorResponse(error, defaultMessage)` from `~/lib/errors.server` in API route catch blocks for consistent error responses and logging.
+
+**Input validation**: Validate and sanitize user input before processing. For JSON strings in formData (e.g. `formData.get("surveyData")`), wrap `JSON.parse` in try/catch and return 400 on failure. For public forms (e.g. contact form), validate email format, message length limits, and required fields.
+
+**Resource access**: When `workspace_id` or `campaign_id` comes from the request body, call `requireWorkspaceAccess({ supabaseClient, user, workspaceId })` from `~/lib/database.server` as defense-in-depth (RLS is the primary guard).
 
 ### Route Data Types
 

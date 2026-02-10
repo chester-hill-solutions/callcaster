@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { logger } from "@/lib/logger.client";
 
 export interface ValidationRule<T> {
   required?: boolean;
@@ -182,7 +183,7 @@ export function useForm<T extends Record<string, unknown>>(
       setIsSubmitting(true);
       await onSubmit(values);
     } catch (error) {
-      console.error('Form submission error:', error);
+      logger.error('Form submission error:', error);
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);

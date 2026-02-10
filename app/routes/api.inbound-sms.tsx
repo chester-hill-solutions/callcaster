@@ -1,14 +1,14 @@
 import { json, ActionFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import { validateTwilioWebhook } from "@/twilio.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!,
-  );
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData);
+  const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
+  if (validation instanceof Response) return validation;
+  const data = validation.params as Record<string, unknown>;
   const { data: number, error: numberError } = await supabase
     .from("workspace_number")
     .select(
@@ -48,12 +48,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           });
 
         if (uploadError) {
-          console.error('Upload error:', uploadError);
+          logger.error('Upload error:', uploadError);
           continue;
         }
         media.push(uploadData?.path);
       } catch (error) {
-        console.error(`Error processing media ${i}:`, error);
+        logger.error(`Error processing media ${i}:`, error);
       }
     }
 
@@ -64,7 +64,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .eq("workspace", number.workspace);
 
     if (contactError) {
-      console.error('Contact lookup error:', contactError);
+      logger.error('Contact lookup error:', contactError);
     }
 
     const messageData = {
@@ -97,7 +97,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         .eq("workspace", number.workspace);
 
       if (contactError) {
-        console.error('Contact lookup error:', contactError);
+        logger.error('Contact lookup error:', contactError);
       }
 
       if (contact && contact.length > 0) {
@@ -113,7 +113,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         .eq("workspace", number.workspace);
 
       if (contactError) {
-        console.error('Contact lookup error:', contactError);
+        logger.error('Contact lookup error:', contactError);
       }
 
       if (contact && contact.length > 0) {
@@ -124,7 +124,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (messageError) {
-      console.error('Message insert error:', messageError);
+      logger.error('Message insert error:', messageError);
       return json({ messageError }, 400);
     }
     const smsWebhook = number.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_sms")).flat()

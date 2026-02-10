@@ -1,6 +1,10 @@
 import { json } from "@remix-run/node";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient, headers } = await verifyAuth(request);
@@ -8,7 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         if (method === "POST") {
-            const { audience_id, campaign_id } = await request.json();
+            const { audience_id, campaign_id } = await safeParseJson(request);
 
             // First check if this audience is already added to the campaign
             const { data: existing, error: checkError } = await supabaseClient
@@ -51,40 +55,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (contactsError) throw contactsError;
 
             if (contacts && contacts.length > 0) {
-                // Get the current max queue_order
-                const { data: maxOrder, error: maxOrderError } = await supabaseClient
-                    .from('campaign_queue')
-                    .select('queue_order')
-                    .eq('campaign_id', campaign_id)
-                    .order('queue_order', { ascending: false })
-                    .limit(1)
-                    .single();
-
-                if (maxOrderError && maxOrderError.code !== 'PGRST116') throw maxOrderError;
-
-                const startOrder = (maxOrder?.queue_order || 0) + 1;
-
-                // Add all contacts to the queue
-                const queueItems = contacts.map((contact, index) => ({
+                const contactIds = contacts.map((c) => c.contact_id);
+                await enqueueContactsForCampaign(
+                    supabaseClient,
                     campaign_id,
-                    contact_id: contact.contact_id,
-                    status: 'queued',
-                    queue_order: startOrder + index,
-                    attempts: 0
-                }));
-
-                const { error: queueError } = await supabaseClient
-                    .from('campaign_queue')
-                    .insert(queueItems);
-
-                if (queueError) throw queueError;
+                    contactIds,
+                    { requeue: false }
+                );
             }
 
             return json({ success: true }, { headers });
         }
 
         if (method === "DELETE") {
-            const { audience_id, campaign_id } = await request.json();
+            const { audience_id, campaign_id } = await safeParseJson(request);
 
             // Remove the audience from the campaign
             const { error } = await supabaseClient
@@ -122,7 +106,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .delete()
                     .eq('campaign_id', campaign_id)
                     .in('contact_id', contactsToRemove.map(c => c.contact_id))
-                    .eq('status', 'queued')
+                    .eq('status', QUEUE_STATUS_QUEUED)
                     .eq('attempts', 0);
 
                 if (removeError) throw removeError;
@@ -133,7 +117,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         return json({ error: "Method not allowed" }, { status: 405, headers });
     } catch (error: unknown) {
-        console.error("Error in campaign_audience action:", error);
+        logger.error("Error in campaign_audience action:", error);
         return json(
             { error: error instanceof Error ? error.message : "An unexpected error occurred" },
             { status: 500, headers }

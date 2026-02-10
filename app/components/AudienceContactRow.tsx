@@ -1,8 +1,9 @@
 import { MdEdit, MdRemoveCircleOutline } from "react-icons/md";
 import { Button } from "./ui/button";
 import { NavLink } from "react-router-dom";
-import type { Contact } from "~/lib/types";
-import type { Json } from "~/lib/database.types";
+import type { Contact } from "@/lib/types";
+import type { Json } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
 export interface AudienceContactRowProps {
@@ -20,7 +21,7 @@ export interface OtherDataItem extends Record<string, unknown> {
 
 export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({ 
   contact, 
-  audience_id,
+  audience_id: _audience_id,
   otherDataHeaders, 
   isSelected = false, 
   onSelect,
@@ -43,7 +44,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
       
       return '';
     } catch (error) {
-      console.error('Error extracting other_data value:', error);
+      logger.error('Error extracting other_data value:', error);
       return '';
     }
   };
@@ -62,7 +63,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
         day: 'numeric',
       });
     } catch (error) {
-      console.error('Error formatting date:', error);
+      logger.error('Error formatting date:', error);
       return '';
     }
   };
@@ -80,7 +81,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
         minute: 'numeric',
       });
     } catch (error) {
-      console.error('Error formatting time:', error);
+      logger.error('Error formatting time:', error);
       return '';
     }
   };

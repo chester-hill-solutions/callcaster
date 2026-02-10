@@ -1,26 +1,10 @@
-<<<<<<< HEAD:app/components/contact/ContactDetailsOtherFields.tsx
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { TextInput } from "@/components/forms/Inputs";
 import { Button } from "@/components/ui/button";
-=======
-import React, { useState, useCallback } from "react";
-import { TextInput } from "./Inputs";
-import { Button } from "~/components/ui/button";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetailsOtherFields.tsx
 import { FaPlus, FaTrash } from "react-icons/fa";
-import type { Json } from "~/lib/database.types";
+import type { Json } from "@/lib/database.types";
+import { logger } from "@/lib/logger.client";
 
-<<<<<<< HEAD:app/components/contact/ContactDetailsOtherFields.tsx
-type ContactUpdate = {
-  other_data?: Array<{[x: string | number]: string}>;
-  [key: string]: unknown;
-};
-
-const OtherDataFields = ({ otherData, editMode, setContact }:{
-  otherData?: Array<{[x: string | number]: string}>;
-  editMode: boolean;
-  setContact: (contact: ContactUpdate | ((prevContact: ContactUpdate) => ContactUpdate)) => void;
-=======
 // Enhanced type definitions
 export interface OtherDataFieldsProps {
   otherData?: Json[];
@@ -32,27 +16,14 @@ export interface OtherDataItem {
   [key: string]: unknown;
 }
 
-export interface OtherDataFieldsState {
-  newKey: string;
-  newValue: string;
-}
-
 const OtherDataFields: React.FC<OtherDataFieldsProps> = ({ 
   otherData, 
   editMode, 
   setContact 
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetailsOtherFields.tsx
 }) => {
   const [newKey, setNewKey] = useState<string>("");
   const [newValue, setNewValue] = useState<string>("");
 
-<<<<<<< HEAD:app/components/contact/ContactDetailsOtherFields.tsx
-  const handleOtherDataChange = (index: number, key: string, value: string) => {
-    const newOtherData = [...otherData];
-    newOtherData[index] = { [key]: value };
-    setContact(prevContact => ({ ...prevContact, other_data: newOtherData }));
-  };
-=======
   // Enhanced handler with better type safety
   const handleOtherDataChange = useCallback((
     index: number, 
@@ -66,16 +37,15 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
       newOtherData[index] = { [key]: value };
       setContact({ other_data: newOtherData });
     } catch (error) {
-      console.error('Error updating other data:', error);
+      logger.error('Error updating other data:', error);
     }
   }, [otherData, setContact]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetailsOtherFields.tsx
 
   // Enhanced add function with validation
   const addNewOtherData = useCallback((): void => {
     try {
       if (!newKey.trim() || !newValue.trim()) {
-        console.warn('Both key and value are required');
+        logger.warn('Both key and value are required');
         return;
       }
 
@@ -86,30 +56,22 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
       setNewKey("");
       setNewValue("");
     } catch (error) {
-      console.error('Error adding new other data:', error);
+      logger.error('Error adding new other data:', error);
     }
   }, [newKey, newValue, otherData, setContact]);
 
-<<<<<<< HEAD:app/components/contact/ContactDetailsOtherFields.tsx
-  const removeOtherData = (index: number) => {
-    setContact(prevContact => ({
-      ...prevContact,
-      other_data: prevContact.other_data.filter((_, i) => i !== index),
-    }));
-  };
-=======
   // Enhanced remove function with validation
   const removeOtherData = useCallback((index: number): void => {
     try {
       if (!otherData || index < 0 || index >= otherData.length) {
-        console.warn('Invalid index for removal');
+        logger.warn('Invalid index for removal');
         return;
       }
 
       const updatedOtherData = otherData.filter((_, i) => i !== index);
       setContact({ other_data: updatedOtherData });
     } catch (error) {
-      console.error('Error removing other data:', error);
+      logger.error('Error removing other data:', error);
     }
   }, [otherData, setContact]);
 
@@ -136,11 +98,10 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
         })
         .filter((item): item is { key: string; value: string; index: number } => item !== null);
     } catch (error) {
-      console.error('Error extracting other data items:', error);
+      logger.error('Error extracting other data items:', error);
       return [];
     }
   }, [otherData]);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/ContactDetailsOtherFields.tsx
 
   return (
     <div className="mt-6">

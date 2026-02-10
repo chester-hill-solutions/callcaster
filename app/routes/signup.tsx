@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import {
   Form,
   json,
@@ -14,16 +13,9 @@ import { FcGoogle } from "react-icons/fc";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
-=======
-import { useActionData, useFetcher, useNavigation } from "@remix-run/react";
-import { json, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from "@remix-run/node";
-import { useEffect, useRef } from "react";
-import { toast } from "sonner";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent } from "~/components/ui/card";
-import { verifyAuth } from "~/lib/supabase.server";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import { logger } from "@/lib/logger.server";
 
 type ActionData =
   | { emailError: string | null; passwordError: string | null; error?: undefined; data?: undefined }
@@ -83,7 +75,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (error) {
-    console.log(error);
+    logger.error("Sign-up error", error);
     if (error.message === "Password should be at least 6 characters.") {
       return json<ActionData>({ passwordError: error.message }, { headers });
     }
@@ -112,38 +104,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // Removed unused legacy styles
 
-type ActionData = {
-  emailError?: string | null;
-  passwordError?: string | null;
-  error?: string;
-  data?: {
-    user?: unknown;
-  };
-} | undefined;
-
 type FetcherData = {
   success?: boolean;
 } | undefined;
 
 export default function SignUp() {
   const actionData = useActionData<ActionData>();
-<<<<<<< HEAD
-  const firstPage = FormFirstPage();
-  const secondPage = FormSecondPage();
-  const [formPage, setFormPage] = useState<ReactNode>(secondPage);
-  const [isFirstPage, setIsFirstPage] = useState<boolean>(false);
   const { state } = useNavigation();
   const fetcher = useFetcher<FetcherData>();
-  const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement>(null);
-  const paginationHandler = (page: ReactNode) => {
-    setFormPage(page);
-  };
-=======
-  const { state } = useNavigation();
-  const fetcher = useFetcher();
-  const formRef = useRef<HTMLFormElement>(null);
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
   // legacy error UI removed; keep actionData for toast only
 
@@ -171,19 +140,11 @@ export default function SignUp() {
     </main>
   );
 }
-<<<<<<< HEAD
 interface ContactFormProps {
   isBusy: boolean;
   formRef: React.RefObject<HTMLFormElement>;
   fetcher: ReturnType<typeof useFetcher<FetcherData>>;
 }
-=======
-type ContactFormProps = {
-  isBusy: boolean;
-  formRef: React.RefObject<HTMLFormElement>;
-  fetcher: ReturnType<typeof useFetcher>;
-};
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">

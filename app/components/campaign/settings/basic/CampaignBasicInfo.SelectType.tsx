@@ -5,18 +5,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Flags } from "@/lib/types";
+import type { Campaign } from "@/lib/types";
 
 interface CampaignBasicInfoSelectTypeProps {
   campaignData: Campaign;
   handleInputChange: (name: string, value: string | number | boolean) => void;
-  flags: Record<string, boolean>;
+  flags?: Record<string, boolean>;
 }
 
 export default function SelectType({
   handleInputChange,
   campaignData,
-  flags,
 }: CampaignBasicInfoSelectTypeProps) {
   const isLiveCallEnabled = true;
   const isMessageEnabled = true;
@@ -24,7 +23,7 @@ export default function SelectType({
 
   return (
     <Select
-      value={campaignData.type}
+      value={campaignData.type ?? ""}
       onValueChange={(value) => handleInputChange("type", value)}
     >
       <SelectTrigger id="type">

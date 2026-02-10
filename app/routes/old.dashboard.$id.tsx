@@ -3,6 +3,7 @@ import { useLoaderData } from "@remix-run/react";
 import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { logger } from "@/lib/logger.client";
 
 interface LoaderData {
   success: boolean;
@@ -46,9 +47,9 @@ export default function Call() {
       `wss://socketserver-production-2306.up.railway.app/${id}`,
     );
 
-    ws.onopen = () => console.log("WebSocket connection established");
-    ws.onerror = (event) => console.error("WebSocket error:", event);
-    ws.onclose = () => console.log("WebSocket connection closed");
+    ws.onopen = () => logger.debug("WebSocket connection established");
+    ws.onerror = (event) => logger.error("WebSocket error:", event);
+    ws.onclose = () => logger.debug("WebSocket connection closed");
 
     ws.onmessage = async (e) => {
       if (e.data) {
@@ -61,7 +62,7 @@ export default function Call() {
             }
           }
         } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+          logger.error("Error parsing WebSocket message:", error);
         }
       }
     };
@@ -109,7 +110,7 @@ export default function Call() {
           audioBuffer.current = [];
         };
       } catch (error) {
-        console.error("Error decoding audio data:", error);
+        logger.error("Error decoding audio data:", error);
       }
     }
   };
@@ -140,7 +141,7 @@ export default function Call() {
 
       setIsRecording(true);
     } catch (error) {
-      console.error("Error accessing media devices.", error);
+      logger.error("Error accessing media devices.", error);
     }
   };
 

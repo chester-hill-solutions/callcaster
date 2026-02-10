@@ -1,32 +1,25 @@
 import { FaPlus } from "react-icons/fa";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
-<<<<<<< HEAD
 import { verifyAuth } from "@/lib/supabase.server";
 import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { getUserRole } from "@/lib/database.server";
 import ContactDetails from "@/components/contact/ContactDetails";
-import { Session, SupabaseClient } from "@supabase/supabase-js";
-import { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
-import { MemberRole } from "@/components/workspace/TeamMember";
-=======
-import { verifyAuth } from "~/lib/supabase.server";
-import { deepEqual } from "~/lib/utils";
-import { Button } from "~/components/ui/button";
-import { getUserRole } from "~/lib/database.server";
-import ContactDetails from "~/components/ContactDetails";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { Audience, Contact, ContactAudience, WorkspaceData, User } from "../lib/types";
-import type { MemberRole } from "~/components/Workspace/TeamMember";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import type { Audience, Contact, ContactAudience, WorkspaceData, User } from "@/lib/types";
+import type { MemberRole } from "@/components/workspace/TeamMember";
+import { logger } from "@/lib/logger.server";
 
 // Enhanced type definitions
 export interface AudienceChanges {
   additions: ContactAudience[];
   deletions: ContactAudience[];
 }
+
+export { ErrorBoundary };
 
 export interface LoaderData {
   workspace: WorkspaceData;
@@ -129,7 +122,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs): Promise<R
       audiences: audiences || [],
     });
   } catch (error) {
-    console.error('Error in contact loader:', error);
+    logger.error('Error in contact loader:', error);
     return redirect(`/workspaces/${workspace_id}`);
   }
 };
@@ -173,7 +166,7 @@ function compareContactAudiences(
       }
     });
   } catch (error) {
-    console.error('Error comparing contact audiences:', error);
+    logger.error('Error comparing contact audiences:', error);
   }
   
   return { additions, deletions };
@@ -238,7 +231,7 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<R
       return json({ success: true, contact: updatedContact });
     }
   } catch (error) {
-    console.error('Error in contact action:', error);
+    logger.error('Error in contact action:', error);
     return json({ error: "Failed to save contact" }, { status: 500 });
   }
 };
@@ -257,7 +250,7 @@ export default function ContactScreen(): JSX.Element {
       setIsSaving(true);
       submit({}, { method: "post" });
     } catch (error) {
-      console.error('Error saving contact:', error);
+      logger.error('Error saving contact:', error);
     } finally {
       setIsSaving(false);
     }
@@ -268,7 +261,7 @@ export default function ContactScreen(): JSX.Element {
       setIsDirty(false);
       setHasChanges(false);
     } catch (error) {
-      console.error('Error resetting contact:', error);
+      logger.error('Error resetting contact:', error);
     }
   }, []);
 

@@ -36,7 +36,7 @@ export const CampaignTypeSpecificSettings = ({
   handleNavigate: _handleNavigate,
 }: {
   campaignData: NonNullable<Campaign>,
-  handleInputChange: (name: string, value: string | boolean | number | null | Schedule) => void,
+  handleInputChange: (name: string, value: unknown) => void,
   mediaData: FileObject[],
   scripts: Script[],
   handleActivateButton: (type: "play" | "pause" | "archive" | "schedule") => void,

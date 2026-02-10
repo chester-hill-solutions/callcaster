@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface CampaignData {
   ivr_campaign: Array<{
@@ -44,7 +46,7 @@ const updateResult = async (supabase: any, outreach_attempt_id: string, result: 
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-    const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     
     const formData = await request.formData();
     const userInput = (formData.get('Digits') || formData.get('SpeechResult')) as string;
@@ -85,13 +87,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
         
         if (nextPageId && !updatedResult.visitedPages?.includes(nextPageId)) {
-            return Response.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/${nextPageId}/${responseId}`, 303);
+            return Response.redirect(`${env.BASE_URL()}/api/ivr/${campaignId}/${nextPageId}/${responseId}`, 303);
         } else {
-            return Response.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/end/${responseId}`, 303);
+            return Response.redirect(`${env.BASE_URL()}/api/ivr/${campaignId}/end/${responseId}`, 303);
         }
 
     } catch (e) {
-        console.error(e);
-        return Response.redirect(`${process.env.BASE_URL}/api/ivr/${campaignId}/error`, 303);
+        logger.error("IVR response error:", e);
+        return Response.redirect(`${env.BASE_URL()}/api/ivr/${campaignId}/error`, 303);
     }
 };

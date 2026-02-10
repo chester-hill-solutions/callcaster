@@ -7,6 +7,7 @@ import { usePhoneNumbers } from "@/hooks/phone/usePhoneNumbers";
 import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger.client";
 
 type RealtimeChangePayload<T extends Record<string, unknown> = Record<string, unknown>> = RealtimePostgresChangesPayload<T>;
 
@@ -220,6 +221,7 @@ export const useSupabaseRealtime = ({
   const recentAttemptRef = useRef(recentAttempt);
   const campaignIdRef = useRef(campaign_id);
   const userRef = useRef(user);
+  const workspaceRef = useRef(workspace);
 
   // Update refs when values change
   useEffect(() => {
@@ -243,11 +245,17 @@ export const useSupabaseRealtime = ({
   }, [user]);
 
   useEffect(() => {
+    workspaceRef.current = workspace;
+  }, [workspace]);
+
+  useEffect(() => {
     const handleChange = (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
       const tableName = payload.table;
       switch (tableName) {
         case "outreach_attempt":
-          if (payload.eventType === 'INSERT' && payload.new) {
+          if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const attemptCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
+            if (Number(attemptCampaignId) !== Number(campaignIdRef.current)) return;
             updateAttempts(
               { new: payload.new as OutreachAttempt },
               userRef.current as SupabaseUser,
@@ -257,9 +265,14 @@ export const useSupabaseRealtime = ({
           }
           break;
         case "call":
-          if (payload.eventType === 'INSERT' && payload.new) {
+          if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const callCampaignId = (payload.new as { campaign_id?: number }).campaign_id;
+            if (callCampaignId != null && Number(callCampaignId) !== Number(campaignIdRef.current)) return;
             updateCalls(
-              { new: payload.new as Call },
+              {
+                new: payload.new as Call,
+                eventType: payload.eventType as 'INSERT' | 'UPDATE',
+              },
               queueRef.current,
               recentAttemptRef.current,
               setNextRecipient,
@@ -269,6 +282,7 @@ export const useSupabaseRealtime = ({
           }
           break;
         case "campaign_queue":
+          if (payload.new && Number((payload.new as { campaign_id?: number }).campaign_id) !== Number(campaignIdRef.current)) return;
           if (payload.eventType === 'INSERT' && payload.new) {
             const queueItem = payload.new as Tables<"campaign_queue"> & { contact: Contact | null };
             if (queueItem.contact) {
@@ -277,6 +291,10 @@ export const useSupabaseRealtime = ({
           }
           break;
         case "workspace_number":
+          if (workspaceRef.current && payload.new) {
+            const rowWorkspace = (payload.new as { workspace?: string }).workspace;
+            if (rowWorkspace !== workspaceRef.current) return;
+          }
           updateWorkspaceNumbers({
             eventType: payload.eventType,
             old: payload.old as Tables<"workspace_number"> | null,
@@ -284,6 +302,10 @@ export const useSupabaseRealtime = ({
           });
           break;
         case "transaction_history":
+          if (workspaceRef.current && payload.new) {
+            const rowWorkspace = (payload.new as { workspace?: string }).workspace;
+            if (rowWorkspace !== workspaceRef.current) return;
+          }
           updateCredits(payload as RealtimePostgresChangesPayload<Tables<"transaction_history">>);
           break;
       }
@@ -300,9 +322,9 @@ export const useSupabaseRealtime = ({
         if (status === 'SUBSCRIBED') {
           // Subscription successful - no need to log in production
         } else if (status === 'CHANNEL_ERROR') {
-          console.error('Failed to subscribe to schema-db-changes');
+          logger.error('Failed to subscribe to schema-db-changes');
         } else if (status === 'TIMED_OUT') {
-          console.error('Subscription to schema-db-changes timed out');
+          logger.error('Subscription to schema-db-changes timed out');
         } else if (status === 'CLOSED') {
           // Subscription closed - no need to log in production
         }
@@ -312,7 +334,7 @@ export const useSupabaseRealtime = ({
       try {
         supabase.removeChannel(subscription);
       } catch (error) {
-        console.error('Error removing subscription channel:', error);
+        logger.error('Error removing subscription channel:', error);
       }
     };
   }, [

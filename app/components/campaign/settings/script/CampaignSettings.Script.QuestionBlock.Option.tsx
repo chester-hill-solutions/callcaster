@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { GrSubtractCircle } from "react-icons/gr";
-import { iconMapping } from "@/components/call-list/CallContact/Result.IconMap";
+import { iconMapping } from "@/components/call-list/records/participant/Result.IconMap";
 
 interface Block {
   id: string;
@@ -9,15 +9,15 @@ interface Block {
 }
 
 interface Option {
-  value: string;
-  content: string;
+  value?: string;
+  content?: string;
   next: string;
   Icon?: string;
 }
 
 interface ScriptData {
-  pages: Record<string, { title: string; blocks: string[] }>;
-  blocks: Record<string, { title: string; id: string }>;
+  pages?: Record<string, { title: string; blocks: string[] }>;
+  blocks?: Record<string, { title: string; id: string }>;
 }
 
 interface QuestionBlockOptionProps {
@@ -28,7 +28,7 @@ interface QuestionBlockOptionProps {
   handleChange: (index: number, e: React.ChangeEvent<HTMLInputElement>) => void;
   handleIconChange: (params: { index: number; iconName: string }) => void;
   scriptData: ScriptData;
-  addNewBlock: () => Promise<string>;
+  addNewBlock: () => void | Promise<string>;
   handleNextChange: (index: number, value: string) => void;
 }
 
@@ -70,7 +70,8 @@ export default function QuestionBlockOption({
     const handleNextStepChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const value = e.currentTarget.value;
         if (value === "add_new_block") {
-            const newBlockId = await addNewBlock();
+            const result = await addNewBlock();
+            const newBlockId = typeof result === "string" ? result : `block_${Date.now()}`;
             handleNextChange(index, newBlockId);
         } else if (value.startsWith("page_")) {
             handleNextChange(index, value);
@@ -118,14 +119,14 @@ export default function QuestionBlockOption({
                                 className="px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 <option value="end">End</option>
-                                {Object.entries(scriptData.pages).map(([pageId, page]) => (
+                                {Object.entries(scriptData.pages ?? {}).map(([pageId, page]) => (
                                     <optgroup key={pageId} label={page.title}>
                                         <option value={`page_${pageId}`}>Go to Page: {page.title}</option>
                                         {page.blocks.map(blockId => {
-                                            const blockData = scriptData.blocks[blockId];
+                                            const blockData = scriptData.blocks?.[blockId];
                                             return (
                                                 <option key={blockId} value={blockId}>
-                                                    {blockData.title || blockData.id}
+                                                    {(blockData && (blockData.title || blockData.id)) || blockId}
                                                 </option>
                                             );
                                         })}
@@ -142,7 +143,7 @@ export default function QuestionBlockOption({
                                         className="flex items-center gap-1 px-2 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
                                         onClick={() => setShowIcons(!showIcons)}
                                     >
-                                        {IconComponent && <IconComponent />}
+                                        {IconComponent ? <IconComponent size={16} /> : null}
                                         <ChevronDown size={16} />
                                     </button>
 
@@ -158,14 +159,15 @@ export default function QuestionBlockOption({
                                             }}
                                         >
                                             {Object.keys(iconMapping).map((iconName) => {
-                                                const Icon = iconMapping[iconName];
+                                                const IconComponentItem = iconMapping[iconName];
+                                                if (!IconComponentItem) return null;
                                                 return (
                                                     <button
                                                         key={iconName}
                                                         onClick={() => handleIconClick(iconName)}
                                                         className="p-2 hover:bg-gray-100 rounded transition-colors h-10 w-10"
                                                     >
-                                                        <Icon size={30} />
+                                                        <IconComponentItem size={30} />
                                                     </button>
                                                 );
                                             })}

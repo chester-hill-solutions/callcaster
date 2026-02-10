@@ -1,8 +1,10 @@
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
-import { createWorkspaceTwilioInstance } from '../lib/database.server';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from '../lib/database.server';
 import { Database } from '@/lib/database.types';
-import { verifyAuth } from '@/lib/supabase.server';
+import { verifyApiKeyOrSession } from '@/lib/api-auth.server';
 import { processTemplateTags } from '@/lib/utils';
+import { logger } from '@/lib/logger.server';
+import { env } from '@/lib/env.server';
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {
@@ -13,7 +15,7 @@ async function shortenUrl(url: string): Promise<string> {
       return shortenedUrl;
     }
   } catch (error) {
-    console.error('Error shortening URL:', error);
+    logger.error('Error shortening URL:', error);
   }
   return url; // Return original URL if shortening fails
 }
@@ -54,7 +56,7 @@ const normalizePhoneNumber = (input: string) => {
     return cleaned;
 };
 
-export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id, user }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string, user: User }) => {
+export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id, user }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string, user: { id: string } | null }) => {
     const mediaData = media && JSON.parse(media);
     const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: workspace });
     try {
@@ -65,7 +67,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             body: processedBody,
             to,
             from,
-            statusCallback: `${process.env.BASE_URL}/api/sms/status`,
+            statusCallback: `${env.BASE_URL()}/api/sms/status`,
             ...(mediaData && mediaData.length > 0 && { mediaUrl: [...mediaData] })
         });
 
@@ -125,7 +127,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             .eq('workspace', workspace)
             .filter('events', 'cs', '[{"category":"outbound_sms"}]');
         if (webhook_error) {
-            console.error('Error fetching webhook:', webhook_error);
+            logger.error('Error fetching webhook:', webhook_error);
             throw { 'webhook_error:': webhook_error };
         }
         if (webhook && webhook.length > 0) {
@@ -150,7 +152,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
                     }),
                 });
                 if (!webhook_response.ok) {
-                    console.error(`Webhook request failed with status ${webhook_response.status}`);
+                    logger.error(`Webhook request failed with status ${webhook_response.status}`);
                     throw new Error(`Error with the webhook event: ${webhook_response.statusText}`);
                 }
                 
@@ -158,19 +160,39 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
         }
         return { message, data, webhook };
     } catch (error) {
-        console.log(`Error sending message: ${error}`);
+        logger.error(`Error sending message: ${error}`);
         return { error: 'Failed to send message' };
     }
 };
 
 export const action = async ({ request }: { request: Request }) => {
-    const { supabaseClient, user } = await verifyAuth(request);
-    const { to_number, workspace_id, contact_id, caller_id, body, media } = await request.json() as { to_number: string, workspace_id: string, contact_id: string, caller_id: string, body: string, media: string };
+    const authResult = await verifyApiKeyOrSession(request);
+
+    if ("error" in authResult) {
+        return new Response(JSON.stringify({ error: authResult.error }), {
+            headers: { "Content-Type": "application/json" },
+            status: authResult.status,
+        });
+    }
+
+    const { to_number, workspace_id, contact_id, caller_id, body, media } = await safeParseJson<{ to_number: string; workspace_id: string; contact_id: string; caller_id: string; body: string; media: string }>(request);
+
+    if (authResult.authType === "api_key") {
+        if (workspace_id !== authResult.workspaceId) {
+            return new Response(JSON.stringify({ error: "workspace_id does not match API key" }), {
+                headers: { "Content-Type": "application/json" },
+                status: 403,
+            });
+        }
+    } else {
+        await requireWorkspaceAccess({ supabaseClient: authResult.supabaseClient, user: authResult.user, workspaceId: workspace_id });
+    }
+
     let to;
     try {
         to = normalizePhoneNumber(to_number);
     } catch (error) {
-        console.error('Invalid phone number:', error);
+        logger.error('Invalid phone number:', error);
         return new Response(JSON.stringify({ error }), {
             headers: {
                 'Content-Type': 'application/json'
@@ -179,11 +201,14 @@ export const action = async ({ request }: { request: Request }) => {
         });
     }
 
+    const supabase = authResult.authType === "api_key" ? authResult.supabase : authResult.supabaseClient;
+    const user = authResult.authType === "session" ? authResult.user : null;
+
     try {
         // Fetch contact data for template tag processing
         let processedBody = body || " ";
         if (contact_id && body) {
-            const { data: contact, error: contactError } = await supabaseClient
+            const { data: contact, error: contactError } = await supabase
                 .from("contact")
                 .select("*")
                 .eq("id", Number(contact_id))
@@ -199,7 +224,7 @@ export const action = async ({ request }: { request: Request }) => {
             media,
             to,
             from: caller_id,
-            supabase: supabaseClient,
+            supabase,
             workspace: workspace_id,
             contact_id,
             user
@@ -211,7 +236,7 @@ export const action = async ({ request }: { request: Request }) => {
             status: 201
         });
     } catch (error) {
-        console.log(error);
+        logger.error("Error in chat_sms action:", error);
         return new Response(JSON.stringify({ error }), {
             headers: {
                 'Content-Type': 'application/json'

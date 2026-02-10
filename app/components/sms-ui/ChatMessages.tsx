@@ -1,5 +1,4 @@
 interface Message {
-<<<<<<< HEAD:app/components/sms-ui/ChatMessages.tsx
   sid?: string;
   status?: string;
   direction?: string;
@@ -11,19 +10,6 @@ interface Message {
 
 interface MessageListProps {
   messages?: Message[];
-=======
-  sid: string;
-  direction: "inbound" | "outbound";
-  status: string;
-  body: string;
-  date_created: string;
-  signedUrls?: string[];
-  outbound_media?: string[];
-}
-
-interface MessageListProps {
-  messages: Message[];
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality):app/components/Chat/ChatMessages.tsx
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 

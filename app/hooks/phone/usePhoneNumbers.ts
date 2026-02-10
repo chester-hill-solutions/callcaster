@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { WorkspaceNumbers } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 /**
  * Hook for managing workspace phone numbers state
@@ -43,7 +44,7 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
   const updateWorkspaceNumbers = useCallback((payload: { eventType: string; old: WorkspaceNumbers | null; new: WorkspaceNumbers | null }) => {
     // Validate payload
     if (!payload || !payload.eventType) {
-      console.error('Invalid phone number update payload: payload or eventType is missing');
+      logger.error('Invalid phone number update payload: payload or eventType is missing');
       return;
     }
 
@@ -52,12 +53,12 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
         switch (payload.eventType) {
           case "INSERT":
             if (!payload.new) {
-              console.error('INSERT event missing new data');
+              logger.error('INSERT event missing new data');
               return currentNumbers;
             }
             if (payload.new.workspace === workspace) {
               if (!payload.new.id) {
-                console.error('INSERT event missing id');
+                logger.error('INSERT event missing id');
                 return currentNumbers;
               }
               return [...currentNumbers, payload.new];
@@ -65,12 +66,12 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
             break;
           case "UPDATE":
             if (!payload.new) {
-              console.error('UPDATE event missing new data');
+              logger.error('UPDATE event missing new data');
               return currentNumbers;
             }
             if (payload.new.workspace === workspace) {
               if (!payload.new.id) {
-                console.error('UPDATE event missing id');
+                logger.error('UPDATE event missing id');
                 return currentNumbers;
               }
               return currentNumbers.map((item) => 
@@ -80,21 +81,21 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
             break;
           case "DELETE":
             if (!payload.old) {
-              console.error('DELETE event missing old data');
+              logger.error('DELETE event missing old data');
               return currentNumbers;
             }
             if (!payload.old.id) {
-              console.error('DELETE event missing id');
+              logger.error('DELETE event missing id');
               return currentNumbers;
             }
             return currentNumbers.filter((item) => item.id !== payload.old?.id);
           default:
-            console.warn(`Unknown event type: ${payload.eventType}`);
+            logger.warn(`Unknown event type: ${payload.eventType}`);
             return currentNumbers;
         }
         return currentNumbers;
       } catch (error) {
-        console.error('Error updating phone numbers:', error);
+        logger.error('Error updating phone numbers:', error);
         return currentNumbers;
       }
     });

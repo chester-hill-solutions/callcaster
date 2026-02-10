@@ -44,13 +44,9 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
-<<<<<<< HEAD
 import type { Database } from "@/lib/database.types";
 import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign, BaseUser } from "@/lib/types";
-=======
-import type { Database } from "~/lib/database.types";
-import type { Contact, Workspace } from "~/lib/types";
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
+import { logger } from "@/lib/logger.client";
 import { sendMessage } from "./api.chat_sms";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
@@ -89,11 +85,7 @@ type LoaderData = {
   campaigns: Campaign[];
   chatsPromise: Promise<{
     chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
-<<<<<<< HEAD
     chatsError: Error | null;
-=======
-    chatsError: string | null;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   }>;
   potentialContacts: Contact[];
   contact: Contact | null;
@@ -111,11 +103,7 @@ type ImageFetcherData = {
 
 type ChatsData = {
   chats: ConversationSummary[];
-<<<<<<< HEAD
   chatsError: Error | null;
-=======
-  chatsError: string | null;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
 };
 
 type WorkspaceContextType = {
@@ -174,7 +162,7 @@ function useImageHandling(workspace_id: string) {
         const fileInput = document.querySelector<HTMLInputElement>("#image");
         if (fileInput) fileInput.value = "";
       } else if (fetcherData.error) {
-        console.error("Image upload error:", fetcherData.error);
+        logger.error("Image upload error:", fetcherData.error);
       }
     }
   }, [imageFetcher]);
@@ -275,13 +263,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
     media: data["media"] as string,
     supabase: supabaseClient,
     workspace: workspaceId as string,
-<<<<<<< HEAD
     contact_id: data.contact_id as string,
     user: user as unknown as BaseUser,
-=======
-    contact_id: data["contact_id"] as string,
-    user: user as unknown as User,
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
   });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
@@ -293,6 +276,10 @@ export default function ChatsList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const chatActionsRef = useRef<{ addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null>(null);
+  const registerChatActions = useCallback((actions: typeof chatActionsRef.current) => {
+    chatActionsRef.current = actions;
+  }, []);
   const [dialogContact, setDialog] = useState<Contact | null>(null);
   const outlet = useOutlet();
   const loc = useLocation();
@@ -351,19 +338,24 @@ export default function ChatsList() {
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      if (!phoneNumber || messageFetcher.state !== "idle") return;
-      
-      const formData = new FormData(e.currentTarget);
+      const target = e.currentTarget;
+      const toNumber = contact_number || phoneNumber;
+      if (!toNumber || messageFetcher.state !== "idle") return;
+
+      const formData = new FormData(target);
       formData.append("media", JSON.stringify(selectedImages));
-      
+      const body = (formData.get("body") as string) || "";
+      const from = (formData.get("from") as string) || workspaceNumbers?.[0]?.phone_number || "";
+      const media = formData.get("media") as string | undefined;
+      chatActionsRef.current?.addOptimisticMessage?.({ body, from, to: toNumber, media });
+
       messageFetcher.submit(formData, { method: "POST" });
-      
-      // Reset form after submission
-      const messageBody = e.currentTarget.querySelector<HTMLInputElement>("#body");
+
+      const messageBody = target.querySelector<HTMLInputElement>("#body") || target.querySelector<HTMLTextAreaElement>("#body");
       if (messageBody) messageBody.value = "";
       setSelectedImages([]);
     },
-    [phoneNumber, messageFetcher, selectedImages, setSelectedImages]
+    [contact_number, phoneNumber, messageFetcher, selectedImages, setSelectedImages, workspaceNumbers]
   );
 
   // Enhanced contact selection handler with read status update
@@ -383,7 +375,7 @@ export default function ChatsList() {
             .or(`from.eq.${number},to.eq.${number}`)
             .then(({ error }) => {
               if (error) {
-                console.error("Error marking messages as read:", error);
+                logger.error("Error marking messages as read:", error);
               } else {
                 // Trigger a global event to notify other components
                 window.dispatchEvent(new CustomEvent('messages-read', { 
@@ -412,7 +404,7 @@ export default function ChatsList() {
           .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
           .then(({ error }) => {
             if (error) {
-              console.error("Error marking messages as read:", error);
+              logger.error("Error marking messages as read:", error);
             } else {
               // Trigger a global event to notify other components
               window.dispatchEvent(new CustomEvent('messages-read', { 
@@ -553,14 +545,8 @@ export default function ChatsList() {
             </div>
           }>
             <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
-<<<<<<< HEAD
               {(chatsData) => {
                 const { chats } = chatsData as ChatsData;
-=======
-              {(value) => {
-                const chatsData = value as ChatsData;
-                const { chats } = chatsData;
->>>>>>> 43dba5c (Add new components and update TypeScript files for improved functionality)
                 const chatNumbers = Array.from(
                   new Set(
                     chats
@@ -663,7 +649,7 @@ export default function ChatsList() {
           setDialog={(contact: Partial<Contact>) => setDialog(contact as Contact)}
         />
         <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
-          <Outlet context={{ supabase, workspace, workspaceNumbers }} />
+          <Outlet context={{ supabase, workspace, workspaceNumbers, registerChatActions }} />
         </div>
         <ChatInput
           isValid={isValid}
@@ -692,6 +678,6 @@ export default function ChatsList() {
 
 function ErrorBoundary() {
   const error = useAsyncError();
-  console.error(error);   
+  logger.error("ErrorBoundary caught error:", error);   
   return <div>Error</div>;
 } 

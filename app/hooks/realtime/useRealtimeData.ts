@@ -1,9 +1,18 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger.client";
 
 type ContactState = {
     isSyncing: boolean;
     error: Error | null;
+};
+
+const WORKSPACE_ID_TABLES = new Set(["workspace_users"]);
+
+const getWorkspaceColumn = (table: string) => {
+    if (table === "workspace") return "id";
+    if (WORKSPACE_ID_TABLES.has(table)) return "workspace_id";
+    return "workspace";
 };
 
 interface RealtimePayload {
@@ -71,6 +80,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
     const [data, setData] = useState<Record<string, T[]>>(() => ({
         [table]: initialData?.filter((item): item is T => Boolean(item)) || []
     }));
+    const workspaceColumn = useMemo(() => getWorkspaceColumn(table), [table]);
     // Initialize isSyncing to true if initialData is not provided (we need to fetch)
     const [state, setState] = useState<ContactState>({
         isSyncing: !initialData,
@@ -81,7 +91,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
     useEffect(() => {
         if (!initialData) {
             setState(prev => ({ ...prev, isSyncing: true }));
-            const column = table === 'workspace' ? 'id' : 'workspace_id';
+            const column = workspaceColumn;
             
             supabase
                 .from(table)
@@ -96,16 +106,12 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
                     setState(prev => ({ ...prev, isSyncing: false }));
                 });
         }
-    }, [supabase, table, workspace_id, initialData]);
+    }, [supabase, table, workspace_id, initialData, workspaceColumn]);
 
     // Memoize filter to avoid recreating on every render
     const filter = useMemo(() => {
-        return table === 'workspace' 
-            ? `id=eq.${workspace_id}`
-            : table === 'campaign' || table === 'contact'
-                ? `workspace=eq.${workspace_id}`
-                : `workspace_id=eq.${workspace_id}`;
-    }, [table, workspace_id]);
+        return `${workspaceColumn}=eq.${workspace_id}`;
+    }, [workspaceColumn, workspace_id]);
 
     useEffect(() => {
         const channelKey = `${workspace_id}-${table}`;
@@ -163,7 +169,7 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
                         break;
                 }
             } catch (error) {
-                console.error('Error processing realtime update:', error);
+                logger.error('Error processing realtime update:', error);
                 setState(prev => ({ ...prev, error: error as Error }));
             }
         }
@@ -183,11 +189,11 @@ export function useRealtimeData<T extends { id: number | string }>(supabase: Sup
                     setState(prev => ({ ...prev, isSyncing: false }));
                 } else if (status === 'CHANNEL_ERROR') {
                     const error = new Error(`Failed to subscribe to realtime updates for ${table}`);
-                    console.error(error.message);
+                    logger.error(error.message);
                     setState(prev => ({ ...prev, error, isSyncing: false }));
                 } else if (status === 'TIMED_OUT') {
                     const error = new Error(`Subscription to ${table} timed out`);
-                    console.error(error.message);
+                    logger.error(error.message);
                     setState(prev => ({ ...prev, error, isSyncing: false }));
                 }
             });

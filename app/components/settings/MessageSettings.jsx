@@ -2,6 +2,7 @@ import { MdAddAPhoto } from "react-icons/md";
 import { MdTag } from "react-icons/md";
 import { Suspense, useRef, useState, useCallback, useEffect } from "react";
 import { Await, Form, useSubmit } from "@remix-run/react";
+import { logger } from "@/lib/logger.client";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -52,7 +53,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     const [showTemplateTags, setShowTemplateTags] = useState(false);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    console.log(surveys);
+    logger.debug("MessageSettings surveys", surveys);
     const FUNCTION_EXAMPLES = [
         {
             label: 'Base64 encode phone and external ID',

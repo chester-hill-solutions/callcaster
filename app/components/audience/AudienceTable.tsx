@@ -1,10 +1,12 @@
 import { useEffect, useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
-import { ImportIcon, Download, Search, X } from "lucide-react";
-import { useSearchParams, useSubmit } from "@remix-run/react";
+import { Download, Search, X } from "lucide-react";
+import { useFetcher, useSearchParams } from "@remix-run/react";
+import { useOptimisticCollection } from "@/hooks/utils/useOptimisticMutation";
 import TablePagination from "@/components/shared/TablePagination";
 import { Input } from "@/components/ui/input";
+import { logger } from "@/lib/logger.client";
 import {
   Table,
   TableBody,
@@ -64,7 +66,14 @@ export function AudienceTable({
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 
-  const submit = useSubmit();
+  const removeFetcher = useFetcher<{ error?: string }>();
+  const { saveSnapshot } = useOptimisticCollection({
+    items: contacts,
+    setItems: setContacts,
+    fetcher: removeFetcher,
+    isError: (d) => Boolean(d && typeof d === "object" && "error" in d && d.error),
+    errorMessage: "Failed to remove contact. Changes reverted.",
+  });
 
   useEffect(() => {
     const transformed = initialContacts?.map(item => item.contact) || [];
@@ -97,50 +106,37 @@ export function AudienceTable({
     if (response.ok) {
       setAudienceInfo(result);
     } else {
-      console.error("Failed to save audience", result);
+      logger.error("Failed to save audience", result);
     }
   };
 
-  const handleRemoveContact = async (id: number) => {
-    // Optimistically update UI
+  const handleRemoveContact = (id: number) => {
+    saveSnapshot();
     setContacts((curr) => curr.filter((contact) => contact.id !== id));
-
     const formData = new FormData();
-    formData.append('contact_id', id.toString());
-    formData.append('audience_id', audience_id || '');
-
-    submit(formData, {
-      action: '/api/contact-audience',
+    formData.append("contact_id", id.toString());
+    formData.append("audience_id", audience_id || "");
+    removeFetcher.submit(formData, {
+      action: "/api/contact-audience",
       method: "DELETE",
-      navigate: false
     });
   };
 
-  const handleRemoveSelected = async () => {
+  const handleRemoveSelected = () => {
     if (selectedContacts.length === 0) return;
-
-    // Convert string IDs to numbers for filtering
-    const selectedIds = selectedContacts.map(id => parseInt(id, 10));
-
-    // Remove contacts from UI immediately (optimistic update)
+    const selectedIds = selectedContacts.map((id) => parseInt(id, 10));
+    saveSnapshot();
     setContacts((curr) => curr.filter((contact) => !selectedIds.includes(contact.id)));
-
-    // Create form data with all selected contacts
-    const formData = new FormData();
-    selectedContacts.forEach(id => {
-      formData.append('contact_ids[]', id);
-    });
-    formData.append('audience_id', audience_id || '');
-
-    // Submit the form
-    submit(formData, {
-      action: '/api/contact-audience/bulk-delete',
-      method: "DELETE",
-      navigate: false
-    });
-
-    // Clear selection
     setSelectedContacts([]);
+    const formData = new FormData();
+    selectedContacts.forEach((id) => {
+      formData.append("contact_ids[]", id);
+    });
+    formData.append("audience_id", audience_id || "");
+    removeFetcher.submit(formData, {
+      action: "/api/contact-audience/bulk-delete",
+      method: "DELETE",
+    });
   };
 
   const handleExportCSV = () => {
