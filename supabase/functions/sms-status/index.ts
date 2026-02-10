@@ -55,22 +55,27 @@ Deno.serve(async (req) => {
       throw new Error("Missing required parameters");
     }
 
-    // Get message data to find the workspace
+    // Get message data to find the workspace (campaign has outreach_attempt; API/chat has workspace on message)
     const { data: messageData, error: messageError } = await supabase
       .from("message")
       .select("*, outreach_attempt(workspace)")
       .eq("sid", sid)
       .single();
 
-    if (messageError || !messageData?.outreach_attempt?.workspace) {
-      throw new Error(`Failed to get message data: ${messageError?.message || 'No workspace found'}`);
+    if (messageError || !messageData) {
+      throw new Error(`Failed to get message data: ${messageError?.message || 'Message not found'}`);
+    }
+
+    const workspaceId = messageData.outreach_attempt?.workspace ?? messageData.workspace;
+    if (!workspaceId) {
+      throw new Error("No workspace found for message");
     }
 
     // Get workspace data to get Twilio auth token
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspace")
       .select("twilio_data")
-      .eq("id", messageData.outreach_attempt.workspace)
+      .eq("id", workspaceId)
       .single();
 
     if (workspaceError || !workspace?.twilio_data?.authToken) {
@@ -101,12 +106,12 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to update message: ${updateError.message}`);
     }
 
-    // Debit credits when message is delivered
-    if ((status === 'delivered' || status === 'failed' || status === 'undelivered') && messageData?.outreach_attempt?.workspace) {
+    // Debit credits when message is delivered (campaign and API-based SMS)
+    if ((status === 'delivered' || status === 'failed' || status === 'undelivered') && workspaceId) {
       const { error: transactionError } = await supabase
         .from('transaction_history')
         .insert({
-          workspace: messageData.outreach_attempt.workspace,
+          workspace: workspaceId,
           type: "DEBIT",
           amount: -1,
           note: `SMS ${sid} ${status}`

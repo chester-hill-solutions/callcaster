@@ -80,50 +80,76 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         logger.error('Error updating call:', error);
         return json({ success: false, error: 'Failed to update call' }, { status: 500 });
     }
+
+    // Resolve workspace and outreach attempt: use this call's row, or parent call (e.g. staffed dial child leg)
+    let outreachAttemptId = data?.[0]?.outreach_attempt_id as number | undefined;
+    let workspaceId: string | undefined = data?.[0]?.workspace ?? undefined;
+    if (outreachAttemptId == null && data?.[0]?.parent_call_sid) {
+        const { data: parentCall } = await supabase
+            .from('call')
+            .select('workspace, outreach_attempt_id')
+            .eq('sid', data[0].parent_call_sid)
+            .single();
+        if (parentCall) {
+            workspaceId = parentCall.workspace ?? undefined;
+            outreachAttemptId = parentCall.outreach_attempt_id ?? undefined;
+        }
+    }
+
     const { data: currentAttempt, error: fetchError } = await supabase
         .from('outreach_attempt')
         .select('disposition, contact_id, workspace')
-        .eq('id', data?.[0]?.outreach_attempt_id as number)
+        .eq('id', outreachAttemptId as number)
         .single();
-    if (fetchError) {
+    if (outreachAttemptId != null && fetchError) {
         logger.error('Error fetching current attempt:', fetchError);
         return json({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
     }
-    realtime.send({
-        type: "broadcast", event: "message", payload: {
-            contact_id: currentAttempt.contact_id,
-            status: underCaseData['call_status']
-        }
-    });
-    
-    if (["initiated", "ringing", "in-progress", "idle"].includes(String(underCaseData['call_status']))) {
-        const { error: updateError } = await supabase
-            .from('outreach_attempt')
-            .update({ disposition: underCaseData['call_status'] as string })
-            .eq('id', data?.[0]?.outreach_attempt_id as number)
-            .select();
+    const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
+    if (currentAttempt) {
+        realtime.send({
+            type: "broadcast", event: "message", payload: {
+                contact_id: currentAttempt.contact_id,
+                status: underCaseData['call_status']
+            }
+        });
+    }
 
-        if (updateError) {
-            logger.error('Error updating attempt:', updateError);
-            return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
+    if (["initiated", "ringing", "in-progress", "idle"].includes(String(underCaseData['call_status']))) {
+        if (outreachAttemptId != null) {
+            const { error: updateError } = await supabase
+                .from('outreach_attempt')
+                .update({ disposition: underCaseData['call_status'] as string })
+                .eq('id', outreachAttemptId)
+                .select();
+
+            if (updateError) {
+                logger.error('Error updating attempt:', updateError);
+                return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
+            }
         }
     }
     const onePerSixty = (duration: number): number => {
         return Math.floor(duration / 60) + 1;
     }
     if (["completed", "failed", "no-answer", "busy"].includes(String(underCaseData['call_status']))) {
-        const billingUnits = onePerSixty(Math.max(getNumber(underCaseData['duration']) ?? 0, getNumber(underCaseData['call_duration']) ?? 0));
-        const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
-            workspace: currentAttempt.workspace,
-            type: "DEBIT",
-            amount: -billingUnits,
-            note: `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${data?.[0]?.outreach_attempt_id}`
-        }).select();
-        if (transactionError) {
-            logger.error('Error creating transaction:', transactionError);
-            return json({ success: false, error: 'Failed to create transaction' }, { status: 500 });
+        if (billingWorkspace) {
+            const billingUnits = onePerSixty(Math.max(getNumber(underCaseData['duration']) ?? 0, getNumber(underCaseData['call_duration']) ?? 0));
+            const note = currentAttempt
+                ? `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${outreachAttemptId}`
+                : `Call ${updateData.sid} (API/staffed dial)`;
+            const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
+                workspace: billingWorkspace,
+                type: "DEBIT",
+                amount: -billingUnits,
+                note,
+            }).select();
+            if (transactionError) {
+                logger.error('Error creating transaction:', transactionError);
+                return json({ success: false, error: 'Failed to create transaction' }, { status: 500 });
+            }
+            logger.debug("Transaction created:", transaction);
         }
-        logger.debug("Transaction created:", transaction)
     }
     return json({ success: true })
 }

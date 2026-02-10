@@ -50,6 +50,22 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ error: "Failed to update message" }, { status: 500 });
     }
 
+    // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
+    if (
+      messageData?.workspace &&
+      (messageStatus === "delivered" || messageStatus === "failed" || messageStatus === "undelivered")
+    ) {
+      const { error: transactionError } = await supabase.from("transaction_history").insert({
+        workspace: messageData.workspace,
+        type: "DEBIT",
+        amount: -1,
+        note: `SMS ${sid} ${messageStatus}`,
+      });
+      if (transactionError) {
+        logger.error("Failed to create SMS transaction:", transactionError);
+      }
+    }
+
     let outreachData:
       | (OutreachAttempt & { campaign: Partial<Campaign> })
       | null = null;
