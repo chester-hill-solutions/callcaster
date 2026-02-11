@@ -36,6 +36,7 @@ This document lists all route files discovered by crawling the application start
 
 ### Campaign APIs
 - `api.campaigns.tsx` - Campaign CRUD operations
+- `api.campaigns.create-with-script.tsx` - One-shot create campaign with script, caller ID, and audiences (see [docs/api-create-campaign-with-script.md](docs/api-create-campaign-with-script.md))
 - `api.campaign_queue.tsx` - Campaign queue management
 - `api.campaign_audience.tsx` - Campaign-audience relationship API
 - `api.campaign-export.tsx` - Campaign data export
