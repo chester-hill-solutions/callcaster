@@ -141,7 +141,6 @@ export default function Navbar({
         </Link>
         <div className="hidden items-center space-x-4 sm:flex">
           <NavButton to="/pricing">Pricing</NavButton>
-          <NavButton to="/docs">API Docs</NavButton>
           {/* <NavButton to="/">Home</NavButton> */}
           {/*           <NavButton to="/services">Services</NavButton>
            */}{" "}
