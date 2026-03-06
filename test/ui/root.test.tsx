@@ -266,7 +266,10 @@ describe("root.tsx", () => {
     };
 
     const mod = await import("../../app/root");
-    const { unmount } = render(<mod.default />);
+    document.documentElement.innerHTML = "";
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { unmount } = render(<mod.default />, { container: document.documentElement });
+    consoleError.mockRestore();
     expect(mocks.navbarProps.isSignedIn).toBe(true);
 
     const r = await mocks.navbarProps.handleSignOut();
@@ -295,7 +298,10 @@ describe("root.tsx", () => {
     };
 
     const mod = await import("../../app/root");
-    render(<mod.default />);
+    document.documentElement.innerHTML = "";
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(<mod.default />, { container: document.documentElement });
+    consoleError.mockRestore();
 
     const r = await mocks.navbarProps.handleSignOut();
     await expect(r.json()).resolves.toEqual({ success: "Sign off successful", error: null });

@@ -72,6 +72,8 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 }) => {
   const microphoneSelectId = "campaign-microphone-select";
   const speakerSelectId = "campaign-speaker-select";
+  const defaultMicrophoneId = availableMicrophones[0]?.deviceId ?? "";
+  const defaultSpeakerId = availableSpeakers[0]?.deviceId ?? "";
 
   return (
     <div className="flex flex-col gap-6 p-6 w-full">
@@ -123,6 +125,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           </label>
           <select
             id={microphoneSelectId}
+            defaultValue={defaultMicrophoneId}
             onChange={handleMicrophoneChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -130,7 +133,6 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={microphone.deviceId}
                 value={microphone.deviceId}
-                selected={microphone.deviceId === availableMicrophones[0]?.deviceId}
               >
                 {microphone.label}
               </option>
@@ -147,6 +149,7 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           </label>
           <select
             id={speakerSelectId}
+            defaultValue={defaultSpeakerId}
             onChange={handleSpeakerChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -154,7 +157,6 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={speaker.deviceId}
                 value={speaker.deviceId}
-                selected={speaker.deviceId === availableSpeakers[0]?.deviceId}
               >
                 {speaker.label}
               </option>

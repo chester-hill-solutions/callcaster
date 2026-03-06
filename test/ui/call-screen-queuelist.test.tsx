@@ -4,7 +4,13 @@ import { describe, expect, test, vi } from "vitest";
 
 vi.mock("@/components/call-list/records/TableHeader", () => ({
   TableHeader: ({ keys = [] }: any) => (
-    <thead data-testid="table-header">{keys.join("|")}</thead>
+    <thead data-testid="table-header">
+      <tr>
+        {keys.map((key: string) => (
+          <th key={key}>{key}</th>
+        ))}
+      </tr>
+    </thead>
   ),
 }));
 
