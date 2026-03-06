@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { days } from "@/lib/utils";
-import InfoHover from "@/components/shared/InfoPopover";
+import InfoPopover from "@/components/shared/InfoPopover";
 
 interface TimeInterval {
   start: string; // Format: "HH:mm"
@@ -35,7 +35,7 @@ const WeeklyScheduleTable = ({ schedule, handleCheckboxChange, handleTimeChange 
           <TableHead>Day</TableHead>
           <TableHead>Active</TableHead>
           <TableHead>Start</TableHead>
-          <TableHead>End{" "}<InfoHover tooltip="The latest time to begin dialing." /></TableHead>
+          <TableHead>End{" "}<InfoPopover tooltip="The latest time to begin dialing." /></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

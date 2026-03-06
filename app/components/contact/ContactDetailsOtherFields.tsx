@@ -86,6 +86,9 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
             const keys = Object.keys(item);
             if (keys.length > 0) {
               const key = keys[0];
+              if (!key) {
+                return null;
+              }
               const value = item[key];
               return {
                 key,

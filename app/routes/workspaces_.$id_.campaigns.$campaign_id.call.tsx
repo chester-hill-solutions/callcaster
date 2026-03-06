@@ -174,8 +174,9 @@ function getNextRecipient(queue: QueueItem[], dialType: string, userId: string) 
   if (dialType === "predictive") {
     return null;
   } else if (dialType === "call") {
-    queue[0]
+    return queue[0] ?? null;
   }
+  return null;
 }
 function getInitialCallsList(attempts: OutreachAttempt[]) {
   return attempts.flatMap((attempt) => attempt.call);
@@ -187,7 +188,7 @@ function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
   return attempts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 }
 
-export const loader: LoaderFunction = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { campaign_id: id, id: workspaceId } = params;
   const {
     supabaseClient: supabase,
@@ -241,7 +242,7 @@ export const loader: LoaderFunction = async ({ request, params }: LoaderFunction
   }
 };
 
-export const action: ActionFunction = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { campaign_id } = params;
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -326,7 +327,12 @@ const CallScreen: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-  } = useTwilioDevice({ token, selectedDevice, workspaceId, send });
+  } = useTwilioDevice(
+    token,
+    selectedDevice,
+    workspaceId,
+    send as unknown as (action: { type: string }) => void,
+  );
 
   const {
     status: liveStatus,
@@ -580,9 +586,9 @@ const requestMicrophoneAccess = useCallback(async () => {
 }, []);
 
 const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { logger.error('No device available'); return };
+  if (!device) { logger.error('No device available'); return }
   const selectedMicrophone = event.target.value;
-  let audio = device.audio;
+  const audio = device.audio;
   audio?.setInputDevice(selectedMicrophone).then(() => {
     setIsMicrophoneMuted(false);
     setMicrophone(selectedMicrophone);
@@ -607,7 +613,7 @@ const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectE
 }, [device, activeCall]);
 
 const handleSpeakerChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { logger.error('No device available'); return };
+  if (!device) { logger.error('No device available'); return }
   const selectedSpeaker = event.target.value;
   setOutput(selectedSpeaker);
   device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
@@ -914,7 +920,10 @@ return (
               }
           }
           displayState={displayState}
-          dispositionOptions={(campaignDetails.disposition_options as unknown) as string[]}
+          dispositionOptions={((campaignDetails.disposition_options as unknown) as string[]).map((option) => ({
+            value: option,
+            label: option,
+          }))}
           handleDialNext={handleDialButton}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}
@@ -926,8 +935,8 @@ return (
         />
         <Household
           isBusy={isBusy}
-          house={house}
-          switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact.contact })}
+          house={house ?? []}
+          switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact })}
           attemptList={attemptList as unknown as (Tables<"outreach_attempt"> & { result?: { status?: string } })[]}
           questionContact={questionContact}
         />
@@ -972,7 +981,7 @@ return (
         dial_type: campaign.dial_type || "call",
         voicemail_file: Boolean(campaign.voicemail_file),
       }}
-      fetchMore={fetchMore}
+      fetchMore={fetchMore as unknown as (params: Record<string, unknown>) => void}
       householdMap={householdMap}
       currentState={currentState}
       isActive={isActive}

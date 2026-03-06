@@ -39,6 +39,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .single();
 
     if (callError) throw new Error(`Error updating call: ${callError.message}`);
+    if (!call.to) throw new Error("Call destination number not found");
 
     const { data: number, error: numberError } = await supabase
       .from("workspace_number")

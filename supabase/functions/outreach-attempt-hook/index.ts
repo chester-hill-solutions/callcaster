@@ -99,7 +99,7 @@ const getResult = async ({
   }
 };
 
-Deno.serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const { type, record, old_record } = await req.json();
     const result = await getResult({ type, record, old_record });
@@ -123,4 +123,8 @@ Deno.serve(async (req: Request) => {
       },
     );
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

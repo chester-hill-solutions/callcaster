@@ -14,9 +14,9 @@ interface GenerateTokenParams {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
-  let url = new URL(request.url);
-  let identity = url.searchParams.get('id') ?? '';
-  let workspace = url.searchParams.get('workspace') ?? '';
+  const url = new URL(request.url);
+  const identity = url.searchParams.get('id') ?? '';
+  const workspace = url.searchParams.get('workspace') ?? '';
   // const baseUrl = process.env['BASE_URL'];
   const { data, error } = await supabase
     .from('workspace')
@@ -41,7 +41,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     twilioAccountSid,
     twilioApiKey,
     twilioApiSecret,
-    { identity: identity ?? '' }
+    { identity }
   );
   token.addGrant(voiceGrant);
   logger.debug("Generated Twilio token");

@@ -4,6 +4,7 @@ import { getUserRole } from "@/lib/database.server";
 import { User } from "@/lib/types";
 import type { Tables } from "@/lib/database.types";
 import type { ResponseAnswer, Contact } from "@/lib/types";
+import { csvResponse, toCsvString } from "@/lib/csv";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -33,11 +34,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       `
       *,
       survey_page(
+        page_order,
         survey_question(
           id,
           question_id,
           question_text,
-          question_type
+          question_type,
+          question_order
         )
       )
     `,
@@ -76,11 +79,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
 type SurveyPageWithQuestions = {
+  page_order?: number;
   survey_question?: Array<{
     id: number;
     question_id: string;
     question_text: string;
     question_type: string;
+    question_order?: number;
   }>;
 };
 
@@ -99,9 +104,32 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
 };
 
   // Get all questions from the survey structure
-  const allQuestions =
-    (survey as Tables<"survey"> & { survey_page?: SurveyPageWithQuestions[] }).survey_page?.flatMap((page) => page.survey_question || []) ||
-    [];
+  const pages =
+    (survey as Tables<"survey"> & { survey_page?: SurveyPageWithQuestions[] }).survey_page ?? [];
+  const allQuestions = pages
+    .slice()
+    .sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0))
+    .flatMap((page) =>
+      (page.survey_question ?? [])
+        .slice()
+        .sort((a, b) => (a.question_order ?? 0) - (b.question_order ?? 0)),
+    );
+
+  const formatDateUtc = (value: string | null | undefined) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "-";
+    // Date-only in UTC for deterministic export.
+    return d.toISOString().slice(0, 10);
+  };
+
+  const safeFilenamePart = (input: string) =>
+    input
+      .normalize("NFKD")
+      .replace(/[^\w.-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 80) || "survey";
 
   // Generate CSV data
   const formatAnswer = (answer: ResponseAnswerWithQuestion) => {
@@ -158,37 +186,25 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
   const rows = ((responses || []) as SurveyResponseWithContact[]).map((response) => [
     getContactName(response),
     response.completed_at ? "Completed" : "In Progress",
-    new Date(response.started_at).toLocaleDateString(),
-    response.completed_at ? new Date(response.completed_at).toLocaleDateString() : "-",
+    formatDateUtc(response.started_at),
+    response.completed_at ? formatDateUtc(response.completed_at) : "-",
     response.last_page_completed || "-",
     ...allQuestions.map((question) =>
       getAnswerForQuestion(response, question.question_id)
     ),
   ]);
 
-  // Combine headers and rows
-  const csvData = [headers, ...rows];
-
-  // Convert to CSV string
-  const csvString = csvData
-    .map(row => 
-      row.map(cell => {
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        const escaped = String(cell).replace(/"/g, '""');
-        if (escaped.includes(',') || escaped.includes('"') || escaped.includes('\n')) {
-          return `"${escaped}"`;
-        }
-        return escaped;
-      }).join(',')
-    )
-    .join('\n');
-
-  // Return CSV file
-  return new Response(csvString, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/csv',
-      'Content-Disposition': `attachment; filename="survey-responses-${survey.title}-${new Date().toISOString().split('T')[0]}.csv"`,
-    },
+  const headerKeys = headers.map((_, idx) => `c${idx}`);
+  const csvRows = rows.map((r) => Object.fromEntries(r.map((cell, idx) => [`c${idx}`, cell])));
+  const csvWithDisplayHeaders = toCsvString({
+    headers: headerKeys,
+    headerLabels: headers,
+    rows: csvRows,
   });
+
+  const filename = `survey-responses-${safeFilenamePart(String(survey.title ?? "survey"))}-${new Date()
+    .toISOString()
+    .slice(0, 10)}.csv`;
+
+  return csvResponse({ filename, csv: csvWithDisplayHeaders });
 } 

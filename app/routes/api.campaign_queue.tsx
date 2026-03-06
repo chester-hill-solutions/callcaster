@@ -74,12 +74,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
               contact: item.contact
             })) || [];
 
-            const ids = contacts.map((contact: unknown) => {
-              if (contact && typeof contact === 'object' && 'id' in contact) {
-                return safeNumber((contact as { id: unknown }).id);
-              }
-              return 0;
-            }).filter(id => id > 0);
+            const ids = contacts
+              .map((contact: unknown) => safeNumber((contact as { id: unknown }).id))
+              .filter((id) => id > 0);
 
             // Delete in batches
             for (let i = 0; i < ids.length; i += BATCH_SIZE) {

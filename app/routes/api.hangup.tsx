@@ -6,10 +6,18 @@ import { logger } from "@/lib/logger.server";
 export const action = async ({ request }: { request: Request }) => {
     const {supabaseClient:supabase, user} = await verifyAuth(request);
     const data = await safeParseJson(request);
+    const conferenceId =
+        typeof data.conference_id === "string" ? data.conference_id : null;
+    const workspaceId =
+        typeof data.workspaceId === "string" ? data.workspaceId : null;
+    const callSid = typeof data.callSid === "string" ? data.callSid : null;
+    if (!conferenceId || !workspaceId || !callSid) {
+        return json({ success: false, message: "Invalid hangup payload" }, { status: 400 });
+    }
     try {
-        const realtime = supabase.realtime.channel(data.conference_id)
-        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: data.workspaceId});
-        await twilio.calls(data.callSid).update({ twiml: `<Response><Hangup/></Response>` });
+        const realtime = supabase.realtime.channel(conferenceId)
+        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: workspaceId});
+        await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
         realtime.send({
             type: "broadcast", event: "message", payload: {
                 contact_id: null,
@@ -25,7 +33,7 @@ export const action = async ({ request }: { request: Request }) => {
             dequeued_reason_text: "Call completed"
         });
         if (error) throw error;
-        const {data:outreach, error:outreachError} = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", data.workspaceId)
+        const {data:outreach, error:outreachError} = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", workspaceId)
         if (outreachError) throw outreachError;
         supabase.removeChannel(realtime);
         return json({ success: true });

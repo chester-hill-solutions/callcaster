@@ -5,10 +5,34 @@ import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.se
 import type { Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient, user } = await verifyAuth(request);
-  const { workspaceId: workspace_id } = await safeParseJson(request);
-  const twilio = await createWorkspaceTwilioInstance({
+type AutoDialEndDeps = Partial<{
+  verifyAuth: typeof verifyAuth;
+  safeParseJson: typeof safeParseJson;
+  createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance;
+  logger: typeof logger;
+}>;
+
+const resolveDeps = (deps?: AutoDialEndDeps) => {
+  return {
+    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    safeParseJson: deps?.safeParseJson ?? safeParseJson,
+    createWorkspaceTwilioInstance:
+      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
+    logger: deps?.logger ?? logger,
+  } as Required<AutoDialEndDeps>;
+};
+
+export const action = async ({
+  request,
+  deps,
+}: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {
+  const d = resolveDeps(deps);
+  const { supabaseClient, user } = await d.verifyAuth(request);
+  const { workspaceId: workspace_id } = await d.safeParseJson(request);
+  if (typeof workspace_id !== "string") {
+    return json({ error: "Missing workspaceId" }, { status: 400 });
+  }
+  const twilio = await d.createWorkspaceTwilioInstance({
     supabase: supabaseClient,
     workspace_id,
   });
@@ -26,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (error) throw error;
       return outreachData;
     } catch (error) {
-      logger.error("Error updating outreach attempt:", error);
+      d.logger.error("Error updating outreach attempt:", error);
       throw error;
     }
   };
@@ -71,19 +95,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .calls(call.sid)
                     .update({ twiml: `<Response><Hangup/></Response>` });
               } catch (callError) {
-                logger.error(`Error updating call ${call.sid}:`, callError);
+                d.logger.error(`Error updating call ${call.sid}:`, callError);
               }
             }),
           );
         } catch (confError) {
-          logger.error(`Error updating conference ${conf.sid}:`, confError);
+          d.logger.error(`Error updating conference ${conf.sid}:`, confError);
         }
       }),
     );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown error occurred";
-    logger.error("Error listing or updating conferences:", error);
+    d.logger.error("Error listing or updating conferences:", error);
     return json({ error: message }, { status: 500 });
   }
 

@@ -2,59 +2,10 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from '../lib/database.server';
 import { Database } from '@/lib/database.types';
 import { verifyApiKeyOrSession } from '@/lib/api-auth.server';
-import { processTemplateTags } from '@/lib/utils';
+import { normalizePhoneNumber, processTemplateTags } from '@/lib/utils';
 import { logger } from '@/lib/logger.server';
 import { env } from '@/lib/env.server';
-
-// Link shortening function using TinyURL API
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const shortenedUrl = await response.text();
-      return shortenedUrl;
-    }
-  } catch (error) {
-    logger.error('Error shortening URL:', error);
-  }
-  return url; // Return original URL if shortening fails
-}
-
-// Process URLs in text and shorten them
-async function processUrls(text: string): Promise<string> {
-  // Regex to match URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  
-  let processedText = text;
-  const urlMatches = text.match(urlRegex);
-  
-  if (urlMatches) {
-    for (const url of urlMatches) {
-      const shortenedUrl = await shortenUrl(url);
-      processedText = processedText.replace(url, shortenedUrl);
-    }
-  }
-  
-  return processedText;
-}
-
-const normalizePhoneNumber = (input: string) => {
-    let cleaned = input.replace(/[^0-9+]/g, '');
-
-    cleaned = cleaned.indexOf('+') > 0 ? cleaned.replace(/\+/g, '') : cleaned;
-    cleaned = !cleaned.startsWith('+') ? '+' + cleaned : cleaned;
-
-    const validLength = 11;
-    const minLength = 11;
-
-    cleaned = cleaned.length < minLength + 1 ? '+1' + cleaned.replace('+', '') : cleaned;
-
-    if (cleaned.length !== validLength + 1) {
-        throw new Error('Invalid phone number length');
-    }
-
-    return cleaned;
-};
+import { processUrls } from '@/lib/sms.server';
 
 export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id, user }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string, user: { id: string } | null }) => {
     const mediaData = media && JSON.parse(media);
@@ -67,7 +18,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             body: processedBody,
             to,
             from,
-            statusCallback: `${env.BASE_URL()}/api/sms/status`,
+            statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
             ...(mediaData && mediaData.length > 0 && { mediaUrl: [...mediaData] })
         });
 
@@ -131,14 +82,14 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             throw { 'webhook_error:': webhook_error };
         }
         if (webhook && webhook.length > 0) {
-            const webhook_data = webhook[0];
-            if (webhook_data) {
-                const webhook_response = await fetch(webhook_data.destination_url, {
+            const webhookData = webhook[0];
+            if (webhookData) {
+                const webhookResponse = await fetch(webhookData.destination_url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        ...(webhook_data.custom_headers && typeof webhook_data.custom_headers === 'object' ?
-                            Object.entries(webhook_data.custom_headers).reduce((acc, [key, value]) => ({
+                        ...(webhookData.custom_headers && typeof webhookData.custom_headers === 'object' ?
+                            Object.entries(webhookData.custom_headers).reduce((acc, [key, value]) => ({
                                 ...acc,
                                 [key]: String(value)
                             }), {}) : {})
@@ -151,17 +102,17 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
                         payload: { type: 'outbound_sms', record: message, old_record: null }
                     }),
                 });
-                if (!webhook_response.ok) {
-                    logger.error(`Webhook request failed with status ${webhook_response.status}`);
-                    throw new Error(`Error with the webhook event: ${webhook_response.statusText}`);
+                if (!webhookResponse.ok) {
+                    logger.error(`Webhook request failed with status ${webhookResponse.status}`);
+                    throw new Error(`Error with the webhook event: ${webhookResponse.statusText}`);
                 }
                 
             }
         }
         return { message, data, webhook };
     } catch (error) {
-        logger.error(`Error sending message: ${error}`);
-        return { error: 'Failed to send message' };
+        logger.error("Error sending message:", error);
+        throw new Error("Failed to send message");
     }
 };
 
@@ -237,11 +188,13 @@ export const action = async ({ request }: { request: Request }) => {
         });
     } catch (error) {
         logger.error("Error in chat_sms action:", error);
-        return new Response(JSON.stringify({ error }), {
+        return new Response(JSON.stringify({
+            error: error instanceof Error ? error.message : "Failed to send message",
+        }), {
             headers: {
                 'Content-Type': 'application/json'
             },
-            status: 400
+            status: 500
         });
     }
 };

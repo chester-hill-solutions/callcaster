@@ -1,8 +1,8 @@
 import { json } from "@remix-run/node";
 import { redirect } from "react-router";
-import { parseCSV } from "../utils";
-import { bulkCreateContacts } from "../database.server";
-import { enqueueContactsForCampaign } from "../queue.server";
+import { parseCSV } from "@/lib/utils";
+import { bulkCreateContacts } from "@/lib/database.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Contact } from "@/lib/types";
 import { Database } from "../database.types";

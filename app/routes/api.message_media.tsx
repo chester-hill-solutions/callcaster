@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 
 function sanitizeFilename(filename: string) {
     const decodedFilename = decodeURIComponent(filename);
-    const sanitized = decodedFilename.replace(/[^a-zA-Z0-9-_\.]/g, '')
+    const sanitized = decodedFilename.replace(/[^a-zA-Z0-9-_.]/g, '')
         .replace(/\s+/g, '_');
 
     const parts = sanitized.split('.');

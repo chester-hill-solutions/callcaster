@@ -5,6 +5,7 @@ import { safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber } from "@/lib/utils";
 
 interface WorkspaceData {
   key: string;
@@ -19,25 +20,6 @@ interface RequestBody {
   phoneNumber: string;
   workspace_id: string;
   friendlyName: string;
-}
-
-function normalizePhoneNumber(input: string): string {
-  let cleaned = input.replace(/[^0-9+]/g, "");
-  if (cleaned.indexOf("+") > 0) {
-    cleaned = cleaned.replace(/\+/g, "");
-  }
-  if (!cleaned.startsWith("+")) {
-    cleaned = "+" + cleaned;
-  }
-  const validLength = 11;
-  const minLength = 11;
-  if (cleaned.length < minLength + 1) {
-    cleaned = "+1" + cleaned.replace("+", "");
-  }
-  if (cleaned.length !== validLength + 1) {
-    throw new Error("Invalid phone number length");
-  }
-  return cleaned;
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {

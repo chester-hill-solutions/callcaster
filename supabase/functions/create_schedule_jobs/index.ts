@@ -43,7 +43,7 @@ const splitCronExpressions = (cronString: string): string[] => {
   return cronString.split('|').map(expr => expr.trim()).filter(Boolean);
 };
 
-Deno.serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const { record } = await req.json();
   const supabase = initSupabaseClient();
 
@@ -102,4 +102,8 @@ Deno.serve(async (req: Request) => {
       );
     }
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

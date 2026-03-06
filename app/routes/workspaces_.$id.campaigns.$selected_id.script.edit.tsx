@@ -5,9 +5,9 @@ import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { SaveBar } from "@/components/shared/SaveBar";
 import {
   getMedia,
-  getRecordingFileNames,
   getSignedUrls,
   getUserRole,
   getWorkspaceScripts,
@@ -22,11 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import type { IVRCampaign, LiveCampaign, MessageCampaign, Script, User } from "@/lib/types";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs , ActionFunctionArgs } from "@remix-run/node";
+import type { Script } from "@/lib/types";
 import { logger } from "@/lib/logger.server";
 import { logger as loggerClient } from "@/lib/logger.client";
+import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
+import { isObject } from "@/lib/type-utils";
 
 type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
 
@@ -37,7 +38,7 @@ type BaseCampaignDetails = {
   script_id: number | null;
   workspace: string;
   script?: Script;
-  mediaLinks?: { [key: string]: string }[];
+  mediaLinks?: Array<string | { [key: string]: string }>;
   message_media?: string[];
   disposition_options?: Record<string, unknown>;
   questions?: Record<string, unknown>;
@@ -59,6 +60,36 @@ type LoaderData = {
 
 type PageData = LoaderData['data'];
 
+function getScriptRecordingFileNames(script: Script | undefined): string[] {
+  if (!script?.steps || !isObject(script.steps) || Array.isArray(script.steps)) {
+    return [];
+  }
+
+  const rawSteps = script.steps as Record<string, unknown>;
+  if (!isObject(rawSteps.blocks)) {
+    return [];
+  }
+
+  return Object.values(rawSteps.blocks)
+    .flatMap((block) => {
+      if (!isObject(block)) {
+        return [];
+      }
+
+      const speechType = block.speechType;
+      const audioFile = block.audioFile;
+      if (
+        speechType === "recorded" &&
+        typeof audioFile === "string" &&
+        audioFile.length > 0
+      ) {
+        return [audioFile];
+      }
+
+      return [];
+    });
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, selected_id } = params;
   
@@ -71,7 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return redirect("/signin");
   }
 
-  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id });
+  const userRole = await getUserRole({ supabaseClient, user, workspaceId: workspace_id });
   const scripts = await getWorkspaceScripts({
     workspace: workspace_id,
     supabase: supabaseClient,
@@ -137,7 +168,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .eq("campaign_id", parseInt(selected_id))
         .single());
       if (campaignDetails?.script?.steps) {
-        const fileNames = getRecordingFileNames(campaignDetails.script.steps);
+        const fileNames = getScriptRecordingFileNames(campaignDetails.script);
         const mediaLinks = await getMedia(
           fileNames,
           supabaseClient,
@@ -164,8 +195,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     script: campaignDetails.script,
     mediaLinks: campaignDetails.mediaLinks,
     message_media: campaignDetails.message_media,
-    disposition_options: campaignDetails.disposition_options,
-    questions: campaignDetails.questions,
+    disposition_options: campaignDetails.disposition_options ?? undefined,
+    questions: campaignDetails.questions ?? undefined,
     voicedrop_audio: campaignDetails.voicedrop_audio,
   };
 
@@ -178,7 +209,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       campaignDetails: typedCampaignDetails
     },
     mediaNames,
-    userRole,
+    userRole: userRole?.role ?? "",
     scripts,
   } satisfies LoaderData);
 };
@@ -263,44 +294,14 @@ export default function ScriptEditor() {
 
   const handlePageDataChange = (newPageData: PageData) => {
     setPageData(newPageData);
-    const obj1 = { ...initData };
-    const obj2 = { ...newPageData };
-    
-    // Handle script updated_at field
-    if (obj1.campaignDetails?.script) {
-      obj1.campaignDetails.script = {
-        ...obj1.campaignDetails.script,
-        updated_at: null
-      };
-    }
-    if (obj2.campaignDetails?.script) {
-      obj2.campaignDetails.script = {
-        ...obj2.campaignDetails.script,
-        updated_at: null
-      };
-    }
-    
+    const obj1 = normalizeScriptPageDataForComparison(initData);
+    const obj2 = normalizeScriptPageDataForComparison(newPageData);
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
-    const obj1 = { ...initData };
-    const obj2 = { ...pageData };
-    
-    // Handle script updated_at field
-    if (obj1.campaignDetails?.script) {
-      obj1.campaignDetails.script = {
-        ...obj1.campaignDetails.script,
-        updated_at: null
-      };
-    }
-    if (obj2.campaignDetails?.script) {
-      obj2.campaignDetails.script = {
-        ...obj2.campaignDetails.script,
-        updated_at: null
-      };
-    }
-    
+    const obj1 = normalizeScriptPageDataForComparison(initData);
+    const obj2 = normalizeScriptPageDataForComparison(pageData);
     setChanged(!deepEqual(obj1, obj2));
   }, [data, initData, pageData]);
 
@@ -320,7 +321,10 @@ export default function ScriptEditor() {
         onPageDataChange={(newData) => {
           handlePageDataChange({
             ...pageData,
-            campaignDetails: newData.campaignDetails
+            campaignDetails: {
+              ...pageData.campaignDetails,
+              script: newData.campaignDetails.script,
+            }
           });
         }}
         scripts={scripts}
@@ -332,25 +336,11 @@ export default function ScriptEditor() {
   return (
     <>
       <div className="relative flex h-full flex-col">
-        {isChanged && (
-          <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
-            <Button
-              onClick={handleReset}
-              className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
-            >
-              Reset
-            </Button>
-            <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
-              You have unsaved changes
-            </div>
-            <Button
-              onClick={() => setShowSaveModal(true)}
-              className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
-            >
-              Save Changes
-            </Button>
-          </div>
-        )}
+        <SaveBar
+          isChanged={isChanged}
+          onSave={() => setShowSaveModal(true)}
+          onReset={handleReset}
+        />
         <div className="h-full flex-grow p-4">
           {(pageData.type === "live_call") && renderCampaignSettingsScript([])}
           {(pageData.type === "robocall" ||
@@ -358,10 +348,24 @@ export default function ScriptEditor() {
             pageData.type === "complex_ivr") && renderCampaignSettingsScript(mediaNames)}
           {pageData.type === "message" && (
             <MessageSettings
-              mediaLinks={pageData.campaignDetails.mediaLinks || []}
+              mediaLinks={
+                Array.isArray(pageData.campaignDetails.mediaLinks)
+                  ? pageData.campaignDetails.mediaLinks.filter(
+                      (link): link is string => typeof link === "string",
+                    )
+                  : []
+              }
               details={pageData.campaignDetails}
-              campaignData={pageData}
-              onChange={handlePageDataChange}
+              onChange={(field, value) => {
+                handlePageDataChange({
+                  ...pageData,
+                  campaignDetails: {
+                    ...pageData.campaignDetails,
+                    [field]: value,
+                  },
+                });
+              }}
+              surveys={[]}
             />
           )}
         </div>

@@ -237,14 +237,18 @@ function groupAndFilterUsageData(usageData: TwilioData['twilioUsage']) {
                 details: []
             };
         }
+        const categoryBucket = acc[mainCategory];
+        if (!categoryBucket) {
+            return acc;
+        }
 
         // Add the record's usage and price
-        acc[mainCategory].usage += parseFloat(record.usage) || 0;
-        acc[mainCategory].price += parseFloat(record.price) || 0;
+        categoryBucket.usage += parseFloat(record.usage) || 0;
+        categoryBucket.price += parseFloat(record.price) || 0;
         
         // Only add detail if it has non-zero usage
         if (parseFloat(record.usage) > 0) {
-            acc[mainCategory].details.push({
+            categoryBucket.details.push({
                 description: record.description,
                 usage: record.usage,
                 usageUnit: record.usageUnit,

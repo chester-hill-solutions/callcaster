@@ -58,7 +58,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   let userName: string = email ?? "";
-  userName = userName.split("@")[0];
+  userName = userName.split("@")[0] ?? "";
   const alphaNumericRegex = new RegExp(/([^a-zA-Z\d])/g);
   userName = userName.replace(alphaNumericRegex, "");
 

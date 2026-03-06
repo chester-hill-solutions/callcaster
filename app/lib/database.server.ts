@@ -15,7 +15,6 @@ export {
   createNewWorkspace,
   getWorkspaceInfo,
   getWorkspaceInfoWithDetails,
-  getWorkspaceCampaigns,
   getWorkspaceUsers,
   getWorkspacePhoneNumbers,
   updateWorkspacePhoneNumber,
@@ -24,7 +23,6 @@ export {
   updateUserWorkspaceAccessDate,
   handleExistingUserSession,
   handleNewUserOTPVerification,
-  forceTokenRefresh,
   createWorkspaceTwilioInstance,
   removeWorkspacePhoneNumber,
   updateCallerId,
@@ -92,9 +90,9 @@ import { json } from "@remix-run/node";
 import { logger } from "./logger.server";
 
 export const parseRequestData = async (request: Request) => {
-  const contentType = request.headers.get("Content-Type");
+  const contentType = request.headers.get("Content-Type") ?? "";
   if (!contentType) return;
-  if (contentType === "application/json") {
+  if (contentType.includes("application/json")) {
     return await request.json();
   } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
     const formData = await request.formData();
@@ -192,7 +190,7 @@ export async function endConferenceByUser({
   }
   const conferences = await twilio.conferences.list({
     friendlyName: user_id,
-    status: ["in-progress"],
+    status: "in-progress",
   });
 
   await Promise.all(
@@ -225,7 +223,7 @@ export async function endConferenceByUser({
 }
 
 // Twilio cancellation functions
-async function fetchQueuedCalls(twilio: typeof Twilio, batchSize: number) {
+async function fetchQueuedCalls(twilio: Twilio.Twilio, batchSize: number) {
   return await twilio.calls.list({
     status: "queued",
     limit: batchSize,
@@ -233,16 +231,15 @@ async function fetchQueuedCalls(twilio: typeof Twilio, batchSize: number) {
   });
 }
 
-async function fetchQueuedMessages(twilio: typeof Twilio, batchSize: number) {
+async function fetchQueuedMessages(twilio: Twilio.Twilio, batchSize: number) {
   return await twilio.messages.list({
-    status: "queued",
     limit: batchSize,
     pageSize: batchSize,
   });
 }
 
 async function cancelCallAndUpdateDB(
-  twilio: typeof Twilio,
+  twilio: Twilio.Twilio,
   supabase: SupabaseClient<Database>,
   call: { sid: string },
 ) {
@@ -250,7 +247,8 @@ async function cancelCallAndUpdateDB(
     const canceledCall = await twilio
       .calls(call.sid)
       .update({ status: "canceled" });
-    await supabase.rpc("cancel_outreach_attempts", {
+    const rpcClient = supabase as SupabaseClient<any>;
+    await rpcClient.rpc("cancel_outreach_attempts", {
       in_call_sid: canceledCall.sid,
     });
     return canceledCall.sid;
@@ -262,7 +260,7 @@ async function cancelCallAndUpdateDB(
 }
 
 async function cancelMessageAndUpdateDB(
-  twilio: typeof Twilio,
+  twilio: Twilio.Twilio,
   supabase: SupabaseClient<Database>,
   message: { sid: string },
 ) {
@@ -270,7 +268,8 @@ async function cancelMessageAndUpdateDB(
     const cancelledMessage = await twilio
       .messages(message.sid)
       .update({ status: "canceled" });
-    await supabase.rpc("cancel_messages", {
+    const rpcClient = supabase as SupabaseClient<any>;
+    await rpcClient.rpc("cancel_messages", {
       message_ids: cancelledMessage.sid,
     });
     return cancelledMessage.sid;
@@ -281,7 +280,7 @@ async function cancelMessageAndUpdateDB(
   }
 }
 
-async function processBatchCancellation(twilio: typeof Twilio, supabase: SupabaseClient<Database>, calls: { sid: string }[]) {
+async function processBatchCancellation(twilio: Twilio.Twilio, supabase: SupabaseClient<Database>, calls: { sid: string }[]) {
   const results = await Promise.allSettled(
     calls.map((call) => cancelCallAndUpdateDB(twilio, supabase, call)),
   );
@@ -300,7 +299,7 @@ async function processBatchCancellation(twilio: typeof Twilio, supabase: Supabas
 }
 
 async function processBatchMessageCancellation(
-  twilio: typeof Twilio,
+  twilio: Twilio.Twilio,
   supabase: SupabaseClient<Database>,
   messages: { sid: string }[],
 ) {
@@ -324,7 +323,7 @@ async function processBatchMessageCancellation(
 }
 
 export async function cancelQueuedCalls(
-  twilio: typeof Twilio,
+  twilio: Twilio.Twilio,
   supabase: SupabaseClient<Database>,
   batchSize = 100,
 ) {
@@ -365,7 +364,7 @@ export async function cancelQueuedCalls(
 }
 
 export async function cancelQueuedMessages(
-  twilio: typeof Twilio,
+  twilio: Twilio.Twilio,
   supabase: SupabaseClient<Database>,
   batchSize = 100,
 ) {
@@ -398,6 +397,65 @@ export async function cancelQueuedMessages(
       hasMoreMessages = false;
     }
   }
+  return {
+    canceledMessages: allCanceledMessages,
+    errors: allErrors,
+  };
+}
+
+export async function cancelQueuedMessagesForCampaign(
+  twilio: Twilio.Twilio,
+  supabase: SupabaseClient<Database>,
+  campaignId: number,
+  batchSize = 100,
+) {
+  let allCanceledMessages = [] as string[];
+  let allErrors = [] as string[];
+  const cancellableStatuses = ["accepted", "scheduled", "queued"] as const;
+  let hasMore = true;
+
+  while (hasMore) {
+    try {
+      const { data: queuedMessages, error } = await supabase
+        .from("message")
+        .select("sid")
+        .eq("campaign_id", campaignId)
+        .in("status", cancellableStatuses)
+        .limit(batchSize);
+
+      if (error) {
+        allErrors.push(`Error retrieving messages: ${error.message || "Unknown error"}`);
+        break;
+      }
+
+      const messages = (queuedMessages ?? []).filter(
+        (message): message is { sid: string } => typeof message?.sid === "string" && message.sid.length > 0,
+      );
+
+      if (messages.length === 0) {
+        hasMore = false;
+        continue;
+      }
+
+      const { cancelledMessages, errors } = await processBatchMessageCancellation(
+        twilio,
+        supabase,
+        messages,
+      );
+
+      allCanceledMessages = allCanceledMessages.concat(cancelledMessages);
+      allErrors = allErrors.concat(errors);
+
+      if (messages.length < batchSize) {
+        hasMore = false;
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      allErrors.push(`Error retrieving messages: ${errorMessage}`);
+      hasMore = false;
+    }
+  }
+
   return {
     canceledMessages: allCanceledMessages,
     errors: allErrors,

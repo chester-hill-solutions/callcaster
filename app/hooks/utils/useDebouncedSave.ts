@@ -89,21 +89,24 @@ const useDebouncedSave = ({
   
     const saveData = useCallback(() => {
         if (nextRecipient?.contact?.id) {
+            const formData = new FormData();
+            formData.append("update", JSON.stringify(update));
+            if (recentAttempt?.id != null) {
+                formData.append("callId", recentAttempt.id.toString());
+            }
+            formData.append("selected_workspace_id", workspaceId);
+            formData.append("contact_id", nextRecipient.contact.id.toString());
+            formData.append("queue_id", nextRecipient.id.toString());
+            if (campaign?.id != null) {
+                formData.append("campaign_id", campaign.id.toString());
+            }
+            formData.append("workspace", workspaceId);
+            formData.append("disposition", disposition || '');
             fetcher.submit(
-                {
-                    update: update,
-                    callId: recentAttempt?.id?.toString(),
-                    selected_workspace_id: workspaceId,
-                    contact_id: nextRecipient.contact.id.toString(),
-                    queue_id: nextRecipient.id.toString(),
-                    campaign_id: campaign?.id?.toString(),
-                    workspace: workspaceId,
-                    disposition: disposition || ''
-                },
+                formData,
                 {
                     method: "PATCH",
                     action: `/api/questions`,
-                    encType: "application/json"
                 }
             );
         } else {

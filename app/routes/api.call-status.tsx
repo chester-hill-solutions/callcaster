@@ -5,6 +5,8 @@ import type { Database, TablesInsert } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -12,10 +14,8 @@ function toUnderCase(str: string): string {
 
 function convertKeysToUnderCase(obj: Record<string, unknown>): Record<string, unknown> {
     const newObj: Record<string, unknown> = {};
-    for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-            newObj[toUnderCase(key)] = obj[key];
-        }
+    for (const [key, value] of Object.entries(obj)) {
+        newObj[toUnderCase(key)] = value;
     }
     return newObj;
 }
@@ -24,6 +24,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const callSidRaw = params.CallSid ?? params.call_sid;
+    if (!callSidRaw) {
+      return json({ error: "Missing CallSid" }, { status: 400 });
+    }
     const supabase = createClient<Database>(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const { data: existingCall } = await supabase.from("call").select("workspace").eq("sid", callSidRaw).single();
     let authToken = env.TWILIO_AUTH_TOKEN();
@@ -47,7 +50,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return v == null ? null : String(v);
     };
     const getNumber = (v: unknown): number | null => {
-      const n = typeof v === 'number' ? v : Number(v);
+      const n = Number(v);
       return Number.isFinite(n) ? n : null;
     };
 
@@ -115,11 +118,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
     }
 
-    if (["initiated", "ringing", "in-progress", "idle"].includes(String(underCaseData['call_status']))) {
-        if (outreachAttemptId != null) {
+    const nextDisposition = String(underCaseData["call_status"] || "").toLowerCase();
+    if (outreachAttemptId != null && nextDisposition) {
+        const currentDisposition = currentAttempt?.disposition ?? null;
+        if (canTransitionOutreachDisposition(currentDisposition, nextDisposition)) {
             const { error: updateError } = await supabase
                 .from('outreach_attempt')
-                .update({ disposition: underCaseData['call_status'] as string })
+                .update({ disposition: nextDisposition as string })
                 .eq('id', outreachAttemptId)
                 .select();
 
@@ -127,6 +132,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 logger.error('Error updating attempt:', updateError);
                 return json({ success: false, error: 'Failed to update attempt' }, { status: 500 });
             }
+        } else {
+            logger.debug("Skipping outreach disposition transition", { currentDisposition, nextDisposition });
         }
     }
     const onePerSixty = (duration: number): number => {
@@ -138,17 +145,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const note = currentAttempt
                 ? `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${outreachAttemptId}`
                 : `Call ${updateData.sid} (API/staffed dial)`;
-            const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
-                workspace: billingWorkspace,
-                type: "DEBIT",
-                amount: -billingUnits,
-                note,
-            }).select();
-            if (transactionError) {
-                logger.error('Error creating transaction:', transactionError);
-                return json({ success: false, error: 'Failed to create transaction' }, { status: 500 });
-            }
-            logger.debug("Transaction created:", transaction);
+            await insertTransactionHistoryIdempotent({
+              supabase,
+              workspaceId: billingWorkspace,
+              type: "DEBIT",
+              amount: -billingUnits,
+              note,
+              idempotencyKey: `call:${updateData.sid}`,
+            });
         }
     }
     return json({ success: true })

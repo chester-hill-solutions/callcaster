@@ -123,6 +123,9 @@ export default function QuestionBlockOption({
                                         <option value={`page_${pageId}`}>Go to Page: {page.title}</option>
                                         {page.blocks.map(blockId => {
                                             const blockData = scriptData.blocks[blockId];
+                                            if (!blockData) {
+                                                return null;
+                                            }
                                             return (
                                                 <option key={blockId} value={blockId}>
                                                     {blockData.title || blockData.id}
@@ -159,6 +162,9 @@ export default function QuestionBlockOption({
                                         >
                                             {Object.keys(iconMapping).map((iconName) => {
                                                 const Icon = iconMapping[iconName];
+                                                if (!Icon) {
+                                                    return null;
+                                                }
                                                 return (
                                                     <button
                                                         key={iconName}

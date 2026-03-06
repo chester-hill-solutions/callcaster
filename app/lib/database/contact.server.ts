@@ -50,9 +50,9 @@ export async function fetchContactData(
   contact_id: number | string,
   contact_number: string,
 ) {
-  let potentialContacts = [];
-  let contact = null;
-  let contactError = null;
+  const potentialContacts: Contact[] = [];
+  let contact: Contact | null = null;
+  let contactError: unknown = null;
 
   if (contact_number && !contact_id) {
     const { data: contacts } = await findPotentialContacts(
@@ -68,7 +68,7 @@ export async function fetchContactData(
       .from("contact")
       .select()
       .eq("workspace", workspaceId)
-      .eq("id", contact_id)
+      .eq("id", Number(contact_id))
       .single();
 
     if (findContactError) {
@@ -88,14 +88,15 @@ export const updateContact = async (
   if (!data.id) {
     throw new Error("Contact ID is required");
   }
-  Object.keys(data).forEach(
-    (key) => data[key] === undefined && delete data[key],
-  );
-  delete data.audience_id;
+  const sanitizedData = Object.fromEntries(
+    Object.entries(data).filter(
+      ([key, value]) => key !== "audience_id" && value !== undefined,
+    ),
+  ) as Partial<Contact>;
 
   const { data: update, error } = await supabaseClient
     .from("contact")
-    .update(data)
+    .update(sanitizedData)
     .eq("id", data.id)
     .select();
 

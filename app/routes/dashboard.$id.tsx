@@ -19,12 +19,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return json({
       success: false,
       message: "Failed to initiate call",
-      error: error.message,
+      error: error instanceof Error ? error.message : "Unknown error",
     });
   }
 };
 
-export default function Call() {
+export default function DashboardCallPage() {
   const { id } = useLoaderData<LoaderData>();
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -35,8 +35,7 @@ export default function Call() {
   const audioBuffer = useRef<ArrayBuffer[]>([]);
 
   useEffect(() => {
-    audioContext.current = new (window.AudioContext ||
-      window.webkitAudioContext)();
+    audioContext.current = new window.AudioContext();
     const ws = new WebSocket(
       `wss://socketserver-production-2306.up.railway.app/${id}`,
     );
@@ -78,7 +77,7 @@ export default function Call() {
         const sampleRate = audioContext.current!.sampleRate;
         const wavFileBuffer = createWavFileFromBuffers(wavBuffer, sampleRate);
         const audioBufferDecoded = await audioContext.current!.decodeAudioData(
-          wavFileBuffer.buffer,
+          wavFileBuffer,
         );
 
         const source = audioContext.current!.createBufferSource();
@@ -115,7 +114,7 @@ export default function Call() {
         wav.toMuLaw();
         const buffer = Buffer.from(wav.toBuffer());
         if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send(buffer, { binary: true });
+          socket.send(buffer);
         }
       };
 

@@ -167,9 +167,10 @@ export default function Credits() {
         <Form method="post">
           <div className="grid gap-4 md:grid-cols-3">
             {creditPackages.map((pkg) => (
-              <div
+              <button
+                type="button"
                 key={pkg.amount}
-                className={`cursor-pointer rounded-lg border p-4 ${selectedAmount === pkg.amount && !isCustom ? "border-primary bg-primary/5" : "border-gray-700"
+                className={`w-full rounded-lg border p-4 text-left ${selectedAmount === pkg.amount && !isCustom ? "border-primary bg-primary/5" : "border-gray-700"
                   }`}
                 onClick={() => {
                   setSelectedAmount(pkg.amount);
@@ -178,14 +179,23 @@ export default function Credits() {
               >
                 <div className="text-2xl font-bold">{pkg.amount.toString().split("").reverse().join("").replace(/(\d{3})(?=\d)/g, "$1,").split("").reverse().join("")} credits</div>
                 <div className="text-gray-600">${pkg.price}</div>
-              </div>
+              </button>
             ))}
             <div
+              role="button"
+              tabIndex={0}
               className={`rounded-lg border p-4 ${isCustom ? "border-primary bg-primary/5" : "border-gray-700"
                 }`}
               onClick={() => {
                 setIsCustom(true);
                 setSelectedAmount(0);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setIsCustom(true);
+                  setSelectedAmount(0);
+                }
               }}
             >
               <div className="text-2xl font-bold">Custom Amount</div>
@@ -237,7 +247,7 @@ export default function Credits() {
               {credits.history.map((transaction) => (
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
-                  <td className="py-2 px-2 max-w-xs text-xs">{transaction.type === "CREDIT" ? "Credits Reloaded" : "Credits Used"} - {transaction.note ?? ""}</td>
+                  <td className="py-2 px-2 max-w-xs text-xs">{transaction.type === "CREDIT" ? "Credits Reloaded" : "Credits Used"} - {("note" in transaction && typeof transaction.note === "string") ? transaction.note : ""}</td>
                   <td className={`py-2 text-right ${transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
                     }`}>
                     {transaction.amount}

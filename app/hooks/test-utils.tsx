@@ -1,5 +1,6 @@
+import React, { ReactElement } from 'react';
 import { renderHook, act, RenderHookResult } from '@testing-library/react';
-import { ReactElement } from 'react';
+import { vi } from 'vitest';
 
 export interface TestHookOptions<TProps, TResult> {
   initialProps?: TProps;
@@ -30,40 +31,40 @@ export async function renderAsyncHook<TProps, TResult>(
 
 // Mock utilities for common dependencies
 export const createMockSupabase = () => ({
-  channel: jest.fn().mockReturnValue({
-    on: jest.fn().mockReturnThis(),
-    subscribe: jest.fn().mockReturnValue({}),
-    unsubscribe: jest.fn(),
+  channel: vi.fn().mockReturnValue({
+    on: vi.fn().mockReturnThis(),
+    subscribe: vi.fn().mockReturnValue({}),
+    unsubscribe: vi.fn(),
   }),
-  removeChannel: jest.fn(),
-  rpc: jest.fn(),
-  from: jest.fn().mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    or: jest.fn().mockReturnThis(),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    single: jest.fn(),
-    update: jest.fn().mockReturnThis(),
+  removeChannel: vi.fn(),
+  rpc: vi.fn(),
+  from: vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn(),
+    update: vi.fn().mockReturnThis(),
   }),
 });
 
 export const createMockTwilioDevice = () => ({
-  connect: jest.fn(),
-  disconnect: jest.fn(),
-  disconnectAll: jest.fn(),
-  register: jest.fn(),
-  unregister: jest.fn(),
-  on: jest.fn(),
-  removeAllListeners: jest.fn(),
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  disconnectAll: vi.fn(),
+  register: vi.fn(),
+  unregister: vi.fn(),
+  on: vi.fn(),
+  removeAllListeners: vi.fn(),
   state: 'disconnected',
   parameters: {},
 });
 
 export const createMockCall = () => ({
-  accept: jest.fn(),
-  disconnect: jest.fn(),
-  on: jest.fn(),
+  accept: vi.fn(),
+  disconnect: vi.fn(),
+  on: vi.fn(),
   parameters: {},
 });
 
@@ -192,9 +193,7 @@ export const detectMemoryLeaks = async <TProps, TResult>(
   }
   
   // Force garbage collection if available
-  if ((global as typeof global & { gc?: () => void }).gc) {
-    (global as typeof global & { gc?: () => void }).gc();
-  }
+  (global as typeof global & { gc?: () => void }).gc?.();
   
   const memoryAfter = (performance as typeof performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize || 0;
   const leakDetected = memoryAfter > memoryBefore * 1.5; // 50% threshold

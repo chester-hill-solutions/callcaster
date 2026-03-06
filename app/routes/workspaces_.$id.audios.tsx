@@ -106,7 +106,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export default function WorkspaceAudio() {
+export default function WorkspaceAudiosPage() {
   const { audioMedia, workspace, error, userRole } =
     useLoaderData<typeof loader>();
 

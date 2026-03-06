@@ -63,7 +63,9 @@ export const ScriptOrAudio = ({ question, edit, mediaNames, onScriptChange, onAu
                     src={question.say}
                     controls
                     className="w-full"
-                />
+                >
+                    <track kind="captions" />
+                </audio>
             )}
         </div>
     );

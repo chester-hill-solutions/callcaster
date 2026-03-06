@@ -1,9 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/node";
+import { json , ActionFunction, ActionFunctionArgs } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
-import { ActionFunction, ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
@@ -24,13 +23,6 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
   const callSid = callSidValue;
   const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
   const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
-
-  if (answeredBy && typeof answeredBy !== "string") {
-    return json({ success: false, error: "AnsweredBy must be a string" });
-  }
-  if (callStatus && typeof callStatus !== "string") {
-    return json({ success: false, error: "CallStatus must be a string" });
-  }
 
   try {
     const { data: dbCall, error: callError } = await supabase

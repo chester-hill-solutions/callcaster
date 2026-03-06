@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "./database.types";
-import { AccountInstance } from "twilio/lib/rest/api/v2010/account";
+import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 
 export type ENV = {
   SUPABASE_URL: string | undefined;
@@ -367,29 +367,6 @@ export interface ActiveCall extends Call {
   mute: (state: boolean) => void;
   _setInputTracksFromStream: (stream: MediaStream) => Promise<void>;
   sendDigits: (digits: string) => void;
-}
-
-export interface CampaignDetails {
-  campaign_id: number | null;
-  created_at: string;
-  disposition_options: Json;
-  id: number;
-  questions: Json;
-  script_id: number | null;
-  voicedrop_audio: string | null;
-  workspace: string;
-  script: Script;
-}
-
-export interface CampaignSchedule {
-  start_date: string;
-  end_date: string;
-  schedule: {
-    [key: string]: {
-      active: boolean;
-      intervals: { start: string; end: string; }[];
-    };
-  };
 }
 
 export interface UseSupabaseRealtimeProps {

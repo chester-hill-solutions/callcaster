@@ -41,12 +41,14 @@ export interface FormActions<T> {
 export function useForm<T extends Record<string, unknown>>(
   config: FormConfig<T>
 ): [FormState<T>, FormActions<T>] {
-  const { initialValues, validationRules = {}, onSubmit, onError } = config;
+  const { initialValues, onSubmit, onError } = config;
+  const validationRules: Partial<Record<keyof T, ValidationRule<T>>> =
+    config.validationRules ?? {};
   const isSubmittingRef = useRef(false);
 
   const [values, setValues] = useState<T>(initialValues);
   const [errors, setErrors] = useState<Record<keyof T, string>>({} as Record<keyof T, string>);
-  const [touched, setTouched] = useState<Record<keyof T, boolean>>({} as Record<keyof T, boolean>);
+  const [touched, setTouchedState] = useState<Record<keyof T, boolean>>({} as Record<keyof T, boolean>);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calculate derived state
@@ -57,7 +59,7 @@ export function useForm<T extends Record<string, unknown>>(
   const validateField = useCallback(
     <K extends keyof T>(field: K): string | null => {
       const value = values[field];
-      const rules = validationRules[field];
+      const rules = validationRules[field] as ValidationRule<T> | undefined;
 
       if (!rules) return null;
 
@@ -143,7 +145,7 @@ export function useForm<T extends Record<string, unknown>>(
   // Set touched state for single field
   const setTouched = useCallback(
     <K extends keyof T>(field: K, touchedValue: boolean) => {
-      setTouched(prev => ({ ...prev, [field]: touchedValue }));
+      setTouchedState(prev => ({ ...prev, [field]: touchedValue }));
     },
     []
   );
@@ -154,14 +156,14 @@ export function useForm<T extends Record<string, unknown>>(
     (Object.keys(initialValues) as Array<keyof T>).forEach((field) => {
       newTouched[field] = touchedValue;
     });
-    setTouched(newTouched);
+    setTouchedState(newTouched);
   }, [initialValues]);
 
   // Reset form
   const reset = useCallback(() => {
     setValues(initialValues);
     setErrors({} as Record<keyof T, string>);
-    setTouched({} as Record<keyof T, boolean>);
+    setTouchedState({} as Record<keyof T, boolean>);
     setIsSubmitting(false);
   }, [initialValues]);
 

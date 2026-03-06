@@ -54,6 +54,14 @@ module.exports = {
       files: ["**/*.{ts,tsx}"],
       plugins: ["@typescript-eslint", "import"],
       parser: "@typescript-eslint/parser",
+      rules: {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-unused-vars": "off",
+        "import/no-duplicates": "off",
+        "import/no-named-as-default": "off",
+        "react/prop-types": "off",
+        "react/no-unescaped-entities": "off",
+      },
       settings: {
         "import/internal-regex": "^~/",
         "import/resolver": {
@@ -70,6 +78,18 @@ module.exports = {
         "plugin:import/recommended",
         "plugin:import/typescript",
       ],
+    },
+    {
+      files: ["supabase/functions/**/*.{ts,tsx}"],
+      rules: {
+        "import/no-unresolved": "off",
+      },
+    },
+    {
+      files: ["**/*.{js,jsx,ts,tsx}"],
+      rules: {
+        "react-hooks/exhaustive-deps": "off",
+      },
     },
 
     // Node

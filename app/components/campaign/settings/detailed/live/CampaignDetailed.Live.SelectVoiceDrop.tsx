@@ -1,4 +1,4 @@
-import InfoHover from "@/components/shared/InfoPopover";
+import InfoPopover from "@/components/shared/InfoPopover";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -26,7 +26,7 @@ export default function SelectVoiceDrop({campaignData, handleInputChange, mediaD
     <div className="flex flex-col min-w-48">
       <Label htmlFor="voicedrop_audio" className="mb-2 flex items-end gap-1">
         Live Voice Drop{" "}
-        <InfoHover
+        <InfoPopover
           align="start"
           tooltip="Agents can diconnect and drop this message"
         />

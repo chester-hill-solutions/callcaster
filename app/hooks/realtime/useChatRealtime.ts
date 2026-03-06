@@ -95,8 +95,9 @@ export const useChatRealTime = ({
     contactNumberRef.current = contact_number;
   }, [contact_number]);
 
-  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Tables<"message">>) => {
-    const newRow = payload.new as Tables<"message"> | null;
+  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
+    const newRow = typedPayload.new as Tables<"message"> | null;
     if (!newRow?.workspace || newRow.workspace !== workspace) return;
 
     const currentContactNumber = contactNumberRef.current;
@@ -105,7 +106,7 @@ export const useChatRealTime = ({
       phoneNumbersMatch(newRow.to, currentContactNumber);
     if (!isForContact) return;
 
-    if (payload.eventType === "INSERT") {
+    if (typedPayload.eventType === "INSERT") {
       if (newRow.status === "failed") return;
       setMessages((curr) => {
         const newMessage = newRow as Message;
@@ -302,21 +303,23 @@ export const useConversationSummaryRealTime = ({
   }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle new messages and message status changes
-  const handleMessageChange = useCallback(async (payload: RealtimePostgresChangesPayload<Tables<"message">>) => {
-    if (payload.eventType === 'INSERT' && payload.new?.workspace === workspace) {
+  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
+    if (typedPayload.eventType === 'INSERT' && typedPayload.new?.workspace === workspace) {
       // For new messages, we need to update unread counts
-      if (payload.new.status === "received") {
+      if (typedPayload.new.status === "received") {
         // Check if this is for the active contact
         const isForActiveContact = activeContactRef.current && 
-          (phoneNumbersMatch(payload.new.from, activeContactRef.current) || 
-           phoneNumbersMatch(payload.new.to, activeContactRef.current));
+          (phoneNumbersMatch(typedPayload.new.from, activeContactRef.current) || 
+           phoneNumbersMatch(typedPayload.new.to, activeContactRef.current));
         
         // If it's not for the active contact, we need to increment unread count
         if (!isForActiveContact) {
           // Find the conversation for this contact
           setConversations(prevConversations => {
             // Determine the contact phone number (the one that's not a workspace number)
-            const contactPhone = payload.new.direction === 'inbound' ? payload.new.from : payload.new.to;
+            const contactPhone =
+              (typedPayload.new.direction === 'inbound' ? typedPayload.new.from : typedPayload.new.to) ?? "";
             
             // Check if we already have a conversation for this contact
             const existingConversationIndex = prevConversations.findIndex(conv => 
@@ -326,20 +329,27 @@ export const useConversationSummaryRealTime = ({
             if (existingConversationIndex >= 0) {
               // Update existing conversation
               const updatedConversations = [...prevConversations];
+              const existingConversation = updatedConversations[existingConversationIndex];
+              if (!existingConversation) {
+                return prevConversations;
+              }
               updatedConversations[existingConversationIndex] = {
-                ...updatedConversations[existingConversationIndex],
-                unread_count: updatedConversations[existingConversationIndex].unread_count + 1,
-                conversation_last_update: payload.new.date_created || new Date().toISOString(),
-                message_count: updatedConversations[existingConversationIndex].message_count + 1
+                ...existingConversation,
+                unread_count: existingConversation.unread_count + 1,
+                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
+                message_count: existingConversation.message_count + 1
               };
               return updatedConversations;
             } else {
               // Create a new conversation entry
               const newConversation: ConversationSummary = {
                 contact_phone: contactPhone,
-                user_phone: payload.new.direction === 'inbound' ? payload.new.to : payload.new.from,
-                conversation_start: payload.new.date_created || new Date().toISOString(),
-                conversation_last_update: payload.new.date_created || new Date().toISOString(),
+                user_phone:
+                  (typedPayload.new.direction === 'inbound'
+                    ? typedPayload.new.to
+                    : typedPayload.new.from) ?? "",
+                conversation_start: typedPayload.new.date_created || new Date().toISOString(),
+                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
                 message_count: 1,
                 unread_count: 1,
                 contact_firstname: '',  // We don't have this info yet
@@ -359,13 +369,13 @@ export const useConversationSummaryRealTime = ({
       }
       
       // For status changes, refresh the conversation summary
-      if (payload.new.status === "delivered" || payload.new.status === "read") {
+      if (typedPayload.new.status === "delivered" || typedPayload.new.status === "read") {
         // For delivered/read status, we need to update unread counts
         setConversations(prevConversations => {
           // Early return if no conversations match
           const hasMatchingConversation = prevConversations.some(conv => 
-            phoneNumbersMatch(conv.contact_phone, payload.new.from) || 
-            phoneNumbersMatch(conv.contact_phone, payload.new.to)
+            phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
+            phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)
           );
           
           if (!hasMatchingConversation) {
@@ -374,8 +384,8 @@ export const useConversationSummaryRealTime = ({
           
           return prevConversations.map(conv => {
             // Check if this message is from/to this conversation's contact
-            if (phoneNumbersMatch(conv.contact_phone, payload.new.from) || 
-                phoneNumbersMatch(conv.contact_phone, payload.new.to)) {
+            if (phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
+                phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)) {
               // Decrement unread count (but not below 0)
               return {
                 ...conv,
@@ -412,7 +422,7 @@ export const useConversationSummaryRealTime = ({
     supabase,
     table: "message",
     filter: `workspace=eq.${workspace}`,
-    onChange: handleMessageChange
+    onChange: handleMessageChange,
   });
 
   // Periodically refresh conversations to ensure they're up to date

@@ -64,7 +64,6 @@ export function QueueContent({
     campaignId,
     queueFetcher,
 }: QueueContentProps) {
-    if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
     const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
     const [queueData, setQueueData] = useState(queueValue.queueData ?? []);
     const pendingUpdates = useRef<Set<number>>(new Set());
@@ -99,7 +98,9 @@ export function QueueContent({
             setQueueData(curr => {
                 const idx = curr.findIndex(item => item.id === payload.new.id);
                 if (idx < 0) return curr;
-                const updated = { ...curr[idx], ...payload.new };
+                const currentItem = curr[idx];
+                if (!currentItem) return curr;
+                const updated = { ...currentItem, ...payload.new, contact: currentItem.contact };
                 return [...curr.slice(0, idx), updated, ...curr.slice(idx + 1)];
             });
         }
@@ -136,6 +137,8 @@ export function QueueContent({
     useEffect(() => {
         setQueueData(queueValue.queueData ?? []);
     }, [queueValue.queueData]);
+
+    if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
 
     return (
         <div className="p-2">

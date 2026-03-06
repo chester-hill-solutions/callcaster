@@ -4,7 +4,7 @@
 
 console.log("Hello from Functions!")
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const { name } = await req.json()
   const data = {
     message: `Hello ${name}!`,
@@ -14,7 +14,11 @@ Deno.serve(async (req) => {
     JSON.stringify(data),
     { headers: { "Content-Type": "application/json" } },
   )
-})
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}
 
 /* To invoke locally:
 

@@ -3,6 +3,7 @@ import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
 import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
 import { OutreachExportData } from "./database.server";
+import type { Json } from "./database.types";
 import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
 import { logger } from "@/lib/logger.server";
 
@@ -39,7 +40,7 @@ export function deepEqual(
   obj1: unknown,
   obj2: unknown,
   path: string = "root",
-  seen = new WeakMap<unknown, unknown>(),
+  seen = new WeakMap<object, object>(),
 ): boolean {
   function log(message: string) {
     //console.log(`[${path}] ${message}`);
@@ -51,9 +52,6 @@ export function deepEqual(
     return false;
   }
   if (typeof obj1 !== "object" && typeof obj2 !== "object") {
-    if (obj1 !== obj2) {
-      log(`Primitive values differ at ${path}: ${obj1} !== ${obj2}`);
-    }
     return obj1 === obj2;
   }
 
@@ -85,11 +83,14 @@ export function deepEqual(
     );
   }
 
-  if (seen.get(obj1) === obj2) return true;
-  seen.set(obj1, obj2);
+  const object1 = obj1 as Record<string, unknown>;
+  const object2 = obj2 as Record<string, unknown>;
 
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  if (seen.get(object1) === object2) return true;
+  seen.set(object1, object2);
+
+  const keys1 = Object.keys(object1);
+  const keys2 = Object.keys(object2);
 
   if (keys1.length !== keys2.length) {
     log(`Number of keys differ: ${keys1.length} !== ${keys2.length}`);
@@ -103,11 +104,11 @@ export function deepEqual(
   }
 
   return keys1.every((key) => {
-    if (!Object.prototype.hasOwnProperty.call(obj2, key)) {
+    if (!Object.prototype.hasOwnProperty.call(object2, key)) {
       log(`Second object doesn't have key: ${key}`);
       return false;
     }
-    return deepEqual(obj1[key], obj2[key], `${path}.${key}`, seen);
+    return deepEqual(object1[key], object2[key], `${path}.${key}`, seen);
   });
 }
 const headerMappings = {
@@ -143,19 +144,22 @@ const parseCSVHeaders = (unparsedHeaders: string[]) => {
   return unparsedHeaders.map((header) => header.toLowerCase().trim());
 };
 
+type CsvHeaderKey = keyof typeof headerMappings;
+
 const matchHeader = (header: string) => {
   for (const [key, patterns] of Object.entries(headerMappings)) {
     if (patterns.some((pattern) => pattern.test(header))) {
-      return key;
+      return key as CsvHeaderKey;
     }
   }
   return null;
 };
-const parseEmail = (email: string) => {
+const parseEmail = (email: string | null) => {
+  if (!email) return null;
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email) ? email.toLowerCase() : null;
 };
-function parsePhoneNumber(input: string) {
+function parsePhoneNumber(input: string | null) {
   if (input) {
     let cleaned = input.replace(/[^0-9+]/g, "");
 
@@ -183,21 +187,19 @@ function parsePhoneNumber(input: string) {
 }
 
 const parseName = (name: string | null) => {
-  if (name) {
-    const parts = name.split(/\s+/);
-    if (parts.length === 1) {
-      return { firstname: parts[0], surname: null };
-    } else if (parts.length === 2) {
-      return { firstname: parts[0], surname: parts[1] };
-    } else if (parts.length > 2) {
-      return { firstname: parts[0], surname: parts.slice(1).join(" ") };
-    }
-    return { firstname: "", surname: "" };
-  } else {
-    return { firstname: "", surname: "" };
+  const trimmed = (name ?? "").trim();
+  if (!trimmed) return { firstname: "", surname: "" };
+
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return { firstname: parts[0] ?? "", surname: null };
   }
+  if (parts.length === 2) {
+    return { firstname: parts[0] ?? "", surname: parts[1] ?? null };
+  }
+  return { firstname: parts[0] ?? "", surname: parts.slice(1).join(" ") || null };
 };
-const parseOptOut = (value: string) => {
+const parseOptOut = (value: string | null) => {
   if (typeof value === "string") {
     value = value.toLowerCase().trim();
     return ["yes", "true", "1", "opt-out", "unsubscribe"].includes(value);
@@ -205,9 +207,27 @@ const parseOptOut = (value: string) => {
   return Boolean(value);
 };
 
+type ParsedCsvContact = Pick<
+  Contact,
+  | "firstname"
+  | "surname"
+  | "phone"
+  | "email"
+  | "address"
+  | "city"
+  | "opt_out"
+  | "created_at"
+  | "workspace"
+  | "external_id"
+  | "postal"
+  | "province"
+  | "country"
+  | "other_data"
+>;
+
 const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
   return data.slice(1).map((row) => {
-    const contact = {
+    const contact: ParsedCsvContact = {
       firstname: null,
       surname: null,
       phone: null,
@@ -230,10 +250,15 @@ const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
 
       if (key) {
         switch (key) {
-          case "name":
+          case "name": {
             const { firstname, surname } = parseName(value);
             contact.firstname = firstname;
             contact.surname = surname;
+            break;
+          }
+          case "firstname":
+          case "surname":
+            contact[key] = value;
             break;
           case "phone":
             contact.phone = parsePhoneNumber(value);
@@ -244,11 +269,19 @@ const parseCSVData = (data: string[][], parsedHeaders: string[]) => {
           case "opt_out":
             contact.opt_out = parseOptOut(value);
             break;
-          default:
+          case "address":
+          case "city":
+          case "external_id":
+          case "postal":
+          case "province":
+          case "country":
             contact[key] = value;
+            break;
+          default:
+            break;
         }
       } else if (value !== null) {
-        contact.other_data.push({ [header]: value });
+        contact.other_data.push({ [header]: value } as Json);
       }
     });
 
@@ -292,7 +325,7 @@ export const sortQueue = (queue: QueueItem[]): QueueItem[] => {
     if (a.id !== b.id) {
       return a.id - b.id;
     }
-    return a.queue_order - b.queue_order;
+    return (a.queue_order ?? 0) - (b.queue_order ?? 0);
   });
 };
 
@@ -301,10 +334,11 @@ export const createHouseholdMap = (
 ): Record<string, QueueItem[]> => {
   return queue.reduce<Record<string, QueueItem[]>>((acc, curr, index) => {
     if (curr?.contact?.address) {
-      if (!acc[curr.contact.address]) {
-        acc[curr.contact.address] = [];
+      const address = curr.contact.address;
+      if (!acc[address]) {
+        acc[address] = [];
       }
-      acc[curr.contact.address].push(curr);
+      acc[address]?.push(curr);
     } else {
       acc[`NO_ADDRESS_${index}`] = [curr];
     }
@@ -313,13 +347,18 @@ export const createHouseholdMap = (
 };
 
 export const updateAttemptWithCall = (
-  attempt: Attempt,
-  call: Call,
-): Attempt => {
+  attempt: OutreachAttempt,
+  call: Call | null,
+): OutreachAttempt => {
+  const resultData =
+    attempt.result && typeof attempt.result === "object" && !Array.isArray(attempt.result)
+      ? attempt.result
+      : {};
+
   return {
     ...attempt,
     result: {
-      ...attempt.result,
+      ...resultData,
       ...(call &&
         call.status &&
         call.direction !== "outbound-api" && { status: call.status }),
@@ -345,7 +384,9 @@ export const playTone = (tone: string, audioContext: AudioContext) => {
 
   if (!audioContext) return;
 
-  const [lowFreq, highFreq] = dtmfFrequencies[tone];
+  const toneFrequencies = dtmfFrequencies[tone];
+  if (!toneFrequencies) return;
+  const [lowFreq, highFreq] = toneFrequencies;
   const duration = 0.15; // Duration of the tone in seconds
 
   const oscillator1 = audioContext.createOscillator();
@@ -377,7 +418,7 @@ export const formatTime = (milliseconds: number): string => {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
-export function isPhoneNumber(phone) {
+export function isPhoneNumber(phone: string) {
   const cleanPhone = phone.replace(/\D/g, "");
   if (cleanPhone.length < 10 || cleanPhone.length > 15) {
     return false;
@@ -386,13 +427,16 @@ export function isPhoneNumber(phone) {
   return phoneRegex.test(phone);
 }
 
-export function isEmail(email) {
+export function isEmail(email: string) {
   const emailRegex =
     /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   if (!emailRegex.test(email) || email.length > 254) {
     return false;
   }
   const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) {
+    return false;
+  }
   if (localPart.length > 64 || domain.length > 255) {
     return false;
   }
@@ -400,7 +444,8 @@ export function isEmail(email) {
     return false;
   }
   const domainParts = domain.split(".");
-  if (domainParts[domainParts.length - 1].length < 2) {
+  const topLevelDomain = domainParts[domainParts.length - 1];
+  if (!topLevelDomain || topLevelDomain.length < 2) {
     return false;
   }
   return true;
@@ -445,9 +490,9 @@ export const handleNavlinkStyles = (isActive: boolean, isPending: boolean): stri
 };
 
 export function extractKeys(data: OutreachExportData[]) {
-  const dynamicKeys = new Set();
-  const resultKeys = new Set();
-  const otherDataKeys = new Set();
+  const dynamicKeys = new Set<string>();
+  const resultKeys = new Set<string>();
+  const otherDataKeys = new Set<string>();
 
   data.forEach(row => {
     getAllKeys(row, "", dynamicKeys);
@@ -459,7 +504,7 @@ export function extractKeys(data: OutreachExportData[]) {
 
     if (row.contact.other_data && Array.isArray(row.contact.other_data)) {
       row.contact.other_data.forEach((item, index) => {
-        if (typeof item === "object") {
+        if (typeof item === "object" && item !== null) {
           getAllKeys(item, `other_data_${index}_`, otherDataKeys);
         }
       });
@@ -469,8 +514,21 @@ export function extractKeys(data: OutreachExportData[]) {
   return { dynamicKeys, resultKeys, otherDataKeys };
 }
 
-export function flattenRow(row, users) {
-  const flattenedRow = {};
+type FlattenedExportRow = Record<string, unknown> & {
+  user_id?: string | null;
+  created_at?: string;
+  callcaster_id?: string | number;
+  call_duration?: number;
+  contact_other_data?: unknown;
+  id?: unknown;
+  contact_id?: unknown;
+  attempt_id?: unknown;
+};
+
+type WorkspaceUserDataLike = { id: string; username: string };
+
+export function flattenRow(row: OutreachExportData, users: WorkspaceUserDataLike[]) {
+  const flattenedRow: FlattenedExportRow = {};
   getAllKeys(row, "", flattenedRow);
   getAllKeys(row.contact, "contact_", flattenedRow);
 
@@ -498,7 +556,10 @@ export function flattenRow(row, users) {
     delete flattenedRow.id;
   }
   if ("contact_id" in flattenedRow) {
-    flattenedRow.callcaster_id = flattenedRow.contact_id;
+    const contactId = flattenedRow.contact_id;
+    if (typeof contactId === "string" || typeof contactId === "number") {
+      flattenedRow.callcaster_id = contactId;
+    }
     delete flattenedRow.contact_id;
   }
 
@@ -511,7 +572,8 @@ export function generateCSVContent(headers: string[], data: Record<string, unkno
 
   data.forEach(row => {
     const csvRow = headers
-      .map(header => escapeCSV(row[header] || ""))
+      // Preserve 0/false; only treat null/undefined as empty.
+      .map(header => escapeCSV(row[header] ?? ""))
       .join(",");
     csvContent += csvRow + "\n";
   });
@@ -519,9 +581,14 @@ export function generateCSVContent(headers: string[], data: Record<string, unkno
   return csvContent;
 }
 
-export function getAllKeys(obj: unknown, prefix: string = "", target: Set<string> | Record<string, unknown> = new Set()) {
-  Object.keys(obj).forEach(key => {
-    const value = obj[key];
+export function getAllKeys(obj: unknown, prefix: string = "", target: Set<string> | Record<string, unknown> = new Set<string>()) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    return target;
+  }
+
+  const typedObj = obj as Record<string, unknown>;
+  Object.keys(typedObj).forEach(key => {
+    const value = typedObj[key];
     const fullKey = `${prefix}${key}`;
     
     if (
@@ -542,7 +609,7 @@ export function getAllKeys(obj: unknown, prefix: string = "", target: Set<string
   return target;
 }
 
-export function escapeCSV(field) {
+export function escapeCSV(field: unknown) {
   if (field == null) return "";
   const stringField = String(field);
   if (/[",\n]/.test(stringField)) {

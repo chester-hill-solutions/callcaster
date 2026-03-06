@@ -1,11 +1,19 @@
+import type { Dispatch, SetStateAction } from "react";
 import { FetcherWithComponents } from "@remix-run/react";
 import { getNextContact } from "./getNextContact";
 import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
+import { isObject } from "./type-utils";
 import { logger } from "@/lib/logger.client";
 
-const getRecentAttempt = ({ attempts, contact }:{attempts:OutreachAttempt[], contact:Contact}) => {
-  return attempts.find((call) => call.contact_id === contact?.contact?.id) || {};
+const getRecentAttempt = ({
+  attempts,
+  contact,
+}: {
+  attempts: OutreachAttempt[];
+  contact: QueueItem;
+}): OutreachAttempt | null => {
+  return attempts.find((attempt) => attempt.contact_id === contact.contact.id) ?? null;
 };
 const getAttemptCalls = ({ attempt, calls }:{attempt:OutreachAttempt, calls:Call[]}) => {
   return calls.filter((call) => call.outreach_attempt_id === attempt.id);
@@ -35,7 +43,7 @@ export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents
         headers: { "Content-Type": "application/json" },
       });
     }
-    setConference({});
+    setConference();
   };
   return { handleConferenceStart, handleConferenceEnd };
 };
@@ -49,28 +57,41 @@ export const handleCall = ({ submit }:{submit:FetcherWithComponents<unknown>["su
     nextRecipient,
     recentAttempt,
     selectedDevice,
+  }: {
+    contact: Contact;
+    campaign: Campaign;
+    user: { id: string };
+    workspaceId: string;
+    nextRecipient: QueueItem | null;
+    recentAttempt: OutreachAttempt | null;
+    selectedDevice: string | null;
   }) => {
     if (contact.phone) {
-      const data = {
-        to_number: contact.phone,
-        campaign_id: campaign.id,
-        user_id: user.id,
-        contact_id: contact.id,
-        workspace_id: workspaceId,
-        outreach_id: recentAttempt?.id,
-        queue_id: nextRecipient?.id,
-        caller_id: campaign.caller_id,
-        selected_device: selectedDevice,
-      };
+      const data = new FormData();
+      data.append("to_number", contact.phone);
+      data.append("campaign_id", campaign.id.toString());
+      data.append("user_id", user.id);
+      data.append("contact_id", contact.id.toString());
+      data.append("workspace_id", workspaceId);
+      if (recentAttempt?.id != null) {
+        data.append("outreach_id", recentAttempt.id.toString());
+      }
+      if (nextRecipient?.id != null) {
+        data.append("queue_id", nextRecipient.id.toString());
+      }
+      if (campaign.caller_id) {
+        data.append("caller_id", campaign.caller_id);
+      }
+      if (selectedDevice) {
+        data.append("selected_device", selectedDevice);
+      }
 
       submit(data, {
         action: "/api/dial",
         method: "POST",
-        encType: "application/json",
       });
     }
   };
-  const dialNext = () => {};
   return { startCall };
 };
 
@@ -81,18 +102,32 @@ export const handleContact = ({
   setNextRecipient,
   attempts,
   calls,
+}: {
+  setQuestionContact: (contact: QueueItem | null) => void;
+  setRecentAttempt: (attempt: OutreachAttempt | null) => void;
+  setUpdate: (update: Record<string, unknown> | null) => void;
+  setNextRecipient: (recipient: QueueItem | null) => void;
+  attempts: OutreachAttempt[];
+  calls: Call[];
 }) => {
-  const switchQuestionContact = ({ contact }:{contact:Contact}) => {
+  const switchQuestionContact = ({ contact }:{contact:QueueItem}) => {
     setQuestionContact(contact);
     const newRecentAttempt = getRecentAttempt({ attempts, contact });
-    if (!isRecent(newRecentAttempt.created_at)) {
+    if (!newRecentAttempt || !isRecent(newRecentAttempt.created_at)) {
       setRecentAttempt(null);
       setUpdate(null);
       return contact;
     }
     const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
-    setRecentAttempt({ ...newRecentAttempt, call: recentCalls });
-    setUpdate(newRecentAttempt.result || null);
+    const recentCall = recentCalls[0];
+    if (!recentCall) {
+      setRecentAttempt(null);
+      setUpdate(null);
+      return contact;
+    }
+    setRecentAttempt({ ...newRecentAttempt, call: recentCall });
+    setUpdate(isObject(newRecentAttempt.result) ? newRecentAttempt.result : null);
+    return contact;
   };
   const nextNumber = ({
     skipHousehold = false,
@@ -103,7 +138,7 @@ export const handleContact = ({
   }: {
     skipHousehold: boolean;
     queue: QueueItem[];
-    householdMap: Map<string, QueueItem[]>;
+    householdMap: Record<string, QueueItem[]>;
     nextRecipient: QueueItem | null;
     groupByHousehold: boolean;
   }) => {
@@ -124,10 +159,15 @@ export const handleContact = ({
       contact: nextContact,
     });
 
-    if (isRecent(newRecentAttempt.created_at)) {
+    if (newRecentAttempt && isRecent(newRecentAttempt.created_at)) {
       const recentCalls = getAttemptCalls({ attempt: newRecentAttempt, calls });
-      setRecentAttempt({ ...newRecentAttempt, call: recentCalls });
-      setUpdate(newRecentAttempt.result || {});
+      const recentCall = recentCalls[0];
+      if (!recentCall) {
+        setRecentAttempt(null);
+        return;
+      }
+      setRecentAttempt({ ...newRecentAttempt, call: recentCall });
+      setUpdate(isObject(newRecentAttempt.result) ? newRecentAttempt.result : null);
     }
   };
 
@@ -145,7 +185,7 @@ export const handleQueue = ({
   groupByHousehold: boolean;
   campaign: Campaign;
   workspaceId: string;
-  setQueue: (queue: QueueItem[]) => void;
+  setQueue: Dispatch<SetStateAction<QueueItem[]>>;
 }) => {
   const dequeue = ({ contact }:{contact:QueueItem }) => {
     if (!contact || !contact.contact || !contact.contact.phone) return;
@@ -170,19 +210,19 @@ export const handleQueue = ({
   const updateQueue = (newContacts: QueueItem[]) => {
     setQueue((prevQueue) => {
       const existingHouseholds = new Map<string, QueueItem[]>();
-      prevQueue?.forEach((contact) => {
-        const address = contact.contact.address;
+      prevQueue.forEach((contact) => {
+        const address = contact.contact.address ?? `ADDRESS_${contact.contact.id}`;
         if (!existingHouseholds.has(address)) {
           existingHouseholds.set(address, []);
         }
-        existingHouseholds.get(address).push(contact);
+        existingHouseholds.get(address)?.push(contact);
       });
 
-      newContacts?.forEach((newContact) => {
+      newContacts.forEach((newContact) => {
         const address = newContact.contact.address || `ADDRESS_${newContact.contact.id}`;
         if (existingHouseholds.has(address)) {
           const household = existingHouseholds.get(address);
-          if (!household.some((c) => c.queue_id === newContact.queue_id)) {
+          if (household && !household.some((c) => c.id === newContact.id)) {
             household.push(newContact);
           }
         } else {

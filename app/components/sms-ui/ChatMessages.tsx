@@ -8,16 +8,21 @@ interface Message {
   date_created: string | Date;
 }
 
-interface MessageListProps {
+interface ChatMessagesProps {
   messages?: Message[];
-  messagesEndRef: React.RefObject<HTMLDivElement>;
+  messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export default function MessageList({ messages, messagesEndRef }: MessageListProps) {
+export default function ChatMessages({
+  messages,
+  messagesEndRef,
+}: ChatMessagesProps) {
+  const safeMessages = messages ?? [];
+
   return (
     <div className="h-full overflow-y-auto p-4">
-      {messages?.length > 0 ? (
-        messages.map((message: Message, index: number) => (
+      {safeMessages.length > 0 ? (
+        safeMessages.map((message: Message, index: number) => (
           <div
             key={index}
             className={`message-item mb-4 flex ${
@@ -63,7 +68,7 @@ export default function MessageList({ messages, messagesEndRef }: MessageListPro
           <p className="text-gray-500">No messages yet</p>
         </div>
       )}
-      <div ref={messagesEndRef} />
+      <div ref={messagesEndRef as React.RefObject<HTMLDivElement>} />
     </div>
   );
 }

@@ -115,7 +115,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  if (isPhoneNumber(number?.inbound_action)) {
+  if (typeof number?.inbound_action === "string" && isPhoneNumber(number.inbound_action)) {
     twiml.pause({ length: 1 });
     twiml.dial(number.inbound_action || '');
     return new Response(twiml.toString(), {
@@ -123,7 +123,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
         "Content-Type": "text/xml",
       },
     });
-  } else if (isEmail(number?.inbound_action)) {
+  } else if (typeof number?.inbound_action === "string" && isEmail(number.inbound_action)) {
     const phoneNumber = data.Called;
     if (voicemail?.signedUrl) {
       twiml.play(voicemail.signedUrl);

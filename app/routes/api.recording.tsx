@@ -1,9 +1,10 @@
 import { json } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
+import type { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request, params }) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
   const supabase = createClient(

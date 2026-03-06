@@ -172,16 +172,16 @@ export default function ApiKeysSection({
 
           {showCreateForm ? (
             <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-2">
-              <label className="font-sans text-sm font-semibold uppercase tracking-tighter text-gray-600">
+              <p className="font-sans text-sm font-semibold uppercase tracking-tighter text-gray-600">
                 Key name
-              </label>
+              </p>
               <input
+                aria-label="Key name"
                 type="text"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
                 placeholder="e.g. Production, Zapier"
                 className="rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-zinc-800"
-                autoFocus
               />
               <div className="flex gap-2">
                 <Button

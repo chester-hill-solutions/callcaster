@@ -1,6 +1,7 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -16,6 +17,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (!exportId || !workspaceId) {
       return json({ error: "Missing required parameters" }, { status: 400 });
     }
+
+    // Defense-in-depth: ensure the requesting user can access the workspace whose
+    // export status they are attempting to read.
+    await requireWorkspaceAccess({ supabaseClient, user, workspaceId });
     
     // Download the status file from Supabase storage
     const { data: statusFile, error: downloadError } = await supabaseClient.storage

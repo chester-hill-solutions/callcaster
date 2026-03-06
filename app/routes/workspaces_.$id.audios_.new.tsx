@@ -86,7 +86,7 @@ export default function Media() {
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
-    setPendingFileName(filePath.split("\\").at(-1));
+    setPendingFileName(filePath.split("\\").at(-1) ?? "");
   };
 
   return (
@@ -98,7 +98,7 @@ export default function Media() {
       <CardTitle>Add Audio</CardTitle>
       {actionData?.error != null && (
             <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-              Error: {actionData.error.message}
+              Error: {typeof actionData.error === "string" ? actionData.error : actionData.error.message}
             </p>
           )}
           <CardContent>

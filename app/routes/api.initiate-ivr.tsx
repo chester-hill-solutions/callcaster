@@ -19,14 +19,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (error) throw error;
     logger.debug("Campaign queue data:", data);
     for (let i = 0; i < data?.length; i++) {
-        let contact = data[i];
+        const contact = data[i];
+        if (!contact) {
+            continue;
+        }
         const formData = new FormData();
         formData.append('user_id', user_id.id);
         formData.append('campaign_id', String(campaign_id));
         formData.append('workspace_id', workspace_id);
-        formData.append('queue_id', contact.id);
-        formData.append('contact_id', contact.contact_id);
-        formData.append('caller_id', contact.caller_id);
+        formData.append('queue_id', String(contact.id));
+        formData.append('contact_id', String(contact.contact_id));
+        formData.append('caller_id', String(contact.caller_id));
         formData.append('to_number', normalizePhoneNumber(contact.phone));
         const res = await fetch(`${env.BASE_URL()}/api/ivr`, {
             body: formData,
@@ -35,7 +38,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             logger.error("Error initiating IVR call:", e);
             return null;
         })
-        if (res.creditsError) {
+        if (res?.creditsError) {
             return {
                 creditsError: true,
             }

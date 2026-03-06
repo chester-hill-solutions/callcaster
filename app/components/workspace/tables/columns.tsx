@@ -7,6 +7,67 @@ import { Button } from "@/components/ui/button";
 import { NavLink, useFetcher, useSubmit } from "@remix-run/react";
 import { useEffect } from "react";
 
+function AudienceDownloadCell({ audienceId }: { audienceId: string | number }) {
+  const fetcher = useFetcher();
+
+  useEffect(() => {
+    if (!fetcher.data) {
+      return;
+    }
+
+    const blob = new Blob([fetcher.data as BlobPart], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "audiences.csv");
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, [fetcher.data]);
+
+  return (
+    <fetcher.Form method="GET" action="/api/audiences">
+      <input type="hidden" name="audienceId" value={audienceId} />
+      <input type="hidden" name="returnType" value="csv" />
+      <Button
+        type="submit"
+        variant="ghost"
+        disabled={fetcher.state === "submitting"}
+      >
+        {fetcher.state === "submitting" ? (
+          "Downloading..."
+        ) : (
+          <MdDownload className="text-brand-primary dark:text-white" />
+        )}
+      </Button>
+    </fetcher.Form>
+  );
+}
+
+function AudienceDeleteCell({ audienceId }: { audienceId: string | number }) {
+  const submit = useSubmit();
+
+  return (
+    <Button
+      onClick={() => {
+        submit(
+          { id: audienceId },
+          {
+            method: "DELETE",
+            action: "/api/audiences",
+            navigate: false,
+          },
+        );
+      }}
+    >
+      <MdRemoveCircle />
+    </Button>
+  );
+}
+
 export const audienceColumns: ColumnDef<Audience>[] = [
   {
     accessorKey: "name",
@@ -36,58 +97,14 @@ export const audienceColumns: ColumnDef<Audience>[] = [
   {
     header: "Download",
     cell: ({ row }) => {
-      const fetcher = useFetcher();
-      useEffect(() => {
-        if (fetcher.data) {
-          const blob = new Blob([fetcher.data as BlobPart], { 
-            type: "text/csv;charset=utf-8",
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.setAttribute("download", "audiences.csv");
-          document.body.appendChild(link);
-          link.click();
-          link.parentNode?.removeChild(link);
-        }
-      }, [fetcher.data]);
-      return (
-        <fetcher.Form method="GET" action="/api/audiences">
-          <input type="hidden" name="audienceId" value={row.original?.id} />
-          <input type="hidden" name="returnType" value="csv" />
-          <Button 
-            type="submit"
-            variant="ghost"
-            disabled={fetcher.state === "submitting"}
-          >
-            {fetcher.state === "submitting" ? (
-              "Downloading..."
-            ) : (
-              <MdDownload className="text-brand-primary dark:text-white" />
-            )}
-          </Button>
-        </fetcher.Form>
-      );
+      return <AudienceDownloadCell audienceId={row.original.id} />;
     },
-    maxSize: 50,  
+    maxSize: 50,
   },
   {
     header: "Delete",
     cell: ({ row }) => {
-      const submit = useSubmit();
-      return (
-          <Button
-            onClick={(e) => {
-              submit({id: row.original.id}, {
-                method:"DELETE",
-                action:"/api/audiences",
-                navigate:false
-              })
-            }}
-          >
-            <MdRemoveCircle />
-          </Button>
-      );
+      return <AudienceDeleteCell audienceId={row.original.id} />;
     },
     maxSize: 50,
   },

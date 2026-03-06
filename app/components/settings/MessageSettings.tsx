@@ -1,8 +1,6 @@
-import { MdAddAPhoto } from "react-icons/md";
-import { MdTag } from "react-icons/md";
+import { MdAddAPhoto , MdTag } from "react-icons/md";
 import { Suspense, useRef, useState, useCallback, useEffect } from "react";
 import { Await, Form, useSubmit } from "@remix-run/react";
-import { logger } from "@/lib/logger.client";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -53,7 +51,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     const [showTemplateTags, setShowTemplateTags] = useState(false);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    logger.debug("MessageSettings surveys", surveys);
     const FUNCTION_EXAMPLES = [
         {
             label: 'Base64 encode phone and external ID',
@@ -245,8 +242,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
-                {true ? (
-                    <div className="flex flex-col">
+                <div className="flex flex-col">
                         <Suspense fallback={<div>Loading media...</div>}>
                             <Await
                                 resolve={mediaLinks}
@@ -465,9 +461,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             })()
                         )}
                     </div>
-                ) : (
-                    <div></div>
-                )}
             </div>
         </div>
     )

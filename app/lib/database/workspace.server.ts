@@ -7,7 +7,6 @@ import type { Database } from "../database.types";
 import {
   WorkspaceData,
   WorkspaceNumbers,
-  User,
 } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -15,6 +14,7 @@ import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";
 import { createStripeContact } from "./stripe.server";
+import { AppError, ErrorCode } from "@/lib/errors.server";
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -97,7 +97,7 @@ export async function createNewWorkspace({
         user_id,
       });
     if (insertWorkspaceError) {
-      logger.error(insertWorkspaceError);
+      logger.error("Error creating workspace in RPC", insertWorkspaceError);
     }
 
     const account = await createSubaccount({
@@ -248,13 +248,13 @@ export async function updateWorkspacePhoneNumber({
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
-  numberId: string;
-  updates: Partial<WorkspaceNumbers>;
+  numberId: string | number;
+  updates: Partial<NonNullable<WorkspaceNumbers>>;
 }) {
   const { data, error } = await supabaseClient
     .from("workspace_number")
     .update(updates)
-    .eq("id", numberId)
+    .eq("id", Number(numberId))
     .eq("workspace", workspaceId)
     .select()
     .single();
@@ -290,7 +290,7 @@ export async function getUserRole({
   workspaceId,
 }: {
   supabaseClient: SupabaseClient;
-  user: User;
+  user: { id: string } | null;
   workspaceId: string;
 }) {
   if (!user) {
@@ -323,10 +323,9 @@ export async function requireWorkspaceAccess({
   user: { id: string };
   workspaceId: string;
 }): Promise<void> {
-  const { AppError, ErrorCode } = await import("@/lib/errors.server");
   const role = await getUserRole({
     supabaseClient,
-    user: user as User,
+    user,
     workspaceId,
   });
   if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
@@ -441,11 +440,12 @@ export async function removeWorkspacePhoneNumber({
   workspaceId: string;
   numberId: bigint;
 }) {
+  const normalizedNumberId = Number(numberId);
   try {
     const { data: number, error: numberError } = await supabaseClient
       .from("workspace_number")
       .select()
-      .eq("id", numberId)
+      .eq("id", normalizedNumberId)
       .single();
     if (numberError) throw numberError;
     const twilio = await createWorkspaceTwilioInstance({
@@ -470,7 +470,7 @@ export async function removeWorkspacePhoneNumber({
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
       .delete()
-      .eq("id", numberId);
+      .eq("id", normalizedNumberId);
 
     if (deletionError) throw deletionError;
     return { error: null };
@@ -490,7 +490,7 @@ export async function updateCallerId({
   number: WorkspaceNumbers;
   friendly_name: string;
 }) {
-  if (!number || !number.phone_number) return;
+  if (!number || !number.phone_number) return { error: null };
   try {
     const twilio = await createWorkspaceTwilioInstance({
       supabase: supabaseClient,
@@ -521,8 +521,9 @@ export async function updateCallerId({
       updatedOutgoing,
       updatedIncoming,
     ]);
+    return { error: null };
   } catch (error) {
-    logger.error(error);
+    logger.error("Error updating caller ID", error);
     return { error };
   }
 }
@@ -556,19 +557,24 @@ export async function getWorkspaceScripts({
   return data;
 }
 
-export function getRecordingFileNames(stepData: unknown[]) {
+export function getRecordingFileNames(stepData: unknown) {
   if (!Array.isArray(stepData)) {
     logger.warn("stepData is not an array");
     return [];
   }
 
-  return stepData.reduce((fileNames: string[], step: { speechType?: string; say?: string }) => {
+  return stepData.reduce((fileNames: string[], step) => {
+    if (!step || typeof step !== "object" || Array.isArray(step)) {
+      return fileNames;
+    }
+
+    const typedStep = step as { speechType?: string; say?: string };
     if (
-      step.speechType === "recorded" &&
-      step.say &&
-      step.say !== "Enter your question here"
+      typedStep.speechType === "recorded" &&
+      typedStep.say &&
+      typedStep.say !== "Enter your question here"
     ) {
-      fileNames.push(step.say);
+      fileNames.push(typedStep.say);
     }
     return fileNames;
   }, []);
@@ -599,7 +605,7 @@ export async function listMedia(
   const { data, error } = await supabaseClient.storage
     .from(`workspaceAudio`)
     .list(workspace);
-  if (error) logger.error(error);
+  if (error) logger.error("Error listing workspace media", error);
   return data;
 }
 
@@ -624,14 +630,17 @@ export async function acceptWorkspaceInvitations(
   invitationIds: string[],
   userId: string,
 ) {
-  let errors = [];
+  const errors: Array<{ invitationId: string; type: string }> = [];
   for (const invitationId of invitationIds) {
     const { data: invite, error: inviteError } = await supabaseClient
       .from("workspace_invite")
       .select()
       .eq("id", invitationId)
       .single();
-    if (inviteError) errors.push({ invitationId: inviteError, type: "invite" });
+    if (inviteError || !invite) {
+      errors.push({ invitationId, type: "invite" });
+      continue;
+    }
 
     const { error: workspaceError } = await addUserToWorkspace({
       supabaseClient: supabaseClient,
@@ -640,7 +649,7 @@ export async function acceptWorkspaceInvitations(
       role: invite.role,
     });
     if (workspaceError)
-      errors.push({ invitationId: inviteError, type: "workspace" });
+      errors.push({ invitationId, type: "workspace" });
 
     const { error: deletionError } = await supabaseClient
       .from("workspace_invite")
@@ -648,9 +657,9 @@ export async function acceptWorkspaceInvitations(
       .eq("id", invitationId);
 
     if (deletionError)
-      errors.push({ invitationId: inviteError, type: "deletion" });
-    return { errors };
+      errors.push({ invitationId, type: "deletion" });
   }
+  return { errors };
 }
 
 export async function getInvitesByUserId(
@@ -674,7 +683,7 @@ export async function fetchConversationSummary(
   if (campaign_id) {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
+      { p_workspace: workspaceId, campaign_id_prop: Number(campaign_id) },
     );
     chats = data;
     chatsError = error;

@@ -10,7 +10,7 @@ const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: 
   const { data: campaign, error } = await supabase
     .from("campaign")
     .select(`*, ivr_campaign(*, script(*))`)
-    .eq("id", campaign_id)
+    .eq("id", Number(campaign_id))
     .single();
   if (error) throw error;
   return campaign;
@@ -36,12 +36,19 @@ interface Script {
 
 const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
   const currentPage = script.pages[currentPageId];
+  if (!currentPage) {
+    return null;
+  }
   const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
 
   if (currentBlockIndex < currentPage.blocks.length - 1) {
+    const nextBlockId = currentPage.blocks[currentBlockIndex + 1];
+    if (!nextBlockId) {
+      return null;
+    }
     return {
       pageId: currentPageId,
-      blockId: currentPage.blocks[currentBlockIndex + 1],
+      blockId: nextBlockId,
     };
   }
 
@@ -49,7 +56,12 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   const currentPageIndex = pageIds.indexOf(currentPageId);
   if (currentPageIndex < pageIds.length - 1) {
     const nextPageId = pageIds[currentPageIndex + 1];
-    return { pageId: nextPageId, blockId: script.pages[nextPageId].blocks[0] };
+    const nextPage = nextPageId ? script.pages[nextPageId] : undefined;
+    const nextBlockId = nextPage?.blocks[0];
+    if (!nextPageId || !nextBlockId) {
+      return null;
+    }
+    return { pageId: nextPageId, blockId: nextBlockId };
   }
 
   return null;
@@ -76,6 +88,10 @@ const handleNextStep = (twiml: Twilio.twiml.VoiceResponse, nextStep: string, cam
     twiml.hangup();
   } else if (nextStep.includes(":")) {
     const [nextPageId, nextBlockId] = nextStep.split(":");
+    if (!nextPageId || !nextBlockId) {
+      twiml.hangup();
+      return;
+    }
     twiml.redirect(
       `${env.BASE_URL()}/api/ivr/${campaignId}/${nextPageId}/${nextBlockId}/`
     );

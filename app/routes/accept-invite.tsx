@@ -431,6 +431,7 @@ export default function AcceptInvite() {
     if (state === "idle" && actionData?.status === "accept_failed") {
       toast.error("We could not accept all invitations. Please try again.");
     }
+    return undefined;
   }, [actionData, navigate, state]);
 
   return (

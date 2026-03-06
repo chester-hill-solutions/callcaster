@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

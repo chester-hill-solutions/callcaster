@@ -3,8 +3,7 @@ import { capitalize } from "@/lib/utils";
 import { Link, NavLink } from '@remix-run/react';
 import { FaTimes } from 'react-icons/fa';
 import { Button } from "@/components/ui/button";
-import { User } from "@/lib/types";
-import { WorkspaceInvite } from "@/lib/types";
+import { User , WorkspaceInvite } from "@/lib/types";
 import { TypedResponse } from "@remix-run/node";
 
 type MobileMenuProps = {  

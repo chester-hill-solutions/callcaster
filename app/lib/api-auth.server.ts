@@ -26,7 +26,7 @@ export type ApiKeyAuthResult = {
 export type SessionAuthResult = {
   authType: "session";
   supabaseClient: ReturnType<typeof createClient<Database>>;
-  user: { id: string; email?: string; [key: string]: unknown };
+  user: { id: string; email?: string };
 };
 
 export type AuthErrorResult = {
@@ -70,12 +70,10 @@ export async function verifyApiKeyOrSession(
       return { error: "Invalid API key", status: 401 };
     }
 
-    supabase
+    void supabase
       .from("workspace_api_key")
       .update({ last_used_at: new Date().toISOString() })
-      .eq("id", row.id)
-      .then(() => {})
-      .catch(() => {});
+      .eq("id", row.id);
 
     return {
       authType: "api_key",
@@ -97,7 +95,10 @@ export async function verifyApiKeyOrSession(
   return {
     authType: "session",
     supabaseClient,
-    user: user as { id: string; email?: string; [key: string]: unknown },
+    user: {
+      id: user.id,
+      email: user.email ?? undefined,
+    },
   };
 }
 

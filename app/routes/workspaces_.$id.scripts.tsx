@@ -7,12 +7,10 @@ import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { formatDateToLocale } from "@/lib/utils";
 import { useEffect } from "react";
-import type { PostgrestError } from "@supabase/supabase-js";
+import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger.server";
-import type { Json } from "@/lib/database.types";
+import type { Json , Database } from "@/lib/database.types";
 import type { User } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;

@@ -8,6 +8,8 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { logger } from "@/lib/logger.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 
 const supabase = createClient(
   env.SUPABASE_URL(),
@@ -30,11 +32,41 @@ const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
   }
 };
 
-const updateOutreachAttempt = async (
+const requireValue = (
+  value: string | null | undefined,
+  fieldName: string,
+): string => {
+  if (!value) {
+    throw new Error(`Missing required field: ${fieldName}`);
+  }
+  return value;
+};
+
+export const updateOutreachAttempt = async (
   id: string,
   update: Partial<OutreachAttempt>,
 ) => {
   try {
+    if (update.disposition) {
+      const { data: current, error: currentError } = await supabase
+        .from("outreach_attempt")
+        .select("disposition, contact_id")
+        .eq("id", id)
+        .single();
+      if (!currentError && current?.disposition) {
+        const c = String(current.disposition).toLowerCase();
+        const n = String(update.disposition).toLowerCase();
+        if (!canTransitionOutreachDisposition(c, n)) {
+          logger.debug("Skipping outreach disposition transition", {
+            id,
+            current: c,
+            next: n,
+          });
+          return current as any;
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from("outreach_attempt")
       .update(update)
@@ -54,6 +86,7 @@ const updateOutreachAttempt = async (
 
 const updateCampaignQueue = async (
   contactId: string,
+  campaignId: number,
   update: Partial<Tables<"campaign_queue">>,
 ) => {
   try {
@@ -61,6 +94,7 @@ const updateCampaignQueue = async (
       .from("campaign_queue")
       .update(update)
       .eq("contact_id", contactId)
+      .eq("campaign_id", campaignId)
       .select();
     if (error) throw error;
     return data;
@@ -103,13 +137,18 @@ const handleCallStatus = async (
   duration: number
 ) => {
   try {
-    const callUpdate = await updateCall(parsedBody.CallSid, {
-      end_time: new Date(parsedBody.Timestamp).toISOString(),
+    const callSid = requireValue(parsedBody.CallSid, "CallSid");
+    const timestamp = requireValue(parsedBody.Timestamp, "Timestamp");
+    const callUpdate = await updateCall(callSid, {
+      end_time: new Date(timestamp).toISOString(),
       status: status?.toLowerCase() as Tables<"call">["status"],
       duration: duration.toString()
     });
+    if (!callUpdate.outreach_attempt_id) {
+      throw new Error("Missing outreach_attempt_id for auto-dial status update");
+    }
     const outreachStatus = await updateOutreachAttempt(
-      callUpdate.outreach_attempt_id,
+      String(callUpdate.outreach_attempt_id),
       { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
     );
     await updateTransaction(callUpdate, duration);
@@ -130,7 +169,7 @@ const handleCallStatus = async (
       payload: { contact_id: outreachStatus.contact_id, status },
     });
     const conferences = await twilio.conferences.list({
-      friendlyName: callUpdate.conference_id,
+      friendlyName: callUpdate.conference_id ?? "",
       status: "in-progress",
     });
     if (conferences.length && status !== "completed") {
@@ -146,18 +185,22 @@ const onePerSixty = (duration: number) => {
   return Math.floor(duration / 60) + 1;
 }
 const updateTransaction = async (call: Tables<"call">, duration: number) => {
+  if (!call.workspace) {
+    logger.error("Skipping transaction update because call workspace is missing", {
+      callSid: call.sid,
+    });
+    return null;
+  }
   const billingUnits = onePerSixty(duration);
-  const { data: transaction, error: transactionError } = await supabase.from('transaction_history').insert({
-    workspace: call.workspace,
+  await insertTransactionHistoryIdempotent({
+    supabase,
+    workspaceId: call.workspace,
     type: "DEBIT",
     amount: -billingUnits,
-    note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
-  }).select();
-  if (transactionError) {
-    logger.error("Error creating transaction:", transactionError);
-    throw transactionError;
-  }
-  return transaction;
+    note: `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`,
+    idempotencyKey: `call:${call.sid}`,
+  });
+  return null;
 }
 
 const handleParticipantLeave = async (
@@ -167,11 +210,16 @@ const handleParticipantLeave = async (
 ) => {
 
   try {
-    const dbCall = await updateCall(parsedBody.CallSid, {
-      end_time: new Date(parsedBody.Timestamp).toISOString(),
+    const callSid = requireValue(parsedBody.CallSid, "CallSid");
+    const timestamp = requireValue(parsedBody.Timestamp, "Timestamp");
+    const dbCall = await updateCall(callSid, {
+      end_time: new Date(timestamp).toISOString(),
       duration: Math.max(Number(parsedBody.Duration), Number(parsedBody.CallDuration)).toString(),
       status: parsedBody?.CallStatus?.toLowerCase() as Tables<"call">["status"]
     });
+    if (!dbCall.outreach_attempt_id) {
+      throw new Error("Missing outreach_attempt_id for participant leave");
+    }
     const { data: outreachStatus, error: outreachError } = await supabase
       .from('outreach_attempt')
       .select('*')
@@ -191,7 +239,7 @@ const handleParticipantLeave = async (
       },
     });
     const conferences = await twilio.conferences.list({
-      friendlyName: parsedBody.FriendlyName,
+      friendlyName: parsedBody.FriendlyName ?? parsedBody.ConferenceSid ?? "",
       status: "in-progress",
     });
     await Promise.all(
@@ -212,17 +260,20 @@ const handleParticipantJoin = async (
 ) => {
   try {
     if (!dbCall.conference_id) {
-      await updateCall(parsedBody.CallSid, {
-        conference_id: parsedBody.ConferenceSid,
-        start_time: new Date(parsedBody.Timestamp).toISOString(),
+      await updateCall(requireValue(parsedBody.CallSid, "CallSid"), {
+        conference_id: requireValue(parsedBody.ConferenceSid, "ConferenceSid"),
+        start_time: new Date(requireValue(parsedBody.Timestamp, "Timestamp")).toISOString(),
       });
     }
     if (dbCall.outreach_attempt_id) {
+      if (!dbCall.campaign_id) {
+        throw new Error("Missing campaign_id for participant join");
+      }
       const outreachStatus = await updateOutreachAttempt(
         `${dbCall.outreach_attempt_id}`,
         { disposition: "in-progress", answered_at: new Date().toISOString() },
       );
-      await updateCampaignQueue(outreachStatus.contact_id, {
+      await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
         status: parsedBody.FriendlyName,
       });
 
@@ -268,9 +319,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const twilio = await createWorkspaceTwilioInstance({
       supabase,
-      workspace_id: dbCall.workspace,
+      workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    realtime = supabase.channel(parsedBody.ConferenceSid);
+    realtime = supabase.channel(parsedBody.ConferenceSid ?? dbCall.conference_id ?? "default");
     switch (parsedBody.CallStatus) {
       case "failed":
       case "busy":

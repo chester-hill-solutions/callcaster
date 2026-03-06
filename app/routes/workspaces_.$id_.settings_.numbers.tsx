@@ -142,16 +142,15 @@ interface FormData {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const rawData = Object.fromEntries(await request.formData());
-  const data = rawData as FormData;
+  const data = Object.fromEntries(await request.formData()) as Record<string, FormDataEntryValue>;
   const formName = data.formName;
   const workspace_id = params.id;
   if (!workspace_id) return { error: "Workspace ID is required" };
 
   if (formName === "caller-id") {
-    delete data.formName;
+    const { formName: _ignoredFormName, ...callerIdData } = data;
     const res = await fetch(`${process.env['BASE_URL']}/api/caller-id`, {
-      body: JSON.stringify({ ...data, workspace_id }),
+      body: JSON.stringify({ ...callerIdData, workspace_id }),
       headers: {
         "Content-Type": "application/json",
         ...headers,
@@ -163,10 +162,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return { validationRequest, numberRequest };
 
   } else if (formName === "remove-number") {
-    delete data.formName;
+    const { formName: _ignoredFormName, ...removeNumberData } = data;
     const { error } = await removeWorkspacePhoneNumber({
       supabaseClient,
-      numberId: BigInt(data.numberId || '0'),
+      numberId: BigInt(String(removeNumberData.numberId || '0')),
       workspaceId: workspace_id as string,
     });
     if (error) return { error };

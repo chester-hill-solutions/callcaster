@@ -96,7 +96,7 @@ export function parseFormData<T extends Record<string, unknown>>(
   const result = {} as T;
   
   for (const [key, value] of formData.entries()) {
-    if (key in schema) {
+    if (key in schema && typeof value === "string") {
       const parser = schema[key as keyof T];
       result[key as keyof T] = parser(value) as T[keyof T];
     }
@@ -119,7 +119,7 @@ export function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
   return obj[key];
 }
 
-export function hasProperty<T, K extends keyof T>(obj: T, key: K): obj is T & Record<K, unknown> {
+export function hasProperty<T extends object, K extends keyof T>(obj: T, key: K): obj is T & Record<K, unknown> {
   return key in obj;
 }
 
@@ -318,18 +318,14 @@ export function deepClone<T>(obj: T): T {
   if (Array.isArray(obj)) {
     return obj.map(item => deepClone(item)) as T;
   }
-  
-  if (typeof obj === 'object') {
-    const cloned = {} as T;
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        cloned[key] = deepClone(obj[key]);
-      }
+
+  const cloned = {} as T;
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone(obj[key]);
     }
-    return cloned;
   }
-  
-  return obj;
+  return cloned;
 }
 
 // Type-safe null coalescing

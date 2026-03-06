@@ -167,7 +167,7 @@ const handleCancelCampaign = async (
       
       while (hasMore) {
         const { data: messages, error: messagesError } = await supabase
-          .from('messages')
+          .from('message')
           .select("sid, queue_id")
           .eq('campaign_id', id)
           .in('status', ['queued', 'sending'])
@@ -203,7 +203,7 @@ const handleCancelCampaign = async (
         
         // Mark the messages as cancelled in the database
         const { error: messageUpdateError } = await supabase
-          .from('messages')
+          .from('message')
           .update({ status: 'canceled' })
           .in('sid', messages.map((message) => message.sid));
         if (messageUpdateError) console.error('Error marking messages as cancelled', messageUpdateError);
@@ -310,7 +310,7 @@ const handlePauseCampaign = async (
       
       while (hasMore) {
         const { data: messages, error: messagesError } = await supabase
-          .from('messages')
+          .from('message')
           .select("sid, queue_id")
           .eq('campaign_id', id)
           .eq('status', 'queued')
@@ -373,7 +373,7 @@ async function getWorkspaceUsers(
   const { data, error } = await supabaseClient.rpc("get_workspace_users", {
     selected_workspace_id: workspaceId,
   });
-  if (error) { console.error(error); throw error };
+  if (error) { console.error(error); throw error }
   return { data, error };
 }
 
@@ -423,7 +423,7 @@ const handleInitiateCampaign = async (
   }
 };
 
-serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const startTime = Date.now();
   const TIMEOUT_THRESHOLD = 25000; // 25 seconds to leave buffer for response
   
@@ -438,7 +438,7 @@ serve(async (req: Request) => {
         end_date: string,
         created_at: string,
         voicemail_file: string,
-        call_questions: {},
+        call_questions: Record<string, unknown>,
         workspace: string,
         caller_id: string,
         group_household_queue: boolean,
@@ -557,4 +557,8 @@ serve(async (req: Request) => {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+if (import.meta.main) {
+  serve(handleRequest);
+}

@@ -78,7 +78,7 @@ export const useAttempts = (initialAttempts: OutreachAttempt[], initialRecentAtt
     );
     
     try {
-      const updatedAttempt: OutreachAttempt = updateAttemptWithCall(payload.new, calls[0]);
+      const updatedAttempt: OutreachAttempt = updateAttemptWithCall(payload.new, calls[0] ?? null);
 
     setAttempts((currentAttempts) => {
       const index = currentAttempts.findIndex((item) => item?.id === payload?.new?.id);

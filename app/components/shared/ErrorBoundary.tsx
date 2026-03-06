@@ -1,7 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import type { AppError } from '@/lib/types';
-import { createAppError } from '@/lib/type-utils';
-import { logger } from '@/lib/logger.client';
+import { createAppError, type AppError } from '@/lib/type-safety-utils';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -37,7 +35,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Convert the error to our AppError type
     const appError: AppError = createAppError(
       error.message || 'An unexpected error occurred',
@@ -50,14 +48,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     );
 
     // Log the error
-    logger.error('ErrorBoundary caught an error:', appError);
-    logger.error('Error info:', errorInfo);
+    console.error('ErrorBoundary caught an error:', appError);
+    console.error('Error info:', errorInfo);
 
     // Call the onError callback if provided
     this.props.onError?.(appError, errorInfo);
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.hasError) {
       const { error } = this.state;
       const { fallback } = this.props;
@@ -130,7 +128,7 @@ export function useErrorHandler() {
       }
     );
 
-    logger.error('Error handled by useErrorHandler:', appError);
+    console.error('Error handled by useErrorHandler:', appError);
     
     // You can add additional error reporting logic here
     // For example, sending to an error reporting service

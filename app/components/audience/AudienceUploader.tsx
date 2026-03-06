@@ -13,10 +13,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
 
-const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
+export const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
 
 // Parse CSV with columns option for better mapping
-const parseCSV = (csvString: string) => {
+export const parseCSV = (csvString: string) => {
   try {
     const records = parse(csvString, {
       columns: true,
@@ -33,13 +33,13 @@ const parseCSV = (csvString: string) => {
   }
 };
 
-const parseCSVHeaders = (unparsedHeaders: string[]) => {
+export const parseCSVHeaders = (unparsedHeaders: string[]) => {
   return unparsedHeaders.map((header) => header.toLowerCase().trim());
 };
 
 type CSVRecord = Record<string, string | number | null | undefined>;
 
-const parseCSVData = (records: CSVRecord[], headers: string[]) => {
+export const parseCSVData = (records: CSVRecord[], headers: string[]) => {
   return records.map((record) => {
     const contact: Record<string, string> = {};
     headers.forEach((header) => {
@@ -177,7 +177,6 @@ export default function AudienceUploader({
   );
 
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filePath = e.target.value;
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -218,7 +217,7 @@ export default function AudienceUploader({
     }, {} as Record<string, string>);
 
     setHeaderMapping(initialMapping);
-    setPendingFileName(filePath.split("\\").at(-1) || "");
+    setPendingFileName(file.name);
     setPendingContactHeaders(headers);
     setPreviewData(cleanPreviewData as unknown as Contact[]);
     setIsHeaderMappingConfirmed(false);
@@ -235,9 +234,7 @@ export default function AudienceUploader({
     setPendingFileName("");
     setSelectedFile(null); // Clear the stored file
     const fileInput = document.getElementById("contacts") as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = "";
-    }
+    fileInput.value = "";
     setIsHeaderMappingConfirmed(false);
   };
 
@@ -251,19 +248,11 @@ export default function AudienceUploader({
 
   const handleUploadContacts = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!pendingFileName || !isHeaderMappingConfirmed) {
-      return;
-    }
-    
+
     setUploadError(null);
     setUploadStatus("submitting");
     
     try {
-      if (!selectedFile) {
-        throw new Error("No file selected");
-      }
-      
       const formData = new FormData();
       formData.append("workspace_id", workspaceId as string);
       
@@ -273,7 +262,7 @@ export default function AudienceUploader({
         formData.append("audience_name", audienceName);
       }
       
-      formData.append("contacts", selectedFile);
+      formData.append("contacts", selectedFile!);
       formData.append("header_mapping", JSON.stringify(headerMapping));
       if (splitNameColumn) {
         formData.append("split_name_column", splitNameColumn);
@@ -413,7 +402,7 @@ export default function AudienceUploader({
                       <TableCell>
                         <select
                           className="rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-zinc-800"
-                          value={headerMapping[header] || 'other_data'}
+                          value={headerMapping[header]}
                           onChange={(e) => updateHeaderMapping(header, e.target.value)}
                         >
                           {VALID_HEADERS.map(validHeader => (
@@ -432,7 +421,7 @@ export default function AudienceUploader({
                               id="split-name"
                               className="rounded border-gray-300"
                               checked={Boolean(splitNameColumn)}
-                              onChange={(e) => setSplitNameColumn(e.target.checked ? header : null)}
+                              onChange={() => setSplitNameColumn(null)}
                             />
                             <label htmlFor="split-name">Split into First/Last Name</label>
                           </div>
@@ -524,10 +513,10 @@ export default function AudienceUploader({
         <div className="flex justify-end">
           <Button
             onClick={handleUploadContacts}
-            disabled={!pendingFileName || !isHeaderMappingConfirmed || (fetcher.state as FetcherState) !== "idle"}
+            disabled={!pendingFileName || !isHeaderMappingConfirmed}
             className="bg-brand-primary text-white hover:bg-brand-secondary"
           >
-            {(fetcher.state as FetcherState) !== "idle" ? "Uploading..." : "Start Upload"}
+            Start Upload
           </Button>
         </div>
       ) : (

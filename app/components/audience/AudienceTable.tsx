@@ -123,7 +123,6 @@ export function AudienceTable({
   };
 
   const handleRemoveSelected = () => {
-    if (selectedContacts.length === 0) return;
     const selectedIds = selectedContacts.map((id) => parseInt(id, 10));
     saveSnapshot();
     setContacts((curr) => curr.filter((contact) => !selectedIds.includes(contact.id)));
@@ -140,23 +139,19 @@ export function AudienceTable({
   };
 
   const handleExportCSV = () => {
-    // Create CSV content
-    const headers = ["id", "firstname", "surname", "phone", "email", "address", "city", "province", "postal", "country"];
-    const csvContent = [
-      headers.join(","),
-      ...contacts.map(contact =>
-        headers.map(header =>
-          JSON.stringify((contact as Record<string, unknown>)[header] || "")
-        ).join(",")
-      )
-    ].join("\n");
+    if (!audience_id) return;
 
-    // Create download link
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `audience_${audience_id}_contacts.csv`);
+    const url = new URL("/api/audiences", window.location.origin);
+    url.searchParams.set("returnType", "csv");
+    url.searchParams.set("audienceId", String(audience_id));
+    // Keep parity with current UI state (server can ignore unsupported params).
+    url.searchParams.set("sortKey", sorting.sortKey);
+    url.searchParams.set("sortDirection", sorting.sortDirection);
+    if (searchTerm.trim()) url.searchParams.set("q", searchTerm.trim());
+
+    const link = document.createElement("a");
+    link.href = url.toString();
+    link.rel = "noopener";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

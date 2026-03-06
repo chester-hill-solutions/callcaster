@@ -296,7 +296,7 @@ export default function ContactScreen(): JSX.Element {
       </div>
 
       <ContactDetails
-        contact={contact}
+        contact={contact ?? undefined}
         audiences={audiences}
         userRole={userRole}
         onDirtyChange={setIsDirty}

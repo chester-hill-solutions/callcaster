@@ -172,7 +172,7 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   return null;
 };
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     // Get request details for validation
     const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-recording`;
@@ -321,4 +321,8 @@ Deno.serve(async (req) => {
       status: 500
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

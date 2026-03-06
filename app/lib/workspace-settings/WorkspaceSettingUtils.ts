@@ -1,7 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "../database.types";
-import { getWorkspaceUsers } from "../database.server";
+import type { Database, Tables } from "../database.types";
+import { getWorkspaceUsers } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 
 export async function handleAddUser(
@@ -101,7 +101,7 @@ export async function handleDeleteSelf(
     .select()
     .single();
   if (errorDeletingSelf) {
-    logger.error(errorDeletingSelf);
+    logger.error("Error deleting current user from workspace", errorDeletingSelf);
     return { data: null, error: errorDeletingSelf.message };
   }
 
@@ -325,7 +325,7 @@ export async function sendWebhookNotification({
     };
     const webhookWithEvents = webhook as WebhookWithEvents;
     const hasMatchingEvent = webhookWithEvents.events && Array.isArray(webhookWithEvents.events) && 
-      webhookWithEvents.events.some((event) => 
+      webhookWithEvents.events.some((event: { category: string; type: string }) => 
         event.category === eventCategory && event.type === eventType
       );
     

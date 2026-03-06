@@ -180,9 +180,20 @@ export default function WorkspaceSettings() {
     phoneNumbers,
     pendingInvites,
     webhook,
+    workspace,
   } = useLoaderData<LoaderData>();
-  const {workspace} = useOutletContext<{workspace: WorkspaceData}>();
-    const actionData = useActionData<typeof action>();
+  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
+  const { workspace: outletWorkspace } = useOutletContext<{
+    workspace: WorkspaceData;
+  }>();
+  const actionData = useActionData<typeof action>();
+  const canManageWebhook =
+    hasAccess &&
+    outletWorkspace != null &&
+    "id" in outletWorkspace &&
+    typeof outletWorkspace.id === "string";
+  const webhookWorkspaceId = canManageWebhook ? String(outletWorkspace.id) : "";
+  const webhookUserId = String(activeUserId);
   const workspaceOwner = users?.find(
     (user) => user?.role === "owner"
   ) as UserWithRole | undefined;
@@ -430,7 +441,7 @@ export default function WorkspaceSettings() {
           )}
         </Card>
         {hasAccess && (
-          <ApiKeysSection workspaceId={workspace?.id ?? ""} hasAccess={hasAccess} />
+          <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
         )}
         {hasAccess && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
@@ -438,13 +449,13 @@ export default function WorkspaceSettings() {
               Manage Webhook
             </h3>
             <div className="flex flex-col py-4">
-              {hasAccess && workspace && 'id' in workspace && typeof workspace.id === 'string' ? (
+              {canManageWebhook ? (
                 <WebhookEditor initialWebhook={webhook ? {
                   id: String(webhook.id || ''),
                   destination_url: webhook.destination_url || '',
                   events: Array.isArray(webhook.event) ? webhook.event.map((e: string) => ({ category: 'inbound_call' as const, type: e as 'INSERT' | 'UPDATE' })) : [],
                   custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
-                } : undefined} userId={activeUserId} workspaceId={workspace.id} />
+                } : undefined} userId={webhookUserId} workspaceId={webhookWorkspaceId} />
               ) : (
                 <p className="text-center text-gray-600">
                   You don't have permission to manage webhooks.

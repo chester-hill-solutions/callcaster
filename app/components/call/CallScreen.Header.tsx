@@ -1,6 +1,5 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { logger } from "@/lib/logger.client";
 import {
   Mic,
   MicOff,
@@ -71,7 +70,9 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   onVerifyNewNumber,
   pin
 }) => {
-  logger.debug("Verified numbers", verifiedNumbers);
+  const microphoneSelectId = "campaign-microphone-select";
+  const speakerSelectId = "campaign-speaker-select";
+
   return (
     <div className="flex flex-col gap-6 p-6 w-full">
       <div className="flex justify-between items-center">
@@ -114,10 +115,14 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label
+            htmlFor={microphoneSelectId}
+            className="text-sm font-medium text-gray-700 flex items-center gap-2"
+          >
             <Mic size={16} /> Microphone
           </label>
           <select
+            id={microphoneSelectId}
             onChange={handleMicrophoneChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -134,10 +139,14 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label
+            htmlFor={speakerSelectId}
+            className="text-sm font-medium text-gray-700 flex items-center gap-2"
+          >
             <Headphones size={16} /> Speaker
           </label>
           <select
+            id={speakerSelectId}
             onChange={handleSpeakerChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >

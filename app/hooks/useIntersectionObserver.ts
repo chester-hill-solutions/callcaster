@@ -52,6 +52,9 @@ export function useIntersectionObserver(
       if (newNode) {
         const observer = new IntersectionObserver(
           ([intersectionEntry]) => {
+            if (!intersectionEntry) {
+              return;
+            }
             setEntry(intersectionEntry);
 
             // Freeze once visible if option is enabled

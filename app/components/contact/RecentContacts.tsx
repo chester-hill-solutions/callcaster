@@ -13,19 +13,26 @@ export interface ResultItemProps {
 }
 
 export interface AttemptCardProps {
-  attempt: OutreachAttempt;
+  attempt: OutreachAttemptWithCampaign;
   isOpen: boolean;
   toggleOpen: () => void;
   index: number;
 }
 
 export interface RecentContactsProps {
-  contact?: Contact & { outreach_attempt?: OutreachAttempt[] };
+  contact?: Contact & { outreach_attempt?: OutreachAttemptWithCampaign[] };
 }
 
 export interface RecentContactsState {
   openCards: Set<number>;
 }
+
+type OutreachAttemptWithCampaign = OutreachAttempt & {
+  campaign?: {
+    title?: string | null;
+    type?: string | null;
+  } | null;
+};
 
 const ResultItem: React.FC<ResultItemProps> = ({ label, value }) => {
   // Helper function to safely format value using type utilities
@@ -108,7 +115,7 @@ const AttemptCard: React.FC<AttemptCardProps> = ({
       
       return Object.entries(attempt.result)
         .map(([key, value]) => ({ key, value }))
-        .filter(({ value }) => value != null);
+        .filter((entry): entry is { key: string; value: Json } => entry.value != null);
     } catch (error) {
       logger.error('Error extracting result data:', error);
       return [];
@@ -196,7 +203,7 @@ export const RecentContacts: React.FC<RecentContactsProps> = ({ contact }) => {
   const [openCards, setOpenCards] = useState<Set<number>>(new Set());
 
   // Helper function to get recent attempts
-  const getRecentAttempts = useCallback((): OutreachAttempt[] => {
+  const getRecentAttempts = useCallback((): OutreachAttemptWithCampaign[] => {
     try {
       if (!contact?.outreach_attempt?.length) return [];
       return contact.outreach_attempt.slice(-5).reverse();

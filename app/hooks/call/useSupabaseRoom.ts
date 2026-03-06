@@ -126,6 +126,7 @@ const useSupabaseRoom = ({
     useEffect(() => {
         const roomName = `${userId}`;
         const room = supabase.channel(roomName);
+        const realtimeRoom = room as any;
         channelRef.current = room;
 
         const handleConnect = () => {
@@ -140,13 +141,13 @@ const useSupabaseRoom = ({
             updatePresence('offline');
         };
 
-        room.on('connect', handleConnect)
+        realtimeRoom.on('connect', handleConnect)
             .on('disconnect', handleDisconnect)
             .on('error', (error: Error) => {
                 setStatus('error');
                 logger.error(`Error in ${roomName}:`, error);
             })
-            .on('broadcast', { event: 'message' }, (e) => {
+            .on('broadcast', { event: 'message' }, (e: { payload?: unknown }) => {
                 try {
                     if (!e || !e.payload) {
                         logger.warn('Invalid broadcast payload received');
@@ -165,14 +166,14 @@ const useSupabaseRoom = ({
                         setUsers([]);
                         return;
                     }
-                    const usersArray: PresenceUser[] = Object.values(state).flat() as PresenceUser[];
+                    const usersArray = Object.values(state).flat() as unknown as PresenceUser[];
                     setUsers(usersArray);
                 } catch (error) {
                     logger.error('Error handling presence sync:', error);
                     setUsers([]);
                 }
             })
-            .subscribe((status) => {
+            .subscribe((status: string) => {
                 if (status === 'SUBSCRIBED') {
                     logger.debug(`Successfully subscribed to ${roomName}`);
                 } else if (status === 'CHANNEL_ERROR') {

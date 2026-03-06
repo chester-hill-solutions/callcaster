@@ -1,5 +1,5 @@
 import { MdSend, MdImage } from "react-icons/md";
-import MessagesImages from "./ChatImages";
+import ChatImages from "./ChatImages";
 import type { Contact } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
 import type { useFetcher } from "@remix-run/react";
@@ -111,7 +111,7 @@ export default function ChatInput({
           </button>
         </div>
         {selectedImages.filter(Boolean).length > 0 && (
-          <MessagesImages
+          <ChatImages
             selectedImages={selectedImages}
             onRemove={handleImageRemove}
           />

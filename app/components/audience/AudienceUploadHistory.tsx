@@ -44,6 +44,7 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
     
     try {
       setLoading(true);
+      setError(null);
       const { data, error } = await supabase
         .from("audience_upload")
         .select("*")
@@ -152,7 +153,6 @@ export default function AudienceUploadHistory({ audienceId }: AudienceUploadHist
   }
 
   function getProgressPercentage(upload: AudienceUpload): number {
-    if (upload.status === "completed") return 100;
     if (upload.total_contacts === 0) return 0;
     return Math.round((upload.processed_contacts / upload.total_contacts) * 100);
   }

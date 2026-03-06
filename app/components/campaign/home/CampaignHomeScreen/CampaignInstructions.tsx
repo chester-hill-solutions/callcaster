@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 interface CampaignInstructionsProps {
   campaignData: {
+    [key: string]: unknown;
     instructions?: {
       join?: string;
       script?: string;

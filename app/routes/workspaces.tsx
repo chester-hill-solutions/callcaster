@@ -10,7 +10,7 @@ import {
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
-import { createNewWorkspace, forceTokenRefresh } from "@/lib/database.server";
+import { createNewWorkspace } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { Toaster, toast } from "sonner";
@@ -23,7 +23,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Session } from "@supabase/supabase-js";  
 export { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 interface Workspace {
@@ -90,10 +89,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (newWorkspaceId) {
-    const { data: refreshData, error: refreshError } = await forceTokenRefresh({
-      supabaseClient,
-      serverSession: user as unknown as Session,
-    });
     return redirect(`/workspaces/${newWorkspaceId}`, { headers });
   }
 
@@ -118,6 +113,7 @@ const WorkspaceCard = React.memo(
     );
   },
 );
+WorkspaceCard.displayName = "WorkspaceCard";
 
 const NewWorkspaceDialog = ({
   userId,

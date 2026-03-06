@@ -5,11 +5,19 @@ import { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
+function getSafeRedirectPath(next: string | null): string {
+  if (!next || !next.startsWith("/")) {
+    return "/";
+  }
+
+  return next.startsWith("//") ? "/" : next;
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const requestUrl = new URL(request.url);
   const token_hash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type") as EmailOtpType | null;
-  const next = requestUrl.searchParams.get("next") || "/";
+  const next = getSafeRedirectPath(requestUrl.searchParams.get("next"));
   const headers = new Headers();
   const cookies = parse(request.headers.get("Cookie") ?? "");
 

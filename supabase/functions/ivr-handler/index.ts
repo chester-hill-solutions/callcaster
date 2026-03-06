@@ -74,7 +74,7 @@ async function processNextCall(owner, campaign_id) {
   }
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const body: RequestBody = await req.json();
 
@@ -203,4 +203,8 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

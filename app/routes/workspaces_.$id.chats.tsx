@@ -28,7 +28,7 @@ import {
 } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Card } from "@/components/ui/card";
 import { useConversationSummaryRealTime, phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import ChatHeader from "@/components/sms-ui/ChatHeader";
@@ -45,7 +45,7 @@ import {
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, Campaign, BaseUser } from "@/lib/types";
+import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, BaseUser } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import { sendMessage } from "./api.chat_sms";
 
@@ -63,14 +63,9 @@ interface WorkspaceNumber {
   phone_number: string;
 }
 
-interface ConversationSummary {
-  contact_phone: string;
-  user_phone: string;
-  conversation_start: string;
-  conversation_last_update: string;
-  message_count: number;
-  unread_count: number;
-}
+type ConversationSummary = NonNullable<
+  Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]
+>;
 
 interface Chat {
   contact_phone: string;
@@ -117,6 +112,100 @@ type WorkspaceContextType = {
     created_at: string;
   };
 };
+
+function ConversationList({
+  chats,
+  conversationData,
+  setConversationData,
+  conversations,
+  contactNumber,
+  handleExistingConversationClick,
+  formatDate,
+  refreshConversations,
+}: {
+  chats: ConversationSummary[];
+  conversationData: ConversationSummary[];
+  setConversationData: Dispatch<SetStateAction<ConversationSummary[]>>;
+  conversations: ConversationSummary[];
+  contactNumber?: string;
+  handleExistingConversationClick: (phoneNumber: string) => void;
+  formatDate: (value: string) => string;
+  refreshConversations: (force: boolean) => void;
+}) {
+  const chatNumbers = Array.from(
+    new Set(
+      chats
+        .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
+        .map((chat) => chat.contact_phone),
+    ),
+  );
+  const shapedChats = chatNumbers
+    .map((num) => chats.find((chat) => chat?.contact_phone === num))
+    .filter((chat): chat is ConversationSummary => chat !== undefined && chat !== null);
+
+  useEffect(() => {
+    if (shapedChats.length === 0) {
+      return;
+    }
+
+    const currentPhoneNumbers = new Set(conversationData.map((c) => c.contact_phone));
+    const newPhoneNumbers = new Set(shapedChats.map((c) => c.contact_phone));
+    const hasNewConversations = shapedChats.some(
+      (chat) => !currentPhoneNumbers.has(chat.contact_phone),
+    );
+    const countChanged = currentPhoneNumbers.size !== newPhoneNumbers.size;
+
+    if (hasNewConversations || countChanged || conversationData.length === 0) {
+      setConversationData(shapedChats);
+      refreshConversations(false);
+    }
+  }, [shapedChats, conversationData, refreshConversations, setConversationData]);
+
+  if (shapedChats.length === 0) {
+    return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
+  }
+
+  const displayChats = conversations.length > 0 ? conversations : shapedChats;
+
+  return (
+    <>
+      {displayChats
+        .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
+        .map((chat) => (
+          <button
+            type="button"
+            key={chat.contact_phone}
+            className={`flex w-full items-center justify-between border-b border-gray-100 p-4 text-left hover:bg-gray-50 ${
+              chat.contact_phone === contactNumber ? "bg-gray-50" : ""
+            }`}
+            onClick={() => handleExistingConversationClick(chat.contact_phone)}
+          >
+            <div className="flex items-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
+                <MdChat size={20} />
+              </div>
+              <div className="ml-4">
+                <div className="font-medium">{chat.contact_phone}</div>
+                <div className="line-clamp-1 text-sm text-gray-500">
+                  {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? "message" : "messages"}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col items-end">
+              <div className="text-xs text-gray-500">
+                {formatDate(chat.conversation_last_update)}
+              </div>
+              {chat.unread_count > 0 && (
+                <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
+                  {chat.unread_count}
+                </div>
+              )}
+            </div>
+          </button>
+        ))}
+    </>
+  );
+}
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
@@ -221,9 +310,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   ]);
   const { contact, potentialContacts, contactError } = contactData || { contact: null, potentialContacts: [], contactError: null };
   if (contactError) {
+    const contactErrorMessage =
+      typeof contactError === "object" &&
+      contactError !== null &&
+      "message" in contactError &&
+      typeof contactError.message === "string"
+        ? contactError.message
+        : "Failed to load contact";
     return json(
       {
-        error: contactError.message,
+        error: contactErrorMessage,
         userRole,
       },
       { headers },
@@ -546,82 +642,18 @@ export default function ChatsList() {
           }>
             <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
               {(chatsData) => {
-                const { chats } = chatsData as ChatsData;
-                const chatNumbers = Array.from(
-                  new Set(
-                    chats
-                      ?.filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
-                      .map((chat) => chat.contact_phone),
-                  ),
+                return (
+                  <ConversationList
+                    chats={(chatsData as ChatsData).chats}
+                    conversationData={conversationData}
+                    setConversationData={setConversationData}
+                    conversations={conversations}
+                    contactNumber={contact_number}
+                    handleExistingConversationClick={handleExistingConversationClick}
+                    formatDate={formatDate}
+                    refreshConversations={refreshConversations}
+                  />
                 );
-                const shapedChats = chatNumbers.map((num) =>
-                  chats?.find((chat) => chat?.contact_phone === num),
-                ).filter((chat): chat is ConversationSummary => chat !== undefined && chat !== null);
-
-                // Update the conversations data state
-                useEffect(() => {
-                  if (shapedChats?.length > 0) {
-                    // Only update if the data has actually changed
-                    const currentPhoneNumbers = new Set(conversationData.map(c => c.contact_phone));
-                    const newPhoneNumbers = new Set(shapedChats.map(c => c.contact_phone));
-                    
-                    // Check if the phone numbers have changed
-                    const hasNewConversations = shapedChats.some(chat => 
-                      !currentPhoneNumbers.has(chat.contact_phone)
-                    );
-                    
-                    // Check if the conversation count has changed
-                    const countChanged = currentPhoneNumbers.size !== newPhoneNumbers.size;
-                    
-                    if (hasNewConversations || countChanged || conversationData.length === 0) {
-                      setConversationData(shapedChats);
-                      // Only force refresh if we have new data
-                      refreshConversations(false);
-                    }
-                  }
-                }, [shapedChats, conversationData, refreshConversations]);
-
-                if (!shapedChats?.length) {
-                  return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
-                }
-
-                // Use the conversations from the real-time hook instead of shapedChats
-                // This ensures we get real-time updates
-                const displayChats = conversations.length > 0 ? conversations : shapedChats;
-
-                return displayChats
-                  .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
-                  .map((chat) => (
-                    <div
-                      key={chat.contact_phone}
-                      className={`flex cursor-pointer items-center justify-between border-b border-gray-100 p-4 hover:bg-gray-50 ${
-                        chat.contact_phone === contact_number ? "bg-gray-50" : ""
-                      }`}
-                      onClick={() => handleExistingConversationClick(chat.contact_phone)}
-                    >
-                      <div className="flex items-center">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
-                          <MdChat size={20} />
-                        </div>
-                        <div className="ml-4">
-                          <div className="font-medium">{chat.contact_phone}</div>
-                          <div className="text-sm text-gray-500 line-clamp-1">
-                            {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? 'message' : 'messages'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="text-xs text-gray-500">
-                          {formatDate(chat.conversation_last_update)}
-                        </div>
-                        {chat.unread_count > 0 && (
-                          <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
-                            {chat.unread_count}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ));
               }}
             </Await>
           </Suspense>
@@ -635,7 +667,7 @@ export default function ChatsList() {
           potentialContacts={potentialContacts}
           phoneNumber={phoneNumber}
           contactNumber={contact_number}
-          handlePhoneChange={(e: React.ChangeEvent<HTMLInputElement>) => handlePhoneChange(e.target.value as string)}
+          handlePhoneChange={handlePhoneChange}
           isValid={isValid}
           selectedContact={selectedContact}
           contacts={contacts}

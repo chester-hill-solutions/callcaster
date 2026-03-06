@@ -77,11 +77,19 @@ const handleMachineAnswer = async (
     outreachStatus: OutreachStatusItem[]
 ) => {
     const twiml = new Twilio.twiml.VoiceResponse();
-    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, outreachStatus[0].user_id?.toString() ?? '');
+    const firstOutreachStatus = outreachStatus[0];
+    if (!firstOutreachStatus) {
+        await call.update({ twiml: "<Response><Hangup/></Response>" });
+        return new Response(twiml.toString(), {
+            headers: { 'Content-Type': 'text/xml' }
+        });
+    }
 
-    const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id?.toString() ?? '', status: 'in-progress' });
+    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, firstOutreachStatus.user_id?.toString() ?? '');
+
+    const conferences = await twilio.conferences.list({ friendlyName: firstOutreachStatus.user_id?.toString() ?? '', status: 'in-progress' });
     if (conferences.length) {
-        await triggerAutoDialer(outreachStatus[0].user_id?.toString() ?? '', outreachStatus[0].campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+        await triggerAutoDialer(firstOutreachStatus.user_id?.toString() ?? '', firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
     }
 
     const playTwiml = `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`;
@@ -96,7 +104,7 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
     const twiml = new Twilio.twiml.VoiceResponse();
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
-        await updateOutreachAttempt(dbCall.outreach_attempt_id?.toString() ?? '', { answered_at: new Date().toISOString() });
+        await updateOutreachAttempt(String(dbCall.outreach_attempt_id), { answered_at: new Date().toISOString() });
     }
 
     const dial = twiml.dial();
@@ -149,7 +157,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const callSid = formData.get('CallSid') as string;
     const answeredBy = formData.get('AnsweredBy') as string;
     const callStatus = formData.get('CallStatus') as string;
-    const called = formData.get('Called') as string;
+    const called = (formData.get('Called') ?? "").toString();
 
     let response: Response;
     
@@ -186,7 +194,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
                 }
             } else {
                 //This is a human answer
-                response = await handleHumanAnswer(dbCall, conferenceName, called?.toString() ?? '');
+                response = await handleHumanAnswer(dbCall, conferenceName, called);
             }
         }
     } catch (error) {

@@ -5,7 +5,7 @@ import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const { campaign_id, owner } = await req.json()
     const supabase = createClient(
@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
     const { data, error } = await supabase.rpc("get_campaign_queue", {
-      campaign_id_pro: campaign_id
+      campaign_id_pro: campaign_id,
     });
     if (error || !data) throw error || "No queue found";
     if (!data.length) {
@@ -120,4 +120,8 @@ Deno.serve(async (req) => {
       { headers: { "Content-Type": "application/json" } }
     )
   }
-})
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

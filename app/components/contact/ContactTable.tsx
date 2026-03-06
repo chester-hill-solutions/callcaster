@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useFetcher } from "@remix-run/react";
 import { Trash } from "lucide-react";
 
+import { AudienceContactRow } from "@/components/AudienceContactRow";
 import { Button } from "@/components/ui/button";
-import { AudienceContactRow } from "./AudienceContactRow";
 import { ContactForm } from "./ContactForm";
 import type { Contact } from "@/lib/types";
 import type { Json } from "@/lib/database.types";

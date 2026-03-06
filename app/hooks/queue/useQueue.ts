@@ -79,7 +79,7 @@ export const useQueue = ({
   );
   const [householdMap, setHouseholdMap] = useState(createHouseholdMap(queue));
   const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(() => {
-    return !isPredictive && queue.length > 0 ? queue[0] : null;
+    return !isPredictive && queue.length > 0 ? (queue[0] ?? null) : null;
   });
   
   // Use ref to avoid including nextRecipient in updateQueue dependencies
@@ -168,7 +168,7 @@ export const useQueue = ({
 
   useEffect(() => {
     if (!nextRecipient && queue.length > 0 && !isPredictive) {
-      setNextRecipient(queue[0]);
+      setNextRecipient(queue[0] ?? null);
     }
   }, [queue, nextRecipient, isPredictive]);
 

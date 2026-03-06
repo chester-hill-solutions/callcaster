@@ -10,7 +10,7 @@ type Call = any;
 // Lazy load Twilio SDK only on client side
 const getTwilioSDK = () => {
   if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const SDK = require('@twilio/voice-sdk');
   return { Device: SDK.Device, Call: SDK.Call };
 };

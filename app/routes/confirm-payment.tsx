@@ -3,6 +3,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import Stripe from "stripe";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -34,35 +35,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error("Invalid session metadata");
     }
 
-    // Idempotency: skip insert if this session was already recorded (e.g. user refreshed)
-    const noteContainsSession = `stripe_session:${sessionId}`;
-    const { data: historyRows } = await supabaseClient
-      .from("transaction_history")
-      .select("id, note")
-      .eq("workspace", workspaceId)
-      .eq("type", "CREDIT")
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    const alreadyRecorded = (historyRows ?? []).some(
-      (row) => (row as { note?: string }).note?.includes(noteContainsSession)
-    );
-    if (alreadyRecorded) {
-      return redirect(`/workspaces/${workspaceId}/billing?success=true`);
-    }
-
-    // Create transaction history entry instead of updating credits directly
-    const { error } = await supabaseClient.from("transaction_history").insert({
-      workspace: workspaceId,
-      amount: creditAmount,
+    await insertTransactionHistoryIdempotent({
+      supabase: supabaseClient as any,
+      workspaceId,
       type: "CREDIT",
+      amount: creditAmount,
       note: `Reloaded ${creditAmount} credits, stripe_session:${sessionId}`,
-      created_at: new Date().toISOString(),
-    } as Record<string, unknown>);
-
-    if (error) {
-      throw error;
-    }
+      idempotencyKey: `stripe_session:${sessionId}`,
+    });
 
     return redirect(`/workspaces/${workspaceId}/billing?success=true`);
   } catch (error) {

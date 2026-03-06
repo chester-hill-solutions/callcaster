@@ -1,12 +1,10 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs , json } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useParams } from "@remix-run/react";
-import { json } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
-import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import MessageList from "@/components/sms-ui/ChatMessages";
+import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
@@ -35,7 +33,7 @@ const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const {id, contact_number} = params;
   const { supabaseClient, headers, user } = await verifyAuth(request);
-  let messages = [];
+  const messages = [];
   let normalizedNumber = null;
 
   if (contact_number !== "new") {
@@ -213,31 +211,48 @@ export default function ChatScreen() {
     }
   };
 
-  const { observe, unobserve } = useIntersectionObserver(observerCallback, { threshold: 0.5 });
-
-  // Handle intersection observer setup once
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            observerCallback(entry.target as HTMLElement);
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
-    messageElements.forEach((el) => observe(el));
+    messageElements.forEach((el) => observer.observe(el));
 
     return () => {
-      messageElements.forEach((el) => unobserve(el));
+      observer.disconnect();
     };
-  }, [observe, unobserve]); // Only re-run when observe/unobserve change
+  }, []); // Only set up once
 
   // Handle new message elements
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            observerCallback(entry.target as HTMLElement);
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
     // Only observe new messages
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
     const newMessages = Array.from(messageElements).slice(lastMessageCountRef.current);
     
-    newMessages.forEach((el) => observe(el));
+    newMessages.forEach((el) => observer.observe(el));
     lastMessageCountRef.current = messageElements.length;
 
     return () => {
-      newMessages.forEach((el) => unobserve(el));
+      observer.disconnect();
     };
-  }, [messages, observe, unobserve]);
+  }, [messages]);
 
   // Intelligent scroll handling
   useEffect(() => {
@@ -265,7 +280,7 @@ export default function ChatScreen() {
 
   return (
     <div className="flex h-full flex-col">
-      <MessageList messages={messages} messagesEndRef={messagesEndRef} />
+      <ChatMessages messages={messages.filter(Boolean) as unknown as React.ComponentProps<typeof ChatMessages>["messages"]} messagesEndRef={messagesEndRef} />
     </div>
   );
 }

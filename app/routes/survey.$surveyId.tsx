@@ -9,8 +9,33 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { SurveyQuestionType, SurveyAnswerData, SurveyQuestionWithOptions, ResponseAnswer } from "@/lib/types";
+import { SurveyQuestionType } from "@/lib/types";
 import { useDebounce } from "@/hooks/utils/useDebounce";
+
+type LoaderQuestionOption = {
+  id: number;
+  option_value: string;
+  option_label: string;
+  option_order: number;
+};
+
+type LoaderQuestion = {
+  id: number;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  is_required: boolean;
+  question_option?: LoaderQuestionOption[];
+};
+
+type ExistingAnswerRow = {
+  answer_value: string;
+  survey_question: { question_id: string };
+};
+
+function safeString(value: string | string[]): string {
+  return Array.isArray(value) ? JSON.stringify(value) : value;
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { surveyId } = params;
@@ -84,7 +109,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     if (!responseError && response) {
       existingResponse = response;
       // Convert answers to the format expected by the component
-      existingAnswers = response.response_answer?.reduce((acc: Record<string, string | string[]>, answer: ResponseAnswer & { survey_question: SurveyQuestionWithOptions }) => {
+      existingAnswers = (response.response_answer as ExistingAnswerRow[] | undefined)?.reduce((acc: Record<string, string | string[]>, answer) => {
         const questionId = answer.survey_question.question_id.toString();
         acc[questionId] = answer.answer_value as string | string[];
         return acc;
@@ -114,6 +139,22 @@ export default function SurveyPage() {
   const totalPages = survey.survey_page?.length || 0;
   const progress = totalPages > 0 ? ((currentPageIndex + 1) / totalPages) * 100 : 0;
 
+  // Create a debounced save function for text fields.
+  const debouncedSave = useDebounce((questionId: string, value: string | string[]) => {
+    const formData = new FormData();
+    formData.append("surveyId", survey.survey_id);
+    formData.append("questionId", questionId);
+    formData.append("answerValue", Array.isArray(value) ? JSON.stringify(value) : safeString(value));
+    formData.append("contactId", contact?.id?.toString() || "");
+    formData.append("resultId", resultId);
+    formData.append("pageId", currentPage?.page_id ?? "");
+
+    answerFetcher.submit(formData, {
+      method: "POST",
+      action: "/api/survey-answer",
+    });
+  }, 1000);
+
   // Early return if no current page
   if (!currentPage) {
     return (
@@ -125,22 +166,6 @@ export default function SurveyPage() {
       </div>
     );
   }
-
-  // Create a debounced save function for text fields
-  const debouncedSave = useDebounce((questionId: string, value: string | string[]) => {
-    const formData = new FormData();
-    formData.append("surveyId", survey.survey_id);
-    formData.append("questionId", questionId);
-          formData.append("answerValue", Array.isArray(value) ? JSON.stringify(value) : safeString(value));
-    formData.append("contactId", contact?.id?.toString() || "");
-    formData.append("resultId", resultId);
-    formData.append("pageId", currentPage.page_id);
-
-    answerFetcher.submit(formData, {
-      method: "POST",
-      action: "/api/survey-answer",
-    });
-  }, 1000); // 1 second delay
 
   const handleAnswerChange = (questionId: string, value: string | string[]) => {
     setAnswers(prev => ({
@@ -154,7 +179,7 @@ export default function SurveyPage() {
     }
 
     // Use debounced save for text fields, immediate save for others
-    const currentQuestion = currentPage.survey_question?.find((q: SurveyQuestionWithOptions) => q.question_id === questionId);
+    const currentQuestion = currentPage.survey_question?.find((q) => q.question_id === questionId);
     const isTextField = currentQuestion?.question_type === "text" || currentQuestion?.question_type === "textarea";
     
     debouncedSave(questionId, value);
@@ -189,7 +214,7 @@ export default function SurveyPage() {
     setIsCompleted(true);
   };
 
-  const renderQuestion = (question: SurveyQuestionWithOptions) => {
+  const renderQuestion = (question: LoaderQuestion) => {
     const questionId = question.question_id;
     const currentAnswer = answers[questionId] as string | string[] | undefined;
     
@@ -437,7 +462,7 @@ export default function SurveyPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentPage.survey_question?.map((question: SurveyQuestionWithOptions) => (
+          {currentPage.survey_question?.map((question) => (
             <div key={question.id} className="space-y-4">
               {renderQuestion(question)}
             </div>

@@ -39,7 +39,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { data: dbCall, error: callError } = await serviceSupabase
     .from("call")
-    .select("id, sid, workspace, outreach_attempt_id, status")
+    .select("sid, workspace, outreach_attempt_id, status")
     .eq("sid", callSid)
     .single();
 

@@ -8,6 +8,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { Workspace, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { FileObject } from "@supabase/storage-js";
+import { logger } from "@/lib/logger.server";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
@@ -58,7 +59,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return { audioMedia: mediaWithUrls, error: null };
 }
 
-export default function WorkspaceAudio() {
+export default function WorkspaceVoicemailsPage() {
   const { audioMedia, error} =
     useLoaderData<typeof loader>();
   const {workspace } = useOutletContext<{workspace: Workspace}>();

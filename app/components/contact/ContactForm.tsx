@@ -9,7 +9,7 @@ export interface ContactFormProps {
   handleInputChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   handleSaveContact: (event: React.FormEvent<HTMLFormElement>) => void;
   workspace_id: string;
-  audience_id: string;
+  audience_id: string | null;
 }
 
 export interface ContactFormData {
@@ -20,7 +20,7 @@ export interface ContactFormData {
   email?: string;
   address?: string;
   workspace: string;
-  audience_id: string;
+  audience_id: string | null;
 }
 
 const ContactForm: React.FC<ContactFormProps> = ({
@@ -84,7 +84,7 @@ const ContactForm: React.FC<ContactFormProps> = ({
       className="w-full px-2 py-1"
     />
     <input hidden name="workspace" value={workspace_id} readOnly />
-    <input hidden name="audience_id" value={audience_id} readOnly />
+    <input hidden name="audience_id" value={audience_id ?? ""} readOnly />
     <div className="flex flex-auto justify-end">
       <div>
         <Button type="submit" className="ml-2">

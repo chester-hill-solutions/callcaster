@@ -50,7 +50,7 @@ interface ChatHeaderParams {
   toggleContactMenu: () => void;
   isContactMenuOpen: boolean;
   handleContactSelect: (contact: Contact) => void;
-  dropdownRef: RefObject<HTMLElement | null>;
+  dropdownRef: RefObject<HTMLDivElement | null>;
   searchError?: string;
   existingConversation?: Chat & { phoneNumber?: string; latestMessage?: string; date?: string } | null;
   handleExistingConversationClick: (phoneNumber: string) => void;
@@ -154,7 +154,7 @@ export default function ChatHeader({
             {!existingConversation && allContacts.length > 0 && (
               <div
                 className="relative inline-block text-left"
-                ref={dropdownRef}
+                ref={dropdownRef as React.RefObject<HTMLDivElement>}
               >
                 <button
                   type="button"

@@ -11,9 +11,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const data = await parseRequestData(request);
 
     switch (method) {
-      case 'PATCH':
+      case 'PATCH': {
         const updatedContact = await updateContact(supabaseClient, data);
         return json({ data: updatedContact }, { status: 200 });
+      }
 
       case 'POST':
         if (Array.isArray(data.contacts)) {

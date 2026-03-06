@@ -199,7 +199,7 @@ export class SurveyUtils {
     if (!survey.survey_page || pageIndex < 0 || pageIndex >= survey.survey_page.length) {
       return null;
     }
-    return survey.survey_page[pageIndex];
+    return survey.survey_page[pageIndex] ?? null;
   }
 
   // Safely get total pages count
@@ -258,8 +258,8 @@ export const SurveyValidationRules = {
   
   phone: (value: unknown): boolean => {
     const phone = safeString(value);
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
+    const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+    return phoneRegex.test(phone.replace(/[\s-()]/g, ''));
   },
   
   minLength: (min: number) => (value: unknown): boolean => {

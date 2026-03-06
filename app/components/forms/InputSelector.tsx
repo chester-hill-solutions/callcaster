@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger.client";
@@ -9,13 +9,13 @@ import {
   MdStop,
   MdPlayArrow,
 } from "react-icons/md";
-import DeviceSelector from "./AudioSelector";
+import AudioSelector from "./AudioSelector";
 
 interface InputSelectorProps {
   device: Device;
 }
 
-const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
+export default function InputSelector({ device }: InputSelectorProps) {
   const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -198,7 +198,7 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
 
   return (
     <div className="flex flex-col space-x-2 sm:flex-row sm:items-center">
-      <DeviceSelector
+      <AudioSelector
         devices={inputDevices}
         onDeviceChange={setSelectedDeviceId}
         selectedDeviceId={selectedDeviceId}
@@ -241,6 +241,4 @@ const InputSelector: React.FC<InputSelectorProps> = ({ device }) => {
       </Button>
     </div>
   );
-};
-
-export default InputSelector;
+}

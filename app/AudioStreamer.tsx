@@ -35,11 +35,9 @@ const AudioStreamer = () => {
   };
 
   const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      mediaRecorder.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
-      setIsRecording(false);
-    }
+    mediaRecorder!.stop();
+    mediaRecorder!.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+    setIsRecording(false);
   };
 
   return (

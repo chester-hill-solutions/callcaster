@@ -144,7 +144,7 @@ export function useTwilioConnection({
 
     return () => {
       if (device.state === 'registered') {
-        device.unregister().catch((err) => logger.error('Error unregistering device:', err));
+        device.unregister().catch((err: Error) => logger.error('Error unregistering device:', err));
       }
       device.removeAllListeners('registered');
       device.removeAllListeners('unregistered');

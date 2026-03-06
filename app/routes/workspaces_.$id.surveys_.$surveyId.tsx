@@ -1,5 +1,5 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData , Link } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import type { User, SurveyWithPages } from "@/lib/types";
@@ -19,7 +19,6 @@ import {
   ExternalLink,
   MessageSquare
 } from "lucide-react";
-import { Link } from "@remix-run/react";
 
 // Type-safe interfaces for survey data
 interface SurveyPage {
@@ -275,7 +274,7 @@ export default function SurveyDetailPage() {
                 <p className="text-muted-foreground">No responses yet</p>
               ) : (
                 <div className="space-y-4">
-                  {recentResponses.map((response: SurveyResponse) => (
+                  {recentResponses.map((response) => (
                     <div key={response.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">

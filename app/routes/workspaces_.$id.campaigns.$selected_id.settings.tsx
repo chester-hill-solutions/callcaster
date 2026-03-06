@@ -2,7 +2,7 @@ import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
-import { fetchCampaignAudience, parseActionRequest } from "@/lib/database.server";
+import { fetchCampaignAudience, parseActionRequest , getCampaignTableKey } from "@/lib/database.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger.server";
 import {
@@ -20,7 +20,6 @@ import {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { getCampaignTableKey } from "@/lib/database.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -91,12 +90,12 @@ async function handleCampaignUpdate(
     if (error) throw error;
   } else {
     if (updates["schedule"]) {
-      const parseUpdate = JSON.parse(updates["schedule"])
+      const parseUpdate = JSON.parse(String(updates["schedule"]))
       updates["schedule"] = parseUpdate
     }
     const { error } = await supabaseClient
       .from("campaign")
-      .update(updates)
+      .update(updates as any)
       .eq("id", Number(selected_id));
 
     if (error) throw error;
@@ -110,7 +109,7 @@ async function updateCampaignStatus(
   status: string,
   is_active?: boolean
 ) {
-  let update: { status: string; is_active?: boolean } = { status };
+  const update: { status: string; is_active?: boolean } = { status };
 
   // Use is_active from client if provided, otherwise determine based on status
   if (is_active !== undefined) {
@@ -242,7 +241,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
       await supabaseClient
         .from("campaign")
-        .update(updates)
+        .update(updates as any)
         .eq("id", Number(selected_id));
       return { success: true };
     }
@@ -337,7 +336,7 @@ export default function CampaignSettingsRoute() {
 
   const handleStatusChange = (status: CampaignStatus) => {
     setConfirmStatus("none");
-    let formData: { intent: string; status: CampaignStatus; is_active?: boolean } = { intent: "status", status };
+    const formData: { intent: string; status: CampaignStatus; is_active?: boolean } = { intent: "status", status };
 
     if (status === "running") formData.is_active = true;
     if (status === "paused") formData.is_active = false;
@@ -361,15 +360,19 @@ export default function CampaignSettingsRoute() {
     setConfirmStatus(status);
   };
 
-  const handleInputChange = (name: string, value: string | number | null | undefined) => {
+  const handleInputChange = (name: string, value: unknown) => {
+    const normalizedValue =
+      typeof value === "string" || typeof value === "number" || value == null
+        ? value
+        : String(value);
     if (name === "script_id") {
       // For script selection, we need to update both campaign data and details
       fetcher.submit(
         { 
           intent: "update", 
-          script_id: value?.toString() || "",
-          campaignData: JSON.stringify({ ...campaignData, script_id: value }),
-          campaignDetails: JSON.stringify({ ...campaignDetails, script_id: value })
+          script_id: normalizedValue?.toString() || "",
+          campaignData: JSON.stringify({ ...campaignData, script_id: normalizedValue }),
+          campaignDetails: JSON.stringify({ ...campaignDetails, script_id: normalizedValue })
         },
         { method: "post" }
       );
@@ -378,15 +381,15 @@ export default function CampaignSettingsRoute() {
       fetcher.submit(
         {
           intent: "update",
-          body_text: value?.toString() || "",
+          body_text: normalizedValue?.toString() || "",
           campaignData: JSON.stringify({ ...campaignData}),
-          campaignDetails: JSON.stringify({ ...campaignDetails, body_text: value })
+          campaignDetails: JSON.stringify({ ...campaignDetails, body_text: normalizedValue })
         },
         { method: "post" }
       );
     } else {
       fetcher.submit(
-        { intent: "update", [name]: value?.toString() || "" },
+        { intent: "update", [name]: normalizedValue?.toString() || "" },
         { method: "post" }
       );
     }

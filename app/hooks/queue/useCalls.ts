@@ -53,7 +53,7 @@ type QueueItem = Tables<"campaign_queue"> & { contact: Contact }
  * 
  * // Access recent call
  * if (recentCall) {
- *   console.log('Recent call:', recentCall.id);
+ *   console.log('Recent call:', recentCall.sid);
  * }
  * ```
  */
@@ -81,8 +81,8 @@ export const useCalls = (
       return;
     }
 
-    if (!payload.new.id) {
-      logger.error('Invalid call update payload: payload.new.id is missing');
+    if (!payload.new.sid) {
+      logger.error('Invalid call update payload: payload.new.sid is missing');
       return;
     }
 
@@ -93,11 +93,7 @@ export const useCalls = (
 
     if (attemptId) {
       setCalls((currentCalls) => {
-        const byId = currentCalls.findIndex((c) => c.id === updatedCall.id);
-        const bySid = updatedCall.sid
-          ? currentCalls.findIndex((c) => c.sid === updatedCall.sid)
-          : -1;
-        const idx = byId >= 0 ? byId : bySid;
+        const idx = currentCalls.findIndex((c) => c.sid === updatedCall.sid);
         if (isUpdate && idx >= 0) {
           const next = currentCalls.slice();
           next[idx] = updatedCall;
@@ -106,7 +102,7 @@ export const useCalls = (
         return [...currentCalls, updatedCall];
       });
       setRecentCall((prev) =>
-        prev && (prev.id === updatedCall.id || prev.sid === updatedCall.sid)
+        prev?.sid === updatedCall.sid
           ? updatedCall
           : prev ?? updatedCall
       );
@@ -119,17 +115,13 @@ export const useCalls = (
           setNextRecipient(newRecipient);
           setQuestionContact(newRecipient);
         } else if (currentQueue.length > 0) {
-          setNextRecipient(currentQueue[0]);
-          setQuestionContact(currentQueue[0]);
+          setNextRecipient(currentQueue[0] ?? null);
+          setQuestionContact(currentQueue[0] ?? null);
         }
       }
       } else if (payload.new.contact_id) {
         setCalls((currentCalls) => {
-          const byId = currentCalls.findIndex((c) => c.id === updatedCall.id);
-          const bySid = updatedCall.sid
-            ? currentCalls.findIndex((c) => c.sid === updatedCall.sid)
-            : -1;
-          const idx = byId >= 0 ? byId : bySid;
+          const idx = currentCalls.findIndex((c) => c.sid === updatedCall.sid);
           if (isUpdate && idx >= 0) {
             const next = currentCalls.slice();
             next[idx] = updatedCall;
@@ -146,7 +138,7 @@ export const useCalls = (
 
   useEffect(() => {
     if (!recentCall && callsList.length > 0) {
-      setRecentCall(callsList[callsList.length - 1]);
+      setRecentCall(callsList[callsList.length - 1] ?? null);
     }
   }, [callsList, recentCall]);
 

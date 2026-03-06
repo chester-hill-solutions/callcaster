@@ -2,55 +2,14 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
+  requireWorkspaceAccess,
   safeParseJson,
 } from "../lib/database.server";
-import { processTemplateTags } from "@/lib/utils";
+import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-
-// Link shortening function using TinyURL API
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const shortenedUrl = await response.text();
-      return shortenedUrl;
-    }
-  } catch (error) {
-    logger.error('Error shortening URL:', error);
-  }
-  return url; // Return original URL if shortening fails
-}
-
-// Process URLs in text and shorten them
-async function processUrls(text: string): Promise<string> {
-  // Regex to match URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  
-  let processedText = text;
-  const urlMatches = text.match(urlRegex);
-  
-  if (urlMatches) {
-    for (const url of urlMatches) {
-      const shortenedUrl = await shortenUrl(url);
-      processedText = processedText.replace(url, shortenedUrl);
-    }
-  }
-  
-  return processedText;
-}
-
-const normalizePhoneNumber = (input: string): string => {
-  const cleaned = (input.replace(/[^0-9+]/g, ""))
-    .replace(/^\+?1?(\+|\d{10})$/, "+1$1")
-    .replace(/\+1\+/, "+1");
-
-  if (cleaned.length !== 12) { // +1 plus 10 digits
-    throw new Error("Invalid phone number length");
-  }
-
-  return cleaned;
-};
+import { processUrls } from "@/lib/sms.server";
 
 interface CampaignData {
   body_text: string;
@@ -114,7 +73,7 @@ const sendMessage = async ({
       body: processedBody,
       to,
       from,
-      statusCallback: `${env.BASE_URL()}/api/sms/status`,
+      statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
       ...(media?.length && { mediaUrl: media }),
     }).catch(e => ({ error: e })),
     createOutreachAttempt({
@@ -225,13 +184,58 @@ const createOutreachAttempt = async ({
 };
 
 export const action = async ({ request }: { request: Request }) => {
+  const authResult = await verifyApiKeyOrSession(request);
+  if ("error" in authResult) {
+    return new Response(JSON.stringify({ error: authResult.error }), {
+      headers: { "Content-Type": "application/json" },
+      status: authResult.status,
+    });
+  }
+
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
 
   try {
-    const { campaign_id, workspace_id, caller_id, user_id } = await safeParseJson(request);
+    const {
+      campaign_id,
+      workspace_id,
+      caller_id,
+      user_id,
+    } = await safeParseJson<Record<string, unknown>>(request);
+    if (
+      typeof campaign_id !== "string" ||
+      typeof workspace_id !== "string" ||
+      typeof caller_id !== "string" ||
+      (authResult.authType === "api_key" && typeof user_id !== "string")
+    ) {
+      return new Response(JSON.stringify({ error: "Invalid SMS payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const effectiveUserId =
+      authResult.authType === "api_key" ? user_id : authResult.user.id;
+
+    if (authResult.authType === "api_key") {
+      if (workspace_id !== authResult.workspaceId) {
+        return new Response(
+          JSON.stringify({ error: "workspace_id does not match API key" }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    } else {
+      await requireWorkspaceAccess({
+        supabaseClient: authResult.supabaseClient,
+        user: authResult.user,
+        workspaceId: workspace_id,
+      });
+    }
     
     const [campaign, audience] = await Promise.all([
       getCampaignData({ supabase, campaign_id }),
@@ -275,7 +279,7 @@ export const action = async ({ request }: { request: Request }) => {
             workspace: workspace_id,
             contact_id: member.contact_id,
             queue_id: member.id,
-            user_id,
+            user_id: effectiveUserId as string,
           }).then(
             result => ({ [member.contact_id]: { success: true, ...result }}),
             error => ({ [member.contact_id]: { success: false, error: error.message }})

@@ -6,6 +6,10 @@ import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhook } from "@/twilio.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const supabase = createClient(
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
+  );
   const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
   if (validation instanceof Response) return validation;
   const data = validation.params as Record<string, unknown>;
@@ -67,7 +71,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       logger.error('Contact lookup error:', contactError);
     }
 
-    const messageData = {
+    const firstContactId = contact?.[0]?.id;
+    const messagePayload = {
       sid: data.MessageSid,
       account_sid: data.AccountSid,
       body: data.Body,
@@ -81,12 +86,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       date_sent: now,
       status: "received",
       ...(media.length > 0 && { inbound_media: media }),
-      ...(contact && contact.length > 0 && { contact_id: contact[0].id }),
+      ...(firstContactId != null && { contact_id: firstContactId }),
     };
 
     const { data: message, error: messageError } = await supabase
       .from("message")
-      .insert(messageData)
+      .insert(messagePayload)
       .select();
 
     if ((data.Body as string).toLowerCase() === "stop" || (data.Body as string).toLowerCase() === '"stop"') {

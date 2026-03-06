@@ -72,13 +72,14 @@ const IVRQuestionBlockOption = ({
       <div className="mb-2 flex items-center space-x-2">
         <div className="flex flex-col">
           <p>Input</p>
-          <div
+          <button
+            type="button"
             className="flex h-10 w-[100px] items-center justify-between rounded-md border border-input bg-background bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-transparent [&>span]:line-clamp-1"
             onClick={() => setIsModalOpen(!isModalOpen)}
           >
             {option.value === "vx-any" ? "Voice - Any" : option.value}
             <MdDialpad />
-          </div>
+          </button>
         </div>
         <div className="flex w-full flex-col">
           <p>Next Step</p>

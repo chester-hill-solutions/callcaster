@@ -413,7 +413,7 @@ const createOutreachAttempt = async ({
   return data;
 };
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -515,4 +515,8 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

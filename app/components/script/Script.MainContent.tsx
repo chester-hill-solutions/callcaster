@@ -3,23 +3,23 @@ import { MdRemoveCircleOutline } from "react-icons/md";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/forms/Inputs";
 import MergedQuestionBlock from "@/components/script/ScriptBlock";
-import { Script } from "@/lib/types";
+import { Block, Flow, IVRBlock, Script } from "@/lib/types";
 
 type MainContentProps = {
   script: Script;
-  scriptData: Script["steps"];
+  scriptData: Flow;
   currentPage: string | null;
   openBlock: string | null;
   setOpenBlock: (blockId: string | null) => void;
   handleTitle: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  changeType: (newType: string) => void;
+  changeType: (newType: "script" | "ivr") => void;
   handleSectionNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   removeSection: (id: string) => void;
   removeBlock: (id: string) => void;
   moveBlock: (id: string, direction: number) => void;
   updateBlock: (
     id: string,
-    newBlockData: Partial<Script["steps"]["blocks"][string]>,
+    newBlockData: Partial<Block | IVRBlock>,
   ) => void;
   handleReorder: (
     draggedId: string,
@@ -82,7 +82,7 @@ export default function ScriptMainContent({
                 onChange={handleSectionNameChange}
                 className="mb-4"
               />
-              <Button onClick={() => removeSection(currentPage)} variant="icon">
+              <Button onClick={() => removeSection(currentPage)} variant="ghost" size="icon">
                 <MdRemoveCircleOutline />
               </Button>
             </div>
@@ -91,16 +91,20 @@ export default function ScriptMainContent({
         <div className="flex flex-col gap-2">
           {currentPage &&
             scriptData.pages[currentPage]?.blocks.map((blockId: string) => {
+              const block = scriptData.blocks[blockId];
+              if (!block) {
+                return null;
+              }
               return (
                 <MergedQuestionBlock
                   key={blockId}
-                  type={script.type}
+                  type={script.type === "ivr" ? "ivr" : "script"}
                   pages={scriptData.pages}
                   blocks={scriptData.blocks}
-                  block={scriptData.blocks[blockId] || {}}
+                  block={block}
                   onRemove={() => removeBlock(blockId)}
-                  moveUp={() => moveBlock(blockId, -1)}
-                  moveDown={() => moveBlock(blockId, 1)}
+                  onMoveUp={() => moveBlock(blockId, -1)}
+                  onMoveDown={() => moveBlock(blockId, 1)}
                   onUpdate={(newState) => updateBlock(blockId, newState)}
                   openBlock={openBlock}
                   setOpenBlock={setOpenBlock}

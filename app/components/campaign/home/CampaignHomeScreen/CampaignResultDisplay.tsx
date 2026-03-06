@@ -3,7 +3,6 @@ import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
 import { CampaignState } from "@/routes/workspaces_.$id.campaigns.$selected_id";
 import { Campaign } from "@/lib/types";
-import { logger } from "@/lib/logger.client";
 
 type CampaignResult = {
   disposition: string;
@@ -44,7 +43,6 @@ export const ResultsDisplay = ({
   const isBusy = nav.state !== "idle";
   const totalsByDisposition = getTotalsByDisposition(results);
   const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
-  logger.debug("Campaign results by disposition", totalsByDisposition);
   return campaign?.type === "message" ? (
     <MessageResultsScreen
       totalsByDisposition={totalsByDisposition}

@@ -2,12 +2,41 @@ import { ActionFunction, json } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { validateTwilioWebhook } from "@/twilio.server";
-import { cancelQueuedMessages } from "@/lib/database.server";
+import { cancelQueuedMessagesForCampaign } from "@/lib/database.server";
 import { Database } from "@/lib/database.types";
 import { Campaign, OutreachAttempt } from "@/lib/types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
+
+async function getWorkspaceTwilioAuthToken(args: {
+  supabase: ReturnType<typeof createClient<Database>>;
+  sid: string;
+}): Promise<string> {
+  const { data: messageRecord, error: messageLookupError } = await args.supabase
+    .from("message")
+    .select("workspace")
+    .eq("sid", args.sid)
+    .single();
+
+  if (messageLookupError || !messageRecord?.workspace) {
+    throw new Error("Failed to find message workspace for SMS status webhook");
+  }
+
+  const { data: workspaceRecord, error: workspaceLookupError } = await args.supabase
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", messageRecord.workspace)
+    .single();
+
+  if (workspaceLookupError) {
+    throw new Error("Failed to load workspace Twilio credentials");
+  }
+
+  return workspaceRecord?.twilio_data?.authToken || env.TWILIO_AUTH_TOKEN();
+}
 
 export const action: ActionFunction = async ({ request }) => {
   const supabase = createClient<Database>(
@@ -20,7 +49,22 @@ export const action: ActionFunction = async ({ request }) => {
   );
 
   try {
-    const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
+    const previewFormData = await request.clone().formData();
+    const previewPayload = Object.fromEntries(
+      previewFormData.entries(),
+    ) as Partial<TwilioSmsStatusWebhook>;
+    const previewSid = previewPayload.SmsSid;
+
+    if (!previewSid) {
+      return json({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+    }
+
+    const authToken = await getWorkspaceTwilioAuthToken({
+      supabase,
+      sid: previewSid,
+    });
+
+    const validation = await validateTwilioWebhook(request, authToken);
     if (validation instanceof Response) return validation;
     const payload = validation.params as Partial<TwilioSmsStatusWebhook>;
     const { SmsSid: sid, SmsStatus: status } = payload;
@@ -55,13 +99,16 @@ export const action: ActionFunction = async ({ request }) => {
       messageData?.workspace &&
       (messageStatus === "delivered" || messageStatus === "failed" || messageStatus === "undelivered")
     ) {
-      const { error: transactionError } = await supabase.from("transaction_history").insert({
-        workspace: messageData.workspace,
-        type: "DEBIT",
-        amount: -1,
-        note: `SMS ${sid} ${messageStatus}`,
-      });
-      if (transactionError) {
+      try {
+        await insertTransactionHistoryIdempotent({
+          supabase,
+          workspaceId: messageData.workspace,
+          type: "DEBIT",
+          amount: -1,
+          note: `SMS ${sid} ${messageStatus}`,
+          idempotencyKey: `sms:${sid}`,
+        });
+      } catch (transactionError) {
         logger.error("Failed to create SMS transaction:", transactionError);
       }
     }
@@ -72,13 +119,25 @@ export const action: ActionFunction = async ({ request }) => {
     if (messageData?.outreach_attempt_id) {
       // Use message status as disposition for SMS outreach attempts
       const disposition: OutreachDisposition = messageStatus;
-      
-      const { data: outreachResult, error: outreachError } = await supabase
+
+      const { data: currentAttempt } = await supabase
         .from("outreach_attempt")
-        .update({ disposition })
+        .select("disposition")
         .eq("id", messageData.outreach_attempt_id)
-        .select(`*, campaign(end_date)`)
         .single();
+      const shouldSkip = !shouldUpdateOutreachDisposition({
+        currentDisposition: currentAttempt?.disposition ?? null,
+        nextDisposition: disposition,
+      });
+
+      const { data: outreachResult, error: outreachError } = shouldSkip
+        ? ({ data: null, error: null } as any)
+        : await supabase
+            .from("outreach_attempt")
+            .update({ disposition })
+            .eq("id", messageData.outreach_attempt_id)
+            .select(`*, campaign(end_date)`)
+            .single();
 
       if (outreachError) {
         logger.error("Error updating outreach attempt:", outreachError);
@@ -89,8 +148,16 @@ export const action: ActionFunction = async ({ request }) => {
     }
     if (outreachData && outreachData.campaign?.end_date) {
       const now = new Date();
-      if (outreachData.campaign?.end_date && now > new Date(outreachData.campaign.end_date)) {
-        await cancelQueuedMessages(Twilio, supabase)
+      if (
+        outreachData.campaign?.end_date &&
+        now > new Date(outreachData.campaign.end_date) &&
+        typeof messageData?.campaign_id === "number"
+      ) {
+        await cancelQueuedMessagesForCampaign(
+          twilio,
+          supabase,
+          messageData.campaign_id,
+        );
       }
     }
     logger.debug("Message status update", { messageData });
