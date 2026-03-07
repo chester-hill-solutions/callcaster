@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   getUserRole,
   getWorkspaceInfoWithDetails,
+  getWorkspacePhoneNumbers,
   type WorkspaceInfoWithDetails,
 } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -25,6 +26,10 @@ import CampaignsList from "@/components/campaign/CampaignList";
 import { Campaign, ContextType, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import {
+  deriveWorkspaceMessagingReadiness,
+  getWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -39,6 +44,34 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const userRole = (await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string }))?.role;
   try {
+    const pathname = new URL(request.url).pathname;
+    const [onboarding, phoneNumbersResult] = await Promise.all([
+      getWorkspaceMessagingOnboardingState({
+        supabaseClient,
+        workspaceId: workspaceId as string,
+      }),
+      getWorkspacePhoneNumbers({
+        supabaseClient,
+        workspaceId: workspaceId as string,
+      }),
+    ]);
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding,
+      workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
+        type: number?.type ?? null,
+        phone_number: number?.phone_number ?? null,
+        capabilities: number?.capabilities ?? null,
+      })),
+      recentOutboundCount: 0,
+    });
+    if (
+      pathname === `/workspaces/${workspaceId}` &&
+      (userRole === "owner" || userRole === "admin") &&
+      readiness.shouldRedirectToOnboarding
+    ) {
+      throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
+    }
+
     const workspacePromise = getWorkspaceInfoWithDetails({
       supabaseClient,
       workspaceId,
@@ -48,6 +81,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return defer({
       userRole: userRole,
       workspaceData: workspacePromise,
+      onboardingReadiness: readiness,
       headers
     });
   } catch (error) {
@@ -65,6 +99,7 @@ function WorkspaceResolvedView({
   campaignsListOpen,
   setCampaignsListOpen,
   context,
+  onboardingReadiness,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
@@ -72,6 +107,7 @@ function WorkspaceResolvedView({
   campaignsListOpen: boolean;
   setCampaignsListOpen: Dispatch<SetStateAction<boolean>>;
   context: ContextType;
+  onboardingReadiness: ReturnType<typeof deriveWorkspaceMessagingReadiness>;
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -149,10 +185,27 @@ function WorkspaceResolvedView({
         </div>
         <div className="flex flex-auto flex-col contain-content">
           {!outlet ? (
-            <CampaignEmptyState
-              hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-              type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
-            />
+            <div className="space-y-4">
+              {onboardingReadiness.shouldShowOnboardingBanner ? (
+                <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                  <div className="font-medium">Messaging onboarding still has required steps.</div>
+                  <p className="mt-1">
+                    {onboardingReadiness.warnings.join(" ")}
+                  </p>
+                  {userRole === "admin" || userRole === "owner" ? (
+                    <Button asChild className="mt-3">
+                      <a href={`/workspaces/${workspace.id}/onboarding`}>
+                        Continue onboarding
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <CampaignEmptyState
+                hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
+                type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
+              />
+            </div>
           ) : (
             <Outlet
               context={{
@@ -172,7 +225,7 @@ function WorkspaceResolvedView({
 }
 
 export default function Workspace() {
-  const { workspaceData, userRole } = useLoaderData<typeof loader>();
+  const { workspaceData, userRole, onboardingReadiness } = useLoaderData<typeof loader>();
   const [campaignsListOpen, setCampaignsListOpen] = useState(false);
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
@@ -190,6 +243,7 @@ export default function Workspace() {
                 campaignsListOpen={campaignsListOpen}
                 setCampaignsListOpen={setCampaignsListOpen}
                 context={context}
+                onboardingReadiness={onboardingReadiness}
               />
             );
           }}

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
+    getWorkspaceMessagingOnboardingState: vi.fn(),
     logger: { error: vi.fn() },
     env: { BASE_URL: () => "https://base.example" },
   };
@@ -20,6 +21,9 @@ vi.mock("../app/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+}));
+vi.mock("../app/lib/messaging-onboarding.server", () => ({
+  getWorkspaceMessagingOnboardingState: (...args: any[]) => mocks.getWorkspaceMessagingOnboardingState(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -54,6 +58,20 @@ function makeSupabaseStub(credits: number) {
       if (table === "call") {
         return { upsert };
       }
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { type: "rented", phone_number: "+1555" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
       throw new Error("unexpected table");
     },
     rpc,
@@ -69,7 +87,15 @@ describe("app/routes/api.dial.tsx", () => {
     mocks.safeParseJson.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.getWorkspaceMessagingOnboardingState.mockReset();
     mocks.logger.error.mockReset();
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
+      emergencyVoice: {
+        enabled: false,
+        allowedCallerIdTypes: ["rented"],
+        emergencyEligiblePhoneNumbers: [],
+      },
+    });
   });
 
   test("throws 401 Response when user missing", async () => {
@@ -131,7 +157,7 @@ describe("app/routes/api.dial.tsx", () => {
 
     const mod = await import("../app/routes/api.dial");
     const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
     expect(rpc).not.toHaveBeenCalled(); // outreach_id provided
     expect(upsert).toHaveBeenCalled();
     expect(callsCreate).toHaveBeenCalledWith(
@@ -159,7 +185,7 @@ describe("app/routes/api.dial.tsx", () => {
 
     const mod = await import("../app/routes/api.dial");
     const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
     expect(rpc).toHaveBeenCalledWith("create_outreach_attempt", expect.any(Object));
   });
 
@@ -202,7 +228,7 @@ describe("app/routes/api.dial.tsx", () => {
 
     const mod = await import("../app/routes/api.dial");
     const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    const xml = await res.text();
+    const xml = await (res as Response).text();
     expect(xml).toContain("There was an error placing your call");
     expect(mocks.logger.error).toHaveBeenCalledWith("Error placing call:", expect.any(Error));
   });
@@ -235,7 +261,7 @@ describe("app/routes/api.dial.tsx", () => {
 
   test("throws when create_outreach_attempt rpc errors", async () => {
     const { supabase, rpc } = makeSupabaseStub(10);
-    rpc.mockResolvedValueOnce({ data: null, error: new Error("rpc") });
+    rpc.mockResolvedValueOnce({ data: null, error: new Error("rpc") } as any);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
     mocks.safeParseJson.mockResolvedValueOnce({
       to_number: "+15555550100",
@@ -251,7 +277,7 @@ describe("app/routes/api.dial.tsx", () => {
 
     const mod = await import("../app/routes/api.dial");
     const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    expect(await res.text()).toContain("There was an error placing your call");
+    expect(await (res as Response).text()).toContain("There was an error placing your call");
   });
 
   test("logs when call upsert fails", async () => {
@@ -259,6 +285,20 @@ describe("app/routes/api.dial.tsx", () => {
     supabase.from = (table: string) => {
       if (table === "workspace") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
+      }
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { type: "rented", phone_number: "+1555" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
       }
       if (table === "call") return { upsert: async () => ({ error: new Error("upsert") }) };
       throw new Error("unexpected");
@@ -283,6 +323,56 @@ describe("app/routes/api.dial.tsx", () => {
       "Error saving the call to the database:",
       expect.any(Error),
     );
+  });
+
+  test("blocks emergency-compliant dialing when caller id is not emergency-ready", async () => {
+    const { supabase } = makeSupabaseStub(10);
+    supabase.from = (table: string) => {
+      if (table === "workspace") {
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
+      }
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { type: "caller_id", phone_number: "+1555" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "call") {
+        return { upsert: async () => ({ error: null }) };
+      }
+      throw new Error("unexpected");
+    };
+    mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+      emergencyVoice: {
+        enabled: true,
+        allowedCallerIdTypes: ["rented"],
+        emergencyEligiblePhoneNumbers: ["+1999"],
+      },
+    });
+
+    const mod = await import("../app/routes/api.dial");
+    await expect(
+      mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
+    ).rejects.toMatchObject({ status: 400 });
   });
 });
 

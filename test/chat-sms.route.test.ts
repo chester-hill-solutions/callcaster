@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => {
   return {
     verifyApiKeyOrSession: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
+    getWorkspaceTwilioPortalConfig: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     safeParseJson: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
@@ -17,6 +18,7 @@ vi.mock("@/lib/api-auth.server", () => ({
 }));
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+  getWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.getWorkspaceTwilioPortalConfig(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
@@ -93,11 +95,26 @@ describe("app/routes/api.chat_sms.tsx", () => {
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.getWorkspaceTwilioPortalConfig.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.processTemplateTags.mockClear();
     mocks.env.SUPABASE_URL.mockClear();
     mocks.logger.error.mockReset();
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
+      trafficClass: "unknown",
+      throughputProduct: "none",
+      multiTenancyMode: "none",
+      trafficShapingEnabled: false,
+      defaultMessageIntent: null,
+      sendMode: "from_number",
+      messagingServiceSid: null,
+      onboardingStatus: "not_started",
+      supportNotes: "",
+      updatedAt: null,
+      updatedBy: null,
+      auditTrail: [],
+    });
     vi.unstubAllGlobals();
   });
 
@@ -445,6 +462,73 @@ describe("app/routes/api.chat_sms.tsx", () => {
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }], message: expect.anything() });
     expect(mocks.processTemplateTags).toHaveBeenCalled();
+  });
+
+  test("action uses messaging service mode and message intent overrides", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
+    const supabaseClient = makeSupabaseStub({
+      contactRow: { firstname: "A" },
+      webhookRows: [],
+    });
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM2",
+      body: args.body,
+      direction: "outbound-api",
+      from: null,
+      to: args.to,
+      dateUpdated: new Date().toISOString(),
+      uri: "/x",
+      accountSid: "AC",
+      numMedia: 0,
+      status: "queued",
+      messagingServiceSid: args.messagingServiceSid,
+      dateSent: null,
+      dateCreated: new Date().toISOString(),
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      to_number: "+15551234567",
+      workspace_id: "w1",
+      contact_id: "1",
+      caller_id: "+15551234567",
+      body: "Hello",
+      media: "[]",
+      message_intent: "security",
+      messaging_service_sid: "MGOVERRIDE",
+    });
+    mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValueOnce({
+      trafficClass: "unknown",
+      throughputProduct: "none",
+      multiTenancyMode: "none",
+      trafficShapingEnabled: true,
+      defaultMessageIntent: "notifications",
+      sendMode: "messaging_service",
+      messagingServiceSid: "MGDEFAULT",
+      onboardingStatus: "requested",
+      supportNotes: "",
+      updatedAt: null,
+      updatedBy: null,
+      auditTrail: [],
+    });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      messages: { create },
+    });
+
+    const mod = await import("../app/routes/api.chat_sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(201);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messagingServiceSid: "MGOVERRIDE",
+        messageIntent: "security",
+      }),
+    );
+    expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ from: expect.anything() }));
   });
 
   test("action returns 500 when createWorkspaceTwilioInstance throws", async () => {

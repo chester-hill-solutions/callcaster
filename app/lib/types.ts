@@ -112,7 +112,302 @@ export type WorkspaceWebhook = Tables<"webhook"> | null;
 export type Workspace = Tables<"workspace"> | null;
 export type WorkspaceNumber = Tables<"workspace_number"> | null;
 
-export type TwilioAccountData = AccountInstance | null;
+export const TWILIO_TRAFFIC_CLASS_VALUES = [
+  "a2p10dlc",
+  "toll_free",
+  "short_code",
+  "alphanumeric",
+  "international_long_code",
+  "unknown",
+] as const;
+
+export const TWILIO_THROUGHPUT_PRODUCT_VALUES = [
+  "none",
+  "market_throughput",
+  "account_based_throughput",
+] as const;
+
+export const TWILIO_MULTI_TENANCY_MODE_VALUES = [
+  "none",
+  "even",
+  "weighted",
+] as const;
+
+export const TWILIO_MESSAGE_INTENT_VALUES = [
+  "otp",
+  "notifications",
+  "fraud",
+  "security",
+  "customercare",
+  "delivery",
+  "education",
+  "events",
+  "polling",
+  "announcements",
+  "marketing",
+] as const;
+
+export const TWILIO_SEND_MODE_VALUES = [
+  "from_number",
+  "messaging_service",
+] as const;
+
+export const TWILIO_ONBOARDING_STATUS_VALUES = [
+  "not_started",
+  "planned",
+  "requested",
+  "enabled",
+] as const;
+
+export type TwilioTrafficClass = (typeof TWILIO_TRAFFIC_CLASS_VALUES)[number];
+export type TwilioThroughputProduct = (typeof TWILIO_THROUGHPUT_PRODUCT_VALUES)[number];
+export type TwilioMultiTenancyMode = (typeof TWILIO_MULTI_TENANCY_MODE_VALUES)[number];
+export type TwilioMessageIntent = (typeof TWILIO_MESSAGE_INTENT_VALUES)[number];
+export type TwilioSendMode = (typeof TWILIO_SEND_MODE_VALUES)[number];
+export type TwilioOnboardingStatus = (typeof TWILIO_ONBOARDING_STATUS_VALUES)[number];
+export type WorkspaceTwilioSyncStatus =
+  | "never_synced"
+  | "syncing"
+  | "healthy"
+  | "error";
+
+export interface WorkspaceTwilioOpsAuditEntry {
+  changedAt: string;
+  actorUserId: string | null;
+  actorUsername: string | null;
+  summary: string;
+}
+
+export interface WorkspaceTwilioOpsConfig {
+  trafficClass: TwilioTrafficClass;
+  throughputProduct: TwilioThroughputProduct;
+  multiTenancyMode: TwilioMultiTenancyMode;
+  trafficShapingEnabled: boolean;
+  defaultMessageIntent: TwilioMessageIntent | null;
+  sendMode: TwilioSendMode;
+  messagingServiceSid: string | null;
+  onboardingStatus: TwilioOnboardingStatus;
+  supportNotes: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  auditTrail: WorkspaceTwilioOpsAuditEntry[];
+}
+
+export interface WorkspaceTwilioPortalRecommendation {
+  severity: "info" | "warning";
+  message: string;
+}
+
+export interface WorkspaceTwilioPortalMetrics {
+  recentOutboundCount: number;
+  rawFromCount: number;
+  messagingServiceCount: number;
+  statusCounts: Partial<Record<Database["public"]["Enums"]["message_status"], number>>;
+  numberTypes: string[];
+}
+
+export interface WorkspaceTwilioSyncSnapshot {
+  accountStatus: string | null;
+  accountFriendlyName: string | null;
+  phoneNumberCount: number;
+  numberTypes: string[];
+  recentUsageCount: number;
+  usageTotalPrice: number | null;
+  lastSyncedAt: string | null;
+  lastSyncStatus: WorkspaceTwilioSyncStatus;
+  lastSyncError: string | null;
+}
+
+export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
+  "a2p10dlc",
+  "rcs",
+  "voice_compliance",
+] as const;
+
+export const WORKSPACE_ONBOARDING_STATUS_VALUES = [
+  "not_started",
+  "collecting_business",
+  "provisioning",
+  "submitting",
+  "in_review",
+  "approved",
+  "rejected",
+  "live",
+] as const;
+
+export const WORKSPACE_ONBOARDING_STEP_STATUS_VALUES = [
+  "pending",
+  "in_progress",
+  "complete",
+  "blocked",
+] as const;
+
+export const WORKSPACE_EMERGENCY_ADDRESS_STATUS_VALUES = [
+  "not_started",
+  "pending_validation",
+  "validated",
+  "invalid",
+] as const;
+
+export const WORKSPACE_TWILIO_AUTH_MODE_VALUES = [
+  "auth_token",
+  "api_key",
+  "mixed",
+] as const;
+
+export type WorkspaceOnboardingChannel =
+  (typeof WORKSPACE_ONBOARDING_CHANNEL_VALUES)[number];
+export type WorkspaceOnboardingStatus =
+  (typeof WORKSPACE_ONBOARDING_STATUS_VALUES)[number];
+export type WorkspaceOnboardingStepStatus =
+  (typeof WORKSPACE_ONBOARDING_STEP_STATUS_VALUES)[number];
+export type WorkspaceEmergencyAddressStatus =
+  (typeof WORKSPACE_EMERGENCY_ADDRESS_STATUS_VALUES)[number];
+export type WorkspaceTwilioAuthMode =
+  (typeof WORKSPACE_TWILIO_AUTH_MODE_VALUES)[number];
+
+export interface WorkspaceOnboardingStepState {
+  id: string;
+  label: string;
+  status: WorkspaceOnboardingStepStatus;
+  description: string | null;
+}
+
+export interface WorkspaceMessagingBusinessProfile {
+  legalBusinessName: string;
+  businessType: string;
+  websiteUrl: string;
+  privacyPolicyUrl: string;
+  termsOfServiceUrl: string;
+  supportEmail: string;
+  supportPhone: string;
+  useCaseSummary: string;
+  optInWorkflow: string;
+  optInKeywords: string;
+  optOutKeywords: string;
+  helpKeywords: string;
+  sampleMessages: string[];
+}
+
+export interface WorkspaceMessagingServiceState {
+  desiredSendMode: TwilioSendMode;
+  serviceSid: string | null;
+  friendlyName: string | null;
+  provisioningStatus: WorkspaceOnboardingStatus;
+  attachedSenderPhoneNumbers: string[];
+  supportedChannels: WorkspaceOnboardingChannel[];
+  stickySenderEnabled: boolean;
+  advancedOptOutEnabled: boolean;
+  lastProvisionedAt: string | null;
+  lastError: string | null;
+}
+
+export interface WorkspaceTwilioBootstrapState {
+  status: WorkspaceOnboardingStatus;
+  authMode: WorkspaceTwilioAuthMode;
+  callbackBaseUrl: string | null;
+  inboundVoiceUrl: string | null;
+  inboundSmsUrl: string | null;
+  statusCallbackUrl: string | null;
+  createdResources: string[];
+  featureFlags: string[];
+  driftMessages: string[];
+  lastSyncedAt: string | null;
+  lastError: string | null;
+}
+
+export interface WorkspaceEmergencyAddressState {
+  addressSid: string | null;
+  customerName: string;
+  street: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  countryCode: string;
+  status: WorkspaceEmergencyAddressStatus;
+  validationError: string | null;
+  lastValidatedAt: string | null;
+}
+
+export interface WorkspaceEmergencyVoiceState {
+  status: WorkspaceOnboardingStatus;
+  enabled: boolean;
+  emergencyEligiblePhoneNumbers: string[];
+  ineligibleCallerIds: string[];
+  allowedCallerIdTypes: string[];
+  complianceNotes: string;
+  address: WorkspaceEmergencyAddressState;
+  lastReviewedAt: string | null;
+}
+
+export interface WorkspaceA2POnboardingState {
+  status: WorkspaceOnboardingStatus;
+  brandSid: string | null;
+  campaignSid: string | null;
+  trustProductSid: string | null;
+  customerProfileBundleSid: string | null;
+  brandType: string | null;
+  tcrId: string | null;
+  rejectionReason: string | null;
+  lastSubmittedAt: string | null;
+  lastSyncedAt: string | null;
+}
+
+export interface WorkspaceRcsOnboardingState {
+  status: WorkspaceOnboardingStatus;
+  provider: string | null;
+  agentId: string | null;
+  senderId: string | null;
+  regions: string[];
+  prerequisites: string[];
+  notes: string;
+  lastSubmittedAt: string | null;
+  lastSyncedAt: string | null;
+}
+
+export interface WorkspaceOnboardingReviewState {
+  blockingIssues: string[];
+  lastError: string | null;
+  lastUpdatedAt: string | null;
+}
+
+export interface WorkspaceMessagingOnboardingState {
+  version: number;
+  status: WorkspaceOnboardingStatus;
+  currentStep: string;
+  selectedChannels: WorkspaceOnboardingChannel[];
+  steps: WorkspaceOnboardingStepState[];
+  businessProfile: WorkspaceMessagingBusinessProfile;
+  messagingService: WorkspaceMessagingServiceState;
+  subaccountBootstrap: WorkspaceTwilioBootstrapState;
+  emergencyVoice: WorkspaceEmergencyVoiceState;
+  a2p10dlc: WorkspaceA2POnboardingState;
+  rcs: WorkspaceRcsOnboardingState;
+  reviewState: WorkspaceOnboardingReviewState;
+  lastUpdatedAt: string | null;
+  lastUpdatedBy: string | null;
+}
+
+export interface WorkspaceMessagingReadiness {
+  shouldRedirectToOnboarding: boolean;
+  shouldShowOnboardingBanner: boolean;
+  messagingReady: boolean;
+  voiceReady: boolean;
+  legacyMode: boolean;
+  sendMode: TwilioSendMode;
+  messagingServiceSid: string | null;
+  selectedChannels: WorkspaceOnboardingChannel[];
+  currentStep: string;
+  warnings: string[];
+}
+
+export type TwilioAccountData = (Partial<AccountInstance> & {
+  sid?: string;
+  authToken?: string;
+  portalConfig?: WorkspaceTwilioOpsConfig | null;
+  portalSync?: WorkspaceTwilioSyncSnapshot | null;
+  onboarding?: WorkspaceMessagingOnboardingState | null;
+}) | null;
 
 export enum WorkspaceTableNames {
   Audience = "audiences",

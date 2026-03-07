@@ -16,6 +16,10 @@ interface Capabilities {
   sms: boolean;
   voice: boolean;
   verification_status: string;
+  emergency_address_status: string;
+  emergency_address_sid: string | null;
+  emergency_eligible: boolean;
+  emergency_compliance_status: string;
 }
 
 export const action: ActionFunction = async ({ request }) => {
@@ -34,7 +38,11 @@ export const action: ActionFunction = async ({ request }) => {
         mms: parsedBody.VerificationStatus === 'success',
         sms: parsedBody.VerificationStatus === 'success',
         voice: parsedBody.VerificationStatus === 'success',
-        verification_status: parsedBody.VerificationStatus
+        verification_status: parsedBody.VerificationStatus,
+        emergency_address_status: 'not_started',
+        emergency_address_sid: null,
+        emergency_eligible: false,
+        emergency_compliance_status: 'not_started',
       };
 
       const { data: numberRequest, error: numberError } = await supabase

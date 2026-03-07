@@ -72,6 +72,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             sms: false,
             voice: false,
             verification_status: 'pending',
+            emergency_address_status: 'not_started',
+            emergency_address_sid: null,
+            emergency_eligible: false,
+            emergency_compliance_status: 'not_started',
           },
         },
         {

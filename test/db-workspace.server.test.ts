@@ -44,16 +44,16 @@ describe("app/lib/database/workspace.server.ts", () => {
       const incomingList = vi.fn(async () => [{ sid: "IN1" }]);
 
       const outgoingCallerIds: any = ((sid: string) => ({
-        remove: () => outgoingRemove(sid),
-        update: (p: any) => outgoingUpdate({ sid, ...p }),
+        remove: () => (outgoingRemove as any)(sid),
+        update: (p: any) => (outgoingUpdate as any)({ sid, ...p }),
       })) as any;
-      outgoingCallerIds.list = (q: any) => outgoingList(q);
+      outgoingCallerIds.list = (q: any) => (outgoingList as any)(q);
 
       const incomingPhoneNumbers: any = ((sid: string) => ({
-        remove: () => incomingRemove(sid),
-        update: (p: any) => incomingUpdate({ sid, ...p }),
+        remove: () => (incomingRemove as any)(sid),
+        update: (p: any) => (incomingUpdate as any)({ sid, ...p }),
       })) as any;
-      incomingPhoneNumbers.list = (q: any) => incomingList(q);
+      incomingPhoneNumbers.list = (q: any) => (incomingList as any)(q);
 
       const TwilioCtor: any = function (_sid: string, _token: string) {
         return {
@@ -520,7 +520,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       auth: { verifyOtp: async () => ({ data: null, error: new Error("x") }) },
     };
     const r1 = await mod.handleNewUserOTPVerification(supabaseVerifyErr, "th", "signup" as any, headers);
-    expect((await r1.json()).error).toBeTruthy();
+    expect((await r1.json() as any).error).toBeTruthy();
 
     const supabaseNoSession: any = {
       auth: { verifyOtp: async () => ({ data: { session: null }, error: null }) },
@@ -535,7 +535,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       },
     };
     const r3 = await mod.handleNewUserOTPVerification(supabaseSessionErr, "th", "signup" as any, headers);
-    expect((await r3.json()).error).toBeTruthy();
+    expect((await r3.json() as any).error).toBeTruthy();
 
     const supabaseInviteErr: any = {
       auth: {
@@ -549,7 +549,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     const r4 = await mod.handleNewUserOTPVerification(supabaseInviteErr, "th", "signup" as any, headers);
-    expect((await r4.json()).error).toBeTruthy();
+    expect((await r4.json() as any).error).toBeTruthy();
 
     const supabaseOk: any = {
       auth: {
@@ -951,6 +951,130 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     await mod.fetchConversationSummary(supabase, "w1", "1");
     expect(rpc).toHaveBeenCalledWith("get_conversation_summary_by_campaign", { p_workspace: "w1", campaign_id_prop: 1 });
+  });
+
+  test("portal config prefers onboarding Messaging Service defaults when present", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    const config = mod.getWorkspaceTwilioPortalConfigFromTwilioData({
+      sid: "AC123",
+      authToken: "auth",
+      portalConfig: {
+        trafficClass: "unknown",
+        throughputProduct: "none",
+        multiTenancyMode: "none",
+        trafficShapingEnabled: false,
+        defaultMessageIntent: null,
+        sendMode: "from_number",
+        messagingServiceSid: null,
+        onboardingStatus: "not_started",
+        supportNotes: "",
+        updatedAt: null,
+        updatedBy: null,
+        auditTrail: [],
+      },
+      onboarding: {
+        version: 1,
+        status: "in_review",
+        currentStep: "provider_provisioning",
+        selectedChannels: ["a2p10dlc"],
+        steps: [],
+        businessProfile: {
+          legalBusinessName: "Acme",
+          businessType: "llc",
+          websiteUrl: "https://acme.test",
+          privacyPolicyUrl: "",
+          termsOfServiceUrl: "",
+          supportEmail: "",
+          supportPhone: "",
+          useCaseSummary: "",
+          optInWorkflow: "",
+          optInKeywords: "",
+          optOutKeywords: "",
+          helpKeywords: "",
+          sampleMessages: [],
+        },
+        messagingService: {
+          desiredSendMode: "messaging_service",
+          serviceSid: "MG123",
+          friendlyName: "Acme Messaging",
+          provisioningStatus: "live",
+          attachedSenderPhoneNumbers: [],
+          supportedChannels: ["a2p10dlc"],
+          stickySenderEnabled: true,
+          advancedOptOutEnabled: true,
+          lastProvisionedAt: null,
+          lastError: null,
+        },
+        subaccountBootstrap: {
+          status: "live",
+          authMode: "mixed",
+          callbackBaseUrl: null,
+          inboundVoiceUrl: null,
+          inboundSmsUrl: null,
+          statusCallbackUrl: null,
+          createdResources: [],
+          featureFlags: [],
+          driftMessages: [],
+          lastSyncedAt: null,
+          lastError: null,
+        },
+        emergencyVoice: {
+          status: "not_started",
+          enabled: false,
+          emergencyEligiblePhoneNumbers: [],
+          ineligibleCallerIds: [],
+          allowedCallerIdTypes: ["rented"],
+          complianceNotes: "",
+          address: {
+            addressSid: null,
+            customerName: "",
+            street: "",
+            city: "",
+            region: "",
+            postalCode: "",
+            countryCode: "US",
+            status: "not_started",
+            validationError: null,
+            lastValidatedAt: null,
+          },
+          lastReviewedAt: null,
+        },
+        a2p10dlc: {
+          status: "in_review",
+          brandSid: "BN123",
+          campaignSid: null,
+          trustProductSid: null,
+          customerProfileBundleSid: null,
+          brandType: null,
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+        rcs: {
+          status: "not_started",
+          provider: null,
+          agentId: null,
+          senderId: null,
+          regions: [],
+          prerequisites: [],
+          notes: "",
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+        reviewState: {
+          blockingIssues: [],
+          lastError: null,
+          lastUpdatedAt: null,
+        },
+        lastUpdatedAt: null,
+        lastUpdatedBy: null,
+      },
+    } as any);
+
+    expect(config.sendMode).toBe("messaging_service");
+    expect(config.messagingServiceSid).toBe("MG123");
+    expect(config.onboardingStatus).toBe("requested");
   });
 });
 

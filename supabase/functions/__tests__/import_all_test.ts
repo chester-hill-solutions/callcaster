@@ -23,6 +23,7 @@ const modules = [
   "../sms-status/index.ts",
   "../update_audience_membership/index.ts",
   "../update_queue_by_campaign_audience/index.ts",
+  "../workspace-twilio-sync/index.ts",
 ] as const;
 
 Deno.test(

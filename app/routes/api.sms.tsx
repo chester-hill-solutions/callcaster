@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
+  getWorkspaceTwilioPortalConfig,
   requireWorkspaceAccess,
   safeParseJson,
 } from "../lib/database.server";
@@ -10,6 +11,7 @@ import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { processUrls } from "@/lib/sms.server";
+import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 interface CampaignData {
   body_text: string;
@@ -45,6 +47,49 @@ interface SendMessageParams {
   contact_id: string | number;
   queue_id: number | string;
   user_id: string;
+  portalConfig: WorkspaceTwilioOpsConfig;
+  messageIntent?: TwilioMessageIntent | null;
+  messagingServiceSid?: string | null;
+}
+
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function resolveSmsRequest({
+  body,
+  to,
+  from,
+  media,
+  portalConfig,
+  messageIntent,
+  messagingServiceSid,
+}: {
+  body: string;
+  to: string;
+  from: string;
+  media: string[];
+  portalConfig: WorkspaceTwilioOpsConfig;
+  messageIntent?: TwilioMessageIntent | null;
+  messagingServiceSid?: string | null;
+}) {
+  const resolvedMessagingServiceSid =
+    messagingServiceSid ??
+    (portalConfig.sendMode === "messaging_service"
+      ? portalConfig.messagingServiceSid
+      : null);
+  const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+
+  return {
+    body,
+    to,
+    statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+    ...(media?.length && { mediaUrl: media }),
+    ...(resolvedMessagingServiceSid
+      ? { messagingServiceSid: resolvedMessagingServiceSid }
+      : { from }),
+    ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
+  };
 }
 
 const sendMessage = async ({
@@ -58,6 +103,9 @@ const sendMessage = async ({
   contact_id,
   queue_id,
   user_id,
+  portalConfig,
+  messageIntent,
+  messagingServiceSid,
 }: SendMessageParams) => {
   
   const twilio = await createWorkspaceTwilioInstance({
@@ -69,13 +117,19 @@ const sendMessage = async ({
   const processedBody = await processUrls(body);
 
   const [message, outreachAttempt] = await Promise.all([
-    twilio.messages.create({
-      body: processedBody,
-      to,
-      from,
-      statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
-      ...(media?.length && { mediaUrl: media }),
-    }).catch(e => ({ error: e })),
+    twilio.messages
+      .create(
+        resolveSmsRequest({
+          body: processedBody,
+          to,
+          from,
+          media,
+          portalConfig,
+          messageIntent,
+          messagingServiceSid,
+        }),
+      )
+      .catch(e => ({ error: e })),
     createOutreachAttempt({
       supabase,
       contact_id,
@@ -202,6 +256,8 @@ export const action = async ({ request }: { request: Request }) => {
       campaign_id,
       workspace_id,
       caller_id,
+      message_intent,
+      messaging_service_sid,
       user_id,
     } = await safeParseJson<Record<string, unknown>>(request);
     if (
@@ -218,6 +274,12 @@ export const action = async ({ request }: { request: Request }) => {
 
     const effectiveUserId =
       authResult.authType === "api_key" ? user_id : authResult.user.id;
+
+    const messageIntent =
+      typeof message_intent === "string" && message_intent.trim()
+        ? (message_intent.trim() as TwilioMessageIntent)
+        : null;
+    const messagingServiceSid = parseOptionalString(messaging_service_sid);
 
     if (authResult.authType === "api_key") {
       if (workspace_id !== authResult.workspaceId) {
@@ -237,12 +299,16 @@ export const action = async ({ request }: { request: Request }) => {
       });
     }
     
-    const [campaign, audience] = await Promise.all([
+    const [campaign, audience, portalConfig] = await Promise.all([
       getCampaignData({ supabase, campaign_id }),
       getCampaignQueueById({
         supabaseClient: supabase,
         campaign_id,
-      })
+      }),
+      getWorkspaceTwilioPortalConfig({
+        supabaseClient: supabase,
+        workspaceId: workspace_id,
+      }),
     ]);
 
     const media = campaign.message_media?.length 
@@ -280,6 +346,9 @@ export const action = async ({ request }: { request: Request }) => {
             contact_id: member.contact_id,
             queue_id: member.id,
             user_id: effectiveUserId as string,
+            portalConfig,
+            messageIntent,
+            messagingServiceSid,
           }).then(
             result => ({ [member.contact_id]: { success: true, ...result }}),
             error => ({ [member.contact_id]: { success: false, error: error.message }})

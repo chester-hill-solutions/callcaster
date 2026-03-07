@@ -1,6 +1,7 @@
 import { MdAddAPhoto , MdTag } from "react-icons/md";
 import { Suspense, useRef, useState, useCallback, useEffect } from "react";
 import { Await, Form, useSubmit } from "@remix-run/react";
+import { getSmsSegmentInfo } from "@/lib/sms-segments";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -51,6 +52,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     const [showTemplateTags, setShowTemplateTags] = useState(false);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const segmentInfo = getSmsSegmentInfo(displayText);
     const FUNCTION_EXAMPLES = [
         {
             label: 'Base64 encode phone and external ID',
@@ -271,13 +273,16 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {(details.body_text?.length || 0) % 140} /{" "}
-                                    {Math.max(1, Math.ceil(((details.body_text?.length || 0) / 140))) * 140}{" "}
-                                    character{details.body_text?.length !== 1 && 's'}
+                                    {segmentInfo.unitsUsedInCurrentSegment} / {segmentInfo.unitsPerSegment}{" "}
+                                    {segmentInfo.encoding === "GSM-7" ? "units" : "characters"} used
                                 </div>
                                 <div>
-                                    {Math.ceil((details.body_text?.length || 0) / 140)} part
-                                    {(Math.ceil((details.body_text?.length || 0) / 140)) !== 1 && 's'}
+                                    {segmentInfo.segmentCount} segment
+                                    {segmentInfo.segmentCount !== 1 && 's'} ({segmentInfo.encoding})
+                                </div>
+                                <div>
+                                    {segmentInfo.totalCharacters} visible character
+                                    {segmentInfo.totalCharacters !== 1 && 's'}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">

@@ -79,6 +79,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const workspaceId = params.workspaceId;
   if (!workspaceId) throw new Error("No workspace id found!");
   const userId = user.id;
+
+  const { data: userData } = await supabaseClient
+    .from("user")
+    .select("access_level")
+    .eq("id", userId)
+    .single();
   
   // Check if user is admin
   const { data: userRoleData } = await supabaseClient
@@ -88,7 +94,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .eq("user_id", userId)
     .single();
 
-  if (!userRoleData || userRoleData.role !== "admin") {
+  const hasSudoAccess = userData?.access_level === "sudo";
+  const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
+
+  if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
     return json({ error: "Unauthorized" }, { status: 403, headers });
   }
 
@@ -175,6 +184,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return json({ error: "No workspace_id found!" }, { headers });
   }
 
+  const { data: userData } = await supabaseClient
+    .from("user")
+    .select("access_level")
+    .eq("id", user?.id)
+    .single();
+
   // Check if user is admin
   const { data: userRoleData } = await supabaseClient
     .from("workspace_users")
@@ -183,7 +198,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .eq("user_id", user?.id)
     .single();
 
-  if (!userRoleData || userRoleData.role !== "admin") {
+  const hasSudoAccess = userData?.access_level === "sudo";
+  const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
+
+  if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
     return json({ error: "Unauthorized" }, { status: 403, headers });
   }
 

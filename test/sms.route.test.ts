@@ -1,6 +1,20 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 let currentSupabase: any = null;
+const defaultPortalConfig = {
+  trafficClass: "unknown",
+  throughputProduct: "none",
+  multiTenancyMode: "none",
+  trafficShapingEnabled: false,
+  defaultMessageIntent: null,
+  sendMode: "from_number",
+  messagingServiceSid: null,
+  onboardingStatus: "not_started",
+  supportNotes: "",
+  updatedAt: null,
+  updatedBy: null,
+  auditTrail: [],
+};
 
 const mocks = vi.hoisted(() => {
   return {
@@ -8,6 +22,7 @@ const mocks = vi.hoisted(() => {
     verifyApiKeyOrSession: vi.fn(),
     safeParseJson: vi.fn(),
     getCampaignQueueById: vi.fn(),
+    getWorkspaceTwilioPortalConfig: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     processTemplateTags: vi.fn((text: string) => text),
@@ -30,6 +45,7 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("../app/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
   getCampaignQueueById: (...args: any[]) => mocks.getCampaignQueueById(...args),
+  getWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.getWorkspaceTwilioPortalConfig(...args),
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
@@ -124,6 +140,7 @@ describe("app/routes/api.sms.tsx", () => {
     mocks.verifyApiKeyOrSession.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.getCampaignQueueById.mockReset();
+    mocks.getWorkspaceTwilioPortalConfig.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.processTemplateTags.mockReset();
@@ -134,6 +151,7 @@ describe("app/routes/api.sms.tsx", () => {
       workspaceId: "w1",
       supabase: {},
     });
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
 
     (globalThis as any).fetch = vi.fn(async () => ({ ok: true, text: async () => "http://tiny" }));
   });
@@ -416,6 +434,63 @@ describe("app/routes/api.sms.tsx", () => {
     expect(res.status).toBe(200);
     expect(inserted[0].sid).toBe("failed-+15551234567-123");
     (Date.now as any).mockRestore?.();
+  });
+
+  test("uses messaging service and explicit message intent overrides", async () => {
+    currentSupabase = makeSupabase({
+      campaign: { body_text: "Priority update", message_media: [], campaign: { end_time: new Date().toISOString() } },
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c10",
+      workspace_id: "w1",
+      caller_id: "+15551234567",
+      user_id: "u1",
+      message_intent: "fraud",
+      messaging_service_sid: "MGOVERRIDE",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 19, contact_id: 11, contact: { phone: "+15551234567" } },
+    ]);
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValueOnce({
+      ...defaultPortalConfig,
+      sendMode: "messaging_service",
+      messagingServiceSid: "MGDEFAULT",
+      defaultMessageIntent: "notifications",
+    });
+
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM10",
+      body: args.body,
+      numSegments: 1,
+      direction: "outbound-api",
+      from: null,
+      to: args.to,
+      dateUpdated: "x",
+      price: "0",
+      errorMessage: null,
+      accountSid: "AC",
+      uri: "/",
+      numMedia: "0",
+      status: "queued",
+      messagingServiceSid: args.messagingServiceSid,
+      dateSent: "x",
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messagingServiceSid: "MGOVERRIDE",
+        messageIntent: "fraud",
+      }),
+    );
+    expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ from: expect.anything() }));
   });
 
   test("campaign fetch error returns 500", async () => {

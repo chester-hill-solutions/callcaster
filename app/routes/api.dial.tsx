@@ -6,6 +6,7 @@ import type { TablesInsert, Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 
 interface DialRequest {
   to_number: string;
@@ -54,6 +55,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (credits <= 0) {
         return {
             creditsError: true,
+        }
+    }
+    const [{ data: callerIdRecord }, onboarding] = await Promise.all([
+        supabase
+            .from("workspace_number")
+            .select("type, phone_number")
+            .eq("workspace", workspace_id)
+            .eq("phone_number", caller_id)
+            .maybeSingle(),
+        getWorkspaceMessagingOnboardingState({
+            supabaseClient: supabase as any,
+            workspaceId: workspace_id,
+        }),
+    ]);
+    if (onboarding.emergencyVoice.enabled) {
+        if (!callerIdRecord) {
+            throw new Response("Caller ID must be a workspace number for emergency-compliant voice.", { status: 400 });
+        }
+        if (!onboarding.emergencyVoice.allowedCallerIdTypes.includes(callerIdRecord.type ?? "")) {
+            throw new Response("Selected caller ID is not eligible for emergency-compliant voice.", { status: 400 });
+        }
+        if (
+            callerIdRecord.phone_number &&
+            !onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.includes(callerIdRecord.phone_number)
+        ) {
+            throw new Response("Selected caller ID is not marked as emergency-ready.", { status: 400 });
         }
     }
     const to = normalizePhoneNumber(to_number)

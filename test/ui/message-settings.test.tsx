@@ -279,7 +279,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(mocks.submit).toHaveBeenCalled();
   });
 
-  test("character and parts text handle singular/plural branches (details.body_text length)", async () => {
+  test("shows real GSM-7 segment usage and visible character counts", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props1 = baseProps({
@@ -287,25 +287,34 @@ describe("app/components/MessageSettings.tsx", () => {
       details: { ...baseProps().details, message_media: [], body_text: "a" },
     });
     const { unmount } = render(<MessageSettings {...props1} />);
-    expect(screen.getByText(/character$/)).toBeInTheDocument(); // singular
-    expect(screen.getByText(/1 part$/)).toBeInTheDocument();
+    expect(screen.getByText("1 / 160 units used")).toBeInTheDocument();
+    expect(screen.getByText("1 segment (GSM-7)")).toBeInTheDocument();
+    expect(screen.getByText("1 visible character")).toBeInTheDocument();
 
     unmount();
     const props2 = baseProps({
       mediaLinks: [],
-      details: { ...baseProps().details, message_media: [], body_text: "ab" },
+      details: { ...baseProps().details, message_media: [], body_text: "^".repeat(81) },
     });
     const r2 = render(<MessageSettings {...props2} />);
-    expect(screen.getByText(/characters$/)).toBeInTheDocument(); // plural
-    expect(screen.getByText(/1 part$/)).toBeInTheDocument();
+    expect(screen.getByText("9 / 153 units used")).toBeInTheDocument();
+    expect(screen.getByText("2 segments (GSM-7)")).toBeInTheDocument();
+    expect(screen.getByText("81 visible characters")).toBeInTheDocument();
 
     r2.unmount();
+  });
+
+  test("switches to unicode segment limits when the message contains emoji", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+
     const props3 = baseProps({
       mediaLinks: [],
-      details: { ...baseProps().details, message_media: [], body_text: "x".repeat(141) },
+      details: { ...baseProps().details, message_media: [], body_text: "🔥".repeat(71) },
     });
     render(<MessageSettings {...props3} />);
-    expect(screen.getByText(/2 parts$/)).toBeInTheDocument();
+    expect(screen.getByText("4 / 67 characters used")).toBeInTheDocument();
+    expect(screen.getByText("2 segments (UCS-2)")).toBeInTheDocument();
+    expect(screen.getByText("71 visible characters")).toBeInTheDocument();
   });
 });
 
