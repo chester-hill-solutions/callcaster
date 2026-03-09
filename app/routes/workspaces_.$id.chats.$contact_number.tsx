@@ -9,9 +9,19 @@ import MessageList from "~/components/Chat/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "~/lib/types";
 import { normalizePhoneNumber } from "~/lib/utils";
 
-const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
+type ChatMessage = NonNullable<Message> & {
+  signedUrls?: (string | undefined)[];
+};
+
+const getMessageMedia = async ({
+  messages,
+  supabaseClient,
+}: {
+  messages: ChatMessage[];
+  supabaseClient: SupabaseClient;
+}) => {
   return Promise.all(
-    (messages ?? []).map(async (message: Message) => {
+    (messages ?? []).map(async (message: ChatMessage) => {
       const inboundMedia = message?.inbound_media ?? [];
       if (inboundMedia.filter(Boolean).length > 0) {
         const urls = await Promise.all(
@@ -30,10 +40,36 @@ const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message
   );
 };
 
+function dedupeMessagesBySid(messages: ChatMessage[]) {
+  const dedupedMessages = new Map<string, ChatMessage>();
+
+  for (const message of messages) {
+    if (!message?.sid) {
+      continue;
+    }
+
+    const existingMessage = dedupedMessages.get(message.sid);
+    if (
+      !existingMessage ||
+      new Date(message.date_created || 0).getTime() >=
+        new Date(existingMessage.date_created || 0).getTime()
+    ) {
+      dedupedMessages.set(message.sid, message);
+    }
+  }
+
+  return Array.from(dedupedMessages.values()).sort((a, b) => {
+    return (
+      new Date(a.date_created || 0).getTime() -
+      new Date(b.date_created || 0).getTime()
+    );
+  });
+}
+
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const {id, contact_number} = params;
   const { supabaseClient, headers, user } = await verifyAuth(request);
-  let messages = [];
+  let messages: ChatMessage[] = [];
   let normalizedNumber = null;
 
   if (contact_number !== "new") {
@@ -56,7 +92,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       } else {
         messages.push(
           ...(await getMessageMedia({
-            messages: messagesData as Message[],
+            messages: (messagesData ?? []) as ChatMessage[],
             supabaseClient,
           })),
         );
@@ -76,12 +112,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       if (!messagesError) {
         messages.push(
           ...(await getMessageMedia({
-            messages: messagesData as Message[],
+            messages: (messagesData ?? []) as ChatMessage[],
             supabaseClient,
           })),
         );
       }
     }
+
+    messages = dedupeMessagesBySid(messages);
 
     // Mark messages as read on the server side when loading the conversation
     if (normalizedNumber) {
@@ -110,7 +148,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function ChatScreen() {
   const { supabase, workspace, workspaceNumbers } = useOutletContext<{ supabase: SupabaseClient, workspace: NonNullable<Workspace>, workspaceNumbers: WorkspaceNumber[] }>();
-  const { messages: initialMessages, contact_number: loaderContactNumber } = useLoaderData<{ messages: Message[], contact_number: string }>();
+  const { messages: initialMessages, contact_number: loaderContactNumber } = useLoaderData<{ messages: ChatMessage[], contact_number: string }>();
   const { contact_number: paramContactNumber } = useParams();
   
   // Use the contact number from the loader (which might be normalized) or fall back to the param

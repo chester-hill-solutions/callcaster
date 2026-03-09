@@ -131,7 +131,7 @@ const sendMessage = async ({
   await Promise.all([
     supabase
       .from("message")
-      .insert({
+      .upsert({
         sid: message.sid || `failed-${to}-${Date.now()}`,
         body: message.body,
         num_segments: message.numSegments,
@@ -154,7 +154,7 @@ const sendMessage = async ({
         campaign_id,
         workspace,
         contact_id,
-      })
+      }, { onConflict: "sid" })
       .select(),
     
     updateOutreach({

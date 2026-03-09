@@ -5,6 +5,9 @@ import type { Database } from "~/lib/database.types";
 import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
+type ChatMessage = NonNullable<Message> & {
+  signedUrls?: (string | undefined)[];
+};
 
 // Helper function to normalize phone numbers for comparison
 function normalizePhoneForComparison(phone: string | null): string | null {
@@ -40,11 +43,11 @@ export const useChatRealTime = ({
   contact_number,
 }: {
   supabase: SupabaseClient<Database>;
-  initial: Message[];
+  initial: ChatMessage[];
   workspace: string;
   contact_number?: string;
 }) => {
-  const [messages, setMessages] = useState<Message[]>(initial);
+  const [messages, setMessages] = useState<ChatMessage[]>(initial);
   const initialRef = useRef(initial);
   const messageIdsRef = useRef(new Set(initial.map(msg => msg?.sid)));
   const contactNumberRef = useRef(contact_number);
@@ -77,7 +80,7 @@ export const useChatRealTime = ({
       }
       
       setMessages((curr) => {
-        const newMessage = payload.new as Message;
+        const newMessage = payload.new as ChatMessage;
         if (!newMessage?.sid || messageIdsRef.current.has(newMessage.sid)) {
           return curr;
         }
@@ -102,189 +105,124 @@ export const useConversationSummaryRealTime = ({
   initial,
   workspace,
   activeContactNumber,
+  campaignId,
+  hasInboundOnly = false,
 }: {
   supabase: SupabaseClient<Database>;
   initial: ConversationSummary[];
   workspace: string;
   activeContactNumber?: string; // Add this to track the active conversation
+  campaignId?: string | null;
+  hasInboundOnly?: boolean;
 }) => {
-  const [conversations, setConversations] = useState<ConversationSummary[]>(initial);
-  const initialRef = useRef(initial);
-  const isFetchingRef = useRef(false);
-  const phoneNumbersRef = useRef(new Set(initial.map(conv => conv.contact_phone)));
+  const [conversations, setConversations] = useState<ConversationSummary[]>(
+    () => sortConversations(initial),
+  );
   const activeContactRef = useRef(activeContactNumber);
-  const lastUpdateTimeRef = useRef<number>(Date.now());
+  const campaignIdRef = useRef(campaignId);
+  const hasInboundOnlyRef = useRef(hasInboundOnly);
   
   // Update active contact ref when it changes
   useEffect(() => {
     activeContactRef.current = activeContactNumber;
   }, [activeContactNumber]);
 
-  // Fetch conversation summary with debouncing to prevent excessive calls
-  const fetchConversationSummary = useCallback(async (force = false) => {
-    // Debounce fetches to prevent excessive calls (only fetch every 2 seconds unless forced)
-    const now = Date.now();
-    if (!force && now - lastUpdateTimeRef.current < 2000) {
-      return;
-    }
-    
-    if (isFetchingRef.current) return;
-    
-    isFetchingRef.current = true;
-    lastUpdateTimeRef.current = now;
-    
-    try {
-      const { data, error } = await supabase.rpc("get_conversation_summary", {
-        p_workspace: workspace,
-      });
-      if (error) {
-        console.error("Error fetching conversation summary:", error);
-        return;
-      }
-      if (data) {
-        const filteredData = data.filter((item): item is ConversationSummary => item !== null);
-        
-        // Process the data to update unread counts
-        const processedData = filteredData.map(conv => {
-          // If this is the active conversation, we can assume messages are being read
-          if (activeContactRef.current && 
-              phoneNumbersMatch(conv.contact_phone, activeContactRef.current)) {
-            return {
-              ...conv,
-              unread_count: 0 // Mark as read for the active conversation
-            };
-          }
-          return conv;
-        });
-        
-        // Sort conversations by most recent first
-        processedData.sort((a, b) => {
-          return new Date(b.conversation_last_update).getTime() - 
-                 new Date(a.conversation_last_update).getTime();
-        });
-        
-        setConversations(processedData);
-        
-        // Update the phone numbers set for future comparisons
-        phoneNumbersRef.current = new Set(processedData.map(conv => conv.contact_phone));
-      }
-    } finally {
-      isFetchingRef.current = false;
-    }
-  }, [supabase, workspace]);
+  useEffect(() => {
+    campaignIdRef.current = campaignId;
+  }, [campaignId]);
+
+  useEffect(() => {
+    hasInboundOnlyRef.current = hasInboundOnly;
+  }, [hasInboundOnly]);
 
   // Update conversations when initial data changes
   useEffect(() => {
-    const newPhoneNumbers = new Set(initial.map(conv => conv.contact_phone));
-    if (!setsAreEqual(phoneNumbersRef.current, newPhoneNumbers) || initial.length !== conversations.length) {
-      phoneNumbersRef.current = newPhoneNumbers;
-      initialRef.current = initial;
-      
-      // Sort by most recent first
-      const sortedConversations = [...initial].sort((a, b) => {
-        return new Date(b.conversation_last_update).getTime() - 
-               new Date(a.conversation_last_update).getTime();
-      });
-      
-      setConversations(sortedConversations);
-    }
-  }, [initial, conversations.length]);
+    const sortedConversations = sortConversations(initial);
+    setConversations(sortedConversations);
+  }, [initial]);
 
   // Handle new messages and message status changes
-  const handleMessageChange = useCallback(async (payload: any) => {
+  const handleMessageChange = useCallback((payload: any) => {
     if (payload.new?.workspace === workspace) {
-      // For new messages, we need to update unread counts
-      if (payload.new.status === "received") {
-        // Check if this is for the active contact
-        const isForActiveContact = activeContactRef.current && 
-          (phoneNumbersMatch(payload.new.from, activeContactRef.current) || 
-           phoneNumbersMatch(payload.new.to, activeContactRef.current));
-        
-        // If it's not for the active contact, we need to increment unread count
-        if (!isForActiveContact) {
-          // Find the conversation for this contact
-          setConversations(prevConversations => {
-            // Determine the contact phone number (the one that's not a workspace number)
-            const contactPhone = payload.new.direction === 'inbound' ? payload.new.from : payload.new.to;
-            
-            // Check if we already have a conversation for this contact
-            const existingConversationIndex = prevConversations.findIndex(conv => 
-              phoneNumbersMatch(conv.contact_phone, contactPhone)
-            );
-            
-            if (existingConversationIndex >= 0) {
-              // Update existing conversation
-              const updatedConversations = [...prevConversations];
-              updatedConversations[existingConversationIndex] = {
-                ...updatedConversations[existingConversationIndex],
-                unread_count: updatedConversations[existingConversationIndex].unread_count + 1,
-                conversation_last_update: payload.new.date_created || new Date().toISOString(),
-                message_count: updatedConversations[existingConversationIndex].message_count + 1
-              };
-              return updatedConversations;
-            } else {
-              // Create a new conversation entry
-              const newConversation: ConversationSummary = {
-                contact_phone: contactPhone,
-                user_phone: payload.new.direction === 'inbound' ? payload.new.to : payload.new.from,
-                conversation_start: payload.new.date_created || new Date().toISOString(),
-                conversation_last_update: payload.new.date_created || new Date().toISOString(),
-                message_count: 1,
-                unread_count: 1,
-                contact_firstname: '',  // We don't have this info yet
-                contact_surname: ''     // We don't have this info yet
-              };
-              
-              // Add the new conversation and sort by most recent
-              const updatedConversations = [...prevConversations, newConversation].sort((a, b) => {
-                return new Date(b.conversation_last_update).getTime() - 
-                       new Date(a.conversation_last_update).getTime();
-              });
-              
-              return updatedConversations;
-            }
-          });
+      if (payload.new.status === "failed") {
+        return;
+      }
+
+      const contactPhone =
+        payload.new.direction === "inbound" ? payload.new.from : payload.new.to;
+      const userPhone =
+        payload.new.direction === "inbound" ? payload.new.to : payload.new.from;
+
+      if (!contactPhone || !userPhone) {
+        return;
+      }
+
+      const isForActiveContact =
+        activeContactRef.current &&
+        (phoneNumbersMatch(contactPhone, activeContactRef.current) ||
+          phoneNumbersMatch(userPhone, activeContactRef.current));
+
+      setConversations((prevConversations) => {
+        const existingConversationIndex = prevConversations.findIndex((conv) =>
+          phoneNumbersMatch(conv.contact_phone, contactPhone),
+        );
+        const matchesCampaign = campaignIdRef.current
+          ? String(payload.new.campaign_id ?? "") === campaignIdRef.current
+          : true;
+        const matchesInboundFilter =
+          !hasInboundOnlyRef.current || payload.new.direction === "inbound";
+
+        if (existingConversationIndex === -1 && (!matchesCampaign || !matchesInboundFilter)) {
+          return prevConversations;
         }
-      }
-      
-      // For status changes, refresh the conversation summary
-      if (payload.new.status === "delivered" || payload.new.status === "read") {
-        // For delivered/read status, we need to update unread counts
-        setConversations(prevConversations => {
-          return prevConversations.map(conv => {
-            // Check if this message is from/to this conversation's contact
-            if (phoneNumbersMatch(conv.contact_phone, payload.new.from) || 
-                phoneNumbersMatch(conv.contact_phone, payload.new.to)) {
-              // Decrement unread count (but not below 0)
-              return {
-                ...conv,
-                unread_count: Math.max(0, conv.unread_count - 1)
-              };
-            }
-            return conv;
-          });
-        });
-      }
-      
-      // Store the last time we received a message change
-      lastUpdateTimeRef.current = Date.now();
-      
-      // Clear any existing timeout to prevent multiple calls
-      if ((handleMessageChange as any).timeoutId) {
-        clearTimeout((handleMessageChange as any).timeoutId);
-      }
-      
-      // Use a longer delay to allow multiple messages to be processed together
-      // and prevent excessive refreshes
-      (handleMessageChange as any).timeoutId = setTimeout(() => {
-        // Only fetch if it's been at least 2 seconds since the last fetch
-        const now = Date.now();
-        if (now - lastUpdateTimeRef.current >= 2000) {
-          fetchConversationSummary();
+
+        if (existingConversationIndex >= 0) {
+          const updatedConversations = [...prevConversations];
+          const existingConversation =
+            updatedConversations[existingConversationIndex];
+          const isNewMessage = payload.eventType === "INSERT";
+          const unreadIncrement =
+            isNewMessage &&
+            payload.new.status === "received" &&
+            !isForActiveContact
+              ? 1
+              : 0;
+
+          updatedConversations[existingConversationIndex] = {
+            ...existingConversation,
+            user_phone: existingConversation.user_phone || userPhone,
+            conversation_last_update:
+              payload.new.date_created || existingConversation.conversation_last_update,
+            message_count: isNewMessage
+              ? existingConversation.message_count + 1
+              : existingConversation.message_count,
+            unread_count:
+              payload.new.status === "delivered" || payload.new.status === "read"
+                ? Math.max(0, existingConversation.unread_count - 1)
+                : existingConversation.unread_count + unreadIncrement,
+          };
+
+          return sortConversations(updatedConversations);
         }
-      }, 2000);
+
+        const unreadCount =
+          payload.new.status === "received" && !isForActiveContact ? 1 : 0;
+        const newConversation: ConversationSummary = {
+          contact_phone: contactPhone,
+          user_phone: userPhone,
+          conversation_start: payload.new.date_created || new Date().toISOString(),
+          conversation_last_update:
+            payload.new.date_created || new Date().toISOString(),
+          message_count: payload.eventType === "INSERT" ? 1 : 0,
+          unread_count: unreadCount,
+          contact_firstname: "",
+          contact_surname: "",
+        };
+
+        return sortConversations([...prevConversations, newConversation]);
+      });
     }
-  }, [workspace, fetchConversationSummary, setConversations]);
+  }, [workspace]);
 
   // Subscribe to message changes
   useSupabaseRealtimeSubscription({
@@ -293,19 +231,6 @@ export const useConversationSummaryRealTime = ({
     filter: `workspace=eq.${workspace}`,
     onChange: handleMessageChange
   });
-
-  // Periodically refresh conversations to ensure they're up to date
-  useEffect(() => {
-    // Initial fetch
-    fetchConversationSummary(true);
-    
-    // Set up periodic refresh (every 60 seconds)
-    const intervalId = setInterval(() => {
-      fetchConversationSummary(true);
-    }, 60000);
-    
-    return () => clearInterval(intervalId);
-  }, [fetchConversationSummary]);
 
   // Mark all messages as read for the active contact
   const markConversationAsRead = useCallback(async (contactPhone: string) => {
@@ -323,27 +248,32 @@ export const useConversationSummaryRealTime = ({
       if (error) {
         console.error("Error marking conversation as read:", error);
       } else {
-        // Force refresh conversation summary to update unread counts
-        fetchConversationSummary(true);
+        setConversations((prevConversations) =>
+          prevConversations.map((conversation) =>
+            phoneNumbersMatch(conversation.contact_phone, contactPhone)
+              ? { ...conversation, unread_count: 0 }
+              : conversation,
+          ),
+        );
       }
     } catch (err) {
       console.error("Error in markConversationAsRead:", err);
     }
-  }, [supabase, workspace, fetchConversationSummary]);
+  }, [supabase, workspace]);
 
   return { 
     conversations, 
     setConversations, 
-    refreshConversations: fetchConversationSummary,
     markConversationAsRead
   };
 };
 
-// Helper function to compare sets
-function setsAreEqual<T>(a: Set<T>, b: Set<T>): boolean {
-  if (a.size !== b.size) return false;
-  for (const item of a) {
-    if (!b.has(item)) return false;
-  }
-  return true;
+function sortConversations(conversations: ConversationSummary[]) {
+  return [...conversations].sort((a, b) => {
+    return (
+      new Date(b.conversation_last_update).getTime() -
+      new Date(a.conversation_last_update).getTime()
+    );
+  });
 }
+

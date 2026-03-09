@@ -322,7 +322,7 @@ const sendMessage = async ({
 
     const { error: messageInsertError } = await supabase
       .from("message")
-      .insert({
+      .upsert({
         sid: message.sid || `failed-${to}-${Date.now()}`,
         body: message.body,
         num_segments: message.numSegments,
@@ -347,7 +347,7 @@ const sendMessage = async ({
         contact_id,
         queue_id,
         outreach_attempt_id: outreachAttemptId,
-      });
+      }, { onConflict: "sid" });
 
     if (messageInsertError) {
       // Update outreach attempt as failed if message insert fails

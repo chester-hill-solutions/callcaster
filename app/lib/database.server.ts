@@ -1365,29 +1365,147 @@ export async function fetchWorkspaceData(
   return { workspace, workspaceError };
 }
 
+type ConversationSummary = NonNullable<
+  Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]
+>;
+
+type FetchConversationSummaryOptions = {
+  campaignId?: string | null;
+  hasInboundOnly?: boolean;
+  page?: number;
+  pageSize?: number;
+};
+
+export type ConversationSummaryPage = {
+  chats: ConversationSummary[];
+  chatsError: PostgrestError | null;
+  hasMore: boolean;
+  totalCount: number;
+};
+
+function normalizeConversationPhone(phone: string | null | undefined) {
+  if (!phone) return null;
+
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10) return `1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return digits;
+
+  return digits || null;
+}
+
+function dedupeConversationSummaries(chats: ConversationSummary[]) {
+  const dedupedChats = new Map<string, ConversationSummary>();
+
+  for (const chat of chats) {
+    const normalizedPhone =
+      normalizeConversationPhone(chat.contact_phone) ?? chat.contact_phone;
+    const existingChat = dedupedChats.get(normalizedPhone);
+
+    if (
+      !existingChat ||
+      new Date(chat.conversation_last_update).getTime() >
+        new Date(existingChat.conversation_last_update).getTime()
+    ) {
+      dedupedChats.set(normalizedPhone, chat);
+    }
+  }
+
+  return Array.from(dedupedChats.values()).sort((a, b) => {
+    return (
+      new Date(b.conversation_last_update).getTime() -
+      new Date(a.conversation_last_update).getTime()
+    );
+  });
+}
+
+async function fetchInboundConversationPhones(
+  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
+) {
+  const { data, error } = await supabaseClient
+    .from("message")
+    .select("from")
+    .eq("workspace", workspaceId)
+    .eq("direction", "inbound")
+    .not("from", "is", null)
+    .neq("status", "failed");
+
+  if (error) {
+    throw error;
+  }
+
+  return new Set(
+    (data ?? [])
+      .map((message) => normalizeConversationPhone(message.from))
+      .filter((phone): phone is string => Boolean(phone)),
+  );
+}
+
 export async function fetchConversationSummary(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
-  campaign_id?: string | null,
+  options: FetchConversationSummaryOptions = {},
 ) {
-  let chats, chatsError;
-  if (campaign_id) {
+  const {
+    campaignId,
+    hasInboundOnly = false,
+    page = 1,
+    pageSize = 50,
+  } = options;
+
+  let chats: ConversationSummary[] | null;
+  let chatsError: PostgrestError | null;
+
+  if (campaignId) {
     const { data, error } = await supabaseClient.rpc(
       "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
+      { p_workspace: workspaceId, campaign_id_prop: Number(campaignId) },
     );
     chats = data;
     chatsError = error;
-    
   } else {
-    const { data, error } = await supabaseClient.rpc(
-      "get_conversation_summary",
-      { p_workspace: workspaceId },
-    );
+    const { data, error } = await supabaseClient.rpc("get_conversation_summary", {
+      p_workspace: workspaceId,
+    });
     chats = data;
     chatsError = error;
   }
-  return { chats, chatsError };
+
+  if (chatsError) {
+    return {
+      chats: [],
+      chatsError,
+      hasMore: false,
+      totalCount: 0,
+    };
+  }
+
+  let filteredChats = dedupeConversationSummaries(
+    (chats ?? []).filter((chat): chat is ConversationSummary => Boolean(chat)),
+  );
+
+  if (hasInboundOnly) {
+    const inboundPhones = await fetchInboundConversationPhones(
+      supabaseClient,
+      workspaceId,
+    );
+    filteredChats = filteredChats.filter((chat) =>
+      inboundPhones.has(
+        normalizeConversationPhone(chat.contact_phone) ?? chat.contact_phone,
+      ),
+    );
+  }
+
+  const totalCount = filteredChats.length;
+  const start = Math.max(0, (page - 1) * pageSize);
+  const end = start + pageSize;
+
+  return {
+    chats: filteredChats.slice(start, end),
+    chatsError: null,
+    hasMore: end < totalCount,
+    totalCount,
+  };
 }
 export async function fetchCampaignsByType({
   supabaseClient,

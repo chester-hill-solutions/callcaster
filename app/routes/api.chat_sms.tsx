@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createWorkspaceTwilioInstance } from '../lib/database.server';
 import { Database } from '~/lib/database.types';
 import { verifyAuth } from '~/lib/supabase.server';
@@ -54,7 +54,7 @@ const normalizePhoneNumber = (input: string) => {
     return cleaned;
 };
 
-export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id, user }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string, user: User }) => {
+export const sendMessage = async ({ body, to, from, media, supabase, workspace, contact_id }: { body: string, to: string, from: string, media: string, supabase: SupabaseClient<Database>, workspace: string, contact_id: string }) => {
     const mediaData = media && JSON.parse(media);
     const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: workspace });
     try {
@@ -92,7 +92,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             subresourceUris: subresource_uris,
         } = message;
 
-        const { data, error } = await supabase.from('message').insert({
+        const { data, error } = await supabase.from('message').upsert({
             sid,
             body: sentBody,
             num_segments,
@@ -116,7 +116,7 @@ export const sendMessage = async ({ body, to, from, media, supabase, workspace, 
             workspace,
             ...(contact_id && { contact_id }),
             ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] })
-        }).select();
+        }, { onConflict: 'sid' }).select();
 
         if (error) throw { 'message_entry_error:': error };
         const { data: webhook, error: webhook_error } = await supabase
@@ -201,8 +201,7 @@ export const action = async ({ request }: { request: Request }) => {
             from: caller_id,
             supabase: supabaseClient,
             workspace: workspace_id,
-            contact_id,
-            user
+            contact_id
         });
         return new Response(JSON.stringify({ data, message }), {
             headers: {

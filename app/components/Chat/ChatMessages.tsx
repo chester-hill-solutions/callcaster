@@ -1,10 +1,25 @@
-export default function MessageList({ messages, messagesEndRef }) {
+import type { MutableRefObject } from "react";
+import type { Message } from "~/lib/types";
+
+type ChatMessage = NonNullable<Message> & {
+  signedUrls?: (string | undefined)[];
+};
+
+type MessageListProps = {
+  messages: ChatMessage[];
+  messagesEndRef: MutableRefObject<HTMLDivElement | null>;
+};
+
+export default function MessageList({
+  messages,
+  messagesEndRef,
+}: MessageListProps) {
   return (
     <div className="h-full overflow-y-auto p-4">
       {messages?.length > 0 ? (
         messages.map((message, index) => (
           <div
-            key={index}
+            key={message.sid || `${message.date_created}-${index}`}
             className={`message-item mb-4 flex ${
               message.direction !== "inbound" ? "justify-end" : "justify-start"
             }`}
@@ -37,7 +52,7 @@ export default function MessageList({ messages, messagesEndRef }) {
               ))}
               <div className="mt-1 text-right">
                 <small className="text-xs opacity-75">
-                  {new Date(message.date_created).toLocaleTimeString()}
+                  {new Date(message.date_created || Date.now()).toLocaleTimeString()}
                 </small>
               </div>
             </div>

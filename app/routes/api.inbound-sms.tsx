@@ -20,8 +20,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .single();
 
   if (number) {
-    const media = [];
     const now = new Date();
+    const { data: existingMessage, error: existingMessageError } = await supabase
+      .from("message")
+      .select("sid")
+      .eq("sid", data.MessageSid as string)
+      .maybeSingle();
+
+    if (existingMessageError) {
+      console.error("Message lookup error:", existingMessageError);
+    }
+
+    if (existingMessage) {
+      return json({ message: existingMessage, duplicate: true }, 200);
+    }
+
+    const media = [];
     for (let i = 0; i < parseInt(data.NumMedia as string); i++) {
       try {
         const mediaResponse = await fetch(
@@ -38,12 +52,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
 
         const newMedia = await mediaResponse.blob();
-        const fileName = `${number.workspace}/sms-${data.MessageSid}-${i}-${now.toISOString()}`;
+        const fileName = `${number.workspace}/sms-${data.MessageSid}-${i}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("messageMedia")
           .upload(fileName, newMedia, {
             cacheControl: "60",
-            upsert: false,
+            upsert: true,
             contentType: data[`MediaContentType${i}`] as string,
           });
 
@@ -86,7 +100,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     const { data: message, error: messageError } = await supabase
       .from("message")
-      .insert(messageData)
+      .upsert(messageData, { onConflict: "sid" })
       .select();
 
     if ((data.Body as string).toLowerCase() === "stop" || (data.Body as string).toLowerCase() === '"stop"') {

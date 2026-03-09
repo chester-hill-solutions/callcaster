@@ -1,14 +1,12 @@
 import {
   ActionFunctionArgs,
   LoaderFunctionArgs,
-  defer,
+  json,
   redirect,
 } from "@remix-run/node";
 import {
   NavLink,
   Outlet,
-  Await,
-  json,
   useFetcher,
   useLoaderData,
   useLocation,
@@ -21,6 +19,7 @@ import {
 import { MdAdd, MdChat } from "react-icons/md";
 import { Button } from "~/components/ui/button";
 import {
+  ConversationSummaryPage,
   fetchCampaignsByType,
   fetchContactData,
   fetchConversationSummary,
@@ -28,7 +27,7 @@ import {
 } from "~/lib/database.server";
 import { verifyAuth } from "~/lib/supabase.server";
 import { normalizePhoneNumber } from "~/lib/utils";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "~/components/ui/card";
 import { useConversationSummaryRealTime, phoneNumbersMatch } from "~/hooks/useChatRealtime";
 import ChatHeader from "~/components/Chat/ChatHeader";
@@ -45,7 +44,7 @@ import {
 import { X } from "lucide-react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/lib/database.types";
-import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace } from "~/lib/types";
+import type { User, Contact, Workspace } from "~/lib/types";
 import { sendMessage } from "./api.chat_sms";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
@@ -68,10 +67,8 @@ type WorkspaceContextType = {
 
 type LoaderData = {
   campaigns: any[];
-  chatsPromise: Promise<{
-    chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
-    chatsError: any;
-  }>;
+  initialChats: ConversationSummary[];
+  hasMoreChats: boolean;
   potentialContacts: Contact[];
   contact: Contact | null;
   error: string | null;
@@ -87,10 +84,6 @@ type ImageFetcherData = {
 };
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
-type ChatsData = {
-  chats: ConversationSummary[];
-  chatsError: any;
-};
 
 type Chat = {
   contact_phone: string;
@@ -102,6 +95,7 @@ type Chat = {
 };
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
+const CONVERSATION_PAGE_SIZE = 50;
 
 // Custom hook for image handling
 function useImageHandling(workspace_id: string) {
@@ -186,6 +180,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
+  const hasInboundOnly = url.searchParams.get("has_inbound") === "true";
+  const page = Number(url.searchParams.get("page") || "1");
+  const conversationsOnly = url.searchParams.get("conversations_only") === "true";
   const contact_number = params.contact_number;
 
   if (!workspaceId) {
@@ -193,13 +190,43 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
 
-  const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
+  if (!userRole) {
+    return json(
+      {
+        error: "You don't have access to this workspace",
+      },
+      { headers, status: 403 },
+    );
+  }
+
+  if (conversationsOnly) {
+    const conversationsPage = await fetchConversationSummary(
+      supabaseClient,
+      workspaceId,
+      {
+        campaignId: campaign_id,
+        hasInboundOnly,
+        page,
+        pageSize: CONVERSATION_PAGE_SIZE,
+      },
+    );
+
+    return json(conversationsPage, { headers });
+  }
+
+  const [workspaceNumbers, contactData, smsCampaigns, initialChatsPage] = await Promise.all([
     supabaseClient.from("workspace_number").select("*").eq("workspace", workspaceId).eq('type', 'rented'),
     !contact_id || !contact_number ? null : fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
     fetchCampaignsByType({
       supabaseClient,
       workspaceId,
       type: "message_campaign",
+    }),
+    fetchConversationSummary(supabaseClient, workspaceId, {
+      campaignId: campaign_id,
+      hasInboundOnly,
+      page: 1,
+      pageSize: CONVERSATION_PAGE_SIZE,
     }),
   ]);
   const { contact, potentialContacts, contactError } = contactData || { contact: null, potentialContacts: [], contactError: null };
@@ -213,12 +240,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const chatsPromise = fetchConversationSummary(supabaseClient, workspaceId, campaign_id);
-  return defer(
+  return json(
     {
       campaigns: smsCampaigns,
       workspaceNumbers: workspaceNumbers?.data,
-      chatsPromise,
+      initialChats: initialChatsPage.chats,
+      hasMoreChats: initialChatsPage.hasMore,
       potentialContacts,
       contact,
       error: null,
@@ -230,7 +257,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { supabaseClient } = await verifyAuth(request);
 
   const workspaceId = params.id;
   const formData = await request.formData();
@@ -247,7 +274,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
     supabase: supabaseClient,
     workspace: workspaceId as string,
     contact_id: data.contact_id as string,
-    user: user as unknown as User,
   });
   if (!params.contact_number) return redirect(contact_number);
   return json({ responseData });
@@ -255,26 +281,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function ChatsList() {
   const { supabase, workspace } = useOutletContext<WorkspaceContextType>();
-  const { chatsPromise, potentialContacts, contact, campaigns, workspaceNumbers } = useLoaderData<LoaderData>();
+  const {
+    initialChats,
+    hasMoreChats: initialHasMoreChats,
+    potentialContacts,
+    contact,
+    campaigns,
+    workspaceNumbers,
+  } = useLoaderData<LoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
+  const conversationsFetcher = useFetcher<ConversationSummaryPage>();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const conversationListRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const currentPageRef = useRef(1);
+  const requestedPageRef = useRef(1);
   const [dialogContact, setDialog] = useState<Contact | null>(null);
+  const [hasMoreChats, setHasMoreChats] = useState(initialHasMoreChats);
   const outlet = useOutlet();
   const loc = useLocation();
   const navigate = useNavigate();
   const contact_number = outlet ? loc.pathname.split("/").pop() || "" : "";
   const formatDate = useDateFormatter();
-  
-  // State to hold the conversation data
-  const [conversationData, setConversationData] = useState<ConversationSummary[]>([]);
+  const selectedCampaignId = searchParams.get("campaign_id");
+  const hasInboundOnly = searchParams.get("has_inbound") === "true";
 
-  // Initialize the conversation summary hook with the state
-  const { conversations, refreshConversations, markConversationAsRead } = useConversationSummaryRealTime({
+  const { conversations, setConversations, markConversationAsRead } = useConversationSummaryRealTime({
     supabase,
-    initial: conversationData,
+    initial: initialChats,
     workspace: workspace.id,
     activeContactNumber: contact_number,
+    campaignId: selectedCampaignId,
+    hasInboundOnly,
   });
 
   // Custom hooks for images
@@ -295,7 +334,6 @@ export default function ChatsList() {
     existingConversation,
     handleSearch: handlePhoneChange,
     toggleContactMenu,
-    clearSelectedContact,
     isValid,
   } = useContactSearch({
     supabase,
@@ -338,57 +376,19 @@ export default function ChatsList() {
       const number = normalizePhoneNumber(contact.phone || "");
       if (number) {
         navigate(`./${number}`);
-        
-        // Mark messages as read when selecting a contact
-        if (supabase) {
-          supabase
-            .from("message")
-            .update({ status: "delivered" })
-            .eq("workspace", workspace.id)
-            .eq("status", "received")
-            .or(`from.eq.${number},to.eq.${number}`)
-            .then(({ error }) => {
-              if (error) {
-                console.error("Error marking messages as read:", error);
-              } else {
-                // Trigger a global event to notify other components
-                window.dispatchEvent(new CustomEvent('messages-read', { 
-                  detail: { contactNumber: number }
-                }));
-              }
-            });
-        }
+        markConversationAsRead(number);
       }
       return null;
     },
-    [navigate, supabase, workspace.id]
+    [markConversationAsRead, navigate]
   );
 
   const handleExistingConversationClick = useCallback(
     (phoneNumber: string) => {
       navigate(`./${phoneNumber}`);
-      
-      // Mark messages as read when selecting a conversation
-      if (supabase) {
-        supabase
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", workspace.id)
-          .eq("status", "received")
-          .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
-          .then(({ error }) => {
-            if (error) {
-              console.error("Error marking messages as read:", error);
-            } else {
-              // Trigger a global event to notify other components
-              window.dispatchEvent(new CustomEvent('messages-read', { 
-                detail: { contactNumber: phoneNumber }
-              }));
-            }
-          });
-      }
+      markConversationAsRead(phoneNumber);
     },
-    [navigate, supabase, workspace.id]
+    [markConversationAsRead, navigate]
   );
 
   // Adapter functions to match ChatHeader's expected types
@@ -426,44 +426,141 @@ export default function ChatsList() {
     return null;
   }, [setDialog]);
 
-  // Listen for message-read and messages-read events to refresh the UI
   useEffect(() => {
-    let debounceTimer: NodeJS.Timeout | null = null;
-    
     const handleMessageRead = (event: CustomEvent) => {
-      // Get the contact number from the event detail
       const contactNumber = event.detail?.contactNumber;
-      
-      // Only update if we have a contact number and it's in our conversation list
-      if (contactNumber && conversations.some(conv => 
-        phoneNumbersMatch(conv.contact_phone, contactNumber)
-      )) {
-        // Clear any existing timer
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        
-        // Set a new timer to refresh after a delay
-        debounceTimer = setTimeout(() => {
-          // This will update the unread count for the specific conversation
-          refreshConversations(false);
-        }, 1000);
+      if (!contactNumber) {
+        return;
       }
+
+      setConversations((prevConversations) =>
+        prevConversations.map((conversation) =>
+          phoneNumbersMatch(conversation.contact_phone, contactNumber)
+            ? { ...conversation, unread_count: 0 }
+            : conversation,
+        ),
+      );
     };
 
-    // Add event listeners
     window.addEventListener('message-read', handleMessageRead as EventListener);
     window.addEventListener('messages-read', handleMessageRead as EventListener);
 
     return () => {
-      // Remove event listeners and clear any pending timer
       window.removeEventListener('message-read', handleMessageRead as EventListener);
       window.removeEventListener('messages-read', handleMessageRead as EventListener);
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
     };
-  }, [conversations, refreshConversations]);
+  }, [setConversations]);
+
+  useEffect(() => {
+    currentPageRef.current = 1;
+    requestedPageRef.current = 1;
+    setHasMoreChats(initialHasMoreChats);
+  }, [initialChats, initialHasMoreChats, selectedCampaignId, hasInboundOnly]);
+
+  useEffect(() => {
+    if (conversationsFetcher.state !== "idle" || !conversationsFetcher.data) {
+      return;
+    }
+
+    const fetchedPage = conversationsFetcher.data;
+    currentPageRef.current = requestedPageRef.current;
+    setHasMoreChats(fetchedPage.hasMore);
+    setConversations((prevConversations) => {
+      const mergedConversations = [...prevConversations];
+
+      for (const chat of fetchedPage.chats) {
+        const existingConversationIndex = mergedConversations.findIndex(
+          (existingChat) =>
+            phoneNumbersMatch(existingChat.contact_phone, chat.contact_phone),
+        );
+
+        if (existingConversationIndex >= 0) {
+          mergedConversations[existingConversationIndex] = {
+            ...mergedConversations[existingConversationIndex],
+            ...chat,
+          };
+          continue;
+        }
+
+        mergedConversations.push(chat);
+      }
+
+      return mergedConversations.sort((a, b) => {
+        return (
+          new Date(b.conversation_last_update).getTime() -
+          new Date(a.conversation_last_update).getTime()
+        );
+      });
+    });
+  }, [conversationsFetcher.data, conversationsFetcher.state, setConversations]);
+
+  const loadMoreConversations = useCallback(() => {
+    if (conversationsFetcher.state !== "idle" || !hasMoreChats) {
+      return;
+    }
+
+    const nextPage = currentPageRef.current + 1;
+    requestedPageRef.current = nextPage;
+
+    const params = new URLSearchParams();
+    if (selectedCampaignId) {
+      params.set("campaign_id", selectedCampaignId);
+    }
+    if (hasInboundOnly) {
+      params.set("has_inbound", "true");
+    }
+    params.set("conversations_only", "true");
+    params.set("page", String(nextPage));
+    params.set("page_size", String(CONVERSATION_PAGE_SIZE));
+
+    conversationsFetcher.load(
+      `/workspaces/${workspace.id}/chats?${params.toString()}`,
+    );
+  }, [
+    conversationsFetcher,
+    hasInboundOnly,
+    hasMoreChats,
+    selectedCampaignId,
+    workspace.id,
+  ]);
+
+  useEffect(() => {
+    if (!conversationListRef.current || !loadMoreRef.current) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMoreConversations();
+        }
+      },
+      {
+        root: conversationListRef.current,
+        rootMargin: "200px 0px",
+      },
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [loadMoreConversations]);
+
+  const displayChats = useMemo(() => {
+    return conversations.filter((chat): chat is ConversationSummary =>
+      Boolean(chat?.contact_phone),
+    );
+  }, [conversations]);
+
+  const updateSearchParams = useCallback(
+    (updater: (params: URLSearchParams) => void) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        updater(next);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
 
   return (
     <main className="flex h-[calc(100vh-80px)] w-full gap-4">
@@ -479,11 +576,14 @@ export default function ChatsList() {
         </Button>
         <div className="flex">
           <Select
-            defaultValue={searchParams.get("campaign_id") || undefined}
+            value={selectedCampaignId || "all"}
             onValueChange={(val) => {
-              setSearchParams((prev) => {
-                prev.set("campaign_id", val);
-                return prev;
+              updateSearchParams((params) => {
+                if (val === "all") {
+                  params.delete("campaign_id");
+                  return;
+                }
+                params.set("campaign_id", val);
               });
             }}
           >
@@ -491,6 +591,9 @@ export default function ChatsList() {
               <SelectValue placeholder="Filter by Campaign" />
             </SelectTrigger>
             <SelectContent className="w-full bg-slate-50">
+              <SelectItem value="all" className="w-full p-4">
+                All Campaigns
+              </SelectItem>
               {campaigns &&
                 campaigns?.map((campaign: { id: number; title: string }) => (
                   <SelectItem
@@ -503,120 +606,94 @@ export default function ChatsList() {
                 ))}
             </SelectContent>
           </Select>
+          <Select
+            value={hasInboundOnly ? "has_inbound" : "all"}
+            onValueChange={(val) => {
+              updateSearchParams((params) => {
+                if (val === "has_inbound") {
+                  params.set("has_inbound", "true");
+                  return;
+                }
+                params.delete("has_inbound");
+              });
+            }}
+          >
+            <SelectTrigger className="flex items-center p-2">
+              <SelectValue placeholder="Conversation Filter" />
+            </SelectTrigger>
+            <SelectContent className="w-full bg-slate-50">
+              <SelectItem value="all" className="w-full p-4">
+                All Conversations
+              </SelectItem>
+              <SelectItem value="has_inbound" className="w-full p-4">
+                Has Inbound Message
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="reset"
             variant={"ghost"}
-            onClick={() =>
-              setSearchParams((prev) => {
-                prev.delete("campaign_id");
-                return prev;
-              })
-            }
+            onClick={() => {
+              updateSearchParams((params) => {
+                params.delete("campaign_id");
+                params.delete("has_inbound");
+              });
+            }}
           >
             <X />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          <Suspense fallback={
-            <div className="h-[calc(100vh-200px)] animate-pulse space-y-4 p-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-10 w-10 rounded-full bg-gray-200"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
-                    <div className="h-3 w-1/2 rounded bg-gray-200"></div>
+        <div ref={conversationListRef} className="flex-1 overflow-y-auto">
+          {!displayChats.length ? (
+            <div className="p-4 text-center text-gray-500">No conversations yet</div>
+          ) : (
+            <>
+              {displayChats.map((chat) => (
+                <div
+                  key={chat.contact_phone}
+                  className={`flex cursor-pointer items-center justify-between border-b border-gray-100 p-4 hover:bg-gray-50 ${
+                    chat.contact_phone === contact_number ? "bg-gray-50" : ""
+                  }`}
+                  onClick={() => handleExistingConversationClick(chat.contact_phone)}
+                >
+                  <div className="flex items-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
+                      <MdChat size={20} />
+                    </div>
+                    <div className="ml-4">
+                      <div className="font-medium">
+                        {chat.contact_firstname || chat.contact_surname
+                          ? `${chat.contact_firstname || ""} ${
+                              chat.contact_surname || ""
+                            }`
+                          : chat.contact_phone}
+                      </div>
+                      <div className="text-sm text-gray-500 line-clamp-1">
+                        {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? 'message' : 'messages'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <div className="text-xs text-gray-500">
+                      {formatDate(chat.conversation_last_update)}
+                    </div>
+                    {chat.unread_count > 0 && (
+                      <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
+                        {chat.unread_count}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
-            </div>
-          }>
-            <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
-              {(chatsData: any) => {
-                const { chats } = chatsData as ChatsData;
-                const chatNumbers = Array.from(
-                  new Set(
-                    chats
-                      ?.filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
-                      .map((chat) => chat.contact_phone),
-                  ),
-                );
-                const shapedChats = chatNumbers.map((num) =>
-                  chats?.find((chat) => chat?.contact_phone === num),
-                ).filter((chat): chat is ConversationSummary => chat !== undefined && chat !== null);
-
-                // Update the conversations data state
-                useEffect(() => {
-                  if (shapedChats?.length > 0) {
-                    // Only update if the data has actually changed
-                    const currentPhoneNumbers = new Set(conversationData.map(c => c.contact_phone));
-                    const newPhoneNumbers = new Set(shapedChats.map(c => c.contact_phone));
-                    
-                    // Check if the phone numbers have changed
-                    const hasNewConversations = shapedChats.some(chat => 
-                      !currentPhoneNumbers.has(chat.contact_phone)
-                    );
-                    
-                    // Check if the conversation count has changed
-                    const countChanged = currentPhoneNumbers.size !== newPhoneNumbers.size;
-                    
-                    if (hasNewConversations || countChanged || conversationData.length === 0) {
-                      setConversationData(shapedChats);
-                      // Only force refresh if we have new data
-                      refreshConversations(false);
-                    }
-                  }
-                }, [shapedChats, conversationData, refreshConversations]);
-
-                if (!shapedChats?.length) {
-                  return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
-                }
-
-                // Use the conversations from the real-time hook instead of shapedChats
-                // This ensures we get real-time updates
-                const displayChats = conversations.length > 0 ? conversations : shapedChats;
-
-                return displayChats
-                  .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
-                  .map((chat) => (
-                    <div
-                      key={chat.contact_phone}
-                      className={`flex cursor-pointer items-center justify-between border-b border-gray-100 p-4 hover:bg-gray-50 ${
-                        chat.contact_phone === contact_number ? "bg-gray-50" : ""
-                      }`}
-                      onClick={() => handleExistingConversationClick(chat.contact_phone)}
-                    >
-                      <div className="flex items-center">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
-                          <MdChat size={20} />
-                        </div>
-                        <div className="ml-4">
-                          <div className="font-medium">
-                            {chat.contact_firstname || chat.contact_surname
-                              ? `${chat.contact_firstname || ""} ${
-                                  chat.contact_surname || ""
-                                }`
-                              : chat.contact_phone}
-                          </div>
-                          <div className="text-sm text-gray-500 line-clamp-1">
-                            {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? 'message' : 'messages'}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="text-xs text-gray-500">
-                          {formatDate(chat.conversation_last_update)}
-                        </div>
-                        {chat.unread_count > 0 && (
-                          <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
-                            {chat.unread_count}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ));
-              }}
-            </Await>
-          </Suspense>
+              <div ref={loadMoreRef} className="p-4 text-center text-sm text-gray-500">
+                {conversationsFetcher.state !== "idle"
+                  ? "Loading more conversations..."
+                  : hasMoreChats
+                    ? "Scroll to load more"
+                    : "All conversations loaded"}
+              </div>
+            </>
+          )}
         </div>
       </Card>
 
