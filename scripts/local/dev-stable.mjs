@@ -13,7 +13,7 @@ const APP_PORT = process.env.PORT ?? "3000";
 const BUILD_PATH = path.resolve("build/index.js");
 const BUILD_DIR = path.dirname(BUILD_PATH);
 const REMIX_BIN = resolveLocalBin("remix");
-const REMIX_SERVE_BIN = resolveLocalBin("remix-serve");
+const SERVER_ENTRY = path.resolve("server/index.js");
 
 let appProcess = null;
 let isShuttingDown = false;
@@ -46,6 +46,7 @@ if (!devPingAddress || typeof devPingAddress === "string") {
 const DEV_ENV = {
   ...process.env,
   NODE_ENV: "development",
+  PORT: APP_PORT,
   REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
 };
 
@@ -117,7 +118,7 @@ async function waitForInitialBuild() {
 }
 
 async function startAppServer() {
-  appProcess = spawn(REMIX_SERVE_BIN, ["./build/index.js", "--port", APP_PORT], {
+  appProcess = spawn(process.execPath, [SERVER_ENTRY], {
     env: DEV_ENV,
     stdio: ["inherit", "pipe", "pipe"],
   });
@@ -163,13 +164,39 @@ async function restartAppServer() {
   restartInFlight = true;
   const previousProcess = appProcess;
 
-  await new Promise((resolve) => {
-    previousProcess.once("exit", resolve);
-    previousProcess.kill("SIGTERM");
-  });
+  await terminateProcess(previousProcess, "app");
 
   restartInFlight = false;
   await startAppServer();
+}
+
+async function terminateProcess(childProcess, label) {
+  await new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(killTimer);
+      resolve();
+    };
+
+    const killTimer = setTimeout(() => {
+      if (childProcess.exitCode !== null || childProcess.killed) {
+        finish();
+        return;
+      }
+
+      console.error(`[${label}] did not exit after SIGTERM, sending SIGKILL`);
+      childProcess.kill("SIGKILL");
+    }, 5_000);
+
+    childProcess.once("exit", finish);
+    childProcess.kill("SIGTERM");
+  });
 }
 
 async function shutdown(exitCode) {
@@ -190,10 +217,7 @@ async function shutdown(exitCode) {
   await Promise.all(
     processes.map(
       (childProcess) =>
-        new Promise((resolve) => {
-          childProcess.once("exit", resolve);
-          childProcess.kill("SIGTERM");
-        }),
+        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-watch"),
     ),
   );
 
