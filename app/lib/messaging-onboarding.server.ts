@@ -65,34 +65,34 @@ function normalizeStep(value: unknown, fallback: WorkspaceOnboardingStepState): 
 
 export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] = [
   {
-    id: "path_selection",
-    label: "Choose channels",
+    id: "business_profile",
+    label: "Business basics",
     status: "pending",
-    description: "Pick A2P 10DLC, RCS, and any voice compliance requirements.",
+    description: "Start with the legal business identity, website, and support contact details.",
+  },
+  {
+    id: "use_case",
+    label: "Messaging use case",
+    status: "pending",
+    description: "Explain what you send, how people opt in, and include sample messages.",
+  },
+  {
+    id: "path_selection",
+    label: "Channel selection",
+    status: "pending",
+    description: "Choose which messaging and voice tracks this workspace actually needs.",
   },
   {
     id: "messaging_service",
     label: "Messaging Service",
     status: "pending",
-    description: "Provision or confirm the workspace Messaging Service.",
-  },
-  {
-    id: "business_profile",
-    label: "Business profile",
-    status: "pending",
-    description: "Collect business identity, compliance, and emergency address details.",
-  },
-  {
-    id: "use_case",
-    label: "Use case",
-    status: "pending",
-    description: "Collect opt-in workflow, support information, and sample messages.",
+    description: "Provision or confirm the shared Messaging Service used for sending.",
   },
   {
     id: "provider_provisioning",
     label: "Provider provisioning",
     status: "pending",
-    description: "Create provider resources and track review state.",
+    description: "Create provider resources and track carrier or provider review.",
   },
   {
     id: "launch_checks",
@@ -155,7 +155,7 @@ function normalizeReviewState(value: unknown): WorkspaceOnboardingReviewState {
 export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnboardingState = {
   version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
   status: "not_started",
-  currentStep: "path_selection",
+  currentStep: "business_profile",
   selectedChannels: ["a2p10dlc", "voice_compliance"],
   steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   businessProfile: {
@@ -230,6 +230,17 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
     provider: null,
     agentId: null,
     senderId: null,
+    displayName: "",
+    publicDescription: "",
+    logoImageUrl: "",
+    bannerImageUrl: "",
+    accentColor: "",
+    optInPolicyImageUrl: "",
+    useCaseVideoUrl: "",
+    representativeName: "",
+    representativeTitle: "",
+    representativeEmail: "",
+    notificationEmail: "",
     regions: [],
     prerequisites: [],
     notes: "",
@@ -245,9 +256,14 @@ export function normalizeWorkspaceMessagingOnboardingState(
   value: unknown,
 ): WorkspaceMessagingOnboardingState {
   if (!isRecord(value)) {
-    return {
+    const defaultState = {
       ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step })),
+    };
+
+    return {
+      ...defaultState,
+      steps: buildOnboardingStepsForState(defaultState),
     };
   }
 
@@ -415,6 +431,17 @@ export function normalizeWorkspaceMessagingOnboardingState(
         provider: parseOptionalString(value.rcs.provider),
         agentId: parseOptionalString(value.rcs.agentId),
         senderId: parseOptionalString(value.rcs.senderId),
+        displayName: parseString(value.rcs.displayName),
+        publicDescription: parseString(value.rcs.publicDescription),
+        logoImageUrl: parseString(value.rcs.logoImageUrl),
+        bannerImageUrl: parseString(value.rcs.bannerImageUrl),
+        accentColor: parseString(value.rcs.accentColor),
+        optInPolicyImageUrl: parseString(value.rcs.optInPolicyImageUrl),
+        useCaseVideoUrl: parseString(value.rcs.useCaseVideoUrl),
+        representativeName: parseString(value.rcs.representativeName),
+        representativeTitle: parseString(value.rcs.representativeTitle),
+        representativeEmail: parseString(value.rcs.representativeEmail),
+        notificationEmail: parseString(value.rcs.notificationEmail),
         regions: parseStringArray(value.rcs.regions),
         prerequisites: parseStringArray(value.rcs.prerequisites),
         notes: parseString(value.rcs.notes),
@@ -423,7 +450,7 @@ export function normalizeWorkspaceMessagingOnboardingState(
       }
     : DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.rcs;
 
-  return {
+  const normalizedState = {
     version:
       typeof value.version === "number"
         ? value.version
@@ -433,7 +460,7 @@ export function normalizeWorkspaceMessagingOnboardingState(
       WORKSPACE_ONBOARDING_STATUS_VALUES,
       "not_started",
     ),
-    currentStep: parseOptionalString(value.currentStep) ?? "path_selection",
+    currentStep: parseOptionalString(value.currentStep) ?? "business_profile",
     selectedChannels:
       selectedChannels.length > 0
         ? selectedChannels
@@ -448,6 +475,11 @@ export function normalizeWorkspaceMessagingOnboardingState(
     reviewState: normalizeReviewState(value.reviewState),
     lastUpdatedAt: parseOptionalString(value.lastUpdatedAt),
     lastUpdatedBy: parseOptionalString(value.lastUpdatedBy),
+  };
+
+  return {
+    ...normalizedState,
+    steps: buildOnboardingStepsForState(normalizedState),
   };
 }
 
@@ -632,6 +664,8 @@ export function deriveWorkspaceMessagingReadiness({
   const messagingReady = Boolean(onboarding.messagingService.serviceSid);
   const hasValidatedEmergencyAddress =
     onboarding.emergencyVoice.address.status === "validated";
+  const businessCountryCode = onboarding.emergencyVoice.address.countryCode.trim().toUpperCase();
+  const isCanadianBusiness = businessCountryCode === "CA" || businessCountryCode === "CANADA";
   const voiceReady =
     !onboarding.selectedChannels.includes("voice_compliance") ||
     (onboarding.emergencyVoice.enabled &&
@@ -644,6 +678,7 @@ export function deriveWorkspaceMessagingReadiness({
   }
   if (
     onboarding.selectedChannels.includes("a2p10dlc") &&
+    !isCanadianBusiness &&
     onboarding.a2p10dlc.status !== "approved" &&
     onboarding.a2p10dlc.status !== "live"
   ) {
@@ -682,7 +717,7 @@ export function deriveWorkspaceMessagingReadiness({
 export function buildOnboardingStepsForState(
   onboarding: WorkspaceMessagingOnboardingState,
 ): WorkspaceOnboardingStepState[] {
-  const [pathSelectionStep, messagingServiceStep, businessProfileStep, useCaseStep, providerProvisioningStep, launchChecksStep] =
+  const [businessProfileStep, useCaseStep, pathSelectionStep, messagingServiceStep, providerProvisioningStep, launchChecksStep] =
     DEFAULT_WORKSPACE_ONBOARDING_STEPS;
   const emergencyReady =
     onboarding.emergencyVoice.address.status === "validated" &&
@@ -698,14 +733,6 @@ export function buildOnboardingStepsForState(
 
   return [
     {
-      ...pathSelectionStep!,
-      status: onboarding.selectedChannels.length > 0 ? "complete" : "in_progress",
-    },
-    {
-      ...messagingServiceStep!,
-      status: onboarding.messagingService.serviceSid ? "complete" : "in_progress",
-    },
-    {
       ...businessProfileStep!,
       status:
         onboarding.businessProfile.legalBusinessName &&
@@ -720,6 +747,14 @@ export function buildOnboardingStepsForState(
         onboarding.businessProfile.sampleMessages.length > 0
           ? "complete"
           : "in_progress",
+    },
+    {
+      ...pathSelectionStep!,
+      status: onboarding.selectedChannels.length > 0 ? "complete" : "in_progress",
+    },
+    {
+      ...messagingServiceStep!,
+      status: onboarding.messagingService.serviceSid ? "complete" : "in_progress",
     },
     {
       ...providerProvisioningStep!,

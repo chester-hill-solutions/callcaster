@@ -358,6 +358,17 @@ export interface WorkspaceRcsOnboardingState {
   provider: string | null;
   agentId: string | null;
   senderId: string | null;
+  displayName: string;
+  publicDescription: string;
+  logoImageUrl: string;
+  bannerImageUrl: string;
+  accentColor: string;
+  optInPolicyImageUrl: string;
+  useCaseVideoUrl: string;
+  representativeName: string;
+  representativeTitle: string;
+  representativeEmail: string;
+  notificationEmail: string;
   regions: string[];
   prerequisites: string[];
   notes: string;

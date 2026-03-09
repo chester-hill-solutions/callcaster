@@ -362,6 +362,7 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+      selectedChannels: ["voice_compliance"],
       emergencyVoice: {
         enabled: true,
         allowedCallerIdTypes: ["rented"],
@@ -373,6 +374,58 @@ describe("app/routes/api.dial.tsx", () => {
     await expect(
       mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
     ).rejects.toMatchObject({ status: 400 });
+  });
+
+  test("does not enforce emergency voice when the voice track is not selected", async () => {
+    const { supabase } = makeSupabaseStub(10);
+    supabase.from = (table: string) => {
+      if (table === "workspace") {
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { credits: 10 }, error: null }) }) }) };
+      }
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { type: "caller_id", phone_number: "+1555" },
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "call") {
+        return { upsert: async () => ({ error: null }) };
+      }
+      throw new Error("unexpected");
+    };
+    mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+      selectedChannels: ["a2p10dlc"],
+      emergencyVoice: {
+        enabled: true,
+        allowedCallerIdTypes: ["rented"],
+        emergencyEligiblePhoneNumbers: [],
+      },
+    });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
+
+    const mod = await import("../app/routes/api.dial");
+    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+
+    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
   });
 });
 

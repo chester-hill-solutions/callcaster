@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "remix build",
-    "dev": "remix dev --port 3000",
+    "dev": "node ./scripts/local/dev-stable.mjs",
+    "dev:classic": "remix dev --port 3000",
     "dev:calling:sync": "node ./scripts/local/sync-calling-dev.mjs",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "remix-serve ./build/index.js",

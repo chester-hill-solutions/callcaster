@@ -8,6 +8,7 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -122,6 +123,7 @@ export async function ensureWorkspaceTwilioBootstrap({
       });
     }
 
+    nextOnboarding = hydrateWorkspaceRcsOnboardingState(nextOnboarding);
     nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
       status: nextOnboarding.messagingService.serviceSid ? "collecting_business" : "provisioning",
       currentStep: nextOnboarding.messagingService.serviceSid

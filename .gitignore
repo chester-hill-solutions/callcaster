@@ -10,3 +10,4 @@ migrations
 /public/exports/*
 
 /coverage
+.cursor

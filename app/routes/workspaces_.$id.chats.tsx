@@ -28,7 +28,16 @@ import {
 } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import { Suspense, useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { Card } from "@/components/ui/card";
 import { useConversationSummaryRealTime, phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import ChatHeader from "@/components/sms-ui/ChatHeader";
@@ -43,11 +52,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import type { User, Contact, WorkspaceNumber as WorkspaceNumberType, Workspace, BaseUser } from "@/lib/types";
+import {
+  RealtimePostgresChangesPayload,
+  SupabaseClient,
+} from "@supabase/supabase-js";
+import type { Database, Tables } from "@/lib/database.types";
+import type { User, Contact, Workspace, BaseUser } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import { sendMessage } from "./api.chat_sms";
+import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import {
+  buildRepliedContactKeys,
+  getChatSortOption,
+  getConversationPhoneKey,
+  sortConversationSummaries,
+  type ChatSortOption,
+} from "@/lib/chat-conversation-sort";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
 interface Campaign {
@@ -81,6 +101,7 @@ type LoaderData = {
   chatsPromise: Promise<{
     chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
     chatsError: Error | null;
+    repliedContactKeys: string[];
   }>;
   potentialContacts: Contact[];
   contact: Contact | null;
@@ -99,6 +120,7 @@ type ImageFetcherData = {
 type ChatsData = {
   chats: ConversationSummary[];
   chatsError: Error | null;
+  repliedContactKeys: string[];
 };
 
 type WorkspaceContextType = {
@@ -118,6 +140,8 @@ function ConversationList({
   conversationData,
   setConversationData,
   conversations,
+  sortBy,
+  repliedContactKeys,
   contactNumber,
   handleExistingConversationClick,
   formatDate,
@@ -127,6 +151,8 @@ function ConversationList({
   conversationData: ConversationSummary[];
   setConversationData: Dispatch<SetStateAction<ConversationSummary[]>>;
   conversations: ConversationSummary[];
+  sortBy: ChatSortOption;
+  repliedContactKeys: Set<string>;
   contactNumber?: string;
   handleExistingConversationClick: (phoneNumber: string) => void;
   formatDate: (value: string) => string;
@@ -161,15 +187,19 @@ function ConversationList({
     }
   }, [shapedChats, conversationData, refreshConversations, setConversationData]);
 
+  const displayChats = conversations.length > 0 ? conversations : shapedChats;
+  const sortedChats = useMemo(
+    () => sortConversationSummaries(displayChats, sortBy, repliedContactKeys),
+    [displayChats, repliedContactKeys, sortBy],
+  );
+
   if (shapedChats.length === 0) {
     return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
   }
 
-  const displayChats = conversations.length > 0 ? conversations : shapedChats;
-
   return (
     <>
-      {displayChats
+      {sortedChats
         .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
         .map((chat) => (
           <button
@@ -208,6 +238,42 @@ function ConversationList({
 }
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
+
+async function fetchRepliedContactKeys({
+  supabaseClient,
+  workspaceId,
+  chats,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  chats: ConversationSummary[] | null | undefined;
+}) {
+  const contactPhones = Array.from(
+    new Set(
+      (chats ?? [])
+        .map((chat) => chat?.contact_phone)
+        .filter((phone): phone is string => Boolean(phone)),
+    ),
+  );
+
+  if (contactPhones.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabaseClient
+    .from("message")
+    .select("from")
+    .eq("workspace", workspaceId)
+    .eq("direction", "inbound")
+    .in("from", contactPhones);
+
+  if (error) {
+    logger.error("Error fetching replied chat contacts:", error);
+    return [];
+  }
+
+  return buildRepliedContactKeys(data ?? []);
+}
 
 // Custom hook for image handling
 function useImageHandling(workspace_id: string) {
@@ -326,7 +392,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  const chatsPromise = fetchConversationSummary(supabaseClient, workspaceId, campaign_id);
+  const chatsPromise = (async () => {
+    const { chats, chatsError } = await fetchConversationSummary(
+      supabaseClient,
+      workspaceId,
+      campaign_id,
+    );
+    const repliedContactKeys = await fetchRepliedContactKeys({
+      supabaseClient,
+      workspaceId,
+      chats: chats ?? [],
+    });
+
+    return { chats, chatsError, repliedContactKeys };
+  })();
   return defer(
     {
       campaigns: smsCampaigns,
@@ -382,9 +461,13 @@ export default function ChatsList() {
   const navigate = useNavigate();
   const contact_number = outlet ? loc.pathname.split("/").pop() || "" : "";
   const formatDate = useDateFormatter();
+  const sortBy = getChatSortOption(searchParams.get("sort"));
   
   // State to hold the conversation data
   const [conversationData, setConversationData] = useState<ConversationSummary[]>([]);
+  const [liveRepliedContactKeys, setLiveRepliedContactKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // Initialize the conversation summary hook with the state
   const { conversations, refreshConversations } = useConversationSummaryRealTime({
@@ -412,7 +495,6 @@ export default function ChatsList() {
     existingConversation,
     handleSearch: handlePhoneChange,
     toggleContactMenu,
-    clearSelectedContact,
     isValid,
   } = useContactSearch({
     supabase,
@@ -429,6 +511,39 @@ export default function ChatsList() {
       navigate(".");
     }
   }, [contact_number, navigate]);
+
+  useSupabaseRealtimeSubscription({
+    supabase,
+    table: "message",
+    filter: `workspace=eq.${workspace.id}`,
+    onChange: (payload) => {
+      const typedPayload =
+        payload as RealtimePostgresChangesPayload<Tables<"message">>;
+
+      if (typedPayload.eventType !== "INSERT") {
+        return;
+      }
+
+      if (typedPayload.new?.direction !== "inbound") {
+        return;
+      }
+
+      const repliedContactKey = getConversationPhoneKey(typedPayload.new.from);
+      if (!repliedContactKey) {
+        return;
+      }
+
+      setLiveRepliedContactKeys((currentKeys) => {
+        if (currentKeys.has(repliedContactKey)) {
+          return currentKeys;
+        }
+
+        const nextKeys = new Set(currentKeys);
+        nextKeys.add(repliedContactKey);
+        return nextKeys;
+      });
+    },
+  });
 
   // Form submission handler
   const handleSubmit = useCallback(
@@ -589,11 +704,12 @@ export default function ChatsList() {
         </Button>
         <div className="flex">
           <Select
-            defaultValue={searchParams.get("campaign_id") || ""}
+            value={searchParams.get("campaign_id") || ""}
             onValueChange={(val) => {
               setSearchParams((prev) => {
-                prev.set("campaign_id", val);
-                return prev;
+                const next = new URLSearchParams(prev);
+                next.set("campaign_id", val);
+                return next;
               });
             }}
           >
@@ -618,13 +734,42 @@ export default function ChatsList() {
             variant={"ghost"}
             onClick={() =>
               setSearchParams((prev) => {
-                prev.delete("campaign_id");
-                return prev;
+                const next = new URLSearchParams(prev);
+                next.delete("campaign_id");
+                return next;
               })
             }
           >
             <X />
           </Button>
+        </div>
+        <div className="border-b p-2">
+          <Select
+            value={sortBy}
+            onValueChange={(value) => {
+              setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                const nextSort = getChatSortOption(value);
+
+                if (nextSort === "recent") {
+                  next.delete("sort");
+                } else {
+                  next.set("sort", nextSort);
+                }
+
+                return next;
+              });
+            }}
+          >
+            <SelectTrigger className="flex items-center">
+              <SelectValue placeholder="Sort chats" />
+            </SelectTrigger>
+            <SelectContent className="w-full bg-slate-50">
+              <SelectItem value="recent">Recent activity</SelectItem>
+              <SelectItem value="hasReplied">Has replied</SelectItem>
+              <SelectItem value="hasUnreadReply">Has unread reply</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex-1 overflow-y-auto">
           <Suspense fallback={
@@ -648,6 +793,13 @@ export default function ChatsList() {
                     conversationData={conversationData}
                     setConversationData={setConversationData}
                     conversations={conversations}
+                    sortBy={sortBy}
+                    repliedContactKeys={
+                      new Set([
+                        ...(chatsData as ChatsData).repliedContactKeys,
+                        ...liveRepliedContactKeys,
+                      ])
+                    }
                     contactNumber={contact_number}
                     handleExistingConversationClick={handleExistingConversationClick}
                     formatDate={formatDate}

@@ -259,7 +259,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                     <textarea
                                         ref={textareaRef}
                                         name="body_text"
-                                        className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
+                                        className="h-fit w-full cursor-text resize-none rounded-md border-none bg-white pb-2 pl-4 pr-4 pt-2 text-gray-900 outline-none"
                                         style={{ caretColor: "black" }}
                                         rows={5}
                                         value={displayText}

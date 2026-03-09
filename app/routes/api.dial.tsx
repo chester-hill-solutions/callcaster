@@ -69,7 +69,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             workspaceId: workspace_id,
         }),
     ]);
-    if (onboarding.emergencyVoice.enabled) {
+    if (onboarding.selectedChannels?.includes("voice_compliance") && onboarding.emergencyVoice.enabled) {
         if (!callerIdRecord) {
             throw new Response("Caller ID must be a workspace number for emergency-compliant voice.", { status: 400 });
         }

@@ -27,7 +27,12 @@ import {
     DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
     deriveWorkspaceMessagingReadiness,
 } from "@/lib/messaging-onboarding.server";
-import { updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
+import {
+  TWILIO_RCS_DOCS_URL,
+  TWILIO_RCS_PROVIDER,
+  TWILIO_RCS_SENDERS_URL,
+  updateWorkspaceRcsOnboarding,
+} from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
@@ -358,7 +363,50 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
-                provider: parseOptionalString(formData.get("rcsProvider")),
+                provider: TWILIO_RCS_PROVIDER,
+                displayName: typeof formData.get("rcsDisplayName") === "string" ? String(formData.get("rcsDisplayName")) : "",
+                publicDescription:
+                    typeof formData.get("rcsPublicDescription") === "string"
+                        ? String(formData.get("rcsPublicDescription"))
+                        : "",
+                logoImageUrl:
+                    typeof formData.get("rcsLogoImageUrl") === "string"
+                        ? String(formData.get("rcsLogoImageUrl"))
+                        : "",
+                bannerImageUrl:
+                    typeof formData.get("rcsBannerImageUrl") === "string"
+                        ? String(formData.get("rcsBannerImageUrl"))
+                        : "",
+                accentColor:
+                    typeof formData.get("rcsAccentColor") === "string"
+                        ? String(formData.get("rcsAccentColor"))
+                        : "",
+                optInPolicyImageUrl:
+                    typeof formData.get("rcsOptInPolicyImageUrl") === "string"
+                        ? String(formData.get("rcsOptInPolicyImageUrl"))
+                        : "",
+                useCaseVideoUrl:
+                    typeof formData.get("rcsUseCaseVideoUrl") === "string"
+                        ? String(formData.get("rcsUseCaseVideoUrl"))
+                        : "",
+                representativeName:
+                    typeof formData.get("rcsRepresentativeName") === "string"
+                        ? String(formData.get("rcsRepresentativeName"))
+                        : "",
+                representativeTitle:
+                    typeof formData.get("rcsRepresentativeTitle") === "string"
+                        ? String(formData.get("rcsRepresentativeTitle"))
+                        : "",
+                representativeEmail:
+                    typeof formData.get("rcsRepresentativeEmail") === "string"
+                        ? String(formData.get("rcsRepresentativeEmail"))
+                        : "",
+                notificationEmail:
+                    typeof formData.get("rcsNotificationEmail") === "string"
+                        ? String(formData.get("rcsNotificationEmail"))
+                        : "",
+                agentId: parseOptionalString(formData.get("rcsAgentId")),
+                senderId: parseOptionalString(formData.get("rcsSenderId")),
                 regions: typeof formData.get("rcsRegions") === "string"
                     ? String(formData.get("rcsRegions"))
                         .split(",")
@@ -747,18 +795,135 @@ function PortalContent({ data }: { data: TwilioPageData }) {
                         ))}
                     </div>
 
+                    <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+                        Twilio currently manages RCS sender creation and compliance review in Console. Save the sender package here, then continue the registration flow in Twilio.
+                        <div className="mt-3 flex flex-wrap gap-3">
+                            <a className="underline" href={TWILIO_RCS_SENDERS_URL} target="_blank" rel="noreferrer">
+                                Open Twilio RCS senders
+                            </a>
+                            <a className="underline" href={TWILIO_RCS_DOCS_URL} target="_blank" rel="noreferrer">
+                                View Twilio onboarding guide
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-lg border p-4">
+                            <div className="text-sm text-muted-foreground">Provider</div>
+                            <div className="mt-1 font-medium">{TWILIO_RCS_PROVIDER}</div>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                            <div className="text-sm text-muted-foreground">Messaging Service SID</div>
+                            <div className="mt-1 font-mono text-sm">
+                                {onboarding.messagingService.serviceSid ?? "Provision Messaging Service first"}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                            <div className="text-sm text-muted-foreground">Inbound webhook</div>
+                            <div className="mt-1 break-all font-mono text-xs">
+                                {onboarding.subaccountBootstrap.inboundSmsUrl ?? "Bootstrap messaging first"}
+                            </div>
+                        </div>
+                        <div className="rounded-lg border p-4">
+                            <div className="text-sm text-muted-foreground">Status callback</div>
+                            <div className="mt-1 break-all font-mono text-xs">
+                                {onboarding.subaccountBootstrap.statusCallbackUrl ?? "Bootstrap messaging first"}
+                            </div>
+                        </div>
+                    </div>
+
                     <Form method="post" className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
                         <input type="hidden" name="_action" value="save_workspace_rcs" />
                         <div className="space-y-2">
-                            <Label htmlFor="rcsProvider">RCS provider</Label>
-                            <Input id="rcsProvider" name="rcsProvider" defaultValue={onboarding.rcs.provider ?? ""} />
+                            <Label htmlFor="rcsDisplayName">Sender display name</Label>
+                            <Input id="rcsDisplayName" name="rcsDisplayName" defaultValue={onboarding.rcs.displayName} />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="rcsRegions">RCS regions</Label>
+                            <Label htmlFor="rcsRegions">Destination countries</Label>
                             <Input id="rcsRegions" name="rcsRegions" defaultValue={onboarding.rcs.regions.join(", ")} />
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                            <Label htmlFor="rcsNotes">RCS notes</Label>
+                            <Label htmlFor="rcsPublicDescription">Public sender description</Label>
+                            <Textarea
+                                id="rcsPublicDescription"
+                                name="rcsPublicDescription"
+                                defaultValue={onboarding.rcs.publicDescription}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsLogoImageUrl">Logo image URL</Label>
+                            <Input id="rcsLogoImageUrl" name="rcsLogoImageUrl" defaultValue={onboarding.rcs.logoImageUrl} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsBannerImageUrl">Banner image URL</Label>
+                            <Input
+                                id="rcsBannerImageUrl"
+                                name="rcsBannerImageUrl"
+                                defaultValue={onboarding.rcs.bannerImageUrl}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsAccentColor">Accent color</Label>
+                            <Input id="rcsAccentColor" name="rcsAccentColor" defaultValue={onboarding.rcs.accentColor} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsOptInPolicyImageUrl">Opt-in policy image URL</Label>
+                            <Input
+                                id="rcsOptInPolicyImageUrl"
+                                name="rcsOptInPolicyImageUrl"
+                                defaultValue={onboarding.rcs.optInPolicyImageUrl}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsUseCaseVideoUrl">Use case video URL</Label>
+                            <Input
+                                id="rcsUseCaseVideoUrl"
+                                name="rcsUseCaseVideoUrl"
+                                defaultValue={onboarding.rcs.useCaseVideoUrl}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsNotificationEmail">Notification email</Label>
+                            <Input
+                                id="rcsNotificationEmail"
+                                name="rcsNotificationEmail"
+                                defaultValue={onboarding.rcs.notificationEmail}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsRepresentativeName">Authorized representative name</Label>
+                            <Input
+                                id="rcsRepresentativeName"
+                                name="rcsRepresentativeName"
+                                defaultValue={onboarding.rcs.representativeName}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsRepresentativeTitle">Authorized representative title</Label>
+                            <Input
+                                id="rcsRepresentativeTitle"
+                                name="rcsRepresentativeTitle"
+                                defaultValue={onboarding.rcs.representativeTitle}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsRepresentativeEmail">Authorized representative email</Label>
+                            <Input
+                                id="rcsRepresentativeEmail"
+                                name="rcsRepresentativeEmail"
+                                defaultValue={onboarding.rcs.representativeEmail}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsAgentId">Twilio or Google agent ID</Label>
+                            <Input id="rcsAgentId" name="rcsAgentId" defaultValue={onboarding.rcs.agentId ?? ""} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="rcsSenderId">Twilio sender ID</Label>
+                            <Input id="rcsSenderId" name="rcsSenderId" defaultValue={onboarding.rcs.senderId ?? ""} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <Label htmlFor="rcsNotes">Ops notes</Label>
                             <Textarea id="rcsNotes" name="rcsNotes" defaultValue={onboarding.rcs.notes} />
                         </div>
                         <div className="space-y-2">

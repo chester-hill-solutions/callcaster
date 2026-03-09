@@ -7,7 +7,7 @@ This app runs as a Remix server on `http://localhost:3000` and uses local Supaba
 - Node `>=18` or Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
 - Supabase CLI
-- ngrok
+- Localtunnel
 - A Twilio account with:
   - an account SID and auth token
   - a TwiML App SID for Voice SDK/browser calling
@@ -20,7 +20,6 @@ This app runs as a Remix server on `http://localhost:3000` and uses local Supaba
 - Supabase Postgres: `54322`
 - Supabase Studio: `http://127.0.0.1:54323`
 - Inbucket email UI: `http://127.0.0.1:54324`
-- ngrok local API: `http://127.0.0.1:4040`
 
 ## Environment Setup
 
@@ -63,27 +62,36 @@ npm run dev
    - Supabase Studio at `http://127.0.0.1:54323`
    - Inbucket at `http://127.0.0.1:54324`
 
-## Calling Setup With ngrok
+## Calling Setup With Localtunnel
 
 Twilio cannot call back into `localhost`, so calling features need a public HTTPS base URL.
 
-1. Start ngrok against the local app:
+1. Install Localtunnel if you do not already have it:
 
 ```bash
-ngrok http 3000
+npm install -g localtunnel
 ```
 
-2. Copy the HTTPS forwarding URL from ngrok.
+2. Start Localtunnel against the local app:
 
-3. Set `BASE_URL` in `.env` to that HTTPS URL.
+```bash
+lt --port 3000
+```
+
+3. Copy the HTTPS forwarding URL from Localtunnel.
+
+4. Set `BASE_URL` in `.env` to that HTTPS URL.
 
 Example:
 
 ```bash
-BASE_URL=https://your-subdomain.ngrok-free.app
+BASE_URL=https://your-subdomain.loca.lt
 ```
 
-4. Restart the app after changing `.env`.
+5. Restart the app after changing `.env`.
+
+Localtunnel quickstart reference:
+- [Localtunnel docs](https://theboroer.github.io/localtunnel-www/)
 
 ## Sync Twilio To The Current Tunnel
 
@@ -101,10 +109,10 @@ Sync every workspace with stored Twilio credentials:
 npm run dev:calling:sync -- --all-workspaces
 ```
 
-Override the detected ngrok URL:
+Pass the current Localtunnel URL explicitly:
 
 ```bash
-npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.ngrok-free.app
+npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
 ```
 
 What the script updates:
@@ -115,11 +123,14 @@ What the script updates:
 The script reads the public URL in this order:
 - `--base-url`
 - `BASE_URL` from the environment
-- ngrok's local API at `http://127.0.0.1:4040/api/tunnels`
+
+Because Localtunnel does not expose the same local tunnel API flow as ngrok, prefer either:
+- setting `BASE_URL` in `.env`
+- passing `--base-url` directly to the sync command
 
 ## Why Resync Is Required
 
-Twilio webhook validation uses the exact incoming request URL. If your ngrok hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
+Twilio webhook validation uses the exact incoming request URL. If your Localtunnel hostname changes but Twilio is still sending requests to the old URL, webhook validation will fail until the callbacks are updated.
 
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
@@ -129,9 +140,9 @@ Relevant runtime wiring:
 
 1. Start Supabase with `supabase start`
 2. Start the app with `npm run dev`
-3. Start ngrok with `ngrok http 3000`
+3. Start Localtunnel with `lt --port 3000`
 4. Update `BASE_URL` in `.env` if the tunnel changed
-5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id>`
+5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
 6. Test the calling flow
 
 ## Troubleshooting
@@ -141,12 +152,12 @@ Relevant runtime wiring:
 - Restart the app after changing `.env`
 
 `Invalid Twilio signature`
-- Make sure `BASE_URL` exactly matches the public ngrok URL
+- Make sure `BASE_URL` exactly matches the current Localtunnel URL
 - Re-run the sync script after every tunnel rotation
 - Confirm the Twilio auth token in `.env` matches the account being used
 
 Calling loads but webhooks do not fire
-- Verify ngrok is forwarding to port `3000`
+- Verify Localtunnel is forwarding to port `3000`
 - Check that the script updated the right workspace or all workspaces
 - Confirm the relevant number exists in the workspace and in Twilio
 

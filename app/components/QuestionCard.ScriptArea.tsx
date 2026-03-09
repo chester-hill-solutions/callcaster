@@ -31,7 +31,7 @@ export const ScriptOrAudio = ({ question, edit, mediaNames, onScriptChange, onAu
                             <textarea 
                                 rows={Math.max(3, Math.ceil(question.say.length / 40))} 
                                 value={question.say} 
-                                className="w-full p-3 border rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 resize-none"
+                                className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
                                 onChange={(e) => onScriptChange(e.target.value)}
                                 style={{
                                     lineHeight: '1.5',

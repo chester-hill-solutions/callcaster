@@ -97,6 +97,12 @@ function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
   if (!onboarding.messagingService.serviceSid) {
     issues.push("Messaging Service must be provisioned first.");
   }
+  if (!onboarding.a2p10dlc.customerProfileBundleSid) {
+    issues.push("Customer Profile Bundle SID is required before A2P registration can be submitted.");
+  }
+  if (!onboarding.a2p10dlc.trustProductSid) {
+    issues.push("A2P Messaging Profile Bundle SID is required before A2P registration can be submitted.");
+  }
 
   return issues;
 }
@@ -134,6 +140,7 @@ export async function provisionWorkspaceA2P({
       a2p10dlc: {
         ...onboarding.a2p10dlc,
         status: "collecting_business",
+        rejectionReason: null,
       },
       lastUpdatedBy: actorUserId,
     });
@@ -171,10 +178,11 @@ export async function provisionWorkspaceA2P({
 
     if (!brandSid && messagingApi?.brandRegistrations?.create) {
       const brand = await messagingApi.brandRegistrations.create({
-        customerProfileBundleSid:
-          nextOnboarding.a2p10dlc.customerProfileBundleSid ?? undefined,
-        friendlyName: nextOnboarding.businessProfile.legalBusinessName,
-        statusCallback: undefined,
+        customerProfileBundleSid: nextOnboarding.a2p10dlc.customerProfileBundleSid!,
+        a2PProfileBundleSid: nextOnboarding.a2p10dlc.trustProductSid!,
+        ...(nextOnboarding.a2p10dlc.brandType
+          ? { brandType: nextOnboarding.a2p10dlc.brandType }
+          : {}),
       });
       brandSid = parseOptionalString(brand?.sid);
     }

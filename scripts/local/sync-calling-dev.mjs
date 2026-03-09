@@ -94,12 +94,14 @@ function printHelp() {
 Usage:
   npm run dev:calling:sync -- --workspace-id <workspace-id>
   npm run dev:calling:sync -- --all-workspaces
-  npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.ngrok-free.app
+  npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url https://your-subdomain.loca.lt
 
 The script resolves the public base URL in this order:
   1. --base-url
   2. BASE_URL from the environment
-  3. ngrok local API at ${NGROK_API_URL}
+  3. ngrok local API at ${NGROK_API_URL} (fallback only)
+
+For Localtunnel, set BASE_URL in .env or pass --base-url explicitly.
 `.trim());
 }
 
@@ -129,6 +131,7 @@ function normalizeOptionalBaseUrl(value) {
 
   if (
     trimmed.includes("your-ngrok-subdomain") ||
+    trimmed.includes("your-subdomain.loca.lt") ||
     trimmed.includes("your-subdomain") ||
     trimmed.includes("placeholder")
   ) {
@@ -164,7 +167,7 @@ async function discoverNgrokUrl() {
   const response = await fetch(NGROK_API_URL);
   if (!response.ok) {
     throw new Error(
-      `Could not reach ngrok local API at ${NGROK_API_URL}. Start ngrok or pass --base-url.`,
+      `Could not reach ngrok local API at ${NGROK_API_URL}. If you are using Localtunnel, pass --base-url or set BASE_URL.`,
     );
   }
 
@@ -174,7 +177,7 @@ async function discoverNgrokUrl() {
 
   if (!httpsTunnel?.public_url) {
     throw new Error(
-      `No HTTPS ngrok tunnel found at ${NGROK_API_URL}. Start ngrok or pass --base-url.`,
+      `No HTTPS ngrok tunnel found at ${NGROK_API_URL}. If you are using Localtunnel, pass --base-url or set BASE_URL.`,
     );
   }
 

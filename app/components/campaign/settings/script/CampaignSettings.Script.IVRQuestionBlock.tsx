@@ -230,7 +230,7 @@ const IVRQuestionBlock = ({
                 onChange={(e) => handleChange("audioFile", e.target.value)}
                 placeholder="Your synthetic greeting"
                 rows={Math.max(3, Math.ceil((localBlock?.audioFile || 1) as number / 40))}
-                className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-100"
+                className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
             )}
             {localBlock.speechType === "recorded" && (

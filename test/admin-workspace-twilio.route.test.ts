@@ -37,6 +37,9 @@ vi.mock("../app/lib/twilio-a2p.server", () => ({
 
 vi.mock("../app/lib/rcs-onboarding.server", () => ({
   updateWorkspaceRcsOnboarding: (...args: any[]) => mocks.updateWorkspaceRcsOnboarding(...args),
+  TWILIO_RCS_PROVIDER: "Twilio",
+  TWILIO_RCS_DOCS_URL: "https://www.twilio.com/docs/rcs/onboarding",
+  TWILIO_RCS_SENDERS_URL: "https://console.twilio.com/us1/develop/rcs/senders",
 }));
 
 function makePortalSnapshot() {
@@ -46,7 +49,25 @@ function makePortalSnapshot() {
       currentStep: "messaging_service",
       steps: [],
       messagingService: { serviceSid: null },
-      rcs: { provider: null, regions: [], notes: "", status: "not_started" },
+      rcs: {
+        provider: "Twilio",
+        agentId: null,
+        senderId: null,
+        displayName: "",
+        publicDescription: "",
+        logoImageUrl: "",
+        bannerImageUrl: "",
+        accentColor: "",
+        optInPolicyImageUrl: "",
+        useCaseVideoUrl: "",
+        representativeName: "",
+        representativeTitle: "",
+        representativeEmail: "",
+        notificationEmail: "",
+        regions: [],
+        notes: "",
+        status: "not_started",
+      },
     },
     readiness: {
       messagingReady: false,
@@ -294,7 +315,19 @@ describe("app/routes/admin_.workspaces.$workspaceId.twilio.tsx", () => {
     mocks.updateWorkspaceRcsOnboarding.mockResolvedValueOnce({});
     const rcsData = new FormData();
     rcsData.set("_action", "save_workspace_rcs");
-    rcsData.set("rcsProvider", "Twilio");
+    rcsData.set("rcsDisplayName", "Acme Support");
+    rcsData.set("rcsPublicDescription", "Support conversations");
+    rcsData.set("rcsLogoImageUrl", "https://example.com/logo.png");
+    rcsData.set("rcsBannerImageUrl", "https://example.com/banner.png");
+    rcsData.set("rcsAccentColor", "#0057FF");
+    rcsData.set("rcsOptInPolicyImageUrl", "https://example.com/opt-in.png");
+    rcsData.set("rcsUseCaseVideoUrl", "https://example.com/demo.mp4");
+    rcsData.set("rcsRepresentativeName", "Jordan Smith");
+    rcsData.set("rcsRepresentativeTitle", "Head of Operations");
+    rcsData.set("rcsRepresentativeEmail", "jordan@example.com");
+    rcsData.set("rcsNotificationEmail", "compliance@example.com");
+    rcsData.set("rcsAgentId", "agent-123");
+    rcsData.set("rcsSenderId", "sender-123");
     rcsData.set("rcsRegions", "US, CA");
     rcsData.set("rcsNotes", "beta");
     rcsData.set("rcsStatus", "in_review");
@@ -308,6 +341,19 @@ describe("app/routes/admin_.workspaces.$workspaceId.twilio.tsx", () => {
       workspaceId: "w1",
       actorUserId: "u1",
       provider: "Twilio",
+      displayName: "Acme Support",
+      publicDescription: "Support conversations",
+      logoImageUrl: "https://example.com/logo.png",
+      bannerImageUrl: "https://example.com/banner.png",
+      accentColor: "#0057FF",
+      optInPolicyImageUrl: "https://example.com/opt-in.png",
+      useCaseVideoUrl: "https://example.com/demo.mp4",
+      representativeName: "Jordan Smith",
+      representativeTitle: "Head of Operations",
+      representativeEmail: "jordan@example.com",
+      notificationEmail: "compliance@example.com",
+      agentId: "agent-123",
+      senderId: "sender-123",
       regions: ["US", "CA"],
       notes: "beta",
       status: "in_review",

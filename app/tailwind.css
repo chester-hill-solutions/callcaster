@@ -211,8 +211,15 @@
   }
 }
 
-input,
+input:not([type="hidden"]),
+select,
 textarea {
   border: 2px solid hsl(var(--border));
+  background-color: white;
+  color: rgb(17 24 39);
   padding: 4px 8px;
+}
+
+textarea::placeholder {
+  color: rgb(107 114 128);
 }
