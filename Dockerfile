@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:alpine
 WORKDIR /app
 
 # Add build argument for cache busting (Railway: set RAILWAY_CACHE_BUST env var)
