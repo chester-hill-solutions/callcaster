@@ -152,7 +152,7 @@ export async function safeAsync<T>(
 
 // Type-safe event handling
 export interface TypedEventHandlers {
-  onInput: (event: React.InputEvent<HTMLInputElement>) => void;
+  onInput: (event: React.FormEvent<HTMLInputElement>) => void;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onClick: (event: React.MouseEvent<HTMLElement>) => void;

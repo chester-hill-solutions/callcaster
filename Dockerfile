@@ -11,6 +11,11 @@ COPY package.json package-lock.json* ./
 # Install dependencies
 RUN npm install
 
+# Install ffmpeg for upload-time audio normalization
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy source code
 COPY . .
 

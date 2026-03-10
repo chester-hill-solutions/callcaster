@@ -37,6 +37,13 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap, syncWorkspaceTwilioBootstrapState } from "@/lib/twilio-bootstrap.server";
+import {
+  getConversationParticipantPhones,
+  getConversationPhoneKey,
+  sortConversationSummaries,
+  type ChatSortOption,
+  type ConversationSummary,
+} from "../chat-conversation-sort";
 
 const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
@@ -1418,27 +1425,184 @@ export async function getInvitesByUserId(
   return data;
 }
 
+type FetchConversationSummaryOptions = {
+  limit?: number;
+  offset?: number;
+  sort?: ChatSortOption;
+};
+
+type ConversationMessageRow = Pick<
+  Database["public"]["Tables"]["message"]["Row"],
+  "campaign_id" | "contact_id" | "date_created" | "direction" | "from" | "status" | "to"
+>;
+
+type ContactNameRow = Pick<
+  Database["public"]["Tables"]["contact"]["Row"],
+  "firstname" | "id" | "phone" | "surname"
+>;
+
+function compareConversationDates(left: string, right: string): number {
+  return new Date(left).getTime() - new Date(right).getTime();
+}
+
 export async function fetchConversationSummary(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   campaign_id?: string | null,
+  options: FetchConversationSummaryOptions = {},
 ) {
-  let chats, chatsError;
-  if (campaign_id) {
-    const { data, error } = await supabaseClient.rpc(
-      "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: Number(campaign_id) },
-    );
-    chats = data;
-    chatsError = error;
-  } else {
-    const { data, error } = await supabaseClient.rpc(
-      "get_conversation_summary",
-      { p_workspace: workspaceId },
-    );
-    chats = data;
-    chatsError = error;
+  const limit = Math.max(1, options.limit ?? 20);
+  const offset = Math.max(0, options.offset ?? 0);
+  const sort = options.sort ?? "recent";
+
+  const { data: workspaceNumberRows, error: workspaceNumbersError } =
+    await supabaseClient
+      .from("workspace_number")
+      .select("phone_number")
+      .eq("workspace", workspaceId);
+
+  if (workspaceNumbersError) {
+    return { chats: [], chatsError: workspaceNumbersError, hasMore: false };
   }
-  return { chats, chatsError };
+
+  const workspacePhoneKeys = new Set(
+    (workspaceNumberRows ?? [])
+      .map((row) => getConversationPhoneKey(row.phone_number))
+      .filter((phone): phone is string => Boolean(phone)),
+  );
+
+  let messageQuery = supabaseClient
+    .from("message")
+    .select("campaign_id, contact_id, date_created, direction, from, status, to")
+    .eq("workspace", workspaceId)
+    .not("date_created", "is", null)
+    .neq("status", "failed")
+    .order("date_created", { ascending: false });
+
+  if (campaign_id) {
+    const numericCampaignId = Number(campaign_id);
+    if (!Number.isNaN(numericCampaignId)) {
+      messageQuery = messageQuery.eq("campaign_id", numericCampaignId);
+    }
+  }
+
+  const { data: messageRows, error: messagesError } = await messageQuery;
+  if (messagesError) {
+    return { chats: [], chatsError: messagesError, hasMore: false };
+  }
+
+  const contactIds = Array.from(
+    new Set(
+      (messageRows ?? [])
+        .map((message) => message.contact_id)
+        .filter((contactId): contactId is number => typeof contactId === "number"),
+    ),
+  );
+
+  let contactsById = new Map<number, ContactNameRow>();
+  if (contactIds.length > 0) {
+    const { data: contactRows, error: contactsError } = await supabaseClient
+      .from("contact")
+      .select("firstname, id, phone, surname")
+      .in("id", contactIds);
+
+    if (contactsError) {
+      logger.error("Error loading contact names for conversations", contactsError);
+    } else {
+      contactsById = new Map(
+        (contactRows ?? []).map((contact) => [contact.id, contact]),
+      );
+    }
+  }
+
+  const conversationMap = new Map<string, ConversationSummary>();
+
+  for (const message of (messageRows ?? []) as ConversationMessageRow[]) {
+    const { contactPhone, userPhone } = getConversationParticipantPhones(
+      message,
+      workspacePhoneKeys,
+    );
+    const conversationKey = getConversationPhoneKey(contactPhone);
+    const timestamp = message.date_created ?? new Date().toISOString();
+
+    if (!contactPhone || !conversationKey) {
+      continue;
+    }
+
+    const contact = typeof message.contact_id === "number"
+      ? contactsById.get(message.contact_id)
+      : undefined;
+    const existingConversation = conversationMap.get(conversationKey);
+    const hasReplied = message.direction === "inbound";
+    const unreadIncrement =
+      message.direction === "inbound" && message.status === "received" ? 1 : 0;
+
+    if (!existingConversation) {
+      conversationMap.set(conversationKey, {
+        contact_phone: contact?.phone || contactPhone,
+        user_phone: userPhone ?? "",
+        conversation_start: timestamp,
+        conversation_last_update: timestamp,
+        message_count: 1,
+        unread_count: unreadIncrement,
+        contact_firstname: contact?.firstname ?? null,
+        contact_surname: contact?.surname ?? null,
+        has_replied: hasReplied,
+      });
+      continue;
+    }
+
+    existingConversation.message_count += 1;
+    existingConversation.unread_count += unreadIncrement;
+    existingConversation.has_replied =
+      existingConversation.has_replied === true || hasReplied;
+
+    if (
+      compareConversationDates(
+        existingConversation.conversation_start,
+        timestamp,
+      ) > 0
+    ) {
+      existingConversation.conversation_start = timestamp;
+    }
+
+    if (
+      compareConversationDates(
+        existingConversation.conversation_last_update,
+        timestamp,
+      ) < 0
+    ) {
+      existingConversation.conversation_last_update = timestamp;
+    }
+
+    if (!existingConversation.contact_firstname && contact?.firstname) {
+      existingConversation.contact_firstname = contact.firstname;
+    }
+
+    if (!existingConversation.contact_surname && contact?.surname) {
+      existingConversation.contact_surname = contact.surname;
+    }
+
+    if (!existingConversation.user_phone && userPhone) {
+      existingConversation.user_phone = userPhone;
+    }
+
+    if (!existingConversation.contact_phone && (contact?.phone || contactPhone)) {
+      existingConversation.contact_phone = contact?.phone || contactPhone;
+    }
+  }
+
+  const sortedChats = sortConversationSummaries(
+    Array.from(conversationMap.values()),
+    sort,
+  );
+  const paginatedChats = sortedChats.slice(offset, offset + limit + 1);
+  const hasMore = paginatedChats.length > limit;
+
+  return {
+    chats: hasMore ? paginatedChats.slice(0, limit) : paginatedChats,
+    chatsError: null,
+    hasMore,
+  };
 }
 

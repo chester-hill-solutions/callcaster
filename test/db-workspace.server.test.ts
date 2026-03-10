@@ -940,17 +940,115 @@ describe("app/lib/database/workspace.server.ts", () => {
     await expect(mod.getInvitesByUserId(supabaseOk, "u1")).resolves.toEqual([{ id: 1 }]);
   });
 
-  test("fetchConversationSummary uses correct rpc based on campaign_id", async () => {
+  test("fetchConversationSummary paginates and applies campaign filtering", async () => {
     const mod = await import("../app/lib/database/workspace.server");
+    let selectedCampaignId: number | null = null;
 
-    const rpc = vi.fn(async (_name: string) => ({ data: [{ id: 1 }], error: null }));
-    const supabase: any = { rpc };
+    const messageRows = [
+      {
+        campaign_id: 1,
+        contact_id: 10,
+        date_created: "2026-03-03T00:00:00.000Z",
+        direction: "outbound",
+        from: "+15551111111",
+        status: "delivered",
+        to: "+15550000001",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 10,
+        date_created: "2026-03-01T00:00:00.000Z",
+        direction: "inbound",
+        from: "+15550000001",
+        status: "received",
+        to: "+15551111111",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 11,
+        date_created: "2026-03-02T00:00:00.000Z",
+        direction: "outbound",
+        from: "+15551111111",
+        status: "delivered",
+        to: "+15550000002",
+      },
+      {
+        campaign_id: 2,
+        contact_id: 12,
+        date_created: "2026-03-04T00:00:00.000Z",
+        direction: "outbound",
+        from: "+15551111111",
+        status: "delivered",
+        to: "+15550000003",
+      },
+    ];
 
-    await mod.fetchConversationSummary(supabase, "w1");
-    expect(rpc).toHaveBeenCalledWith("get_conversation_summary", { p_workspace: "w1" });
+    const workspaceNumberQuery = {
+      select: vi.fn(() => workspaceNumberQuery),
+      eq: vi.fn(() => workspaceNumberQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
+    };
 
-    await mod.fetchConversationSummary(supabase, "w1", "1");
-    expect(rpc).toHaveBeenCalledWith("get_conversation_summary_by_campaign", { p_workspace: "w1", campaign_id_prop: 1 });
+    const messageQuery = {
+      select: vi.fn(() => messageQuery),
+      eq: vi.fn((column: string, value: unknown) => {
+        if (column === "campaign_id") {
+          selectedCampaignId = Number(value);
+        }
+        return messageQuery;
+      }),
+      not: vi.fn(() => messageQuery),
+      neq: vi.fn(() => messageQuery),
+      order: vi.fn(() => messageQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({
+          data: messageRows.filter((row) =>
+            selectedCampaignId === null
+              ? true
+              : row.campaign_id === selectedCampaignId,
+          ),
+          error: null,
+        }),
+    };
+
+    const contactQuery = {
+      select: vi.fn(() => contactQuery),
+      in: vi.fn(() => Promise.resolve({
+        data: [
+          { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
+          { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
+        ],
+        error: null,
+      })),
+    };
+
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === "workspace_number") return workspaceNumberQuery;
+        if (table === "message") return messageQuery;
+        if (table === "contact") return contactQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    const result = await mod.fetchConversationSummary(supabase, "w1", "1", {
+      limit: 1,
+      offset: 0,
+      sort: "recent",
+    });
+
+    expect(selectedCampaignId).toBe(1);
+    expect(result.hasMore).toBe(true);
+    expect(result.chats).toEqual([
+      expect.objectContaining({
+        contact_phone: "+15550000001",
+        contact_firstname: "Taylor",
+        contact_surname: "One",
+        message_count: 2,
+        unread_count: 1,
+      }),
+    ]);
   });
 
   test("portal config prefers onboarding Messaging Service defaults when present", async () => {

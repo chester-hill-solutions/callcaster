@@ -1,14 +1,12 @@
 import {
   ActionFunctionArgs,
   LoaderFunctionArgs,
-  defer,
+  json,
   redirect,
 } from "@remix-run/node";
 import {
   NavLink,
   Outlet,
-  Await,
-  json,
   useFetcher,
   useLoaderData,
   useLocation,
@@ -16,7 +14,7 @@ import {
   useOutlet,
   useOutletContext,
   useSearchParams,
-  useAsyncError,
+  useRouteError,
 } from "@remix-run/react";
 import { MdAdd, MdChat } from "react-icons/md";
 import { Button } from "@/components/ui/button";
@@ -29,17 +27,15 @@ import {
 import { verifyAuth } from "@/lib/supabase.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import {
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import { Card } from "@/components/ui/card";
-import { useConversationSummaryRealTime, phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
+import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
+import { useInfiniteScroll } from "@/hooks";
 import ChatHeader from "@/components/sms-ui/ChatHeader";
 import ChatInput from "@/components/sms-ui/ChatInput";
 import ChatAddContactDialog from "@/components/sms-ui/ChatAddContactDialog";  
@@ -57,16 +53,22 @@ import {
   SupabaseClient,
 } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/database.types";
-import type { User, Contact, Workspace, BaseUser } from "@/lib/types";
+import type {
+  User,
+  Contact,
+  Workspace,
+  BaseUser,
+  WorkspaceNumber,
+} from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import { sendMessage } from "./api.chat_sms";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import {
-  buildRepliedContactKeys,
+  getConversationParticipantPhones,
   getChatSortOption,
-  getConversationPhoneKey,
+  normalizeConversationPhone,
   sortConversationSummaries,
-  type ChatSortOption,
+  type ConversationSummary,
 } from "@/lib/chat-conversation-sort";
 
 // Define WorkspaceNumber interface here to avoid type conflicts
@@ -78,14 +80,10 @@ interface Campaign {
   created_at: string;
 }
 
-interface WorkspaceNumber {
-  id: string;
-  phone_number: string;
+interface RouteWorkspaceNumber {
+  id: number;
+  phone_number: string | null;
 }
-
-type ConversationSummary = NonNullable<
-  Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]
->;
 
 interface Chat {
   contact_phone: string;
@@ -98,29 +96,25 @@ interface Chat {
 
 type LoaderData = {
   campaigns: Campaign[];
-  chatsPromise: Promise<{
-    chats: Database["public"]["Functions"]["get_conversation_summary"]["Returns"];
-    chatsError: Error | null;
-    repliedContactKeys: string[];
-  }>;
+  chats: ConversationSummary[];
+  chatsError: string | null;
   potentialContacts: Contact[];
   contact: Contact | null;
   error: string | null;
   userRole: string;
   contact_number: string | undefined;
-  workspaceNumbers: WorkspaceNumber[];
+  workspaceNumbers: RouteWorkspaceNumber[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    hasMore: boolean;
+  };
 };
 
 type ImageFetcherData = {
   success: boolean;
   url: string;
   error?: string;
-};
-
-type ChatsData = {
-  chats: ConversationSummary[];
-  chatsError: Error | null;
-  repliedContactKeys: string[];
 };
 
 type WorkspaceContextType = {
@@ -130,33 +124,21 @@ type WorkspaceContextType = {
     name: string;
     owner: string | null;
     users: string[] | null;
-    workspace_number?: WorkspaceNumber[];
+    workspace_number?: RouteWorkspaceNumber[];
     created_at: string;
   };
 };
 
 function ConversationList({
   chats,
-  conversationData,
-  setConversationData,
-  conversations,
-  sortBy,
-  repliedContactKeys,
   contactNumber,
   handleExistingConversationClick,
   formatDate,
-  refreshConversations,
 }: {
   chats: ConversationSummary[];
-  conversationData: ConversationSummary[];
-  setConversationData: Dispatch<SetStateAction<ConversationSummary[]>>;
-  conversations: ConversationSummary[];
-  sortBy: ChatSortOption;
-  repliedContactKeys: Set<string>;
   contactNumber?: string;
   handleExistingConversationClick: (phoneNumber: string) => void;
   formatDate: (value: string) => string;
-  refreshConversations: (force: boolean) => void;
 }) {
   const chatNumbers = Array.from(
     new Set(
@@ -169,37 +151,13 @@ function ConversationList({
     .map((num) => chats.find((chat) => chat?.contact_phone === num))
     .filter((chat): chat is ConversationSummary => chat !== undefined && chat !== null);
 
-  useEffect(() => {
-    if (shapedChats.length === 0) {
-      return;
-    }
-
-    const currentPhoneNumbers = new Set(conversationData.map((c) => c.contact_phone));
-    const newPhoneNumbers = new Set(shapedChats.map((c) => c.contact_phone));
-    const hasNewConversations = shapedChats.some(
-      (chat) => !currentPhoneNumbers.has(chat.contact_phone),
-    );
-    const countChanged = currentPhoneNumbers.size !== newPhoneNumbers.size;
-
-    if (hasNewConversations || countChanged || conversationData.length === 0) {
-      setConversationData(shapedChats);
-      refreshConversations(false);
-    }
-  }, [shapedChats, conversationData, refreshConversations, setConversationData]);
-
-  const displayChats = conversations.length > 0 ? conversations : shapedChats;
-  const sortedChats = useMemo(
-    () => sortConversationSummaries(displayChats, sortBy, repliedContactKeys),
-    [displayChats, repliedContactKeys, sortBy],
-  );
-
   if (shapedChats.length === 0) {
     return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
   }
 
   return (
     <>
-      {sortedChats
+      {shapedChats
         .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
         .map((chat) => (
           <button
@@ -239,40 +197,113 @@ function ConversationList({
 
 const phoneRegex = /^(\+\d{1,2}\s?)?(\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}$/;
 
-async function fetchRepliedContactKeys({
-  supabaseClient,
-  workspaceId,
-  chats,
+function mergeConversationPages(
+  currentChats: ConversationSummary[],
+  nextChats: ConversationSummary[],
+): ConversationSummary[] {
+  const mergedChats = [...currentChats];
+
+  for (const nextChat of nextChats) {
+    const existingIndex = mergedChats.findIndex((chat) =>
+      phoneNumbersMatch(chat.contact_phone, nextChat.contact_phone),
+    );
+
+    if (existingIndex >= 0) {
+      mergedChats[existingIndex] = {
+        ...mergedChats[existingIndex],
+        ...nextChat,
+      };
+      continue;
+    }
+
+    mergedChats.push(nextChat);
+  }
+
+  return mergedChats;
+}
+
+function getWorkspacePhoneKeys(workspaceNumbers: RouteWorkspaceNumber[]): Set<string> {
+  return new Set(
+    workspaceNumbers
+      .map((workspaceNumber) => workspaceNumber.phone_number)
+      .map((phoneNumber) =>
+        phoneNumber ? normalizeConversationPhone(phoneNumber) : null,
+      )
+      .filter((phoneNumber): phoneNumber is string => Boolean(phoneNumber))
+      .map((phoneNumber) => phoneNumber.replace(/\D/g, "")),
+  );
+}
+
+function upsertConversationFromMessage({
+  currentChats,
+  message,
+  activeContactNumber,
+  workspacePhoneKeys,
 }: {
-  supabaseClient: SupabaseClient<Database>;
-  workspaceId: string;
-  chats: ConversationSummary[] | null | undefined;
-}) {
-  const contactPhones = Array.from(
-    new Set(
-      (chats ?? [])
-        .map((chat) => chat?.contact_phone)
-        .filter((phone): phone is string => Boolean(phone)),
-    ),
+  currentChats: ConversationSummary[];
+  message: Tables<"message">;
+  activeContactNumber?: string;
+  workspacePhoneKeys: Set<string>;
+}): ConversationSummary[] {
+  const { contactPhone, userPhone } = getConversationParticipantPhones(
+    {
+      from: message.from,
+      to: message.to,
+      direction: message.direction,
+    },
+    workspacePhoneKeys,
   );
 
-  if (contactPhones.length === 0) {
-    return [];
+  if (!contactPhone) {
+    return currentChats;
   }
 
-  const { data, error } = await supabaseClient
-    .from("message")
-    .select("from")
-    .eq("workspace", workspaceId)
-    .eq("direction", "inbound")
-    .in("from", contactPhones);
+  const nextTimestamp = message.date_created ?? new Date().toISOString();
+  const isInbound = message.direction === "inbound";
+  const isActiveConversation =
+    Boolean(activeContactNumber) &&
+    phoneNumbersMatch(contactPhone, activeContactNumber ?? null);
+  const unreadIncrement =
+    isInbound && message.status === "received" && !isActiveConversation ? 1 : 0;
+  const existingConversationIndex = currentChats.findIndex((chat) =>
+    phoneNumbersMatch(chat.contact_phone, contactPhone),
+  );
 
-  if (error) {
-    logger.error("Error fetching replied chat contacts:", error);
-    return [];
+  if (existingConversationIndex < 0) {
+    return [
+      ...currentChats,
+      {
+        contact_phone: contactPhone,
+        user_phone: userPhone ?? "",
+        conversation_start: nextTimestamp,
+        conversation_last_update: nextTimestamp,
+        message_count: 1,
+        unread_count: unreadIncrement,
+        contact_firstname: null,
+        contact_surname: null,
+        has_replied: isInbound,
+      },
+    ];
   }
 
-  return buildRepliedContactKeys(data ?? []);
+  return currentChats.map((chat, index) => {
+    if (index !== existingConversationIndex) {
+      return chat;
+    }
+
+    return {
+      ...chat,
+      user_phone: chat.user_phone || userPhone || "",
+      message_count: chat.message_count + 1,
+      unread_count: chat.unread_count + unreadIncrement,
+      conversation_last_update:
+        new Date(chat.conversation_last_update).getTime() >
+        new Date(nextTimestamp).getTime()
+          ? chat.conversation_last_update
+          : nextTimestamp,
+      has_replied: chat.has_replied === true || isInbound,
+    };
+  });
 }
 
 // Custom hook for image handling
@@ -358,6 +389,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
+  const sortBy = getChatSortOption(url.searchParams.get("sort"));
+  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const pageSize = Math.min(
+    100,
+    Math.max(10, Number.parseInt(url.searchParams.get("pageSize") || "20", 10) || 20),
+  );
+  const offset = (page - 1) * pageSize;
   const contact_number = params["contact_number"];
 
   if (!workspaceId) {
@@ -385,37 +423,55 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         : "Failed to load contact";
     return json(
       {
+        campaigns: smsCampaigns,
+        chats: [],
+        chatsError: null,
+        contact: null,
         error: contactErrorMessage,
+        pagination: {
+          page,
+          pageSize,
+          hasMore: false,
+        },
+        potentialContacts: [],
         userRole,
+        workspaceNumbers: workspaceNumbers?.data ?? [],
+        contact_number,
       },
       { headers },
     );
   }
 
-  const chatsPromise = (async () => {
-    const { chats, chatsError } = await fetchConversationSummary(
-      supabaseClient,
-      workspaceId,
-      campaign_id,
-    );
-    const repliedContactKeys = await fetchRepliedContactKeys({
-      supabaseClient,
-      workspaceId,
-      chats: chats ?? [],
-    });
+  const { chats, chatsError, hasMore } = await fetchConversationSummary(
+    supabaseClient,
+    workspaceId,
+    campaign_id,
+    {
+      limit: pageSize,
+      offset,
+      sort: sortBy,
+    },
+  );
 
-    return { chats, chatsError, repliedContactKeys };
-  })();
-  return defer(
+  return json(
     {
       campaigns: smsCampaigns,
-      workspaceNumbers: workspaceNumbers?.data,
-      chatsPromise,
+      workspaceNumbers: workspaceNumbers?.data ?? [],
+      chats: chats ?? [],
+      chatsError:
+        chatsError && typeof chatsError === "object" && "message" in chatsError
+          ? String(chatsError.message)
+          : null,
       potentialContacts,
       contact,
       error: null,
       userRole,
       contact_number,
+      pagination: {
+        page,
+        pageSize,
+        hasMore,
+      },
     },
     { headers },
   );
@@ -447,35 +503,74 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
 export default function ChatsList() {
   const { supabase, workspace } = useOutletContext<WorkspaceContextType>();
-  const { chatsPromise, potentialContacts, contact, campaigns, workspaceNumbers } = useLoaderData<LoaderData>();
+  const {
+    chats,
+    chatsError,
+    pagination,
+    potentialContacts,
+    contact,
+    campaigns,
+    workspaceNumbers,
+  } = useLoaderData<LoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const messageFetcher = useFetcher({ key: "messages" });
+  const paginationFetcher = useFetcher<LoaderData>({ key: "chat-pages" });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const chatActionsRef = useRef<{ addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null>(null);
+  const requestedPageRef = useRef(pagination.page);
   const registerChatActions = useCallback((actions: typeof chatActionsRef.current) => {
     chatActionsRef.current = actions;
   }, []);
   const [dialogContact, setDialog] = useState<Contact | null>(null);
   const outlet = useOutlet();
-  const loc = useLocation();
   const navigate = useNavigate();
-  const contact_number = outlet ? loc.pathname.split("/").pop() || "" : "";
+  const location = useLocation();
+  const contact_number = outlet ? location.pathname.split("/").pop() || "" : "";
   const formatDate = useDateFormatter();
   const sortBy = getChatSortOption(searchParams.get("sort"));
-  
-  // State to hold the conversation data
-  const [conversationData, setConversationData] = useState<ConversationSummary[]>([]);
-  const [liveRepliedContactKeys, setLiveRepliedContactKeys] = useState<Set<string>>(
-    () => new Set(),
+  const [loadedChats, setLoadedChats] = useState<ConversationSummary[]>(chats);
+  const [paginationState, setPaginationState] = useState(pagination);
+  const workspacePhoneKeys = useMemo(
+    () => getWorkspacePhoneKeys(workspaceNumbers),
+    [workspaceNumbers],
   );
+  const chatInputWorkspaceNumbers = useMemo(
+    () =>
+      workspaceNumbers
+        .filter(
+          (workspaceNumber): workspaceNumber is RouteWorkspaceNumber =>
+            Boolean(workspaceNumber.phone_number),
+        )
+        .map((workspaceNumber) => ({
+          id: String(workspaceNumber.id),
+          phone_number: workspaceNumber.phone_number ?? "",
+        })),
+    [workspaceNumbers],
+  );
+  const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
 
-  // Initialize the conversation summary hook with the state
-  const { conversations, refreshConversations } = useConversationSummaryRealTime({
-    supabase,
-    initial: conversationData,
-    workspace: workspace.id,
-    activeContactNumber: contact_number,
-  });
+  useEffect(() => {
+    setLoadedChats(chats);
+    setPaginationState(pagination);
+    requestedPageRef.current = pagination.page;
+  }, [chats, pagination]);
+
+  useEffect(() => {
+    if (!paginationFetcher.data) {
+      return;
+    }
+
+    setLoadedChats((currentChats) =>
+      mergeConversationPages(currentChats, paginationFetcher.data?.chats ?? []),
+    );
+    setPaginationState(paginationFetcher.data.pagination);
+    requestedPageRef.current = paginationFetcher.data.pagination.page;
+  }, [paginationFetcher.data]);
+
+  const displayedChats = useMemo(
+    () => sortConversationSummaries(loadedChats, sortBy),
+    [loadedChats, sortBy],
+  );
 
   // Custom hooks for images
   const { 
@@ -519,30 +614,92 @@ export default function ChatsList() {
     onChange: (payload) => {
       const typedPayload =
         payload as RealtimePostgresChangesPayload<Tables<"message">>;
+      const selectedCampaignId = searchParams.get("campaign_id");
+      const nextRow = typedPayload.new as Tables<"message"> | null;
 
-      if (typedPayload.eventType !== "INSERT") {
+      if (!nextRow) {
         return;
       }
 
-      if (typedPayload.new?.direction !== "inbound") {
+      if (
+        selectedCampaignId &&
+        Number(nextRow.campaign_id) !== Number(selectedCampaignId)
+      ) {
         return;
       }
 
-      const repliedContactKey = getConversationPhoneKey(typedPayload.new.from);
-      if (!repliedContactKey) {
+      if (typedPayload.eventType === "INSERT") {
+        setLoadedChats((currentChats) =>
+          upsertConversationFromMessage({
+            currentChats,
+            message: nextRow,
+            activeContactNumber: contact_number,
+            workspacePhoneKeys,
+          }),
+        );
         return;
       }
 
-      setLiveRepliedContactKeys((currentKeys) => {
-        if (currentKeys.has(repliedContactKey)) {
-          return currentKeys;
-        }
+      if (typedPayload.eventType !== "UPDATE") {
+        return;
+      }
 
-        const nextKeys = new Set(currentKeys);
-        nextKeys.add(repliedContactKey);
-        return nextKeys;
-      });
+      if (nextRow.status !== "delivered" && nextRow.status !== "read") {
+        return;
+      }
+
+      const { contactPhone } = getConversationParticipantPhones(
+        {
+          from: nextRow.from,
+          to: nextRow.to,
+          direction: nextRow.direction,
+        },
+        workspacePhoneKeys,
+      );
+
+      if (!contactPhone) {
+        return;
+      }
+
+      setLoadedChats((currentChats) =>
+        currentChats.map((chat) =>
+          phoneNumbersMatch(chat.contact_phone, contactPhone)
+            ? { ...chat, unread_count: 0 }
+            : chat,
+        ),
+      );
     },
+  });
+
+  const handleLoadMore = useCallback(() => {
+    if (paginationFetcher.state !== "idle" || !paginationState.hasMore) {
+      return;
+    }
+
+    const nextPage = paginationState.page + 1;
+    if (requestedPageRef.current >= nextPage) {
+      return;
+    }
+
+    requestedPageRef.current = nextPage;
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.set("page", String(nextPage));
+    nextSearchParams.set("pageSize", String(paginationState.pageSize));
+    paginationFetcher.load(`${chatsRoutePath}?${nextSearchParams.toString()}`);
+  }, [
+    chatsRoutePath,
+    paginationFetcher,
+    paginationState.hasMore,
+    paginationState.page,
+    paginationState.pageSize,
+    searchParams,
+  ]);
+
+  const [loadMoreRef] = useInfiniteScroll({
+    hasMore: paginationState.hasMore,
+    loading: paginationFetcher.state !== "idle",
+    onLoadMore: handleLoadMore,
+    rootMargin: "120px",
   });
 
   // Form submission handler
@@ -556,7 +713,8 @@ export default function ChatsList() {
       const formData = new FormData(target);
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
-      const from = (formData.get("from") as string) || workspaceNumbers?.[0]?.phone_number || "";
+      const from =
+        (formData.get("from") as string) || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
       chatActionsRef.current?.addOptimisticMessage?.({ body, from, to: toNumber, media });
 
@@ -575,26 +733,29 @@ export default function ChatsList() {
       const number = normalizePhoneNumber(contact.phone || "");
       if (number) {
         navigate(`./${number}`);
-        
-        // Mark messages as read when selecting a contact
-        if (supabase) {
-          supabase
-            .from("message")
-            .update({ status: "delivered" })
-            .eq("workspace", workspace.id)
-            .eq("status", "received")
-            .or(`from.eq.${number},to.eq.${number}`)
-            .then(({ error }) => {
-              if (error) {
-                logger.error("Error marking messages as read:", error);
-              } else {
-                // Trigger a global event to notify other components
-                window.dispatchEvent(new CustomEvent('messages-read', { 
-                  detail: { contactNumber: number }
-                }));
-              }
-            });
-        }
+        setLoadedChats((currentChats) =>
+          currentChats.map((chat) =>
+            phoneNumbersMatch(chat.contact_phone, number)
+              ? { ...chat, unread_count: 0 }
+              : chat,
+          ),
+        );
+
+        supabase
+          .from("message")
+          .update({ status: "delivered" })
+          .eq("workspace", workspace.id)
+          .eq("status", "received")
+          .or(`from.eq.${number},to.eq.${number}`)
+          .then(({ error }) => {
+            if (error) {
+              logger.error("Error marking messages as read:", error);
+            } else {
+              window.dispatchEvent(new CustomEvent("messages-read", {
+                detail: { contactNumber: number },
+              }));
+            }
+          });
       }
       return null;
     },
@@ -604,26 +765,30 @@ export default function ChatsList() {
   const handleExistingConversationClick = useCallback(
     (phoneNumber: string) => {
       navigate(`./${phoneNumber}`);
-      
-      // Mark messages as read when selecting a conversation
-      if (supabase) {
-        supabase
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", workspace.id)
-          .eq("status", "received")
-          .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
-          .then(({ error }) => {
-            if (error) {
-              logger.error("Error marking messages as read:", error);
-            } else {
-              // Trigger a global event to notify other components
-              window.dispatchEvent(new CustomEvent('messages-read', { 
-                detail: { contactNumber: phoneNumber }
-              }));
-            }
-          });
-      }
+
+      setLoadedChats((currentChats) =>
+        currentChats.map((chat) =>
+          phoneNumbersMatch(chat.contact_phone, phoneNumber)
+            ? { ...chat, unread_count: 0 }
+            : chat,
+        ),
+      );
+
+      supabase
+        .from("message")
+        .update({ status: "delivered" })
+        .eq("workspace", workspace.id)
+        .eq("status", "received")
+        .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
+        .then(({ error }) => {
+          if (error) {
+            logger.error("Error marking messages as read:", error);
+          } else {
+            window.dispatchEvent(new CustomEvent("messages-read", {
+              detail: { contactNumber: phoneNumber },
+            }));
+          }
+        });
     },
     [navigate, supabase, workspace.id]
   );
@@ -646,49 +811,43 @@ export default function ChatsList() {
     return null;
   }, [handleExistingConversationClick]);
 
-  const setDialogAdapter = useCallback((contact: Contact) => {
-    setDialog(contact);
-    return null;
-  }, [setDialog]);
-
-  // Listen for message-read and messages-read events to refresh the UI
   useEffect(() => {
-    let debounceTimer: NodeJS.Timeout | null = null;
-    
-    const handleMessageRead = (event: CustomEvent) => {
-      // Get the contact number from the event detail
-      const contactNumber = event.detail?.contactNumber;
-      
-      // Only update if we have a contact number and it's in our conversation list
-      if (contactNumber && conversations.some(conv => 
-        phoneNumbersMatch(conv.contact_phone, contactNumber)
-      )) {
-        // Clear any existing timer
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        
-        // Set a new timer to refresh after a delay
-        debounceTimer = setTimeout(() => {
-          // This will update the unread count for the specific conversation
-          refreshConversations(false);
-        }, 1000);
+    const handleMessageRead = (event: Event) => {
+      const customEvent = event as CustomEvent<{ contactNumber?: string }>;
+      const contactNumber = customEvent.detail?.contactNumber;
+
+      if (!contactNumber) {
+        return;
       }
+
+      setLoadedChats((currentChats) =>
+        currentChats.map((chat) =>
+          phoneNumbersMatch(chat.contact_phone, contactNumber)
+            ? { ...chat, unread_count: 0 }
+            : chat,
+        ),
+      );
     };
 
-    // Add event listeners
-    window.addEventListener('message-read', handleMessageRead as EventListener);
-    window.addEventListener('messages-read', handleMessageRead as EventListener);
+    window.addEventListener("message-read", handleMessageRead);
+    window.addEventListener("messages-read", handleMessageRead);
 
     return () => {
-      // Remove event listeners and clear any pending timer
-      window.removeEventListener('message-read', handleMessageRead as EventListener);
-      window.removeEventListener('messages-read', handleMessageRead as EventListener);
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
+      window.removeEventListener("message-read", handleMessageRead);
+      window.removeEventListener("messages-read", handleMessageRead);
     };
-  }, [conversations, refreshConversations]);
+  }, []);
+
+  const updateFilters = useCallback(
+    (updater: (params: URLSearchParams) => URLSearchParams) => {
+      setSearchParams((previousParams) => {
+        const nextParams = updater(new URLSearchParams(previousParams));
+        nextParams.delete("page");
+        return nextParams;
+      });
+    },
+    [setSearchParams],
+  );
 
   return (
     <main className="flex h-[calc(100vh-80px)] w-full gap-4">
@@ -705,11 +864,10 @@ export default function ChatsList() {
         <div className="flex">
           <Select
             value={searchParams.get("campaign_id") || ""}
-            onValueChange={(val) => {
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("campaign_id", val);
-                return next;
+            onValueChange={(value) => {
+              updateFilters((nextParams) => {
+                nextParams.set("campaign_id", value);
+                return nextParams;
               });
             }}
           >
@@ -717,26 +875,24 @@ export default function ChatsList() {
               <SelectValue placeholder="Filter by Campaign" />
             </SelectTrigger>
             <SelectContent className="w-full bg-slate-50">
-              {campaigns &&
-                campaigns?.map((campaign: { id: number; title: string }) => (
-                  <SelectItem
-                    value={`${campaign.id}`}
-                    key={campaign?.id}
-                    className="w-full p-4"
-                  >
-                    {campaign.title}
-                  </SelectItem>
-                ))}
+              {campaigns?.map((campaign: { id: number; title: string }) => (
+                <SelectItem
+                  value={`${campaign.id}`}
+                  key={campaign.id}
+                  className="w-full p-4"
+                >
+                  {campaign.title}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button
             type="reset"
             variant={"ghost"}
             onClick={() =>
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.delete("campaign_id");
-                return next;
+              updateFilters((nextParams) => {
+                nextParams.delete("campaign_id");
+                return nextParams;
               })
             }
           >
@@ -747,17 +903,16 @@ export default function ChatsList() {
           <Select
             value={sortBy}
             onValueChange={(value) => {
-              setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
+              updateFilters((nextParams) => {
                 const nextSort = getChatSortOption(value);
 
                 if (nextSort === "recent") {
-                  next.delete("sort");
+                  nextParams.delete("sort");
                 } else {
-                  next.set("sort", nextSort);
+                  nextParams.set("sort", nextSort);
                 }
 
-                return next;
+                return nextParams;
               });
             }}
           >
@@ -772,43 +927,31 @@ export default function ChatsList() {
           </Select>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <Suspense fallback={
-            <div className="h-[calc(100vh-200px)] animate-pulse space-y-4 p-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center space-x-4">
-                  <div className="h-10 w-10 rounded-full bg-gray-200"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
-                    <div className="h-3 w-1/2 rounded bg-gray-200"></div>
-                  </div>
-                </div>
-              ))}
+          {chatsError ? (
+            <p className="border-b px-4 py-2 text-sm text-red-500">
+              {chatsError}
+            </p>
+          ) : null}
+          <ConversationList
+            chats={displayedChats}
+            contactNumber={contact_number}
+            handleExistingConversationClick={handleExistingConversationClick}
+            formatDate={formatDate}
+          />
+          {paginationFetcher.data?.chatsError ? (
+            <p className="px-4 py-2 text-sm text-red-500">
+              {paginationFetcher.data.chatsError}
+            </p>
+          ) : null}
+          {paginationState.hasMore ? (
+            <div ref={loadMoreRef} className="px-4 py-3 text-center text-sm text-gray-500">
+              {paginationFetcher.state === "idle" ? "Load more chats" : "Loading more chats..."}
             </div>
-          }>
-            <Await resolve={chatsPromise} errorElement={<p className="p-4 text-center text-red-500">Error loading chats</p>}>
-              {(chatsData) => {
-                return (
-                  <ConversationList
-                    chats={(chatsData as ChatsData).chats}
-                    conversationData={conversationData}
-                    setConversationData={setConversationData}
-                    conversations={conversations}
-                    sortBy={sortBy}
-                    repliedContactKeys={
-                      new Set([
-                        ...(chatsData as ChatsData).repliedContactKeys,
-                        ...liveRepliedContactKeys,
-                      ])
-                    }
-                    contactNumber={contact_number}
-                    handleExistingConversationClick={handleExistingConversationClick}
-                    formatDate={formatDate}
-                    refreshConversations={refreshConversations}
-                  />
-                );
-              }}
-            </Await>
-          </Suspense>
+          ) : displayedChats.length > 0 ? (
+            <div className="px-4 py-3 text-center text-sm text-gray-400">
+              All chats loaded
+            </div>
+          ) : null}
         </div>
       </Card>
 
@@ -830,7 +973,7 @@ export default function ChatsList() {
           searchError={searchError || undefined}
           existingConversation={existingConversation as unknown as Chat}
           handleExistingConversationClick={handleExistingConversationClickAdapter}
-          setDialog={(contact: Partial<Contact>) => setDialog(contact as Contact)}
+          setDialog={(nextContact: Partial<Contact>) => setDialog(nextContact as Contact)}
         />
         <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
           <Outlet context={{ supabase, workspace, workspaceNumbers, registerChatActions }} />
@@ -839,8 +982,8 @@ export default function ChatsList() {
           isValid={isValid}
           phoneNumber={phoneNumber}
           workspace={workspace as NonNullable<Workspace>}
-          workspaceNumbers={workspaceNumbers as WorkspaceNumber[]}
-          initialFrom={workspaceNumbers?.[0]?.phone_number as string}
+          workspaceNumbers={chatInputWorkspaceNumbers}
+          initialFrom={chatInputWorkspaceNumbers[0]?.phone_number || ""}
           handleSubmit={handleSubmit}
           handleImageSelect={handleImageSelect}
           handleImageRemove={handleImageRemove}
@@ -860,8 +1003,8 @@ export default function ChatsList() {
   );
 }
 
-function ErrorBoundary() {
-  const error = useAsyncError();
-  logger.error("ErrorBoundary caught error:", error);   
-  return <div>Error</div>;
-} 
+export function ErrorBoundary() {
+  const error = useRouteError();
+  logger.error("Chats route error boundary caught error:", error);
+  return <div className="p-4 text-sm text-red-500">Error loading chats.</div>;
+}
