@@ -4,7 +4,7 @@
 import "dotenv/config";
 
 import { spawn } from "node:child_process";
-import { existsSync, watch } from "node:fs";
+import { existsSync, readdirSync, statSync, watch } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -12,8 +12,10 @@ import { setTimeout as delay } from "node:timers/promises";
 const APP_PORT = process.env.PORT ?? "3000";
 const BUILD_PATH = path.resolve("build/index.js");
 const BUILD_DIR = path.dirname(BUILD_PATH);
+const CLIENT_BUILD_DIR = path.resolve("public/build");
 const REMIX_BIN = resolveLocalBin("remix");
 const SERVER_ENTRY = path.resolve("server/index.js");
+const startupTimestamp = Date.now();
 
 let appProcess = null;
 let isShuttingDown = false;
@@ -107,14 +109,39 @@ function pipeOutput(label, childProcess) {
 
 async function waitForInitialBuild() {
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (existsSync(BUILD_PATH)) {
+    if (hasFreshBuildOutput()) {
       return;
     }
 
     await delay(500);
   }
 
-  throw new Error(`Timed out waiting for initial build at ${BUILD_PATH}`);
+  throw new Error(
+    `Timed out waiting for initial build output at ${BUILD_PATH} and ${CLIENT_BUILD_DIR}`,
+  );
+}
+
+function hasFreshBuildOutput() {
+  if (!existsSync(BUILD_PATH) || !existsSync(CLIENT_BUILD_DIR)) {
+    return false;
+  }
+
+  const serverBuildMtime = statSync(BUILD_PATH).mtimeMs;
+
+  if (serverBuildMtime < startupTimestamp) {
+    return false;
+  }
+
+  const clientEntries = readdirSync(CLIENT_BUILD_DIR);
+
+  if (clientEntries.length === 0) {
+    return false;
+  }
+
+  return clientEntries.some((entry) => {
+    const entryPath = path.join(CLIENT_BUILD_DIR, entry);
+    return statSync(entryPath).mtimeMs >= startupTimestamp;
+  });
 }
 
 async function startAppServer() {

@@ -13,6 +13,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const BUILD_PATH = path.resolve(ROOT_DIR, "build/index.js");
+const PUBLIC_DIR = path.resolve(ROOT_DIR, "public");
+const PUBLIC_BUILD_DIR = path.resolve(PUBLIC_DIR, "build");
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const SHUTDOWN_GRACE_PERIOD_MS = 10_000;
@@ -96,6 +98,18 @@ export function createApp({
   app.set("trust proxy", true);
   app.use(compression());
   app.use(buildRequestLogger());
+  app.use(
+    "/build",
+    express.static(PUBLIC_BUILD_DIR, {
+      immutable: true,
+      maxAge: "1y",
+    }),
+  );
+  app.use(
+    express.static(PUBLIC_DIR, {
+      maxAge: "1h",
+    }),
+  );
 
   app.get("/healthz", (_request, response) => {
     response.status(200).json({ ok: true });
