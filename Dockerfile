@@ -1,4 +1,4 @@
-FROM node:alpine
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 # Add build argument for cache busting (Railway: set RAILWAY_CACHE_BUST env var)
@@ -9,7 +9,7 @@ RUN echo "Cache bust: $CACHE_BUST"
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY . .
