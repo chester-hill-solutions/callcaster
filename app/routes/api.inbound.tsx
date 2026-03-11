@@ -142,19 +142,25 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  const workspaceIdForHandset = number.workspace?.id ?? null;
-  if (number?.handset_enabled && workspaceIdForHandset) {
-    const { data: session } = await (supabase as import("@supabase/supabase-js").SupabaseClient<Record<string, unknown>>)
+  if (number?.handset_enabled && workspaceId) {
+    const now = new Date().toISOString();
+    const { data: session, error: sessionError } = await (supabase as import("@supabase/supabase-js").SupabaseClient<Record<string, unknown>>)
       .from("handset_session")
       .select("client_identity")
-      .eq("workspace_id", workspaceIdForHandset)
+      .eq("workspace_id", workspaceId)
       .eq("status", "active")
-      .gt("expires_at", new Date().toISOString())
+      .gt("expires_at", now)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    if (sessionError) {
+      logger.warn("Handset session lookup failed", { workspaceId, error: sessionError.message });
+    }
     const clientIdentity = session && typeof session === "object" && "client_identity" in session ? (session as { client_identity: string }).client_identity : null;
+    if (!clientIdentity && number.handset_enabled) {
+      logger.debug("Handset enabled but no active session", { workspaceId, Called: data.Called });
+    }
     if (clientIdentity) {
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
       const dial = handsetTwiml.dial({ timeout: 30 });
