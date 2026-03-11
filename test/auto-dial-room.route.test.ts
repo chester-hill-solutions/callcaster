@@ -27,6 +27,10 @@ vi.mock("../app/lib/env.server", () => ({
 
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
+vi.mock("@/twilio.server", () => ({
+  validateTwilioWebhookParams: vi.fn(() => true),
+}));
+
 vi.mock("twilio", () => {
   class VoiceResponse {
     private _dialed: any[] = [];
@@ -111,6 +115,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
             eq: () => ({
               single: async () => ({
                 data: { verified_audio_numbers: ["+1555"] },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -204,6 +220,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           }),
         };
       }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
       throw new Error(`unexpected table ${table}`);
     });
 
@@ -276,6 +304,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
       }
       if (table === "outreach_attempt") {
         return { update: () => ({ eq: () => ({ select: async () => ({ data: [{ user_id: "u1", campaign_id: 1 }], error: null }) }) }) };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
+                error: null,
+              }),
+            }),
+          }),
+        };
       }
       throw new Error(`unexpected table ${table}`);
     });
@@ -358,6 +398,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           update: () => ({
             eq: () => ({
               select: async () => ({ data: [{ ok: 1 }], error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
+                error: null,
+              }),
             }),
           }),
         };
@@ -548,7 +600,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     const supabase = makeSupabase({});
     supabase.from.mockImplementation((table: string) => {
       if (table === "call") {
-        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: null, conference_id: "u1" }, error: null }) }) }) };
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1" }, error: null }) }) }) };
       }
       if (table === "campaign") {
         return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: true, caller_id: "+1555" }, error: null }) }) }) };
@@ -558,6 +610,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
       }
       if (table === "outreach_attempt") {
         return { update: () => ({ eq: () => ({ select: async () => ({ data: [{}], error: null }) }) }) };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
+                error: null,
+              }),
+            }),
+          }),
+        };
       }
       throw new Error(`unexpected ${table}`);
     });
@@ -622,6 +686,18 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
       }
       if (table === "campaign_queue") {
         return { update: () => ({ eq: () => ({ select: async () => ({ data: [], error: null }) }) }) };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { authToken: "auth" } },
+                error: null,
+              }),
+            }),
+          }),
+        };
       }
       throw new Error(`unexpected table ${table}`);
     });

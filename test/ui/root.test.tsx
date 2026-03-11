@@ -274,7 +274,7 @@ describe("root.tsx", () => {
 
     const r = await mocks.navbarProps.handleSignOut();
     await expect(r.json()).resolves.toEqual({ success: null, error: "bad" });
-    expect(mocks.navigate).not.toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith("/reset");
 
     unmount();
     expect(mocks.unsubscribe).toHaveBeenCalled();

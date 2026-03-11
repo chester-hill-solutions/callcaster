@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
     verifyAuth: vi.fn(),
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
+    requireWorkspaceAccess: vi.fn(),
     normalizeProviderStatus: vi.fn(),
     logger: {
       debug: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/lib/supabase.server", () => ({ verifyAuth: (...args: any[]) => mocks.
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...args: any[]) => mocks.createClient(...args) }));
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/call-status", () => ({
   normalizeProviderStatus: (...args: any[]) => mocks.normalizeProviderStatus(...args),
@@ -76,9 +78,11 @@ describe("app/routes/api.call-status-poll.tsx", () => {
     mocks.verifyAuth.mockReset();
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.requireWorkspaceAccess.mockReset();
     mocks.normalizeProviderStatus.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -127,6 +131,7 @@ describe("app/routes/api.call-status-poll.tsx", () => {
 
   test("returns 403 for workspace mismatch or missing membership", async () => {
     const userSupabase = makeUserSupabase({ membership: null });
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: userSupabase,
       headers: new Headers(),
@@ -149,6 +154,10 @@ describe("app/routes/api.call-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
+    const { AppError, ErrorCode } = await import("../app/lib/errors.server");
+    mocks.requireWorkspaceAccess.mockRejectedValueOnce(
+      new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN),
+    );
     const svc2 = makeServiceSupabase({
       callSingle: { data: { workspace: "w1", status: null }, error: null },
     });
@@ -333,7 +342,11 @@ describe("app/routes/api.call-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any);
     expect(r1.status).toBe(500);
-    await expect(r1.json()).resolves.toEqual({ error: "Failed to fetch call status" });
+    await expect(r1.json()).resolves.toEqual({
+      error: "Failed to fetch call status",
+      code: "INTERNAL_SERVER_ERROR",
+      statusCode: 500,
+    });
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: userSupabase,
@@ -344,7 +357,11 @@ describe("app/routes/api.call-status-poll.tsx", () => {
     const r2 = await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any);
-    await expect(r2.json()).resolves.toEqual({ error: "boom" });
+    await expect(r2.json()).resolves.toEqual({
+      error: "boom",
+      code: "INTERNAL_SERVER_ERROR",
+      statusCode: 500,
+    });
   }, 30000);
 });
 

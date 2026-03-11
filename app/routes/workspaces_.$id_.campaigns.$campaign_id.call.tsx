@@ -47,7 +47,12 @@ import {
   normalizeProviderStatus,
   getStateMachineAction,
 } from "@/lib/call-status";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import {
+  buildQueuedQueueUpdate,
+  COMPLETED_QUEUE_COUNT_FILTER,
+  isAssignedToUser,
+  isQueued,
+} from "@/lib/queue-status";
 
 // Type imports
 import type {
@@ -92,7 +97,7 @@ async function getCallScreenData(supabase: SupabaseClient, campaignId: string, w
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
       .eq("campaign_id", parseInt(campaignId))
-      .eq("status", "dequeued"),
+      .or(COMPLETED_QUEUE_COUNT_FILTER),
     supabase
       .from("outreach_attempt")
       .select(`*, call:call(*)`)
@@ -138,34 +143,27 @@ async function getVerifiedNumbers(supabase: SupabaseClient, userId: string) {
 }
 async function getQueueByDialType(supabase: SupabaseClient, campaignId: string, dialType: string, userId: string) {
   let queue = [] as QueueItem[];
-  if (dialType === "predictive") {
-    const { data, error } = await supabase
-      .from('campaign_queue')
-      .select('*, contact(*)')
-      .eq('campaign_id', parseInt(campaignId))
-      .eq('status', QUEUE_STATUS_QUEUED)
-      .order('attempts', { ascending: true })
-      .order('queue_order', { ascending: true })
-      .limit(50);
-    if (error) {
-      logger.error("Error fetching predictive queue:", error);
-      throw error;
-    }
-    queue = data as unknown as QueueItem[];
-  } else if (dialType === "call") {
-    const { data, error } = await supabase
-      .from('campaign_queue')
-      .select('*, contact(*)')
-      .eq('campaign_id', parseInt(campaignId))
-      .eq('status', userId)
-      .limit(50);
-    if (error) {
-      logger.error("Error fetching call queue:", error);
-      throw error;
-    }
-    queue = data as unknown as QueueItem[];
+  const { data, error } = await supabase
+    .from("campaign_queue")
+    .select("*, contact(*)")
+    .eq("campaign_id", parseInt(campaignId))
+    .is("dequeued_at", null)
+    .order("attempts", { ascending: true })
+    .order("queue_order", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    logger.error(`Error fetching ${dialType} queue:`, error);
+    throw error;
   }
-  else {
+
+  const rows = (data as unknown as QueueItem[]) ?? [];
+
+  if (dialType === "predictive") {
+    queue = rows.filter((item) => isQueued(item)).slice(0, 50);
+  } else if (dialType === "call") {
+    queue = rows.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
+  } else {
     throw "Invalid dial type";
   }
   return queue;
@@ -249,11 +247,29 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (!user || !campaign_id) {
     throw redirect("/signin");
   }
+  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
+    .from("campaign_queue")
+    .select("id, status, dequeued_at, assigned_to_user_id")
+    .eq("campaign_id", parseInt(campaign_id))
+    .is("dequeued_at", null);
+
+  if (assignedRowsError) {
+    logger.error("Error fetching assigned campaign queue rows:", assignedRowsError);
+    throw assignedRowsError;
+  }
+
+  const assignedIds = (assignedRows ?? [])
+    .filter((row) => isAssignedToUser(row, user.id))
+    .map((row) => row.id);
+
+  if (assignedIds.length === 0) {
+    return redirect("/workspaces", { headers });
+  }
+
   const update = await supabaseClient
     .from("campaign_queue")
-    .update({ status: "queued" })
-    .eq("status", user.id)
-    .eq("campaign_id", parseInt(campaign_id))
+    .update(buildQueuedQueueUpdate())
+    .in("id", assignedIds)
     .select();
   if (update.error) {
     logger.error("Error updating campaign queue:", update.error);
@@ -464,7 +480,7 @@ const handleDialButton = useCallback(() => {
   if (!campaign) return;
 
   if (campaign.dial_type === "predictive") {
-    if (deviceIsBusy || incomingCall || deviceStatus !== "registered") {
+    if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
       logger.debug("Device Busy", { deviceStatus, callCount: device?.calls.length });
       return;
     }
@@ -763,7 +779,6 @@ useEffect(() => {
         break;
       case "connected":
         send({ type: "CONNECT" });
-        send({ type: "CONNECT" });
         break;
       case "completed":
       case "failed":
@@ -771,7 +786,6 @@ useEffect(() => {
         send({ type: "HANG_UP" });
         break;
       default:
-        send({ type: "NEXT" });
         send({ type: "NEXT" });
     }
   }

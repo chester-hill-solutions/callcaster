@@ -1,8 +1,8 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
-
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
+const baseUrl = getFunctionsBaseUrl();
 
 interface RequestBody {
   to_number: string;

@@ -310,7 +310,7 @@ export async function handleRequest(req: Request): Promise<Response> {
   
   try {
     // Get request details for validation
-    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-flow`;
+    const publicUrl = `${baseUrl}/ivr-flow`;
     const twilioSignature = req.headers.get('x-twilio-signature');
     
     const formData = await req.formData();

@@ -23,19 +23,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    // Get the status file from storage
-    const { data: statusData, error: statusError } = await supabaseClient.storage
-      .from("audience-uploads")
-      .download(`${workspaceId}/${uploadId}.json`);
-
-    if (statusError) {
-      return json({ error: statusError.message }, { status: 500, headers });
-    }
-
-    // Parse the status JSON
-    const status = JSON.parse(await statusData.text());
-
-    // Get the upload record for additional details
     const { data: uploadData, error: uploadError } = await supabaseClient
       .from("audience_upload")
       .select("*")
@@ -46,14 +33,37 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return json({ error: uploadError.message }, { status: 500, headers });
     }
 
-    // Combine status file data with database record
+    let statusFileData: Record<string, unknown> = {};
+    const { data: statusData, error: statusError } = await supabaseClient.storage
+      .from("audience-uploads")
+      .download(`${workspaceId}/${uploadId}.json`);
+
+    if (!statusError) {
+      try {
+        statusFileData = JSON.parse(await statusData.text()) as Record<string, unknown>;
+      } catch (error) {
+        logger.error("Error parsing upload status file:", error);
+      }
+    }
+
     return json({
-      ...status,
+      ...statusFileData,
+      uploadId: uploadData.id,
+      audience_id: uploadData.audience_id,
+      status: uploadData.status,
       file_name: uploadData.file_name,
       file_size: uploadData.file_size,
       total_contacts: uploadData.total_contacts,
       processed_contacts: uploadData.processed_contacts,
-      error_message: uploadData.error_message
+      error_message: uploadData.error_message,
+      stage:
+        typeof statusFileData.stage === "string"
+          ? statusFileData.stage
+          : uploadData.status === "completed"
+            ? "Upload completed"
+            : uploadData.status === "error"
+              ? "Upload failed"
+              : "Processing contacts",
     }, { headers });
 
   } catch (error) {

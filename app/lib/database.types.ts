@@ -466,36 +466,45 @@ export type Json =
         }
         campaign_queue: {
           Row: {
+            assigned_to_user_id: string | null
             attempts: number
             campaign_id: number
             contact_id: number
             created_at: string
             id: number
+            provider_status: string | null
             queue_order: number | null
+            queue_state: string | null
             status: string
             dequeued_by: string | null
             dequeued_at: string | null
             dequeued_reason: string | null
           }
           Insert: {
+            assigned_to_user_id?: string | null
             attempts?: number
             campaign_id: number
             contact_id: number
             created_at?: string
             id?: number
+            provider_status?: string | null
             queue_order?: number | null
+            queue_state?: string | null
             status?: string
             dequeued_by?: string | null
             dequeued_at?: string | null
             dequeued_reason?: string | null
           }
           Update: {
+            assigned_to_user_id?: string | null
             attempts?: number
             campaign_id?: number
             contact_id?: number
             created_at?: string
             id?: number
+            provider_status?: string | null
             queue_order?: number | null
+            queue_state?: string | null
             status?: string
             dequeued_by?: string | null
             dequeued_at?: string | null

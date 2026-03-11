@@ -24,7 +24,7 @@ export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents
     begin();
   };
 
-  const handleConferenceEnd = ({ activeCall, setConference, workspaceId }:{activeCall:ActiveCall, setConference:() => void, workspaceId:string}) => {
+  const handleConferenceEnd = async ({ activeCall, setConference, workspaceId }:{activeCall:ActiveCall, setConference:() => void, workspaceId:string}) => {
     submit(
       { workspaceId },
       {
@@ -34,14 +34,25 @@ export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents
       },
     );
     if (activeCall?.parameters?.CallSid) {
-      fetch(`/api/hangup`, {
-        method: "POST",
-        body: JSON.stringify({
-          callSid: activeCall.parameters.CallSid,
-          workspaceId,
-        }),
-        headers: { "Content-Type": "application/json" },
-      });
+      try {
+        const response = await fetch(`/api/hangup`, {
+          method: "POST",
+          body: JSON.stringify({
+            callSid: activeCall.parameters.CallSid,
+            workspaceId,
+          }),
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) {
+          logger.error("Failed to hang up conference call", {
+            callSid: activeCall.parameters.CallSid,
+            status: response.status,
+          });
+        }
+      } catch (error) {
+        logger.error("Failed to hang up conference call", error);
+      }
     }
     setConference();
   };

@@ -1,10 +1,12 @@
 import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 
 interface WorkspaceData {
@@ -23,6 +25,7 @@ interface RequestBody {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   try {
     const supabase: SupabaseClient = createClient(
       env.SUPABASE_URL(),
@@ -30,6 +33,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
     const { phoneNumber, workspace_id, friendlyName }: RequestBody =
       await safeParseJson(request);
+
+    await requireWorkspaceAccess({
+      supabaseClient: userSupabase,
+      user,
+      workspaceId: workspace_id,
+    });
 
     const { data, error } = await supabase
       .from("workspace")
@@ -55,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       friendlyName,
       phoneNumber,
       statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
-    }).catch((error) => logger.error('Twilio validation request error:', error));
+    });
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase
@@ -92,6 +101,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ validationRequest, numberRequest });
   } catch (error) {
     logger.error("Action error:", error);
-    return json({ error: (error as Error).message }, { status: 500 });
+    return createErrorResponse(error, "Failed to create caller ID");
   }
 };

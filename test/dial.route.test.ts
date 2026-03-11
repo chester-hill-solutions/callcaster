@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => {
   return {
     createSupabaseServerClient: vi.fn(),
     verifyAuth: vi.fn(),
-    safeParseJson: vi.fn(),
+    parseActionRequest: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("../app/lib/supabase.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("../app/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
 }));
@@ -84,7 +84,7 @@ describe("app/routes/api.dial.tsx", () => {
     vi.resetModules();
     mocks.createSupabaseServerClient.mockReset();
     mocks.verifyAuth.mockReset();
-    mocks.safeParseJson.mockReset();
+    mocks.parseActionRequest.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.getWorkspaceMessagingOnboardingState.mockReset();
@@ -101,7 +101,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("throws 401 Response when user missing", async () => {
     const { supabase } = makeSupabaseStub(10);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15550001111",
       user_id: "u1",
       campaign_id: "1",
@@ -121,7 +121,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("returns creditsError when credits <= 0", async () => {
     const { supabase } = makeSupabaseStub(0);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15550001111",
       user_id: "u1",
       campaign_id: "1",
@@ -140,7 +140,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("happy path uses outreach_id when provided and upserts call", async () => {
     const { supabase, rpc, upsert } = makeSupabaseStub(10);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "1+5555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -170,7 +170,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("creates outreach attempt when outreach_id missing", async () => {
     const { supabase, rpc } = makeSupabaseStub(10);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -192,7 +192,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("invalid phone number throws before calling Twilio", async () => {
     const { supabase } = makeSupabaseStub(10);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+123",
       user_id: "u1",
       campaign_id: "1",
@@ -212,7 +212,7 @@ describe("app/routes/api.dial.tsx", () => {
   test("call create error logs and says message", async () => {
     const { supabase } = makeSupabaseStub(10);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -244,7 +244,7 @@ describe("app/routes/api.dial.tsx", () => {
       }),
     };
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -263,7 +263,7 @@ describe("app/routes/api.dial.tsx", () => {
     const { supabase, rpc } = makeSupabaseStub(10);
     rpc.mockResolvedValueOnce({ data: null, error: new Error("rpc") } as any);
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -304,7 +304,7 @@ describe("app/routes/api.dial.tsx", () => {
       throw new Error("unexpected");
     };
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -351,7 +351,7 @@ describe("app/routes/api.dial.tsx", () => {
       throw new Error("unexpected");
     };
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",
@@ -402,7 +402,7 @@ describe("app/routes/api.dial.tsx", () => {
       throw new Error("unexpected");
     };
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: supabase, headers: new Headers() });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseActionRequest.mockResolvedValueOnce({
       to_number: "+15555550100",
       user_id: "u1",
       campaign_id: "1",

@@ -170,7 +170,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     ).resolves.toEqual({ data: "w_new", error: null });
     expect(stripe.createStripeContact).toHaveBeenCalled();
 
-    // rpc error is logged but flow can continue
+    // rpc error now aborts before any provisioning
     const supabaseRpcErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: new Error("rpc") })),
       from: () => ({
@@ -179,7 +179,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    await mod.createNewWorkspace({ supabaseClient: supabaseRpcErr, workspaceName: "W", user_id: "u1" });
+    await expect(
+      mod.createNewWorkspace({ supabaseClient: supabaseRpcErr, workspaceName: "W", user_id: "u1" }),
+    ).resolves.toMatchObject({ data: null, error: "rpc" });
     expect(logger.error).toHaveBeenCalled();
 
     // update error bubbles into catch and returns message string

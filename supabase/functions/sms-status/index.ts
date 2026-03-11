@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import {
   cancelQueuedMessages,
   normalizeTwilioSmsStatus,
@@ -70,7 +71,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     // Validate the request is from Twilio
     const twilioSignature = req.headers.get('x-twilio-signature');
-    const url = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/sms-status`;
+    const url = getFunctionUrl("sms-status");
     const isValidRequest = Twilio.validateRequest(
       workspace.twilio_data.authToken,
       twilioSignature || '',

@@ -1,8 +1,9 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
-import { createWorkspaceTwilioInstance, getWorkspaceUsers } from '../lib/database.server';
+import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from '../lib/database.server';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import {
   buildOnboardingStepsForState,
@@ -10,6 +11,7 @@ import {
   mergeWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 interface FormData {
   phoneNumber: string;
@@ -17,6 +19,7 @@ interface FormData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    await verifyAuth(request);
     const twilio = new Twilio.Twilio(process.env['TWILIO_SID'] ?? '', process.env['TWILIO_AUTH_TOKEN'] ?? '');
     const url = new URL(request.url);
     const params = url.searchParams;
@@ -43,10 +46,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    const { supabaseClient: userSupabase, user } = await verifyAuth(request);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
     const { phoneNumber, workspace_id } = Object.fromEntries(formData) as unknown as FormData;
     try {
+        await requireWorkspaceAccess({ supabaseClient: userSupabase, user, workspaceId: workspace_id });
         const { data: users, error } = await getWorkspaceUsers({
             supabaseClient: supabase,
             workspaceId: workspace_id,
@@ -152,12 +157,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         })
     } catch (error) {
         logger.error('Failed to register number', error);
-        return new Response(JSON.stringify({ error }), {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            status: 500
-        });
+        return createErrorResponse(error, "Failed to register number");
 
     }
 }

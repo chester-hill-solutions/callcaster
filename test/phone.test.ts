@@ -22,11 +22,11 @@ describe("app/lib/utils/phone", () => {
   });
 
   test("normalizePhoneNumber removes + when it appears after start", () => {
-    expect(normalizePhoneNumber("1+5555550100")).toBe("+115555550100");
+    expect(normalizePhoneNumber("1+5555550100")).toBe("+15555550100");
   });
 
-  test("normalizePhoneNumber replaces non-+1 country prefix with +1", () => {
-    expect(normalizePhoneNumber("+44 20 7946 0018")).toBe("+1442079460018");
+  test("normalizePhoneNumber throws on invalid non-NA length", () => {
+    expect(() => normalizePhoneNumber("+44 20 7946 0018")).toThrow("Invalid phone number length");
   });
 
   test("isValidPhoneNumber returns false for non-strings/empty", () => {

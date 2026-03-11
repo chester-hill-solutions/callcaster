@@ -113,8 +113,8 @@ describe("confirm-payment route", () => {
 
     expect(first.status).toBe(302);
     expect(second.status).toBe(302);
-    expect(first.headers.get("Location")).toBe("/workspaces/w1/billing?success=true");
-    expect(second.headers.get("Location")).toBe("/workspaces/w1/billing?success=true");
+    expect(first.headers.get("Location")).toBe("/workspaces/w1/billing?payment_status=success&credits_added=250");
+    expect(second.headers.get("Location")).toBe("/workspaces/w1/billing?payment_status=success&credits_added=250");
     expect(supabaseClient.rows).toHaveLength(1);
     expect(supabaseClient.rows[0].note).toContain("stripe_session:sess_123");
   }, 30000);
@@ -151,7 +151,9 @@ describe("confirm-payment route", () => {
     } as any);
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("/workspaces/w1/billing?error=true");
+    expect(response.headers.get("Location")).toBe(
+      "/workspaces/w1/billing?payment_status=error&payment_message=We+could+not+confirm+this+payment+yet.+If+your+card+was+charged%2C+please+contact+support.",
+    );
     expect(loggerError).toHaveBeenCalled();
   }, 30000);
 });

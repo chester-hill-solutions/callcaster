@@ -81,6 +81,7 @@ const useSupabaseRoom = ({
     });
     const channelRef = useRef<ReturnType<SupabaseClient<Database>['channel']> | null>(null);
     const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const statusRef = useRef<'offline' | 'online' | 'error'>('offline');
 
     const updatePresence = useCallback(async (newStatus: 'online' | 'offline') => {
         if (!campaign) return;
@@ -124,7 +125,13 @@ const useSupabaseRoom = ({
     }, [supabase, workspace, campaign, userId]);
 
     useEffect(() => {
-        const roomName = `${userId}`;
+        statusRef.current = status;
+    }, [status]);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const roomName = `${workspace}:${campaign ?? "no-campaign"}:${userId}`;
         const room = supabase.channel(roomName);
         const realtimeRoom = room as any;
         channelRef.current = room;
@@ -189,8 +196,8 @@ const useSupabaseRoom = ({
             });
 
         presenceIntervalRef.current = setInterval(() => {
-            if (status === 'online') {
-                updatePresence('online');
+            if (statusRef.current === 'online') {
+                void updatePresence('online');
             }
         }, PRESENCE_UPDATE_INTERVAL);
 
@@ -203,9 +210,11 @@ const useSupabaseRoom = ({
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
             }
-            handleDisconnect();
+            if (statusRef.current === 'online') {
+                void updatePresence('offline');
+            }
         };
-    }, [supabase, userId, updatePresence, status]);
+    }, [campaign, supabase, updatePresence, userId, workspace]);
 
     return { status, users, predictiveState };
 };

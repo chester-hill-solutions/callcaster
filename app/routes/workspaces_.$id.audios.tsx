@@ -91,17 +91,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
   }
 
-  for (const media of mediaData) {
-    const url = signedUrls.find(
+  const mediaWithSignedUrls = mediaData.map((media) => {
+    const signedUrl = signedUrls.find(
       (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
     )?.signedUrl;
-    if (url) {
-      (media as any)["signedUrl"] = url;
-    }
-  }
+
+    return signedUrl ? { ...media, signedUrl } : media;
+  });
 
   return json(
-    { audioMedia: mediaData, workspace: workspaceData, error: null, userRole },
+    { audioMedia: mediaWithSignedUrls, workspace: workspaceData, error: null, userRole },
     { headers },
   );
 }

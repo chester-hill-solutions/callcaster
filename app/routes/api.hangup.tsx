@@ -1,41 +1,67 @@
 import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "../lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
+import { isAssignedToUser } from "@/lib/queue-status";
 
 export const action = async ({ request }: { request: Request }) => {
     const {supabaseClient:supabase, user} = await verifyAuth(request);
-    const data = await safeParseJson(request);
+    const data = await parseActionRequest(request);
     const conferenceId =
         typeof data.conference_id === "string" ? data.conference_id : null;
     const workspaceId =
         typeof data.workspaceId === "string" ? data.workspaceId : null;
     const callSid = typeof data.callSid === "string" ? data.callSid : null;
-    if (!conferenceId || !workspaceId || !callSid) {
+    if (!workspaceId || !callSid) {
         return json({ success: false, message: "Invalid hangup payload" }, { status: 400 });
     }
     try {
-        const realtime = supabase.realtime.channel(conferenceId)
+        await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId });
+
+        let resolvedConferenceId = conferenceId;
+        if (!resolvedConferenceId) {
+            const { data: callRecord, error: callError } = await supabase
+                .from("call")
+                .select("conference_id")
+                .eq("sid", callSid)
+                .eq("workspace", workspaceId)
+                .maybeSingle();
+            if (callError) throw callError;
+            resolvedConferenceId = callRecord?.conference_id ?? null;
+        }
+
+        const realtime = resolvedConferenceId
+            ? supabase.realtime.channel(resolvedConferenceId)
+            : null;
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: workspaceId});
         await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
-        realtime.send({
+        realtime?.send({
             type: "broadcast", event: "message", payload: {
                 contact_id: null,
                 status: 'idle'
             }
         });
-        const {data:queue, error:queueError} = await supabase.from("campaign_queue").select('*, campaign(group_household_queue)').eq("status", user.id).single();
+        const { data: queueRows, error: queueError } = await supabase
+            .from("campaign_queue")
+            .select("*, campaign(group_household_queue)")
+            .is("dequeued_at", null);
         if (queueError) throw queueError;
-        const { data:dequeue, error } = await supabase.rpc('dequeue_contact', { 
+        const queue = queueRows?.find((row) => isAssignedToUser(row, user.id));
+        if (!queue) {
+            throw new Error("No active assigned queue entry found for user");
+        }
+        const { error } = await supabase.rpc('dequeue_contact', {
             passed_contact_id: queue.contact_id, 
             group_on_household: queue.campaign.group_household_queue,
             dequeued_by_id: user.id,
             dequeued_reason_text: "Call completed"
         });
         if (error) throw error;
-        const {data:outreach, error:outreachError} = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", workspaceId)
+        const { error:outreachError } = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", workspaceId)
         if (outreachError) throw outreachError;
-        supabase.removeChannel(realtime);
+        if (realtime) {
+            supabase.removeChannel(realtime);
+        }
         return json({ success: true });
    
     } catch (error) {

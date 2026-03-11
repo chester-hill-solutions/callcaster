@@ -4,6 +4,11 @@ import { Tables } from "@/lib/database.types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
+import {
+  getAssignedUserId,
+  isDequeued,
+  isQueued,
+} from "@/lib/queue-status";
 
 interface UseQueueProps {
   initialQueue: QueueItem[];
@@ -69,7 +74,7 @@ export const useQueue = ({
 }: UseQueueProps) => {
   const [queue, setQueue] = useState<QueueItem[]>(
     isPredictive
-      ? initialPredictiveQueue.filter((item) => item.status === "queued")
+      ? initialPredictiveQueue.filter((item) => isQueued(item))
       : initialQueue?.length > 0
         ? sortQueue(initialQueue)
         : [],
@@ -106,9 +111,12 @@ export const useQueue = ({
         return;
       }
 
-      const newStatus = payload.new.status;
+      const assignedUserId = getAssignedUserId(payload.new);
       const isRemoval =
-        !isPredictive && newStatus !== "queued" && newStatus !== user.id || newStatus === "dequeued";
+        (!isPredictive &&
+          !isQueued(payload.new) &&
+          assignedUserId !== user.id) ||
+        isDequeued(payload.new);
 
       setQueue((currentQueue) => {
         let updatedQueue = isRemoval
@@ -119,12 +127,12 @@ export const useQueue = ({
           const newQueueItem = payload.new;
 
           if (isPredictive) {
-            if (newStatus === user.id || newStatus === "queued") {
+            if (assignedUserId === user.id || isQueued(newQueueItem)) {
               if (!isDuplicate(newQueueItem, updatedQueue)) {
                 updatedQueue = updatedQueue.length
                   ? sortQueue([...updatedQueue, newQueueItem])
                   : [newQueueItem];
-                if (newStatus === user.id) {
+                if (assignedUserId === user.id) {
                   setNextRecipient(newQueueItem);
                   setCallDuration(0);
                 }
@@ -133,7 +141,7 @@ export const useQueue = ({
               updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
             }
           } else {
-            if (newStatus === user.id) {
+            if (assignedUserId === user.id) {
               updatedQueue = updatedQueue.filter(
                 (item) => item.contact_id !== payload.new.contact_id,
               );

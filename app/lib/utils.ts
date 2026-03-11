@@ -5,6 +5,7 @@ import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndAp
 import { OutreachExportData } from "./database.server";
 import type { Json } from "./database.types";
 import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
+import { normalizePhoneNumber as normalizeNorthAmericanPhoneNumber } from "./utils/phone";
 import { logger } from "@/lib/logger.server";
 
 export function cn(...inputs: ClassValue[]) {
@@ -452,29 +453,7 @@ export function isEmail(email: string) {
 }
 
 export function normalizePhoneNumber(input: string) {
-  let cleaned = input.replace(/[^0-9+]/g, "");
-
-  if (cleaned.indexOf("+") > 0) {
-    cleaned = cleaned.replace(/\+/g, "");
-  }
-  if (!cleaned.startsWith("+")) {
-    cleaned = "+" + cleaned;
-  }
-
-  const validLength = 11;
-  const minLength = 11;
-
-  if (cleaned.length < minLength + 1) {
-    // +1 for the +
-    cleaned = "+1" + cleaned.replace("+", "");
-  }
-
-  if (cleaned.length !== validLength + 1) {
-    // +1 for the +
-    throw new Error("Invalid phone number length");
-  }
-
-  return cleaned;
+  return normalizeNorthAmericanPhoneNumber(input);
 }
 
 export const handleNavlinkStyles = (isActive: boolean, isPending: boolean): string => {

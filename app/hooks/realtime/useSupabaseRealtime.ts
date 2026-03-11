@@ -282,11 +282,40 @@ export const useSupabaseRealtime = ({
           break;
         case "campaign_queue":
           if (payload.new && Number((payload.new as { campaign_id?: number }).campaign_id) !== Number(campaignIdRef.current)) return;
-          if (payload.eventType === 'INSERT' && payload.new) {
-            const queueItem = payload.new as Tables<"campaign_queue"> & { contact: Contact | null };
+          if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && payload.new) {
+            const queueItem = payload.new as Tables<"campaign_queue"> & { contact?: Contact | null };
             if (queueItem.contact) {
               updateQueue({ new: queueItem as Tables<"campaign_queue"> & { contact: Contact } });
+              return;
             }
+
+            void supabase
+              .from("campaign_queue")
+              .select("*, contact(*)")
+              .eq("id", queueItem.id)
+              .maybeSingle()
+              .then(({ data, error }) => {
+                if (error) {
+                  logger.error("Failed to hydrate queue item from realtime payload", error);
+                  return;
+                }
+
+                if (data?.contact) {
+                  updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
+                  return;
+                }
+
+                const existingContact =
+                  queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
+                if (existingContact) {
+                  updateQueue({
+                    new: {
+                      ...queueItem,
+                      contact: existingContact,
+                    } as Tables<"campaign_queue"> & { contact: Contact },
+                  });
+                }
+              });
           }
           break;
         case "workspace_number":

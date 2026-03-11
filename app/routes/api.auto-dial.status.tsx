@@ -10,6 +10,7 @@ import { validateTwilioWebhookParams } from "@/twilio.server";
 import { logger } from "@/lib/logger.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
+import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 
 const supabase = createClient(
   env.SUPABASE_URL(),
@@ -274,7 +275,9 @@ const handleParticipantJoin = async (
         { disposition: "in-progress", answered_at: new Date().toISOString() },
       );
       await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
-        status: parsedBody.FriendlyName,
+        ...buildProviderStatusQueueUpdate(
+          parsedBody.FriendlyName ?? parsedBody.ConferenceSid ?? "in-progress",
+        ),
       });
 
       realtime.send({

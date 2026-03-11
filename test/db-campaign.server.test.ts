@@ -806,7 +806,9 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchCampaignAudience returns data and throws for any query error", async () => {
     const mod = await import("../app/lib/database/campaign.server");
 
-    const makeClient = (errs: { queue?: any; queued?: any; scripts?: any } = {}) => ({
+    const makeClient = (
+      errs: { queue?: any; queued?: any; dequeued?: any; scripts?: any } = {},
+    ) => ({
       from: (table: string) => {
         if (table === "script") {
           return {
@@ -816,11 +818,15 @@ describe("app/lib/database/campaign.server.ts", () => {
           };
         }
         if (table === "campaign_queue") {
-          const state = { isQueuedQuery: false, limit: 0 };
+          const state = { isQueuedQuery: false, isDequeuedQuery: false, limit: 0 };
           const chain: any = {
             select: () => chain,
             eq: (_k: string, v: any) => {
               if (v === "queued") state.isQueuedQuery = true;
+              return chain;
+            },
+            or: () => {
+              state.isDequeuedQuery = true;
               return chain;
             },
             not: () => chain,
@@ -829,6 +835,9 @@ describe("app/lib/database/campaign.server.ts", () => {
               state.limit = n;
               if (n === 25) {
                 return { data: [{ id: 1 }], count: 25, error: errs.queue ?? null };
+              }
+              if (state.isDequeuedQuery) {
+                return { data: [{ id: 1 }], count: 2, error: errs.dequeued ?? null };
               }
               return { data: [{ id: 1 }], count: 1, error: errs.queued ?? null };
             },
@@ -843,6 +852,7 @@ describe("app/lib/database/campaign.server.ts", () => {
     expect(ok).toMatchObject({
       campaign_queue: [{ id: 1 }],
       queue_count: 1,
+      dequeued_count: 2,
       total_count: 25,
       scripts: [{ id: 1 }],
     });
@@ -852,6 +862,9 @@ describe("app/lib/database/campaign.server.ts", () => {
     );
     await expect(mod.fetchCampaignAudience(makeClient({ queued: { message: "qc" } }), "1", "w1")).rejects.toThrow(
       "Error fetching queued count",
+    );
+    await expect(mod.fetchCampaignAudience(makeClient({ dequeued: { message: "dc" } }), "1", "w1")).rejects.toThrow(
+      "Error fetching dequeued count",
     );
     await expect(mod.fetchCampaignAudience(makeClient({ scripts: { message: "s" } }), "1", "w1")).rejects.toThrow(
       "Error fetching scripts",

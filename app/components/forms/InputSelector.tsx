@@ -31,8 +31,8 @@ export default function InputSelector({ device }: InputSelectorProps) {
 
   const getDefaultDevice = useCallback(() => {
     if (!device?.audio) return null;
-    const speakerDevices = device.audio.speakerDevices.get();
-    return speakerDevices.size > 0 ? Array.from(speakerDevices)[0] : null;
+    const availableDevices = device.audio.availableInputDevices;
+    return availableDevices.size > 0 ? Array.from(availableDevices.values())[0] : null;
   }, [device]);
 
   const handleDeviceChange = useCallback(() => {

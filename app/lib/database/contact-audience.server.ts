@@ -45,10 +45,12 @@ export async function removeContactsFromAudience(
 
   const newCount = count ?? 0;
 
-  await supabaseClient
+  const { error: updateError } = await supabaseClient
     .from("audience")
     .update({ total_contacts: newCount })
     .eq("id", audienceId);
+
+  if (updateError) throw updateError;
 
   return { removed_count: contactIds.length, new_total: newCount };
 }

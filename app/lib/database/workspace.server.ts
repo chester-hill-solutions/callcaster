@@ -45,6 +45,20 @@ import {
   type ConversationSummary,
 } from "../chat-conversation-sort";
 
+async function syncWorkspaceTwilioBootstrapStateSafely(args: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  try {
+    await syncWorkspaceTwilioBootstrapState(args);
+  } catch (error) {
+    logger.error("Failed to sync workspace Twilio bootstrap state:", {
+      workspaceId: args.workspaceId,
+      error,
+    });
+  }
+}
+
 const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
   throughputProduct: "none",
@@ -477,7 +491,7 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncError: "Missing workspace Twilio credentials",
       },
     });
-    await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId }).catch(() => undefined);
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
     return snapshot;
   }
 
@@ -521,7 +535,7 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncError: null,
       },
     });
-    await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId }).catch(() => undefined);
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
     return snapshot;
   } catch (syncError) {
     const snapshot = await updateWorkspaceTwilioSyncSnapshot({
@@ -540,7 +554,7 @@ export async function syncWorkspaceTwilioSnapshot({
           syncError instanceof Error ? syncError.message : "Unknown Twilio sync failure",
       },
     });
-    await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId }).catch(() => undefined);
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
     return snapshot;
   }
 }
@@ -817,7 +831,10 @@ export async function createNewWorkspace({
         user_id,
       });
     if (insertWorkspaceError) {
-      logger.error("Error creating workspace in RPC", insertWorkspaceError);
+      throw insertWorkspaceError;
+    }
+    if (!insertWorkspaceData) {
+      throw new Error("Workspace creation RPC returned no workspace id");
     }
 
     const account = await createSubaccount({
@@ -1212,12 +1229,14 @@ export async function removeWorkspacePhoneNumber({
     const incomingIds = await twilio.incomingPhoneNumbers.list({
       friendlyName: number.friendly_name,
     });
-    outgoingIds.map(async (id) => {
-      return await twilio.outgoingCallerIds(id.sid).remove();
-    });
-    incomingIds.map(async (id) => {
-      return await twilio.incomingPhoneNumbers(id.sid).remove();
-    });
+    await Promise.all([
+      ...outgoingIds.map(async (id) => {
+        return await twilio.outgoingCallerIds(id.sid).remove();
+      }),
+      ...incomingIds.map(async (id) => {
+        return await twilio.incomingPhoneNumbers(id.sid).remove();
+      }),
+    ]);
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
       .delete()

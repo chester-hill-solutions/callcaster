@@ -102,9 +102,9 @@ export const useCalls = (
         return [...currentCalls, updatedCall];
       });
       setRecentCall((prev) =>
-        prev?.sid === updatedCall.sid
-          ? updatedCall
-          : prev ?? updatedCall
+        isUpdate
+          ? (prev?.sid === updatedCall.sid ? updatedCall : prev)
+          : updatedCall
       );
       if (!isUpdate) {
         setRecentAttempt(null);

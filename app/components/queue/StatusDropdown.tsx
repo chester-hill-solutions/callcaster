@@ -6,9 +6,13 @@ interface StatusDropdownProps {
 }
 
 export function StatusDropdown({ currentStatus, onSelect }: StatusDropdownProps) {
+    const currentValue = currentStatus && STATUS_OPTIONS.includes(currentStatus as typeof STATUS_OPTIONS[number])
+        ? currentStatus
+        : "";
+
     return (
         <select 
-            value={currentStatus || ''} 
+            value={currentValue} 
             onChange={(e) => onSelect(e.target.value as typeof STATUS_OPTIONS[number])}
             className="h-6 text-xs px-2 rounded border border-gray-200"
         >

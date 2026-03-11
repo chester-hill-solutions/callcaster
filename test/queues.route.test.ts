@@ -162,6 +162,12 @@ describe("app/routes/api.queues.tsx", () => {
       message: "Campaign queue items reset successfully",
       affected_rows: 3,
     });
+    expect(update).toHaveBeenCalledWith({
+      status: "queued",
+      dequeued_at: null,
+      dequeued_by: null,
+      dequeued_reason: null,
+    });
   });
 
   test("action returns 405 for unsupported method", async () => {

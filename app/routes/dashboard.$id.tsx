@@ -74,15 +74,22 @@ export default function DashboardCallPage() {
     const wavBuffer = audioBuffer.current;
     if (wavBuffer.length) {
       try {
-        const sampleRate = audioContext.current!.sampleRate;
+        const currentAudioContext = audioContext.current;
+        if (!currentAudioContext) {
+          logger.error("Audio context is not initialized");
+          setIsPlaying(false);
+          return;
+        }
+
+        const sampleRate = currentAudioContext.sampleRate;
         const wavFileBuffer = createWavFileFromBuffers(wavBuffer, sampleRate);
-        const audioBufferDecoded = await audioContext.current!.decodeAudioData(
+        const audioBufferDecoded = await currentAudioContext.decodeAudioData(
           wavFileBuffer,
         );
 
-        const source = audioContext.current!.createBufferSource();
+        const source = currentAudioContext.createBufferSource();
         source.buffer = audioBufferDecoded;
-        source.connect(audioContext.current!.destination);
+        source.connect(currentAudioContext.destination);
         source.start();
         source.onended = () => {
           setIsPlaying(false);
@@ -97,20 +104,27 @@ export default function DashboardCallPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const currentAudioContext = audioContext.current;
+      if (!currentAudioContext) {
+        logger.error("Audio context is not initialized");
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
       audioStream.current = stream;
-      const source = audioContext.current!.createMediaStreamSource(stream);
-      processorNode.current = audioContext.current!.createScriptProcessor(
+      const source = currentAudioContext.createMediaStreamSource(stream);
+      processorNode.current = currentAudioContext.createScriptProcessor(
         4096,
         1,
         1,
       );
       source.connect(processorNode.current);
-      processorNode.current.connect(audioContext.current!.destination);
+      processorNode.current.connect(currentAudioContext.destination);
 
       processorNode.current.onaudioprocess = (e) => {
         const inputData = e.inputBuffer.getChannelData(0);
         const wav = new wavefile.WaveFile();
-        wav.fromScratch(1, audioContext.current!.sampleRate, "32f", inputData);
+        wav.fromScratch(1, currentAudioContext.sampleRate, "32f", inputData);
         wav.toMuLaw();
         const buffer = Buffer.from(wav.toBuffer());
         if (socket && socket.readyState === WebSocket.OPEN) {

@@ -10,6 +10,7 @@ import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { processUrls } from "@/lib/sms.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
@@ -181,12 +182,7 @@ const sendMessage = async ({
 
     supabase
       .from("campaign_queue")
-      .update({ 
-        status: "dequeued",
-        dequeued_by: user_id,
-        dequeued_at: new Date().toISOString(),
-        dequeued_reason: "SMS message sent"
-      })
+      .update(buildDequeuedQueueUpdate(user_id, "SMS message sent"))
       .eq("id", queue_id)
   ]);
 

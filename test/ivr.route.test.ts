@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
+    requireWorkspaceAccess: vi.fn(),
+    verifyAuth: vi.fn(),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -16,9 +18,13 @@ const mocks = vi.hoisted(() => {
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
+  requireWorkspaceAccess: (...a: any[]) => mocks.requireWorkspaceAccess(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/supabase.server", () => ({
+  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+}));
 
 function makeSupabase(opts?: {
   outreachError?: any;
@@ -53,7 +59,14 @@ describe("app/routes/api.ivr.tsx", () => {
     vi.resetModules();
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
+    mocks.requireWorkspaceAccess.mockReset();
+    mocks.verifyAuth.mockReset();
     mocks.logger.error.mockReset();
+    mocks.verifyAuth.mockResolvedValue({
+      supabaseClient: {},
+      user: { id: "u1" },
+    });
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   });
 
   test("throws when required form data missing", async () => {
@@ -113,7 +126,11 @@ describe("app/routes/api.ivr.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
     res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
     expect(res.status).toBe(500);
-    expect(await res.text()).toContain("Unknown error");
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Error processing IVR request",
+      code: "INTERNAL_SERVER_ERROR",
+      statusCode: 500,
+    });
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 });

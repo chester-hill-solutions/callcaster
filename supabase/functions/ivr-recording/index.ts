@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
+import { getFunctionsBaseUrl, getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -19,7 +20,7 @@ interface WorkspaceData {
 const log = (level: string, message: string, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
+const baseUrl = `${getFunctionsBaseUrl()}/`;
 
 interface CallDataWithOutreach {
   outreach_attempt: {
@@ -175,7 +176,7 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
 export async function handleRequest(req: Request): Promise<Response> {
   try {
     // Get request details for validation
-    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-recording`;
+    const publicUrl = getFunctionUrl("ivr-recording");
     log('info', 'Request URL', { url: publicUrl });
     
     const twilioSignature = req.headers.get('x-twilio-signature');

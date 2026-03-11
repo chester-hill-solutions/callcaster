@@ -66,6 +66,37 @@ describe("app/lib/database/contact-audience.server.ts", () => {
     expect(updateSpy).toHaveBeenCalledWith({ total_contacts: 0 });
   });
 
+  test("removeContactsFromAudience: throws when audience total_contacts update fails", async () => {
+    const mod = await import("../app/lib/database/contact-audience.server");
+
+    const supabase: any = {
+      from: (table: string) => {
+        if (table === "contact_audience") {
+          return {
+            delete: () => ({
+              eq: () => ({
+                in: async () => ({ error: null }),
+              }),
+            }),
+            select: () => ({
+              eq: async () => ({ count: 2, error: null }),
+            }),
+          };
+        }
+        if (table === "audience") {
+          return {
+            update: () => ({
+              eq: async () => ({ error: new Error("upd") }),
+            }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    };
+
+    await expect(mod.removeContactsFromAudience(supabase, 99, [1, 2])).rejects.toThrow("upd");
+  });
+
   test("removeContactsFromAudience: throws when delete fails", async () => {
     const mod = await import("../app/lib/database/contact-audience.server");
 

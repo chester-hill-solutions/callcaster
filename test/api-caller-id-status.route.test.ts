@@ -27,6 +27,10 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
+vi.mock("@/twilio.server", () => ({
+  validateTwilioWebhookParams: vi.fn(() => true),
+}));
+
 describe("app/routes/api.caller-id.status.tsx", () => {
   beforeEach(() => {
     supabaseMocks.createClient.mockReset();
@@ -34,7 +38,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
   });
 
   test("returns parsed body when VerificationStatus is neither success nor failed", async () => {
-    supabaseMocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    supabaseMocks.createClient.mockReturnValueOnce({
+      from: () => ({
+        select: () => ({
+          eq: async () => ({
+            data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+            error: null,
+          }),
+        }),
+      }),
+    });
     const mod = await import("../app/routes/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
@@ -51,7 +64,20 @@ describe("app/routes/api.caller-id.status.tsx", () => {
         select: async () => ({ data: [{ id: 1 }], error: null }),
       }),
     }));
-    supabaseMocks.createClient.mockReturnValueOnce({ from: () => ({ update }) });
+    supabaseMocks.createClient.mockReturnValueOnce({ from: (table: string) => {
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: async () => ({
+              data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+              error: null,
+            }),
+          }),
+          update,
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    } });
 
     const mod = await import("../app/routes/api.caller-id.status");
     const fd = new FormData();
@@ -84,7 +110,22 @@ describe("app/routes/api.caller-id.status.tsx", () => {
         },
       }),
     }));
-    supabaseMocks.createClient.mockReturnValue({ from: () => ({ update }) });
+    supabaseMocks.createClient.mockReturnValue({
+      from: (table: string) => {
+        if (table === "workspace_number") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+                error: null,
+              }),
+            }),
+            update,
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    });
 
     const mod = await import("../app/routes/api.caller-id.status");
     const makeReq = () => {

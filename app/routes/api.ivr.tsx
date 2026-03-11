@@ -1,10 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "../lib/database.server";
 import { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }:ActionFunctionArgs) => {
+  const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const formData = await request.formData();
 
@@ -26,6 +30,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
   });
 
   try {
+    await requireWorkspaceAccess({ supabaseClient: userSupabase, user, workspaceId: workspace_id });
     const { data, error: outreachError } = await supabase.rpc(
       "create_outreach_attempt",
       {
@@ -65,12 +70,7 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     // Dequeue
     const { error: dequeueError } = await supabase
       .from("campaign_queue")
-      .update({ 
-        status: "dequeued",
-        dequeued_at: new Date().toISOString(),
-        dequeued_reason: "IVR call completed",
-        dequeued_by: user_id, 
-      })
+      .update(buildDequeuedQueueUpdate(user_id, "IVR call completed"))
       .eq("id", queue_id);
       
     if (dequeueError) throw dequeueError;
@@ -81,9 +81,6 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     });
   } catch (error: unknown) {
     logger.error("Error processing IVR request:", error);
-    return new Response(
-      `Error processing IVR request: ${error instanceof Error ? error.message : "Unknown error"}`,
-      { status: 500 }
-    );
+    return createErrorResponse(error, "Error processing IVR request");
   }
 };

@@ -12,6 +12,10 @@ import {
 import { logger } from "../logger.server";
 import { getSignedUrls } from "./workspace.server";
 import { extractKeys, flattenRow } from "../utils";
+import {
+  COMPLETED_QUEUE_COUNT_FILTER,
+  QUEUE_STATUS_QUEUED,
+} from "../queue-status";
 
 export type CampaignType =
   | "live_call"
@@ -551,7 +555,7 @@ export const fetchQueueCounts = async (
       .from("campaign_queue")
       .select("*, contact!inner(*)", { count: "exact", head: true })
       .eq("campaign_id", Number(campaignId))
-      .eq("status", "queued")
+      .eq("status", QUEUE_STATUS_QUEUED)
       .not("contact.phone", "is", null)
       .neq("contact.phone", "")
       .limit(1);
@@ -593,14 +597,24 @@ export const fetchCampaignAudience = async (
     .from("campaign_queue")
     .select(`id, contact_id, contact!inner(*)`, { count: "exact" })
     .eq("campaign_id", Number(campaignId))
-    .eq("status", "queued")
+    .eq("status", QUEUE_STATUS_QUEUED)
     .not("contact.phone", "is", null)
     .neq("contact.phone", "")
     .limit(1);
 
-  const [queueResult, isQueuedCount, scripts] = await Promise.all([
+  const dequeuedCountPromise = supabaseClient
+    .from("campaign_queue")
+    .select(`id, contact_id, contact!inner(*)`, { count: "exact", head: true })
+    .eq("campaign_id", Number(campaignId))
+    .or(COMPLETED_QUEUE_COUNT_FILTER)
+    .not("contact.phone", "is", null)
+    .neq("contact.phone", "")
+    .limit(1);
+
+  const [queueResult, isQueuedCount, dequeuedCount, scripts] = await Promise.all([
     queuePromise,
     isQueuedCountPromise,
+    dequeuedCountPromise,
     scriptsPromise,
   ]);
 
@@ -610,11 +624,16 @@ export const fetchCampaignAudience = async (
     throw new Error(
       `Error fetching queued count: ${isQueuedCount.error.message}`,
     );
+  if (dequeuedCount.error)
+    throw new Error(
+      `Error fetching dequeued count: ${dequeuedCount.error.message}`,
+    );
   if (scripts.error)
     throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
     campaign_queue: queueResult.data,
     queue_count: isQueuedCount.count,
+    dequeued_count: dequeuedCount.count,
     total_count: queueResult.count,
     scripts: scripts.data,
   };

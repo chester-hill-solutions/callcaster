@@ -3,7 +3,7 @@ import { safeParseJson } from "@/lib/database.server";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { logger } from "@/lib/logger.server";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import { buildQueuedQueueUpdate } from "@/lib/queue-status";
 
 interface DequeueRequest {
   contact_id: number;
@@ -53,7 +53,7 @@ else if (request.method === 'DELETE') {
         const { campaignId }: ResetRequest = await safeParseJson(request);
         const { data, error } = await supabase
             .from('campaign_queue')
-            .update({ status: QUEUE_STATUS_QUEUED })
+            .update(buildQueuedQueueUpdate())
             // Reset all items for campaign
             .eq('campaign_id', Number(campaignId))
             .select();

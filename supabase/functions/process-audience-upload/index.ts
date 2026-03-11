@@ -28,10 +28,25 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Clone the request to avoid consuming the body multiple times
   const reqClone = req.clone();
   let body: RequestBody | null = null;
+
+  const updateUploadOrThrow = async (
+    supabaseAdmin: ReturnType<typeof createClient>,
+    uploadId: number,
+    values: Record<string, unknown>,
+  ) => {
+    const { error } = await supabaseAdmin
+      .from("audience_upload")
+      .update(values)
+      .eq("id", uploadId);
+    if (error) {
+      throw new Error(`Failed to update audience_upload: ${error.message}`);
+    }
+  };
   
   try {
     // Get the request body
-    body = await reqClone.json() as RequestBody;
+    const requestBody = await reqClone.json() as RequestBody;
+    body = requestBody;
     
     // Create a Supabase client with service role key for admin access
     const supabaseAdmin = createClient(
@@ -44,18 +59,15 @@ export async function handleRequest(req: Request): Promise<Response> {
     const records = parseCsvRecords(fileContent);
     
     // Update upload with total contacts and set status to processing
-    await supabaseAdmin
-      .from("audience_upload")
-      .update({
+    await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
         status: "processing",
         total_contacts: records.length,
         processed_contacts: 0
-      })
-      .eq("id", body.uploadId);
+      });
     
     // Process all contacts
     const processedContacts = buildContactsFromRecords({
-      body,
+      body: requestBody,
       records,
     });
     
@@ -80,7 +92,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       if (insertedContacts && insertedContacts.length > 0) {
         const audienceLinks = insertedContacts.map((contact: { id: number }) => ({
           contact_id: contact.id,
-          audience_id: body!.audienceId,
+          audience_id: requestBody.audienceId,
         }));
         
         const { error: linkError } = await supabaseAdmin
@@ -94,31 +106,28 @@ export async function handleRequest(req: Request): Promise<Response> {
       
       // Update processed count
       insertedCount += batch.length;
-      await supabaseAdmin
-        .from("audience_upload")
-        .update({
-          processed_contacts: insertedCount,
-          status: insertedCount >= records.length ? "completed" : "processing"
-        })
-        .eq("id", body.uploadId);
+      await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
+        processed_contacts: insertedCount,
+        status: insertedCount >= records.length ? "completed" : "processing"
+      });
     }
     
     // Final update to mark completion
-    await supabaseAdmin
-      .from("audience_upload")
-      .update({
+    await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
         status: "completed",
         processed_at: new Date().toISOString()
-      })
-      .eq("id", body.uploadId);
+      });
     
     // Update the audience with the total contacts
-    await supabaseAdmin
+    const { error: audienceUpdateError } = await supabaseAdmin
       .from("audience")
       .update({
         total_contacts: insertedCount
       })
       .eq("id", body.audienceId);
+    if (audienceUpdateError) {
+      throw new Error(`Failed to update audience count: ${audienceUpdateError.message}`);
+    }
     
     return new Response(
       JSON.stringify({
@@ -139,13 +148,16 @@ export async function handleRequest(req: Request): Promise<Response> {
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
         );
         
-        await supabaseAdmin
+        const { error: uploadUpdateError } = await supabaseAdmin
           .from("audience_upload")
           .update({
             status: "error",
             error_message: error instanceof Error ? error.message : "Unknown error"
           })
           .eq("id", body.uploadId);
+        if (uploadUpdateError) {
+          throw uploadUpdateError;
+        }
       }
     } catch (updateError) {
       console.error("Failed to update upload status:", updateError);

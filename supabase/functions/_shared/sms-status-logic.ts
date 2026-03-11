@@ -53,6 +53,10 @@ export function shouldUpdateOutreachDisposition(args: {
   return canTransitionOutreachDisposition(current, next);
 }
 
+import {
+  buildCanceledQueueUpdate,
+} from "./queue-writes.ts";
+
 export type OutboundSmsWebhookMessage = {
   sid: string;
   from?: string;
@@ -113,7 +117,7 @@ export async function cancelQueuedMessages(args: {
   if (!queuedMessages?.length) return;
   await args.supabase
     .from("campaign_queue")
-    .update({ status: "cancelled" })
+    .update(buildCanceledQueueUpdate())
     .eq("status", "queued")
     .eq("campaign_id", args.campaignId);
 }

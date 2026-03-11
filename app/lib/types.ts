@@ -100,10 +100,15 @@ export interface SurveyAnswerData {
   answer_value: string;
 }
 export type Script = Tables<"script">;
-export type QueueItem = Tables<"campaign_queue"> & {
+export type CampaignQueueState = Tables<"campaign_queue"> & {
+  assigned_to_user_id?: string | null;
+  provider_status?: string | null;
+  queue_state?: string | null;
+};
+export type QueueItem = CampaignQueueState & {
   contact: Contact;
 };
-export type CampaignQueue = Tables<"campaign_queue">;
+export type CampaignQueue = CampaignQueueState;
 export type Call = Tables<"call">;
 export type User = Tables<"user"> | null;
 export type WorkspaceInvite = Tables<"workspace_invite"> | null;

@@ -38,7 +38,7 @@ describe("callscreenActions", () => {
     handleConferenceStart();
     expect(begin).toHaveBeenCalledTimes(1);
 
-    handleConferenceEnd({
+    await handleConferenceEnd({
       activeCall: { parameters: { CallSid: "CA1" } },
       setConference,
       workspaceId: "w1",
@@ -62,7 +62,7 @@ describe("callscreenActions", () => {
     const setConference = vi.fn();
 
     const { handleConferenceEnd } = handleConference({ submit, begin } as any);
-    handleConferenceEnd({
+    await handleConferenceEnd({
       activeCall: { parameters: {} },
       setConference,
       workspaceId: "w1",

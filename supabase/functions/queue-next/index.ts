@@ -1,8 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
-
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
 
 export async function handleRequest(req: Request): Promise<Response> {
@@ -60,8 +59,8 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     await new Promise(resolve => setTimeout(resolve, 200));
     if (campaign.type === "robocall") {
-      await fetch(
-        `${baseUrl}/ivr-handler`,
+      const response = await fetch(
+        getFunctionUrl("ivr-handler"),
         {
           method: 'POST',
           headers: getFunctionHeaders(),
@@ -82,13 +81,22 @@ export async function handleRequest(req: Request): Promise<Response> {
         }
       );
 
+      if (!response.ok) {
+        await supabase.rpc("handle_campaign_queue_entry", {
+          p_contact_id: contact.contact_id,
+          p_campaign_id: Number(campaign_id),
+          p_requeue: true,
+        });
+        throw new Error(`ivr-handler failed with status ${response.status}`);
+      }
+
       return new Response(
         JSON.stringify(data),
         { headers: { "Content-Type": "application/json" } },
       )
     } else if (campaign.type === "message") {
-      await fetch(
-        `${baseUrl}/sms-handler`,
+      const response = await fetch(
+        getFunctionUrl("sms-handler"),
         {
           method: 'POST',
           headers: getFunctionHeaders(),
@@ -107,6 +115,14 @@ export async function handleRequest(req: Request): Promise<Response> {
           })
         }
       );
+      if (!response.ok) {
+        await supabase.rpc("handle_campaign_queue_entry", {
+          p_contact_id: contact.contact_id,
+          p_campaign_id: Number(campaign_id),
+          p_requeue: true,
+        });
+        throw new Error(`sms-handler failed with status ${response.status}`);
+      }
       return new Response(
         JSON.stringify(data),
         { headers: { "Content-Type": "application/json" } },

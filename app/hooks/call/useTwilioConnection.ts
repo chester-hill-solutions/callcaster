@@ -1,11 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from '@/lib/logger.client';
 
-// Types - Device and Call instances are passed as parameters or created dynamically
-type Device = any;
-type Call = any;
-
-// Lazy load Twilio SDK only on client side
+// The Voice SDK touches browser globals during module evaluation, so keep this
+// lazy client-only require instead of moving it to the import block.
 const getTwilioSDK = () => {
   if (typeof window === 'undefined') return null;
   // eslint-disable-next-line @typescript-eslint/no-require-imports

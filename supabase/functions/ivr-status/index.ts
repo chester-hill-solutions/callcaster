@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
+import { getFunctionsBaseUrl, getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import {
   billingUnitsFromDurationSeconds,
   canTransitionOutreachDisposition,
@@ -40,7 +41,7 @@ const log = (level: string, message: string, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
 
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
+const baseUrl = `${getFunctionsBaseUrl()}/`;
 
 const getWorkspaceData = async (supabase: SupabaseClient, workspace_id: string): Promise<WorkspaceData> => {
   const { data, error } = await supabase
@@ -164,7 +165,7 @@ const handleCallCompletion = async (
 export async function handleRequest(req: Request): Promise<Response> {
   try {
     // Get request details for validation
-    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-status`;
+    const publicUrl = getFunctionUrl("ivr-status");
 
     const twilioSignature = req.headers.get('x-twilio-signature');
 

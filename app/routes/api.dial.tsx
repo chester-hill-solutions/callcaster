@@ -1,6 +1,6 @@
 import Twilio from 'twilio';
 import { createSupabaseServerClient, verifyAuth } from '../lib/supabase.server';
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from "../lib/database.server";
+import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "../lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import type { TablesInsert, Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
@@ -21,8 +21,8 @@ interface DialRequest {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-    const raw = await safeParseJson<Partial<DialRequest>>(request);
+    const { supabaseClient: supabase } = createSupabaseServerClient(request);
+    const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {
         to_number,
         user_id,
@@ -65,7 +65,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .eq("phone_number", caller_id)
             .maybeSingle(),
         getWorkspaceMessagingOnboardingState({
-            supabaseClient: supabase as any,
+            supabaseClient: supabase,
             workspaceId: workspace_id,
         }),
     ]);

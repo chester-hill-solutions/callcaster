@@ -35,8 +35,13 @@ const AudioStreamer = () => {
   };
 
   const stopRecording = () => {
-    mediaRecorder!.stop();
-    mediaRecorder!.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+    if (!mediaRecorder) {
+      logger.warn("Tried to stop recording without an active media recorder");
+      return;
+    }
+
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach((track: MediaStreamTrack) => track.stop());
     setIsRecording(false);
   };
 

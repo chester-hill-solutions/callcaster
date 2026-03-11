@@ -10,6 +10,13 @@ import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 import type { AppError } from "@/lib/errors.server";
+import {
+    applyQueueStatusFilter,
+    COMPLETED_QUEUE_COUNT_FILTER,
+    QUEUE_STATUS_QUEUED,
+    type QueueStatusFilter,
+} from "@/lib/queue-status";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -55,7 +62,8 @@ export const filteredSearch = (query: string, filters: { name: string, phone: st
         }
     }
     if (filters.queueStatus) {
-        searchQuery = searchQuery.eq('status', filters.queueStatus);
+        const queueStatus = filters.queueStatus as QueueStatusFilter;
+        searchQuery = applyQueueStatusFilter(searchQuery, queueStatus);
     }
     if (filters.audiences) {
         const audienceId = Number(filters.audiences);
@@ -108,9 +116,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         )`
     ];
 
-    const [queueData, unfilteredCount, totalCount, queuedCount] = await Promise.all([
+    const [queueData, unfilteredCount, queuedCount] = await Promise.all([
         filteredSearch("", filters, supabaseClient, selectFields, selected_id)
-            .eq('contact.outreach_attempt.campaign_id', selected_id)
             .range(offset, offset + pageSize - 1)
             .then(({ data, error, count }) => ({ data, error, count })),
         supabaseClient
@@ -122,19 +129,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             .from("campaign_queue")
             .select('id', { count: 'exact' })
             .eq('campaign_id', Number(selected_id))
-            .then(({ count, error }) => ({ count, error })),
-        supabaseClient
-            .from("campaign_queue")
-            .select('id', { count: 'exact' })
-            .eq('campaign_id', Number(selected_id))
-            .eq('status', 'queued')
+            .eq('status', QUEUE_STATUS_QUEUED)
             .then(({ count, error }) => ({ count, error })),
     ]);
 
     const queueResponse: QueueResponse = {
         queueData: queueData.data as (QueueItem & { contact: Contact; audiences: Audience[] })[] | null,
         queueError: queueData.error || null,
-        totalCount: totalCount.count,
+        totalCount: queueData.count,
         queuedCount: queuedCount.count,
         unfilteredCount: unfilteredCount.count,
         currentPage: page,
@@ -163,12 +165,47 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const ids = data.ids;
         const newStatus = data.status as string;
         const isAllSelected = data.isAllSelected === true || data.isAllSelected === "true";
+        const filters = typeof data.filters === "string"
+            ? JSON.parse(data.filters)
+            : (data.filters as QueueResponse["filters"] | undefined);
 
         if (isAllSelected) {
+            const filteredIdsQuery = filteredSearch(
+                "",
+                filters || {
+                    name: "",
+                    phone: "",
+                    email: "",
+                    address: "",
+                    audiences: "",
+                    disposition: "",
+                    queueStatus: "",
+                },
+                supabaseClient,
+                ["id"],
+                selected_id,
+            );
+            const { data: filteredRows, error: filteredRowsError } = await filteredIdsQuery;
+
+            if (filteredRowsError) {
+                return json({ success: false, error: filteredRowsError.message });
+            }
+
+            const filteredIds = ((filteredRows ?? []) as unknown as Array<{ id: number | string }>)
+                .map((row) => {
+                    const id = row?.id ?? null;
+                    return typeof id === "number" ? id : Number(id);
+                })
+                .filter((id): id is number => Number.isFinite(id));
+
+            if (filteredIds.length === 0) {
+                return json({ success: true });
+            }
+
             const { error } = await supabaseClient
                 .from("campaign_queue")
                 .update({ status: newStatus })
-                .eq("campaign_id", parseInt(selected_id));
+                .in("id", filteredIds);
 
             if (error) {
                 return json({ success: false, error: error.message });
@@ -205,38 +242,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
 
         const contactIds = contacts.map((contact) => contact.contact_id);
-        const queueItems = contactIds.map((contactId) => ({
-            campaign_id: parseInt(selected_id),
-            contact_id: contactId,
-            status: "queued",
-        }));
-
-        const { error: insertError } = await supabaseClient
-            .from("campaign_queue")
-            .insert(queueItems);
-
-        if (insertError) {
-            return json({ success: false, error: insertError.message });
-        }
+        await enqueueContactsForCampaign(
+            supabaseClient,
+            parseInt(selected_id),
+            contactIds,
+            { requeue: false }
+        );
 
         return json({ success: true });
     }
 
     if (intent === "add_contacts") {
         const contacts = (typeof data.contacts === "string" ? JSON.parse(data.contacts) : data.contacts) as Contact[];
-        const queueItems = contacts.map((contact) => ({
-            campaign_id: parseInt(selected_id),
-            contact_id: contact.id,
-            status: "queued",
-        }));
-
-        const { error } = await supabaseClient
-            .from("campaign_queue")
-            .insert(queueItems);
-
-        if (error) {
-            return json({ success: false, error: error.message });
-        }
+        await enqueueContactsForCampaign(
+            supabaseClient,
+            parseInt(selected_id),
+            contacts.map((contact) => contact.id),
+            { requeue: false }
+        );
 
         return json({ success: true });
     }
@@ -319,8 +342,15 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
     };
 
     const handleStatusChange = (ids: string[], newStatus: string, isAllSelected: boolean) => {
+        const filters = Object.fromEntries(params.entries());
         fetcher.submit(
-            { intent: "update_status", ids: isAllSelected ? 'all' : ids, status: newStatus, isAllSelected },
+            {
+                intent: "update_status",
+                ids: isAllSelected ? 'all' : ids,
+                status: newStatus,
+                isAllSelected,
+                filters: JSON.stringify(filters),
+            },
             { method: "POST", encType: "application/json" }
         );
     };

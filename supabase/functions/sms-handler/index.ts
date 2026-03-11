@@ -6,6 +6,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 
 const TWILIO_MESSAGE_INTENTS = new Set([
@@ -282,7 +283,7 @@ function processTemplateTags(text: string, contact: ContactData): string {
   result = processBraces(result);
   return result;
 }
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
+const baseUrl = `${getFunctionsBaseUrl()}/`;
 interface SendMessageParams {
   body: string;
   to: string;
@@ -298,9 +299,24 @@ interface SendMessageParams {
   messagingServiceSid?: string | null;
 }
 const normalizePhoneNumber = (input: string): string => {
-  const cleaned = (input.replace(/[^0-9+]/g, ""))
-    .replace(/^\+?1?(\+|\d{10})$/, "+1$1")
-    .replace(/\+1\+/, "+1");
+  if (!input || typeof input !== "string") {
+    throw new Error("Phone number input must be a non-empty string");
+  }
+
+  // Keep this behavior aligned with app/lib/utils/phone.ts.
+  let cleaned = input.replace(/[^0-9+]/g, "");
+
+  if (cleaned.indexOf("+") > 0) {
+    cleaned = cleaned.replace(/\+/g, "");
+  }
+
+  if (!cleaned.startsWith("+")) {
+    cleaned = `+${cleaned}`;
+  }
+
+  if (cleaned.length < 12) {
+    cleaned = `+1${cleaned.replace("+", "")}`;
+  }
 
   if (cleaned.length !== 12) { // +1 plus 10 digits
     throw new Error("Invalid phone number length");

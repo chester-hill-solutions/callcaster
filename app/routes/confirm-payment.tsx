@@ -5,6 +5,19 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 
+function buildBillingRedirect(
+  workspaceId: string,
+  params: Record<string, string | number>,
+) {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.set(key, String(value));
+  });
+
+  return redirect(`/workspaces/${workspaceId}/billing?${searchParams.toString()}`);
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session_id");
@@ -36,23 +49,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     await insertTransactionHistoryIdempotent({
-      supabase: supabaseClient as any,
+      supabase: supabaseClient,
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,
-      note: `Reloaded ${creditAmount} credits, stripe_session:${sessionId}`,
+      note: `Added ${creditAmount} credits, stripe_session:${sessionId}`,
       idempotencyKey: `stripe_session:${sessionId}`,
     });
 
-    return redirect(`/workspaces/${workspaceId}/billing?success=true`);
+    return buildBillingRedirect(workspaceId, {
+      payment_status: "success",
+      credits_added: creditAmount,
+    });
   } catch (error) {
     logger.error("Payment confirmation error:", error);
 
     if (fallbackWorkspaceId) {
-      return redirect(`/workspaces/${fallbackWorkspaceId}/billing?error=true`);
+      return buildBillingRedirect(fallbackWorkspaceId, {
+        payment_status: "error",
+        payment_message:
+          "We could not confirm this payment yet. If your card was charged, please contact support.",
+      });
     }
 
-    return redirect("/workspaces?error=payment_failed");
+    return redirect(
+      "/workspaces?payment_status=error&payment_message=We%20could%20not%20confirm%20this%20payment.",
+    );
   }
 }
 

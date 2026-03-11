@@ -36,6 +36,7 @@ import { Audience, Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Schedul
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
+import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
 export type CampaignState = {
   campaign_id: string;
@@ -207,21 +208,18 @@ export default function CampaignScreen() {
     }
   }, [csvData]);
 
-  const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
-    ? "No script selected"
-    : !campaignData?.caller_id
-      ? "No outbound phone number selected"
-      : campaignData?.status === "scheduled" ?
-        `Campaign scheduled.`
-        : !campaignData?.is_active
-          ? "It is currently outside of the Campaign's calling hours"
-          : null;
+  const readiness = getCampaignReadiness(campaignData, campaignDetails, {
+    queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,
+  });
+  const joinDisabled = readiness.startDisabledReason
+    ? readiness.startDisabledReason
+    : campaignData?.status === "scheduled"
+      ? "Campaign scheduled."
+      : !campaignData?.is_active
+        ? "It is currently outside of the campaign's calling hours"
+        : null;
 
-  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
-    ? "No script selected"
-    : !campaignData?.caller_id
-      ? "No outbound phone number selected"
-      : null;
+  const scheduleDisabled = readiness.scheduleDisabledReason;
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />

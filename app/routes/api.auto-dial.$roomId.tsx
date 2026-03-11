@@ -6,12 +6,25 @@ import { Call } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
     const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
     if (error) throw new Error(`Error fetching call data: ${error.message}`);
     return data;
+};
+
+const fetchWorkspaceAuthToken = async (workspaceId: string) => {
+    const { data, error } = await supabase
+        .from("workspace")
+        .select("twilio_data")
+        .eq("id", workspaceId)
+        .single();
+    if (error) throw new Error(`Error fetching workspace auth token: ${error.message}`);
+    const authToken = (data?.twilio_data as { authToken?: string } | null)?.authToken;
+    if (!authToken) throw new Error("Workspace Twilio auth token not found");
+    return authToken;
 };
 
 const fetchCampaignData = async (campaignId: string) => {
@@ -154,6 +167,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const conferenceName = params.roomId;
     const realtime = supabase.realtime.channel(conferenceName)
     const formData = await request.formData();
+    const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
     const answeredBy = formData.get('AnsweredBy') as string;
     const callStatus = formData.get('CallStatus') as string;
@@ -163,6 +177,19 @@ export const action = async ({ request, params }: { request: Request, params: { 
     
     try {
         const dbCall = await fetchCallData(callSid);
+        const authToken = await fetchWorkspaceAuthToken(dbCall.workspace?.toString() ?? "");
+        const isValidTwilioRequest = validateTwilioWebhookParams(
+            parsedBody,
+            request.headers.get("x-twilio-signature"),
+            request.url,
+            authToken
+        );
+        if (!isValidTwilioRequest) {
+            return new Response(`<Response><Hangup/></Response>`, {
+                status: 403,
+                headers: { 'Content-Type': 'text/xml' }
+            });
+        }
         const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
 
         if (await checkUserDevices(dbCall.contact_id?.toString() ?? '', conferenceName, called, campaign.caller_id?.toString() ?? '')) {

@@ -7,6 +7,7 @@ import {
   useActionData,
   useLoaderData,
   useNavigation,
+  useSearchParams,
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
@@ -187,7 +188,10 @@ export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<LoaderData>();
   const actionData = useActionData<typeof action>();
   const { state } = useNavigation();
+  const [searchParams] = useSearchParams();
   const isBusy = state !== "idle";
+  const paymentStatus = searchParams.get("payment_status");
+  const paymentMessage = searchParams.get("payment_message");
 
   useEffect(() => {
     if (actionData?.error) {
@@ -196,7 +200,10 @@ export default function Workspaces() {
     if (error) {
       toast.error(error);
     }
-  }, [actionData, error]);
+    if (paymentStatus === "error" && paymentMessage) {
+      toast.error(paymentMessage);
+    }
+  }, [actionData, error, paymentMessage, paymentStatus]);
 
   const workspaceCards = useMemo(
     () =>
