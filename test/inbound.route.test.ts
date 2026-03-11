@@ -54,12 +54,14 @@ function makeSupabase(opts?: {
   number?: any;
   numberError?: any;
   voicemailSignedUrl?: string | null;
+  voicemailList?: { id?: string; name: string }[] | null;
   callError?: any;
   callRow?: any;
 }) {
   const supabase: any = {
     storage: {
       from: () => ({
+        list: async () => ({ data: opts?.voicemailList ?? [], error: null }),
         createSignedUrl: async () => ({
           data: opts?.voicemailSignedUrl ? { signedUrl: opts.voicemailSignedUrl } : null,
           error: null,
@@ -143,7 +145,13 @@ describe("app/routes/api.inbound.tsx", () => {
     // email path with voicemail signedUrl => play+record
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(true);
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number: { ...baseNumber, inbound_action: "a@b.com", inbound_audio: "vm.mp3" }, voicemailSignedUrl: "https://signed" }));
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        number: { ...baseNumber, inbound_action: "a@b.com", inbound_audio: "vm.mp3" },
+        voicemailSignedUrl: "https://signed",
+        voicemailList: [{ name: "vm.mp3", id: "vm.mp3" }],
+      })
+    );
     res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
     const xml = await res.text();
     expect(xml).toContain("play:https://signed");

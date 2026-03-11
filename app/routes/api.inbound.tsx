@@ -60,11 +60,22 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     throw { status: 500, statusText: "Internal Server Error" };
   }
 
-  const { data: voicemail, error: voicemailError } = number?.inbound_audio
-    ? await supabase.storage
-      .from(`workspaceAudio`)
-      .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
-    : { data: null, error: null };
+  const workspaceId = number.workspace?.id ?? null;
+  let voicemail: { signedUrl: string } | null = null;
+  if (number?.inbound_audio && workspaceId) {
+    const { data: files } = await supabase.storage
+      .from("workspaceAudio")
+      .list(workspaceId);
+    const file = files?.find(
+      (f) => String(f.id) === String(number.inbound_audio) || f.name === number.inbound_audio
+    );
+    if (file) {
+      const { data: signed } = await supabase.storage
+        .from("workspaceAudio")
+        .createSignedUrl(`${workspaceId}/${file.name}`, 3600);
+      if (signed?.signedUrl) voicemail = { signedUrl: signed.signedUrl };
+    }
+  }
   
   // Insert call record
   if (!data.CallSid || typeof data.CallSid !== 'string') {
