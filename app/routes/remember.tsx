@@ -1,8 +1,11 @@
 import { Form, useActionData } from "@remix-run/react";
 import { json } from "@remix-run/node";
 import { useEffect } from "react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
+import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 
@@ -37,41 +40,33 @@ export default function Remember() {
     }
   }, [actionData]);
   return (
-    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-      <div
+    <main className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
+      <AuthCard
         id="login-hero"
-        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        title="Reset Password"
+        description="Enter your email address and we’ll send you a recovery link."
       >
-        <h1 className="mb-4 font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          Reset Password
-        </h1>
         <Form
           id="forgot-password-form"
           method="POST"
           className="mb-auto flex w-full flex-col gap-4"
         >
-          <label
-            htmlFor="email"
-            className="flex w-full flex-col font-Zilla-Slab text-xl font-semibold tracking-[1px] text-black dark:text-white"
-          >
-            Email
-            <input
+          <FormField htmlFor="email" label="Email">
+            <Input
               type="text"
               name="email"
               id="email"
-              className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
+              className="border-border bg-white/90 dark:bg-background/80"
             />
-          </label>
+          </FormField>
           <Button
-            className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-xl tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+            className="min-h-[48px] w-full font-Zilla-Slab text-xl tracking-[1px]"
             type="submit"
           >
             Reset
           </Button>
         </Form>
-      </div>
-      <Toaster richColors />
+      </AuthCard>
     </main>
   );
 }

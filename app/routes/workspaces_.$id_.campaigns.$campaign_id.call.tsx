@@ -11,7 +11,7 @@ import {
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 
 // Lib imports
 import { verifyAuth } from "../lib/supabase.server";
@@ -982,7 +982,6 @@ return (
         completed={completed}
       />
     </div>
-    <Toaster richColors />
     <CampaignDialogs
       isDialogOpen={isDialogOpen}
       setDialog={setDialog}

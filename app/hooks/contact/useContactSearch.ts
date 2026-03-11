@@ -1,6 +1,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { MutableRefObject, useEffect, useState, useCallback } from "react";
 import { Contact } from "@/lib/types";
+import { formatMessageTimestamp } from "@/lib/utils";
 import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
 import { logger } from "@/lib/logger.client";
 
@@ -176,7 +177,7 @@ export function useContactSearch({
         setExistingConversation({
           phoneNumber: normalizedPhoneNumber,
           latestMessage: latestMessage.body,
-          date: new Date(latestMessage.date_created).toLocaleString(),
+          date: formatMessageTimestamp(latestMessage.date_created),
         });
       } else {
         setExistingConversation(null);

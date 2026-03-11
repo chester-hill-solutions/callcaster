@@ -1008,6 +1008,34 @@ export async function getWorkspacePhoneNumbers({
   return { data, error };
 }
 
+/**
+ * Returns the first handset-enabled number for the workspace, or the first voice-capable number.
+ * Used by the handset page to show which number to call.
+ */
+export async function getHandsetNumberForWorkspace({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}): Promise<{ data: { id: number; phone_number: string | null } | null; error: PostgrestError | null }> {
+  const { data: handset } = await supabaseClient
+    .from("workspace_number")
+    .select("id, phone_number")
+    .eq("workspace", workspaceId)
+    .eq("handset_enabled", true)
+    .limit(1)
+    .maybeSingle();
+  if (handset) return { data: handset, error: null };
+  const { data: first } = await supabaseClient
+    .from("workspace_number")
+    .select("id, phone_number")
+    .eq("workspace", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  return { data: first, error: null };
+}
+
 export async function updateWorkspacePhoneNumber({
   supabaseClient,
   workspaceId,
@@ -1460,6 +1488,9 @@ type ContactNameRow = Pick<
   "firstname" | "id" | "phone" | "surname"
 >;
 
+type PhoneMatchedContactRow =
+  Database["public"]["Functions"]["find_contact_by_phone"]["Returns"][number];
+
 function compareConversationDates(left: string, right: string): number {
   return new Date(left).getTime() - new Date(right).getTime();
 }
@@ -1473,6 +1504,12 @@ function contactMatchesConversationPhone(
   }
 
   return getConversationPhoneKey(contact.phone) === getConversationPhoneKey(contactPhone);
+}
+
+function conversationNeedsPhoneMatchedContact(
+  conversation: ConversationSummary,
+): boolean {
+  return !conversation.contact_firstname && !conversation.contact_surname;
 }
 
 export async function fetchConversationSummary(
@@ -1622,6 +1659,64 @@ export async function fetchConversationSummary(
 
     if (!existingConversation.contact_phone && contactPhone) {
       existingConversation.contact_phone = contactPhone;
+    }
+  }
+
+  if (typeof supabaseClient.rpc === "function") {
+    const phonesMissingNames = Array.from(
+      new Set(
+        Array.from(conversationMap.values())
+          .filter((conversation) => conversationNeedsPhoneMatchedContact(conversation))
+          .map((conversation) => conversation.contact_phone)
+          .filter((phone): phone is string => Boolean(phone)),
+      ),
+    );
+
+    if (phonesMissingNames.length > 0) {
+      const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
+      await Promise.all(
+        phonesMissingNames.map(async (contactPhone) => {
+          try {
+            const { data, error } = await supabaseClient.rpc("find_contact_by_phone", {
+              p_workspace_id: workspaceId,
+              p_phone_number: contactPhone,
+            });
+
+            if (error || !data?.[0]) {
+              if (error) {
+                logger.error("Error loading contact by phone for conversation", {
+                  contactPhone,
+                  error,
+                  workspaceId,
+                });
+              }
+              return;
+            }
+
+            phoneMatchedContacts.set(contactPhone, data[0]);
+          } catch (error) {
+            logger.error("Unexpected error loading contact by phone for conversation", {
+              contactPhone,
+              error,
+              workspaceId,
+            });
+          }
+        }),
+      );
+
+      for (const conversation of conversationMap.values()) {
+        if (!conversationNeedsPhoneMatchedContact(conversation)) {
+          continue;
+        }
+
+        const matchedContact = phoneMatchedContacts.get(conversation.contact_phone);
+        if (!matchedContact) {
+          continue;
+        }
+
+        conversation.contact_firstname = matchedContact.firstname;
+        conversation.contact_surname = matchedContact.surname;
+      }
     }
   }
 

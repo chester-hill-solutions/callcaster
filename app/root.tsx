@@ -18,6 +18,7 @@ import {
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
+import { Toaster } from "sonner";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 
 import Navbar from "@/components/layout/Navbar";
@@ -175,6 +176,7 @@ export default function App() {
           params={params}
         />
         <Outlet context={{ env, supabase }} />
+        <Toaster position="top-right" richColors visibleToasts={3} />
         <ScrollRestoration />
         <Scripts />
         <LiveReload />

@@ -4,6 +4,10 @@
 - When implementing from an attached plan whose todos already exist, update the existing todos instead of recreating them and work through the full list before stopping.
 - Do not modify, overwrite, or reset the user's existing `.env` or environment variables during setup work.
 
+## Design System
+
+- Prefer [app/components/ui/](app/components/ui/) primitives; use `FormField` for form layout, `Section`/`AuthCard` for page structure, `DataTable`/`TablePagination` for tables, and `toast()` from sonner (single root Toaster). See [docs/design-system.md](docs/design-system.md).
+
 ## Learned Workspace Facts
 - `twilio-serverless/**` is deprecated in this repo and can generally be ignored for current runtime and coverage work.
 - Local Twilio/calling development uses Localtunnel-style public URLs, and `BASE_URL` should match the current public tunnel URL.

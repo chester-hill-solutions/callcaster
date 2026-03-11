@@ -1,4 +1,3 @@
-
 import {
   Pagination,
   PaginationContent,
@@ -14,12 +13,18 @@ type TablePaginationProps = {
   totalPages: number;
   onPageChange: (page: number) => void;
   maxVisiblePages?: number;
-};  
+  totalCount?: number;
+  pageSize?: number;
+  showSummary?: boolean;
+};
 const TablePagination = ({ 
   currentPage, 
   totalPages, 
   onPageChange,
-  maxVisiblePages = 5
+  maxVisiblePages = 5,
+  pageSize,
+  showSummary = false,
+  totalCount,
 }: TablePaginationProps) => {
   const renderPaginationItems = () => {
     const items = [];
@@ -69,31 +74,43 @@ const TablePagination = ({
   };
 
   return (
-    <Pagination>
-      <PaginationContent>
-        <PaginationItem className="text-muted-foreground">
-          <PaginationPrevious
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onPageChange(currentPage - 1);
-            }}
-            className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-          />
-        </PaginationItem>
-        {renderPaginationItems()}
-        <PaginationItem className="text-muted-foreground">
-          <PaginationNext
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onPageChange(currentPage + 1);
-            }}
-            className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-          />
-        </PaginationItem>
-      </PaginationContent>
-    </Pagination>
+    <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
+      {showSummary && totalCount != null && pageSize != null ? (
+        <div className="text-xs text-muted-foreground">
+          Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to{" "}
+          {Math.min(currentPage * pageSize, totalCount)} of {totalCount} results
+        </div>
+      ) : null}
+      <Pagination className="mx-0 justify-start sm:justify-end">
+        <PaginationContent>
+          <PaginationItem className="text-muted-foreground">
+            <PaginationPrevious
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1) {
+                  onPageChange(currentPage - 1);
+                }
+              }}
+              className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+            />
+          </PaginationItem>
+          {renderPaginationItems()}
+          <PaginationItem className="text-muted-foreground">
+            <PaginationNext
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages) {
+                  onPageChange(currentPage + 1);
+                }
+              }}
+              className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    </div>
   );
 };
 

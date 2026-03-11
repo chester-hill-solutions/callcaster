@@ -17,6 +17,41 @@ export function formatDateToLocale(dateFromSupabase: string) {
   return formattedDateTime;
 }
 
+/** Tidy, readable timestamp for chat messages and conversation lists. */
+export function formatMessageTimestamp(dateInput: string | Date): string {
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const timeStr = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  if (dateOnly.getTime() === today.getTime()) {
+    return timeStr;
+  }
+  if (dateOnly.getTime() === yesterday.getTime()) {
+    return `Yesterday, ${timeStr}`;
+  }
+  if (date.getFullYear() === now.getFullYear()) {
+    const dateStr = date.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
+    return `${dateStr}, ${timeStr}`;
+  }
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export function capitalize(text: string): string {
   return text?.charAt(0).toUpperCase() + text?.slice(1);
 }

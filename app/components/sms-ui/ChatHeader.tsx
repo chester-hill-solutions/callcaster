@@ -3,6 +3,13 @@ import { MdEdit, MdExpandMore } from "react-icons/md";
 import { Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Menu } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 const getSortableName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {
@@ -102,46 +109,29 @@ export default function ChatHeader({
   }, [contacts, potentialContacts]);
 
   const actionButton = !!outlet && !contact && allContacts.length > 0 ? (
-    <div className="relative inline-block text-left">
-      <button
-        type="button"
-        className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100 dark:bg-zinc-800"
-        onClick={() => setIsContactListOpen(!isContactListOpen)}
-      >
-        Edit Contacts
-        <MdExpandMore className="-mr-1 ml-2 h-5 w-5" aria-hidden="true" />
-      </button>
-      {isContactListOpen && (
-        <div className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-md bg-white text-gray-300 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-zinc-800">
-          <div
-            className="py-1"
-            role="menu"
-            aria-orientation="vertical"
-            aria-labelledby="options-menu"
+    <DropdownMenu open={isContactListOpen} onOpenChange={setIsContactListOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" className="gap-2">
+          Edit Contacts
+          <MdExpandMore className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {allContacts.map((contactItem) => (
+          <DropdownMenuItem
+            key={contactItem.id || contactItem.phone}
+            className="flex items-center justify-between gap-3"
+            onSelect={() => setDialog(contactItem)}
           >
-            {allContacts.map((contactItem) => (
-              <div
-                key={contactItem.id || contactItem.phone}
-                className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-900"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-300">
-                    {getDisplayName(contactItem)}
-                  </p>
-                  <p className="text-sm text-gray-600">{contactItem.phone}</p>
-                </div>
-                <button
-                  onClick={() => setDialog(contactItem)}
-                  className="text-indigo-600 hover:text-indigo-900"
-                >
-                  <MdEdit className="h-5 w-5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+            <div className="min-w-0">
+              <p className="truncate font-medium">{getDisplayName(contactItem)}</p>
+              <p className="truncate text-xs text-muted-foreground">{contactItem.phone}</p>
+            </div>
+            <MdEdit className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   ) : (
     <Button
       type="button"
@@ -185,14 +175,14 @@ export default function ChatHeader({
         {!outlet && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
             <div className="relative flex-1">
-              <input
+              <Input
                 type="tel"
                 id="phone"
                 name="phone"
                 value={phoneNumber}
                 onChange={handlePhoneChange}
                 required
-                className={`mt-1 block w-full rounded-md ${
+                className={`mt-1 ${
                   isValid ? "border-gray-300" : "border-red-500"
                 } shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50`}
                 placeholder="Enter phone number"

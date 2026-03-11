@@ -1,11 +1,15 @@
 import { json, redirect } from "@remix-run/node";
 import { Form, NavLink, useActionData } from "@remix-run/react";
 import { useEffect } from "react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
+import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { logger } from "@/lib/logger.server";
+import { Text } from "@/components/ui/typography";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
@@ -51,58 +55,45 @@ export default function SignIn() {
   }, [actionData]);
 
   return (
-    <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
-      <div
+    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
+      <AuthCard
+        title="Login"
+        description="Sign in to manage your workspaces, calls, and messaging."
         id="login-hero"
-        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-28 py-8 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
       >
-        <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
-          Login
-        </h1>
-
-        {actionData?.error && (
-          <p className="block sm:hidden" style={{ color: "red" }}>
+        {actionData?.error ? (
+          <Text className="block text-center text-destructive sm:hidden">
             {actionData.error}
-          </p>
-        )}
-
+          </Text>
+        ) : null}
         <Form
           method="POST"
           className="flex w-full flex-col gap-4"
           id="signin-form"
         >
-          <label
-            htmlFor="email"
-            className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
-          >
-            Email
-            <input
+          <FormField htmlFor="email" label="Email">
+            <Input
               autoComplete="email"
               type="text"
               name="email"
               id="email"
-              className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
+              className="border-border bg-white/90 dark:bg-background/80"
             />
-          </label>
+          </FormField>
 
-          <label
-            htmlFor="password"
-            className="flex w-full flex-col font-Zilla-Slab text-2xl font-semibold tracking-[1px] text-black dark:text-white"
-          >
-            Password
-            <input
+          <FormField htmlFor="password" label="Password">
+            <Input
               autoComplete="current-password"
               type="password"
               name="password"
               id="password"
-              className="w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white"
+              className="border-border bg-white/90 dark:bg-background/80"
             />
-          </label>
+          </FormField>
         </Form>
 
         <Button
-          className="min-h-[48px] rounded-md bg-brand-primary px-16 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+          className="min-h-[48px] w-full font-Zilla-Slab text-2xl font-bold tracking-[1px]"
           type="submit"
           form="signin-form"
         >
@@ -110,8 +101,7 @@ export default function SignIn() {
         </Button>
         <NavLink
           to={"/signup"}
-          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all
-          duration-150 hover:text-brand-primary hover:underline dark:text-brand-secondary dark:hover:text-brand-primary"
+          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all duration-150 hover:text-brand-primary hover:underline dark:text-brand-secondary dark:hover:text-brand-primary"
         >
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
@@ -122,8 +112,7 @@ export default function SignIn() {
         >
           I forgot my password
         </NavLink>
-      </div>
-      <Toaster richColors visibleToasts={1} />
+      </AuthCard>
       <img
         alt="background"
         src="/Hero-1.png"

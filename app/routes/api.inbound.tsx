@@ -9,6 +9,7 @@ import type { TwilioInboundCallWebhook, WebhookEvent } from "@/lib/twilio.types"
 import type { Database } from "@/lib/database.types";
 
 interface WorkspaceNumberData {
+  handset_enabled: boolean;
   inbound_action: string | null;
   inbound_audio: string | null;
   type: string | null;
@@ -41,6 +42,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     .from("workspace_number")
     .select(
       `
+      handset_enabled,
       inbound_action,
       inbound_audio,
       type,
@@ -66,6 +68,31 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       : typeof number.workspace === "string"
         ? number.workspace
         : null) ?? null;
+
+  if (number.handset_enabled && workspaceId) {
+    const now = new Date().toISOString();
+    const { data: session } = await supabase
+      .from("handset_session")
+      .select("client_identity")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .gte("expires_at", now)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (session?.client_identity) {
+      twiml.dial().client(session.client_identity);
+      return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    twiml.say("No one is available to take your call. Please try again later.");
+    twiml.hangup();
+    return new Response(twiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
   let voicemail: { signedUrl: string } | null = null;
   if (number?.inbound_audio && workspaceId) {
     // Prefer treating inbound_audio as storage path (filename); fallback to resolving by id via list

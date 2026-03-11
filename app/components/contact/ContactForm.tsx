@@ -1,5 +1,7 @@
 import { Form } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import type { Contact } from "@/lib/types";
 
 // Enhanced type definitions
@@ -40,49 +42,59 @@ const ContactForm: React.FC<ContactFormProps> = ({
   >
     <input hidden name="id" value={newContact.id || ''} type="hidden"/>
     <div className="flex space-x-2">
-      <input
-        type="text"
-        name="firstname"
-        placeholder="First Name"
-        value={newContact.firstname || ''}
-        onChange={handleInputChange}
-        className="w-full px-2 py-1"
-      />
-      <input
-        type="text"
-        name="surname"
-        placeholder="Last Name"
-        value={newContact.surname || ''}
-        onChange={handleInputChange}
-        className="w-full px-2 py-1"
-      />
+      <FormField htmlFor="firstname" label="First Name" className="w-full">
+        <Input
+          id="firstname"
+          type="text"
+          name="firstname"
+          placeholder="First Name"
+          value={newContact.firstname || ''}
+          onChange={handleInputChange}
+        />
+      </FormField>
+      <FormField htmlFor="surname" label="Last Name" className="w-full">
+        <Input
+          id="surname"
+          type="text"
+          name="surname"
+          placeholder="Last Name"
+          value={newContact.surname || ''}
+          onChange={handleInputChange}
+        />
+      </FormField>
     </div>
     <div className="flex space-x-2">
-      <input
-        type="tel"
-        name="phone"
-        placeholder="Phone Number"
-        value={newContact.phone || ''}
-        onChange={handleInputChange}
-        className="w-full px-2 py-1"
-      />
-      <input
-        type="email"
-        name="email"
-        placeholder="Email Address"
-        value={newContact.email || ''}
-        onChange={handleInputChange}
-        className="w-full px-2 py-1"
-      />
+      <FormField htmlFor="phone" label="Phone Number" className="w-full">
+        <Input
+          id="phone"
+          type="tel"
+          name="phone"
+          placeholder="Phone Number"
+          value={newContact.phone || ''}
+          onChange={handleInputChange}
+        />
+      </FormField>
+      <FormField htmlFor="email" label="Email Address" className="w-full">
+        <Input
+          id="email"
+          type="email"
+          name="email"
+          placeholder="Email Address"
+          value={newContact.email || ''}
+          onChange={handleInputChange}
+        />
+      </FormField>
     </div>
-    <input
-      type="text"
-      name="address"
-      placeholder="Street Address"
-      value={newContact.address || ''}
-      onChange={handleInputChange}
-      className="w-full px-2 py-1"
-    />
+    <FormField htmlFor="address" label="Street Address">
+      <Input
+        id="address"
+        type="text"
+        name="address"
+        placeholder="Street Address"
+        value={newContact.address || ''}
+        onChange={handleInputChange}
+      />
+    </FormField>
     <input hidden name="workspace" value={workspace_id} readOnly />
     <input hidden name="audience_id" value={audience_id ?? ""} readOnly />
     <div className="flex flex-auto justify-end">

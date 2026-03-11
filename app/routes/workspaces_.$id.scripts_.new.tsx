@@ -10,7 +10,7 @@ import {
 } from "@remix-run/react";
 
 import { MdAdd, MdClose } from "react-icons/md";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CardContent } from "@/components/ui/card";
@@ -308,7 +308,6 @@ export default function NewScript() {
           </Form>
         </CardContent>
       </Card>
-      <Toaster richColors />
     </section>
   );
 }

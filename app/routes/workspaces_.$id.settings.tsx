@@ -30,7 +30,7 @@ import {
   testWebhook,
 } from "@/lib/workspace-settings/WorkspaceSettingUtils";
 
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
@@ -38,6 +38,9 @@ import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import Workspace from "./workspaces_.$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
 
 type UserWithRole = Partial<User> & { role: string };
 
@@ -218,23 +221,19 @@ export default function WorkspaceSettings() {
       )}
       <div className="flex gap-2">
         <input type="hidden" name="formName" value="addUser" />
-        <label
-          htmlFor="username"
-          className="flex w-full flex-col text-xl font-semibold dark:text-white"
-        >
-          Email
-          <input
+        <FormField htmlFor="username" label="Email" className="w-full">
+          <Input
             type="text"
             name="username"
             id="username"
-            className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+            className="bg-transparent"
           />
-        </label>
-        <label
+        </FormField>
+        <FormField
           htmlFor="new_user_workspace_role"
-          className="flex w-full flex-col text-xl font-semibold dark:text-white"
+          label="Role"
+          className="w-full"
         >
-          Role
           <select
             className="rounded-md border-2 border-black px-2 py-2 dark:border-white dark:font-normal"
             name="new_user_workspace_role"
@@ -264,7 +263,7 @@ export default function WorkspaceSettings() {
               );
             })}
           </select>
-        </label>
+        </FormField>
       </div>
       <Button
         type="submit"
@@ -302,9 +301,9 @@ export default function WorkspaceSettings() {
   return (
     <main className="mt-8 flex h-fit flex-col">
       <div className="flex justify-center">
-        <h1 className="mb-4 font-Zilla-Slab text-4xl font-bold text-brand-primary dark:text-white">
+        <Heading className="mb-4" branded>
           Workspace Settings
-        </h1>
+        </Heading>
       </div>
       <div className="flex flex-wrap items-stretch gap-4">
         <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex justify-between">
@@ -465,7 +464,6 @@ export default function WorkspaceSettings() {
           </div>
         </Card>}
       </div>
-      <Toaster richColors />
     </main>
   );
 }

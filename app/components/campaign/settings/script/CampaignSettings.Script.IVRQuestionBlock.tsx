@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TextInput as Input } from "@/components/forms/Inputs";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,

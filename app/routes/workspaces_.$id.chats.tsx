@@ -25,7 +25,7 @@ import {
   getUserRole,
 } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import { normalizePhoneNumber } from "@/lib/utils";
+import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import {
   useCallback,
   useEffect,
@@ -107,7 +107,7 @@ type ConversationSidebarProps = {
   contactNumber?: string;
   formatDate: (value: string) => string;
   handleExistingConversationClick: (phoneNumber: string) => void;
-  loadMoreRef: (node: Element | null) => void;
+  onLoadMore: () => void;
   onNewChatClick?: () => void;
   paginationError?: string | null;
   paginationState: LoaderData["pagination"];
@@ -231,7 +231,7 @@ function ConversationSidebar({
   contactNumber,
   formatDate,
   handleExistingConversationClick,
-  loadMoreRef,
+  onLoadMore,
   onNewChatClick,
   paginationError,
   paginationFetcherState,
@@ -240,6 +240,16 @@ function ConversationSidebar({
   sortBy,
   updateFilters,
 }: ConversationSidebarProps) {
+  const [scrollRoot, setScrollRoot] = useState<Element | null>(null);
+
+  const [loadMoreRef] = useInfiniteScroll({
+    root: scrollRoot,
+    hasMore: paginationState.hasMore,
+    loading: paginationFetcherState !== "idle",
+    onLoadMore,
+    rootMargin: "120px",
+  });
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <Button
@@ -316,7 +326,10 @@ function ConversationSidebar({
           </SelectContent>
         </Select>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={(el) => setScrollRoot(el)}
+        className="flex-1 overflow-y-auto"
+      >
         {chatsError ? (
           <p className="border-b px-4 py-2 text-sm text-red-500">
             {chatsError}
@@ -512,26 +525,6 @@ function useImageHandling(workspace_id: string) {
   };
 }
 
-// Custom hook for date formatting
-function useDateFormatter() {
-  return useCallback((dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } else {
-      return date.toLocaleDateString([], { 
-        month: "short", 
-        day: "numeric" 
-      });
-    }
-  }, []);
-}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -677,7 +670,7 @@ export default function ChatsList() {
   const navigate = useNavigate();
   const location = useLocation();
   const contact_number = outlet ? location.pathname.split("/").pop() || "" : "";
-  const formatDate = useDateFormatter();
+  const formatDate = formatMessageTimestamp;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const [loadedChats, setLoadedChats] = useState<ConversationSummary[]>(chats);
   const [paginationState, setPaginationState] = useState(pagination);
@@ -849,13 +842,6 @@ export default function ChatsList() {
     searchParams,
   ]);
 
-  const [loadMoreRef] = useInfiniteScroll({
-    hasMore: paginationState.hasMore,
-    loading: paginationFetcher.state !== "idle",
-    onLoadMore: handleLoadMore,
-    rootMargin: "120px",
-  });
-
   // Form submission handler
   const handleSubmit = useCallback(
     (e: React.FormEvent<HTMLFormElement>) => {
@@ -1011,7 +997,7 @@ export default function ChatsList() {
 
   return (
     <main className="flex h-[calc(100vh-80px)] w-full gap-4">
-      <Card className="hidden h-full w-72 flex-col overflow-hidden md:flex lg:w-80">
+      <Card className="hidden h-full flex-col overflow-hidden md:flex md:basis-2/5 md:max-w-[40%]">
         <ConversationSidebar
           campaigns={campaigns}
           chats={displayedChats}
@@ -1019,7 +1005,7 @@ export default function ChatsList() {
           contactNumber={contact_number}
           formatDate={formatDate}
           handleExistingConversationClick={handleExistingConversationClick}
-          loadMoreRef={loadMoreRef}
+          onLoadMore={handleLoadMore}
           onNewChatClick={handleNewChatClick}
           paginationError={paginationFetcher.data?.chatsError ?? null}
           paginationFetcherState={paginationFetcher.state}
@@ -1030,7 +1016,7 @@ export default function ChatsList() {
         />
       </Card>
 
-      <Card className="flex h-full w-full flex-1 flex-col justify-stretch overflow-hidden rounded-sm">
+      <Card className="flex h-full w-full min-w-0 flex-1 flex-col justify-stretch overflow-hidden rounded-sm md:basis-3/5">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -1084,7 +1070,7 @@ export default function ChatsList() {
               contactNumber={contact_number}
               formatDate={formatDate}
               handleExistingConversationClick={handleExistingConversationClick}
-              loadMoreRef={loadMoreRef}
+              onLoadMore={handleLoadMore}
               onNewChatClick={handleNewChatClick}
               paginationError={paginationFetcher.data?.chatsError ?? null}
               paginationFetcherState={paginationFetcher.state}

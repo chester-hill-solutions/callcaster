@@ -1,7 +1,7 @@
 import { ActionFunctionArgs, json, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useLoaderData } from "@remix-run/react";
 import { useEffect, useRef } from "react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
@@ -304,7 +304,6 @@ export default function WorkspaceUsers() {
 
   return (
     <main className="mt-8 flex h-fit flex-col">
-      <Toaster position="top-right" />
       <div className="flex justify-center">
         <h1 className="mb-4 font-Zilla-Slab text-4xl font-bold text-brand-primary dark:text-white">
           Manage Workspace Users

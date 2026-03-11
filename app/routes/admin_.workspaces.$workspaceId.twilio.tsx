@@ -3,12 +3,13 @@ import { Await, Form, useActionData, useLoaderData } from "@remix-run/react";
 import { Suspense, useEffect } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { FileText, Image, Loader2, MessageSquare, Phone, RefreshCw } from "lucide-react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -518,8 +519,15 @@ function PortalForm({
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                        <Label htmlFor="sendMode">How should messages be sent?</Label>
+                    <FormField
+                        htmlFor="sendMode"
+                        label="How should messages be sent?"
+                        description={
+                            metrics.messagingServiceCount > 0
+                                ? `Observed ${metrics.messagingServiceCount} recent sends via Messaging Service.`
+                                : "No recent Messaging Service sends detected in local history."
+                        }
+                    >
                         <select
                             id="sendMode"
                             name="sendMode"
@@ -532,28 +540,26 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            {metrics.messagingServiceCount > 0
-                                ? `Observed ${metrics.messagingServiceCount} recent sends via Messaging Service.`
-                                : "No recent Messaging Service sends detected in local history."}
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="messagingServiceSid">Messaging Service SID</Label>
+                    <FormField
+                        htmlFor="messagingServiceSid"
+                        label="Messaging Service SID"
+                        description="Only needed when using Messaging Service mode."
+                    >
                         <Input
                             id="messagingServiceSid"
                             name="messagingServiceSid"
                             defaultValue={config.messagingServiceSid ?? ""}
                             placeholder="MGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
                         />
-                        <p className="text-xs text-muted-foreground">
-                            Only needed when using Messaging Service mode.
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="defaultMessageIntent">Default MessageIntent</Label>
+                    <FormField
+                        htmlFor="defaultMessageIntent"
+                        label="Default MessageIntent"
+                        description="Use this when important traffic should be tagged automatically unless callers provide an override."
+                    >
                         <select
                             id="defaultMessageIntent"
                             name="defaultMessageIntent"
@@ -567,13 +573,13 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            Use this when important traffic should be tagged automatically unless callers provide an override.
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="trafficShapingEnabled">Priority routing</Label>
+                    <FormField
+                        htmlFor="trafficShapingEnabled"
+                        label="Priority routing"
+                        description="Recommended when urgent notifications should not sit behind bulk campaign traffic."
+                    >
                         <div className="flex min-h-10 items-center gap-2 rounded-md border border-input px-3">
                             <input
                                 id="trafficShapingEnabled"
@@ -586,10 +592,7 @@ function PortalForm({
                                 Enable Traffic Shaping
                             </Label>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Recommended when urgent notifications should not sit behind bulk campaign traffic.
-                        </p>
-                    </div>
+                    </FormField>
                 </div>
             </div>
 
@@ -602,8 +605,15 @@ function PortalForm({
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                        <Label htmlFor="trafficClass">What kind of traffic is this?</Label>
+                    <FormField
+                        htmlFor="trafficClass"
+                        label="What kind of traffic is this?"
+                        description={
+                            detectedTrafficClass !== "unknown"
+                                ? `Detected from current numbers: ${formatLabel(detectedTrafficClass)}.`
+                                : "No clear sender type detected from current numbers yet."
+                        }
+                    >
                         <select
                             id="trafficClass"
                             name="trafficClass"
@@ -616,15 +626,13 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            {detectedTrafficClass !== "unknown"
-                                ? `Detected from current numbers: ${formatLabel(detectedTrafficClass)}.`
-                                : "No clear sender type detected from current numbers yet."}
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="onboardingStatus">Twilio onboarding status</Label>
+                    <FormField
+                        htmlFor="onboardingStatus"
+                        label="Twilio onboarding status"
+                        description="Tracks whether parent-account throughput enablement has been planned, requested, or completed."
+                    >
                         <select
                             id="onboardingStatus"
                             name="onboardingStatus"
@@ -637,13 +645,13 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            Tracks whether parent-account throughput enablement has been planned, requested, or completed.
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="throughputProduct">Throughput product</Label>
+                    <FormField
+                        htmlFor="throughputProduct"
+                        label="Throughput product"
+                        description="Advanced setting. Only applies once Twilio has enabled the parent-account throughput product."
+                    >
                         <select
                             id="throughputProduct"
                             name="throughputProduct"
@@ -656,13 +664,13 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            Advanced setting. Only applies once Twilio has enabled the parent-account throughput product.
-                        </p>
-                    </div>
+                    </FormField>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="multiTenancyMode">Multi-Tenancy Mode</Label>
+                    <FormField
+                        htmlFor="multiTenancyMode"
+                        label="Multi-Tenancy Mode"
+                        description="Advanced setting for how shared parent-account throughput should be distributed across subaccounts."
+                    >
                         <select
                             id="multiTenancyMode"
                             name="multiTenancyMode"
@@ -675,10 +683,7 @@ function PortalForm({
                                 </option>
                             ))}
                         </select>
-                        <p className="text-xs text-muted-foreground">
-                            Advanced setting for how shared parent-account throughput should be distributed across subaccounts.
-                        </p>
-                    </div>
+                    </FormField>
                 </div>
             </div>
 
@@ -690,15 +695,18 @@ function PortalForm({
                     </p>
                 </div>
 
-                <div className="space-y-2">
-                    <Label htmlFor="supportNotes">Operator Notes</Label>
+                <FormField
+                    htmlFor="supportNotes"
+                    label="Operator Notes"
+                    description="Document carrier constraints, Twilio ticket context, or rollout notes."
+                >
                     <Textarea
                         id="supportNotes"
                         name="supportNotes"
                         defaultValue={config.supportNotes}
                         placeholder="Document carrier constraints, Twilio ticket context, or rollout notes."
                     />
-                </div>
+                </FormField>
             </div>
 
             <div className="flex justify-end">
@@ -926,8 +934,7 @@ function PortalContent({ data }: { data: TwilioPageData }) {
                             <Label htmlFor="rcsNotes">Ops notes</Label>
                             <Textarea id="rcsNotes" name="rcsNotes" defaultValue={onboarding.rcs.notes} />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="rcsStatus">RCS status</Label>
+                        <FormField htmlFor="rcsStatus" label="RCS status">
                             <select
                                 id="rcsStatus"
                                 name="rcsStatus"
@@ -940,7 +947,7 @@ function PortalContent({ data }: { data: TwilioPageData }) {
                                     </option>
                                 ))}
                             </select>
-                        </div>
+                        </FormField>
                         <div className="flex items-end justify-end">
                             <Button type="submit">Save RCS state</Button>
                         </div>
@@ -1367,7 +1374,6 @@ export default function WorkspaceTwilio() {
 
     return (
         <div className="grid grid-cols-1 gap-6">
-            <Toaster position="top-right" />
             <Suspense fallback={<LoadingCard title="Twilio Ops Portal" description="Loading Twilio account, strategy, and messaging insights..." />}>
                 <Await resolve={twilioData}>
                     {(data: TwilioPageData) => <PortalContent data={data} />}
