@@ -18,7 +18,14 @@ import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
-import { Phone, PhoneOff } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const SESSION_EXPIRY_MINUTES = 60;
 
@@ -262,10 +269,30 @@ function HandsetConnected({
     }
   }, [incomingCall]);
 
-  const handleEndSession = useCallback(() => {
+  const handleEndSession = useCallback(async () => {
+    if (callHandling.activeCall) {
+      try {
+        await callHandling.hangUp();
+      } catch {
+        connection.device?.disconnectAll();
+      }
+    }
     endSession();
     onNavigateBack();
-  }, [endSession, onNavigateBack]);
+  }, [callHandling.activeCall, callHandling.hangUp, connection.device, endSession, onNavigateBack]);
+
+  const activeCallRef = useRef(callHandling.activeCall);
+  const hangUpRef = useRef(callHandling.hangUp);
+  activeCallRef.current = callHandling.activeCall;
+  hangUpRef.current = callHandling.hangUp;
+  useEffect(() => {
+    return () => {
+      if (activeCallRef.current) {
+        hangUpRef.current?.().catch(() => {});
+        connection.device?.disconnectAll();
+      }
+    };
+  }, [connection.device]);
 
   const handleKeypadPress = useCallback(
     (key: string) => {
@@ -275,6 +302,96 @@ function HandsetConnected({
   );
 
   const keypadKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
+
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMicId, setSelectedMicId] = useState<string>("");
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>("");
+  const [micMuted, setMicMuted] = useState(false);
+  const [speakerMuted, setSpeakerMuted] = useState(false);
+
+  const refreshDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setMicrophones(devices.filter((d) => d.kind === "audioinput"));
+      setSpeakers(devices.filter((d) => d.kind === "audiooutput"));
+      if (selectedMicId === "" && devices.some((d) => d.kind === "audioinput")) {
+        const first = devices.find((d) => d.kind === "audioinput");
+        if (first?.deviceId) setSelectedMicId(first.deviceId);
+      }
+      if (selectedSpeakerId === "" && devices.some((d) => d.kind === "audiooutput")) {
+        const first = devices.find((d) => d.kind === "audiooutput");
+        if (first?.deviceId) setSelectedSpeakerId(first.deviceId);
+      }
+    } catch {
+      setMicrophones([]);
+      setSpeakers([]);
+    }
+  }, [selectedMicId, selectedSpeakerId]);
+
+  const permissionRequestedRef = useRef(false);
+  useEffect(() => {
+    refreshDevices();
+    if (!permissionRequestedRef.current && typeof navigator?.mediaDevices?.getUserMedia === "function") {
+      permissionRequestedRef.current = true;
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        stream.getTracks().forEach((t) => t.stop());
+        refreshDevices();
+      }).catch(() => {});
+    }
+    navigator.mediaDevices?.addEventListener("devicechange", refreshDevices);
+    return () => navigator.mediaDevices?.removeEventListener("devicechange", refreshDevices);
+  }, [refreshDevices]);
+
+  const device = connection.device;
+  const activeCall = callHandling.activeCall;
+
+  useEffect(() => {
+    if (!activeCall || !device?.audio) return;
+    if (selectedMicId) device.audio.setInputDevice(selectedMicId).catch(() => {});
+    if (selectedSpeakerId) device.audio.speakerDevices?.set(selectedSpeakerId).catch(() => {});
+  }, [activeCall, device, selectedMicId, selectedSpeakerId]);
+
+  const handleMicChange = useCallback(
+    (deviceId: string) => {
+      setSelectedMicId(deviceId);
+      if (!device?.audio) return;
+      device.audio.setInputDevice(deviceId).then(() => {
+        setMicMuted(false);
+        if (activeCall && typeof (activeCall as { _setInputTracksFromStream?: (s: MediaStream) => Promise<void> })._setInputTracksFromStream === "function") {
+          navigator.mediaDevices.getUserMedia({ audio: { deviceId } }).then((stream) => {
+            (activeCall as { _setInputTracksFromStream: (s: MediaStream) => Promise<void> })._setInputTracksFromStream(stream);
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    },
+    [device, activeCall]
+  );
+
+  const handleSpeakerChange = useCallback(
+    (deviceId: string) => {
+      setSelectedSpeakerId(deviceId);
+      device?.audio?.speakerDevices?.set(deviceId).catch(() => {});
+    },
+    [device]
+  );
+
+  const handleMuteMic = useCallback(() => {
+    if (!device?.audio) return;
+    const next = !micMuted;
+    setMicMuted(next);
+    device.audio.outgoing(next);
+    if (activeCall && typeof (activeCall as { mute?: (m: boolean) => void }).mute === "function") {
+      (activeCall as { mute: (m: boolean) => void }).mute(next);
+    }
+  }, [device, activeCall, micMuted]);
+
+  const handleMuteSpeaker = useCallback(() => {
+    if (!device?.audio) return;
+    const next = !speakerMuted;
+    setSpeakerMuted(next);
+    device.audio.incoming(next);
+  }, [device, speakerMuted]);
 
   return (
     <div className="container mx-auto max-w-md p-6">
@@ -318,6 +435,69 @@ function HandsetConnected({
         {callHandling.activeCall && (
           <div className="mt-4 rounded-lg bg-green-100 dark:bg-green-900/30 p-4">
             <p className="font-medium">Connected</p>
+
+            <div className="mt-3 space-y-3">
+              <p className="text-sm font-medium text-muted-foreground">Audio</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Microphone</label>
+                  <Select value={selectedMicId || undefined} onValueChange={handleMicChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select microphone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {microphones.map((d) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId || "default"}>
+                          {d.label || `Microphone ${d.deviceId.slice(0, 8)}`}
+                        </SelectItem>
+                      ))}
+                      {microphones.length === 0 && (
+                        <SelectItem value="none" disabled>No microphones</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`w-full gap-1 ${micMuted ? "bg-red-100 text-red-600 dark:bg-red-900/30" : ""}`}
+                    onClick={handleMuteMic}
+                  >
+                    {micMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                    {micMuted ? "Unmute mic" : "Mute mic"}
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Speaker</label>
+                  <Select value={selectedSpeakerId || undefined} onValueChange={handleSpeakerChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select speaker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {speakers.map((d) => (
+                        <SelectItem key={d.deviceId} value={d.deviceId || "default"}>
+                          {d.label || `Speaker ${d.deviceId.slice(0, 8)}`}
+                        </SelectItem>
+                      ))}
+                      {speakers.length === 0 && (
+                        <SelectItem value="none" disabled>No speakers</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`w-full gap-1 ${speakerMuted ? "bg-red-100 text-red-600 dark:bg-red-900/30" : ""}`}
+                    onClick={handleMuteSpeaker}
+                  >
+                    {speakerMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                    {speakerMuted ? "Unmute speaker" : "Mute speaker"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-3 grid grid-cols-3 gap-2 max-w-[140px]">
               {keypadKeys.map((key) => (
                 <Button

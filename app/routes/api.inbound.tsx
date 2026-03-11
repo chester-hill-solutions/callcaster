@@ -162,12 +162,13 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       logger.debug("Handset enabled but no active session", { workspaceId, Called: data.Called });
     }
     if (clientIdentity) {
+      const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
-      const dial = handsetTwiml.dial({ timeout: 30 });
+      const dial = handsetTwiml.dial({
+        timeout: 30,
+        action: `${baseUrl}/api/inbound-handset-dial-end`,
+      });
       dial.client(clientIdentity);
-      handsetTwiml.say(
-        "No one is available to take your call. Please try again later."
-      );
       return new Response(handsetTwiml.toString(), {
         headers: { "Content-Type": "text/xml" },
       });
