@@ -18,7 +18,9 @@ import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
+import { Input } from "@/components/ui/input";
 import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { normalizePhoneNumber } from "@/lib/utils/phone";
 import {
   Select,
   SelectContent,
@@ -200,6 +202,7 @@ export default function HandsetPage() {
     <HandsetConnected
       token={token}
       handsetNumber={handsetNumber}
+      clientIdentity={clientIdentity}
       workspaceId={workspaceId}
       endSession={endSession}
       onError={setTokenError}
@@ -211,6 +214,7 @@ export default function HandsetPage() {
 type HandsetConnectedProps = {
   token: string;
   handsetNumber: string;
+  clientIdentity: string;
   workspaceId: string;
   endSession: () => void;
   onError: (message: string) => void;
@@ -220,6 +224,7 @@ type HandsetConnectedProps = {
 function HandsetConnected({
   token,
   handsetNumber,
+  clientIdentity,
   workspaceId,
   endSession,
   onError,
@@ -302,6 +307,29 @@ function HandsetConnected({
   );
 
   const keypadKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
+
+  const [outboundTo, setOutboundTo] = useState("");
+  const [outboundError, setOutboundError] = useState<string | null>(null);
+
+  const handleOutboundDial = useCallback(() => {
+    const raw = outboundTo.trim();
+    if (!raw) {
+      setOutboundError("Enter a phone number");
+      return;
+    }
+    setOutboundError(null);
+    try {
+      const to = normalizePhoneNumber(raw);
+      callHandling.makeCall({
+        To: to,
+        workspace_id: workspaceId,
+        client_identity: clientIdentity,
+      });
+    } catch {
+      setOutboundError("Invalid phone number");
+      onError("Invalid phone number");
+    }
+  }, [outboundTo, workspaceId, clientIdentity, callHandling, onError]);
 
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
@@ -407,6 +435,38 @@ function HandsetConnected({
           </p>
           <p className="mt-1 text-lg font-mono">{handsetNumber}</p>
         </div>
+
+        {!callHandling.activeCall && !incomingCall && (
+          <div className="mt-4 rounded-lg border p-4">
+            <p className="text-sm font-medium text-muted-foreground">
+              Dial out
+            </p>
+            <div className="mt-2 flex gap-2">
+              <Input
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={outboundTo}
+                onChange={(e) => {
+                  setOutboundTo(e.target.value);
+                  setOutboundError(null);
+                }}
+                className="font-mono"
+                aria-label="Phone number to dial"
+              />
+              <Button
+                type="button"
+                onClick={handleOutboundDial}
+                className="gap-2 shrink-0"
+              >
+                <Phone size={16} />
+                Dial
+              </Button>
+            </div>
+            {outboundError && (
+              <p className="mt-2 text-sm text-destructive">{outboundError}</p>
+            )}
+          </div>
+        )}
 
         {incomingCall ? (
           <div className="mt-6 rounded-lg border-2 border-primary p-4">
