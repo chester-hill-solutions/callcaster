@@ -1530,6 +1530,51 @@ export type Json =
             },
           ]
         }
+        handset_session: {
+          Row: {
+            id: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status: string
+            created_at: string
+            expires_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status?: string
+            created_at?: string
+            expires_at: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            workspace_id?: string
+            client_identity?: string
+            status?: string
+            created_at?: string
+            expires_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "handset_session_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "handset_session_workspace_id_fkey"
+              columns: ["workspace_id"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            },
+          ]
+        }
         workspace_permissions: {
           Row: {
             id: number

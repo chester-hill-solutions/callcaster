@@ -9,5 +9,4 @@ migrations
 /public/exports
 /public/exports/*
 
-/coverage
 .cursor

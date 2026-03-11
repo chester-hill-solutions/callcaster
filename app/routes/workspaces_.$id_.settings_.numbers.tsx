@@ -195,10 +195,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return null;
 
   } else if (formName === "update-handset") {
-    const { numberId: voiceNumberId, handsetEnabled } = data;
+    const { numberId, handsetEnabled } = data;
     const { error: handsetError } = await updateWorkspacePhoneNumber({
       supabaseClient,
-      numberId: voiceNumberId as string,
+      numberId: numberId as string,
       workspaceId: workspace_id as string,
       updates: { handset_enabled: handsetEnabled === "true" },
     });
@@ -292,9 +292,9 @@ const WorkspaceSettings = () => {
     );
   };
 
-  const handleHandsetChange = (numberId: number, handsetEnabled: boolean) => {
+  const handleHandsetChange = (numberId: number, enabled: boolean) => {
     updateFetcher.submit(
-      { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(handsetEnabled) },
+      { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
       { method: "POST" }
     );
   };
