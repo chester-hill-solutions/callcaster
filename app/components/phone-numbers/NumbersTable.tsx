@@ -104,19 +104,20 @@ export const NumbersTable = ({
       <>
       <Heading className="text-center" branded>
       Existing Numbers
-    </h3><div className="flex flex-col py-4">
-        <table className="w-full table-auto">
-          <thead>
-            <tr>
-              <th className="py-2"></th>
-              <th className="py-2 text-left">Caller ID</th>
-              <th className="py-2 text-left">Phone Number</th>
-              <th className="py-2 text-left">Status</th>
-              <th className="py-2 text-left">Handle Voicemail</th>
-              <th className="py-2 text-left">Voicemail Message</th>
-            </tr>
-          </thead>
-          <tbody>
+    </Heading><div className="flex flex-col py-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="py-2"></TableHead>
+              <TableHead className="py-2 text-left">Caller ID</TableHead>
+              <TableHead className="py-2 text-left">Phone Number</TableHead>
+              <TableHead className="py-2 text-left">Status</TableHead>
+              <TableHead className="py-2 text-left">Handset</TableHead>
+              <TableHead className="py-2 text-left">Handle Voicemail</TableHead>
+              <TableHead className="py-2 text-left">Voicemail Message</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {numbers.map((number) => (
               <NumberRow
                 key={number?.id}
@@ -127,6 +128,7 @@ export const NumbersTable = ({
                 handleIncomingActivityChange={handleIncomingActivityChange}
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
+                handleHandsetChange={handleHandsetChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
@@ -144,6 +146,7 @@ const NumberRow = ({
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
+  handleHandsetChange,
   handleNumberRemoval,
   isBusy,
 }: {
@@ -154,6 +157,7 @@ const NumberRow = ({
   handleIncomingActivityChange: (id: number, value: string) => void;
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
+  handleHandsetChange?: (numberId: number, enabled: boolean) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -235,8 +239,23 @@ const NumberRow = ({
               : ''
           } 
         />
-      </td>
-      <td className="px-2 py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">
+        {handleHandsetChange && number.type !== "caller_id" && (
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(number?.handset_enabled)}
+              disabled={isBusy}
+              onChange={(e) => handleHandsetChange(number.id, e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+              aria-label="Ring handset"
+            />
+            <span className="text-sm">Ring handset</span>
+          </label>
+        )}
+      </TableCell>
+      <TableCell className="px-2 py-2">
         <IncomingActivitySelect
           number={number}
           members={members}
