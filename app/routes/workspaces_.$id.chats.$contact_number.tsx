@@ -1,15 +1,23 @@
-import { LoaderFunctionArgs , json } from "@remix-run/node";
+import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useParams } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 
-const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
+const getMessageMedia = async ({
+  messages,
+  supabaseClient,
+}: {
+  messages: Message[];
+  supabaseClient: SupabaseClient;
+}): Promise<Message[]> => {
   return Promise.all(
     (messages ?? []).map(async (message: Message) => {
       const inboundMedia = message?.inbound_media ?? [];
@@ -22,19 +30,34 @@ const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message
             return data?.signedUrl;
           }),
         );
-        return { ...message, signedUrls: urls };
+        return { ...message, signedUrls: urls } as Message;
       } else {
-        return { ...message, signedUrls: [] };
+        return { ...message, signedUrls: [] } as Message;
       }
     }),
   );
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const {id, contact_number} = params;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  const messages = [];
+  const { id, contact_number } = params;
+  const { supabaseClient, headers } = await verifyAuth(request);
+  const messages: Message[] = [];
   let normalizedNumber = null;
+  let optOutKeywords = parseOptOutKeywords(null);
+
+  if (id) {
+    try {
+      const onboarding = await getWorkspaceMessagingOnboardingState({
+        supabaseClient,
+        workspaceId: id,
+      });
+      optOutKeywords = parseOptOutKeywords(
+        onboarding.businessProfile.optOutKeywords,
+      );
+    } catch (error) {
+      logger.error("Error loading workspace opt-out keywords:", error);
+    }
+  }
 
   if (contact_number !== "new") {
     try {
@@ -103,6 +126,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     {
       messages,
       contact_number: normalizedNumber || contact_number,
+      optOutKeywords,
     },
     { headers },
   );
@@ -115,13 +139,27 @@ export default function ChatScreen() {
     workspaceNumbers: WorkspaceNumber[];
     registerChatActions?: (actions: { addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null) => void;
   }>();
-  const { messages: initialMessages, contact_number: loaderContactNumber } = useLoaderData<{ messages: Message[], contact_number: string }>();
+  const {
+    messages: initialMessages,
+    contact_number: loaderContactNumber,
+    optOutKeywords,
+  } = useLoaderData<{
+    messages: Message[];
+    contact_number: string;
+    optOutKeywords: string[];
+  }>();
   const { contact_number: paramContactNumber } = useParams();
 
   const contact_number = loaderContactNumber || paramContactNumber;
+  const initialVisibleMessageCount = useMemo(
+    () =>
+      initialMessages.filter((message) => !isOptOutMessage(message?.body, optOutKeywords))
+        .length,
+    [initialMessages, optOutKeywords],
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef<number>(initialMessages.length);
+  const lastMessageCountRef = useRef<number>(initialVisibleMessageCount);
   const scrollPositionRef = useRef<number>(0);
   const hasMarkedAsReadRef = useRef<boolean>(false);
 
@@ -131,6 +169,14 @@ export default function ChatScreen() {
     workspace: workspace.id,
     contact_number,
   });
+  const visibleMessages = useMemo(
+    () =>
+      messages.filter(
+        (message): message is Message =>
+          Boolean(message) && !isOptOutMessage(message?.body, optOutKeywords),
+      ),
+    [messages, optOutKeywords],
+  );
 
   useEffect(() => {
     registerChatActions?.({ addOptimisticMessage });
@@ -252,7 +298,7 @@ export default function ChatScreen() {
     return () => {
       observer.disconnect();
     };
-  }, [messages]);
+  }, [visibleMessages]);
 
   // Intelligent scroll handling
   useEffect(() => {
@@ -262,7 +308,7 @@ export default function ChatScreen() {
     if (!container) return;
 
     const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-    const hasNewMessages = messages.length > lastMessageCountRef.current;
+    const hasNewMessages = visibleMessages.length > lastMessageCountRef.current;
 
     if (hasNewMessages) {
       if (isAtBottom) {
@@ -276,11 +322,16 @@ export default function ChatScreen() {
         });
       }
     }
-  }, [messages]);
+  }, [visibleMessages]);
 
   return (
     <div className="flex h-full flex-col">
-      <ChatMessages messages={messages.filter(Boolean) as unknown as React.ComponentProps<typeof ChatMessages>["messages"]} messagesEndRef={messagesEndRef} />
+      <ChatMessages
+        messages={
+          visibleMessages as React.ComponentProps<typeof ChatMessages>["messages"]
+        }
+        messagesEndRef={messagesEndRef}
+      />
     </div>
   );
 }

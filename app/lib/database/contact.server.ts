@@ -6,6 +6,16 @@ import type { Database } from "../database.types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
 
+function dedupeContactsById(contacts: Contact[]): Contact[] {
+  return Array.from(
+    new Map(
+      contacts
+        .filter((contact): contact is Contact => Boolean(contact?.id))
+        .map((contact) => [contact.id, contact]),
+    ).values(),
+  );
+}
+
 export const findPotentialContacts = async (
   supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
@@ -47,7 +57,7 @@ export const findPotentialContacts = async (
 export async function fetchContactData(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
-  contact_id: number | string,
+  contact_id: number | string | null | undefined,
   contact_number: string,
 ) {
   const potentialContacts: Contact[] = [];
@@ -60,7 +70,13 @@ export async function fetchContactData(
       contact_number,
       workspaceId,
     );
-    potentialContacts.push(...(contacts || []));
+    const dedupedContacts = dedupeContactsById((contacts || []) as Contact[]);
+
+    if (dedupedContacts.length === 1) {
+      contact = dedupedContacts[0] ?? null;
+    } else if (dedupedContacts.length > 1) {
+      potentialContacts.push(...dedupedContacts);
+    }
   }
 
   if (contact_id) {

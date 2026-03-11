@@ -1053,6 +1053,73 @@ describe("app/lib/database/workspace.server.ts", () => {
     ]);
   });
 
+  test("fetchConversationSummary ignores mismatched contact phone metadata", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+
+    const workspaceNumberQuery = {
+      select: vi.fn(() => workspaceNumberQuery),
+      eq: vi.fn(() => workspaceNumberQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
+    };
+
+    const messageQuery = {
+      select: vi.fn(() => messageQuery),
+      eq: vi.fn(() => messageQuery),
+      not: vi.fn(() => messageQuery),
+      neq: vi.fn(() => messageQuery),
+      order: vi.fn(() => messageQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({
+          data: [
+            {
+              campaign_id: 1,
+              contact_id: 10,
+              date_created: "2026-03-03T00:00:00.000Z",
+              direction: "outbound",
+              from: "+15551111111",
+              status: "delivered",
+              to: "+15550000001",
+            },
+          ],
+          error: null,
+        }),
+    };
+
+    const contactQuery = {
+      select: vi.fn(() => contactQuery),
+      in: vi.fn(() => Promise.resolve({
+        data: [
+          { id: 10, firstname: "Wrong", surname: "Person", phone: "+15559999999" },
+        ],
+        error: null,
+      })),
+    };
+
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === "workspace_number") return workspaceNumberQuery;
+        if (table === "message") return messageQuery;
+        if (table === "contact") return contactQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+      limit: 20,
+      offset: 0,
+      sort: "recent",
+    });
+
+    expect(result.chats).toEqual([
+      expect.objectContaining({
+        contact_phone: "+15550000001",
+        contact_firstname: null,
+        contact_surname: null,
+      }),
+    ]);
+  });
+
   test("portal config prefers onboarding Messaging Service defaults when present", async () => {
     const mod = await import("../app/lib/database/workspace.server");
     const config = mod.getWorkspaceTwilioPortalConfigFromTwilioData({

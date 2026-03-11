@@ -34,6 +34,12 @@ import {
   useState,
 } from "react";
 import { Card } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader as MobileSheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useInfiniteScroll } from "@/hooks";
 import ChatHeader from "@/components/sms-ui/ChatHeader";
@@ -94,6 +100,23 @@ interface Chat {
   unread_count: number;
 }
 
+type ConversationSidebarProps = {
+  campaigns: Campaign[];
+  chats: ConversationSummary[];
+  chatsError: string | null;
+  contactNumber?: string;
+  formatDate: (value: string) => string;
+  handleExistingConversationClick: (phoneNumber: string) => void;
+  loadMoreRef: (node: Element | null) => void;
+  onNewChatClick?: () => void;
+  paginationError?: string | null;
+  paginationState: LoaderData["pagination"];
+  paginationFetcherState: "idle" | "loading" | "submitting";
+  searchParams: URLSearchParams;
+  sortBy: string;
+  updateFilters: (updater: (params: URLSearchParams) => URLSearchParams) => void;
+};
+
 type LoaderData = {
   campaigns: Campaign[];
   chats: ConversationSummary[];
@@ -129,6 +152,15 @@ type WorkspaceContextType = {
   };
 };
 
+function getConversationDisplayName(chat: ConversationSummary): string {
+  const fullName = [chat.contact_firstname, chat.contact_surname]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .join(" ")
+    .trim();
+
+  return fullName || chat.contact_phone;
+}
+
 function ConversationList({
   chats,
   contactNumber,
@@ -140,16 +172,13 @@ function ConversationList({
   handleExistingConversationClick: (phoneNumber: string) => void;
   formatDate: (value: string) => string;
 }) {
-  const chatNumbers = Array.from(
-    new Set(
-      chats
-        .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
-        .map((chat) => chat.contact_phone),
-    ),
+  const shapedChats = chats.filter(
+    (chat, index): chat is ConversationSummary =>
+      Boolean(chat?.contact_phone) &&
+      chats.findIndex((candidate) =>
+        phoneNumbersMatch(candidate?.contact_phone ?? null, chat.contact_phone),
+      ) === index,
   );
-  const shapedChats = chatNumbers
-    .map((num) => chats.find((chat) => chat?.contact_phone === num))
-    .filter((chat): chat is ConversationSummary => chat !== undefined && chat !== null);
 
   if (shapedChats.length === 0) {
     return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
@@ -173,7 +202,7 @@ function ConversationList({
                 <MdChat size={20} />
               </div>
               <div className="ml-4">
-                <div className="font-medium">{chat.contact_phone}</div>
+                <div className="font-medium">{getConversationDisplayName(chat)}</div>
                 <div className="line-clamp-1 text-sm text-gray-500">
                   {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? "message" : "messages"}
                 </div>
@@ -192,6 +221,127 @@ function ConversationList({
           </button>
         ))}
     </>
+  );
+}
+
+function ConversationSidebar({
+  campaigns,
+  chats,
+  chatsError,
+  contactNumber,
+  formatDate,
+  handleExistingConversationClick,
+  loadMoreRef,
+  onNewChatClick,
+  paginationError,
+  paginationFetcherState,
+  paginationState,
+  searchParams,
+  sortBy,
+  updateFilters,
+}: ConversationSidebarProps) {
+  return (
+    <div className="flex h-full flex-col overflow-hidden">
+      <Button
+        className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
+        asChild
+      >
+        <NavLink to="." onClick={onNewChatClick}>
+          New Chat
+          <MdAdd size={24} className="mr-2" />
+        </NavLink>
+      </Button>
+      <div className="flex">
+        <Select
+          value={searchParams.get("campaign_id") || ""}
+          onValueChange={(value) => {
+            updateFilters((nextParams) => {
+              nextParams.set("campaign_id", value);
+              return nextParams;
+            });
+          }}
+        >
+          <SelectTrigger className="flex items-center p-2">
+            <SelectValue placeholder="Filter by Campaign" />
+          </SelectTrigger>
+          <SelectContent className="w-full bg-slate-50">
+            {campaigns?.map((campaign: { id: number; title: string }) => (
+              <SelectItem
+                value={`${campaign.id}`}
+                key={campaign.id}
+                className="w-full p-4"
+              >
+                {campaign.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          type="reset"
+          variant={"ghost"}
+          onClick={() =>
+            updateFilters((nextParams) => {
+              nextParams.delete("campaign_id");
+              return nextParams;
+            })
+          }
+        >
+          <X />
+        </Button>
+      </div>
+      <div className="border-b p-2">
+        <Select
+          value={sortBy}
+          onValueChange={(value) => {
+            updateFilters((nextParams) => {
+              const nextSort = getChatSortOption(value);
+
+              if (nextSort === "recent") {
+                nextParams.delete("sort");
+              } else {
+                nextParams.set("sort", nextSort);
+              }
+
+              return nextParams;
+            });
+          }}
+        >
+          <SelectTrigger className="flex items-center">
+            <SelectValue placeholder="Sort chats" />
+          </SelectTrigger>
+          <SelectContent className="w-full bg-slate-50">
+            <SelectItem value="recent">Recent activity</SelectItem>
+            <SelectItem value="hasReplied">Has replied</SelectItem>
+            <SelectItem value="hasUnreadReply">Has unread reply</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {chatsError ? (
+          <p className="border-b px-4 py-2 text-sm text-red-500">
+            {chatsError}
+          </p>
+        ) : null}
+        <ConversationList
+          chats={chats}
+          contactNumber={contactNumber}
+          handleExistingConversationClick={handleExistingConversationClick}
+          formatDate={formatDate}
+        />
+        {paginationError ? (
+          <p className="px-4 py-2 text-sm text-red-500">{paginationError}</p>
+        ) : null}
+        {paginationState.hasMore ? (
+          <div ref={loadMoreRef} className="px-4 py-3 text-center text-sm text-gray-500">
+            {paginationFetcherState === "idle" ? "Load more chats" : "Loading more chats..."}
+          </div>
+        ) : chats.length > 0 ? (
+          <div className="px-4 py-3 text-center text-sm text-gray-400">
+            All chats loaded
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -405,7 +555,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
     supabaseClient.from("workspace_number").select("*").eq("workspace", workspaceId).eq('type', 'rented'),
-    !contact_id || !contact_number ? null : fetchContactData(supabaseClient, workspaceId, contact_id, contact_number),
+    contact_number ? fetchContactData(supabaseClient, workspaceId, contact_id, contact_number) : null,
     fetchCampaignsByType({
       supabaseClient,
       workspaceId,
@@ -522,6 +672,7 @@ export default function ChatsList() {
     chatActionsRef.current = actions;
   }, []);
   const [dialogContact, setDialog] = useState<Contact | null>(null);
+  const [isMobileConversationListOpen, setIsMobileConversationListOpen] = useState(false);
   const outlet = useOutlet();
   const navigate = useNavigate();
   const location = useLocation();
@@ -548,6 +699,9 @@ export default function ChatsList() {
     [workspaceNumbers],
   );
   const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
+  const closeMobileConversationList = useCallback(() => {
+    setIsMobileConversationListOpen(false);
+  }, []);
 
   useEffect(() => {
     setLoadedChats(chats);
@@ -732,6 +886,7 @@ export default function ChatsList() {
     (contact: Contact) => {
       const number = normalizePhoneNumber(contact.phone || "");
       if (number) {
+        closeMobileConversationList();
         navigate(`./${number}`);
         setLoadedChats((currentChats) =>
           currentChats.map((chat) =>
@@ -759,11 +914,12 @@ export default function ChatsList() {
       }
       return null;
     },
-    [navigate, supabase, workspace.id]
+    [closeMobileConversationList, navigate, supabase, workspace.id]
   );
 
   const handleExistingConversationClick = useCallback(
     (phoneNumber: string) => {
+      closeMobileConversationList();
       navigate(`./${phoneNumber}`);
 
       setLoadedChats((currentChats) =>
@@ -790,7 +946,7 @@ export default function ChatsList() {
           }
         });
     },
-    [navigate, supabase, workspace.id]
+    [closeMobileConversationList, navigate, supabase, workspace.id]
   );
 
   // Adapter functions to match ChatHeader's expected types
@@ -849,113 +1005,32 @@ export default function ChatsList() {
     [setSearchParams],
   );
 
+  const handleNewChatClick = useCallback(() => {
+    closeMobileConversationList();
+  }, [closeMobileConversationList]);
+
   return (
     <main className="flex h-[calc(100vh-80px)] w-full gap-4">
-      <Card className="flex h-full w-full flex-col overflow-hidden sm:w-64">
-        <Button
-          className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
-          asChild
-        >
-          <NavLink to=".">
-            New Chat
-            <MdAdd size={24} className="mr-2" />
-          </NavLink>
-        </Button>
-        <div className="flex">
-          <Select
-            value={searchParams.get("campaign_id") || ""}
-            onValueChange={(value) => {
-              updateFilters((nextParams) => {
-                nextParams.set("campaign_id", value);
-                return nextParams;
-              });
-            }}
-          >
-            <SelectTrigger className="flex items-center p-2">
-              <SelectValue placeholder="Filter by Campaign" />
-            </SelectTrigger>
-            <SelectContent className="w-full bg-slate-50">
-              {campaigns?.map((campaign: { id: number; title: string }) => (
-                <SelectItem
-                  value={`${campaign.id}`}
-                  key={campaign.id}
-                  className="w-full p-4"
-                >
-                  {campaign.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            type="reset"
-            variant={"ghost"}
-            onClick={() =>
-              updateFilters((nextParams) => {
-                nextParams.delete("campaign_id");
-                return nextParams;
-              })
-            }
-          >
-            <X />
-          </Button>
-        </div>
-        <div className="border-b p-2">
-          <Select
-            value={sortBy}
-            onValueChange={(value) => {
-              updateFilters((nextParams) => {
-                const nextSort = getChatSortOption(value);
-
-                if (nextSort === "recent") {
-                  nextParams.delete("sort");
-                } else {
-                  nextParams.set("sort", nextSort);
-                }
-
-                return nextParams;
-              });
-            }}
-          >
-            <SelectTrigger className="flex items-center">
-              <SelectValue placeholder="Sort chats" />
-            </SelectTrigger>
-            <SelectContent className="w-full bg-slate-50">
-              <SelectItem value="recent">Recent activity</SelectItem>
-              <SelectItem value="hasReplied">Has replied</SelectItem>
-              <SelectItem value="hasUnreadReply">Has unread reply</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {chatsError ? (
-            <p className="border-b px-4 py-2 text-sm text-red-500">
-              {chatsError}
-            </p>
-          ) : null}
-          <ConversationList
-            chats={displayedChats}
-            contactNumber={contact_number}
-            handleExistingConversationClick={handleExistingConversationClick}
-            formatDate={formatDate}
-          />
-          {paginationFetcher.data?.chatsError ? (
-            <p className="px-4 py-2 text-sm text-red-500">
-              {paginationFetcher.data.chatsError}
-            </p>
-          ) : null}
-          {paginationState.hasMore ? (
-            <div ref={loadMoreRef} className="px-4 py-3 text-center text-sm text-gray-500">
-              {paginationFetcher.state === "idle" ? "Load more chats" : "Loading more chats..."}
-            </div>
-          ) : displayedChats.length > 0 ? (
-            <div className="px-4 py-3 text-center text-sm text-gray-400">
-              All chats loaded
-            </div>
-          ) : null}
-        </div>
+      <Card className="hidden h-full w-72 flex-col overflow-hidden md:flex lg:w-80">
+        <ConversationSidebar
+          campaigns={campaigns}
+          chats={displayedChats}
+          chatsError={chatsError}
+          contactNumber={contact_number}
+          formatDate={formatDate}
+          handleExistingConversationClick={handleExistingConversationClick}
+          loadMoreRef={loadMoreRef}
+          onNewChatClick={handleNewChatClick}
+          paginationError={paginationFetcher.data?.chatsError ?? null}
+          paginationFetcherState={paginationFetcher.state}
+          paginationState={paginationState}
+          searchParams={searchParams}
+          sortBy={sortBy}
+          updateFilters={updateFilters}
+        />
       </Card>
 
-      <Card className="flex h-full w-full flex-1 flex-col justify-stretch rounded-sm">
+      <Card className="flex h-full w-full flex-1 flex-col justify-stretch overflow-hidden rounded-sm">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -974,6 +1049,7 @@ export default function ChatsList() {
           existingConversation={existingConversation as unknown as Chat}
           handleExistingConversationClick={handleExistingConversationClickAdapter}
           setDialog={(nextContact: Partial<Contact>) => setDialog(nextContact as Contact)}
+          onShowConversationList={() => setIsMobileConversationListOpen(true)}
         />
         <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
           <Outlet context={{ supabase, workspace, workspaceNumbers, registerChatActions }} />
@@ -992,6 +1068,34 @@ export default function ChatsList() {
           messageFetcher={messageFetcher}
         />
       </Card>
+      <Sheet
+        open={isMobileConversationListOpen}
+        onOpenChange={setIsMobileConversationListOpen}
+      >
+        <SheetContent side="left" className="w-[88vw] p-0 md:hidden">
+          <MobileSheetHeader className="border-b px-4 py-3">
+            <SheetTitle>Chats</SheetTitle>
+          </MobileSheetHeader>
+          <div className="h-[calc(100%-57px)]">
+            <ConversationSidebar
+              campaigns={campaigns}
+              chats={displayedChats}
+              chatsError={chatsError}
+              contactNumber={contact_number}
+              formatDate={formatDate}
+              handleExistingConversationClick={handleExistingConversationClick}
+              loadMoreRef={loadMoreRef}
+              onNewChatClick={handleNewChatClick}
+              paginationError={paginationFetcher.data?.chatsError ?? null}
+              paginationFetcherState={paginationFetcher.state}
+              paginationState={paginationState}
+              searchParams={searchParams}
+              sortBy={sortBy}
+              updateFilters={updateFilters}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
       <ChatAddContactDialog
         existingContact={dialogContact}
         isDialogOpen={Boolean(dialogContact?.phone)}
