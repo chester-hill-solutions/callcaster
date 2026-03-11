@@ -11,6 +11,7 @@ import type { Database } from "@/lib/database.types";
 interface WorkspaceNumberData {
   inbound_action: string | null;
   inbound_audio: string | null;
+  handset_enabled: boolean | null;
   type: string | null;
   workspace: {
     id: string;
@@ -43,6 +44,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       `
       inbound_action,
       inbound_audio,
+      handset_enabled,
       type,
       workspace,
       ...workspace!inner(twilio_data, webhook(*))`,
@@ -113,6 +115,32 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       },
       supabaseClient: supabase,
     });
+  }
+
+  const workspaceId = number.workspace?.id ?? null;
+  if (number?.handset_enabled && workspaceId) {
+    const { data: session } = await (supabase as import("@supabase/supabase-js").SupabaseClient<Record<string, unknown>>)
+      .from("handset_session")
+      .select("client_identity")
+      .eq("workspace_id", workspaceId)
+      .eq("status", "active")
+      .gt("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const clientIdentity = session && typeof session === "object" && "client_identity" in session ? (session as { client_identity: string }).client_identity : null;
+    if (clientIdentity) {
+      const handsetTwiml = new Twilio.twiml.VoiceResponse();
+      const dial = handsetTwiml.dial({ timeout: 30 });
+      dial.client(clientIdentity);
+      handsetTwiml.say(
+        "No one is available to take your call. Please try again later."
+      );
+      return new Response(handsetTwiml.toString(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
   }
 
   if (isPhoneNumber(number?.inbound_action)) {

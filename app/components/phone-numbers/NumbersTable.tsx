@@ -12,6 +12,7 @@ export const NumbersTable = ({
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
+  onHandsetChange,
   onNumberRemoval,
   isBusy,
 }: {
@@ -21,6 +22,7 @@ export const NumbersTable = ({
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
+  onHandsetChange?: (numberId: number, enabled: boolean) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
 }) => {
@@ -66,6 +68,14 @@ export const NumbersTable = ({
     [updateNumber, onCallerIdChange],
   );
 
+  const handleHandsetChange = useCallback(
+    (numberId: number, enabled: boolean) => {
+      updateNumber(numberId, { handset_enabled: enabled });
+      onHandsetChange?.(numberId, enabled);
+    },
+    [updateNumber, onHandsetChange],
+  );
+
   const handleNumberRemoval = useCallback(
     (numberId: number) => {
       setNumbers((prevNumbers: WorkspaceNumbers[]) =>
@@ -91,6 +101,7 @@ export const NumbersTable = ({
               <th className="py-2 text-left">Caller ID</th>
               <th className="py-2 text-left">Phone Number</th>
               <th className="py-2 text-left">Status</th>
+              <th className="py-2 text-left">Handset</th>
               <th className="py-2 text-left">Handle Voicemail</th>
               <th className="py-2 text-left">Voicemail Message</th>
             </tr>
@@ -106,6 +117,7 @@ export const NumbersTable = ({
                 handleIncomingActivityChange={handleIncomingActivityChange}
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
+                handleHandsetChange={handleHandsetChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
@@ -123,6 +135,7 @@ const NumberRow = ({
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
+  handleHandsetChange,
   handleNumberRemoval,
   isBusy,
 }: {
@@ -133,6 +146,7 @@ const NumberRow = ({
   handleIncomingActivityChange: (id: number, value: string) => void;
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
+  handleHandsetChange?: (numberId: number, enabled: boolean) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -213,6 +227,20 @@ const NumberRow = ({
               : ''
           } 
         />
+      </td>
+      <td className="px-2 py-2">
+        {handleHandsetChange && (
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={Boolean(number?.handset_enabled)}
+              disabled={isBusy}
+              onChange={(e) => handleHandsetChange(number.id, e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <span className="text-sm">Ring handset</span>
+          </label>
+        )}
       </td>
       <td className="px-2 py-2">
         <IncomingActivitySelect

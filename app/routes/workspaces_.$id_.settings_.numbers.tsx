@@ -195,6 +195,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
     return null;
 
+  } else if (formName === "update-handset") {
+    const { numberId, handsetEnabled } = data;
+    const { error: handsetError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { handset_enabled: handsetEnabled === "true" },
+    });
+    if (handsetError) return { error: handsetError };
+    return null;
+
   } else if (formName === "update-caller-id") {
     const { numberId: voiceNumberId, friendly_name } = data;
     const { data: number, error: friendlyNameError } =
@@ -282,6 +293,13 @@ const WorkspaceSettings = () => {
     );
   };
 
+  const handleHandsetChange = (numberId: number, enabled: boolean) => {
+    updateFetcher.submit(
+      { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
+      { method: "POST" }
+    );
+  };
+
   const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId: String(numberId) },
@@ -307,6 +325,7 @@ const WorkspaceSettings = () => {
               onIncomingActivityChange={handleIncomingActivityChange}
               onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
               onCallerIdChange={handleCallerIdChange}
+              onHandsetChange={handleHandsetChange}
               onNumberRemoval={handleNumberRemoval}
               isBusy={updateFetcher.state !== "idle"}
             />
