@@ -63,17 +63,25 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
   const workspaceId = number.workspace?.id ?? null;
   let voicemail: { signedUrl: string } | null = null;
   if (number?.inbound_audio && workspaceId) {
-    const { data: files } = await supabase.storage
+    // Prefer treating inbound_audio as storage path (filename); fallback to resolving by id via list
+    const { data: signedByPath } = await supabase.storage
       .from("workspaceAudio")
-      .list(workspaceId);
-    const file = files?.find(
-      (f) => String(f.id) === String(number.inbound_audio) || f.name === number.inbound_audio
-    );
-    if (file) {
-      const { data: signed } = await supabase.storage
+      .createSignedUrl(`${workspaceId}/${number.inbound_audio}`, 3600);
+    if (signedByPath?.signedUrl) {
+      voicemail = { signedUrl: signedByPath.signedUrl };
+    } else {
+      const { data: files } = await supabase.storage
         .from("workspaceAudio")
-        .createSignedUrl(`${workspaceId}/${file.name}`, 3600);
-      if (signed?.signedUrl) voicemail = { signedUrl: signed.signedUrl };
+        .list(workspaceId);
+      const file = files?.find(
+        (f) => String(f.id) === String(number.inbound_audio) || f.name === number.inbound_audio
+      );
+      if (file) {
+        const { data: signed } = await supabase.storage
+          .from("workspaceAudio")
+          .createSignedUrl(`${workspaceId}/${file.name}`, 3600);
+        if (signed?.signedUrl) voicemail = { signedUrl: signed.signedUrl };
+      }
     }
   }
   

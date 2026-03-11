@@ -324,7 +324,7 @@ const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: 
     >
       <option value="">Select a voice message</option>
       {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number, name: string }, index: number) => (
-        <option key={index} value={mediaName.id}>
+        <option key={index} value={mediaName.name}>
           {mediaName.name}
         </option>
       ))}
