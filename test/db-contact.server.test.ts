@@ -30,7 +30,7 @@ describe("app/lib/database/contact.server.ts", () => {
     expect(res).toEqual({ data: [{ id: 1 }], error: null });
   });
 
-  test("fetchContactData: by number only returns potentialContacts", async () => {
+  test("fetchContactData: by number only promotes a unique match to contact", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
     const chain: any = {
@@ -43,9 +43,9 @@ describe("app/lib/database/contact.server.ts", () => {
     const supabase: any = { from: vi.fn(() => chain) };
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
-    expect(res.contact).toBeNull();
+    expect(res.contact).toEqual({ id: 1 });
     expect(res.contactError).toBeNull();
-    expect(res.potentialContacts).toEqual([{ id: 1 }]);
+    expect(res.potentialContacts).toEqual([]);
   });
 
   test("fetchContactData: by number only handles null data", async () => {
@@ -62,6 +62,23 @@ describe("app/lib/database/contact.server.ts", () => {
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.potentialContacts).toEqual([]);
+  });
+
+  test("fetchContactData: by number only keeps ambiguous matches as potential contacts", async () => {
+    const mod = await import("../app/lib/database/contact.server");
+
+    const chain: any = {
+      select: () => chain,
+      eq: () => chain,
+      or: () => chain,
+      not: () => chain,
+      neq: async () => ({ data: [{ id: 1 }, { id: 2 }, { id: 2 }], error: null }),
+    };
+    const supabase: any = { from: vi.fn(() => chain) };
+
+    const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
+    expect(res.contact).toBeNull();
+    expect(res.potentialContacts).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
   test("fetchContactData: by contact_id sets contact or contactError", async () => {

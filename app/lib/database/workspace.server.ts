@@ -1464,6 +1464,17 @@ function compareConversationDates(left: string, right: string): number {
   return new Date(left).getTime() - new Date(right).getTime();
 }
 
+function contactMatchesConversationPhone(
+  contact: ContactNameRow | undefined,
+  contactPhone: string,
+): contact is ContactNameRow {
+  if (!contact?.phone) {
+    return false;
+  }
+
+  return getConversationPhoneKey(contact.phone) === getConversationPhoneKey(contactPhone);
+}
+
 export async function fetchConversationSummary(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
@@ -1548,8 +1559,11 @@ export async function fetchConversationSummary(
       continue;
     }
 
-    const contact = typeof message.contact_id === "number"
+    const candidateContact = typeof message.contact_id === "number"
       ? contactsById.get(message.contact_id)
+      : undefined;
+    const contact = contactMatchesConversationPhone(candidateContact, contactPhone)
+      ? candidateContact
       : undefined;
     const existingConversation = conversationMap.get(conversationKey);
     const hasReplied = message.direction === "inbound";
@@ -1558,7 +1572,7 @@ export async function fetchConversationSummary(
 
     if (!existingConversation) {
       conversationMap.set(conversationKey, {
-        contact_phone: contact?.phone || contactPhone,
+        contact_phone: contactPhone,
         user_phone: userPhone ?? "",
         conversation_start: timestamp,
         conversation_last_update: timestamp,
@@ -1606,8 +1620,8 @@ export async function fetchConversationSummary(
       existingConversation.user_phone = userPhone;
     }
 
-    if (!existingConversation.contact_phone && (contact?.phone || contactPhone)) {
-      existingConversation.contact_phone = contact?.phone || contactPhone;
+    if (!existingConversation.contact_phone && contactPhone) {
+      existingConversation.contact_phone = contactPhone;
     }
   }
 
