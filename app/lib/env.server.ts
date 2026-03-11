@@ -18,6 +18,7 @@ type EnvConfig = {
   STRIPE_SECRET_KEY: string;
   RESEND_API_KEY: string;
   OPENAI_API_KEY?: string;
+  VERIFICATION_PHONE_NUMBER?: string;
 };
 
 const requiredEnvVars: (keyof EnvConfig)[] = [
@@ -113,6 +114,7 @@ export const env = {
   STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
   OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY'),
+  VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
 } as const;
 
 /**

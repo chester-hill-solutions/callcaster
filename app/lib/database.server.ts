@@ -17,6 +17,7 @@ export {
   getWorkspaceInfoWithDetails,
   getWorkspaceUsers,
   getWorkspacePhoneNumbers,
+  getHandsetNumberForWorkspace,
   updateWorkspacePhoneNumber,
   addUserToWorkspace,
   getUserRole,

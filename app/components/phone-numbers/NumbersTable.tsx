@@ -3,6 +3,16 @@ import { Form } from "@remix-run/react";
 import { useState, useCallback, useEffect } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/typography";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { User, WorkspaceNumbers } from "@/lib/types";
 
 export const NumbersTable = ({
@@ -12,6 +22,7 @@ export const NumbersTable = ({
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
+  onHandsetChange,
   onNumberRemoval,
   isBusy,
 }: {
@@ -21,6 +32,7 @@ export const NumbersTable = ({
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
+  onHandsetChange?: (id: number, handsetEnabled: boolean) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
 }) => {
@@ -81,21 +93,23 @@ export const NumbersTable = ({
   );
 
   return (
-      <><h3 className="text-center font-Zilla-Slab text-4xl font-bold">
+      <>
+      <Heading className="text-center" branded>
       Existing Numbers
-    </h3><div className="flex flex-col py-4">
-        <table className="w-full table-auto">
-          <thead>
-            <tr>
-              <th className="py-2"></th>
-              <th className="py-2 text-left">Caller ID</th>
-              <th className="py-2 text-left">Phone Number</th>
-              <th className="py-2 text-left">Status</th>
-              <th className="py-2 text-left">Handle Voicemail</th>
-              <th className="py-2 text-left">Voicemail Message</th>
-            </tr>
-          </thead>
-          <tbody>
+    </Heading><div className="flex flex-col py-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead></TableHead>
+              <TableHead>Caller ID</TableHead>
+              <TableHead>Phone Number</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Handset</TableHead>
+              <TableHead>Handle Voicemail</TableHead>
+              <TableHead>Voicemail Message</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {numbers.map((number) => (
               <NumberRow
                 key={number?.id}
@@ -106,11 +120,12 @@ export const NumbersTable = ({
                 handleIncomingActivityChange={handleIncomingActivityChange}
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
+                onHandsetChange={onHandsetChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div></>
   );
 };
@@ -123,6 +138,7 @@ const NumberRow = ({
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
+  onHandsetChange,
   handleNumberRemoval,
   isBusy,
 }: {
@@ -133,6 +149,7 @@ const NumberRow = ({
   handleIncomingActivityChange: (id: number, value: string) => void;
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
+  onHandsetChange?: (id: number, handsetEnabled: boolean) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -151,8 +168,8 @@ const NumberRow = ({
 
   if (!number) return <>No Number found</>;
   return (
-    <tr className="border-b dark:border-gray-700">
-      <td className="mt-2 py-2">
+    <TableRow>
+      <TableCell className="mt-2 py-2">
         <Button
         variant={"ghost"}
           className="text-red-500 hover:text-red-700"
@@ -161,18 +178,19 @@ const NumberRow = ({
         >
           <MdClose />
         </Button>
-      </td>
-      <td className="px-2 py-2 text-left ">
+      </TableCell>
+      <TableCell className="px-2 py-2 text-left ">
         <div className="flex items-center gap-4">
           {isEditingNumber ? (
             <>
-              <input
+              <Input
                 name="callerId"
                 id="callerId"
                 value={callerId}
                 onKeyDown={handleKeyPress}
                 onChange={(e) => setCallerId(e.target.value)}
                 type="text"
+                className="max-w-xs"
               />
               <Button
                 disabled={isBusy}
@@ -200,9 +218,9 @@ const NumberRow = ({
             </>
           )}
         </div>
-      </td>
-      <td className="px-2 py-2">{number.phone_number}</td>
-      <td className="py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">{number.phone_number}</TableCell>
+      <TableCell className="py-2">
         <StatusIndicator 
           status={
             typeof number?.capabilities === 'object' && 
@@ -213,23 +231,34 @@ const NumberRow = ({
               : ''
           } 
         />
-      </td>
-      <td className="px-2 py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">
+        {onHandsetChange && number.type !== "caller_id" ? (
+          <input
+            type="checkbox"
+            checked={Boolean((number as { handset_enabled?: boolean }).handset_enabled)}
+            disabled={isBusy}
+            onChange={(e) => onHandsetChange(number.id, e.target.checked)}
+            aria-label="Use as handset"
+          />
+        ) : null}
+      </TableCell>
+      <TableCell className="px-2 py-2">
         <IncomingActivitySelect
           number={number}
           members={members}
           verifiedNumbers={verifiedNumbers}
           onChange={handleIncomingActivityChange}
         />
-      </td>
-      <td className="px-2 py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">
         <IncomingVoiceMessageSelect
           number={number}
           mediaNames={mediaNames}
           onChange={handleIncomingVoiceMessageChange}
         />
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 };
 

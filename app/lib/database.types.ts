@@ -1438,11 +1438,57 @@ export type Json =
             },
           ]
         }
+        handset_session: {
+          Row: {
+            id: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status: string
+            created_at: string
+            expires_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status?: string
+            created_at?: string
+            expires_at: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            workspace_id?: string
+            client_identity?: string
+            status?: string
+            created_at?: string
+            expires_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "handset_session_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "handset_session_workspace_id_fkey"
+              columns: ["workspace_id"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
         workspace_number: {
           Row: {
             capabilities: Json | null
             created_at: string
             friendly_name: string | null
+            handset_enabled: boolean
             id: number
             inbound_action: string | null
             inbound_audio: string | null
@@ -1454,6 +1500,7 @@ export type Json =
             capabilities?: Json | null
             created_at?: string
             friendly_name?: string | null
+            handset_enabled?: boolean
             id?: number
             inbound_action?: string | null
             inbound_audio?: string | null
@@ -1465,6 +1512,7 @@ export type Json =
             capabilities?: Json | null
             created_at?: string
             friendly_name?: string | null
+            handset_enabled?: boolean
             id?: number
             inbound_action?: string | null
             inbound_audio?: string | null
@@ -1573,6 +1621,41 @@ export type Json =
               columns: ["user_id"]
               isOneToOne: false
               referencedRelation: "users"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        verification_session: {
+          Row: {
+            id: string
+            user_id: string
+            expected_caller: string
+            status: string
+            expires_at: string
+            created_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            expected_caller: string
+            status?: string
+            expires_at: string
+            created_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            expected_caller?: string
+            status?: string
+            expires_at?: string
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "verification_session_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
               referencedColumns: ["id"]
             }
           ]

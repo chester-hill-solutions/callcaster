@@ -1,5 +1,6 @@
 import React from "react";
-import { TextInput } from "@/components/forms/Inputs";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import type { Contact } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 
@@ -60,18 +61,22 @@ const ContactFields: React.FC<ContactFieldsProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {fields.map((field) => (
         <div key={field.name} className="w-full">
-          <TextInput
+          <FormField
+            htmlFor={field.name}
             label={field.label}
-            id={field.name}
-            name={field.name}
-            type={getFieldType(field)}
-            value={getFieldValue(field.name)}
-            placeholder={field.placeholder}
-            onChange={onInputChange}
-            disabled={!editMode}
             required={field.required}
-            className="w-full"
-          />
+          >
+            <Input
+              id={field.name}
+              name={field.name}
+              type={getFieldType(field)}
+              value={getFieldValue(field.name)}
+              placeholder={field.placeholder}
+              onChange={onInputChange}
+              disabled={!editMode}
+              required={field.required}
+            />
+          </FormField>
         </div>
       ))}
     </div>

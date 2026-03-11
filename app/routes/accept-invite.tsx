@@ -25,7 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { useEffect } from "react";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
@@ -458,7 +458,6 @@ export default function AcceptInvite() {
           <div>Some invitations could not be accepted. Please review and try again.</div>
         )}
       </div>
-      <Toaster richColors />
     </main>
   );
 }

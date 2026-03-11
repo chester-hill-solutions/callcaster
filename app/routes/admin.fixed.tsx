@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request)
@@ -134,7 +134,6 @@ export default function Admin() {
     
     return (
         <div className="container mx-auto py-8 px-4">
-            <Toaster position="top-right" />
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold">Admin Dashboard</h1>

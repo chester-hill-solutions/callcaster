@@ -1,3 +1,5 @@
+import { formatMessageTimestamp } from "@/lib/utils";
+
 interface Message {
   sid?: string;
   status?: string;
@@ -57,7 +59,7 @@ export default function ChatMessages({
               ))}
               <div className="mt-1 text-right">
                 <small className="text-xs opacity-75">
-                  {new Date(message.date_created).toLocaleTimeString()}
+                  {formatMessageTimestamp(message.date_created)}
                 </small>
               </div>
             </div>

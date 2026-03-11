@@ -1120,6 +1120,96 @@ describe("app/lib/database/workspace.server.ts", () => {
     ]);
   });
 
+  test("fetchConversationSummary falls back to first phone-matched contact", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+
+    const workspaceNumberQuery = {
+      select: vi.fn(() => workspaceNumberQuery),
+      eq: vi.fn(() => workspaceNumberQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
+    };
+
+    const messageQuery = {
+      select: vi.fn(() => messageQuery),
+      eq: vi.fn(() => messageQuery),
+      not: vi.fn(() => messageQuery),
+      neq: vi.fn(() => messageQuery),
+      order: vi.fn(() => messageQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({
+          data: [
+            {
+              campaign_id: 1,
+              contact_id: null,
+              date_created: "2026-03-03T00:00:00.000Z",
+              direction: "outbound",
+              from: "+15551111111",
+              status: "delivered",
+              to: "+15550000001",
+            },
+          ],
+          error: null,
+        }),
+    };
+
+    const contactQuery = {
+      select: vi.fn(() => contactQuery),
+      in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    };
+
+    const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
+      expect(fn).toBe("find_contact_by_phone");
+      expect(args).toEqual({
+        p_workspace_id: "w1",
+        p_phone_number: "+15550000001",
+      });
+
+      return {
+        data: [
+          {
+            id: 44,
+            firstname: "Jamie",
+            surname: "Fallback",
+            phone: "+15550000001",
+          },
+          {
+            id: 45,
+            firstname: "Second",
+            surname: "Match",
+            phone: "+15550000001",
+          },
+        ],
+        error: null,
+      };
+    });
+
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === "workspace_number") return workspaceNumberQuery;
+        if (table === "message") return messageQuery;
+        if (table === "contact") return contactQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+      rpc,
+    };
+
+    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+      limit: 20,
+      offset: 0,
+      sort: "recent",
+    });
+
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(result.chats).toEqual([
+      expect.objectContaining({
+        contact_phone: "+15550000001",
+        contact_firstname: "Jamie",
+        contact_surname: "Fallback",
+      }),
+    ]);
+  });
+
   test("portal config prefers onboarding Messaging Service defaults when present", async () => {
     const mod = await import("../app/lib/database/workspace.server");
     const config = mod.getWorkspaceTwilioPortalConfigFromTwilioData({

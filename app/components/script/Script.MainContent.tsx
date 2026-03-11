@@ -1,7 +1,9 @@
 import React from "react";
 import { MdRemoveCircleOutline } from "react-icons/md";
 import { Button } from "@/components/ui/button";
-import { Toggle } from "@/components/forms/Inputs";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import MergedQuestionBlock from "@/components/script/ScriptBlock";
 import { Block, Flow, IVRBlock, Script } from "@/lib/types";
 
@@ -49,39 +51,44 @@ export default function ScriptMainContent({
     <div className="w-3/4" style={{ width: "75%" }}>
       <div className="flex flex-col">
         <div className="flex justify-between">
-          <div className="flex flex-col">
-            <label htmlFor="campaign-name">Script Name</label>
-            <input
+          <FormField htmlFor="campaign-name" label="Script Name" className="max-w-md">
+            <Input
               id="campaign-name"
               value={script?.name || ""}
               type="text"
               onChange={handleTitle}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Toggle
-              name="campaign-type"
-              label="Script Type"
-              isChecked={script?.type === "script"}
-              leftLabel="Recording/Synthetic"
-              rightLabel="Live Script"
-              onChange={(val) => changeType(val ? "script" : "ivr")}
-            />
-          </div>
+          </FormField>
+          <FormField
+            htmlFor="campaign-type"
+            label="Script Type"
+            description={script?.type === "script" ? "Live Script" : "Recording/Synthetic"}
+            className="gap-3"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Recording/Synthetic</span>
+              <Switch
+                id="campaign-type"
+                checked={script?.type === "script"}
+                onCheckedChange={(checked) => changeType(checked ? "script" : "ivr")}
+              />
+              <span className="text-sm text-muted-foreground">Live Script</span>
+            </div>
+          </FormField>
         </div>
         {currentPage && (
           <>
-            <label htmlFor="section-name" className="mt-4">
-              Section Name
-            </label>
+            <div className="mt-4">
+              <FormField htmlFor="section-name" label="Section Name">
+                <Input
+                  id="section-name"
+                  value={scriptData.pages[currentPage]?.title || ""}
+                  type="text"
+                  onChange={handleSectionNameChange}
+                />
+              </FormField>
+            </div>
             <div className="flex gap-2">
-              <input
-                id="section-name"
-                value={scriptData.pages[currentPage]?.title || ""}
-                type="text"
-                onChange={handleSectionNameChange}
-                className="mb-4"
-              />
               <Button onClick={() => removeSection(currentPage)} variant="ghost" size="icon">
                 <MdRemoveCircleOutline />
               </Button>

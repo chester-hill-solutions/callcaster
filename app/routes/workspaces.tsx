@@ -11,11 +11,14 @@ import {
 } from "@remix-run/react";
 import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import { createNewWorkspace } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
+import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   Dialog,
   DialogClose,
@@ -24,6 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Heading } from "@/components/ui/typography";
 export { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 interface Workspace {
@@ -102,9 +106,9 @@ const WorkspaceCard = React.memo(
       <NavLink
         prefetch="intent"
         to={`/workspaces/${workspace.id}`}
-        className="flex h-full flex-col items-center justify-center rounded-md border-2 border-black bg-brand-secondary p-4 text-center text-black transition-colors duration-150 hover:bg-white dark:border-white dark:bg-transparent dark:text-white dark:hover:bg-zinc-800"
+        className="flex h-full flex-col items-center justify-center rounded-lg border border-border bg-card p-4 text-center text-card-foreground shadow-sm transition-colors duration-150 hover:bg-accent hover:text-accent-foreground dark:border-white/20 dark:hover:bg-zinc-800"
       >
-        <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold">
+        <h5 className="mb-2 max-h-[100px] overflow-hidden overflow-ellipsis font-Zilla-Slab text-2xl font-semibold text-brand-primary dark:text-white">
           {workspace.name}
         </h5>
         <p className={`text-xl capitalize ${handleRoleTextStyles(role)}`}>
@@ -137,7 +141,7 @@ const NewWorkspaceDialog = ({
     <DialogContent className="bg-brand-secondary dark:bg-inherit">
       <DialogHeader>
         <DialogTitle>
-          <h3 className="text-center font-Zilla-Slab text-4xl font-black">
+          <h3 className="text-center font-Zilla-Slab text-4xl font-black text-brand-primary dark:text-white">
             Add a New Workspace
           </h3>
         </DialogTitle>
@@ -147,16 +151,15 @@ const NewWorkspaceDialog = ({
         method="POST"
         name="newWorkspace"
       >
-        <label htmlFor="newWorkspaceName" className="flex flex-col gap-2">
-          Enter your Workspace Name
-          <input
+        <FormField htmlFor="newWorkspaceName" label="Enter your Workspace Name">
+          <Input
             type="text"
             name="newWorkspaceName"
             id="newWorkspaceName"
-            className="rounded-sm border-2 border-black bg-transparent px-4 py-2 text-xl dark:border-white"
+            className="text-xl"
             required
           />
-        </label>
+        </FormField>
         <input type="hidden" name="userId" value={userId} />
         <div className="flex gap-4">
           <Button
@@ -220,16 +223,22 @@ export default function Workspaces() {
 
   return (
     <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
-      <h1 className="text-center font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+      <Heading className="text-center" branded>
         Your Workspaces
-      </h1>
-      <div className="flex flex-wrap justify-center gap-4 sm:justify-start">
-        <div className="w-full sm:w-48">
-          <NewWorkspaceDialog userId={userId} isBusy={isBusy} />
+      </Heading>
+      <Section className="w-full">
+        <SectionHeader
+          branded
+          title="Workspace Directory"
+          description="Choose an existing workspace or create a new one."
+        />
+        <div className="flex flex-wrap justify-center gap-4 sm:justify-start">
+          <div className="w-full sm:w-48">
+            <NewWorkspaceDialog userId={userId} isBusy={isBusy} />
+          </div>
+          {workspaceCards}
         </div>
-        {workspaceCards}
-      </div>
-      <Toaster richColors />
+      </Section>
     </main>
   );
 }

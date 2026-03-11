@@ -2,6 +2,9 @@ import { Form, useFetcher } from "@remix-run/react";
 import { useRef, useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
 
 type EventCategory = 
   | "inbound_call" 
@@ -248,23 +251,23 @@ export default function WebhookEditor({
 
   return (
     <Form method="POST" className="flex w-full flex-col gap-4" ref={formRef} onSubmit={handleSubmit}>
-      <label
+      <FormField
         htmlFor="destinationUrl"
-        className="flex w-full flex-col text-xl font-semibold dark:text-white"
+        label="Destination URL"
+        description="Callcaster will send matching events to this endpoint."
       >
-        Destination URL
-        <input
+        <Input
           type="url"
           name="destinationUrl"
           id="destinationUrl"
           value={destinationUrl}
           onChange={(e) => setDestinationUrl(e.target.value)}
-          className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+          className="bg-transparent"
         />
-      </label>
+      </FormField>
       
       <div className="flex flex-col gap-4 border p-4 rounded-md">
-        <h3 className="text-xl font-semibold dark:text-white">Event Types</h3>
+        <Heading level={4}>Event Types</Heading>
         
         {/* Inbound Call Events */}
         <div className="flex flex-col gap-2">
@@ -450,23 +453,23 @@ export default function WebhookEditor({
         {customHeaders.map(([key, value], index) => {
           return (
             <div key={index} className="flex gap-2">
-              <input
+              <Input
                 type="text"
                 value={key}
                 onChange={(e) =>
                   handleHeaderChange(index, e.target.value, value)
                 }
                 placeholder="Header Key"
-                className="flex-1 rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                className="flex-1 bg-transparent"
               />
-              <input
+              <Input
                 type="text"
                 value={value}
                 onChange={(e) =>
                   handleHeaderChange(index, key, e.target.value)
                 }
                 placeholder="Header Value"
-                className="flex-1 rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                className="flex-1 bg-transparent"
               />
               <Button
                 type="button"
