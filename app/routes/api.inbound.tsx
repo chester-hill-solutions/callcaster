@@ -45,7 +45,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       inbound_audio,
       type,
       workspace,
-      ...workspace!inner(twilio_data, webhook(*))`,
+      ...workspace!inner(id, twilio_data, webhook(*))`,
     )
     .eq("phone_number", data.Called)
     .single() as {
@@ -60,7 +60,12 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     throw { status: 500, statusText: "Internal Server Error" };
   }
 
-  const workspaceId = number.workspace?.id ?? null;
+  const workspaceId =
+    (number.workspace && typeof number.workspace === "object" && "id" in number.workspace
+      ? number.workspace.id
+      : typeof number.workspace === "string"
+        ? number.workspace
+        : null) ?? null;
   let voicemail: { signedUrl: string } | null = null;
   if (number?.inbound_audio && workspaceId) {
     // Prefer treating inbound_audio as storage path (filename); fallback to resolving by id via list
