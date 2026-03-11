@@ -20,7 +20,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const fromNumber = formData.get('From') as string;
         const baseUrl = env.BASE_URL();
 
-        let { data, error } = await supabase.from('calls').select('*').eq('id', CallSid).single();
+        const { data: existingData, error } = await supabase.from('calls').select('*').eq('id', CallSid).single();
+        let data = existingData;
 
         if (error || !data) {
 

@@ -1,9 +1,11 @@
 // Twilio not used in this endpoint
 import { createClient } from '@supabase/supabase-js';
-import { safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
+import { verifyAuth } from "@/lib/supabase.server";
 
 // unused types removed
 
@@ -33,8 +35,10 @@ const updateWorkspace = async ({ workspace_id, update }: UpdateWorkspaceParams) 
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+    const { supabaseClient, user } = await verifyAuth(request);
     const { workspace_id }: WorkspaceRequest = await safeParseJson(request);
     try {
+        await requireWorkspaceAccess({ supabaseClient, user, workspaceId: workspace_id });
         const update: WorkspaceUpdate = {};
         const updated = await updateWorkspace({ workspace_id, update });
         return new Response(JSON.stringify({ ...updated }), {
@@ -45,11 +49,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         })
     } catch (error) {
         logger.error('Subaccount failed', error);
-        return new Response(JSON.stringify({ error }), {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            status: 500
-        });
+        return createErrorResponse(error, "Failed to update workspace");
     }
 }

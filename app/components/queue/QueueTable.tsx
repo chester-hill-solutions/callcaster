@@ -18,6 +18,12 @@ import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StatusDropdown } from "./StatusDropdown";
 import { QueueTablePagination } from "./QueueTablePagination";
+import {
+    getQueueDisplayLabel,
+    getQueueDisplayState,
+    QUEUE_STATUS_FILTERS,
+    type QueueStatusFilter,
+} from "@/lib/queue-status";
 
 const STATUS_OPTIONS = ["queued", "dequeued"] as const;
 const ATTEMPT_OPTIONS = ["completed", "failed", "no-answer", "voicemail", "unknown"] as const;
@@ -155,15 +161,20 @@ export function QueueTable({
     // Optimistic update handlers
     const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: typeof STATUS_OPTIONS[number]) => {
         snapshotRef.current = optimisticQueue ?? [];
+        const idsToUpdate = selectedIds.length > 0
+            ? selectedIds
+            : isAllFilteredSelected
+                ? optimisticQueue?.map((item) => item.id.toString()) ?? []
+                : [];
         setOptimisticQueue(prev =>
             prev?.map(item =>
-                selectedIds.includes(item.id.toString())
+                idsToUpdate.includes(item.id.toString())
                     ? { ...item, status: newStatus }
                     : item
             ) || []
         );
         onStatusChange?.(selectedIds, newStatus);
-    }, [onStatusChange, optimisticQueue]);
+    }, [onStatusChange, optimisticQueue, isAllFilteredSelected]);
 
     const handleRemoveContactsOptimistic = useCallback((ids: string[] | 'all') => {
         snapshotRef.current = optimisticQueue ?? [];
@@ -471,7 +482,7 @@ export function QueueTable({
                             ) : (
                                 <>
                                     <option value="">All statuses</option>
-                                    {STATUS_OPTIONS.map((status) => (
+                                    {QUEUE_STATUS_FILTERS.map((status) => (
                                         <option key={status} value={status}>{status}</option>
                                     ))}
                                 </>
@@ -481,10 +492,15 @@ export function QueueTable({
                 );
             },
             cell: ({ row }) => (
-                <StatusDropdown
-                    currentStatus={row.original.status}
-                    onSelect={(status) => handleStatusChangeOptimistic([row.original.id.toString()], status)}
-                />
+                <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-muted px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {getQueueDisplayLabel(row.original.status, row.original.dequeued_at)}
+                    </span>
+                    <StatusDropdown
+                        currentStatus={getQueueDisplayState(row.original.status, row.original.dequeued_at)}
+                        onSelect={(status) => handleStatusChangeOptimistic([row.original.id.toString()], status)}
+                    />
+                </div>
             ),
         },
         {

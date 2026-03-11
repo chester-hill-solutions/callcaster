@@ -1,6 +1,14 @@
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
+import { getFunctionsBaseUrl, getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
+import {
+  billingUnitsFromDurationSeconds,
+  canTransitionOutreachDisposition,
+  checkWorkspaceCredits,
+  getCallWithRetry,
+  insertTransactionHistoryIdempotent,
+} from "../_shared/ivr-status-logic.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -33,28 +41,7 @@ const log = (level: string, message: string, data = {}) => {
   console[level](`[${new Date().toISOString()}] ${message}`, JSON.stringify(data));
 };
 
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
-
-const getCallWithRetry = async (supabase: SupabaseClient, callSid: string, retries = 0) => {
-  const MAX_RETRIES = 5;
-  const RETRY_DELAY = 200;
-
-  const { data, error } = await supabase
-    .from("call")
-    .select('*, outreach_attempt(id, result, current_step), campaign(*,ivr_campaign(*, script(*)))')
-    .eq("sid", callSid)
-    .single();
-
-  if (error || !data) {
-    log('warn', `Failed to retrieve call data`, { callSid, error, retryAttempt: retries });
-    if (retries < MAX_RETRIES) {
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-      return getCallWithRetry(supabase, callSid, retries + 1);
-    }
-    throw new Error("Failed to retrieve call after multiple attempts");
-  }
-  return data;
-};
+const baseUrl = `${getFunctionsBaseUrl()}/`;
 
 const getWorkspaceData = async (supabase: SupabaseClient, workspace_id: string): Promise<WorkspaceData> => {
   const { data, error } = await supabase
@@ -115,7 +102,7 @@ const handleCallCompletion = async (
     }
 
     const finalStates = ['voicemail', 'voicemail-no-message'];
-    if (!finalStates.includes(currentOutreach.disposition)) {
+    if (!finalStates.includes(String(currentOutreach.disposition ?? "").toLowerCase())) {
       let disposition = 'completed';
       if (CallStatus) {
         switch (CallStatus.toLowerCase()) {
@@ -133,37 +120,38 @@ const handleCallCompletion = async (
         }
       }
 
-      // Update outreach attempt with final disposition
-      const { error: dispositionError } = await supabase
-        .from("outreach_attempt")
-        .update({ disposition })
-        .eq("id", callData.outreach_attempt_id);
+      const currentDisposition = String(currentOutreach.disposition ?? "").toLowerCase();
+      const nextDisposition = String(disposition ?? "").toLowerCase();
+      if (canTransitionOutreachDisposition(currentDisposition, nextDisposition)) {
+        // Update outreach attempt with final disposition
+        const { error: dispositionError } = await supabase
+          .from("outreach_attempt")
+          .update({ disposition })
+          .eq("id", callData.outreach_attempt_id);
 
-      if (dispositionError) {
-        log('error', 'Failed to update outreach attempt disposition', {
-          error: dispositionError,
-          outreach_attempt_id: callData.outreach_attempt_id
-        });
+        if (dispositionError) {
+          log('error', 'Failed to update outreach attempt disposition', {
+            error: dispositionError,
+            outreach_attempt_id: callData.outreach_attempt_id
+          });
+        }
       }
     }
 
     // Deduct credits based on call duration
     if (CallDuration) {
-      const { error: transactionError } = await supabase
-        .from('transaction_history')
-        .insert({
-          workspace: callData.workspace,
-          type: "DEBIT",
-          amount: -(Math.floor(parseInt(CallDuration) / 60) + 1),
-          note: `IVR Call ${callData.sid}, Campaign ${callData.campaign.name}, Duration ${CallDuration}s`
-        });
-
-      if (transactionError) {
-        log('error', 'Failed to create transaction', {
-          error: transactionError,
-          workspace: callData.workspace
-        });
-      }
+      const durationSeconds = Number.parseInt(CallDuration, 10);
+      const billingUnits = billingUnitsFromDurationSeconds(
+        Number.isFinite(durationSeconds) ? durationSeconds : 0,
+      );
+      await insertTransactionHistoryIdempotent({
+        supabase: supabase as any,
+        workspaceId: callData.workspace,
+        type: "DEBIT",
+        amount: billingUnits,
+        note: `IVR Call ${callData.sid}, Campaign ${callData.campaign.name}, Duration ${CallDuration}s`,
+        idempotencyKey: `call:${callData.sid}`,
+      });
     }
 
   } catch (error) {
@@ -174,51 +162,10 @@ const handleCallCompletion = async (
   }
 };
 
-const checkWorkspaceCredits = async (
-  supabase: SupabaseClient,
-  workspaceId: string,
-  campaignId: string,
-  callSid: string,
-  twilioClient: Twilio
-): Promise<boolean> => {
-  const { data: workspaceCredits, error: workspaceCreditsError } = await supabase
-    .from('workspace')
-    .select('credits')
-    .eq('id', workspaceId)
-    .single();
-
-  if (workspaceCreditsError) {
-    log('error', 'Failed to check workspace credits', { workspaceCreditsError });
-    return true; // Allow call to proceed if we can't check credits
-  }
-
-  if (workspaceCredits.credits <= 0) {
-    // Update campaign status
-    const { error: updateError } = await supabase
-      .from("campaign")
-      .update({ is_active: false })
-      .eq("id", campaignId);
-
-    if (updateError) {
-      log('error', 'Failed to update campaign status', { updateError });
-    }
-
-    try {
-      await twilioClient.calls(callSid).update({ status: "canceled" });
-    } catch (error) {
-      log('error', 'Failed to cancel call', { error });
-    }
-
-    return false;
-  }
-
-  return true;
-};
-
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     // Get request details for validation
-    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-status`;
+    const publicUrl = getFunctionUrl("ivr-status");
 
     const twilioSignature = req.headers.get('x-twilio-signature');
 
@@ -239,7 +186,7 @@ Deno.serve(async (req) => {
     }
 
     // Get call data
-    const callData = await getCallWithRetry(supabase, CallSid);
+    const callData = await getCallWithRetry(supabase as any, CallSid);
     if (!callData) {
       throw new Error("Call not found");
     }
@@ -261,20 +208,20 @@ Deno.serve(async (req) => {
     // Check credits if call is being initiated
     if (CallStatus === 'initiated') {
       const twilioClient = new Twilio(workspace.twilio_data.sid, workspace.twilio_data.authToken);
-      const hasCredits = await checkWorkspaceCredits(
-        supabase,
-        callData.workspace,
-        callData.campaign_id,
-        CallSid,
-        twilioClient
-      );
-      const {data, error} = supabase.from("campaign").select('is_active').eq("id", callData.campaign_id).single();
+      const hasCredits = await checkWorkspaceCredits({
+        supabase: supabase as any,
+        workspaceId: callData.workspace,
+        campaignId: callData.campaign_id,
+        callSid: CallSid,
+        twilioClient: twilioClient as any,
+      });
+      const {data, error} = await supabase.from("campaign").select('is_active').eq("id", callData.campaign_id).single();
       if (error) throw error;
       if (!data.is_active){
         console.log('Campaign inactive, shutting down call.');
       }
       if (!hasCredits || !data.is_active) {
-        twilioClient.calls(CallSid).update({status: "canceled"})
+        await twilioClient.calls(CallSid).update({status: "canceled"})
         return new Response(
           JSON.stringify({ error: 'Insufficient credits', success: false }),
           { headers: { "Content-Type": "application/json" }, status: 400 }
@@ -322,4 +269,8 @@ Deno.serve(async (req) => {
       status: 500
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

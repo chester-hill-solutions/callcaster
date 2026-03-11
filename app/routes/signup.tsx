@@ -10,12 +10,16 @@ import {
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
+import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
+import { Heading } from "@/components/ui/typography";
 
 type ActionData =
   | { emailError: string | null; passwordError: string | null; error?: undefined; data?: undefined }
@@ -58,7 +62,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   let userName: string = email ?? "";
-  userName = userName.split("@")[0];
+  userName = userName.split("@")[0] ?? "";
   const alphaNumericRegex = new RegExp(/([^a-zA-Z\d])/g);
   userName = userName.replace(alphaNumericRegex, "");
 
@@ -131,9 +135,9 @@ export default function SignUp() {
 
   return (
     <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
-      <h1 className="animate-fade-in-up my-4 font-Tabac-Slab text-4xl font-bold text-brand-primary">
+      <Heading branded level={1} className="animate-fade-in-up my-4 font-Tabac-Slab">
         Sign Up
-      </h1>
+      </Heading>
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
         <ContactForm isBusy={state !== "idle"} formRef={formRef} fetcher={fetcher}/>
       </div>
@@ -149,14 +153,11 @@ interface ContactFormProps {
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">
     <div className="flex flex-wrap gap-8">
-      <Card className="min-w-[400px] flex-initial bg-secondary py-8 dark:bg-zinc-800">
-        <CardContent>
-          <div className="flex w-full justify-center">
-            <p className="max-w-[75%] p-4 text-center">
-              Registration is currently available by invitation. Contact us to
-              let us know you're interested.
-            </p>
-          </div>
+      <AuthCard
+        title="Request Access"
+        description="Registration is currently available by invitation. Contact us to let us know you're interested."
+        className="min-w-[400px] flex-initial bg-secondary py-2 dark:bg-zinc-800"
+      >
           <fetcher.Form
             className="space-y-4"
             action="/api/contact-form"
@@ -164,51 +165,33 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
             ref={formRef}
           >
             <input type="hidden" value={"signup"} id="signup" name="signup" />
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-              >
-                Name
-              </label>
-              <input
+            <FormField htmlFor="name" label="Name">
+              <Input
                 type="text"
                 id="name"
                 name="name"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="bg-white dark:bg-zinc-700 dark:text-white"
               />
-            </div>
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-              >
-                Email
-              </label>
-              <input
+            </FormField>
+            <FormField htmlFor="email" label="Email">
+              <Input
                 type="email"
                 id="email"
                 name="email"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="bg-white dark:bg-zinc-700 dark:text-white"
               />
-            </div>
-            <div>
-              <label
-                htmlFor="message"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-              >
-                Message
-              </label>
-              <textarea
+            </FormField>
+            <FormField htmlFor="message" label="Message">
+              <Textarea
                 id="message"
                 name="message"
                 rows={4}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
-              ></textarea>
-            </div>
+                className="bg-white text-gray-900 dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+              />
+            </FormField>
             <Button
               disabled={isBusy}
               type="submit"
@@ -217,8 +200,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
               Send Message
             </Button>
           </fetcher.Form>
-        </CardContent>
-      </Card>
+      </AuthCard>
     </div>
   </div>
 );

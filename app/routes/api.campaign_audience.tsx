@@ -12,14 +12,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     try {
         if (method === "POST") {
-            const { audience_id, campaign_id } = await safeParseJson(request);
+            const { audience_id, campaign_id } = await safeParseJson<{
+                audience_id: string | number;
+                campaign_id: string | number;
+            }>(request);
+            const audienceId = Number(audience_id);
+            const campaignId = Number(campaign_id);
+            if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
+                return json({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+            }
 
             // First check if this audience is already added to the campaign
             const { data: existing, error: checkError } = await supabaseClient
                 .from("campaign_audience")
                 .select()
-                .eq("campaign_id", campaign_id)
-                .eq("audience_id", audience_id)
+                .eq("campaign_id", campaignId)
+                .eq("audience_id", audienceId)
                 .single();
 
             if (checkError && checkError.code !== "PGRST116") {
@@ -34,31 +42,44 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const { error: addError } = await supabaseClient
                 .from("campaign_audience")
                 .insert({
-                    campaign_id,
-                    audience_id
+                    campaign_id: campaignId,
+                    audience_id: audienceId
                 });
 
             if (addError) throw addError;
 
-            // Get all contacts from this audience that aren't already in the queue
-            const { data: contacts, error: contactsError } = await supabaseClient
+            const { data: audienceContacts, error: contactsError } = await supabaseClient
                 .from('contact_audience')
                 .select('contact_id')
-                .eq('audience_id', audience_id)
-                .not('contact_id', 'in', (
-                    supabaseClient
-                        .from('campaign_queue')
-                        .select('contact_id')
-                        .eq('campaign_id', campaign_id)
-                ));
+                .eq('audience_id', audienceId);
 
             if (contactsError) throw contactsError;
 
-            if (contacts && contacts.length > 0) {
-                const contactIds = contacts.map((c) => c.contact_id);
+            const audienceContactIds = (audienceContacts ?? []).map((contact) => contact.contact_id);
+
+            if (audienceContactIds.length > 0) {
+                const { data: existingQueueRows, error: queueError } = await supabaseClient
+                    .from("campaign_queue")
+                    .select("contact_id")
+                    .eq("campaign_id", campaignId)
+                    .in("contact_id", audienceContactIds);
+
+                if (queueError) throw queueError;
+
+                const existingContactIds = new Set(
+                    (existingQueueRows ?? []).map((row) => row.contact_id),
+                );
+                const contactIds = audienceContactIds.filter(
+                    (contactId) => !existingContactIds.has(contactId),
+                );
+
+                if (contactIds.length === 0) {
+                    return json({ success: true }, { headers });
+                }
+
                 await enqueueContactsForCampaign(
                     supabaseClient,
-                    campaign_id,
+                    campaignId,
                     contactIds,
                     { requeue: false }
                 );
@@ -68,14 +89,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         if (method === "DELETE") {
-            const { audience_id, campaign_id } = await safeParseJson(request);
+            const { audience_id, campaign_id } = await safeParseJson<{
+                audience_id: string | number;
+                campaign_id: string | number;
+            }>(request);
+            const audienceId = Number(audience_id);
+            const campaignId = Number(campaign_id);
+            if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
+                return json({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+            }
 
             // Remove the audience from the campaign
             const { error } = await supabaseClient
                 .from("campaign_audience")
                 .delete()
-                .eq("campaign_id", campaign_id)
-                .eq("audience_id", audience_id);
+                .eq("campaign_id", campaignId)
+                .eq("audience_id", audienceId);
 
             if (error) throw error;
 
@@ -83,28 +112,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const { data: campaignAudiences } = await supabaseClient
                 .from('campaign_audience')
                 .select('audience_id')
-                .eq('campaign_id', campaign_id);
+                .eq('campaign_id', campaignId);
 
-            const { data: contactsToRemove, error: contactsError } = await supabaseClient
+            const remainingAudienceIds = (campaignAudiences ?? []).map((audience) => audience.audience_id);
+
+            const { data: removedAudienceContacts, error: removedAudienceContactsError } = await supabaseClient
                 .from('contact_audience')
                 .select('contact_id')
-                .eq('audience_id', audience_id)
-                .not('contact_id', 'in', (
-                    supabaseClient
-                        .from('contact_audience')
-                        .select('contact_id')
-                        .neq('audience_id', audience_id)
-                        .in('audience_id', campaignAudiences?.map(a => a.audience_id) || [])
-                ));
+                .eq('audience_id', audienceId);
 
-            if (contactsError) throw contactsError;
+            if (removedAudienceContactsError) throw removedAudienceContactsError;
+
+            let contactsToRemove = removedAudienceContacts ?? [];
+
+            if (remainingAudienceIds.length > 0 && contactsToRemove.length > 0) {
+                const { data: retainedContacts, error: retainedContactsError } = await supabaseClient
+                    .from("contact_audience")
+                    .select("contact_id")
+                    .in("audience_id", remainingAudienceIds);
+
+                if (retainedContactsError) throw retainedContactsError;
+
+                const retainedContactIds = new Set(
+                    (retainedContacts ?? []).map((contact) => contact.contact_id),
+                );
+                contactsToRemove = contactsToRemove.filter(
+                    (contact) => !retainedContactIds.has(contact.contact_id),
+                );
+            }
 
             if (contactsToRemove && contactsToRemove.length > 0) {
                 // Remove these contacts from the queue if they haven't been called yet
                 const { error: removeError } = await supabaseClient
                     .from('campaign_queue')
                     .delete()
-                    .eq('campaign_id', campaign_id)
+                    .eq('campaign_id', campaignId)
                     .in('contact_id', contactsToRemove.map(c => c.contact_id))
                     .eq('status', QUEUE_STATUS_QUEUED)
                     .eq('attempts', 0);

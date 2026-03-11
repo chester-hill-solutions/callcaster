@@ -1,6 +1,6 @@
 import fs from 'fs';
 import https from 'https';
-import WebSocket, { WebSocketServer } from 'ws';
+import { WebSocketServer } from 'ws';
 import express from 'express'
 
 const app = express();

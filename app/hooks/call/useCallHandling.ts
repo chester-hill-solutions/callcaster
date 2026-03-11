@@ -1,14 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import type { Call, Device } from "@twilio/voice-sdk";
 import { hangupCall } from '@/lib/services/hooks-api';
 import { logger } from '@/lib/logger.client';
 
-// Types - Device and Call instances are passed as parameters, not instantiated here
-type Device = any;
-type Call = any;
-
 interface CallConnectParams {
   To: string;
-  [key: string]: unknown;
+  [key: string]: string;
 }
 
 interface UseCallHandlingOptions {
@@ -108,7 +105,7 @@ export function useCallHandling({
     updateIncomingCall(call);
     
     // Auto-accept client calls
-    if (call.parameters.To.includes('client')) {
+    if (typeof call.parameters.To === "string" && call.parameters.To.includes('client')) {
       call.accept();
       onStatusChange?.('connected');
       updateCallState('connected');
@@ -166,8 +163,8 @@ export function useCallHandling({
       return;
     }
     
-    const connection = device.connect(params);
-    connection.then((call: unknown) => {
+    const connection = device.connect({ params });
+    connection.then((call: Call) => {
       updateActiveCall(call);
       updateCallState('dialing');
     }).catch((err: unknown) => {
@@ -187,8 +184,13 @@ export function useCallHandling({
     }
 
     try {
+      const callSid = activeCall.parameters.CallSid;
+      if (!callSid) {
+        throw new Error("Active call is missing a CallSid");
+      }
+
       await hangupCall({
-        callSid: activeCall.parameters.CallSid,
+        callSid,
         workspaceId,
       });
 

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 # Add build argument for cache busting (Railway: set RAILWAY_CACHE_BUST env var)
@@ -10,6 +10,11 @@ COPY package.json package-lock.json* ./
 
 # Install dependencies
 RUN npm install
+
+# Install ffmpeg for upload-time audio normalization
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy source code
 COPY . .

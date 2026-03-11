@@ -5,29 +5,17 @@ import { env } from "../lib/env.server";
 import { logger } from "../lib/logger.server";
 import type { Database } from "../lib/database.types";
 import type { Call } from "../lib/types";
+import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
 
 type TwilioClient = Awaited<ReturnType<typeof createWorkspaceTwilioInstance>>;
 
-function normalizePhoneNumber(input:string) {
-  let cleaned = input.replace(/[^0-9+]/g, "");
-  if (cleaned.indexOf("+") > 0) {
-    cleaned = cleaned.replace(/\+/g, "");
-  }
-  if (!cleaned.startsWith("+")) {
-    cleaned = "+" + cleaned;
-  }
-  const validLength = 11;
-  const minLength = 11;
-  if (cleaned.length < minLength + 1) {
-    cleaned = "+1" + cleaned.replace("+", "");
-  }
-  if (cleaned.length !== validLength + 1) {
-    throw new Error("Invalid phone number length");
-  }
-  return cleaned;
-}
+export const normalizePhoneNumber = sharedNormalizePhoneNumber;
 
-async function getNextContact(supabase: SupabaseClient, campaign_id: number, user_id: string) {
+export async function getNextContact(
+  supabase: SupabaseClient,
+  campaign_id: number,
+  user_id: string,
+) {
   const { data: record, error } = await supabase.rpc("auto_dial_queue", {
     campaign_id_variable: campaign_id,
     user_id_variable: user_id,
@@ -36,7 +24,7 @@ async function getNextContact(supabase: SupabaseClient, campaign_id: number, use
   return record.length > 0 ? record[0] : null;
 }
 
-async function createOutreachAttempt(
+export async function createOutreachAttempt(
   supabase: SupabaseClient,
   contactRecord: { queue_id: number, contact_id: number, contact_phone: string }, 
   campaign_id: number,
@@ -57,7 +45,13 @@ async function createOutreachAttempt(
   return outreachAttempt;
 }
 
-async function createTwilioCall(client: TwilioClient, toNumber: string, fromNumber: string, user_id: string, selected_device: string) {
+export async function createTwilioCall(
+  client: TwilioClient,
+  toNumber: string,
+  fromNumber: string,
+  user_id: string,
+  selected_device: string,
+) {
   return await client.calls.create({
     to: toNumber,
     from: fromNumber,
@@ -68,7 +62,7 @@ async function createTwilioCall(client: TwilioClient, toNumber: string, fromNumb
   });
 }
 
-async function saveCallToDatabase(
+export async function saveCallToDatabase(
   supabase: SupabaseClient<Database>,
   callData: Partial<Call>
 ) {
@@ -110,7 +104,7 @@ async function saveCallToDatabase(
   if (error) logger.error("Error saving the call to the database:", error);
 }
 
-async function completeAllConferences(client: TwilioClient, user_id: string) {
+export async function completeAllConferences(client: TwilioClient, user_id: string) {
   const conferences = await client.conferences.list({
     friendlyName: user_id,
     status: "in-progress" as const,

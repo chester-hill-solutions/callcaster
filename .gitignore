@@ -8,5 +8,3 @@ migrations
 .DS_Store
 /public/exports
 /public/exports/*
-
-.cursor

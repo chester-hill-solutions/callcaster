@@ -4,20 +4,25 @@ import {
   Link,
   json,
   useActionData,
-  useLoaderData,
   useNavigate,
   useNavigation,
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
+import {
+  AudioUploadError,
+  getAudioUploadAcceptValue,
+  getSafeMediaBaseName,
+  normalizeUploadedAudio,
+} from "@/lib/audio.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -40,7 +45,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-    const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (workspaceId == null) {
@@ -55,23 +60,40 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   logger.debug("Media To Upload:", mediaToUpload);
 
-  const { data: uploadData, error: uploadError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .upload(`${workspaceId}/${mediaName}.mp3`, mediaToUpload as File, {
-      cacheControl: "60",
-      upsert: false,
-      contentType: "audio/mpeg",
-    });
+  try {
+    if (!(mediaToUpload instanceof File)) {
+      throw new AudioUploadError("Please choose an audio file to upload.");
+    }
 
-  if (uploadError) {
-    return json({ success: false, error: uploadError }, { headers });
+    const safeMediaName = getSafeMediaBaseName(mediaName);
+    const normalizedAudio = await normalizeUploadedAudio(mediaToUpload);
+    const { error: uploadError } = await supabaseClient.storage
+      .from("workspaceAudio")
+      .upload(
+        `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`,
+        normalizedAudio.buffer,
+        {
+          cacheControl: "60",
+          upsert: false,
+          contentType: normalizedAudio.contentType,
+        },
+      );
+
+    if (uploadError) {
+      return json({ success: false, error: uploadError }, { headers });
+    }
+
+    return json({ success: true, error: null }, { headers });
+  } catch (error) {
+    logger.error("Workspace audio upload failed", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to upload audio.";
+    const status = error instanceof AudioUploadError ? error.status : 500;
+    return json({ success: false, error: message }, { headers, status });
   }
-
-  return json({ success: true, error: null }, { headers });
 }
 
 export default function Media() {
-  const { workspace } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [pendingFileName, setPendingFileName] = useState("");
   const navigate = useNavigate();
@@ -86,7 +108,7 @@ export default function Media() {
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
-    setPendingFileName(filePath.split("\\").at(-1));
+    setPendingFileName(filePath.split("\\").at(-1) ?? "");
   };
 
   return (
@@ -98,7 +120,7 @@ export default function Media() {
       <CardTitle>Add Audio</CardTitle>
       {actionData?.error != null && (
             <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-              Error: {actionData.error.message}
+              Error: {typeof actionData.error === "string" ? actionData.error : actionData.error.message}
             </p>
           )}
           <CardContent>
@@ -134,6 +156,7 @@ export default function Media() {
                     type="file"
                     name="media"
                     id="media"
+                    accept={getAudioUploadAcceptValue()}
                     className="hidden"
                     onChange={displayFileToUpload}
                   />

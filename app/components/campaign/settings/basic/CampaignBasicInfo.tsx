@@ -1,5 +1,3 @@
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 import { Archive, Pause, Play, Calendar, Copy, TimerIcon, AlertCircle } from "lucide-react";
@@ -9,15 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Campaign,
-  Flags,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
-  Script,
-  WorkspaceNumbers,
-} from "@/lib/types";
+import { Campaign, Flags, WorkspaceNumbers } from "@/lib/types";
 import SelectType from "./CampaignBasicInfo.SelectType";
 import SelectNumber from "./CampaignBasicInfo.SelectNumber";
 import SelectDates from "./CampaignBasicInfo.Dates";
@@ -83,42 +73,6 @@ const getButtonStates = (
   return states;
 };
 
-// Validation helper
-const validateRequiredFields = (
-  campaignData: Campaign,
-  details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign
-): string[] => {
-  const errors: string[] = [];
-  
-  if (!campaignData.type) {
-    errors.push("Campaign type is required");
-  }
-  
-  if (!campaignData.caller_id) {
-    errors.push("Phone number is required");
-  }
-  
-  if (!campaignData.start_date || !campaignData.end_date) {
-    errors.push("Start and end dates are required");
-  }
-  
-  if (!campaignData.schedule) {
-    errors.push("Calling hours are required");
-  }
-
-  if (details) {
-    if ('script_id' in details && !details.script_id && 'body_text' in details && !details.body_text) {
-      errors.push("Script or message content is required");
-    } else if ('script_id' in details && !details.script_id) {
-      errors.push("Script is required");
-    } else if ('body_text' in details && !details.body_text) {
-      errors.push("Message content is required");
-    }
-  }
-
-  return errors;
-};
-
 // Component Props Interface
 interface CampaignBasicInfoProps {
   campaignData: Campaign;
@@ -127,12 +81,12 @@ interface CampaignBasicInfoProps {
   flags: Flags;
 
   handleButton: (type: "play" | "pause" | "archive" | "schedule") => void;
-  handleConfirmStatus: (status: "queue" | "play" | "archive" | "none") => void;
+  handleConfirmStatus: (status: "play" | "archive" | "none") => void;
   handleDuplicateButton: () => void;
-  joinDisabled: string | null;
-  details: ((LiveCampaign | IVRCampaign) & { script: Script }) | MessageCampaign;
-
+  startDisabledReason: string | null;
+  readinessIssues: string[];
   scheduleDisabled: string | boolean;
+  isBusy: boolean;
 }
 
 // Main Component
@@ -144,15 +98,14 @@ export const CampaignBasicInfo = ({
   handleButton,
   handleConfirmStatus,
   handleDuplicateButton,
-  details,
+  startDisabledReason,
+  readinessIssues,
   scheduleDisabled,
+  isBusy,
 }: CampaignBasicInfoProps) => {
-  const validationErrors = validateRequiredFields(campaignData, details);
-  const isPlayDisabled = validationErrors.length > 0 ? validationErrors.join(", ") : null;
-
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
-    !!isPlayDisabled,
+    !!startDisabledReason,
   );
 
   // Button renderer
@@ -164,9 +117,13 @@ export const CampaignBasicInfo = ({
     const state = buttonStates[type];
 
     const isDisabled = type === "schedule" ? scheduleDisabled : state === "Disabled";
-    const tooltipText = type === "schedule" ? (scheduleDisabled || tooltip) :
-      (state === "Active" ? `Currently ${type === "play" ? "running" : `${type}ed`}` :
-        tooltip);
+    const tooltipText = type === "schedule"
+      ? (scheduleDisabled || tooltip)
+      : type === "play" && startDisabledReason
+        ? startDisabledReason
+        : state === "Active"
+          ? `Currently ${type === "play" ? "running" : `${type}ed`}`
+          : tooltip;
     return (
       <TooltipProvider>
         <Tooltip>
@@ -179,13 +136,13 @@ export const CampaignBasicInfo = ({
                 e.preventDefault();
                 if (type === "duplicate") {
                   handleDuplicateButton();
-                } else if (type === "play" || type === "schedule" || type === "archive") {
-                  handleConfirmStatus(type === "schedule" ? "queue" : type);
+                } else if (type === "play" || type === "archive") {
+                  handleConfirmStatus(type);
                 } else {
                   handleButton(type);
                 }
               }}
-              disabled={!!isDisabled}
+              disabled={!!isDisabled || isBusy}
             >
               {icon}
             </Button>
@@ -220,16 +177,6 @@ export const CampaignBasicInfo = ({
             handleInputChange={handleInputChange}
           />
 
-          <div className="space-y-2">
-            <Label htmlFor="schedule">Calling Hours</Label>
-            <Input
-              id="schedule"
-              type="text"
-              placeholder="9:00 AM - 5:00 PM"
-              value={typeof campaignData.schedule === "string" ? campaignData.schedule : ""}
-              onChange={(e) => handleInputChange("schedule", e.target.value)}
-            />
-          </div>
         </div>
 
         <div className="space-y-4">
@@ -246,10 +193,17 @@ export const CampaignBasicInfo = ({
             {renderButton("duplicate", <Copy className="h-4 w-4" />, "Duplicate campaign")}
           </div>
 
-          {isPlayDisabled && (
-            <div className="flex items-center space-x-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              <span>{isPlayDisabled}</span>
+          {readinessIssues.length > 0 && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              <div className="mb-2 flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4" />
+                <span className="font-medium">Campaign needs attention before it can start</span>
+              </div>
+              <ul className="list-disc space-y-1 pl-5">
+                {readinessIssues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

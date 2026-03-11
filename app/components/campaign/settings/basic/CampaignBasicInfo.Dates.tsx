@@ -7,14 +7,9 @@ import { Clock } from "lucide-react";
 import { logger } from "@/lib/logger.client";
 import {
   Campaign,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
   ScheduleDay,
   ScheduleInterval,
-  Script,
 } from "@/lib/types";
-import { FetcherWithComponents, useSubmit } from "@remix-run/react";
 
 // Schedule type matching the WeeklyScheduleTable component
 type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -39,34 +34,76 @@ interface SelectDatesProps {
   handleInputChange: (name: string, value: string | number | null) => void;
 }
 
+function getDefaultSchedule(): Record<DayName, ScheduleDay> {
+  return {
+    monday: { active: false, intervals: [] },
+    tuesday: { active: false, intervals: [] },
+    wednesday: { active: false, intervals: [] },
+    thursday: { active: false, intervals: [] },
+    friday: { active: false, intervals: [] },
+    saturday: { active: false, intervals: [] },
+    sunday: { active: false, intervals: [] },
+  };
+}
+
+function parseSchedule(schedule: Campaign["schedule"]): Record<DayName, ScheduleDay> {
+  if (!schedule) return getDefaultSchedule();
+
+  try {
+    const parsedSchedule =
+      typeof schedule === "string"
+        ? JSON.parse(schedule)
+        : schedule;
+    const normalizedSchedule = getDefaultSchedule();
+
+    DAYS_OF_WEEK.forEach((day) => {
+      const daySchedule = parsedSchedule?.[day];
+
+      if (!daySchedule || typeof daySchedule !== "object" || !("active" in daySchedule)) {
+        return;
+      }
+
+      normalizedSchedule[day] = {
+        active: Boolean(daySchedule.active),
+        intervals: Array.isArray(daySchedule.intervals)
+          ? daySchedule.intervals
+              .filter(
+                (interval: unknown): interval is ScheduleInterval =>
+                  Boolean(interval) &&
+                  typeof interval === "object" &&
+                  interval !== null &&
+                  "start" in interval &&
+                  "end" in interval &&
+                  typeof interval.start === "string" &&
+                  typeof interval.end === "string",
+              )
+              .map((interval: ScheduleInterval) => ({
+                start: interval.start,
+                end: interval.end,
+              }))
+          : [],
+      };
+    });
+
+    return normalizedSchedule;
+  } catch (error) {
+    logger.error("Error parsing schedule:", error);
+    return getDefaultSchedule();
+  }
+}
+
 export default function SelectDates({
   campaignData,
   handleInputChange,
 }: SelectDatesProps) {
   const [showSchedule, setShowSchedule] = useState(false);
-  const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() => {
-    const defaultSchedule = {
-      monday: { active: false, intervals: [] },
-      tuesday: { active: false, intervals: [] },
-      wednesday: { active: false, intervals: [] },
-      thursday: { active: false, intervals: [] },
-      friday: { active: false, intervals: [] },
-      saturday: { active: false, intervals: [] },
-      sunday: { active: false, intervals: [] },
-    };
+  const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() =>
+    parseSchedule(campaignData.schedule),
+  );
 
-    if (!campaignData?.schedule) return defaultSchedule;
-
-    try {
-      if (typeof campaignData.schedule === 'string') {
-        return JSON.parse(campaignData.schedule);
-      }
-      return campaignData.schedule;
-    } catch (e) {
-      logger.error('Error parsing schedule:', e);
-      return defaultSchedule;
-    }
-  });
+  useEffect(() => {
+    setCurrentSchedule(parseSchedule(campaignData.schedule));
+  }, [campaignData.schedule]);
 
   const utcToLocal = (utcTime: string) => {
     if (!utcTime) return "";
@@ -315,7 +352,7 @@ export default function SelectDates({
               handleTimeChange={handleTimeChange}
             />
             <div className="flex justify-end">
-              <Button onClick={handleSave}>Save Calling Hours</Button>
+              <Button onClick={handleSave}>Apply Calling Hours</Button>
             </div>
           </div>
         )}

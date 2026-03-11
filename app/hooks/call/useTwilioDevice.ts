@@ -1,23 +1,21 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from './useCallDuration';
 import { useTwilioConnection } from './useTwilioConnection';
 import { useCallHandling } from './useCallHandling';
 
-// Types
-type Device = any;
-type Call = any;
-
-// Lazy load Twilio SDK only on client side
+// The Voice SDK touches browser globals during module evaluation, so keep this
+// lazy client-only require instead of moving it to the import block.
 const getTwilioSDK = () => {
   if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const SDK = require('@twilio/voice-sdk');
   return { Device: SDK.Device, Call: SDK.Call };
 };
 
 interface CallConnectParams {
     To: string;
-    [key: string]: unknown;
+    [key: string]: string;
 }
 
 interface TwilioDeviceHook {

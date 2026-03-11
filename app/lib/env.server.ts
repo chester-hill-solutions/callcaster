@@ -18,6 +18,7 @@ type EnvConfig = {
   STRIPE_SECRET_KEY: string;
   RESEND_API_KEY: string;
   OPENAI_API_KEY?: string;
+  VERIFICATION_PHONE_NUMBER?: string;
 };
 
 const requiredEnvVars: (keyof EnvConfig)[] = [
@@ -62,22 +63,16 @@ function validateEnv(): void {
 /**
  * Gets an environment variable value
  * @param key - The environment variable key
- * @param defaultValue - Optional default value for optional variables
  * @returns The environment variable value
  * @throws Error if required variable is missing
  */
 function getEnv<K extends keyof EnvConfig>(
-  key: K,
-  defaultValue?: EnvConfig[K]
+  key: K
 ): EnvConfig[K] {
   const value = process.env[key] as EnvConfig[K] | undefined;
 
   if (value) {
     return value;
-  }
-
-  if (defaultValue !== undefined) {
-    return defaultValue;
   }
 
   if (optionalEnvVars.includes(key)) {
@@ -118,7 +113,8 @@ export const env = {
   BASE_URL: () => getEnv('BASE_URL'),
   STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
-  OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY', undefined),
+  OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY'),
+  VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
 } as const;
 
 /**

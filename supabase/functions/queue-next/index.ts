@@ -1,11 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
 
-
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const { campaign_id, owner } = await req.json()
     const supabase = createClient(
@@ -13,7 +12,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
     const { data, error } = await supabase.rpc("get_campaign_queue", {
-      campaign_id_pro: campaign_id
+      campaign_id_pro: campaign_id,
     });
     if (error || !data) throw error || "No queue found";
     if (!data.length) {
@@ -60,8 +59,8 @@ Deno.serve(async (req) => {
 
     await new Promise(resolve => setTimeout(resolve, 200));
     if (campaign.type === "robocall") {
-      await fetch(
-        `${baseUrl}/ivr-handler`,
+      const response = await fetch(
+        getFunctionUrl("ivr-handler"),
         {
           method: 'POST',
           headers: getFunctionHeaders(),
@@ -82,13 +81,22 @@ Deno.serve(async (req) => {
         }
       );
 
+      if (!response.ok) {
+        await supabase.rpc("handle_campaign_queue_entry", {
+          p_contact_id: contact.contact_id,
+          p_campaign_id: Number(campaign_id),
+          p_requeue: true,
+        });
+        throw new Error(`ivr-handler failed with status ${response.status}`);
+      }
+
       return new Response(
         JSON.stringify(data),
         { headers: { "Content-Type": "application/json" } },
       )
     } else if (campaign.type === "message") {
-      await fetch(
-        `${baseUrl}/sms-handler`,
+      const response = await fetch(
+        getFunctionUrl("sms-handler"),
         {
           method: 'POST',
           headers: getFunctionHeaders(),
@@ -107,6 +115,14 @@ Deno.serve(async (req) => {
           })
         }
       );
+      if (!response.ok) {
+        await supabase.rpc("handle_campaign_queue_entry", {
+          p_contact_id: contact.contact_id,
+          p_campaign_id: Number(campaign_id),
+          p_requeue: true,
+        });
+        throw new Error(`sms-handler failed with status ${response.status}`);
+      }
       return new Response(
         JSON.stringify(data),
         { headers: { "Content-Type": "application/json" } },
@@ -120,4 +136,8 @@ Deno.serve(async (req) => {
       { headers: { "Content-Type": "application/json" } }
     )
   }
-})
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

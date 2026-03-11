@@ -14,11 +14,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NavLink } from "@remix-run/react";
-import { Block, BlockOption, IVRBlock, IVROption, Page } from "@/lib/database.types";
+import { Block, BlockOption, IVRBlock, IVROption, Page } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MdDialpad } from "react-icons/md";
 
-type ResponseType = "speech" | "dtmf" | "dtmf-speech";
+type ScriptEditorBlock = Block | IVRBlock;
+type BlockDictionary = Record<string, ScriptEditorBlock>;
+type PageDictionary = Record<string, Page>;
+
+function isIVRBlock(block: ScriptEditorBlock): block is IVRBlock {
+  return "speechType" in block && "audioFile" in block && "responseType" in block;
+}
 
 const QuestionBlockOption = ({
   option,
@@ -35,8 +41,8 @@ const QuestionBlockOption = ({
   onRemove: (index:number) => void;
   onChange: (index: number, value:BlockOption | IVROption) => void;
   onNextChange: (index: number, value: string) => void;
-  pages: Page[];
-  blocks: Block[];
+  pages: PageDictionary;
+  blocks: BlockDictionary;
   type: "ivr" | "script";
 }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -106,13 +112,13 @@ const QuestionBlockOption = ({
               <SelectValue placeholder="Select next step" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(pages || {}).map(([pageId, page]) => (
+              {Object.entries(pages).map(([pageId, page]) => (
                 <SelectGroup key={pageId}>
                   <SelectLabel>{page.title}</SelectLabel>
                   <SelectItem value={pageId}>Go to {page.title}</SelectItem>
                   {page?.blocks?.map((blockId) => (
                     <SelectItem key={blockId} value={`${pageId}:${blockId}`}>
-                      {blocks[blockId].title || `Block ${blockId}`}
+                      {blocks[blockId]?.title || `Block ${blockId}`}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -146,30 +152,30 @@ const MergedQuestionBlock = ({
   setOpenBlock,
   onReorder,
 }: {
-  block: Block;
-  onUpdate: (state: Partial<Block>) => void;
+  block: ScriptEditorBlock;
+  onUpdate: (state: Partial<ScriptEditorBlock>) => void;
   onRemove: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  pages: Page[];
-  blocks: Block[];
+  pages: PageDictionary;
+  blocks: BlockDictionary;
   type: "script" | "ivr";
   mediaNames: string[];
-  openBlock: string | number;
-  setOpenBlock: (id: string | number | null) => void;
+  openBlock: string | null;
+  setOpenBlock: (id: string | null) => void;
   onReorder: (
     draggedId: string,
     targetId: string,
     dropPosition: "top" | "bottom",
   ) => void;
 }) => {
-  const [localBlock, setLocalBlock] = useState<Block | IVRBlock>(block);
+  const [localBlock, setLocalBlock] = useState<ScriptEditorBlock>(block);
   const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">("none");
   const questionTypes =
     type === "script"
       ? [
           { value: "textarea", label: "Text Input" },
-          { value: "infotext", label: "Static Text" },
+          { value: "textblock", label: "Static Text" },
           { value: "radio", label: "Radio" },
           { value: "dropdown", label: "Dropdown" },
           { value: "boolean", label: "Boolean" },
@@ -183,7 +189,7 @@ const MergedQuestionBlock = ({
   const responseTypes = [
     { value: "speech", label: "Speech Only (Best for recording messages)" },
     { value: "dtmf", label: "DTMF Only (Best for simple IVR)" },
-    { value: "dtmf-speech", label: "DTMF and Speech (Best for complex IVR)" },
+    { value: "dtmf speech", label: "DTMF and Speech (Best for complex IVR)" },
   ];
 
   useEffect(() => {
@@ -231,25 +237,33 @@ const MergedQuestionBlock = ({
   };
 
   const renderContentInput = () => {
-    if (type === "script" || (type === "ivr" && localBlock?.type === "synthetic")) {
+    if (type === "script") {
       return (
         <Textarea
-          value={localBlock.content || localBlock.audioFile}
-          onChange={(e) =>
-            handleChange(
-              type === "script" ? "content" : "audioFile",
-              e.target.value,
-            )
-          }
-          placeholder={
-            type === "script"
-              ? "Your script or question"
-              : "Your synthetic greeting"
-          }
+          value={localBlock.content}
+          onChange={(e) => handleChange("content", e.target.value)}
+          placeholder="Your script or question"
           className="min-h-[100px] bg-white"
         />
       );
-    } else if (localBlock?.type === "recorded") {
+    }
+
+    if (!isIVRBlock(localBlock)) {
+      return null;
+    }
+
+    if (localBlock.speechType === "synthetic") {
+      return (
+        <Textarea
+          value={localBlock.audioFile}
+          onChange={(e) => handleChange("audioFile", e.target.value)}
+          placeholder="Your synthetic greeting"
+          className="min-h-[100px] bg-white"
+        />
+      );
+    }
+
+    if (localBlock.speechType === "recorded") {
       return (
         <div className="flex gap-2">
           <Select
@@ -260,9 +274,11 @@ const MergedQuestionBlock = ({
               <SelectValue placeholder="Select an audio file" />
             </SelectTrigger>
             <SelectContent className="bg-white">
-              {mediaNames.filter((media) => !media.name.startsWith("voicemail-")).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).map((media) => (
-                <SelectItem key={media.id} value={media.name}>
-                  {media.name}
+              {mediaNames
+                .filter((mediaName) => !mediaName.startsWith("voicemail-"))
+                .map((mediaName) => (
+                <SelectItem key={mediaName} value={mediaName}>
+                  {mediaName}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -353,25 +369,43 @@ const MergedQuestionBlock = ({
                 placeholder="Block Title"
                 className="bg-white"
               />
-              <Select
-                value={localBlock?.type}
-                onValueChange={(value) => handleChange("type", value)}
-              >
-                <SelectTrigger className="bg-white">
-                  <SelectValue placeholder="Select block type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {questionTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {renderContentInput()}
-              {type === "ivr" && (
+              {type === "script" ? (
                 <Select
-                  defaultValue={localBlock?.responseType}
+                  value={localBlock.type}
+                  onValueChange={(value) => handleChange("type", value)}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select block type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {questionTypes.map((questionType) => (
+                      <SelectItem key={questionType.value} value={questionType.value}>
+                        {questionType.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : isIVRBlock(localBlock) ? (
+                <Select
+                  value={localBlock.speechType}
+                  onValueChange={(value) => handleChange("speechType", value)}
+                >
+                  <SelectTrigger className="bg-white">
+                    <SelectValue placeholder="Select block type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {questionTypes.map((questionType) => (
+                      <SelectItem key={questionType.value} value={questionType.value}>
+                        {questionType.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
+              {renderContentInput()}
+              {type === "ivr" && isIVRBlock(localBlock) && (
+                <Select
+                  defaultValue={localBlock.responseType ?? undefined}
                   onValueChange={(value) => handleChange("responseType", value)}
                 >
                   <SelectTrigger className="bg-white">
@@ -387,32 +421,32 @@ const MergedQuestionBlock = ({
                 </Select>
               )}
             </div>
-            {["radio", "dropdown", "multi", "synthetic", "recorded"].includes(
-              localBlock?.type,
-            ) && (
+            {((type === "script" &&
+              ["radio", "dropdown", "multi"].includes(localBlock.type)) ||
+              type === "ivr") && (
               <div className="mt-4">
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Options</h3>
-                    {(!type || type === "script" || (type === "ivr" && localBlock?.responseType && localBlock.responseType !== "speech")) && (
+                    {(type === "script" || (type === "ivr" && isIVRBlock(localBlock) && localBlock.responseType && localBlock.responseType !== "speech")) && (
                       <Button variant="outline" size="sm" className="border-primary" onClick={handleAddOption}>
                         <Plus className="mr-2 h-4 w-4" />
                         Add Option
                       </Button>
                     )}
                   </div>
-                  {type === "ivr" && !localBlock?.responseType && (
+                  {type === "ivr" && isIVRBlock(localBlock) && !localBlock.responseType && (
                     <p className="text-sm text-muted-foreground">Please select a response type first</p>
                   )}
-                  {type === "ivr" && localBlock?.responseType === "speech" && (
+                  {type === "ivr" && isIVRBlock(localBlock) && localBlock.responseType === "speech" && (
                     <p className="text-sm text-muted-foreground">Speech response type does not support options - will record response and continue to next block</p>
                   )}
-                  {(!type || type === "script" || (type === "ivr" && localBlock?.responseType && localBlock.responseType !== "speech")) && (
+                  {(type === "script" || (type === "ivr" && isIVRBlock(localBlock) && localBlock.responseType && localBlock.responseType !== "speech")) && (
                     <>
                       {localBlock.options?.length === 0 && (
                         <p className="text-sm text-muted-foreground">No options added - will continue to next block</p>
                       )}
-                      {localBlock.options?.map((option, index) => (
+                      {localBlock.options?.map((option: BlockOption | IVROption, index: number) => (
                         <QuestionBlockOption
                           key={index}
                           option={option}

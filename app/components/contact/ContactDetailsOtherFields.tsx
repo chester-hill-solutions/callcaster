@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
-import { TextInput } from "@/components/forms/Inputs";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import { FaPlus, FaTrash } from "react-icons/fa";
 import type { Json } from "@/lib/database.types";
 import { logger } from "@/lib/logger.client";
@@ -86,6 +87,9 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
             const keys = Object.keys(item);
             if (keys.length > 0) {
               const key = keys[0];
+              if (!key) {
+                return null;
+              }
               const value = item[key];
               return {
                 key,
@@ -110,13 +114,14 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
       <div className="space-y-3">
         {getOtherDataItems().map(({ key, value, index }) => (
           <div key={index} className="flex items-end space-x-2">
-            <TextInput
-              label={key}
-              value={value}
-              onChange={(e) => handleOtherDataChange(index, key, e.target.value)}
-              disabled={!editMode}
-              className="flex-grow"
-            />
+            <FormField htmlFor={`other-data-${index}`} label={key} className="flex-grow">
+              <Input
+                id={`other-data-${index}`}
+                value={value}
+                onChange={(e) => handleOtherDataChange(index, key, e.target.value)}
+                disabled={!editMode}
+              />
+            </FormField>
             {editMode && (
               <Button
                 onClick={() => removeOtherData(index)}
@@ -135,20 +140,22 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
         <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
           <h4 className="mb-3 text-sm font-medium text-gray-700">Add New Field</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <TextInput
-              label="Field Name"
-              value={newKey}
-              onChange={(e) => setNewKey(e.target.value)}
-              placeholder="Enter field name"
-              className="w-full"
-            />
-            <TextInput
-              label="Field Value"
-              value={newValue}
-              onChange={(e) => setNewValue(e.target.value)}
-              placeholder="Enter field value"
-              className="w-full"
-            />
+            <FormField htmlFor="new-other-data-key" label="Field Name">
+              <Input
+                id="new-other-data-key"
+                value={newKey}
+                onChange={(e) => setNewKey(e.target.value)}
+                placeholder="Enter field name"
+              />
+            </FormField>
+            <FormField htmlFor="new-other-data-value" label="Field Value">
+              <Input
+                id="new-other-data-value"
+                value={newValue}
+                onChange={(e) => setNewValue(e.target.value)}
+                placeholder="Enter field value"
+              />
+            </FormField>
           </div>
           <div className="mt-3">
             <Button

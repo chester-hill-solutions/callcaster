@@ -2,9 +2,10 @@ import { createClient } from "@supabase/supabase-js";
 import { json } from "@remix-run/node";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import type { Database, Tables } from "@/lib/database.types";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { env } from "@/lib/env.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import {
   normalizeProviderStatus,
@@ -39,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const { data: dbCall, error: callError } = await serviceSupabase
     .from("call")
-    .select("id, sid, workspace, outreach_attempt_id, status")
+    .select("sid, workspace, outreach_attempt_id, status")
     .eq("sid", callSid)
     .single();
 
@@ -55,20 +56,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     );
   }
 
-  const { data: membership } = await userSupabase
-    .from("workspace")
-    .select("id")
-    .eq("id", workspaceId)
-    .maybeSingle();
-
-  if (!membership) {
-    return json(
-      { error: "Workspace access denied" },
-      { status: 403, headers }
-    );
-  }
-
   try {
+    await requireWorkspaceAccess({
+      supabaseClient: userSupabase,
+      user,
+      workspaceId,
+    });
+
     const twilio = await createWorkspaceTwilioInstance({
       supabase: serviceSupabase,
       workspace_id: dbCall.workspace,
@@ -131,9 +125,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return json({ status: normalizedStatus }, { headers });
   } catch (err) {
     logger.error("Error polling call status", err);
-    return json(
-      { error: err instanceof Error ? err.message : "Failed to fetch call status" },
-      { status: 500, headers }
-    );
+    return createErrorResponse(err, "Failed to fetch call status", 500, { headers });
   }
 };

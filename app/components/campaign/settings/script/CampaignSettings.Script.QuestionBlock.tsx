@@ -42,12 +42,13 @@ const QuestionHeader = ({
           <ArrowDown />
         </button>
       </div>
-      <div
-        className="flex min-h-10 flex-auto items-center"
+      <button
+        type="button"
+        className="flex min-h-10 flex-auto items-center text-left"
         onClick={() => onClick(isOpen ? null : questionId)}
       >
         <h3 className="font-Zilla-Slab text-xl">{title || String(questionId)}</h3>
-      </div>
+      </button>
     </div>
     <button
       onClick={() => removeQuestion(questionId)}

@@ -63,7 +63,7 @@ const handleBlock = async (supabase: any, twiml: any, block: Block, dbCall: Call
     }
 
     if (options && options.length > 0) {
-        let gather = twiml.gather({
+        const gather = twiml.gather({
             action: `/api/ivr/${campaign_id}/${pageId}/${blockId}/${outreach_attempt_id}`,
             input: 'dtmf speech',
             speechTimeout: 'auto',

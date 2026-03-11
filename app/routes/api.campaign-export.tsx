@@ -3,6 +3,8 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
+import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, escapeCsvCell } from "@/lib/csv";
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);
@@ -33,7 +35,7 @@ interface Contact {
   country?: string | null;
   created_by?: string | null;
   date_updated?: string | null;
-  other_data?: Record<string, unknown> | null;
+  other_data?: unknown;
 }
 
 interface ContactWithPhonePatterns extends Contact {
@@ -45,6 +47,7 @@ interface ContactWithPhonePatterns extends Contact {
 interface Message {
   id: string;
   body?: string;
+  campaign_id?: number | null;
   from?: string;
   to?: string;
   direction?: string;
@@ -165,39 +168,6 @@ const processMessageCampaignExport = async (
   };
 
   try {
-    // First verify the bucket exists
-    const { data: buckets, error: bucketError } = await supabaseClient.storage
-      .listBuckets();
-    
-    
-    if (bucketError) {
-      throw new Error(`Error listing buckets: ${bucketError.message}`);
-    }
-
-    const campaignExportsBucket = buckets?.find(b => b.name === 'campaign-exports');
-    if (!campaignExportsBucket) {
-      // Create the bucket if it doesn't exist
-      const { error: createError } = await supabaseClient.storage
-        .createBucket('campaign-exports', { public: false });
-      
-      if (createError) {
-        throw new Error(`Error creating bucket: ${createError.message}`);
-      }
-    }
-
-    // Test write to ensure we have permissions
-    const testData = JSON.stringify({ test: true });
-    const { error: testError } = await supabaseClient.storage
-      .from('campaign-exports')
-      .upload(`${workspaceId}/test.json`, testData, {
-        contentType: "application/json",
-        upsert: true
-      });
-
-    if (testError) {
-      throw new Error(`Error testing write access: ${testError.message}`);
-    }
-
     // Create initial status file
     const { error: statusError } = await supabaseClient.storage
       .from("campaign-exports")
@@ -215,6 +185,7 @@ const processMessageCampaignExport = async (
       .from('campaign')
       .select('id, title, start_date, end_date')
       .eq('id', campaignId)
+      .eq('workspace', workspaceId)
       .single();
 
     if (campaignError || !campaignData) {
@@ -239,8 +210,11 @@ const processMessageCampaignExport = async (
       throw new Error("No contacts found in campaign");
     }
 
-    // Initialize CSV data with headers
-    let csvData = 'body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date\n';
+    // Initialize CSV lines with headers (store as lines to avoid O(n^2) string concatenation).
+    const csvLines: string[] = [];
+    csvLines.push(
+      "body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date",
+    );
 
     // Get contact details in batches
     const CONTACT_BATCH_SIZE = 100;
@@ -289,6 +263,19 @@ const processMessageCampaignExport = async (
       };
     });
 
+    // Build a fast lookup for phone -> contact to avoid O(N*M) scans.
+    const phoneToContact = new Map<string, ContactWithPhonePatterns>();
+    for (const c of contactPhonePatterns) {
+      const candidates = [
+        c.cleanPhone,
+        c.cleanPhoneNoCountry,
+        c.cleanPhoneWithCountry,
+      ].filter((v) => typeof v === "string" && v.length > 0);
+      for (const p of candidates) {
+        if (!phoneToContact.has(p)) phoneToContact.set(p, c);
+      }
+    }
+
     // Get messages in small chunks
     const extendedEndDate = new Date();
     if (campaign.end_date) {
@@ -300,11 +287,13 @@ const processMessageCampaignExport = async (
     let totalMessages = 0;
     let processedMessages = 0;
 
-    // First, get a count of messages in the date range
+    // Count only messages recorded against this campaign to avoid leaking
+    // unrelated workspace conversations that happen to share a phone number.
     const { count: messageCount, error: countError } = await supabaseClient
       .from('message')
       .select('*', { count: 'exact', head: true })
       .eq('workspace', workspaceId)
+      .eq('campaign_id', campaignId)
       .gte('date_created', campaign.start_date)
       .lte('date_created', extendedEndDate.toISOString());
 
@@ -321,6 +310,7 @@ const processMessageCampaignExport = async (
         .from('message')
         .select('*')
         .eq('workspace', workspaceId)
+        .eq('campaign_id', campaignId)
         .gte('date_created', campaign.start_date)
         .lte('date_created', extendedEndDate.toISOString())
         .order('date_created', { ascending: true })
@@ -341,15 +331,8 @@ const processMessageCampaignExport = async (
         const cleanFrom = (message.from || '').replace(/[^0-9]/g, '');
         const cleanTo = (message.to || '').replace(/[^0-9]/g, '');
 
-        // Find matching contact
-        const matchingContact = contactPhonePatterns.find(contact =>
-          contact.cleanPhone === cleanFrom ||
-          contact.cleanPhone === cleanTo ||
-          contact.cleanPhoneNoCountry === cleanFrom ||
-          contact.cleanPhoneNoCountry === cleanTo ||
-          contact.cleanPhoneWithCountry === cleanFrom ||
-          contact.cleanPhoneWithCountry === cleanTo
-        );
+        const matchingContact =
+          phoneToContact.get(cleanFrom) || phoneToContact.get(cleanTo);
 
         if (matchingContact) {
           matchedMessages.push({
@@ -363,32 +346,32 @@ const processMessageCampaignExport = async (
       // Add matched messages to CSV data
       if (matchedMessages.length > 0) {
         for (const item of matchedMessages) {
-          csvData += [
-            escapeCsvField(item.body || ''),
-            escapeCsvField(item.direction || ''),
-            escapeCsvField(item.status || ''),
-            escapeCsvField(item.message_date || ''),
-            escapeCsvField(item.contact.id || ''),
-            escapeCsvField(item.contact.firstname || ''),
-            escapeCsvField(item.contact.surname || ''),
-            escapeCsvField(item.contact.phone || ''),
-            escapeCsvField(item.contact.email || ''),
-            escapeCsvField(item.contact.address || ''),
-            escapeCsvField(item.contact.city || ''),
-            escapeCsvField(item.contact.opt_out ? 'true' : 'false'),
-            escapeCsvField(item.contact.created_at || ''),
-            escapeCsvField(item.contact.workspace || ''),
-            escapeCsvField(item.contact.external_id || ''),
-            escapeCsvField(item.contact.address_id || ''),
-            escapeCsvField(item.contact.postal || ''),
-            escapeCsvField(item.contact.carrier || ''),
-            escapeCsvField(item.contact.province || ''),
-            escapeCsvField(item.contact.country || ''),
-            escapeCsvField(item.contact.cleanPhone || ''),
-            escapeCsvField(campaign.title || ''),
-            escapeCsvField(campaign.start_date || ''),
-            escapeCsvField(campaign.end_date || '')
-          ].join(',') + '\n';
+          csvLines.push([
+            escapeExportCell(item.body),
+            escapeExportCell(item.direction),
+            escapeExportCell(item.status),
+            escapeExportCell(item.message_date),
+            escapeExportCell(item.contact.id),
+            escapeExportCell(item.contact.firstname),
+            escapeExportCell(item.contact.surname),
+            escapeExportCell(item.contact.phone),
+            escapeExportCell(item.contact.email),
+            escapeExportCell(item.contact.address),
+            escapeExportCell(item.contact.city),
+            escapeExportCell(item.contact.opt_out ? 'true' : 'false'),
+            escapeExportCell(item.contact.created_at),
+            escapeExportCell(item.contact.workspace),
+            escapeExportCell(item.contact.external_id),
+            escapeExportCell(item.contact.address_id),
+            escapeExportCell(item.contact.postal),
+            escapeExportCell(item.contact.carrier),
+            escapeExportCell(item.contact.province),
+            escapeExportCell(item.contact.country),
+            escapeExportCell(item.contact.cleanPhone),
+            escapeExportCell(campaign.title),
+            escapeExportCell(campaign.start_date),
+            escapeExportCell(campaign.end_date)
+          ].join(','));
         }
       }
 
@@ -411,6 +394,8 @@ const processMessageCampaignExport = async (
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+
+    const csvData = `${CSV_UTF8_BOM}${csvLines.join(CSV_DEFAULT_LINE_ENDING)}${CSV_DEFAULT_LINE_ENDING}`;
 
     // Upload the final CSV file
     const { error: csvError } = await supabaseClient.storage
@@ -507,8 +492,8 @@ const processCallCampaignExport = async (
       throw new Error(`Error creating status file: ${statusError.message}`);
     }
 
-    // Initialize CSV data
-    let csvData = '';
+    // Initialize CSV lines (store as lines to avoid O(n^2) string concatenation).
+    const csvLines: string[] = [];
     let isFirstChunk = true;
 
     // First, get campaign info
@@ -516,6 +501,7 @@ const processCallCampaignExport = async (
       .from('campaign')
       .select('id, title, start_date, end_date, type, status')
       .eq('id', campaignId)
+      .eq('workspace', workspaceId)
       .single();
     if (campaignError || !campaignData) {
       throw new Error(campaignError?.message || "Campaign not found");
@@ -650,105 +636,102 @@ const processCallCampaignExport = async (
         };
       });
 
-      // Convert matched attempts to CSV
-      if (matchedAttempts.length > 0) {
-        // Add headers if first chunk
-        if (isFirstChunk) {
-          const baseHeaders = 'attempt_id,disposition,full_result,attempt_start,call_sid,duration_seconds,answered_by,call_start,call_end,contact_id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,postal,province,country,campaign_name,campaign_start_date,campaign_end_date,campaign_type,campaign_status,credits_used,pages';
-          
-          // Add a column for each script question
-          const questionColumns = scriptQuestions.map(q => escapeCsvField(q.title)).join(',');
-          
-          csvData = `${baseHeaders},${questionColumns}\n`;
-          isFirstChunk = false;
-        }
+      // Convert attempts to CSV
+      if (isFirstChunk) {
+        const baseHeaders =
+          "attempt_id,disposition,full_result,attempt_start,call_sid,duration_seconds,answered_by,call_start,call_end,contact_id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,postal,province,country,campaign_name,campaign_start_date,campaign_end_date,campaign_type,campaign_status,credits_used,pages";
 
-        // Add data rows
-        for (const item of matchedAttempts) {
-          const durationSeconds = item.call.duration ? parseInt(item.call.duration) : 0;
-          const creditsUsed = Math.max(1, Math.ceil(durationSeconds / 60));
+        // Add a column for each script question
+        const questionColumns = scriptQuestions
+          .map((q) => escapeExportCell(q.title))
+          .join(",");
 
-          // Track visited pages and responses
-          const visitedPages = new Set<string>();
-          const responses: Record<string, string> = {};
+        csvLines.push(`${baseHeaders},${questionColumns}`);
+        isFirstChunk = false;
+      }
 
-          // Extract responses from the attempt result
-          if (item.result) {
-            try {
-              let resultObj: Record<string, unknown>;
-              
-              // Parse result if it's a string
-              if (typeof item.result === 'string') {
-                resultObj = JSON.parse(item.result) as Record<string, unknown>;
-              } else {
-                resultObj = item.result as Record<string, unknown>;
-              }
+      for (const item of matchedAttempts) {
+        const durationSeconds = item.call.duration ? parseInt(item.call.duration) : 0;
+        const creditsUsed = Math.max(1, Math.ceil(durationSeconds / 60));
 
-              Object.entries(resultObj).forEach(([pageId, pageData]) => {
-                if (typeof pageData === 'object' && pageData !== null) {
-                  visitedPages.add(pageId);
-                  
-                  // Extract responses directly from the page data
-                  Object.entries(pageData as Record<string, unknown>).forEach(([key, value]) => {
+        // Track visited pages and responses
+        const visitedPages = new Set<string>();
+        const responses: Record<string, string> = {};
+
+        // Extract responses from the attempt result
+        if (item.result) {
+          try {
+            let resultObj: Record<string, unknown>;
+
+            // Parse result if it's a string
+            if (typeof item.result === "string") {
+              resultObj = JSON.parse(item.result) as Record<string, unknown>;
+            } else {
+              resultObj = item.result as Record<string, unknown>;
+            }
+
+            Object.entries(resultObj).forEach(([pageId, pageData]) => {
+              if (typeof pageData === "object" && pageData !== null) {
+                visitedPages.add(pageId);
+
+                // Extract responses directly from the page data
+                Object.entries(pageData as Record<string, unknown>).forEach(
+                  ([key, value]) => {
                     // Store response by the key directly - we'll match with script questions later
                     responses[key] = String(value);
-                   
-                  });
-                }
-              });
-
-            } catch (e) {
-              logger.error('Error parsing result:', e, 'Raw result:', item.result);
-            }
+                  },
+                );
+              }
+            });
+          } catch (e) {
+            logger.error("Error parsing result:", e, "Raw result:", item.result);
           }
-
-          // Format pages data
-          const pageResponses = pages
-            .filter(page => visitedPages.has(page.id))
-            .map(page => page.title)
-            .join('|');
-
-          const baseData = [
-            escapeCsvField(item.id || ''),
-            escapeCsvField(item.disposition || item.call.status || ''),
-            escapeCsvField(JSON.stringify(item.result) || ''),
-            escapeCsvField(item.created_at || ''),
-            escapeCsvField(item.call.sid || ''),
-            escapeCsvField(durationSeconds.toString()),
-            escapeCsvField(item.call.answered_by || ''),
-            escapeCsvField(item.call.start_time || item.call.date_created || ''),
-            escapeCsvField(item.call.end_time || item.call.date_updated || ''),
-            escapeCsvField(item.contact.id || ''),
-            escapeCsvField(item.contact.firstname || ''),
-            escapeCsvField(item.contact.surname || ''),
-            escapeCsvField(item.contact.phone || ''),
-            escapeCsvField(item.contact.email || ''),
-            escapeCsvField(item.contact.address || ''),
-            escapeCsvField(item.contact.city || ''),
-            escapeCsvField(item.contact.opt_out ? 'true' : 'false'),
-            escapeCsvField(item.contact.created_at || ''),
-            escapeCsvField(item.contact.workspace || ''),
-            escapeCsvField(item.contact.postal || ''),
-            escapeCsvField(item.contact.province || ''),
-            escapeCsvField(item.contact.country || ''),
-            escapeCsvField(campaign.title || ''),
-            escapeCsvField(campaign.start_date || ''),
-            escapeCsvField(campaign.end_date || ''),
-            escapeCsvField(campaign.type || ''),
-            escapeCsvField(campaign.status || ''),
-            escapeCsvField(creditsUsed.toString()),
-            escapeCsvField(pageResponses)
-          ];
-
-          // Add a column for each script question's response
-          const questionResponses = scriptQuestions.map(q => {
-            // Look for response by the question's title/name instead of block ID
-            const response = responses[q.id] || '';
-            return escapeCsvField(response);
-          });
-
-          csvData += [...baseData, ...questionResponses].join(',') + '\n';
         }
+
+        // Format pages data
+        const pageResponses = pages
+          .filter((page) => visitedPages.has(page.id))
+          .map((page) => page.title)
+          .join("|");
+
+        const baseData = [
+          escapeExportCell(item.id),
+          escapeExportCell(item.disposition || item.call.status || ""),
+          escapeExportCell(JSON.stringify(item.result)),
+          escapeExportCell(item.created_at),
+          escapeExportCell(item.call.sid),
+          escapeExportCell(durationSeconds.toString()),
+          escapeExportCell(item.call.answered_by),
+          escapeExportCell(item.call.start_time || item.call.date_created || ""),
+          escapeExportCell(item.call.end_time || item.call.date_updated || ""),
+          escapeExportCell(item.contact.id),
+          escapeExportCell(item.contact.firstname),
+          escapeExportCell(item.contact.surname),
+          escapeExportCell(item.contact.phone),
+          escapeExportCell(item.contact.email),
+          escapeExportCell(item.contact.address),
+          escapeExportCell(item.contact.city),
+          escapeExportCell(item.contact.opt_out ? "true" : "false"),
+          escapeExportCell(item.contact.created_at),
+          escapeExportCell(item.contact.workspace),
+          escapeExportCell(item.contact.postal),
+          escapeExportCell(item.contact.province),
+          escapeExportCell(item.contact.country),
+          escapeExportCell(campaign.title),
+          escapeExportCell(campaign.start_date),
+          escapeExportCell(campaign.end_date),
+          escapeExportCell(campaign.type),
+          escapeExportCell(campaign.status),
+          escapeExportCell(creditsUsed.toString()),
+          escapeExportCell(pageResponses),
+        ];
+
+        // Add a column for each script question's response
+        const questionResponses = scriptQuestions.map((q) =>
+          escapeExportCell(responses[q.id]),
+        );
+
+        csvLines.push([...baseData, ...questionResponses].join(","));
       }
 
       processedAttempts += attempts.length;
@@ -768,6 +751,8 @@ const processCallCampaignExport = async (
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 500));
     }
+
+    const csvData = `${CSV_UTF8_BOM}${csvLines.join(CSV_DEFAULT_LINE_ENDING)}${CSV_DEFAULT_LINE_ENDING}`;
 
     // Upload the final CSV file
     const { error: csvError } = await supabaseClient.storage
@@ -821,20 +806,8 @@ const processCallCampaignExport = async (
   }
 };
 
-// Helper function to escape CSV fields
-const escapeCsvField = (value: unknown): string => {
-  if (value === null || value === undefined) return '';
-
-  const stringValue = String(value);
-
-  // If the value contains a comma, newline, or double quote, enclose it in double quotes
-  if (stringValue.includes(',') || stringValue.includes('\n') || stringValue.includes('"')) {
-    // Replace double quotes with two double quotes
-    return `"${stringValue.replace(/"/g, '""')}"`;
-  }
-
-  return stringValue;
-};
+const escapeExportCell = (value: unknown): string =>
+  escapeCsvCell(value as any, { protectFromInjection: true });
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
@@ -851,68 +824,45 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return new Response("Missing required parameters", { status: 400 });
     }
 
-    // First verify the bucket exists
-    const { data: buckets, error: bucketError } = await supabaseClient.storage
-      .listBuckets();
-    
-    if (bucketError) {
-      throw new Error(`Error listing buckets: ${bucketError.message}`);
-    }
+    // Defense-in-depth: ensure caller has access to the workspace they request.
+    await requireWorkspaceAccess({
+      supabaseClient,
+      user,
+      workspaceId: workspaceId.toString(),
+    });
 
-    const campaignExportsBucket = buckets?.find(b => b.name === 'campaign-exports');
-    if (!campaignExportsBucket) {
-      // Create the bucket if it doesn't exist
-      const { error: createError } = await supabaseClient.storage
-        .createBucket('campaign-exports', { public: false });
-      
-      if (createError) {
-        throw new Error(`Error creating bucket: ${createError.message}`);
-      }
-    }
-
-    // Test write to ensure we have permissions
-    const testData = JSON.stringify({ test: true });
-    const { error: testError } = await supabaseClient.storage
-      .from('campaign-exports')
-      .upload(`${workspaceId}/test.json`, testData, {
-        contentType: "application/json",
-        upsert: true
-      });
-
-    if (testError) {
-      throw new Error(`Error testing write access: ${testError.message}`);
-    }
-
-    // Get campaign type
-    const { data: campaignData, error: campaignError } = await supabaseClient
-      .from('campaign')
-      .select('type, title')
-      .eq('id', Number(campaignId))
+    // Ensure the campaign belongs to the workspace.
+    const { data: campaignRow, error: campaignRowError } = await supabaseClient
+      .from("campaign")
+      .select("id, type, title, workspace")
+      .eq("id", Number(campaignId))
       .single();
-
-    if (campaignError || !campaignData) {
-      return new Response(campaignError?.message || "Campaign not found", { status: 404 });
+    if (campaignRowError || !campaignRow) {
+      return new Response("Campaign not found", { status: 404 });
+    }
+    if (campaignRow.workspace !== workspaceId.toString()) {
+      return new Response("Forbidden", { status: 403 });
     }
 
     // Generate a unique ID for this export
     const exportId = generateUniqueId();
 
     // Start the export process asynchronously based on campaign type
-    if (campaignData.type === "message") {
+    if (campaignRow.type === "message") {
       processMessageCampaignExport(
         supabaseClient,
         Number(campaignId),
         workspaceId.toString(),
         exportId,
-        campaignData.title || ''
+        campaignRow.title || ''
       );
-    } else if (campaignData.type === "live_call" || campaignData.type === "robocall") {
+    } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
       processCallCampaignExport(
         supabaseClient,
         Number(campaignId),
         workspaceId.toString(),
         exportId,
-        campaignData.title || ''
+        campaignRow.title || ''
       );
     } else {
       return new Response("Invalid campaign type", { status: 400 });

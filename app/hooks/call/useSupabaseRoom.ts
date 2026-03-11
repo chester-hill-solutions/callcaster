@@ -81,6 +81,7 @@ const useSupabaseRoom = ({
     });
     const channelRef = useRef<ReturnType<SupabaseClient<Database>['channel']> | null>(null);
     const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const statusRef = useRef<'offline' | 'online' | 'error'>('offline');
 
     const updatePresence = useCallback(async (newStatus: 'online' | 'offline') => {
         if (!campaign) return;
@@ -124,8 +125,15 @@ const useSupabaseRoom = ({
     }, [supabase, workspace, campaign, userId]);
 
     useEffect(() => {
-        const roomName = `${userId}`;
+        statusRef.current = status;
+    }, [status]);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const roomName = `${workspace}:${campaign ?? "no-campaign"}:${userId}`;
         const room = supabase.channel(roomName);
+        const realtimeRoom = room as any;
         channelRef.current = room;
 
         const handleConnect = () => {
@@ -140,13 +148,13 @@ const useSupabaseRoom = ({
             updatePresence('offline');
         };
 
-        room.on('connect', handleConnect)
+        realtimeRoom.on('connect', handleConnect)
             .on('disconnect', handleDisconnect)
             .on('error', (error: Error) => {
                 setStatus('error');
                 logger.error(`Error in ${roomName}:`, error);
             })
-            .on('broadcast', { event: 'message' }, (e) => {
+            .on('broadcast', { event: 'message' }, (e: { payload?: unknown }) => {
                 try {
                     if (!e || !e.payload) {
                         logger.warn('Invalid broadcast payload received');
@@ -165,14 +173,14 @@ const useSupabaseRoom = ({
                         setUsers([]);
                         return;
                     }
-                    const usersArray: PresenceUser[] = Object.values(state).flat() as PresenceUser[];
+                    const usersArray = Object.values(state).flat() as unknown as PresenceUser[];
                     setUsers(usersArray);
                 } catch (error) {
                     logger.error('Error handling presence sync:', error);
                     setUsers([]);
                 }
             })
-            .subscribe((status) => {
+            .subscribe((status: string) => {
                 if (status === 'SUBSCRIBED') {
                     logger.debug(`Successfully subscribed to ${roomName}`);
                 } else if (status === 'CHANNEL_ERROR') {
@@ -188,8 +196,8 @@ const useSupabaseRoom = ({
             });
 
         presenceIntervalRef.current = setInterval(() => {
-            if (status === 'online') {
-                updatePresence('online');
+            if (statusRef.current === 'online') {
+                void updatePresence('online');
             }
         }, PRESENCE_UPDATE_INTERVAL);
 
@@ -202,9 +210,11 @@ const useSupabaseRoom = ({
                 supabase.removeChannel(channelRef.current);
                 channelRef.current = null;
             }
-            handleDisconnect();
+            if (statusRef.current === 'online') {
+                void updatePresence('offline');
+            }
         };
-    }, [supabase, userId, updatePresence, status]);
+    }, [campaign, supabase, updatePresence, userId, workspace]);
 
     return { status, users, predictiveState };
 };

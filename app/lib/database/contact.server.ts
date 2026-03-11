@@ -6,6 +6,16 @@ import type { Database } from "../database.types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
 
+function dedupeContactsById(contacts: Contact[]): Contact[] {
+  return Array.from(
+    new Map(
+      contacts
+        .filter((contact): contact is Contact => Boolean(contact?.id))
+        .map((contact) => [contact.id, contact]),
+    ).values(),
+  );
+}
+
 export const findPotentialContacts = async (
   supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
@@ -47,12 +57,12 @@ export const findPotentialContacts = async (
 export async function fetchContactData(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
-  contact_id: number | string,
+  contact_id: number | string | null | undefined,
   contact_number: string,
 ) {
-  let potentialContacts = [];
-  let contact = null;
-  let contactError = null;
+  const potentialContacts: Contact[] = [];
+  let contact: Contact | null = null;
+  let contactError: unknown = null;
 
   if (contact_number && !contact_id) {
     const { data: contacts } = await findPotentialContacts(
@@ -60,7 +70,13 @@ export async function fetchContactData(
       contact_number,
       workspaceId,
     );
-    potentialContacts.push(...(contacts || []));
+    const dedupedContacts = dedupeContactsById((contacts || []) as Contact[]);
+
+    if (dedupedContacts.length === 1) {
+      contact = dedupedContacts[0] ?? null;
+    } else if (dedupedContacts.length > 1) {
+      potentialContacts.push(...dedupedContacts);
+    }
   }
 
   if (contact_id) {
@@ -68,7 +84,7 @@ export async function fetchContactData(
       .from("contact")
       .select()
       .eq("workspace", workspaceId)
-      .eq("id", contact_id)
+      .eq("id", Number(contact_id))
       .single();
 
     if (findContactError) {
@@ -88,14 +104,15 @@ export const updateContact = async (
   if (!data.id) {
     throw new Error("Contact ID is required");
   }
-  Object.keys(data).forEach(
-    (key) => data[key] === undefined && delete data[key],
-  );
-  delete data.audience_id;
+  const sanitizedData = Object.fromEntries(
+    Object.entries(data).filter(
+      ([key, value]) => key !== "audience_id" && value !== undefined,
+    ),
+  ) as Partial<Contact>;
 
   const { data: update, error } = await supabaseClient
     .from("contact")
-    .update(data)
+    .update(sanitizedData)
     .eq("id", data.id)
     .select();
 

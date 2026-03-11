@@ -7,7 +7,7 @@ import {
   useLoaderData,
 } from "@remix-run/react";
 import { useEffect, useState } from "react";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";

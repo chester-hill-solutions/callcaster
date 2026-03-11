@@ -6,6 +6,11 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"  
 // @deno-types="https://esm.sh/@supabase/supabase-js@2"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.6"
+import {
+  buildContactsFromRecords,
+  decodeBase64ToString,
+  parseCsvRecords,
+} from "../_shared/audience-upload.ts";
 
 // Define the request body interface
 interface RequestBody {
@@ -18,151 +23,30 @@ interface RequestBody {
   splitNameColumn: string | null;
 }
 
-interface Contact {
-  workspace: string;
-  created_by: string;
-  created_at: string;
-  other_data: Array<Record<string, string>>;
-  firstname?: string;
-  surname?: string;
-  upload_id?: number;
-  [key: string]: unknown;
-}
-
-// Process CSV data with proper handling of quoted fields
-function parseCSV(csvString: string): Record<string, string>[] {
-  // Split the CSV into lines, handling potential line breaks within quoted fields
-  const lines: string[] = [];
-  let currentLine = '';
-  let insideQuotes = false;
-  
-  for (let i = 0; i < csvString.length; i++) {
-    const char = csvString[i];
-    const nextChar = csvString[i + 1];
-    
-    if (char === '"') {
-      // Handle escaped quotes (double quotes inside quoted fields)
-      if (nextChar === '"') {
-        currentLine += '"';
-        i++; // Skip the next quote
-      } else {
-        // Toggle quote state
-        insideQuotes = !insideQuotes;
-        currentLine += char;
-      }
-    } else if (char === '\n' && !insideQuotes) {
-      // End of line outside quotes
-      lines.push(currentLine);
-      currentLine = '';
-    } else if (char === '\r' && nextChar === '\n' && !insideQuotes) {
-      // Handle Windows line endings (CRLF)
-      lines.push(currentLine);
-      currentLine = '';
-      i++; // Skip the \n
-    } else {
-      // Regular character
-      currentLine += char;
-    }
-  }
-  
-  // Add the last line if not empty
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-  
-  // Parse the headers
-  const headerLine = lines[0];
-  const headers = parseCSVLine(headerLine);
-  
-  // Create a normalized header map for case-insensitive matching
-  const normalizedHeaderMap = new Map<string, string>();
-  headers.forEach(header => {
-    normalizedHeaderMap.set(header.trim().toLowerCase(), header);
-  });
-  
-  // Parse each data row
-  const records: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    
-    const values = parseCSVLine(lines[i]);
-    if (values.length !== headers.length) {
-      console.warn(`Line ${i+1} has ${values.length} fields, expected ${headers.length}`);
-      // Try to adjust by adding empty fields or truncating
-      while (values.length < headers.length) values.push('');
-      if (values.length > headers.length) values.length = headers.length;
-    }
-    
-    const record: Record<string, string> = {};
-    headers.forEach((header, index) => {
-      record[header.trim()] = values[index] ? values[index].trim() : '';
-    });
-    
-    records.push(record);
-  }
-  
-  return records;
-}
-
-// Parse a single CSV line, handling quoted fields correctly
-function parseCSVLine(line: string): string[] {
-  const result: string[] = [];
-  let currentField = '';
-  let insideQuotes = false;
-  
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    const nextChar = line[i + 1];
-    
-    if (char === '"') {
-      if (nextChar === '"') {
-        // Escaped quote
-        currentField += '"';
-        i++; // Skip the next quote
-      } else {
-        // Toggle quote state
-        insideQuotes = !insideQuotes;
-      }
-    } else if (char === ',' && !insideQuotes) {
-      // End of field
-      result.push(currentField);
-      currentField = '';
-    } else {
-      // Regular character
-      currentField += char;
-    }
-  }
-  
-  // Add the last field
-  result.push(currentField);
-  
-  // Clean up quotes at the beginning and end of fields
-  return result.map(field => {
-    field = field.trim();
-    if (field.startsWith('"') && field.endsWith('"')) {
-      return field.substring(1, field.length - 1);
-    }
-    return field;
-  });
-}
-
-// Declare Deno namespace for TypeScript
-declare namespace Deno {
-  export interface Env {
-    get(key: string): string | undefined;
-  }
-  export const env: Env;
-}
-
-// Use Deno.serve directly without importing
-Deno.serve(async (req: Request) => {
+// Export handler so it can be tested without starting a server on import.
+export async function handleRequest(req: Request): Promise<Response> {
   // Clone the request to avoid consuming the body multiple times
   const reqClone = req.clone();
   let body: RequestBody | null = null;
+
+  const updateUploadOrThrow = async (
+    supabaseAdmin: ReturnType<typeof createClient>,
+    uploadId: number,
+    values: Record<string, unknown>,
+  ) => {
+    const { error } = await supabaseAdmin
+      .from("audience_upload")
+      .update(values)
+      .eq("id", uploadId);
+    if (error) {
+      throw new Error(`Failed to update audience_upload: ${error.message}`);
+    }
+  };
   
   try {
     // Get the request body
-    body = await reqClone.json() as RequestBody;
+    const requestBody = await reqClone.json() as RequestBody;
+    body = requestBody;
     
     // Create a Supabase client with service role key for admin access
     const supabaseAdmin = createClient(
@@ -170,82 +54,21 @@ Deno.serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
     );
     
-    // Decode the base64 file content
-    const fileContent = atob(body.fileContent);
-    
-    // Parse the CSV
-    const records = parseCSV(fileContent);
+    // Decode + parse CSV
+    const fileContent = decodeBase64ToString(body.fileContent);
+    const records = parseCsvRecords(fileContent);
     
     // Update upload with total contacts and set status to processing
-    await supabaseAdmin
-      .from("audience_upload")
-      .update({
+    await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
         status: "processing",
         total_contacts: records.length,
         processed_contacts: 0
-      })
-      .eq("id", body.uploadId);
+      });
     
     // Process all contacts
-    const processedContacts: Contact[] = records.map(row => {
-      const contact: Contact = {
-        workspace: body!.workspaceId,
-        created_by: body!.userId,
-        created_at: new Date().toISOString(),
-        other_data: [],
-        upload_id: body!.uploadId
-      };
-      
-      // Create a map of normalized CSV headers for case-insensitive matching
-      const normalizedRowHeaders = new Map<string, string>();
-      Object.keys(row).forEach(header => {
-        normalizedRowHeaders.set(header.trim().toLowerCase(), header);
-      });
-      
-      // Apply header mapping
-      Object.entries(body!.headerMapping).forEach(([originalHeader, mappedField]) => {
-        // Normalize the original header for case-insensitive matching
-        const normalizedOriginalHeader = originalHeader.trim().toLowerCase();
-        // Find the actual header in the CSV that matches (case-insensitive)
-        const actualHeader = normalizedRowHeaders.get(normalizedOriginalHeader);
-        // Get the value using the actual header if found, otherwise try the original
-        const value = actualHeader ? row[actualHeader] : row[originalHeader];
-        
-        if (body!.splitNameColumn && originalHeader === body!.splitNameColumn && mappedField === 'name') {
-          // Handle name splitting properly
-          const fullName = value || '';
-          
-          // Check if the name is in "Last, First" format
-          if (fullName.includes(',')) {
-            const [lastName, firstName] = fullName.split(',').map(part => part.trim());
-            contact.firstname = firstName;
-            contact.surname = lastName;
-          } else {
-            // Assume "First Last" format
-            const nameParts = fullName.split(' ');
-            if (nameParts.length > 1) {
-              const lastName = nameParts.pop() || '';
-              const firstName = nameParts.join(' ');
-              contact.firstname = firstName;
-              contact.surname = lastName;
-            } else {
-              // Just one word, assume it's a first name
-              contact.firstname = fullName;
-              contact.surname = '';
-            }
-          }
-        } else if (mappedField === 'other_data') {
-          // Store in other_data as JSON
-          contact.other_data.push({ 
-            [originalHeader]: value || '' 
-          });
-        } else {
-          // Regular field mapping
-          contact[mappedField] = value || '';
-        }
-      });
-      
-      return contact;
+    const processedContacts = buildContactsFromRecords({
+      body: requestBody,
+      records,
     });
     
     // Insert contacts in batches of 100
@@ -269,7 +92,7 @@ Deno.serve(async (req: Request) => {
       if (insertedContacts && insertedContacts.length > 0) {
         const audienceLinks = insertedContacts.map((contact: { id: number }) => ({
           contact_id: contact.id,
-          audience_id: body!.audienceId,
+          audience_id: requestBody.audienceId,
         }));
         
         const { error: linkError } = await supabaseAdmin
@@ -283,31 +106,28 @@ Deno.serve(async (req: Request) => {
       
       // Update processed count
       insertedCount += batch.length;
-      await supabaseAdmin
-        .from("audience_upload")
-        .update({
-          processed_contacts: insertedCount,
-          status: insertedCount >= records.length ? "completed" : "processing"
-        })
-        .eq("id", body.uploadId);
+      await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
+        processed_contacts: insertedCount,
+        status: insertedCount >= records.length ? "completed" : "processing"
+      });
     }
     
     // Final update to mark completion
-    await supabaseAdmin
-      .from("audience_upload")
-      .update({
+    await updateUploadOrThrow(supabaseAdmin, body.uploadId, {
         status: "completed",
         processed_at: new Date().toISOString()
-      })
-      .eq("id", body.uploadId);
+      });
     
     // Update the audience with the total contacts
-    await supabaseAdmin
+    const { error: audienceUpdateError } = await supabaseAdmin
       .from("audience")
       .update({
         total_contacts: insertedCount
       })
       .eq("id", body.audienceId);
+    if (audienceUpdateError) {
+      throw new Error(`Failed to update audience count: ${audienceUpdateError.message}`);
+    }
     
     return new Response(
       JSON.stringify({
@@ -328,13 +148,16 @@ Deno.serve(async (req: Request) => {
           Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
         );
         
-        await supabaseAdmin
+        const { error: uploadUpdateError } = await supabaseAdmin
           .from("audience_upload")
           .update({
             status: "error",
             error_message: error instanceof Error ? error.message : "Unknown error"
           })
           .eq("id", body.uploadId);
+        if (uploadUpdateError) {
+          throw uploadUpdateError;
+        }
       }
     } catch (updateError) {
       console.error("Failed to update upload status:", updateError);
@@ -351,13 +174,10 @@ Deno.serve(async (req: Request) => {
       }
     );
   }
-});
+}
 
-function sanitizeValue(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value).trim();
-  // Remove null bytes and other problematic characters
-  return str.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F\uFFFD]/g, '');
+if (import.meta.main) {
+  Deno.serve(handleRequest);
 }
 
 /* To invoke locally:

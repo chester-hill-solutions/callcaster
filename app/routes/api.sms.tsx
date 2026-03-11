@@ -2,55 +2,17 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getCampaignQueueById,
+  getWorkspaceTwilioPortalConfig,
+  requireWorkspaceAccess,
   safeParseJson,
 } from "../lib/database.server";
-import { processTemplateTags } from "@/lib/utils";
+import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-
-// Link shortening function using TinyURL API
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const shortenedUrl = await response.text();
-      return shortenedUrl;
-    }
-  } catch (error) {
-    logger.error('Error shortening URL:', error);
-  }
-  return url; // Return original URL if shortening fails
-}
-
-// Process URLs in text and shorten them
-async function processUrls(text: string): Promise<string> {
-  // Regex to match URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  
-  let processedText = text;
-  const urlMatches = text.match(urlRegex);
-  
-  if (urlMatches) {
-    for (const url of urlMatches) {
-      const shortenedUrl = await shortenUrl(url);
-      processedText = processedText.replace(url, shortenedUrl);
-    }
-  }
-  
-  return processedText;
-}
-
-const normalizePhoneNumber = (input: string): string => {
-  const cleaned = (input.replace(/[^0-9+]/g, ""))
-    .replace(/^\+?1?(\+|\d{10})$/, "+1$1")
-    .replace(/\+1\+/, "+1");
-
-  if (cleaned.length !== 12) { // +1 plus 10 digits
-    throw new Error("Invalid phone number length");
-  }
-
-  return cleaned;
-};
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { processUrls } from "@/lib/sms.server";
+import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 interface CampaignData {
   body_text: string;
@@ -86,6 +48,49 @@ interface SendMessageParams {
   contact_id: string | number;
   queue_id: number | string;
   user_id: string;
+  portalConfig: WorkspaceTwilioOpsConfig;
+  messageIntent?: TwilioMessageIntent | null;
+  messagingServiceSid?: string | null;
+}
+
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function resolveSmsRequest({
+  body,
+  to,
+  from,
+  media,
+  portalConfig,
+  messageIntent,
+  messagingServiceSid,
+}: {
+  body: string;
+  to: string;
+  from: string;
+  media: string[];
+  portalConfig: WorkspaceTwilioOpsConfig;
+  messageIntent?: TwilioMessageIntent | null;
+  messagingServiceSid?: string | null;
+}) {
+  const resolvedMessagingServiceSid =
+    messagingServiceSid ??
+    (portalConfig.sendMode === "messaging_service"
+      ? portalConfig.messagingServiceSid
+      : null);
+  const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+
+  return {
+    body,
+    to,
+    statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+    ...(media?.length && { mediaUrl: media }),
+    ...(resolvedMessagingServiceSid
+      ? { messagingServiceSid: resolvedMessagingServiceSid }
+      : { from }),
+    ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
+  };
 }
 
 const sendMessage = async ({
@@ -99,6 +104,9 @@ const sendMessage = async ({
   contact_id,
   queue_id,
   user_id,
+  portalConfig,
+  messageIntent,
+  messagingServiceSid,
 }: SendMessageParams) => {
   
   const twilio = await createWorkspaceTwilioInstance({
@@ -110,13 +118,19 @@ const sendMessage = async ({
   const processedBody = await processUrls(body);
 
   const [message, outreachAttempt] = await Promise.all([
-    twilio.messages.create({
-      body: processedBody,
-      to,
-      from,
-      statusCallback: `${env.BASE_URL()}/api/sms/status`,
-      ...(media?.length && { mediaUrl: media }),
-    }).catch(e => ({ error: e })),
+    twilio.messages
+      .create(
+        resolveSmsRequest({
+          body: processedBody,
+          to,
+          from,
+          media,
+          portalConfig,
+          messageIntent,
+          messagingServiceSid,
+        }),
+      )
+      .catch(e => ({ error: e })),
     createOutreachAttempt({
       supabase,
       contact_id,
@@ -168,12 +182,7 @@ const sendMessage = async ({
 
     supabase
       .from("campaign_queue")
-      .update({ 
-        status: "dequeued",
-        dequeued_by: user_id,
-        dequeued_at: new Date().toISOString(),
-        dequeued_reason: "SMS message sent"
-      })
+      .update(buildDequeuedQueueUpdate(user_id, "SMS message sent"))
       .eq("id", queue_id)
   ]);
 
@@ -225,20 +234,77 @@ const createOutreachAttempt = async ({
 };
 
 export const action = async ({ request }: { request: Request }) => {
+  const authResult = await verifyApiKeyOrSession(request);
+  if ("error" in authResult) {
+    return new Response(JSON.stringify({ error: authResult.error }), {
+      headers: { "Content-Type": "application/json" },
+      status: authResult.status,
+    });
+  }
+
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
 
   try {
-    const { campaign_id, workspace_id, caller_id, user_id } = await safeParseJson(request);
+    const {
+      campaign_id,
+      workspace_id,
+      caller_id,
+      message_intent,
+      messaging_service_sid,
+      user_id,
+    } = await safeParseJson<Record<string, unknown>>(request);
+    if (
+      typeof campaign_id !== "string" ||
+      typeof workspace_id !== "string" ||
+      typeof caller_id !== "string" ||
+      (authResult.authType === "api_key" && typeof user_id !== "string")
+    ) {
+      return new Response(JSON.stringify({ error: "Invalid SMS payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const effectiveUserId =
+      authResult.authType === "api_key" ? user_id : authResult.user.id;
+
+    const messageIntent =
+      typeof message_intent === "string" && message_intent.trim()
+        ? (message_intent.trim() as TwilioMessageIntent)
+        : null;
+    const messagingServiceSid = parseOptionalString(messaging_service_sid);
+
+    if (authResult.authType === "api_key") {
+      if (workspace_id !== authResult.workspaceId) {
+        return new Response(
+          JSON.stringify({ error: "workspace_id does not match API key" }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+    } else {
+      await requireWorkspaceAccess({
+        supabaseClient: authResult.supabaseClient,
+        user: authResult.user,
+        workspaceId: workspace_id,
+      });
+    }
     
-    const [campaign, audience] = await Promise.all([
+    const [campaign, audience, portalConfig] = await Promise.all([
       getCampaignData({ supabase, campaign_id }),
       getCampaignQueueById({
         supabaseClient: supabase,
         campaign_id,
-      })
+      }),
+      getWorkspaceTwilioPortalConfig({
+        supabaseClient: supabase,
+        workspaceId: workspace_id,
+      }),
     ]);
 
     const media = campaign.message_media?.length 
@@ -275,7 +341,10 @@ export const action = async ({ request }: { request: Request }) => {
             workspace: workspace_id,
             contact_id: member.contact_id,
             queue_id: member.id,
-            user_id,
+            user_id: effectiveUserId as string,
+            portalConfig,
+            messageIntent,
+            messagingServiceSid,
           }).then(
             result => ({ [member.contact_id]: { success: true, ...result }}),
             error => ({ [member.contact_id]: { success: false, error: error.message }})

@@ -1,10 +1,13 @@
 import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import { normalizePhoneNumber } from "@/lib/utils";
 
 interface WorkspaceData {
   key: string;
@@ -21,26 +24,8 @@ interface RequestBody {
   friendlyName: string;
 }
 
-function normalizePhoneNumber(input: string): string {
-  let cleaned = input.replace(/[^0-9+]/g, "");
-  if (cleaned.indexOf("+") > 0) {
-    cleaned = cleaned.replace(/\+/g, "");
-  }
-  if (!cleaned.startsWith("+")) {
-    cleaned = "+" + cleaned;
-  }
-  const validLength = 11;
-  const minLength = 11;
-  if (cleaned.length < minLength + 1) {
-    cleaned = "+1" + cleaned.replace("+", "");
-  }
-  if (cleaned.length !== validLength + 1) {
-    throw new Error("Invalid phone number length");
-  }
-  return cleaned;
-}
-
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   try {
     const supabase: SupabaseClient = createClient(
       env.SUPABASE_URL(),
@@ -48,6 +33,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
     const { phoneNumber, workspace_id, friendlyName }: RequestBody =
       await safeParseJson(request);
+
+    await requireWorkspaceAccess({
+      supabaseClient: userSupabase,
+      user,
+      workspaceId: workspace_id,
+    });
 
     const { data, error } = await supabase
       .from("workspace")
@@ -73,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       friendlyName,
       phoneNumber,
       statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
-    }).catch((error) => logger.error('Twilio validation request error:', error));
+    });
     const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
     const { data: numberRequest, error: numberError } = await supabase
@@ -90,6 +81,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             sms: false,
             voice: false,
             verification_status: 'pending',
+            emergency_address_status: 'not_started',
+            emergency_address_sid: null,
+            emergency_eligible: false,
+            emergency_compliance_status: 'not_started',
           },
         },
         {
@@ -106,6 +101,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return json({ validationRequest, numberRequest });
   } catch (error) {
     logger.error("Action error:", error);
-    return json({ error: (error as Error).message }, { status: 500 });
+    return createErrorResponse(error, "Failed to create caller ID");
   }
 };

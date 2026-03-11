@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect, Session } from "@remix-run/node";
+import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import {
   Await,
   Outlet,
@@ -6,23 +6,20 @@ import {
   useLoaderData,
   useLocation,
   useOutletContext,
+  useRevalidator,
 } from "@remix-run/react";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger as loggerServer } from "@/lib/logger.server";
 import { logger as loggerClient } from "@/lib/logger.client";
 
 import {
   fetchBasicResults,
-  fetchCampaignAudience,
-  fetchCampaignCounts,
   fetchCampaignData,
   fetchCampaignDetails,
-  fetchOutreachData,
   fetchQueueCounts,
   getUserRole,
   getWorkspaceUsers,
-  processOutreachExportData,
 } from "@/lib/database.server";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import {
@@ -35,10 +32,11 @@ import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScr
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
 import { downloadCsv } from "@/lib/csvDownload";
-import { generateCSVContent } from "@/lib/utils";
-import { Audience, Campaign, Contact, Flags, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "@/lib/types";
-import { SupabaseClient, User } from "@supabase/supabase-js";
+import { Audience, Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Schedule, WorkspaceData, WorkspaceNumbers } from "@/lib/types";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
+import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
 export type CampaignState = {
   campaign_id: string;
@@ -62,18 +60,21 @@ export type CampaignState = {
   details: LiveCampaign | MessageCampaign | IVRCampaign;
 };
 
-const getTable = (campaignType: string) => {
+type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
+
+const getTable = (campaignType: string | null | undefined): CampaignTable | null => {
   return campaignType === "live_call"
     ? "live_campaign"
     : campaignType === "message"
       ? "message_campaign"
-      : ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
+      : campaignType && ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
         ? "ivr_campaign"
-        : "";
-}
+        : null;
+};
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
+  const rpcClient = supabaseClient as SupabaseClient<any>;
   if (!user) {
     return redirect("/signin");
   }
@@ -87,7 +88,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
   }
   if (campaignType.data.type === "message") {
-    const { data, error } = await supabaseClient.rpc('get_campaign_messages', {
+    const { data, error } = await rpcClient.rpc('get_campaign_messages', {
       prop_campaign_id: Number(campaign_id),
       prop_workspace_id: workspace_id
     }).csv();
@@ -97,7 +98,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
     return json({ csvContent: data, filename: `outreach_results_${campaign_id}.csv` });
   } else if (campaignType.data.type === "live_call" || campaignType.data.type === "robocall") {
-    const { data, error } = await supabaseClient.rpc('get_campaign_attempts', {
+    const { data, error } = await rpcClient.rpc('get_campaign_attempts', {
       p_campaign_id: Number(campaign_id)
     }).csv();
     if (error || !data) {
@@ -128,7 +129,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     supabaseClient.from('campaign').select('type').eq('id', Number(selected_id)).single(),
     fetchQueueCounts(supabaseClient, selected_id),
     fetchCampaignData(supabaseClient, selected_id),
-    getUserRole({ supabaseClient, user: user as unknown as User, workspaceId: workspace_id }),
+    getUserRole({ supabaseClient, user, workspaceId: workspace_id }),
   ]);
   if (!campaignType || !campaignType.data) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -136,6 +137,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (workspace.error) throw workspace.error;
 
   const campaignTable = getTable(campaignType.data.type);
+  if (!campaignTable) {
+    return redirect(`/workspaces/${workspace_id}/campaigns`);
+  }
 
   const campaignDetails = await fetchCampaignDetails(
     supabaseClient,
@@ -172,7 +176,13 @@ export default function CampaignScreen() {
   const isCampaignParentRoute = route.length === 5;
   const revalidator = useRevalidator();
   const lastRevalidateRef = useRef(0);
-  const { data: campaignDetailsArray } = useRealtimeData(supabase, route[2], getTable(campaignData?.type || "live_call"), [initialCampaignDetails]);
+  const realtimeTable = getTable(campaignData?.type) ?? "live_campaign";
+  const workspaceRouteId = route[2] ?? "";
+  const safeQueueCounts = {
+    fullCount: queueCounts.fullCount ?? 0,
+    queuedCount: queueCounts.queuedCount ?? 0,
+  };
+  const { data: campaignDetailsArray } = useRealtimeData(supabase, workspaceRouteId, realtimeTable, [initialCampaignDetails]);
   const campaignDetails = campaignDetailsArray?.[0];
 
   useSupabaseRealtimeSubscription({
@@ -198,21 +208,18 @@ export default function CampaignScreen() {
     }
   }, [csvData]);
 
-  const joinDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
-    ? "No script selected"
-    : !campaignData?.caller_id
-      ? "No outbound phone number selected"
-      : campaignData?.status === "scheduled" ?
-        `Campaign scheduled.`
-        : !campaignData?.is_active
-          ? "It is currently outside of the Campaign's calling hours"
-          : null;
+  const readiness = getCampaignReadiness(campaignData, campaignDetails, {
+    queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,
+  });
+  const joinDisabled = readiness.startDisabledReason
+    ? readiness.startDisabledReason
+    : campaignData?.status === "scheduled"
+      ? "Campaign scheduled."
+      : !campaignData?.is_active
+        ? "It is currently outside of the campaign's calling hours"
+        : null;
 
-  const scheduleDisabled = (!campaignDetails?.script_id && !campaignDetails?.body_text)
-    ? "No script selected"
-    : !campaignData?.caller_id
-      ? "No outbound phone number selected"
-      : null;
+  const scheduleDisabled = readiness.scheduleDisabledReason;
   return (
     <div className="flex h-full w-full flex-col">
       <CampaignHeader title={campaignData?.title || ""} status={campaignData?.status || "pending"} isDesktop={false} />
@@ -229,6 +236,9 @@ export default function CampaignScreen() {
           <Await resolve={results} errorElement={<ErrorLoadingResults />}>
             {(resolvedResults) =>
               {
+                if (!campaignData) {
+                  return <ErrorLoadingResults />;
+                }
                 return resolvedResults.length < 1 ? (
                 <NoResultsYet />
               ) : (
@@ -236,7 +246,7 @@ export default function CampaignScreen() {
                   results={resolvedResults}
                   campaign={campaignData}
                   hasAccess={hasAccess}
-                  queueCounts={queueCounts}
+                  queueCounts={safeQueueCounts}
                 />
               )}
             }
@@ -245,11 +255,13 @@ export default function CampaignScreen() {
       )}
       {isCampaignParentRoute &&
         !hasAccess &&
-        (campaignData?.type === "live_call" || !campaignData?.type) && (
+        campaignData &&
+        (campaignData.type === "live_call" || !campaignData.type) && (
           <CampaignInstructions
-            campaignData={campaignData}
+            campaignData={campaignData as { [key: string]: unknown; instructions?: { join?: string; script?: string } }}
+            totalCalls={safeQueueCounts.queuedCount}
+            expectedTotal={safeQueueCounts.fullCount}
             joinDisabled={joinDisabled}
-            queueCounts={queueCounts}
           />
         )}
       <Outlet

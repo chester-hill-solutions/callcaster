@@ -1,6 +1,7 @@
 import React from 'react';
-import type { AppError } from './types';
-import { createAppError, safeString, safeNumber, safeBoolean, safeDate } from './type-utils';
+import type { AppError } from './type-safety-utils';
+import { createAppError } from './type-safety-utils';
+import { safeString, safeNumber, safeBoolean, safeDate } from './type-utils';
 
 // Type-safe validation rules
 export interface ValidationRule<T = unknown> {
@@ -61,8 +62,8 @@ export const ValidationRules = {
 
   phone: (fieldName: string): ValidationRule<string> => ({
     validate: (value: string) => {
-      const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-      return phoneRegex.test(value.replace(/[\s\-\(\)]/g, ''));
+      const phoneRegex = /^[+]?[1-9][\d]{0,15}$/;
+      return phoneRegex.test(value.replace(/[\s-()]/g, ''));
     },
     message: `${fieldName} must be a valid phone number`,
     code: 'INVALID_PHONE',
@@ -166,7 +167,7 @@ export class FormValidator {
     for (const rule of field.rules) {
       if (!rule.validate(value as typeof field.value)) {
         errors.push(
-          createAppError(rule.message, rule.code, { fieldName })
+          createAppError(rule.message, rule.code ?? 'VALIDATION_ERROR', { fieldName })
         );
       }
     }
@@ -220,13 +221,13 @@ export const FormSanitizers = {
   boolean: (value: unknown): boolean => safeBoolean(value),
   date: (value: unknown): Date | null => safeDate(value),
   email: (value: unknown): string => safeString(value).toLowerCase().trim(),
-  phone: (value: unknown): string => safeString(value).replace(/[\s\-\(\)]/g, ''),
+  phone: (value: unknown): string => safeString(value).replace(/[\s-()]/g, ''),
   url: (value: unknown): string => safeString(value).trim(),
 };
 
 // Type-safe form builder
 export class FormBuilder {
-  private fields: Record<string, FormFieldValidation> = {};
+  private fields: Record<string, FormFieldValidation<unknown>> = {};
   private customValidations: ((values: Record<string, unknown>) => AppError[])[] = [];
 
   // Add a string field
@@ -237,7 +238,7 @@ export class FormBuilder {
   ): this {
     this.fields[fieldName] = {
       value: '',
-      rules,
+      rules: rules as ValidationRule<unknown>[],
       required,
       fieldName,
     };
@@ -252,7 +253,7 @@ export class FormBuilder {
   ): this {
     this.fields[fieldName] = {
       value: 0,
-      rules,
+      rules: rules as ValidationRule<unknown>[],
       required,
       fieldName,
     };
@@ -267,7 +268,7 @@ export class FormBuilder {
   ): this {
     this.fields[fieldName] = {
       value: false,
-      rules,
+      rules: rules as ValidationRule<unknown>[],
       required,
       fieldName,
     };
@@ -282,7 +283,7 @@ export class FormBuilder {
   ): this {
     this.fields[fieldName] = {
       value: new Date(),
-      rules,
+      rules: rules as ValidationRule<unknown>[],
       required,
       fieldName,
     };

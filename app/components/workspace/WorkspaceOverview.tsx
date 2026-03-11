@@ -1,12 +1,24 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/lib/database.types";
+import type { getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
 
 type WorkspaceRecord = (Tables<"workspace"> & { campaign?: unknown[] }) | null;
 type WorkspaceUserRecord = (Tables<"workspace_users"> & { user?: Tables<"user"> | null })[] | null | undefined;
 type WorkspaceNumberRecord = Tables<"workspace_number">[] | null | undefined;
+type WorkspaceTwilioSnapshot = Awaited<ReturnType<typeof getWorkspaceTwilioPortalSnapshot>> | null | undefined;
 
-export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumbers }: { workspace: WorkspaceRecord; workspaceUsers: WorkspaceUserRecord; phoneNumbers: WorkspaceNumberRecord }) {
+export default function WorkspaceOverview({
+    workspace,
+    workspaceUsers,
+    phoneNumbers,
+    twilioSnapshot,
+}: {
+    workspace: WorkspaceRecord;
+    workspaceUsers: WorkspaceUserRecord;
+    phoneNumbers: WorkspaceNumberRecord;
+    twilioSnapshot?: WorkspaceTwilioSnapshot;
+}) {
     if (!workspace) {
         return null;
     }
@@ -14,9 +26,10 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
     const users = workspaceUsers ?? [];
     const numbers = phoneNumbers ?? [];
     const campaigns = Array.isArray(workspace.campaign) ? workspace.campaign : [];
+    const syncSnapshot = twilioSnapshot?.syncSnapshot;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Card>
                 <CardHeader>
                     <CardTitle>Workspace Details</CardTitle>
@@ -71,6 +84,55 @@ export default function WorkspaceOverview({ workspace, workspaceUsers, phoneNumb
                             <dt className="text-sm font-medium text-gray-500">Phone Numbers</dt>
                             <dd className="mt-1 text-sm">{numbers.length}</dd>
                         </div>
+                    </dl>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Twilio Sync</CardTitle>
+                    <CardDescription>Latest synced Twilio health for this workspace</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <dl className="space-y-4">
+                        <div className="flex flex-col">
+                            <dt className="text-sm font-medium text-gray-500">Sync Status</dt>
+                            <dd className="mt-1 text-sm">
+                                <Badge
+                                    variant={
+                                        syncSnapshot?.lastSyncStatus === "error"
+                                            ? "destructive"
+                                            : syncSnapshot?.lastSyncStatus === "healthy"
+                                                ? "secondary"
+                                                : "outline"
+                                    }
+                                >
+                                    {syncSnapshot?.lastSyncStatus || "never_synced"}
+                                </Badge>
+                            </dd>
+                        </div>
+                        <div className="flex flex-col">
+                            <dt className="text-sm font-medium text-gray-500">Account Status</dt>
+                            <dd className="mt-1 text-sm">{syncSnapshot?.accountStatus || "Unknown"}</dd>
+                        </div>
+                        <div className="flex flex-col">
+                            <dt className="text-sm font-medium text-gray-500">Last Synced</dt>
+                            <dd className="mt-1 text-sm">
+                                {syncSnapshot?.lastSyncedAt ? new Date(syncSnapshot.lastSyncedAt).toLocaleString() : "Never"}
+                            </dd>
+                        </div>
+                        <div className="flex flex-col">
+                            <dt className="text-sm font-medium text-gray-500">Number Types</dt>
+                            <dd className="mt-1 text-sm">
+                                {syncSnapshot?.numberTypes?.length ? syncSnapshot.numberTypes.join(", ") : "None detected"}
+                            </dd>
+                        </div>
+                        {syncSnapshot?.lastSyncError && (
+                            <div className="flex flex-col">
+                                <dt className="text-sm font-medium text-gray-500">Last Error</dt>
+                                <dd className="mt-1 text-sm text-red-600">{syncSnapshot.lastSyncError}</dd>
+                            </div>
+                        )}
                     </dl>
                 </CardContent>
             </Card>

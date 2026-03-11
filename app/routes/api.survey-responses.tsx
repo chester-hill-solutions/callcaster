@@ -4,6 +4,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505"
+  );
+}
+
+type SubmittedSurveyAnswer = {
+  question_id: string;
+  answer_value: string | string[];
+};
+
+type SubmittedSurveyResponse = {
+  result_id: string;
+  contact_id?: number | null;
+  completed?: boolean;
+  last_page_completed?: string | null;
+  answers?: SubmittedSurveyAnswer[];
+};
+
 export async function action({ request }: ActionFunctionArgs) {
   const { supabaseClient } = await verifyAuth(request);
   
@@ -24,9 +46,9 @@ async function handleSubmitResponse(
     if (!responseDataRaw) {
       return json({ error: "Response data is required" }, { status: 400 });
     }
-    let responseData: unknown;
+    let responseData: SubmittedSurveyResponse;
     try {
-      responseData = JSON.parse(responseDataRaw) as Record<string, unknown>;
+      responseData = JSON.parse(responseDataRaw) as SubmittedSurveyResponse;
     } catch {
       return json({ error: "Invalid response data format" }, { status: 400 });
     }
@@ -51,27 +73,53 @@ async function handleSubmitResponse(
       return json({ error: "Survey is not active" }, { status: 400 });
     }
 
-    // Create survey response
-    const { data: surveyResponse, error: responseError } = await supabaseClient
+    const nowIso = new Date().toISOString();
+
+    // Idempotent create: insert-first, fetch-on-duplicate.
+    let surveyResponse: { id: number } | null = null;
+    const { data: inserted, error: responseError } = await supabaseClient
       .from("survey_response")
       .insert({
         survey_id: survey.id,
         result_id: responseData.result_id,
-        contact_id: responseData.contact_id || null,
-        started_at: new Date().toISOString(),
-        completed_at: responseData.completed ? new Date().toISOString() : null,
-        last_page_completed: responseData.last_page_completed || null,
+        contact_id: responseData.contact_id ?? null,
+        started_at: nowIso,
+        completed_at: responseData.completed ? nowIso : null,
+        last_page_completed: responseData.last_page_completed ?? null,
       })
-      .select()
+      .select("id")
       .single();
 
     if (responseError) {
-      logger.error("Error creating survey response:", responseError);
-      return json({ error: "Failed to submit response" }, { status: 500 });
+      if (!isUniqueViolation(responseError)) {
+        logger.error("Error creating survey response:", responseError);
+        return json({ error: "Failed to submit response" }, { status: 500 });
+      }
+      const { data: existing, error: existingError } = await supabaseClient
+        .from("survey_response")
+        .select("id")
+        .eq("result_id", responseData.result_id)
+        .single();
+      if (existingError || !existing) {
+        logger.error("Error fetching existing survey response:", existingError);
+        return json({ error: "Failed to submit response" }, { status: 500 });
+      }
+      surveyResponse = existing;
+      // Update completion/progress fields deterministically.
+      await supabaseClient
+        .from("survey_response")
+        .update({
+          completed_at: responseData.completed ? nowIso : null,
+          last_page_completed: responseData.last_page_completed ?? null,
+          updated_at: nowIso,
+        })
+        .eq("id", existing.id);
+    } else {
+      surveyResponse = inserted;
     }
 
     // Create response answers
-    if (responseData.answers && responseData.answers.length > 0) {
+    if (responseData.answers && responseData.answers.length > 0 && surveyResponse) {
       // Get the page ID if last_page_completed is provided
       let pageId: number | null = null;
       if (responseData.last_page_completed) {
@@ -103,23 +151,35 @@ async function handleSubmitResponse(
           continue;
         }
 
-        // Create response answer
-        await supabaseClient
+        // Insert-first, update-on-duplicate to avoid duplicate answers under concurrency.
+        const answerValue = Array.isArray(answer.answer_value)
+          ? JSON.stringify(answer.answer_value)
+          : answer.answer_value;
+        const { error: answerInsertError } = await supabaseClient
           .from("response_answer")
           .insert({
             response_id: surveyResponse.id,
             question_id: question.id,
-            answer_value: Array.isArray(answer.answer_value) 
-              ? JSON.stringify(answer.answer_value) 
-              : answer.answer_value,
-            answered_at: new Date().toISOString(),
+            answer_value: answerValue,
+            answered_at: nowIso,
           });
+        if (answerInsertError) {
+          if (!isUniqueViolation(answerInsertError)) {
+            logger.error("Failed to insert response_answer:", answerInsertError);
+            continue;
+          }
+          await supabaseClient
+            .from("response_answer")
+            .update({ answer_value: answerValue, answered_at: nowIso })
+            .eq("response_id", surveyResponse.id)
+            .eq("question_id", question.id);
+        }
       }
     }
 
     return json({ 
       success: true, 
-      response_id: surveyResponse.id,
+      response_id: surveyResponse?.id,
       result_id: responseData.result_id 
     });
   } catch (error) {

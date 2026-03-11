@@ -1,22 +1,15 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/logger.client";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { MdVolumeOff, MdVolumeUp } from "react-icons/md";
-import DeviceSelector from "./AudioSelector";
+import AudioSelector from "./AudioSelector";
 
 interface OutputSelectorProps {
   device: Device;
 }
 
-const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
+export default function OutputSelector({ device }: OutputSelectorProps) {
   const [outputDevices, setOutputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +55,7 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
     const retryInterval = 1000;
 
     const tryInitialize = () => {
-      if (device?.audio?.availableOutputDevices?.size > 0) {
+      if ((device?.audio?.availableOutputDevices?.size ?? 0) > 0) {
         handleDeviceChange();
       } else if (retryCount < maxRetries) {
         retryCount++;
@@ -116,7 +109,7 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
 
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <DeviceSelector
+      <AudioSelector
         devices={outputDevices}
         onDeviceChange={setSelectedDeviceId}
         selectedDeviceId={selectedDeviceId}
@@ -144,6 +137,4 @@ const OutputSelector: React.FC<OutputSelectorProps> = ({ device }) => {
       </div>
     </div>
   );
-};
-
-export default OutputSelector;
+}

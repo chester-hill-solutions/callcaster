@@ -1,7 +1,7 @@
 import { json, type ActionFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
-import { User, SurveyFormData } from "@/lib/types";
+import { SurveyFormData } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
@@ -10,6 +10,9 @@ import { createErrorResponse, AppError, ErrorCode, handleDatabaseError } from "@
 export async function action({ request }: ActionFunctionArgs) {
   try {
     const { supabaseClient, user } = await verifyAuth(request);
+    if (!user) {
+      return json({ error: "Unauthorized" }, { status: 401 });
+    }
     
     if (request.method === "POST") {
       return await handleCreateSurvey(request, supabaseClient, user);
@@ -28,133 +31,129 @@ export async function action({ request }: ActionFunctionArgs) {
 async function handleCreateSurvey(
   request: Request,
   supabaseClient: SupabaseClient<Database>,
-  user: User
+  user: { id: string }
 ) {
+  const formData = await request.formData();
+  const surveyDataRaw = formData.get("surveyData") as string | null;
+  if (!surveyDataRaw) {
+    return json({ error: "Survey data is required" }, { status: 400 });
+  }
+  let surveyData: SurveyFormData;
   try {
-    const formData = await request.formData();
-    const surveyDataRaw = formData.get("surveyData") as string | null;
-    if (!surveyDataRaw) {
-      return json({ error: "Survey data is required" }, { status: 400 });
-    }
-    let surveyData: unknown;
-    try {
-      surveyData = JSON.parse(surveyDataRaw) as Record<string, unknown>;
-    } catch {
-      return json({ error: "Invalid survey data format" }, { status: 400 });
-    }
-    const workspaceId = formData.get("workspaceId") as string;
+    surveyData = JSON.parse(surveyDataRaw) as SurveyFormData;
+  } catch {
+    return json({ error: "Invalid survey data format" }, { status: 400 });
+  }
+  const workspaceId = formData.get("workspaceId") as string;
 
-    if (!workspaceId) {
-      return json({ error: "Workspace ID is required" }, { status: 400 });
-    }
+  if (!workspaceId) {
+    return json({ error: "Workspace ID is required" }, { status: 400 });
+  }
 
-    // Check user role - convert Supabase Auth User to database User type
-    const { data: dbUser, error: dbUserError } = await supabaseClient
-      .from("user")
-      .select("*")
-      .eq("id", user.id)
-      .single();
-    
-    if (dbUserError || !dbUser) {
-      return json({ error: "User not found" }, { status: 404 });
-    }
-    
-    const userRole = await getUserRole({ 
-      supabaseClient, 
-      user: dbUser, 
-      workspaceId 
-    });
+  // Check user role - convert Supabase Auth User to database User type
+  const { data: dbUser, error: dbUserError } = await supabaseClient
+    .from("user")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+  
+  if (dbUserError || !dbUser) {
+    return json({ error: "User not found" }, { status: 404 });
+  }
+  
+  const userRole = await getUserRole({ 
+    supabaseClient, 
+    user: dbUser, 
+    workspaceId 
+  });
 
-    if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-      return json({ error: "Unauthorized" }, { status: 403 });
-    }
+  if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
+    return json({ error: "Unauthorized" }, { status: 403 });
+  }
 
-    // Create survey
-    const { data: survey, error: surveyError } = await supabaseClient
-      .from("survey")
-      .insert({
-        survey_id: surveyData.survey_id,
-        title: surveyData.title,
-        workspace: workspaceId,
-        is_active: surveyData.is_active || false,
-      })
-      .select()
-      .single();
+  // Create survey
+  const { data: survey, error: surveyError } = await supabaseClient
+    .from("survey")
+    .insert({
+      survey_id: surveyData.survey_id,
+      title: surveyData.title,
+      workspace: workspaceId,
+      is_active: surveyData.is_active || false,
+    })
+    .select()
+    .single();
 
-    if (surveyError) {
-      handleDatabaseError(surveyError, "Error creating survey");
-    }
+  if (surveyError) {
+    handleDatabaseError(surveyError, "Error creating survey");
+  }
 
-    // Create pages and questions
-    if (surveyData.pages && surveyData.pages.length > 0) {
-      for (const page of surveyData.pages) {
-        // Create page
-        const { data: surveyPage, error: pageError } = await supabaseClient
-          .from("survey_page")
-          .insert({
-            survey_id: survey.id,
-            page_id: page.page_id,
-            title: page.title,
-            page_order: page.page_order,
-          })
-          .select()
-          .single();
+  // Create pages and questions
+  if (surveyData.pages && surveyData.pages.length > 0) {
+    for (const page of surveyData.pages) {
+      // Create page
+      const { data: surveyPage, error: pageError } = await supabaseClient
+        .from("survey_page")
+        .insert({
+          survey_id: survey.id,
+          page_id: page.page_id,
+          title: page.title,
+          page_order: page.page_order,
+        })
+        .select()
+        .single();
 
-        if (pageError) {
-          logger.error("Error creating page:", pageError);
-          continue;
-        }
+      if (pageError) {
+        logger.error("Error creating page:", pageError);
+        continue;
+      }
 
-        // Create questions for this page
-        if (page.questions && page.questions.length > 0) {
-          for (const question of page.questions) {
-            // Create question
-            const { data: surveyQuestion, error: questionError } = await supabaseClient
-              .from("survey_question")
-              .insert({
-                page_id: surveyPage.id,
-                question_id: question.question_id,
-                question_text: question.question_text,
-                question_type: question.question_type,
-                is_required: question.is_required,
-                question_order: question.question_order,
-              })
-              .select()
-              .single();
+      // Create questions for this page
+      if (page.questions && page.questions.length > 0) {
+        for (const question of page.questions) {
+          // Create question
+          const { data: surveyQuestion, error: questionError } = await supabaseClient
+            .from("survey_question")
+            .insert({
+              page_id: surveyPage.id,
+              question_id: question.question_id,
+              question_text: question.question_text,
+              question_type: question.question_type,
+              is_required: question.is_required,
+              question_order: question.question_order,
+            })
+            .select()
+            .single();
 
-            if (questionError) {
-              logger.error("Error creating question:", questionError);
-              continue;
-            }
+          if (questionError) {
+            logger.error("Error creating question:", questionError);
+            continue;
+          }
 
-            // Create options for this question
-            if (question.options && question.options.length > 0) {
-              for (const option of question.options) {
-                await supabaseClient
-                  .from("question_option")
-                  .insert({
-                    question_id: surveyQuestion.id,
-                    option_value: option.option_value,
-                    option_label: option.option_label,
-                    option_order: option.option_order,
-                  });
-              }
+          // Create options for this question
+          if (question.options && question.options.length > 0) {
+            for (const option of question.options) {
+              await supabaseClient
+                .from("question_option")
+                .insert({
+                  question_id: surveyQuestion.id,
+                  option_value: option.option_value,
+                  option_label: option.option_label,
+                  option_order: option.option_order,
+                });
             }
           }
         }
       }
     }
-
-    return json({ success: true, survey });
-  } catch (error) {
-    throw error; // Let the action handler catch it
   }
+
+  return json({ success: true, survey });
 }
 
 async function handleUpdateSurvey(
   request: Request,
   supabaseClient: SupabaseClient<Database>,
-  user: User
+  user: { id: string }
 ) {
   try {
     const formData = await request.formData();
@@ -162,9 +161,9 @@ async function handleUpdateSurvey(
     if (!surveyDataRaw) {
       return json({ error: "Survey data is required" }, { status: 400 });
     }
-    let surveyData: unknown;
+    let surveyData: SurveyFormData;
     try {
-      surveyData = JSON.parse(surveyDataRaw) as Record<string, unknown>;
+      surveyData = JSON.parse(surveyDataRaw) as SurveyFormData;
     } catch {
       return json({ error: "Invalid survey data format" }, { status: 400 });
     }
@@ -188,7 +187,7 @@ async function handleUpdateSurvey(
     // Check user role
     const userRole = await getUserRole({ 
       supabaseClient, 
-      user: user as unknown as User, 
+      user, 
       workspaceId: existingSurvey.workspace 
     });
 
@@ -222,7 +221,7 @@ async function handleUpdateSurvey(
 async function handleDeleteSurvey(
   request: Request,
   supabaseClient: SupabaseClient<Database>,
-  user: User
+  user: { id: string }
 ) {
   try {
     const formData = await request.formData();
@@ -246,7 +245,7 @@ async function handleDeleteSurvey(
     // Check user role
     const userRole = await getUserRole({ 
       supabaseClient, 
-      user: user as unknown as User, 
+      user, 
       workspaceId: existingSurvey.workspace 
     });
 

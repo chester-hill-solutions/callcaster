@@ -95,6 +95,10 @@ function callReducer(state: CallState, action: CallAction): CallState {
         return state;
       }
       break;
+    default: {
+      const unreachableState: never = state;
+      return unreachableState;
+    }
   }
   return state;
 }
@@ -113,11 +117,17 @@ function contextReducer(state: CallContext, action: CallAction): CallContext {
       return { ...state, callDuration: state.callDuration + 1 };
     case 'SET_DISPOSITION':
       return { ...state, disposition: action.disposition };
+    case 'CONNECT':
+    case 'FAIL':
+    case 'HANG_UP':
+      return state;
     case 'NEXT':
     case 'START_DIALING':
       return initialContext;
-    default:
-      return state;
+    default: {
+      const unreachableAction: never = action;
+      return unreachableAction;
+    }
   }
 }
 

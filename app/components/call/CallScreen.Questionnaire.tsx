@@ -45,7 +45,7 @@ const CallQuestionnaire = ({
   disabled,
   isBusy
 }: CallQuestionnaireProps) => {
-  const scriptSteps = campaignDetails.script?.steps as Script['steps'] | undefined;
+  const scriptSteps = campaignDetails.script?.steps as Script["steps"] | undefined;
   const pageKeys = Object.keys(scriptSteps?.pages || {});
   const [currentPageId, setCurrentPageId] = useState<string | undefined>(
     pageKeys[0] || undefined
@@ -54,20 +54,19 @@ const CallQuestionnaire = ({
 
   useEffect(() => {
     setLocalUpdate(update || {});
-      }, [update]);
+  }, [update]);
 
   const handleBlockResponse = (blockId: string, value: string | boolean | string[]) => {
-    if (!currentPageId) return;
-    
+    const pageId = currentPageId!;
     const newUpdate = {
       ...localUpdate,
-      [currentPageId]: {
-        ...(localUpdate[currentPageId] as Record<string, unknown> || {}),
+      [pageId]: {
+        ...((localUpdate[pageId] as Record<string, unknown>) || {}),
         [blockId]: value,
       },
     };
     setLocalUpdate(newUpdate);
-    handleResponse({ pageId: currentPageId, blockId, value });
+    handleResponse({ pageId, blockId, value });
   };
 
   const renderBlock = (blockId: string) => {
@@ -75,7 +74,8 @@ const CallQuestionnaire = ({
     
     if (!block) return null;
     
-    const pageUpdate = currentPageId ? (localUpdate[currentPageId] as Record<string, unknown> | undefined) : undefined;
+    const pageId = currentPageId!;
+    const pageUpdate = localUpdate[pageId] as Record<string, unknown> | undefined;
     const blockValue = pageUpdate?.[blockId];
     
     return (
@@ -127,22 +127,17 @@ const CallQuestionnaire = ({
       </div>
       <div className="p-4">
         <div className="flex flex-col gap-4">
-          {currentPageId && scriptSteps?.pages?.[currentPageId]?.blocks.map(
-            renderBlock,
-          )}
+          {(scriptSteps?.pages?.[currentPageId || ""]?.blocks ?? []).map(renderBlock)}
         </div>
         {scriptSteps?.pages && currentPageId && <div className="mt-4 flex justify-between">
           <Button
             onClick={() => {
-              const pageIds = Object.keys(scriptSteps?.pages || {});
+              const pageIds = Object.keys(scriptSteps.pages!);
               const currentIndex = pageIds.indexOf(currentPageId);
-              if (currentIndex > 0) {
-                setCurrentPageId(pageIds[currentIndex - 1]);
-              }
+              setCurrentPageId(pageIds[currentIndex - 1]);
             }}
             disabled={
               isBusy ||
-              !currentPageId ||
               currentPageId === pageKeys[0]
             }
           >
@@ -150,15 +145,12 @@ const CallQuestionnaire = ({
           </Button>
           <Button
             onClick={() => {
-              const pageIds = Object.keys(scriptSteps?.pages || {});
+              const pageIds = Object.keys(scriptSteps.pages!);
               const currentIndex = pageIds.indexOf(currentPageId);
-              if (currentIndex < pageIds.length - 1) {
-                setCurrentPageId(pageIds[currentIndex + 1]);
-              }
+              setCurrentPageId(pageIds[currentIndex + 1]);
             }}
             disabled={
               isBusy ||
-              !currentPageId ||
               currentPageId === pageKeys[pageKeys.length - 1]
             }
           >

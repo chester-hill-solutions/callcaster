@@ -4,24 +4,19 @@ import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { SaveBar } from "@/components/shared/SaveBar";
 import { getUserRole, listMedia } from "@/lib/database.server";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { Script, WorkspaceData, User } from "@/lib/types";
+import { Script, WorkspaceData } from "@/lib/types";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger.server";
+import {
+  normalizeScriptForComparison,
+  normalizeScriptPageDataForComparison,
+} from "@/lib/script-change";
   
-type LoaderDataProps = Promise<{
-  workspace: WorkspaceData;
-  workspace_id: string;
-  selected_id: string;
-  script: Script;
-  mediaNames: string[];
-  userRole: MemberRole;
-}>;
-
-export const loader = async ({ request, params }: LoaderFunctionArgs): LoaderDataProps => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, scriptId: selected_id } = params;
   const { supabaseClient, headers, user } = await verifyAuth(request);
   if (!user) {
@@ -33,7 +28,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs): LoaderDat
     .eq("id", workspace_id as string)
     .single();
   if (workspaceError) throw workspaceError;
-  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspace_id as string });
+  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user, workspaceId: workspace_id as string });
   const { data: script } = await supabaseClient
     .from("script")
     .select()
@@ -130,57 +125,31 @@ export default function ScriptEditor() {
 
   const handlePageDataChange = (newPageData: PageData) => {
     setScript(newPageData.campaignDetails.script);
-    const obj1 = { campaignDetails: { script } };
-    const obj2 = newPageData;
-    if (obj1.campaignDetails?.script?.updated_at) {
-      delete (obj1.campaignDetails.script as Partial<Script>).updated_at;
-    }
-    if (obj2.campaignDetails?.script?.updated_at) {
-      delete (obj2.campaignDetails.script as Partial<Script>).updated_at;
-    }
+    const obj1 = normalizeScriptPageDataForComparison({ campaignDetails: { script } });
+    const obj2 = normalizeScriptPageDataForComparison(newPageData);
     setChanged(!deepEqual(obj1, obj2));
   };
 
   useEffect(() => {
-    const obj1 = { ...script };
-    const obj2 = { ...initScript };
-    if (obj1.updated_at) {
-      delete (obj1 as Partial<Script>).updated_at;
-    }
-    if (obj2.updated_at) {
-      delete (obj2 as Partial<Script>).updated_at;
-    }
+    const obj1 = normalizeScriptForComparison(script);
+    const obj2 = normalizeScriptForComparison(initScript);
     setChanged(!deepEqual(obj1, obj2));
   }, [initScript, script]);
 
   return (
     <div className="relative flex h-full flex-col overflow-visible">
-      {isChanged && (
-        <div className="fixed left-0 right-0 top-0 z-50 flex flex-col items-center justify-between bg-primary px-4 py-3 text-white shadow-md sm:flex-row sm:px-6 sm:py-5">
-          <Button
-            onClick={handleReset}
-            className="mb-2 w-full rounded bg-white px-4 py-2 text-gray-500 transition-colors hover:bg-red-100 sm:mb-0 sm:w-auto"
-          >
-            Reset
-          </Button>
-          <div className="mb-2 text-center text-lg font-semibold sm:mb-0 sm:text-left">
-            You have unsaved changes
-          </div>
-          <Button
-            onClick={() => handleSaveUpdate()}
-            className="w-full rounded bg-secondary px-4 py-2 text-black transition-colors hover:bg-white sm:w-auto"
-          >
-            Save Changes
-          </Button>
-        </div>
-      )}
+      <SaveBar
+        isChanged={isChanged}
+        onSave={handleSaveUpdate}
+        onReset={handleReset}
+      />
       <div className="h-full flex-grow p-4">
         <CampaignSettingsScript
           pageData={{ campaignDetails: { script } } as PageData}
           onPageDataChange={(newData: PageData) => {
             handlePageDataChange(newData);
           }}
-          mediaNames={mediaNames}
+          mediaNames={(mediaNames ?? []).map((media) => typeof media === "string" ? media : media.name)}
           scripts={[]}
         />
       </div>

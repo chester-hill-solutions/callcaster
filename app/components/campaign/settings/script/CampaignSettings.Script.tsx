@@ -1,14 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { useNavigate } from '@remix-run/react';
-import { Script, LiveCampaign, IVRCampaign } from '@/lib/types';
-import { useScriptState } from '@/hooks/campaign/useScriptState';
+import { Block, Flow, IVRBlock, Script } from '@/lib/types';
 import Sidebar from '@/components/script/Script.Sidebar';
 import ScriptMainContent from '@/components/script/Script.MainContent';
-import { logger } from '@/lib/logger.client';
 import { isObject, isString } from '@/lib/type-utils';
 
 type PageData = {
-  campaignDetails: (LiveCampaign | IVRCampaign) & { script: Script };
+  campaignDetails: {
+    script: Script;
+    [key: string]: unknown;
+  };
 };
 
 type ScriptPageProps = {
@@ -18,57 +19,59 @@ type ScriptPageProps = {
   mediaNames: string[];
 };
 
-interface ScriptData {
-  pages: Record<string, ScriptPage>;
-  blocks: Record<string, ScriptBlock>;
+type ScriptData = Flow;
+
+function getFlowType(script: Script): Flow["type"] {
+  return script.type === "ivr" ? "ivr" : "script";
 }
 
-interface ScriptPage {
-  id: string;
-  title: string;
-  blocks: string[];
+function createEmptyFlow(type: Flow["type"]): Flow {
+  return {
+    type,
+    pages: {},
+    blocks: {},
+    startPage: "",
+  };
 }
 
-interface ScriptBlock {
-  id: string;
-  type: string;
-  content?: unknown;
-  [key: string]: unknown;
+function createDefaultBlock(id: string, flowType: Flow["type"]): Block | IVRBlock {
+  const baseBlock: Block = {
+    id,
+    type: "textarea",
+    title: "",
+    content: "",
+    options: [],
+  };
+
+  if (flowType === "ivr") {
+    return {
+      ...baseBlock,
+      audioFile: "",
+      speechType: "synthetic",
+      responseType: null,
+    };
+  }
+
+  return baseBlock;
 }
 
-interface BlockUpdate {
-  id: string;
-  type?: string;
-  content?: unknown;
-  [key: string]: unknown;
-}
+function normalizeFlow(script: Script): Flow {
+  const flowType = getFlowType(script);
+  if (!isObject(script.steps)) {
+    return createEmptyFlow(flowType);
+  }
 
-// Type guard for script data
-function isScriptData(data: unknown): data is ScriptData {
-  if (!isObject(data)) return false;
-  const scriptData = data as Record<string, unknown>;
-  return (
-    isObject(scriptData.pages) &&
-    isObject(scriptData.blocks)
-  );
-}
+  const raw = script.steps as Record<string, unknown>;
+  const pages = isObject(raw.pages) ? raw.pages as Flow["pages"] : {};
+  const blocks = isObject(raw.blocks) ? raw.blocks as Flow["blocks"] : {};
+  const firstPageId = Object.keys(pages)[0] ?? "";
 
-// Type guard for script page
-function isScriptPage(data: unknown): data is ScriptPage {
-  if (!isObject(data)) return false;
-  const page = data as Record<string, unknown>;
-  return (
-    isString(page.id) &&
-    isString(page.title) &&
-    Array.isArray(page.blocks)
-  );
-}
-
-// Type guard for block update
-function isBlockUpdate(data: unknown): data is BlockUpdate {
-  if (!isObject(data)) return false;
-  const update = data as Record<string, unknown>;
-  return isString(update.id);
+  return {
+    type: raw.type === "ivr" ? "ivr" : raw.type === "script" ? "script" : flowType,
+    pages,
+    blocks,
+    startPage: isString(raw.startPage) ? raw.startPage : firstPageId,
+  };
 }
 
 export default function CampaignSettingsScript({
@@ -78,13 +81,12 @@ export default function CampaignSettingsScript({
   mediaNames = [],
 }: ScriptPageProps) {
   const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState<string | null>(null);
-  const [openBlock, setOpenBlock] = useState<string | null>(null);
-
   const script = pageData.campaignDetails.script;
-  const scriptData: ScriptData = isScriptData(script.steps)
-    ? script.steps
-    : { pages: {}, blocks: {} };
+  const scriptData = normalizeFlow(script);
+  const [currentPage, setCurrentPage] = useState<string | null>(
+    scriptData.startPage || Object.keys(scriptData.pages)[0] || null,
+  );
+  const [openBlock, setOpenBlock] = useState<string | null>(null);
 
   const updateScript = useCallback((newScript: Script | ((prev: Script) => Script)) => {
     onPageDataChange({
@@ -98,30 +100,23 @@ export default function CampaignSettingsScript({
 
   const updateScriptData = useCallback((newScriptData: ScriptData | ((prev: ScriptData) => ScriptData)) => {
     const updatedScriptData = typeof newScriptData === "function" ? newScriptData(scriptData) : newScriptData;
-    
-    if (!isScriptData(updatedScriptData)) {
-      logger.error('Invalid script data format');
-      return;
-    }
-    
+
     updateScript({
       ...script,
-      steps: updatedScriptData as unknown as NonNullable<Script["steps"]>,
+      steps: updatedScriptData,
     });
-  }, [script, updateScript]);
+  }, [script, scriptData, updateScript]);
 
-  const addBlock = useCallback((type: string) => {
+  const addBlock = useCallback(() => {
     if (!currentPage) return;
-    
+
     const blockId = `block_${Date.now()}`;
+    const defaultBlock = createDefaultBlock(blockId, scriptData.type);
     updateScriptData((prevScriptData) => ({
       ...prevScriptData,
       blocks: {
         ...prevScriptData.blocks,
-        [blockId]: {
-          id: blockId,
-          type,
-        } as ScriptBlock,
+        [blockId]: defaultBlock,
       },
       pages: {
         ...prevScriptData.pages,
@@ -130,11 +125,11 @@ export default function CampaignSettingsScript({
           id: currentPage,
           title: prevScriptData.pages[currentPage]?.title ?? "",
           blocks: [...(prevScriptData.pages[currentPage]?.blocks || []), blockId],
-        } as ScriptPage,
+        },
       },
     }));
     setOpenBlock(blockId);
-  }, [currentPage, updateScriptData]);
+  }, [currentPage, scriptData.type, updateScriptData]);
 
   const removeBlock = useCallback((blockId: string) => {
     updateScriptData((prevScriptData) => {
@@ -154,88 +149,86 @@ export default function CampaignSettingsScript({
     setOpenBlock(null);
   }, [updateScriptData]);
 
-  const moveBlock = useCallback((blockId: string, targetPageId: string) => {
+  const moveBlock = useCallback((blockId: string, direction: number) => {
+    if (!currentPage) return;
     updateScriptData((prevScriptData) => {
-      const newScriptData = { ...prevScriptData };
-      
-      // Remove block from current page
-      if (currentPage) {
-        const page = newScriptData.pages[currentPage];
-        if (page) page.blocks = page.blocks.filter((id) => id !== blockId);
+      const currentPageData = prevScriptData.pages[currentPage];
+      if (!currentPageData) return prevScriptData;
+
+      const currentBlocks = [...currentPageData.blocks];
+      const currentIndex = currentBlocks.indexOf(blockId);
+      const nextIndex = currentIndex + direction;
+
+      if (
+        currentIndex === -1 ||
+        nextIndex < 0 ||
+        nextIndex >= currentBlocks.length
+      ) {
+        return prevScriptData;
       }
-      
-      // Add block to target page
-      if (!newScriptData.pages[targetPageId]) {
-        newScriptData.pages[targetPageId] = {
-          id: targetPageId,
-          title: `Section ${Object.keys(newScriptData.pages).length + 1}`,
-          blocks: [],
-        };
+
+      const currentItem = currentBlocks[currentIndex];
+      const nextItem = currentBlocks[nextIndex];
+      if (!currentItem || !nextItem) {
+        return prevScriptData;
       }
-      newScriptData.pages[targetPageId].blocks.push(blockId);
-      
-      return newScriptData;
+
+      currentBlocks[currentIndex] = nextItem;
+      currentBlocks[nextIndex] = currentItem;
+
+      return {
+        ...prevScriptData,
+        pages: {
+          ...prevScriptData.pages,
+          [currentPage]: {
+            ...currentPageData,
+            blocks: currentBlocks,
+          },
+        },
+      };
     });
   }, [currentPage, updateScriptData]);
 
-  const handleTitle = useCallback((blockId: string, title: string) => {
-    updateScriptData((prevScriptData) => ({
-      ...prevScriptData,
-      blocks: {
-        ...prevScriptData.blocks,
-        [blockId]: {
-          ...prevScriptData.blocks[blockId],
-          id: blockId,
-          type: prevScriptData.blocks[blockId]?.type ?? "textblock",
-          title,
-        } as ScriptBlock,
-      },
+  const handleTitle = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.target;
+    updateScript((prevScript) => ({
+      ...prevScript,
+      name: value,
     }));
-  }, [updateScriptData]);
+  }, [updateScript]);
 
-  const changeType = useCallback((blockId: string, newType: string) => {
-    updateScriptData((prevScriptData) => ({
-      ...prevScriptData,
-      blocks: {
-        ...prevScriptData.blocks,
-        [blockId]: {
-          ...prevScriptData.blocks[blockId],
-          id: blockId,
-          type: newType,
-          title: prevScriptData.blocks[blockId]?.title ?? "",
-        } as ScriptBlock,
-      },
+  const changeType = useCallback((newType: "script" | "ivr") => {
+    updateScript((prevScript) => ({
+      ...prevScript,
+      type: newType,
     }));
-  }, [updateScriptData]);
+  }, [updateScript]);
 
-  const updateBlock = useCallback((id: string, newBlockData: BlockUpdate) => {
-    if (!isBlockUpdate(newBlockData)) {
-      logger.error('Invalid block update format');
-      return;
-    }
-    
+  const updateBlock = useCallback((id: string, newBlockData: Partial<Block | IVRBlock>) => {
     updateScriptData((prevScriptData) => ({
       ...prevScriptData,
       blocks: {
         ...prevScriptData.blocks,
         [id]: {
+          ...createDefaultBlock(id, prevScriptData.type),
           ...prevScriptData.blocks[id],
           ...newBlockData,
           id,
-        } as ScriptBlock,
+        },
       },
     }));
   }, [updateScriptData]);
 
   const addPage = useCallback(() => {
-    const newPageId = `page_${Object.keys(scriptData?.pages || {}).length + 1}`;
+    const newPageId = `page_${Object.keys(scriptData.pages).length + 1}`;
     updateScriptData((prevScriptData) => ({
       ...prevScriptData,
+      startPage: prevScriptData.startPage || newPageId,
       pages: {
         ...prevScriptData.pages,
         [newPageId]: {
           id: newPageId,
-          title: `New Section ${Object.keys(prevScriptData.pages || {}).length + 1}`,
+          title: `New Section ${Object.keys(prevScriptData.pages).length + 1}`,
           blocks: [],
         },
       },
@@ -247,19 +240,25 @@ export default function CampaignSettingsScript({
     updateScriptData((prevScriptData) => {
       const newScriptData = { ...prevScriptData };
       delete newScriptData.pages[id];
+      if (newScriptData.startPage === id) {
+        newScriptData.startPage = Object.keys(newScriptData.pages)[0] ?? "";
+      }
       return newScriptData;
     });
+    if (currentPage === id) {
+      setCurrentPage(null);
+    }
   }, [updateScriptData]);
 
   const handleScriptChange = useCallback((value: string) => {
     if (value === `create-new-${scripts.length + 1}`) {
       navigate("../../../../scripts/new");
     } else {
-      const newScript = scripts.find((script) => script.id === parseInt(value));
-      if (newScript && isScriptData(newScript.steps)) {
+      const newScript = scripts.find((script) => script.id === parseInt(value, 10));
+      if (newScript) {
         updateScript(() => newScript);
-        updateScriptData(() => newScript.steps as unknown as ScriptData);
-        setCurrentPage(getFirstPageId(newScript.steps));
+        updateScriptData(() => normalizeFlow(newScript));
+        setCurrentPage(getFirstPageId(normalizeFlow(newScript)));
         setOpenBlock(null);
       }
     }
@@ -276,7 +275,7 @@ export default function CampaignSettingsScript({
             id: currentPage,
             title: event.target.value,
             blocks: prevScriptData.pages[currentPage]?.blocks ?? [],
-          } as ScriptPage,
+          },
         },
       }));
     }
@@ -285,7 +284,11 @@ export default function CampaignSettingsScript({
   const handleReorder = useCallback((draggedId: string, targetId: string, dropPosition: 'top' | 'bottom') => {
     if (!currentPage) return;
     updateScriptData((prevScriptData) => {
-      const currentPageBlocks = prevScriptData.pages[currentPage].blocks;
+      const currentPageData = prevScriptData.pages[currentPage];
+      if (!currentPageData) {
+        return prevScriptData;
+      }
+      const currentPageBlocks = currentPageData.blocks;
       const draggedIndex = currentPageBlocks.indexOf(draggedId);
       const targetIndex = currentPageBlocks.indexOf(targetId);
 
@@ -302,11 +305,11 @@ export default function CampaignSettingsScript({
         pages: {
           ...prevScriptData.pages,
           [currentPage]: {
-            ...curPage,
+            ...currentPageData,
             id: currentPage,
-            title: curPage?.title ?? "",
+            title: currentPageData.title ?? "",
             blocks: newBlocksOrder,
-          } as ScriptPage,
+          },
         },
       };
     });
@@ -346,19 +349,24 @@ export default function CampaignSettingsScript({
 }
 
 function getFirstPageId(scriptData: unknown): string | null {
-  if (!isScriptData(scriptData)) {
+  if (!isObject(scriptData)) {
     return null;
   }
-  
-  const pages = scriptData.pages || {};
+
+  const raw = scriptData as Record<string, unknown>;
+  if (!isObject(raw.pages)) {
+    return null;
+  }
+
+  const pages = raw.pages as Record<string, unknown>;
   const pageValues = Object.values(pages);
-  
+
   if (pageValues.length > 0) {
     const firstPage = pageValues[0];
-    if (isScriptPage(firstPage)) {
-      return firstPage.id || Object.keys(pages)[0];
+    if (isObject(firstPage) && isString(firstPage.id)) {
+      return firstPage.id || Object.keys(pages)[0] || null;
     }
   }
-  
+
   return Object.keys(pages)[0] || null;
 }

@@ -249,7 +249,7 @@ async function handleInvite({
   }
 }
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       headers: { "Content-Type": "application/json" },
@@ -259,4 +259,8 @@ Deno.serve(async (req) => {
 
   const inviteData = await req.json();
   return handleInvite(inviteData);
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

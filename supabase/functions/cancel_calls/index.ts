@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
 
-Deno.serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -11,7 +11,8 @@ Deno.serve(async (req: Request) => {
     let lastId = 0
     let processedCalls = 0
 
-    while (true) {
+    let hasMore = true
+    while (hasMore) {
       const { data: activeCalls, error: activeCallsError } = await supabase
         .from('call')
         .select('id, sid, workspace')
@@ -21,7 +22,10 @@ Deno.serve(async (req: Request) => {
         .limit(batchSize)
 
       if (activeCallsError) throw activeCallsError
-      if (!activeCalls || activeCalls.length === 0) break
+      if (!activeCalls || activeCalls.length === 0) {
+        hasMore = false
+        break
+      }
 
       const { error: updateCallError } = await supabase
         .from('call')
@@ -57,7 +61,7 @@ Deno.serve(async (req: Request) => {
       { status: 500, headers: { "Content-Type": "application/json" } }
     )
   }
-})
+}
 
 async function queueTwilioCancellations(supabase, calls) {
   const { error } = await supabase
@@ -68,4 +72,8 @@ async function queueTwilioCancellations(supabase, calls) {
     })))
   
   if (error) throw error
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
 }

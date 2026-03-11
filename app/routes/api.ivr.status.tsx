@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { Twilio } from "twilio";
+import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
@@ -56,7 +56,7 @@ export interface CallEvent {
 const updateCallStatus = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string): Promise<void> => {
     const { error } = await supabase
         .from('call')
-        .update({ end_time: new Date(timestamp), status })
+        .update({ end_time: new Date(timestamp).toISOString(), status })
         .eq('sid', callSid);
     if (error) throw error;
 };
@@ -72,6 +72,9 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
     if (!pagesObject) return null;
     for (const pageId in pagesObject) {
         const page = pagesObject[pageId];
+        if (!page) {
+            continue;
+        }
         if (page.title.toLowerCase() === "voicemail") {
             return page;
         }
@@ -81,7 +84,7 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
 
 const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
     const call = twilio.calls(callSid);
-    await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date() });
+    await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
     const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
@@ -147,13 +150,59 @@ export const action = async ({ request }: { request: Request }) => {
         const callStatus = parsedBody.CallStatus;
         const timestamp = String(parsedBody.Timestamp || '');
 
-        if (callStatus === 'failed' || callStatus === 'no-answer') {
-            const disposition = callStatus === 'failed' ? 'failed' : 'no-answer';
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id as number | null, disposition);
-        } else if (parsedBody.AnsweredBy && parsedBody.AnsweredBy.includes('machine') && !parsedBody.AnsweredBy.includes('other') && callStatus !== 'completed') {
-            await handleVoicemail(twilio, callSid, dbCall as Call, dbCall.campaign as Campaign & {ivr_campaign: IVRCampaign & {script: Script}}, supabase);
-        } else if (callStatus === 'completed'){
-            await handleCallStatusUpdate(supabase, callSid, callStatus, timestamp, dbCall.outreach_attempt_id as number | null, 'completed');
+        const answeredBy = parsedBody.AnsweredBy;
+        const isMachine =
+            Boolean(answeredBy) &&
+            answeredBy.includes('machine') &&
+            !answeredBy.includes('other') &&
+            callStatus !== 'completed';
+
+        if (isMachine) {
+            await handleVoicemail(
+                twilio,
+                callSid,
+                dbCall as unknown as Call,
+                dbCall.campaign as unknown as Campaign & { ivr_campaign: IVRCampaign & { script: Script } },
+                supabase,
+            );
+        } else {
+            switch (callStatus) {
+                case 'failed': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'failed',
+                    );
+                    break;
+                }
+                case 'no-answer': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'no-answer',
+                    );
+                    break;
+                }
+                case 'completed': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'completed',
+                    );
+                    break;
+                }
+                default:
+                    break;
+            }
         }
     } catch (error) {
         logger.error("Error processing IVR status:", error);

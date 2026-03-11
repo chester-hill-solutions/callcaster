@@ -3,6 +3,16 @@ import { Form } from "@remix-run/react";
 import { useState, useCallback, useEffect } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/typography";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { User, WorkspaceNumbers } from "@/lib/types";
 
 export const NumbersTable = ({
@@ -91,7 +101,8 @@ export const NumbersTable = ({
   );
 
   return (
-      <><h3 className="text-center font-Zilla-Slab text-4xl font-bold">
+      <>
+      <Heading className="text-center" branded>
       Existing Numbers
     </h3><div className="flex flex-col py-4">
         <table className="w-full table-auto">
@@ -101,7 +112,6 @@ export const NumbersTable = ({
               <th className="py-2 text-left">Caller ID</th>
               <th className="py-2 text-left">Phone Number</th>
               <th className="py-2 text-left">Status</th>
-              <th className="py-2 text-left">Handset</th>
               <th className="py-2 text-left">Handle Voicemail</th>
               <th className="py-2 text-left">Voicemail Message</th>
             </tr>
@@ -117,12 +127,11 @@ export const NumbersTable = ({
                 handleIncomingActivityChange={handleIncomingActivityChange}
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
-                handleHandsetChange={handleHandsetChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div></>
   );
 };
@@ -135,7 +144,6 @@ const NumberRow = ({
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
-  handleHandsetChange,
   handleNumberRemoval,
   isBusy,
 }: {
@@ -146,7 +154,6 @@ const NumberRow = ({
   handleIncomingActivityChange: (id: number, value: string) => void;
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
-  handleHandsetChange?: (numberId: number, enabled: boolean) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -165,8 +172,8 @@ const NumberRow = ({
 
   if (!number) return <>No Number found</>;
   return (
-    <tr className="border-b dark:border-gray-700">
-      <td className="mt-2 py-2">
+    <TableRow>
+      <TableCell className="mt-2 py-2">
         <Button
         variant={"ghost"}
           className="text-red-500 hover:text-red-700"
@@ -175,18 +182,19 @@ const NumberRow = ({
         >
           <MdClose />
         </Button>
-      </td>
-      <td className="px-2 py-2 text-left ">
+      </TableCell>
+      <TableCell className="px-2 py-2 text-left ">
         <div className="flex items-center gap-4">
           {isEditingNumber ? (
             <>
-              <input
+              <Input
                 name="callerId"
                 id="callerId"
                 value={callerId}
                 onKeyDown={handleKeyPress}
                 onChange={(e) => setCallerId(e.target.value)}
                 type="text"
+                className="max-w-xs"
               />
               <Button
                 disabled={isBusy}
@@ -214,9 +222,9 @@ const NumberRow = ({
             </>
           )}
         </div>
-      </td>
-      <td className="px-2 py-2">{number.phone_number}</td>
-      <td className="py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">{number.phone_number}</TableCell>
+      <TableCell className="py-2">
         <StatusIndicator 
           status={
             typeof number?.capabilities === 'object' && 
@@ -229,35 +237,21 @@ const NumberRow = ({
         />
       </td>
       <td className="px-2 py-2">
-        {handleHandsetChange && (
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={Boolean(number?.handset_enabled)}
-              disabled={isBusy}
-              onChange={(e) => handleHandsetChange(number.id, e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-            <span className="text-sm">Ring handset</span>
-          </label>
-        )}
-      </td>
-      <td className="px-2 py-2">
         <IncomingActivitySelect
           number={number}
           members={members}
           verifiedNumbers={verifiedNumbers}
           onChange={handleIncomingActivityChange}
         />
-      </td>
-      <td className="px-2 py-2">
+      </TableCell>
+      <TableCell className="px-2 py-2">
         <IncomingVoiceMessageSelect
           number={number}
           mediaNames={mediaNames}
           onChange={handleIncomingVoiceMessageChange}
         />
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   );
 };
 
@@ -352,7 +346,7 @@ const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: 
     >
       <option value="">Select a voice message</option>
       {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number, name: string }, index: number) => (
-        <option key={index} value={mediaName.id}>
+        <option key={index} value={mediaName.name}>
           {mediaName.name}
         </option>
       ))}

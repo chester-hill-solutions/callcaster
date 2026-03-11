@@ -2,11 +2,12 @@ import { json } from "@remix-run/node";
 import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "../lib/supabase.server";
 import { logger } from "@/lib/logger.server";
+import type { TablesInsert } from "@/lib/database.types";
 
 export const action = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, user } =
     await verifyAuth(request);
-  const data = await safeParseJson(request);
+  const data = await safeParseJson<Record<string, unknown>>(request);
   const {
     id,
     name,
@@ -16,9 +17,17 @@ export const action = async ({ request }: { request: Request }) => {
   } = data;
   
   try {
-    const scriptData = {
+    if (
+      typeof name !== "string" ||
+      typeof workspace !== "string" ||
+      (typeof id !== "number" && typeof id !== "string" && id != null)
+    ) {
+      return json({ error: "Invalid script payload" }, { status: 400 });
+    }
+
+    const scriptData: TablesInsert<"script"> = {
       name,
-      steps,
+      steps: (steps ?? null) as TablesInsert<"script">["steps"],
       updated_at: new Date().toISOString(),
       updated_by: user.id,
       workspace,
@@ -31,10 +40,11 @@ export const action = async ({ request }: { request: Request }) => {
         .insert({...scriptData, name: saveAsCopy ? `${name} (Copy)` : name})
         .select();
     } else {
+      const scriptId = typeof id === "number" ? id : Number(id);
       scriptOperation = supabase
         .from("script")
         .update(scriptData)
-        .eq("id", id)
+        .eq("id", scriptId)
         .select();
     }
 

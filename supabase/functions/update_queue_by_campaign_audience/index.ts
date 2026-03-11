@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import { handleQueueSyncEvent } from "../_shared/queue-sync.ts";
 
 const initSupabaseClient = () => {
   return createClient(
@@ -8,70 +9,16 @@ const initSupabaseClient = () => {
 };
 
 
-const getContactsForAudience = async (supabase, audienceId) => {
-  const { data: contacts, error } = await supabase
-    .from("contact_audience")
-    .select()
-    .eq("audience_id", audienceId);
-  console.log(contacts, error)
-  if (error) throw error;
-  return contacts.map(contact => contact.contact_id);
-};
-
-const handleQueueInsert = async (supabase, contactIds, campaignId) => {
-  const update = contactIds.map(id => ({
-    contact_id: id,
-    status: "queued",
-    campaign_id: campaignId,
-  }));
-  const { data, error } = await supabase
-    .from("campaign_queue")
-    .insert(update)
-    .select();
-  console.log(data)
-  if (error) throw error;
-  return data;
-};
-
-const handleQueueDelete = async (supabase, contactIds) => {
-  const { data, error } = await supabase
-    .from("campaign_queue")
-    .delete()
-    .in("contact_id", contactIds);
-
-  if (error) throw error;
-  return data;
-};
-
-const handleEvent = async (type, record, old_record) => {
-  const supabase = initSupabaseClient();
-
-  try {
-    let result;
-    if (type === "INSERT") {
-      const contactIds = await getContactsForAudience(supabase, record.audience_id);
-      if (contactIds.length > 0) {
-        result = await handleQueueInsert(supabase, contactIds, record.campaign_id);
-      }
-    } else if (type === "DELETE") {
-      const contactIds = await getContactsForAudience(supabase, old_record.audience_id);
-      if (contactIds.length > 0) {
-        result = await handleQueueDelete(supabase, contactIds);
-      }
-    }
-
-    return result || null;
-  } catch (error) {
-    console.error("Error in handleEvent:", error);
-    throw error;
-  }
-};
-
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const { type, record, old_record } = await req.json();
     console.log('Initiating Queue update: ', type, record, old_record);
-    const result = await handleEvent(type, record, old_record);
+    const result = await handleQueueSyncEvent({
+      supabase: initSupabaseClient() as any,
+      type,
+      record,
+      old_record,
+    });
 
     if (result) {
       return new Response(JSON.stringify(result), {
@@ -90,4 +37,8 @@ Deno.serve(async (req) => {
       status: 500,
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

@@ -2,6 +2,9 @@ import { Form, useFetcher } from "@remix-run/react";
 import { useRef, useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
 
 type EventCategory = 
   | "inbound_call" 
@@ -248,44 +251,46 @@ export default function WebhookEditor({
 
   return (
     <Form method="POST" className="flex w-full flex-col gap-4" ref={formRef} onSubmit={handleSubmit}>
-      <label
+      <FormField
         htmlFor="destinationUrl"
-        className="flex w-full flex-col text-xl font-semibold dark:text-white"
+        label="Destination URL"
+        description="Callcaster will send matching events to this endpoint."
       >
-        Destination URL
-        <input
+        <Input
           type="url"
           name="destinationUrl"
           id="destinationUrl"
           value={destinationUrl}
           onChange={(e) => setDestinationUrl(e.target.value)}
-          className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+          className="bg-transparent"
         />
-      </label>
+      </FormField>
       
       <div className="flex flex-col gap-4 border p-4 rounded-md">
-        <h3 className="text-xl font-semibold dark:text-white">Event Types</h3>
+        <Heading level={4}>Event Types</Heading>
         
         {/* Inbound Call Events */}
         <div className="flex flex-col gap-2">
           <h4 className="font-medium">Inbound Call</h4>
           <div className="flex gap-4 ml-4">
-            <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.inbound_call.insert}
                 onCheckedChange={(checked) => handleEventConfigChange("inbound_call", "insert", checked as boolean)}
                 name="inbound_call_insert"
+                aria-label="Inbound call new call"
               />
               New Call
-            </label>
-            <label className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.inbound_call.update}
                 onCheckedChange={(checked) => handleEventConfigChange("inbound_call", "update", checked as boolean)}
                 name="inbound_call_update"
+                aria-label="Inbound call updated"
               />
               Call Updated
-            </label>
+            </div>
             {eventConfig.inbound_call.insert && (
               <Button
                 type="button"
@@ -305,22 +310,24 @@ export default function WebhookEditor({
         <div className="flex flex-col gap-2">
           <h4 className="font-medium">Inbound SMS</h4>
           <div className="flex gap-4 ml-4">
-            <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.inbound_sms.insert}
                 onCheckedChange={(checked) => handleEventConfigChange("inbound_sms", "insert", checked as boolean)}
                 name="inbound_sms_insert"
+                aria-label="Inbound SMS new message"
               />
               New Message
-            </label>
-            <label className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.inbound_sms.update}
                 onCheckedChange={(checked) => handleEventConfigChange("inbound_sms", "update", checked as boolean)}
                 name="inbound_sms_update"
+                aria-label="Inbound SMS updated"
               />
               Message Updated
-            </label>
+            </div>
             {eventConfig.inbound_sms.insert && (
               <Button
                 type="button"
@@ -340,22 +347,24 @@ export default function WebhookEditor({
         <div className="flex flex-col gap-2">
           <h4 className="font-medium">Outbound Call</h4>
           <div className="flex gap-4 ml-4">
-            <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.outbound_call.insert}
                 onCheckedChange={(checked) => handleEventConfigChange("outbound_call", "insert", checked as boolean)}
                 name="outbound_call_insert"
+                aria-label="Outbound call new call"
               />
               New Call
-            </label>
-            <label className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.outbound_call.update}
                 onCheckedChange={(checked) => handleEventConfigChange("outbound_call", "update", checked as boolean)}
                 name="outbound_call_update"
+                aria-label="Outbound call updated"
               />
               Call Updated
-            </label>
+            </div>
             {eventConfig.outbound_call.insert && (
               <Button
                 type="button"
@@ -375,22 +384,24 @@ export default function WebhookEditor({
         <div className="flex flex-col gap-2">
           <h4 className="font-medium">Outbound SMS</h4>
           <div className="flex gap-4 ml-4">
-            <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.outbound_sms.insert}
                 onCheckedChange={(checked) => handleEventConfigChange("outbound_sms", "insert", checked as boolean)}
                 name="outbound_sms_insert"
+                aria-label="Outbound SMS new message"
               />
               New Message
-            </label>
-            <label className="flex items-center gap-2">
+            </div>
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.outbound_sms.update}
                 onCheckedChange={(checked) => handleEventConfigChange("outbound_sms", "update", checked as boolean)}
                 name="outbound_sms_update"
+                aria-label="Outbound SMS updated"
               />
               Message Updated
-            </label>
+            </div>
             {eventConfig.outbound_sms.insert && (
               <Button
                 type="button"
@@ -410,14 +421,15 @@ export default function WebhookEditor({
         <div className="flex flex-col gap-2">
           <h4 className="font-medium">Voicemail</h4>
           <div className="flex gap-4 ml-4">
-            <label className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <Checkbox
                 checked={eventConfig.voicemail.insert}
                 onCheckedChange={(checked) => handleEventConfigChange("voicemail", "insert", checked as boolean)}
                 name="voicemail_insert"
+                aria-label="Voicemail new voicemail"
               />
               New Voicemail
-            </label>
+            </div>
             {eventConfig.voicemail.insert && (
               <Button
                 type="button"
@@ -435,29 +447,29 @@ export default function WebhookEditor({
       </div>
       
       <div className="flex flex-col gap-2">
-        <label className="text-xl font-semibold dark:text-white">
+        <p className="text-xl font-semibold dark:text-white">
           Custom Headers
-        </label>
+        </p>
         {customHeaders.map(([key, value], index) => {
           return (
             <div key={index} className="flex gap-2">
-              <input
+              <Input
                 type="text"
                 value={key}
                 onChange={(e) =>
                   handleHeaderChange(index, e.target.value, value)
                 }
                 placeholder="Header Key"
-                className="flex-1 rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                className="flex-1 bg-transparent"
               />
-              <input
+              <Input
                 type="text"
                 value={value}
                 onChange={(e) =>
                   handleHeaderChange(index, key, e.target.value)
                 }
                 placeholder="Header Value"
-                className="flex-1 rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+                className="flex-1 bg-transparent"
               />
               <Button
                 type="button"

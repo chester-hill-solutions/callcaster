@@ -1,9 +1,9 @@
 import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useSubmit, useNavigate } from "@remix-run/react";
+import { Link, useLoaderData, useSubmit, useNavigate } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
-import { User, SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
+import { SurveyFormData, SurveyQuestionType, SurveyPage, SurveyQuestion, QuestionOption, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Missing required parameters", { status: 400 });
   }
 
-  const userRole = await getUserRole({ supabaseClient, user: user as User, workspaceId });
+  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
 
   const { data: survey, error } = await supabaseClient
     .from("survey")
@@ -256,7 +256,7 @@ export default function EditSurveyPage() {
                 qIndex === questionIndex 
                   ? {
                       ...question,
-                      options: question.options.map((option, oIndex) => 
+                      options: (question.options ?? []).map((option, oIndex) =>
                         oIndex === optionIndex 
                           ? { ...option, [field]: value }
                           : option

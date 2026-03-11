@@ -1,6 +1,7 @@
 import { json } from "@remix-run/node";
 import twilio from "twilio";
 import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -13,11 +14,20 @@ interface GenerateTokenParams {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
-  let url = new URL(request.url);
-  let identity = url.searchParams.get('id') ?? '';
-  let workspace = url.searchParams.get('workspace') ?? '';
-  // const baseUrl = process.env['BASE_URL'];
+  const { supabaseClient: supabase, user } = await getSupabaseServerClientWithSession(request);
+  const url = new URL(request.url);
+  const workspace = url.searchParams.get('workspace') ?? '';
+
+  if (!workspace) {
+    return json({ error: 'workspace is required' }, { status: 400 });
+  }
+
+  await requireWorkspaceAccess({
+    supabaseClient: supabase,
+    user,
+    workspaceId: workspace,
+  });
+
   const { data, error } = await supabase
     .from('workspace')
     .select('twilio_data, key, token')
@@ -41,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     twilioAccountSid,
     twilioApiKey,
     twilioApiSecret,
-    { identity: identity ?? '' }
+    { identity: user.id }
   );
   token.addGrant(voiceGrant);
   logger.debug("Generated Twilio token");

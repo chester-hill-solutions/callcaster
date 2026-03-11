@@ -6,12 +6,25 @@ import { Call } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
 const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
     const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
     if (error) throw new Error(`Error fetching call data: ${error.message}`);
     return data;
+};
+
+const fetchWorkspaceAuthToken = async (workspaceId: string) => {
+    const { data, error } = await supabase
+        .from("workspace")
+        .select("twilio_data")
+        .eq("id", workspaceId)
+        .single();
+    if (error) throw new Error(`Error fetching workspace auth token: ${error.message}`);
+    const authToken = (data?.twilio_data as { authToken?: string } | null)?.authToken;
+    if (!authToken) throw new Error("Workspace Twilio auth token not found");
+    return authToken;
 };
 
 const fetchCampaignData = async (campaignId: string) => {
@@ -77,11 +90,19 @@ const handleMachineAnswer = async (
     outreachStatus: OutreachStatusItem[]
 ) => {
     const twiml = new Twilio.twiml.VoiceResponse();
-    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, outreachStatus[0].user_id?.toString() ?? '');
+    const firstOutreachStatus = outreachStatus[0];
+    if (!firstOutreachStatus) {
+        await call.update({ twiml: "<Response><Hangup/></Response>" });
+        return new Response(twiml.toString(), {
+            headers: { 'Content-Type': 'text/xml' }
+        });
+    }
 
-    const conferences = await twilio.conferences.list({ friendlyName: outreachStatus[0].user_id?.toString() ?? '', status: 'in-progress' });
+    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, firstOutreachStatus.user_id?.toString() ?? '');
+
+    const conferences = await twilio.conferences.list({ friendlyName: firstOutreachStatus.user_id?.toString() ?? '', status: 'in-progress' });
     if (conferences.length) {
-        await triggerAutoDialer(outreachStatus[0].user_id?.toString() ?? '', outreachStatus[0].campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+        await triggerAutoDialer(firstOutreachStatus.user_id?.toString() ?? '', firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
     }
 
     const playTwiml = `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`;
@@ -96,7 +117,7 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
     const twiml = new Twilio.twiml.VoiceResponse();
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
-        await updateOutreachAttempt(dbCall.outreach_attempt_id?.toString() ?? '', { answered_at: new Date().toISOString() });
+        await updateOutreachAttempt(String(dbCall.outreach_attempt_id), { answered_at: new Date().toISOString() });
     }
 
     const dial = twiml.dial();
@@ -146,15 +167,29 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const conferenceName = params.roomId;
     const realtime = supabase.realtime.channel(conferenceName)
     const formData = await request.formData();
+    const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
     const answeredBy = formData.get('AnsweredBy') as string;
     const callStatus = formData.get('CallStatus') as string;
-    const called = formData.get('Called') as string;
+    const called = (formData.get('Called') ?? "").toString();
 
     let response: Response;
     
     try {
         const dbCall = await fetchCallData(callSid);
+        const authToken = await fetchWorkspaceAuthToken(dbCall.workspace?.toString() ?? "");
+        const isValidTwilioRequest = validateTwilioWebhookParams(
+            parsedBody,
+            request.headers.get("x-twilio-signature"),
+            request.url,
+            authToken
+        );
+        if (!isValidTwilioRequest) {
+            return new Response(`<Response><Hangup/></Response>`, {
+                status: 403,
+                headers: { 'Content-Type': 'text/xml' }
+            });
+        }
         const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
 
         if (await checkUserDevices(dbCall.contact_id?.toString() ?? '', conferenceName, called, campaign.caller_id?.toString() ?? '')) {
@@ -186,7 +221,7 @@ export const action = async ({ request, params }: { request: Request, params: { 
                 }
             } else {
                 //This is a human answer
-                response = await handleHumanAnswer(dbCall, conferenceName, called?.toString() ?? '');
+                response = await handleHumanAnswer(dbCall, conferenceName, called);
             }
         }
     } catch (error) {

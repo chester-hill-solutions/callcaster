@@ -249,8 +249,8 @@ const processResult = async (supabase, script, currentStep, result, userInput, o
   if (step === 'hangup') {
     return { step, result };
   }
-  let [currentPageId, currentBlockId] = step.split(':');
-  let currentBlock = script.blocks[currentBlockId];
+  const [currentPageId, currentBlockId] = step.split(':');
+  const currentBlock = script.blocks[currentBlockId];
 
   if (userInput !== undefined) {
     // Ensure the result structure matches the script structure
@@ -305,12 +305,12 @@ const getWorkspaceData = async (supabase, workspace_id: string) => {
   return data;
 };
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const startTime = Date.now();
   
   try {
     // Get request details for validation
-    const publicUrl = `https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/ivr-flow`;
+    const publicUrl = `${baseUrl}/ivr-flow`;
     const twilioSignature = req.headers.get('x-twilio-signature');
     
     const formData = await req.formData();
@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
     let [currentPageId, currentBlockId] = currentStep.split(':');
     const script = callData.campaign.ivr_campaign[0].script.steps;
     let currentBlock = script.blocks[currentBlockId];
-    let userInput = event.Digits || event.SpeechResult;
+    const userInput = event.Digits || event.SpeechResult;
     let result = callData.outreach_attempt?.result || {};
 
     if (event.AnsweredBy?.includes('machine') && !event.AnsweredBy.includes('other')) {
@@ -449,4 +449,8 @@ Deno.serve(async (req) => {
       status: 500
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

@@ -104,7 +104,7 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
                 name="message"
                 rows={4}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600"
               ></textarea>
             </div>
             <Button

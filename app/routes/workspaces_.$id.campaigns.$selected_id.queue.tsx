@@ -1,19 +1,26 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
-import { Suspense, useState } from "react";
+import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { parseActionRequest } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign } from "@/lib/types";
-import { Contact } from "@/lib/types";
+import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
+import type { AppError } from "@/lib/errors.server";
+import {
+    applyQueueStatusFilter,
+    COMPLETED_QUEUE_COUNT_FILTER,
+    QUEUE_STATUS_QUEUED,
+    type QueueStatusFilter,
+} from "@/lib/queue-status";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
-    queueError: AppError | null;
+    queueError: AppError | Error | null;
     totalCount: number | null;
     unfilteredCount: number | null;
     queuedCount: number | null;
@@ -55,7 +62,8 @@ export const filteredSearch = (query: string, filters: { name: string, phone: st
         }
     }
     if (filters.queueStatus) {
-        searchQuery = searchQuery.eq('status', filters.queueStatus);
+        const queueStatus = filters.queueStatus as QueueStatusFilter;
+        searchQuery = applyQueueStatusFilter(searchQuery, queueStatus);
     }
     if (filters.audiences) {
         const audienceId = Number(filters.audiences);
@@ -108,9 +116,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         )`
     ];
 
-    const [queueData, unfilteredCount, totalCount, queuedCount] = await Promise.all([
+    const [queueData, unfilteredCount, queuedCount] = await Promise.all([
         filteredSearch("", filters, supabaseClient, selectFields, selected_id)
-            .eq('contact.outreach_attempt.campaign_id', selected_id)
             .range(offset, offset + pageSize - 1)
             .then(({ data, error, count }) => ({ data, error, count })),
         supabaseClient
@@ -122,19 +129,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             .from("campaign_queue")
             .select('id', { count: 'exact' })
             .eq('campaign_id', Number(selected_id))
-            .then(({ count, error }) => ({ count, error })),
-        supabaseClient
-            .from("campaign_queue")
-            .select('id', { count: 'exact' })
-            .eq('campaign_id', Number(selected_id))
-            .eq('status', 'queued')
+            .eq('status', QUEUE_STATUS_QUEUED)
             .then(({ count, error }) => ({ count, error })),
     ]);
 
     const queueResponse: QueueResponse = {
         queueData: queueData.data as (QueueItem & { contact: Contact; audiences: Audience[] })[] | null,
         queueError: queueData.error || null,
-        totalCount: totalCount.count,
+        totalCount: queueData.count,
         queuedCount: queuedCount.count,
         unfilteredCount: unfilteredCount.count,
         currentPage: page,
@@ -163,18 +165,53 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const ids = data.ids;
         const newStatus = data.status as string;
         const isAllSelected = data.isAllSelected === true || data.isAllSelected === "true";
+        const filters = typeof data.filters === "string"
+            ? JSON.parse(data.filters)
+            : (data.filters as QueueResponse["filters"] | undefined);
 
         if (isAllSelected) {
+            const filteredIdsQuery = filteredSearch(
+                "",
+                filters || {
+                    name: "",
+                    phone: "",
+                    email: "",
+                    address: "",
+                    audiences: "",
+                    disposition: "",
+                    queueStatus: "",
+                },
+                supabaseClient,
+                ["id"],
+                selected_id,
+            );
+            const { data: filteredRows, error: filteredRowsError } = await filteredIdsQuery;
+
+            if (filteredRowsError) {
+                return json({ success: false, error: filteredRowsError.message });
+            }
+
+            const filteredIds = ((filteredRows ?? []) as unknown as Array<{ id: number | string }>)
+                .map((row) => {
+                    const id = row?.id ?? null;
+                    return typeof id === "number" ? id : Number(id);
+                })
+                .filter((id): id is number => Number.isFinite(id));
+
+            if (filteredIds.length === 0) {
+                return json({ success: true });
+            }
+
             const { error } = await supabaseClient
                 .from("campaign_queue")
                 .update({ status: newStatus })
-                .eq("campaign_id", parseInt(selected_id));
+                .in("id", filteredIds);
 
             if (error) {
                 return json({ success: false, error: error.message });
             }
         } else {
-            const updateIds = (Array.isArray(ids) ? ids : JSON.parse(ids ?? "[]")).map(
+            const updateIds = (Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))).map(
                 (item: string | { id: string }) => (typeof item === "object" ? item.id : item)
             );
             
@@ -205,38 +242,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
 
         const contactIds = contacts.map((contact) => contact.contact_id);
-        const queueItems = contactIds.map((contactId) => ({
-            campaign_id: parseInt(selected_id),
-            contact_id: contactId,
-            status: "queued",
-        }));
-
-        const { error: insertError } = await supabaseClient
-            .from("campaign_queue")
-            .insert(queueItems);
-
-        if (insertError) {
-            return json({ success: false, error: insertError.message });
-        }
+        await enqueueContactsForCampaign(
+            supabaseClient,
+            parseInt(selected_id),
+            contactIds,
+            { requeue: false }
+        );
 
         return json({ success: true });
     }
 
     if (intent === "add_contacts") {
         const contacts = (typeof data.contacts === "string" ? JSON.parse(data.contacts) : data.contacts) as Contact[];
-        const queueItems = contacts.map((contact) => ({
-            campaign_id: parseInt(selected_id),
-            contact_id: contact.id,
-            status: "queued",
-        }));
-
-        const { error } = await supabaseClient
-            .from("campaign_queue")
-            .insert(queueItems);
-
-        if (error) {
-            return json({ success: false, error: error.message });
-        }
+        await enqueueContactsForCampaign(
+            supabaseClient,
+            parseInt(selected_id),
+            contacts.map((contact) => contact.id),
+            { requeue: false }
+        );
 
         return json({ success: true });
     }
@@ -255,7 +278,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 return json({ success: false, error: error.message });
             }
         } else {
-            const removeIds = (Array.isArray(ids) ? ids : JSON.parse(ids ?? "[]")).map(
+            const removeIds = (Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))).map(
                 (item: string | { id: string }) => (typeof item === "object" ? item.id : item)
             );
             
@@ -319,8 +342,15 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
     };
 
     const handleStatusChange = (ids: string[], newStatus: string, isAllSelected: boolean) => {
+        const filters = Object.fromEntries(params.entries());
         fetcher.submit(
-            { intent: "update_status", ids: isAllSelected ? 'all' : ids, status: newStatus, isAllSelected },
+            {
+                intent: "update_status",
+                ids: isAllSelected ? 'all' : ids,
+                status: newStatus,
+                isAllSelected,
+                filters: JSON.stringify(filters),
+            },
             { method: "POST", encType: "application/json" }
         );
     };
@@ -328,7 +358,7 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
     const handleAddFromAudience = (audienceId: number) => {
         fetcher.submit(
             { audience_id: audienceId, campaign_id: Number(campaignId) },
-            { action: "/api/campaign_audience", method: "POST", encType: "application/json", navigate: false }
+            { action: "/api/campaign_audience", method: "POST", encType: "application/json" }
         );
     };
 
@@ -339,7 +369,7 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
                 campaign_id: Number(campaignId),
                 startOrder: unfilteredCount
             },
-            { action: "/api/campaign_queue", method: "POST", encType: "application/json", navigate: false }
+            { action: "/api/campaign_queue", method: "POST", encType: "application/json" }
         );
     };
 
@@ -349,7 +379,7 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
             ids === 'all'
                 ? { campaign_id: Number(campaignId), filters }
                 : { ids, campaign_id: Number(campaignId) },
-            { method: "DELETE", encType: "application/json", navigate: false, action: "/api/campaign_queue" }
+            { method: "DELETE", encType: "application/json", action: "/api/campaign_queue" }
         );
     };
 
@@ -362,6 +392,78 @@ function useQueueActions(campaignId: string, unfilteredCount: number) {
         handleRemoveContactsFromQueue,
         queueFetcher: fetcher,
     };
+}
+
+function QueueResolvedContent({
+    queueValue,
+    campaignId,
+    selectedAudienceIds,
+    audiences,
+    supabase,
+    campaignWorkspace,
+    isSelectingAudience,
+    selectedAudience,
+    setIsSelectingAudience,
+    setSelectedAudience,
+    isAllFilteredSelected,
+    setIsAllFilteredSelected,
+    searchModalOpen,
+    setSearchModalOpen,
+}: {
+    queueValue: QueueResponse;
+    campaignId: string;
+    selectedAudienceIds: number[];
+    audiences: NonNullable<Audience>[];
+    supabase: SupabaseClient;
+    campaignWorkspace: string;
+    isSelectingAudience: boolean;
+    selectedAudience: number | null;
+    setIsSelectingAudience: Dispatch<SetStateAction<boolean>>;
+    setSelectedAudience: Dispatch<SetStateAction<number | null>>;
+    isAllFilteredSelected: boolean;
+    setIsAllFilteredSelected: Dispatch<SetStateAction<boolean>>;
+    searchModalOpen: boolean;
+    setSearchModalOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+    const queueActions = useQueueActions(campaignId, queueValue.unfilteredCount ?? 0);
+    const queueContentValue = {
+        ...queueValue,
+        queueError: queueValue.queueError || null,
+    } as QueueResponse;
+
+    return (
+        <>
+            <ContactSearchDialog
+                open={searchModalOpen}
+                onOpenChange={setSearchModalOpen}
+                campaignId={campaignId}
+                workspaceId={campaignWorkspace}
+                unfilteredCount={queueValue.unfilteredCount ?? 0}
+                onAddToQueue={queueActions.handleAddContactToQueue}
+            />
+            <QueueContent
+                queueValue={queueContentValue}
+                audiences={audiences}
+                isSelectingAudience={isSelectingAudience}
+                selectedAudience={selectedAudience}
+                setIsSelectingAudience={setIsSelectingAudience}
+                setSelectedAudience={setSelectedAudience}
+                handleAddFromAudience={queueActions.handleAddFromAudience}
+                handleAddContact={() => setSearchModalOpen(true)}
+                onStatusChange={(ids, status) => queueActions.handleStatusChange(ids, status, isAllFilteredSelected)}
+                isAllFilteredSelected={isAllFilteredSelected}
+                setIsAllFilteredSelected={setIsAllFilteredSelected}
+                selectedAudienceIds={selectedAudienceIds}
+                campaignId={campaignId}
+                supabase={supabase}
+                handleFilterChange={queueActions.handleFilterChange}
+                clearFilter={queueActions.clearFilter}
+                addContactToQueue={queueActions.handleAddContactToQueue}
+                removeContactsFromQueue={queueActions.handleRemoveContactsFromQueue}
+                queueFetcher={queueActions.queueFetcher}
+            />
+        </>
+    );
 }
 
 export default function Queue() {
@@ -381,44 +483,23 @@ export default function Queue() {
         <Suspense fallback={<div className="flex justify-center items-center p-8"><Spinner className="h-8 w-8" /></div>}>
             <Await resolve={queuePromise}>
                 {(queueValue) => {
-                    const queueActions = useQueueActions(campaignId, queueValue.unfilteredCount ?? 0);
-                    const queueContentValue = {
-                        ...queueValue,
-                        queueError: queueValue.queueError || null
-                    } as QueueResponse;
-
                     return (
-                        <>
-                            <ContactSearchDialog
-                                open={searchModalOpen}
-                                onOpenChange={setSearchModalOpen}
-                                campaignId={campaignId}
-                                workspaceId={campaignData.workspace}
-                                unfilteredCount={queueValue.unfilteredCount ?? 0}
-                                onAddToQueue={queueActions.handleAddContactToQueue}
-                            />
-                            <QueueContent
-                                queueValue={queueContentValue}
-                                audiences={audiences}
-                                isSelectingAudience={isSelectingAudience}
-                                selectedAudience={selectedAudience}
-                                setIsSelectingAudience={setIsSelectingAudience}
-                                setSelectedAudience={setSelectedAudience}
-                                handleAddFromAudience={queueActions.handleAddFromAudience}
-                                handleAddContact={() => setSearchModalOpen(true)}
-                                onStatusChange={(ids, status) => queueActions.handleStatusChange(ids, status, isAllFilteredSelected)}
-                                isAllFilteredSelected={isAllFilteredSelected}
-                                setIsAllFilteredSelected={setIsAllFilteredSelected}
-                                selectedAudienceIds={selectedAudienceIds}
-                                campaignId={campaignId}
-                                supabase={supabase}
-                                handleFilterChange={queueActions.handleFilterChange}
-                                clearFilter={queueActions.clearFilter}
-                                addContactToQueue={queueActions.handleAddContactToQueue}
-                                removeContactsFromQueue={queueActions.handleRemoveContactsFromQueue}
-                                queueFetcher={queueActions.queueFetcher}
-                            />
-                        </>
+                        <QueueResolvedContent
+                            queueValue={queueValue as QueueResponse}
+                            campaignId={campaignId}
+                            selectedAudienceIds={selectedAudienceIds}
+                            audiences={audiences}
+                            supabase={supabase}
+                            campaignWorkspace={campaignData.workspace}
+                            isSelectingAudience={isSelectingAudience}
+                            selectedAudience={selectedAudience}
+                            setIsSelectingAudience={setIsSelectingAudience}
+                            setSelectedAudience={setSelectedAudience}
+                            isAllFilteredSelected={isAllFilteredSelected}
+                            setIsAllFilteredSelected={setIsAllFilteredSelected}
+                            searchModalOpen={searchModalOpen}
+                            setSearchModalOpen={setSearchModalOpen}
+                        />
                     );
                 }}
             </Await>

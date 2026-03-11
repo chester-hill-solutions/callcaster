@@ -157,6 +157,7 @@ export default function WorkspaceExports() {
       const interval = setInterval(revalidate, 5000); // Poll every 5 seconds
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [exports, revalidate]);
 
   const getProgressDisplay = (exportItem: ExportItem) => {

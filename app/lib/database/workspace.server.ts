@@ -7,7 +7,20 @@ import type { Database } from "../database.types";
 import {
   WorkspaceData,
   WorkspaceNumbers,
-  User,
+  type TwilioAccountData,
+  type TwilioMessageIntent,
+  TWILIO_MESSAGE_INTENT_VALUES,
+  TWILIO_MULTI_TENANCY_MODE_VALUES,
+  TWILIO_ONBOARDING_STATUS_VALUES,
+  TWILIO_SEND_MODE_VALUES,
+  TWILIO_THROUGHPUT_PRODUCT_VALUES,
+  TWILIO_TRAFFIC_CLASS_VALUES,
+  type TwilioTrafficClass,
+  type WorkspaceTwilioOpsAuditEntry,
+  type WorkspaceTwilioOpsConfig,
+  type WorkspaceTwilioPortalMetrics,
+  type WorkspaceTwilioPortalRecommendation,
+  type WorkspaceTwilioSyncSnapshot,
 } from "../types";
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -15,6 +28,727 @@ import { env } from "../env.server";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";
 import { createStripeContact } from "./stripe.server";
+import { AppError, ErrorCode } from "@/lib/errors.server";
+import {
+  buildOnboardingStepsForState,
+  DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+  deriveWorkspaceMessagingReadiness,
+  getWorkspaceMessagingOnboardingFromTwilioData,
+  mergeWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
+import { ensureWorkspaceTwilioBootstrap, syncWorkspaceTwilioBootstrapState } from "@/lib/twilio-bootstrap.server";
+import {
+  getConversationParticipantPhones,
+  getConversationPhoneKey,
+  sortConversationSummaries,
+  type ChatSortOption,
+  type ConversationSummary,
+} from "../chat-conversation-sort";
+
+async function syncWorkspaceTwilioBootstrapStateSafely(args: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  try {
+    await syncWorkspaceTwilioBootstrapState(args);
+  } catch (error) {
+    logger.error("Failed to sync workspace Twilio bootstrap state:", {
+      workspaceId: args.workspaceId,
+      error,
+    });
+  }
+}
+
+const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
+  trafficClass: "unknown",
+  throughputProduct: "none",
+  multiTenancyMode: "none",
+  trafficShapingEnabled: false,
+  defaultMessageIntent: null,
+  sendMode: "from_number",
+  messagingServiceSid: null,
+  onboardingStatus: "not_started",
+  supportNotes: "",
+  updatedAt: null,
+  updatedBy: null,
+  auditTrail: [],
+};
+
+const DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT: WorkspaceTwilioSyncSnapshot = {
+  accountStatus: null,
+  accountFriendlyName: null,
+  phoneNumberCount: 0,
+  numberTypes: [],
+  recentUsageCount: 0,
+  usageTotalPrice: null,
+  lastSyncedAt: null,
+  lastSyncStatus: "never_synced",
+  lastSyncError: null,
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function pickEnumValue<const T extends readonly string[]>(
+  value: unknown,
+  allowedValues: T,
+  fallback: T[number],
+): T[number] {
+  return typeof value === "string" && allowedValues.includes(value) ? value : fallback;
+}
+
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function parseAuditTrail(value: unknown): WorkspaceTwilioOpsAuditEntry[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((entry) => ({
+      changedAt: typeof entry.changedAt === "string" ? entry.changedAt : new Date(0).toISOString(),
+      actorUserId: typeof entry.actorUserId === "string" ? entry.actorUserId : null,
+      actorUsername: typeof entry.actorUsername === "string" ? entry.actorUsername : null,
+      summary: typeof entry.summary === "string" ? entry.summary : "Saved Twilio portal settings",
+    }))
+    .slice(0, 10);
+}
+
+function mapOnboardingStateToPortalStatus(
+  onboardingStatus: ReturnType<typeof getWorkspaceMessagingOnboardingFromTwilioData>["status"],
+): WorkspaceTwilioOpsConfig["onboardingStatus"] {
+  switch (onboardingStatus) {
+    case "approved":
+    case "live":
+      return "enabled";
+    case "provisioning":
+    case "submitting":
+    case "in_review":
+      return "requested";
+    case "collecting_business":
+      return "planned";
+    case "not_started":
+    case "rejected":
+      return "not_started";
+    default: {
+      const exhaustiveCheck: never = onboardingStatus;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+export function normalizeWorkspaceTwilioOpsConfig(value: unknown): WorkspaceTwilioOpsConfig {
+  if (!isRecord(value)) {
+    return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
+  }
+
+  const defaultMessageIntent =
+    typeof value.defaultMessageIntent === "string" &&
+    TWILIO_MESSAGE_INTENT_VALUES.includes(value.defaultMessageIntent as TwilioMessageIntent)
+      ? (value.defaultMessageIntent as TwilioMessageIntent)
+      : null;
+
+  return {
+    trafficClass: pickEnumValue(
+      value.trafficClass,
+      TWILIO_TRAFFIC_CLASS_VALUES,
+      DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.trafficClass,
+    ),
+    throughputProduct: pickEnumValue(
+      value.throughputProduct,
+      TWILIO_THROUGHPUT_PRODUCT_VALUES,
+      DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.throughputProduct,
+    ),
+    multiTenancyMode: pickEnumValue(
+      value.multiTenancyMode,
+      TWILIO_MULTI_TENANCY_MODE_VALUES,
+      DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.multiTenancyMode,
+    ),
+    trafficShapingEnabled:
+      typeof value.trafficShapingEnabled === "boolean"
+        ? value.trafficShapingEnabled
+        : DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.trafficShapingEnabled,
+    defaultMessageIntent,
+    sendMode: pickEnumValue(
+      value.sendMode,
+      TWILIO_SEND_MODE_VALUES,
+      DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.sendMode,
+    ),
+    messagingServiceSid: parseOptionalString(value.messagingServiceSid),
+    onboardingStatus: pickEnumValue(
+      value.onboardingStatus,
+      TWILIO_ONBOARDING_STATUS_VALUES,
+      DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.onboardingStatus,
+    ),
+    supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
+    updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
+    auditTrail: parseAuditTrail(value.auditTrail),
+  };
+}
+
+export function getWorkspaceTwilioPortalConfigFromTwilioData(
+  twilioData: TwilioAccountData,
+): WorkspaceTwilioOpsConfig {
+  if (!twilioData || !isRecord(twilioData)) {
+    return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
+  }
+
+  const config = normalizeWorkspaceTwilioOpsConfig(twilioData.portalConfig);
+  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+
+  return normalizeWorkspaceTwilioOpsConfig({
+    ...config,
+    sendMode:
+      onboarding.messagingService.desiredSendMode === "messaging_service"
+        ? "messaging_service"
+        : config.sendMode,
+    messagingServiceSid:
+      onboarding.messagingService.serviceSid ?? config.messagingServiceSid,
+    onboardingStatus: mapOnboardingStateToPortalStatus(onboarding.status),
+    trafficClass:
+      onboarding.selectedChannels.includes("a2p10dlc") && config.trafficClass === "unknown"
+        ? "a2p10dlc"
+        : config.trafficClass,
+  });
+}
+
+export function normalizeWorkspaceTwilioSyncSnapshot(value: unknown): WorkspaceTwilioSyncSnapshot {
+  if (!isRecord(value)) {
+    return { ...DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT };
+  }
+
+  const lastSyncStatus =
+    value.lastSyncStatus === "syncing" ||
+    value.lastSyncStatus === "healthy" ||
+    value.lastSyncStatus === "error" ||
+    value.lastSyncStatus === "never_synced"
+      ? value.lastSyncStatus
+      : DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT.lastSyncStatus;
+
+  return {
+    accountStatus: parseOptionalString(value.accountStatus),
+    accountFriendlyName: parseOptionalString(value.accountFriendlyName),
+    phoneNumberCount: typeof value.phoneNumberCount === "number" ? value.phoneNumberCount : 0,
+    numberTypes: Array.isArray(value.numberTypes)
+      ? value.numberTypes.filter((item): item is string => typeof item === "string")
+      : [],
+    recentUsageCount: typeof value.recentUsageCount === "number" ? value.recentUsageCount : 0,
+    usageTotalPrice:
+      typeof value.usageTotalPrice === "number" ? value.usageTotalPrice : null,
+    lastSyncedAt: parseOptionalString(value.lastSyncedAt),
+    lastSyncStatus,
+    lastSyncError: parseOptionalString(value.lastSyncError),
+  };
+}
+
+export function getWorkspaceTwilioSyncSnapshotFromTwilioData(
+  twilioData: TwilioAccountData,
+): WorkspaceTwilioSyncSnapshot {
+  if (!twilioData || !isRecord(twilioData)) {
+    return { ...DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT };
+  }
+
+  return normalizeWorkspaceTwilioSyncSnapshot(twilioData.portalSync);
+}
+
+export function detectTwilioTrafficClass(numberTypes: string[]): TwilioTrafficClass {
+  const normalizedTypes = numberTypes.map((value) => value.toLowerCase());
+
+  if (normalizedTypes.some((value) => value.includes("short"))) {
+    return "short_code";
+  }
+  if (normalizedTypes.some((value) => value.includes("toll"))) {
+    return "toll_free";
+  }
+  if (normalizedTypes.some((value) => value.includes("alpha"))) {
+    return "alphanumeric";
+  }
+  if (normalizedTypes.some((value) => value.includes("international"))) {
+    return "international_long_code";
+  }
+  if (
+    normalizedTypes.some(
+      (value) =>
+        value.includes("10dlc") ||
+        value.includes("local") ||
+        value.includes("mobile") ||
+        value.includes("long"),
+    )
+  ) {
+    return "a2p10dlc";
+  }
+
+  return "unknown";
+}
+
+function buildTwilioPortalAuditSummary(
+  currentConfig: WorkspaceTwilioOpsConfig,
+  nextConfig: WorkspaceTwilioOpsConfig,
+): string {
+  const changedFields: string[] = [];
+
+  if (currentConfig.trafficClass !== nextConfig.trafficClass) {
+    changedFields.push(`traffic class to ${nextConfig.trafficClass}`);
+  }
+  if (currentConfig.throughputProduct !== nextConfig.throughputProduct) {
+    changedFields.push(`throughput product to ${nextConfig.throughputProduct}`);
+  }
+  if (currentConfig.multiTenancyMode !== nextConfig.multiTenancyMode) {
+    changedFields.push(`multi-tenancy to ${nextConfig.multiTenancyMode}`);
+  }
+  if (currentConfig.sendMode !== nextConfig.sendMode) {
+    changedFields.push(`send mode to ${nextConfig.sendMode}`);
+  }
+  if (currentConfig.messagingServiceSid !== nextConfig.messagingServiceSid) {
+    changedFields.push("messaging service SID");
+  }
+  if (currentConfig.defaultMessageIntent !== nextConfig.defaultMessageIntent) {
+    changedFields.push("default MessageIntent");
+  }
+  if (currentConfig.onboardingStatus !== nextConfig.onboardingStatus) {
+    changedFields.push(`onboarding status to ${nextConfig.onboardingStatus}`);
+  }
+  if (currentConfig.trafficShapingEnabled !== nextConfig.trafficShapingEnabled) {
+    changedFields.push(
+      nextConfig.trafficShapingEnabled ? "enabled traffic shaping" : "disabled traffic shaping",
+    );
+  }
+  if (currentConfig.supportNotes !== nextConfig.supportNotes) {
+    changedFields.push("support notes");
+  }
+
+  if (changedFields.length === 0) {
+    return "Saved Twilio portal settings";
+  }
+
+  return `Updated ${changedFields.join(", ")}`;
+}
+
+export async function getWorkspaceTwilioPortalConfig({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return getWorkspaceTwilioPortalConfigFromTwilioData((data?.twilio_data ?? null) as TwilioAccountData);
+}
+
+export async function updateWorkspaceTwilioPortalConfig({
+  supabaseClient,
+  workspaceId,
+  updates,
+  actorUserId,
+  actorUsername,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  updates: Partial<WorkspaceTwilioOpsConfig>;
+  actorUserId: string | null;
+  actorUsername: string | null;
+}) {
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const currentConfig = getWorkspaceTwilioPortalConfigFromTwilioData(
+    (data?.twilio_data ?? null) as TwilioAccountData,
+  );
+
+  const mergedConfig = normalizeWorkspaceTwilioOpsConfig({
+    ...currentConfig,
+    ...updates,
+    auditTrail: currentConfig.auditTrail,
+    updatedAt: currentConfig.updatedAt,
+    updatedBy: currentConfig.updatedBy,
+  });
+
+  const changedAt = new Date().toISOString();
+  const auditEntry: WorkspaceTwilioOpsAuditEntry = {
+    changedAt,
+    actorUserId,
+    actorUsername,
+    summary: buildTwilioPortalAuditSummary(currentConfig, mergedConfig),
+  };
+
+  const nextConfig: WorkspaceTwilioOpsConfig = {
+    ...mergedConfig,
+    updatedAt: changedAt,
+    updatedBy: actorUserId,
+    auditTrail: [auditEntry, ...currentConfig.auditTrail].slice(0, 10),
+  };
+
+  const nextTwilioData = {
+    ...currentTwilioData,
+    portalConfig: nextConfig,
+  };
+
+  const { error: updateError } = await supabaseClient
+    .from("workspace")
+    .update({ twilio_data: nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"] })
+    .eq("id", workspaceId);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  return nextConfig;
+}
+
+export async function updateWorkspaceTwilioSyncSnapshot({
+  supabaseClient,
+  workspaceId,
+  snapshot,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  snapshot: WorkspaceTwilioSyncSnapshot;
+}) {
+  const { data, error } = await supabaseClient
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const nextTwilioData = {
+    ...currentTwilioData,
+    portalSync: normalizeWorkspaceTwilioSyncSnapshot(snapshot),
+  };
+
+  const { error: updateError } = await supabaseClient
+    .from("workspace")
+    .update({ twilio_data: nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"] })
+    .eq("id", workspaceId);
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  return normalizeWorkspaceTwilioSyncSnapshot(snapshot);
+}
+
+export async function syncWorkspaceTwilioSnapshot({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const { data: workspace, error } = await supabaseClient
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  const twilioData = isRecord(workspace?.twilio_data) ? workspace.twilio_data : {};
+  const sid = typeof twilioData.sid === "string" ? twilioData.sid : null;
+  const authToken = typeof twilioData.authToken === "string" ? twilioData.authToken : null;
+
+  if (!sid || !authToken) {
+    const snapshot = await updateWorkspaceTwilioSyncSnapshot({
+      supabaseClient,
+      workspaceId,
+      snapshot: {
+        accountStatus: null,
+        accountFriendlyName: null,
+        phoneNumberCount: 0,
+        numberTypes: [],
+        recentUsageCount: 0,
+        usageTotalPrice: null,
+        lastSyncedAt: new Date().toISOString(),
+        lastSyncStatus: "error",
+        lastSyncError: "Missing workspace Twilio credentials",
+      },
+    });
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    return snapshot;
+  }
+
+  try {
+    const twilio = new Twilio.Twilio(sid, authToken);
+    const [account, numbers, usageRecords] = await Promise.all([
+      twilio.api.v2010.accounts(sid).fetch(),
+      twilio.incomingPhoneNumbers.list({ limit: 200 }),
+      twilio.usage.records.list(),
+    ]);
+
+    const numberTypes = Array.from(
+      new Set(
+        numbers.flatMap((number) => {
+          const detectedTypes: string[] = [];
+          if (number.capabilities.sms) detectedTypes.push("sms");
+          if (number.capabilities.mms) detectedTypes.push("mms");
+          if (number.capabilities.voice) detectedTypes.push("voice");
+          return detectedTypes;
+        }),
+      ),
+    );
+
+    const usageTotalPrice = usageRecords.reduce((sum, record) => {
+      const price = Number(record.price ?? 0);
+      return Number.isFinite(price) ? sum + price : sum;
+    }, 0);
+
+    const snapshot = await updateWorkspaceTwilioSyncSnapshot({
+      supabaseClient,
+      workspaceId,
+      snapshot: {
+        accountStatus: account.status,
+        accountFriendlyName: account.friendlyName,
+        phoneNumberCount: numbers.length,
+        numberTypes,
+        recentUsageCount: usageRecords.length,
+        usageTotalPrice,
+        lastSyncedAt: new Date().toISOString(),
+        lastSyncStatus: "healthy",
+        lastSyncError: null,
+      },
+    });
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    return snapshot;
+  } catch (syncError) {
+    const snapshot = await updateWorkspaceTwilioSyncSnapshot({
+      supabaseClient,
+      workspaceId,
+      snapshot: {
+        accountStatus: null,
+        accountFriendlyName: null,
+        phoneNumberCount: 0,
+        numberTypes: [],
+        recentUsageCount: 0,
+        usageTotalPrice: null,
+        lastSyncedAt: new Date().toISOString(),
+        lastSyncStatus: "error",
+        lastSyncError:
+          syncError instanceof Error ? syncError.message : "Unknown Twilio sync failure",
+      },
+    });
+    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    return snapshot;
+  }
+}
+
+function buildTwilioPortalRecommendations({
+  config,
+  detectedTrafficClass,
+  metrics,
+}: {
+  config: WorkspaceTwilioOpsConfig;
+  detectedTrafficClass: TwilioTrafficClass;
+  metrics: WorkspaceTwilioPortalMetrics;
+}): WorkspaceTwilioPortalRecommendation[] {
+  const recommendations: WorkspaceTwilioPortalRecommendation[] = [];
+
+  if (config.trafficClass === "a2p10dlc" && config.throughputProduct !== "none") {
+    recommendations.push({
+      severity: "warning",
+      message:
+        "US/Canada A2P 10DLC traffic is carrier-capped, so parent-account throughput products will not raise campaign MPS.",
+    });
+  }
+
+  if (
+    config.sendMode === "messaging_service" &&
+    !config.messagingServiceSid
+  ) {
+    recommendations.push({
+      severity: "warning",
+      message: "This workspace is set to Messaging Service mode, but no Messaging Service SID is configured.",
+    });
+  }
+
+  if (
+    config.trafficShapingEnabled &&
+    !config.defaultMessageIntent
+  ) {
+    recommendations.push({
+      severity: "warning",
+      message:
+        "Traffic Shaping is enabled, but no default MessageIntent is configured, so messages will not be prioritized unless callers override it.",
+    });
+  }
+
+  if (
+    config.trafficClass === "unknown" &&
+    detectedTrafficClass !== "unknown"
+  ) {
+    recommendations.push({
+      severity: "info",
+      message: `Workspace phone numbers suggest ${detectedTrafficClass} traffic. Update the saved traffic class if that matches current operations.`,
+    });
+  }
+
+  if (
+    detectedTrafficClass !== "a2p10dlc" &&
+    detectedTrafficClass !== "unknown" &&
+    config.throughputProduct === "none"
+  ) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "This sender mix is eligible for parent-account throughput controls. Consider Market Throughput or Account Based Throughput plus Multi-Tenancy.",
+    });
+  }
+
+  if (metrics.recentOutboundCount > 0 && metrics.rawFromCount === metrics.recentOutboundCount) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "Recent outbound traffic is using raw From numbers only. Messaging Services can help with sender pooling and throughput operations.",
+    });
+  }
+
+  return recommendations;
+}
+
+export async function getWorkspaceTwilioPortalSnapshot({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  const [{ data: workspace, error: workspaceError }, { data: workspaceNumbers, error: numbersError }, { data: recentMessages, error: messagesError }] =
+    await Promise.all([
+      supabaseClient.from("workspace").select("name, twilio_data").eq("id", workspaceId).single(),
+      supabaseClient
+        .from("workspace_number")
+        .select("type, phone_number, capabilities")
+        .eq("workspace", workspaceId),
+      supabaseClient
+        .from("message")
+        .select("status, messaging_service_sid")
+        .eq("workspace", workspaceId)
+        .eq("direction", "outbound-api")
+        .order("date_created", { ascending: false })
+        .limit(200),
+    ]);
+
+  if (workspaceError) {
+    throw workspaceError;
+  }
+  if (numbersError) {
+    throw numbersError;
+  }
+  if (messagesError) {
+    throw messagesError;
+  }
+
+  const config = getWorkspaceTwilioPortalConfigFromTwilioData(
+    (workspace?.twilio_data ?? null) as TwilioAccountData,
+  );
+  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(
+    (workspace?.twilio_data ?? null) as TwilioAccountData,
+  );
+  const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(
+    (workspace?.twilio_data ?? null) as TwilioAccountData,
+  );
+  const numberTypes = (workspaceNumbers ?? [])
+    .map((number) => number.type)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+  const detectedTrafficClass = detectTwilioTrafficClass(numberTypes);
+  const statusCounts = (recentMessages ?? []).reduce<WorkspaceTwilioPortalMetrics["statusCounts"]>(
+    (acc, message) => {
+      if (message.status) {
+        acc[message.status] = (acc[message.status] ?? 0) + 1;
+      }
+      return acc;
+    },
+    {},
+  );
+
+  const metrics: WorkspaceTwilioPortalMetrics = {
+    recentOutboundCount: recentMessages?.length ?? 0,
+    rawFromCount: (recentMessages ?? []).filter((message) => !message.messaging_service_sid).length,
+    messagingServiceCount: (recentMessages ?? []).filter((message) => !!message.messaging_service_sid).length,
+    statusCounts,
+    numberTypes,
+  };
+
+  const recommendations = buildTwilioPortalRecommendations({
+    config,
+    detectedTrafficClass,
+    metrics,
+  });
+  const readiness = deriveWorkspaceMessagingReadiness({
+    onboarding,
+    workspaceNumbers: (workspaceNumbers ?? []).map((number) => ({
+      type: number.type,
+      phone_number: number.phone_number,
+      capabilities: number.capabilities,
+    })),
+    recentOutboundCount: metrics.recentOutboundCount,
+  });
+
+  if (readiness.shouldShowOnboardingBanner) {
+    recommendations.push(
+      ...readiness.warnings.map((message) => ({
+        severity: "warning" as const,
+        message,
+      })),
+    );
+  }
+
+  const supportRequestSummary = [
+    `Workspace: ${workspace?.name ?? workspaceId}`,
+    `Traffic class: ${config.trafficClass}`,
+    `Detected sender types: ${numberTypes.length ? numberTypes.join(", ") : "none detected"}`,
+    `Throughput product: ${config.throughputProduct}`,
+    `Multi-tenancy: ${config.multiTenancyMode}`,
+    `Traffic shaping: ${config.trafficShapingEnabled ? "enabled" : "disabled"}`,
+    `Default MessageIntent: ${config.defaultMessageIntent ?? "none"}`,
+    `Send mode: ${config.sendMode}`,
+    `Messaging Service SID: ${config.messagingServiceSid ?? "not configured"}`,
+    `Recent outbound messages: ${metrics.recentOutboundCount}`,
+    `Recent messaging-service sends: ${metrics.messagingServiceCount}`,
+    `Recent raw-from sends: ${metrics.rawFromCount}`,
+    `Messaging ready: ${readiness.messagingReady ? "yes" : "no"}`,
+    `Voice ready: ${readiness.voiceReady ? "yes" : "no"}`,
+    `Support notes: ${config.supportNotes || "none"}`,
+  ].join("\n");
+
+  return {
+    config,
+    onboarding,
+    readiness,
+    detectedTrafficClass,
+    metrics,
+    recommendations,
+    supportRequestSummary,
+    syncSnapshot,
+  };
+}
 
 export async function getUserWorkspaces({
   supabaseClient,
@@ -97,7 +831,10 @@ export async function createNewWorkspace({
         user_id,
       });
     if (insertWorkspaceError) {
-      logger.error(insertWorkspaceError);
+      throw insertWorkspaceError;
+    }
+    if (!insertWorkspaceData) {
+      throw new Error("Workspace creation RPC returned no workspace id");
     }
 
     const account = await createSubaccount({
@@ -122,10 +859,31 @@ export async function createNewWorkspace({
       workspace_id: insertWorkspaceData!,
     });
 
+    const seededOnboarding = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        subaccountBootstrap: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.subaccountBootstrap,
+          callbackBaseUrl: env.BASE_URL(),
+          inboundVoiceUrl: `${env.BASE_URL()}/api/inbound`,
+          inboundSmsUrl: `${env.BASE_URL()}/api/inbound-sms`,
+          statusCallbackUrl: `${env.BASE_URL()}/api/caller-id/status`,
+          status: "provisioning",
+        },
+        status: "provisioning",
+        currentStep: "messaging_service",
+        lastUpdatedBy: user_id,
+      },
+    );
+    seededOnboarding.steps = buildOnboardingStepsForState(seededOnboarding);
+
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
       .update({
-        twilio_data: Object(account),
+        twilio_data: {
+          ...Object(account),
+          onboarding: seededOnboarding,
+        },
         key: newKey.sid,
         token: newKey.secret,
         stripe_id: newStripeCustomer.id,
@@ -133,6 +891,16 @@ export async function createNewWorkspace({
       .eq("id", insertWorkspaceData!);
     if (insertWorkspaceUsersError) {
       throw insertWorkspaceUsersError;
+    }
+
+    try {
+      await ensureWorkspaceTwilioBootstrap({
+        supabaseClient,
+        workspaceId: insertWorkspaceData!,
+        actorUserId: user_id,
+      });
+    } catch (bootstrapError) {
+      logger.error("Workspace Twilio bootstrap failed after workspace creation:", bootstrapError);
     }
 
     return { data: insertWorkspaceData, error: null };
@@ -240,6 +1008,34 @@ export async function getWorkspacePhoneNumbers({
   return { data, error };
 }
 
+/**
+ * Returns the first handset-enabled number for the workspace, or the first voice-capable number.
+ * Used by the handset page to show which number to call.
+ */
+export async function getHandsetNumberForWorkspace({
+  supabaseClient,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+}): Promise<{ data: { id: number; phone_number: string | null } | null; error: PostgrestError | null }> {
+  const { data: handset } = await supabaseClient
+    .from("workspace_number")
+    .select("id, phone_number")
+    .eq("workspace", workspaceId)
+    .eq("handset_enabled", true)
+    .limit(1)
+    .maybeSingle();
+  if (handset) return { data: handset, error: null };
+  const { data: first } = await supabaseClient
+    .from("workspace_number")
+    .select("id, phone_number")
+    .eq("workspace", workspaceId)
+    .limit(1)
+    .maybeSingle();
+  return { data: first, error: null };
+}
+
 export async function updateWorkspacePhoneNumber({
   supabaseClient,
   workspaceId,
@@ -248,13 +1044,13 @@ export async function updateWorkspacePhoneNumber({
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
-  numberId: string;
-  updates: Partial<WorkspaceNumbers>;
+  numberId: string | number;
+  updates: Partial<NonNullable<WorkspaceNumbers>>;
 }) {
   const { data, error } = await supabaseClient
     .from("workspace_number")
     .update(updates)
-    .eq("id", numberId)
+    .eq("id", Number(numberId))
     .eq("workspace", workspaceId)
     .select()
     .single();
@@ -290,7 +1086,7 @@ export async function getUserRole({
   workspaceId,
 }: {
   supabaseClient: SupabaseClient;
-  user: User;
+  user: { id: string } | null;
   workspaceId: string;
 }) {
   if (!user) {
@@ -323,10 +1119,9 @@ export async function requireWorkspaceAccess({
   user: { id: string };
   workspaceId: string;
 }): Promise<void> {
-  const { AppError, ErrorCode } = await import("@/lib/errors.server");
   const role = await getUserRole({
     supabaseClient,
-    user: user as User,
+    user,
     workspaceId,
   });
   if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
@@ -441,11 +1236,12 @@ export async function removeWorkspacePhoneNumber({
   workspaceId: string;
   numberId: bigint;
 }) {
+  const normalizedNumberId = Number(numberId);
   try {
     const { data: number, error: numberError } = await supabaseClient
       .from("workspace_number")
       .select()
-      .eq("id", numberId)
+      .eq("id", normalizedNumberId)
       .single();
     if (numberError) throw numberError;
     const twilio = await createWorkspaceTwilioInstance({
@@ -461,16 +1257,18 @@ export async function removeWorkspacePhoneNumber({
     const incomingIds = await twilio.incomingPhoneNumbers.list({
       friendlyName: number.friendly_name,
     });
-    outgoingIds.map(async (id) => {
-      return await twilio.outgoingCallerIds(id.sid).remove();
-    });
-    incomingIds.map(async (id) => {
-      return await twilio.incomingPhoneNumbers(id.sid).remove();
-    });
+    await Promise.all([
+      ...outgoingIds.map(async (id) => {
+        return await twilio.outgoingCallerIds(id.sid).remove();
+      }),
+      ...incomingIds.map(async (id) => {
+        return await twilio.incomingPhoneNumbers(id.sid).remove();
+      }),
+    ]);
     const { error: deletionError } = await supabaseClient
       .from("workspace_number")
       .delete()
-      .eq("id", numberId);
+      .eq("id", normalizedNumberId);
 
     if (deletionError) throw deletionError;
     return { error: null };
@@ -490,7 +1288,7 @@ export async function updateCallerId({
   number: WorkspaceNumbers;
   friendly_name: string;
 }) {
-  if (!number || !number.phone_number) return;
+  if (!number || !number.phone_number) return { error: null };
   try {
     const twilio = await createWorkspaceTwilioInstance({
       supabase: supabaseClient,
@@ -521,8 +1319,9 @@ export async function updateCallerId({
       updatedOutgoing,
       updatedIncoming,
     ]);
+    return { error: null };
   } catch (error) {
-    logger.error(error);
+    logger.error("Error updating caller ID", error);
     return { error };
   }
 }
@@ -556,19 +1355,24 @@ export async function getWorkspaceScripts({
   return data;
 }
 
-export function getRecordingFileNames(stepData: unknown[]) {
+export function getRecordingFileNames(stepData: unknown) {
   if (!Array.isArray(stepData)) {
     logger.warn("stepData is not an array");
     return [];
   }
 
-  return stepData.reduce((fileNames: string[], step: { speechType?: string; say?: string }) => {
+  return stepData.reduce((fileNames: string[], step) => {
+    if (!step || typeof step !== "object" || Array.isArray(step)) {
+      return fileNames;
+    }
+
+    const typedStep = step as { speechType?: string; say?: string };
     if (
-      step.speechType === "recorded" &&
-      step.say &&
-      step.say !== "Enter your question here"
+      typedStep.speechType === "recorded" &&
+      typedStep.say &&
+      typedStep.say !== "Enter your question here"
     ) {
-      fileNames.push(step.say);
+      fileNames.push(typedStep.say);
     }
     return fileNames;
   }, []);
@@ -599,7 +1403,7 @@ export async function listMedia(
   const { data, error } = await supabaseClient.storage
     .from(`workspaceAudio`)
     .list(workspace);
-  if (error) logger.error(error);
+  if (error) logger.error("Error listing workspace media", error);
   return data;
 }
 
@@ -624,14 +1428,17 @@ export async function acceptWorkspaceInvitations(
   invitationIds: string[],
   userId: string,
 ) {
-  let errors = [];
+  const errors: Array<{ invitationId: string; type: string }> = [];
   for (const invitationId of invitationIds) {
     const { data: invite, error: inviteError } = await supabaseClient
       .from("workspace_invite")
       .select()
       .eq("id", invitationId)
       .single();
-    if (inviteError) errors.push({ invitationId: inviteError, type: "invite" });
+    if (inviteError || !invite) {
+      errors.push({ invitationId, type: "invite" });
+      continue;
+    }
 
     const { error: workspaceError } = await addUserToWorkspace({
       supabaseClient: supabaseClient,
@@ -640,7 +1447,7 @@ export async function acceptWorkspaceInvitations(
       role: invite.role,
     });
     if (workspaceError)
-      errors.push({ invitationId: inviteError, type: "workspace" });
+      errors.push({ invitationId, type: "workspace" });
 
     const { error: deletionError } = await supabaseClient
       .from("workspace_invite")
@@ -648,9 +1455,9 @@ export async function acceptWorkspaceInvitations(
       .eq("id", invitationId);
 
     if (deletionError)
-      errors.push({ invitationId: inviteError, type: "deletion" });
-    return { errors };
+      errors.push({ invitationId, type: "deletion" });
   }
+  return { errors };
 }
 
 export async function getInvitesByUserId(
@@ -665,27 +1472,265 @@ export async function getInvitesByUserId(
   return data;
 }
 
+type FetchConversationSummaryOptions = {
+  limit?: number;
+  offset?: number;
+  sort?: ChatSortOption;
+};
+
+type ConversationMessageRow = Pick<
+  Database["public"]["Tables"]["message"]["Row"],
+  "campaign_id" | "contact_id" | "date_created" | "direction" | "from" | "status" | "to"
+>;
+
+type ContactNameRow = Pick<
+  Database["public"]["Tables"]["contact"]["Row"],
+  "firstname" | "id" | "phone" | "surname"
+>;
+
+type PhoneMatchedContactRow =
+  Database["public"]["Functions"]["find_contact_by_phone"]["Returns"][number];
+
+function compareConversationDates(left: string, right: string): number {
+  return new Date(left).getTime() - new Date(right).getTime();
+}
+
+function contactMatchesConversationPhone(
+  contact: ContactNameRow | undefined,
+  contactPhone: string,
+): contact is ContactNameRow {
+  if (!contact?.phone) {
+    return false;
+  }
+
+  return getConversationPhoneKey(contact.phone) === getConversationPhoneKey(contactPhone);
+}
+
+function conversationNeedsPhoneMatchedContact(
+  conversation: ConversationSummary,
+): boolean {
+  return !conversation.contact_firstname && !conversation.contact_surname;
+}
+
 export async function fetchConversationSummary(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   campaign_id?: string | null,
+  options: FetchConversationSummaryOptions = {},
 ) {
-  let chats, chatsError;
-  if (campaign_id) {
-    const { data, error } = await supabaseClient.rpc(
-      "get_conversation_summary_by_campaign",
-      { p_workspace: workspaceId, campaign_id_prop: campaign_id },
-    );
-    chats = data;
-    chatsError = error;
-  } else {
-    const { data, error } = await supabaseClient.rpc(
-      "get_conversation_summary",
-      { p_workspace: workspaceId },
-    );
-    chats = data;
-    chatsError = error;
+  const limit = Math.max(1, options.limit ?? 20);
+  const offset = Math.max(0, options.offset ?? 0);
+  const sort = options.sort ?? "recent";
+
+  const { data: workspaceNumberRows, error: workspaceNumbersError } =
+    await supabaseClient
+      .from("workspace_number")
+      .select("phone_number")
+      .eq("workspace", workspaceId);
+
+  if (workspaceNumbersError) {
+    return { chats: [], chatsError: workspaceNumbersError, hasMore: false };
   }
-  return { chats, chatsError };
+
+  const workspacePhoneKeys = new Set(
+    (workspaceNumberRows ?? [])
+      .map((row) => getConversationPhoneKey(row.phone_number))
+      .filter((phone): phone is string => Boolean(phone)),
+  );
+
+  let messageQuery = supabaseClient
+    .from("message")
+    .select("campaign_id, contact_id, date_created, direction, from, status, to")
+    .eq("workspace", workspaceId)
+    .not("date_created", "is", null)
+    .neq("status", "failed")
+    .order("date_created", { ascending: false });
+
+  if (campaign_id) {
+    const numericCampaignId = Number(campaign_id);
+    if (!Number.isNaN(numericCampaignId)) {
+      messageQuery = messageQuery.eq("campaign_id", numericCampaignId);
+    }
+  }
+
+  const { data: messageRows, error: messagesError } = await messageQuery;
+  if (messagesError) {
+    return { chats: [], chatsError: messagesError, hasMore: false };
+  }
+
+  const contactIds = Array.from(
+    new Set(
+      (messageRows ?? [])
+        .map((message) => message.contact_id)
+        .filter((contactId): contactId is number => typeof contactId === "number"),
+    ),
+  );
+
+  let contactsById = new Map<number, ContactNameRow>();
+  if (contactIds.length > 0) {
+    const { data: contactRows, error: contactsError } = await supabaseClient
+      .from("contact")
+      .select("firstname, id, phone, surname")
+      .in("id", contactIds);
+
+    if (contactsError) {
+      logger.error("Error loading contact names for conversations", contactsError);
+    } else {
+      contactsById = new Map(
+        (contactRows ?? []).map((contact) => [contact.id, contact]),
+      );
+    }
+  }
+
+  const conversationMap = new Map<string, ConversationSummary>();
+
+  for (const message of (messageRows ?? []) as ConversationMessageRow[]) {
+    const { contactPhone, userPhone } = getConversationParticipantPhones(
+      message,
+      workspacePhoneKeys,
+    );
+    const conversationKey = getConversationPhoneKey(contactPhone);
+    const timestamp = message.date_created ?? new Date().toISOString();
+
+    if (!contactPhone || !conversationKey) {
+      continue;
+    }
+
+    const candidateContact = typeof message.contact_id === "number"
+      ? contactsById.get(message.contact_id)
+      : undefined;
+    const contact = contactMatchesConversationPhone(candidateContact, contactPhone)
+      ? candidateContact
+      : undefined;
+    const existingConversation = conversationMap.get(conversationKey);
+    const hasReplied = message.direction === "inbound";
+    const unreadIncrement =
+      message.direction === "inbound" && message.status === "received" ? 1 : 0;
+
+    if (!existingConversation) {
+      conversationMap.set(conversationKey, {
+        contact_phone: contactPhone,
+        user_phone: userPhone ?? "",
+        conversation_start: timestamp,
+        conversation_last_update: timestamp,
+        message_count: 1,
+        unread_count: unreadIncrement,
+        contact_firstname: contact?.firstname ?? null,
+        contact_surname: contact?.surname ?? null,
+        has_replied: hasReplied,
+      });
+      continue;
+    }
+
+    existingConversation.message_count += 1;
+    existingConversation.unread_count += unreadIncrement;
+    existingConversation.has_replied =
+      existingConversation.has_replied === true || hasReplied;
+
+    if (
+      compareConversationDates(
+        existingConversation.conversation_start,
+        timestamp,
+      ) > 0
+    ) {
+      existingConversation.conversation_start = timestamp;
+    }
+
+    if (
+      compareConversationDates(
+        existingConversation.conversation_last_update,
+        timestamp,
+      ) < 0
+    ) {
+      existingConversation.conversation_last_update = timestamp;
+    }
+
+    if (!existingConversation.contact_firstname && contact?.firstname) {
+      existingConversation.contact_firstname = contact.firstname;
+    }
+
+    if (!existingConversation.contact_surname && contact?.surname) {
+      existingConversation.contact_surname = contact.surname;
+    }
+
+    if (!existingConversation.user_phone && userPhone) {
+      existingConversation.user_phone = userPhone;
+    }
+
+    if (!existingConversation.contact_phone && contactPhone) {
+      existingConversation.contact_phone = contactPhone;
+    }
+  }
+
+  if (typeof supabaseClient.rpc === "function") {
+    const phonesMissingNames = Array.from(
+      new Set(
+        Array.from(conversationMap.values())
+          .filter((conversation) => conversationNeedsPhoneMatchedContact(conversation))
+          .map((conversation) => conversation.contact_phone)
+          .filter((phone): phone is string => Boolean(phone)),
+      ),
+    );
+
+    if (phonesMissingNames.length > 0) {
+      const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
+      await Promise.all(
+        phonesMissingNames.map(async (contactPhone) => {
+          try {
+            const { data, error } = await supabaseClient.rpc("find_contact_by_phone", {
+              p_workspace_id: workspaceId,
+              p_phone_number: contactPhone,
+            });
+
+            if (error || !data?.[0]) {
+              if (error) {
+                logger.error("Error loading contact by phone for conversation", {
+                  contactPhone,
+                  error,
+                  workspaceId,
+                });
+              }
+              return;
+            }
+
+            phoneMatchedContacts.set(contactPhone, data[0]);
+          } catch (error) {
+            logger.error("Unexpected error loading contact by phone for conversation", {
+              contactPhone,
+              error,
+              workspaceId,
+            });
+          }
+        }),
+      );
+
+      for (const conversation of conversationMap.values()) {
+        if (!conversationNeedsPhoneMatchedContact(conversation)) {
+          continue;
+        }
+
+        const matchedContact = phoneMatchedContacts.get(conversation.contact_phone);
+        if (!matchedContact) {
+          continue;
+        }
+
+        conversation.contact_firstname = matchedContact.firstname;
+        conversation.contact_surname = matchedContact.surname;
+      }
+    }
+  }
+
+  const sortedChats = sortConversationSummaries(
+    Array.from(conversationMap.values()),
+    sort,
+  );
+  const paginatedChats = sortedChats.slice(offset, offset + limit + 1);
+  const hasMore = paginatedChats.length > limit;
+
+  return {
+    chats: hasMore ? paginatedChats.slice(0, limit) : paginatedChats,
+    chatsError: null,
+    hasMore,
+  };
 }
 

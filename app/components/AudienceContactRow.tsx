@@ -50,9 +50,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
   };
 
   // Helper function to format date safely
-  const formatDate = (dateString: string | null): string => {
-    if (!dateString) return '';
-    
+  const formatDate = (dateString: string): string => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';
@@ -69,9 +67,7 @@ export const AudienceContactRow: React.FC<AudienceContactRowProps> = ({
   };
 
   // Helper function to format time safely
-  const formatTime = (dateString: string | null): string => {
-    if (!dateString) return '';
-    
+  const formatTime = (dateString: string): string => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';

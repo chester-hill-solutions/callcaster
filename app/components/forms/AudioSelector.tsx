@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Select,
   SelectContent,
@@ -13,7 +12,11 @@ interface SelectorProps {
   selectedDeviceId: string;
 }
 
-const DeviceSelector: React.FC<SelectorProps> = ({ devices, onDeviceChange, selectedDeviceId }) => {
+export default function AudioSelector({
+  devices,
+  onDeviceChange,
+  selectedDeviceId,
+}: SelectorProps) {
   return (
     <Select onValueChange={onDeviceChange} value={selectedDeviceId || undefined}>
       <SelectTrigger className="w-[200px]">
@@ -34,6 +37,4 @@ const DeviceSelector: React.FC<SelectorProps> = ({ devices, onDeviceChange, sele
       </SelectContent>
     </Select>
   );
-};
-
-export default DeviceSelector;
+}

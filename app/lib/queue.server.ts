@@ -10,12 +10,16 @@ export async function enqueueContactsForCampaign(
   supabaseClient: SupabaseClient,
   campaignId: number,
   contactIds: number[],
-  options?: { startOrder?: number; requeue?: boolean }
+  options?: { startOrder?: number | string; requeue?: boolean }
 ) {
   if (contactIds.length === 0) return;
 
   const requeue = options?.requeue ?? false;
-  let startOrder = options?.startOrder;
+  const parsedStartOrder =
+    typeof options?.startOrder === "string"
+      ? Number.parseInt(options.startOrder, 10)
+      : options?.startOrder;
+  let startOrder = Number.isFinite(parsedStartOrder) ? parsedStartOrder : undefined;
 
   if (startOrder === undefined) {
     const { data: maxOrder, error: maxOrderError } = await supabaseClient
@@ -29,6 +33,7 @@ export async function enqueueContactsForCampaign(
     if (maxOrderError) throw maxOrderError;
     startOrder = (maxOrder?.queue_order ?? 0) + 1;
   }
+  const resolvedStartOrder = startOrder ?? 1;
 
   for (let i = 0; i < contactIds.length; i += BATCH_SIZE) {
     const batch = contactIds.slice(i, i + BATCH_SIZE);
@@ -36,7 +41,7 @@ export async function enqueueContactsForCampaign(
       const { error } = await supabaseClient.rpc("handle_campaign_queue_entry", {
         p_contact_id: batch[j],
         p_campaign_id: campaignId,
-        p_queue_order: startOrder + i + j,
+        p_queue_order: resolvedStartOrder + i + j,
         p_requeue: requeue,
       });
 

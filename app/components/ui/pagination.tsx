@@ -41,6 +41,7 @@ type PaginationLinkProps = {
 
 const PaginationLink = ({
   className,
+  children,
   isActive,
   size = "icon",
   ...props
@@ -55,7 +56,9 @@ const PaginationLink = ({
       className
     )}
     {...props}
-  />
+  >
+    {children}
+  </a>
 )
 PaginationLink.displayName = "PaginationLink"
 

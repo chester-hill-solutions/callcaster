@@ -18,6 +18,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type LoaderData = {
   contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;

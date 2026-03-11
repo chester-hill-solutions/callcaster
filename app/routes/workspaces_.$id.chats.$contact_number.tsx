@@ -1,17 +1,25 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs, json } from "@remix-run/node";
 import { useLoaderData, useOutletContext, useParams } from "@remix-run/react";
-import { json } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
-import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import MessageList from "@/components/sms-ui/ChatMessages";
+import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 
-const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message[], supabaseClient: SupabaseClient }) => {
+const getMessageMedia = async ({
+  messages,
+  supabaseClient,
+}: {
+  messages: Message[];
+  supabaseClient: SupabaseClient;
+}): Promise<Message[]> => {
   return Promise.all(
     (messages ?? []).map(async (message: Message) => {
       const inboundMedia = message?.inbound_media ?? [];
@@ -24,19 +32,34 @@ const getMessageMedia = async ({ messages, supabaseClient }: { messages: Message
             return data?.signedUrl;
           }),
         );
-        return { ...message, signedUrls: urls };
+        return { ...message, signedUrls: urls } as Message;
       } else {
-        return { ...message, signedUrls: [] };
+        return { ...message, signedUrls: [] } as Message;
       }
     }),
   );
 };
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const {id, contact_number} = params;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  let messages = [];
+  const { id, contact_number } = params;
+  const { supabaseClient, headers } = await verifyAuth(request);
+  const messages: Message[] = [];
   let normalizedNumber = null;
+  let optOutKeywords = parseOptOutKeywords(null);
+
+  if (id) {
+    try {
+      const onboarding = await getWorkspaceMessagingOnboardingState({
+        supabaseClient,
+        workspaceId: id,
+      });
+      optOutKeywords = parseOptOutKeywords(
+        onboarding.businessProfile.optOutKeywords,
+      );
+    } catch (error) {
+      logger.error("Error loading workspace opt-out keywords:", error);
+    }
+  }
 
   if (contact_number !== "new") {
     try {
@@ -105,6 +128,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     {
       messages,
       contact_number: normalizedNumber || contact_number,
+      optOutKeywords,
     },
     { headers },
   );
@@ -117,13 +141,28 @@ export default function ChatScreen() {
     workspaceNumbers: WorkspaceNumber[];
     registerChatActions?: (actions: { addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null) => void;
   }>();
-  const { messages: initialMessages, contact_number: loaderContactNumber } = useLoaderData<{ messages: Message[], contact_number: string }>();
+  const {
+    messages: initialMessages,
+    contact_number: loaderContactNumber,
+    optOutKeywords,
+  } = useLoaderData<{
+    messages: Message[];
+    contact_number: string;
+    optOutKeywords: string[];
+  }>();
   const { contact_number: paramContactNumber } = useParams();
 
   const contact_number = loaderContactNumber || paramContactNumber;
+  const [hideOptOutMessages, setHideOptOutMessages] = useState(true);
+  const initialFilteredMessageCount = useMemo(
+    () =>
+      initialMessages.filter((message) => !isOptOutMessage(message?.body, optOutKeywords))
+        .length,
+    [initialMessages, optOutKeywords],
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef<number>(initialMessages.length);
+  const lastMessageCountRef = useRef<number>(initialFilteredMessageCount);
   const scrollPositionRef = useRef<number>(0);
   const hasMarkedAsReadRef = useRef<boolean>(false);
 
@@ -133,6 +172,32 @@ export default function ChatScreen() {
     workspace: workspace.id,
     contact_number,
   });
+  const hiddenMessageCount = useMemo(
+    () =>
+      messages.filter(
+        (message) => Boolean(message) && isOptOutMessage(message?.body, optOutKeywords),
+      ).length,
+    [messages, optOutKeywords],
+  );
+  const displayedMessages = useMemo(
+    () =>
+      messages.filter((message): message is Message => {
+        if (!message) {
+          return false;
+        }
+
+        if (!hideOptOutMessages) {
+          return true;
+        }
+
+        return !isOptOutMessage(message.body, optOutKeywords);
+      }),
+    [hideOptOutMessages, messages, optOutKeywords],
+  );
+
+  useEffect(() => {
+    lastMessageCountRef.current = displayedMessages.length;
+  }, [hideOptOutMessages]); // Reset message count tracking when the filter view changes
 
   useEffect(() => {
     registerChatActions?.({ addOptimisticMessage });
@@ -213,31 +278,48 @@ export default function ChatScreen() {
     }
   };
 
-  const { observe, unobserve } = useIntersectionObserver(observerCallback, { threshold: 0.5 });
-
-  // Handle intersection observer setup once
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            observerCallback(entry.target as HTMLElement);
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
-    messageElements.forEach((el) => observe(el));
+    messageElements.forEach((el) => observer.observe(el));
 
     return () => {
-      messageElements.forEach((el) => unobserve(el));
+      observer.disconnect();
     };
-  }, [observe, unobserve]); // Only re-run when observe/unobserve change
+  }, []); // Only set up once
 
   // Handle new message elements
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            observerCallback(entry.target as HTMLElement);
+          }
+        });
+      },
+      { threshold: 0.5 },
+    );
     // Only observe new messages
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
     const newMessages = Array.from(messageElements).slice(lastMessageCountRef.current);
     
-    newMessages.forEach((el) => observe(el));
+    newMessages.forEach((el) => observer.observe(el));
     lastMessageCountRef.current = messageElements.length;
 
     return () => {
-      newMessages.forEach((el) => unobserve(el));
+      observer.disconnect();
     };
-  }, [messages, observe, unobserve]);
+  }, [displayedMessages]);
 
   // Intelligent scroll handling
   useEffect(() => {
@@ -247,7 +329,7 @@ export default function ChatScreen() {
     if (!container) return;
 
     const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-    const hasNewMessages = messages.length > lastMessageCountRef.current;
+    const hasNewMessages = displayedMessages.length > lastMessageCountRef.current;
 
     if (hasNewMessages) {
       if (isAtBottom) {
@@ -261,11 +343,67 @@ export default function ChatScreen() {
         });
       }
     }
-  }, [messages]);
+  }, [displayedMessages]);
 
   return (
     <div className="flex h-full flex-col">
-      <MessageList messages={messages} messagesEndRef={messagesEndRef} />
+      <div className="px-3 pt-3 sm:px-4">
+        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Chat filters</span>
+              {hiddenMessageCount > 0 ? (
+                <Badge variant="secondary" className="font-medium">
+                  {hideOptOutMessages
+                    ? `${hiddenMessageCount} STOP hidden`
+                    : `${hiddenMessageCount} STOP shown`}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="font-normal">
+                  No STOP replies
+                </Badge>
+              )}
+            </div>
+            <label
+              htmlFor="hide-opt-out-replies"
+              className="flex items-center gap-3 text-sm"
+            >
+              <span className="text-sm font-medium">Hide STOP replies</span>
+              <Switch
+                id="hide-opt-out-replies"
+                checked={hideOptOutMessages}
+                onCheckedChange={setHideOptOutMessages}
+                aria-label="Hide STOP replies"
+              />
+            </label>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {optOutKeywords.slice(0, 4).map((keyword) => (
+              <Badge
+                key={keyword}
+                variant="outline"
+                className="bg-background px-2 py-0 text-[11px] font-normal text-muted-foreground"
+              >
+                {keyword}
+              </Badge>
+            ))}
+            {optOutKeywords.length > 4 ? (
+              <Badge
+                variant="outline"
+                className="bg-background px-2 py-0 text-[11px] font-normal text-muted-foreground"
+              >
+                +{optOutKeywords.length - 4}
+              </Badge>
+            ) : null}
+          </div>
+        </div>
+      </div>
+      <ChatMessages
+        messages={
+          displayedMessages as React.ComponentProps<typeof ChatMessages>["messages"]
+        }
+        messagesEndRef={messagesEndRef}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import {
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 
 // Lib imports
 import { verifyAuth } from "../lib/supabase.server";
@@ -47,7 +47,12 @@ import {
   normalizeProviderStatus,
   getStateMachineAction,
 } from "@/lib/call-status";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import {
+  buildQueuedQueueUpdate,
+  COMPLETED_QUEUE_COUNT_FILTER,
+  isAssignedToUser,
+  isQueued,
+} from "@/lib/queue-status";
 
 // Type imports
 import type {
@@ -92,7 +97,7 @@ async function getCallScreenData(supabase: SupabaseClient, campaignId: string, w
       .from("campaign_queue")
       .select("id", { count: "exact", head: true })
       .eq("campaign_id", parseInt(campaignId))
-      .eq("status", "dequeued"),
+      .or(COMPLETED_QUEUE_COUNT_FILTER),
     supabase
       .from("outreach_attempt")
       .select(`*, call:call(*)`)
@@ -138,34 +143,27 @@ async function getVerifiedNumbers(supabase: SupabaseClient, userId: string) {
 }
 async function getQueueByDialType(supabase: SupabaseClient, campaignId: string, dialType: string, userId: string) {
   let queue = [] as QueueItem[];
-  if (dialType === "predictive") {
-    const { data, error } = await supabase
-      .from('campaign_queue')
-      .select('*, contact(*)')
-      .eq('campaign_id', parseInt(campaignId))
-      .eq('status', QUEUE_STATUS_QUEUED)
-      .order('attempts', { ascending: true })
-      .order('queue_order', { ascending: true })
-      .limit(50);
-    if (error) {
-      logger.error("Error fetching predictive queue:", error);
-      throw error;
-    }
-    queue = data as unknown as QueueItem[];
-  } else if (dialType === "call") {
-    const { data, error } = await supabase
-      .from('campaign_queue')
-      .select('*, contact(*)')
-      .eq('campaign_id', parseInt(campaignId))
-      .eq('status', userId)
-      .limit(50);
-    if (error) {
-      logger.error("Error fetching call queue:", error);
-      throw error;
-    }
-    queue = data as unknown as QueueItem[];
+  const { data, error } = await supabase
+    .from("campaign_queue")
+    .select("*, contact(*)")
+    .eq("campaign_id", parseInt(campaignId))
+    .is("dequeued_at", null)
+    .order("attempts", { ascending: true })
+    .order("queue_order", { ascending: true })
+    .limit(200);
+
+  if (error) {
+    logger.error(`Error fetching ${dialType} queue:`, error);
+    throw error;
   }
-  else {
+
+  const rows = (data as unknown as QueueItem[]) ?? [];
+
+  if (dialType === "predictive") {
+    queue = rows.filter((item) => isQueued(item)).slice(0, 50);
+  } else if (dialType === "call") {
+    queue = rows.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
+  } else {
     throw "Invalid dial type";
   }
   return queue;
@@ -174,8 +172,9 @@ function getNextRecipient(queue: QueueItem[], dialType: string, userId: string) 
   if (dialType === "predictive") {
     return null;
   } else if (dialType === "call") {
-    queue[0]
+    return queue[0] ?? null;
   }
+  return null;
 }
 function getInitialCallsList(attempts: OutreachAttempt[]) {
   return attempts.flatMap((attempt) => attempt.call);
@@ -187,7 +186,7 @@ function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
   return attempts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 }
 
-export const loader: LoaderFunction = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { campaign_id: id, id: workspaceId } = params;
   const {
     supabaseClient: supabase,
@@ -241,18 +240,36 @@ export const loader: LoaderFunction = async ({ request, params }: LoaderFunction
   }
 };
 
-export const action: ActionFunction = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { campaign_id } = params;
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
   if (!user || !campaign_id) {
     throw redirect("/signin");
   }
+  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
+    .from("campaign_queue")
+    .select("id, status, dequeued_at, assigned_to_user_id")
+    .eq("campaign_id", parseInt(campaign_id))
+    .is("dequeued_at", null);
+
+  if (assignedRowsError) {
+    logger.error("Error fetching assigned campaign queue rows:", assignedRowsError);
+    throw assignedRowsError;
+  }
+
+  const assignedIds = (assignedRows ?? [])
+    .filter((row) => isAssignedToUser(row, user.id))
+    .map((row) => row.id);
+
+  if (assignedIds.length === 0) {
+    return redirect("/workspaces", { headers });
+  }
+
   const update = await supabaseClient
     .from("campaign_queue")
-    .update({ status: "queued" })
-    .eq("status", user.id)
-    .eq("campaign_id", parseInt(campaign_id))
+    .update(buildQueuedQueueUpdate())
+    .in("id", assignedIds)
     .select();
   if (update.error) {
     logger.error("Error updating campaign queue:", update.error);
@@ -326,7 +343,12 @@ const CallScreen: React.FC = () => {
     callDuration,
     setCallDuration,
     deviceIsBusy,
-  } = useTwilioDevice({ token, selectedDevice, workspaceId, send });
+  } = useTwilioDevice(
+    token,
+    selectedDevice,
+    workspaceId,
+    send as unknown as (action: { type: string }) => void,
+  );
 
   const {
     status: liveStatus,
@@ -458,7 +480,7 @@ const handleDialButton = useCallback(() => {
   if (!campaign) return;
 
   if (campaign.dial_type === "predictive") {
-    if (deviceIsBusy || incomingCall || deviceStatus !== "registered") {
+    if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
       logger.debug("Device Busy", { deviceStatus, callCount: device?.calls.length });
       return;
     }
@@ -580,9 +602,9 @@ const requestMicrophoneAccess = useCallback(async () => {
 }, []);
 
 const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { logger.error('No device available'); return };
+  if (!device) { logger.error('No device available'); return }
   const selectedMicrophone = event.target.value;
-  let audio = device.audio;
+  const audio = device.audio;
   audio?.setInputDevice(selectedMicrophone).then(() => {
     setIsMicrophoneMuted(false);
     setMicrophone(selectedMicrophone);
@@ -607,7 +629,7 @@ const handleMicrophoneChange = useCallback((event: React.ChangeEvent<HTMLSelectE
 }, [device, activeCall]);
 
 const handleSpeakerChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-  if (!device) { logger.error('No device available'); return };
+  if (!device) { logger.error('No device available'); return }
   const selectedSpeaker = event.target.value;
   setOutput(selectedSpeaker);
   device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
@@ -757,7 +779,6 @@ useEffect(() => {
         break;
       case "connected":
         send({ type: "CONNECT" });
-        send({ type: "CONNECT" });
         break;
       case "completed":
       case "failed":
@@ -765,7 +786,6 @@ useEffect(() => {
         send({ type: "HANG_UP" });
         break;
       default:
-        send({ type: "NEXT" });
         send({ type: "NEXT" });
     }
   }
@@ -914,7 +934,10 @@ return (
               }
           }
           displayState={displayState}
-          dispositionOptions={(campaignDetails.disposition_options as unknown) as string[]}
+          dispositionOptions={((campaignDetails.disposition_options as unknown) as string[]).map((option) => ({
+            value: option,
+            label: option,
+          }))}
           handleDialNext={handleDialButton}
           handleDequeueNext={handleDequeueNext}
           disposition={disposition}
@@ -926,8 +949,8 @@ return (
         />
         <Household
           isBusy={isBusy}
-          house={house}
-          switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact.contact })}
+          house={house ?? []}
+          switchQuestionContact={(args: { contact: QueueItem }) => switchQuestionContact({ contact: args.contact })}
           attemptList={attemptList as unknown as (Tables<"outreach_attempt"> & { result?: { status?: string } })[]}
           questionContact={questionContact}
         />
@@ -959,7 +982,6 @@ return (
         completed={completed}
       />
     </div>
-    <Toaster richColors />
     <CampaignDialogs
       isDialogOpen={isDialogOpen}
       setDialog={setDialog}
@@ -972,7 +994,7 @@ return (
         dial_type: campaign.dial_type || "call",
         voicemail_file: Boolean(campaign.voicemail_file),
       }}
-      fetchMore={fetchMore}
+      fetchMore={fetchMore as unknown as (params: Record<string, unknown>) => void}
       householdMap={householdMap}
       currentState={currentState}
       isActive={isActive}

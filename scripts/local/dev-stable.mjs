@@ -1,0 +1,256 @@
+#!/usr/bin/env node
+/* eslint-env node */
+
+import "dotenv/config";
+
+import { spawn } from "node:child_process";
+import { existsSync, readdirSync, statSync, watch } from "node:fs";
+import { createServer } from "node:http";
+import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+const APP_PORT = process.env.PORT ?? "3000";
+const BUILD_PATH = path.resolve("build/index.js");
+const BUILD_DIR = path.dirname(BUILD_PATH);
+const CLIENT_BUILD_DIR = path.resolve("public/build");
+const REMIX_BIN = resolveLocalBin("remix");
+const SERVER_ENTRY = path.resolve("server/index.js");
+const startupTimestamp = Date.now();
+
+let appProcess = null;
+let isShuttingDown = false;
+let restartTimer = null;
+let restartInFlight = false;
+let buildWatcher = null;
+
+const devPingServer = createServer((request, response) => {
+  if (request.method === "POST" && request.url === "/ping") {
+    response.writeHead(200, { "Content-Type": "text/plain" });
+    response.end("ok");
+    return;
+  }
+
+  response.writeHead(204);
+  response.end();
+});
+
+await new Promise((resolve, reject) => {
+  devPingServer.once("error", reject);
+  devPingServer.listen(0, "127.0.0.1", resolve);
+});
+
+const devPingAddress = devPingServer.address();
+
+if (!devPingAddress || typeof devPingAddress === "string") {
+  throw new Error("Could not determine Remix dev ping server address");
+}
+
+const DEV_ENV = {
+  ...process.env,
+  NODE_ENV: "development",
+  PORT: APP_PORT,
+  REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
+};
+
+const watchProcess = spawn(REMIX_BIN, ["watch"], {
+  env: DEV_ENV,
+  stdio: ["inherit", "pipe", "pipe"],
+});
+
+pipeOutput("remix-watch", watchProcess);
+
+watchProcess.on("exit", (code, signal) => {
+  if (isShuttingDown) {
+    return;
+  }
+
+  console.error(
+    `[remix-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
+  );
+  shutdown(code ?? 1);
+});
+
+await waitForInitialBuild();
+await startAppServer();
+
+buildWatcher = watch(BUILD_DIR, (eventType, fileName) => {
+  if (!fileName || typeof fileName !== "string") {
+    return;
+  }
+
+  if (fileName !== "index.js") {
+    return;
+  }
+
+  if (eventType !== "change" && eventType !== "rename") {
+    return;
+  }
+
+  scheduleRestart();
+});
+
+process.on("SIGINT", () => shutdown(0));
+process.on("SIGTERM", () => shutdown(0));
+
+function resolveLocalBin(name) {
+  const executable = process.platform === "win32" ? `${name}.cmd` : name;
+  return path.resolve("node_modules", ".bin", executable);
+}
+
+function pipeOutput(label, childProcess) {
+  childProcess.stdout?.on("data", (chunk) => {
+    process.stdout.write(`[${label}] ${chunk}`);
+  });
+
+  childProcess.stderr?.on("data", (chunk) => {
+    process.stderr.write(`[${label}] ${chunk}`);
+  });
+}
+
+async function waitForInitialBuild() {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (hasFreshBuildOutput()) {
+      return;
+    }
+
+    await delay(500);
+  }
+
+  throw new Error(
+    `Timed out waiting for initial build output at ${BUILD_PATH} and ${CLIENT_BUILD_DIR}`,
+  );
+}
+
+function hasFreshBuildOutput() {
+  if (!existsSync(BUILD_PATH) || !existsSync(CLIENT_BUILD_DIR)) {
+    return false;
+  }
+
+  const serverBuildMtime = statSync(BUILD_PATH).mtimeMs;
+
+  if (serverBuildMtime < startupTimestamp) {
+    return false;
+  }
+
+  const clientEntries = readdirSync(CLIENT_BUILD_DIR);
+
+  if (clientEntries.length === 0) {
+    return false;
+  }
+
+  return clientEntries.some((entry) => {
+    const entryPath = path.join(CLIENT_BUILD_DIR, entry);
+    return statSync(entryPath).mtimeMs >= startupTimestamp;
+  });
+}
+
+async function startAppServer() {
+  appProcess = spawn(process.execPath, [SERVER_ENTRY], {
+    env: DEV_ENV,
+    stdio: ["inherit", "pipe", "pipe"],
+  });
+
+  pipeOutput("app", appProcess);
+
+  appProcess.on("exit", (code, signal) => {
+    if (isShuttingDown || restartInFlight) {
+      return;
+    }
+
+    console.error(
+      `[app] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
+    );
+    shutdown(code ?? 1);
+  });
+}
+
+function scheduleRestart() {
+  if (isShuttingDown) {
+    return;
+  }
+
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+  }
+
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    restartAppServer().catch((error) => {
+      console.error(`[app] restart failed: ${error instanceof Error ? error.message : String(error)}`);
+      shutdown(1);
+    });
+  }, 200);
+}
+
+async function restartAppServer() {
+  if (!appProcess) {
+    await startAppServer();
+    return;
+  }
+
+  restartInFlight = true;
+  const previousProcess = appProcess;
+
+  await terminateProcess(previousProcess, "app");
+
+  restartInFlight = false;
+  await startAppServer();
+}
+
+async function terminateProcess(childProcess, label) {
+  await new Promise((resolve) => {
+    let settled = false;
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(killTimer);
+      resolve();
+    };
+
+    const killTimer = setTimeout(() => {
+      if (childProcess.exitCode !== null || childProcess.killed) {
+        finish();
+        return;
+      }
+
+      console.error(`[${label}] did not exit after SIGTERM, sending SIGKILL`);
+      childProcess.kill("SIGKILL");
+    }, 5_000);
+
+    childProcess.once("exit", finish);
+    childProcess.kill("SIGTERM");
+  });
+}
+
+async function shutdown(exitCode) {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  buildWatcher?.close();
+
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
+
+  const processes = [appProcess, watchProcess].filter(Boolean);
+
+  await Promise.all(
+    processes.map(
+      (childProcess) =>
+        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-watch"),
+    ),
+  );
+
+  await new Promise((resolve) => {
+    devPingServer.close(() => resolve());
+  });
+
+  process.exit(exitCode);
+}

@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -49,4 +49,8 @@ Deno.serve(async (req) => {
     JSON.stringify(data),
     { headers: { "Content-Type": "application/json" } },
   );
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

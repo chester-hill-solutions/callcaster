@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 
 function sanitizeFilename(filename: string) {
     const decodedFilename = decodeURIComponent(filename);
-    const sanitized = decodedFilename.replace(/[^a-zA-Z0-9-_\.]/g, '')
+    const sanitized = decodedFilename.replace(/[^a-zA-Z0-9-_.]/g, '')
         .replace(/\s+/g, '_');
 
     const parts = sanitized.split('.');
@@ -69,7 +69,22 @@ export async function action({ request }: ActionFunctionArgs) {
                 return json({ success: false, error: updateError }, { headers });
             }
 
-            return json({ success: true, error: null, campaignUpdate }, { headers });
+            const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
+                .from("messageMedia")
+                .createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
+
+            if (signedUrlError) {
+                logger.error("Error signing uploaded message media:", signedUrlError);
+                return json({ success: false, error: signedUrlError }, { headers });
+            }
+
+            return json({
+                success: true,
+                error: null,
+                campaignUpdate,
+                uploadedFileName: safeFileName,
+                url: signedUrlData.signedUrl,
+            }, { headers });
         } else {
             const { data, error: imageError } = await supabaseClient.storage.from('messageMedia').createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
             if (imageError) return json({ success: false, error: imageError }, { headers });
@@ -104,7 +119,7 @@ export async function action({ request }: ActionFunctionArgs) {
         if (updateError) {
             return json({ success: false, error: updateError }, { headers });
         }
-        return json({ success: true, error: null, campaignUpdate }, { headers });
+        return json({ success: true, error: null, campaignUpdate, removedFileName: encodedMediaName }, { headers });
     }
     return json({ success: false, error: 'Method not allowed' }, { status: 405 });
 }

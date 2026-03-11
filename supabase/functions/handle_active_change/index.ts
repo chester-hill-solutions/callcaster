@@ -4,8 +4,12 @@ import Twilio from "npm:twilio@5.3.0";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { encode } from "https://deno.land/std@0.177.0/encoding/base64.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1';
+import {
+  buildCanceledQueueUpdate,
+  buildQueuedQueueUpdate,
+} from "../_shared/queue-writes.ts";
 
 // Timeout wrapper for async operations
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> => {
@@ -147,7 +151,7 @@ const handleCancelCampaign = async (
         // Remove from queue
         const { error: queueUpdateError } = await supabase
           .from("campaign_queue")
-          .update({ status: "canceled" })
+          .update(buildCanceledQueueUpdate())
           .in("id", calls.map((call) => call.queue_id).filter(Boolean));
         if (queueUpdateError) console.error('Error updating queue for cancelled calls', queueUpdateError);
         
@@ -167,7 +171,7 @@ const handleCancelCampaign = async (
       
       while (hasMore) {
         const { data: messages, error: messagesError } = await supabase
-          .from('messages')
+          .from('message')
           .select("sid, queue_id")
           .eq('campaign_id', id)
           .in('status', ['queued', 'sending'])
@@ -203,7 +207,7 @@ const handleCancelCampaign = async (
         
         // Mark the messages as cancelled in the database
         const { error: messageUpdateError } = await supabase
-          .from('messages')
+          .from('message')
           .update({ status: 'canceled' })
           .in('sid', messages.map((message) => message.sid));
         if (messageUpdateError) console.error('Error marking messages as cancelled', messageUpdateError);
@@ -211,7 +215,7 @@ const handleCancelCampaign = async (
         // Remove from queue
         const { error: queueUpdateError } = await supabase
           .from("campaign_queue")
-          .update({ status: "canceled" })
+          .update(buildCanceledQueueUpdate())
           .in("id", messages.map((message) => message.queue_id).filter(Boolean));
         if (queueUpdateError) console.error('Error updating queue for cancelled messages', queueUpdateError);
         
@@ -291,7 +295,7 @@ const handlePauseCampaign = async (
         // Re-queue any which did not get sent for the next run.
         const { error: queueUpdateError } = await supabase
           .from("campaign_queue")
-          .update({ status: "queued" })
+          .update(buildQueuedQueueUpdate())
           .in("id", calls.map((call) => call.queue_id));
         if (queueUpdateError) console.error('Error re-queuing delayed calls', queueUpdateError);
         
@@ -310,7 +314,7 @@ const handlePauseCampaign = async (
       
       while (hasMore) {
         const { data: messages, error: messagesError } = await supabase
-          .from('messages')
+          .from('message')
           .select("sid, queue_id")
           .eq('campaign_id', id)
           .eq('status', 'queued')
@@ -353,7 +357,7 @@ const handlePauseCampaign = async (
         // Re-queue any which did not get sent for the next run.
         const { error: queueUpdateError } = await supabase
           .from("campaign_queue")
-          .update({ status: "queued" })
+          .update(buildQueuedQueueUpdate())
           .in("id", messages.map((message) => message.queue_id));
         if (queueUpdateError) console.error('Error re-queuing delayed messages', queueUpdateError);
         
@@ -373,7 +377,7 @@ async function getWorkspaceUsers(
   const { data, error } = await supabaseClient.rpc("get_workspace_users", {
     selected_workspace_id: workspaceId,
   });
-  if (error) { console.error(error); throw error };
+  if (error) { console.error(error); throw error }
   return { data, error };
 }
 
@@ -405,7 +409,7 @@ const handleInitiateCampaign = async (
     
     const response = await withTimeout(
       fetch(
-        `${baseUrl}/queue-next`,
+        getFunctionUrl("queue-next"),
         {
           method: 'POST',
           headers: getFunctionHeaders(),
@@ -423,7 +427,7 @@ const handleInitiateCampaign = async (
   }
 };
 
-serve(async (req: Request) => {
+export async function handleRequest(req: Request): Promise<Response> {
   const startTime = Date.now();
   const TIMEOUT_THRESHOLD = 25000; // 25 seconds to leave buffer for response
   
@@ -438,7 +442,7 @@ serve(async (req: Request) => {
         end_date: string,
         created_at: string,
         voicemail_file: string,
-        call_questions: {},
+        call_questions: Record<string, unknown>,
         workspace: string,
         caller_id: string,
         group_household_queue: boolean,
@@ -502,9 +506,7 @@ serve(async (req: Request) => {
         });
       }
       else if (record.type === "robocall" || record.type === "message") {
-
-        await handleInitiateCampaign(supabase, record.id)
-          .catch(e => console.error('Error initiating campaign:', e));
+        await handleInitiateCampaign(supabase, record.id);
 
         return new Response(JSON.stringify({ status: "queued" }), {
           headers: { "Content-Type": "application/json" },
@@ -519,20 +521,16 @@ serve(async (req: Request) => {
       record.status === "running"
     ) {
       const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
-      // Fire and forget pause operation with timeout protection
-      void handlePauseCampaign(supabase, record.id, twilio)
-        .catch(e => console.error('Error pausing campaign:', e));
+      await handlePauseCampaign(supabase, record.id, twilio);
 
-      return new Response(JSON.stringify({ status: "pausing" }), {
+      return new Response(JSON.stringify({ status: "paused" }), {
         headers: { "Content-Type": "application/json" },
       });
     } else if (record.status === "canceled" || record.status === "cancelled") {
-      // Process cancellations using dedicated cancellation handler
       const twilio = await createWorkspaceTwilioInstance(supabase, record.workspace);
-      void handleCancelCampaign(supabase, record.id, twilio)
-        .catch(e => console.error('Error canceling campaign:', e));
+      await handleCancelCampaign(supabase, record.id, twilio);
 
-      return new Response(JSON.stringify({ status: "canceling" }), {
+      return new Response(JSON.stringify({ status: "canceled" }), {
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -557,4 +555,8 @@ serve(async (req: Request) => {
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
-});
+}
+
+if (import.meta.main) {
+  serve(handleRequest);
+}

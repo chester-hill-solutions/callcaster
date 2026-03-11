@@ -12,7 +12,7 @@ exports.handler = async function (context, event, callback) {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id, index, total, isLastContact
+  const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id, isLastContact
   } = event;
   const { data: workspaceCredits, error: workspaceCreditsError } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
   if (workspaceCreditsError) throw workspaceCreditsError;

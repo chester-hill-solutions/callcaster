@@ -7,8 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect } from "react";
-import { toast, Toaster } from "sonner";
-import type { Tables } from "@/lib/database.types";
+import { toast } from "sonner";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request);
@@ -207,7 +206,7 @@ export default function UserWorkspaces() {
 
     // Filter out workspaces the user is already a member of
     const availableWorkspaces = allWorkspaces.filter(
-        (workspace: Tables<"workspace">) => !userWorkspaces.some((uw: { workspace_id: string }) => uw.workspace_id === workspace.id)
+        (workspace) => !userWorkspaces.some((uw) => uw.workspace_id === workspace.id)
     );
 
     useEffect(() => {
@@ -222,7 +221,6 @@ export default function UserWorkspaces() {
 
     return (
         <div className="container mx-auto py-8 px-4">
-            <Toaster position="top-right" />
             <div className="flex justify-between items-center mb-8">
                 <div>
                     <h1 className="text-3xl font-bold">Manage User Workspaces</h1>
@@ -252,13 +250,13 @@ export default function UserWorkspaces() {
                                 <input type="hidden" name="_action" value="add_to_workspace" />
                                 
                                 <div className="space-y-2 flex-1">
-                                    <label className="text-sm font-medium">Workspace</label>
+                                    <p className="text-sm font-medium">Workspace</p>
                                     <Select name="workspaceId" required>
-                                        <SelectTrigger>
+                                        <SelectTrigger aria-label="Workspace">
                                             <SelectValue placeholder="Select workspace" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {availableWorkspaces.map((workspace: Tables<"workspace">) => (
+                                            {availableWorkspaces.map((workspace) => (
                                                 <SelectItem key={workspace.id} value={workspace.id}>
                                                     {workspace.name}
                                                 </SelectItem>
@@ -268,9 +266,9 @@ export default function UserWorkspaces() {
                                 </div>
                                 
                                 <div className="space-y-2 w-[150px]">
-                                    <label className="text-sm font-medium">Role</label>
+                                    <p className="text-sm font-medium">Role</p>
                                     <Select name="role" defaultValue="member">
-                                        <SelectTrigger>
+                                        <SelectTrigger aria-label="Role">
                                             <SelectValue placeholder="Select role" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -310,7 +308,7 @@ export default function UserWorkspaces() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {userWorkspaces.map((userWorkspace: { workspace_id: string; user_id: string; role: string; workspace?: Tables<"workspace"> | null }) => (
+                                    {userWorkspaces.map((userWorkspace) => (
                                         <TableRow key={`${userWorkspace.workspace_id}-${userWorkspace.user_id}`}>
                                             <TableCell className="font-medium">
                                                 {userWorkspace.workspace?.name || 'Unknown Workspace'}
@@ -377,7 +375,7 @@ export default function UserWorkspaces() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {pendingInvites.map((invite: { id: string; workspace?: Tables<"workspace"> | null; role: string; created_at: string }) => (
+                                    {pendingInvites.map((invite) => (
                                         <TableRow key={invite.id}>
                                             <TableCell className="font-medium">
                                                 {invite.workspace?.name || 'Unknown Workspace'}

@@ -9,6 +9,9 @@ import {
 } from "@remix-run/react";
 import { createSupabaseServerClient } from "../lib/supabase.server";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+
+// Legacy route kept for backwards compatibility while the newer dashboard is the
+// actively maintained path. Avoid adding new product behavior here.
 //import { CampaignLink } from '../components/DashboardLinks';
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {

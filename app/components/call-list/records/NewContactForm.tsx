@@ -25,6 +25,7 @@ export const NewContactForm = ({ fetcher, openContact, handleContact, newContact
                     <div className="flex flex-col w-full">
                         <label htmlFor="firstname" className="text-sm font-medium text-gray-700">First Name</label>
                         <input
+                            id="firstname"
                             name="firstname"
                             className="mt-1 border border-gray-300 p-2 rounded shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                             value={newContact.firstname}
@@ -34,6 +35,7 @@ export const NewContactForm = ({ fetcher, openContact, handleContact, newContact
                     <div className="flex flex-col w-full">
                         <label htmlFor="surname" className="text-sm font-medium text-gray-700">Last Name</label>
                         <input
+                            id="surname"
                             name="surname"
                             className="mt-1 border border-gray-300 p-2 rounded shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                             value={newContact.surname}
@@ -45,6 +47,7 @@ export const NewContactForm = ({ fetcher, openContact, handleContact, newContact
                     <div className="flex flex-col w-full">
                         <label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone</label>
                         <input
+                            id="phone"
                             name="phone"
                             type="tel"
                             className="mt-1 border border-gray-300 p-2 rounded shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
@@ -55,6 +58,7 @@ export const NewContactForm = ({ fetcher, openContact, handleContact, newContact
                     <div className="flex flex-col w-full">
                         <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
                         <input
+                            id="email"
                             name="email"
                             type="email"
                             className="mt-1 border border-gray-300 p-2 rounded shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
@@ -66,6 +70,7 @@ export const NewContactForm = ({ fetcher, openContact, handleContact, newContact
                 <div className="flex flex-col gap-4">
                     <label htmlFor="audiences" className="text-sm font-medium text-gray-700">Select Audiences</label>
                     <select
+                        id="audiences"
                         name="audiences"
                         multiple
                         className="w-full h-48 border border-gray-300 p-2 rounded shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"

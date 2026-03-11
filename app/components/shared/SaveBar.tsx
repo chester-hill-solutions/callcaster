@@ -41,6 +41,7 @@ export const SaveBar = ({
             onClick={onReset}
             variant="ghost"
             size="sm"
+            disabled={isSaving}
           >
             Reset
           </Button>
@@ -49,8 +50,9 @@ export const SaveBar = ({
           onClick={onSave}
           size="sm"
           className="bg-red-600 hover:bg-red-700 text-white"
+          disabled={isSaving}
         >
-          Save Changes
+          {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>

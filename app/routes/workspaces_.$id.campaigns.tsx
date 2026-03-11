@@ -6,8 +6,7 @@ import {
 } from "@remix-run/react";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import { MemberRole } from "@/components/workspace/TeamMember";
-import { Audience, WorkspaceData, WorkspaceNumbers } from "@/lib/types";
-import { Campaign } from "@/lib/types";
+import { Audience, WorkspaceData, WorkspaceNumbers , Campaign } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
@@ -19,7 +18,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return null;
 };
 
-export default function SelectedType() {
+export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();
   const { audiences, campaigns, phoneNumbers, userRole, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
   return !outlet ? (

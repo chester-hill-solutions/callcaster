@@ -1,8 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
-import { createCampaign, requireWorkspaceAccess } from "@/lib/database.server";
+import { createCampaign, requireWorkspaceAccess , safeParseJson } from "@/lib/database.server";
 import type { CampaignData, CampaignType } from "@/lib/database/campaign.server";
-import { safeParseJson } from "@/lib/database.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { logger } from "@/lib/logger.server";
 import type { Json } from "@/lib/database.types";
@@ -44,14 +43,12 @@ interface CreateWithScriptBody {
 
 function jsonResponse(
   data: unknown,
-  status: number,
-  init?: { headers?: Record<string, string> }
+  status: number
 ) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
-      ...init?.headers,
     },
   });
 }
@@ -194,8 +191,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  let scriptId: number | null = null;
-  let createdScript: { id: number; name: string; type: string | null; steps: unknown } | null = null;
+  if (existingScriptId != null) {
+    const { data: existingScript, error: scriptLookupError } = await supabase
+      .from("script")
+      .select("id")
+      .eq("id", existingScriptId)
+      .eq("workspace", workspaceId)
+      .maybeSingle();
+
+    if (scriptLookupError) {
+      logger.error("Error validating script_id", scriptLookupError);
+      return jsonResponse(
+        { error: "Failed to validate script_id" },
+        500
+      );
+    }
+
+    if (!existingScript) {
+      return jsonResponse(
+        { error: "script_id must belong to this workspace" },
+        400
+      );
+    }
+  }
+
+  let scriptId: number;
+  let createdScript: { id: number; name: string; type: string | null; steps: unknown } | null =
+    null;
 
   if (scriptPayload) {
     const scriptType =
@@ -235,8 +257,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       type: scriptRow.type,
       steps: scriptRow.steps,
     };
-  } else if (existingScriptId != null) {
-    scriptId = existingScriptId;
+  } else {
+    scriptId = existingScriptId!;
   }
 
   const campaignData: CampaignData = {
@@ -244,7 +266,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     title,
     type,
     caller_id,
-    script_id: scriptId ?? undefined,
+    script_id: scriptId,
     status,
     is_active: Boolean(is_active),
     start_date: start_date ?? undefined,

@@ -12,6 +12,10 @@ import {
 import { logger } from "../logger.server";
 import { getSignedUrls } from "./workspace.server";
 import { extractKeys, flattenRow } from "../utils";
+import {
+  COMPLETED_QUEUE_COUNT_FILTER,
+  QUEUE_STATUS_QUEUED,
+} from "../queue-status";
 
 export type CampaignType =
   | "live_call"
@@ -36,7 +40,9 @@ export interface CampaignDetails {
   [key: string]: unknown;
 }
 
-export function getCampaignTableKey(type: CampaignType): string {
+type CampaignTableKey = "live_campaign" | "message_campaign" | "ivr_campaign";
+
+export function getCampaignTableKey(type: CampaignType): CampaignTableKey {
   switch (type) {
     case "live_call":
       return "live_campaign";
@@ -169,11 +175,6 @@ export async function updateCampaign({
             message_media: undefined,
             step_data: undefined,
           });
-
-  if (cleanCampaignData.script_id && !cleanCampaignDetails.script_id) {
-    cleanCampaignDetails.script_id = cleanCampaignData.script_id;
-    delete cleanCampaignData.script_id;
-  }
 
   const campaign = await handleDatabaseOperation(
     async () =>
@@ -389,7 +390,7 @@ export async function updateOrCopyScript({
     ? await supabase.from("script").select().eq("id", id).single()
     : { data: null, error: null };
   let scriptOperation;
-  const upsertData = {
+  const upsertData: Partial<Script> = {
     ...scriptData,
     name:
       saveAsCopy && originalScript?.name === updateData.name
@@ -401,8 +402,8 @@ export async function updateOrCopyScript({
   };
 
   if (saveAsCopy || !id) {
-    delete upsertData.id;
-    scriptOperation = supabase.from("script").insert(upsertData).select();
+    const { id: _unusedId, ...insertData } = upsertData;
+    scriptOperation = supabase.from("script").insert(insertData).select();
   } else {
     scriptOperation = supabase
       .from("script")
@@ -413,7 +414,7 @@ export async function updateOrCopyScript({
   const { data: updatedScript, error: scriptError } = await scriptOperation;
   if (scriptError) {
     if (scriptError.code === "23505") {
-      logger.error(scriptError);
+      logger.error("Duplicate script conflict", scriptError);
       throw new Error(
         `A script with this name (${upsertData.name}) already exists in the workspace`,
       );
@@ -508,9 +509,10 @@ export const fetchCampaignDetails = async (
   supabaseClient: SupabaseClient,
   campaignId: string | number,
   workspaceId: string,
-  tableName: string,
+  tableName: CampaignTableKey,
 ) => {
-  const { data, error } = await supabaseClient
+  const typedClient = supabaseClient as SupabaseClient<any>;
+  const { data, error } = await typedClient
     .from(tableName)
     .select()
     .eq("campaign_id", campaignId)
@@ -518,7 +520,7 @@ export const fetchCampaignDetails = async (
   if (error) {
     if (error.code === "PGRST116") {
       const { data: newCampaign, error: newCampaignError } =
-        await supabaseClient
+        await typedClient
           .from(tableName)
           .insert({ campaign_id: campaignId, workspace: workspaceId })
           .select()
@@ -553,7 +555,7 @@ export const fetchQueueCounts = async (
       .from("campaign_queue")
       .select("*, contact!inner(*)", { count: "exact", head: true })
       .eq("campaign_id", Number(campaignId))
-      .eq("status", "queued")
+      .eq("status", QUEUE_STATUS_QUEUED)
       .not("contact.phone", "is", null)
       .neq("contact.phone", "")
       .limit(1);
@@ -595,14 +597,24 @@ export const fetchCampaignAudience = async (
     .from("campaign_queue")
     .select(`id, contact_id, contact!inner(*)`, { count: "exact" })
     .eq("campaign_id", Number(campaignId))
-    .eq("status", "queued")
+    .eq("status", QUEUE_STATUS_QUEUED)
     .not("contact.phone", "is", null)
     .neq("contact.phone", "")
     .limit(1);
 
-  const [queueResult, isQueuedCount, scripts] = await Promise.all([
+  const dequeuedCountPromise = supabaseClient
+    .from("campaign_queue")
+    .select(`id, contact_id, contact!inner(*)`, { count: "exact", head: true })
+    .eq("campaign_id", Number(campaignId))
+    .or(COMPLETED_QUEUE_COUNT_FILTER)
+    .not("contact.phone", "is", null)
+    .neq("contact.phone", "")
+    .limit(1);
+
+  const [queueResult, isQueuedCount, dequeuedCount, scripts] = await Promise.all([
     queuePromise,
     isQueuedCountPromise,
+    dequeuedCountPromise,
     scriptsPromise,
   ]);
 
@@ -612,11 +624,16 @@ export const fetchCampaignAudience = async (
     throw new Error(
       `Error fetching queued count: ${isQueuedCount.error.message}`,
     );
+  if (dequeuedCount.error)
+    throw new Error(
+      `Error fetching dequeued count: ${dequeuedCount.error.message}`,
+    );
   if (scripts.error)
     throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
     campaign_queue: queueResult.data,
     queue_count: isQueuedCount.count,
+    dequeued_count: dequeuedCount.count,
     total_count: queueResult.count,
     scripts: scripts.data,
   };
@@ -628,7 +645,8 @@ export const fetchAdvancedCampaignDetails = async (
   campaignType: "live_call" | "message" | "robocall",
   workspaceId: string,
 ) => {
-  let table, extraSelect = "";
+  let table: CampaignTableKey;
+  let extraSelect = "";
   switch (campaignType) {
     case "live_call":
     case null:
@@ -646,19 +664,36 @@ export const fetchAdvancedCampaignDetails = async (
       throw new Error(`Invalid campaign type: ${campaignType}`);
   }
 
-  const { data, error } = await supabaseClient
+  const typedClient = supabaseClient as SupabaseClient<any>;
+  const { data: rawData, error } = await typedClient
     .from(table)
     .select(`*${extraSelect}`)
     .eq("campaign_id", campaignId)
     .single();
+  const data = rawData as
+    | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
+        mediaLinks?: string[];
+      })
+    | (Database["public"]["Tables"]["live_campaign"]["Row"] & { script?: Script | null })
+    | (Database["public"]["Tables"]["ivr_campaign"]["Row"] & { script?: Script | null })
+    | null;
 
   if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
 
-  if (campaignType === "message" && data?.message_media?.length > 0) {
-    data.mediaLinks = await getSignedUrls(
+  const messageData =
+    campaignType === "message"
+      ? (data as
+          | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
+              mediaLinks?: string[];
+            })
+          | null)
+      : null;
+
+  if (messageData?.message_media?.length) {
+    messageData.mediaLinks = await getSignedUrls(
       supabaseClient,
       workspaceId,
-      data.message_media,
+      messageData.message_media,
     );
   }
 
@@ -679,7 +714,7 @@ export async function fetchCampaignsByType({
     .select(`...campaign(title, id)`)
     .eq("workspace", workspaceId);
   if (error) {
-    logger.error(error);
+    logger.error("Error fetching campaigns by type", error);
   }
   return data;
 }
@@ -694,7 +729,7 @@ export async function getCampaignQueueById({
   const { data, error } = await supabaseClient
     .from("campaign_queue")
     .select("*, contact(*)")
-    .eq("campaign_id", campaign_id);
+    .eq("campaign_id", Number(campaign_id));
   if (error) throw error;
   return data;
 }
@@ -736,8 +771,12 @@ export function checkSchedule(campaignData: Campaign) {
     "thursday",
     "friday",
     "saturday",
-  ];
-  const todaySchedule = scheduleObject[daysOfWeek[currentDay]];
+  ] as const;
+  const dayKey = daysOfWeek[currentDay];
+  if (!dayKey) {
+    return false;
+  }
+  const todaySchedule = scheduleObject[dayKey];
   if (!todaySchedule.active) {
     return false;
   }
@@ -767,7 +806,7 @@ export type OutreachExportData = {
   workspace: string;
   contact: Database["public"]["Tables"]["contact"]["Row"];
   calls: { duration: number }[];
-}[];
+};
 
 type WorkspaceUserData = {
   id: string;
@@ -778,7 +817,7 @@ type WorkspaceUserData = {
 export async function fetchOutreachData(
   supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
-) {
+): Promise<OutreachExportData[]> {
   const { data, error } = await supabaseClient
     .from("outreach_attempt")
     .select(`
@@ -786,10 +825,10 @@ export async function fetchOutreachData(
       contact:contact_id(*),
       calls:call!outreach_attempt_id(duration)
     `)
-    .eq("campaign_id", campaignId);
+    .eq("campaign_id", Number(campaignId));
 
   if (error) throw new Error("Error fetching data");
-  return (data || []) as unknown as OutreachExportData;
+  return (data || []) as unknown as OutreachExportData[];
 }
 
 export function processOutreachExportData(
@@ -805,25 +844,24 @@ export function processOutreachExportData(
         : header,
   );
 
-  let flattenedData = data.map((row) => flattenRow(row, users));
+  const flattenedData = data.map((row) => flattenRow(row, users));
+  type FlattenedExportRow = (typeof flattenedData)[number];
 
   flattenedData.sort((a, b) => {
-    if (a.callcaster_id < b.callcaster_id) return -1;
-    if (a.callcaster_id > b.callcaster_id) return 1;
-    return (
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
+    const diff = Number(a.callcaster_id) - Number(b.callcaster_id);
+    if (Number.isFinite(diff) && diff !== 0) return diff;
+    return new Date(a.created_at ?? "").getTime() - new Date(b.created_at ?? "").getTime();
   });
 
-  const mergedData: Record<string, unknown>[] = [];
-  let currentGroup: Record<string, unknown> | null = null;
+  const mergedData: FlattenedExportRow[] = [];
+  let currentGroup: FlattenedExportRow | null = null;
 
   flattenedData.forEach((row) => {
     if (
       !currentGroup ||
       row.callcaster_id !== currentGroup.callcaster_id ||
-      new Date(row.created_at).getTime() -
-        new Date(currentGroup.created_at).getTime() >
+      new Date(row.created_at ?? "").getTime() -
+        new Date(currentGroup.created_at ?? "").getTime() >
         12 * 60 * 60 * 1000
     ) {
       if (currentGroup) {
@@ -832,14 +870,18 @@ export function processOutreachExportData(
       currentGroup = { ...row };
     } else {
       Object.keys(row).forEach((key) => {
+        // Keep `call_duration` max via special handling below.
+        if (key === "call_duration") return;
         if (row[key] != null && row[key] !== "" && currentGroup) {
           currentGroup[key] = row[key];
         }
       });
 
       // Special handling for call_duration - keep the longer duration
-      if (row.call_duration > currentGroup.call_duration) {
-        currentGroup.call_duration = row.call_duration;
+      const next = Number(row.call_duration);
+      const prev = Number(currentGroup.call_duration);
+      if (Number.isFinite(next) && (!Number.isFinite(prev) || next > prev)) {
+        currentGroup.call_duration = next;
       }
     }
   });

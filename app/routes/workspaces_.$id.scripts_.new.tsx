@@ -10,11 +10,12 @@ import {
 } from "@remix-run/react";
 
 import { MdAdd, MdClose } from "react-icons/md";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CardContent } from "@/components/ui/card";
 import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
+import type { Json } from "@/lib/database.types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -100,16 +101,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
     .insert({
       name,
       type,
-      steps,
+      steps: steps as Json,
       created_by: user?.id,
       workspace: workspaceId,
     })
     .select();
   if (ref && data && data.length > 0) {
+    const createdScript = data[0];
+    if (!createdScript) {
+      return json(
+        { success: false, error: "Failed to create script" },
+        { headers },
+      );
+    }
     const tableKey = type === "script" ? "live_campaign" : "ivr_campaign";
     const { error: updateError } = await supabaseClient
       .from(tableKey)
-      .update({ script_id: data[0].id })
+      .update({ script_id: createdScript.id })
       .eq("campaign_id", Number(ref) || 0)
       .select();
     if (updateError) {
@@ -135,17 +143,25 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function NewScript() {
-  const { workspace, error, ref, campaignType } =
-    useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const workspace = "workspace" in loaderData ? loaderData.workspace : null;
+  const error = "error" in loaderData ? loaderData.error : null;
+  const ref = "ref" in loaderData ? loaderData.ref : null;
+  const campaignType = "campaignType" in loaderData ? loaderData.campaignType : undefined;
+  const createdScripts =
+    actionData && "data" in actionData && Array.isArray(actionData.data)
+      ? actionData.data
+      : null;
+  const createdScript = createdScripts?.[0] ?? null;
   const [pendingFileName, setPendingFileName] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (actionData?.success && actionData.data && actionData.data.length > 0) {
+    if (actionData?.success && createdScript) {
       toast.success("Script successfully added to your workspace!");
       setTimeout(
-        () => navigate(`../${actionData.data[0].id}`, { relative: "path" }),
+        () => navigate(`../${createdScript.id}`, { relative: "path" }),
         750,
       );
     } else if (actionData?.error) {
@@ -157,7 +173,7 @@ export default function NewScript() {
             : "An error occurred";
       toast.error(`Error: ${errorMessage}`);
     }
-  }, [actionData, navigate]);
+  }, [actionData, createdScript, navigate]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -177,7 +193,7 @@ export default function NewScript() {
   };
 
   if (error || !workspace) {
-    return <div>Error: {error?.message || "Workspace not found"}</div>;
+    return <div>Error: {typeof error === "string" ? error : error?.message || "Workspace not found"}</div>;
   }
 
   return (
@@ -203,7 +219,7 @@ export default function NewScript() {
             className="space-y-6"
             encType="multipart/form-data"
           >
-            <input hidden value={ref} id="ref" name="ref" />
+            <input hidden value={ref ?? ""} id="ref" name="ref" />
             <label
               htmlFor="script-name"
               className="block text-sm font-medium text-gray-700 dark:text-gray-200"
@@ -292,7 +308,6 @@ export default function NewScript() {
           </Form>
         </CardContent>
       </Card>
-      <Toaster richColors />
     </section>
   );
 }

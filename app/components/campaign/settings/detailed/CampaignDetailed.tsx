@@ -50,7 +50,11 @@ export const CampaignTypeSpecificSettings = ({
   surveys: Pick<Survey, "survey_id" | "title">[],
   handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void,
 }) => {
-  const isScriptRequired = !('script_id' in details) && !('body_text' in details);
+  const isScriptMissing = "script_id" in details && !details.script_id;
+  const isMessageContentMissing =
+    "body_text" in details &&
+    !details.body_text?.trim() &&
+    (!("message_media" in details) || !details.message_media?.length);
 
   return (
     <>
@@ -85,7 +89,7 @@ export const CampaignTypeSpecificSettings = ({
                 </NavLink>
               </Button>
             </div>
-            {isScriptRequired && (
+            {isScriptMissing && (
               <p className="text-sm text-destructive flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" />
                 Script is required
@@ -137,10 +141,15 @@ export const CampaignTypeSpecificSettings = ({
             onChange={handleInputChange}
             surveys={surveys}
           />
-          {isScriptRequired && (
+          {isMessageContentMissing && (
             <p className="text-sm text-destructive flex items-center gap-1">
               <AlertCircle className="h-4 w-4" />
-              Message content is required
+              Message content or media is required
+            </p>
+          )}
+          {isChanged && (
+            <p className="text-sm text-muted-foreground">
+              Save your edits before sending or scheduling this message campaign.
             </p>
           )}
           <div className="flex gap-2 justify-end">

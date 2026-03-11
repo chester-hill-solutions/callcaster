@@ -1,4 +1,4 @@
-import { FetcherWithComponents, Form, NavLink, useNavigation, useNavigationType, useSubmit } from "@remix-run/react";
+import { FetcherWithComponents, Form } from "@remix-run/react";
 import { FileObject } from "@supabase/storage-js";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,9 +12,7 @@ import {
 import {
   Audience,
   Campaign,
-  CampaignAudience,
   Flags,
-  Schedule,
   Survey,
   Script,
   WorkspaceNumbers,
@@ -25,7 +23,6 @@ import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
 import { Tables } from "@/lib/database.types";
-import { CampaignState } from "@/routes/workspaces_.$id.campaigns.$selected_id";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
@@ -53,15 +50,22 @@ export type CampaignSettingsProps = {
   handleResetData?: () => void;
   formFetcher: FetcherWithComponents<unknown>;
   user: User;
-  joinDisabled: string | null;
+  startDisabledReason: string | null;
+  readinessIssues: string[];
   campaignQueue: QueueItem[];
   queueCount: number;
+  dequeuedCount: number;
   totalCount: number;
   mediaLinks: string[];
   handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void;
   scheduleDisabled: string | boolean;
-  handleConfirmStatus: (status: "play" | "archive" | "none" | "queue") => void;
-  confirmStatus: "play" | "archive" | "none" | "queue";
+  handleConfirmStatus: (status: "play" | "archive" | "none") => void;
+  confirmStatus: "play" | "archive" | "none";
+  isBusy: boolean;
+  isSaving: boolean;
+  activeIntent: string | null;
+  feedbackMessage?: string | null;
+  feedbackTone?: "success" | "error" | null;
   credits: number;
   surveys: Pick<Survey, "survey_id" | "title">[];
 };
@@ -82,18 +86,32 @@ export const CampaignSettings = ({
   formFetcher,
   scripts,
   mediaLinks,
-  joinDisabled,
+  startDisabledReason,
+  readinessIssues,
   flags,
   campaignQueue,
   queueCount,
+  dequeuedCount,
   totalCount,
   handleNavigate,
   scheduleDisabled,
   handleConfirmStatus,
   confirmStatus,  
+  isBusy,
+  isSaving,
+  activeIntent,
+  feedbackMessage,
+  feedbackTone,
   surveys,  
 }: CampaignSettingsProps) => {
-  const nav = useNavigation();
+  const confirmActionLabel =
+    confirmStatus === "play"
+      ? activeIntent === "status" && isBusy
+        ? "Starting..."
+        : "Start Campaign"
+      : activeIntent === "status" && isBusy
+        ? "Archiving..."
+        : "Archive Campaign";
 
   const renderConfirmDescription = () => {
 
@@ -180,14 +198,16 @@ export const CampaignSettings = ({
               onClick={() => handleConfirmStatus("none")}
               className="mr-2"
               variant="outline"
+              disabled={isBusy}
             >
               Cancel
             </Button>
             <Button
               onClick={() => handleConfirmStatus(confirmStatus)}
               variant={confirmStatus === "archive" ? "destructive" : "default"}
+              disabled={isBusy}
             >
-              {confirmStatus === "play" ? "Start Campaign" : confirmStatus === "archive" ? "Archive Campaign" : "Confirm"}
+              {confirmActionLabel}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -202,10 +222,23 @@ export const CampaignSettings = ({
         {handleSave && handleResetData && (
           <SaveBar
             isChanged={isChanged || false}
-            isSaving={nav.state === 'submitting'}
+            isSaving={isSaving}
             onSave={handleSave}
             onReset={handleResetData}
+            message="Unsaved changes. Save before starting or scheduling."
           />
+        )}
+        {feedbackMessage && (
+          <div
+            className={`rounded-md border px-4 py-3 text-sm ${
+              feedbackTone === "error"
+                ? "border-destructive/30 bg-destructive/5 text-destructive"
+                : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
+            }`}
+            role={feedbackTone === "error" ? "alert" : "status"}
+          >
+            {feedbackMessage}
+          </div>
         )}
         <Form method="patch">
           <input
@@ -228,9 +261,10 @@ export const CampaignSettings = ({
                 handleDuplicateButton={handleDuplicateButton}
                 phoneNumbers={phoneNumbers}
                 flags={flags}
-                joinDisabled={joinDisabled}
-                details={campaignDetails}
+                startDisabledReason={startDisabledReason}
+                readinessIssues={readinessIssues}
                 scheduleDisabled={scheduleDisabled}
+                isBusy={isBusy}
               />
             </section>
             <section className="rounded-lg border p-4">
@@ -245,7 +279,7 @@ export const CampaignSettings = ({
                 mediaLinks={mediaLinks}
                 isChanged={isChanged}
                 isBusy={formFetcher.state !== "idle"}
-                joinDisabled={joinDisabled}
+                joinDisabled={startDisabledReason}
                 scheduleDisabled={scheduleDisabled}
                 surveys={surveys}
                 handleNavigate={handleNavigate}
@@ -255,6 +289,7 @@ export const CampaignSettings = ({
             <CampaignSettingsQueue
               campaignQueue={campaignQueue}
               queueCount={queueCount}
+              dequeuedCount={dequeuedCount}
               totalCount={totalCount}
             />
           </div>

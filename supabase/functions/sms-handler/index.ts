@@ -6,7 +6,96 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
+
+const TWILIO_MESSAGE_INTENTS = new Set([
+  "otp",
+  "notifications",
+  "fraud",
+  "security",
+  "customercare",
+  "delivery",
+  "education",
+  "events",
+  "polling",
+  "announcements",
+  "marketing",
+]);
+
+type WorkspaceTwilioOpsConfig = {
+  trafficClass: string;
+  throughputProduct: string;
+  multiTenancyMode: string;
+  trafficShapingEnabled: boolean;
+  defaultMessageIntent: string | null;
+  sendMode: "from_number" | "messaging_service";
+  messagingServiceSid: string | null;
+  onboardingStatus: string;
+  supportNotes: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  auditTrail: Array<{
+    changedAt: string;
+    actorUserId: string | null;
+    actorUsername: string | null;
+    summary: string;
+  }>;
+};
+
+const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
+  trafficClass: "unknown",
+  throughputProduct: "none",
+  multiTenancyMode: "none",
+  trafficShapingEnabled: false,
+  defaultMessageIntent: null,
+  sendMode: "from_number",
+  messagingServiceSid: null,
+  onboardingStatus: "not_started",
+  supportNotes: "",
+  updatedAt: null,
+  updatedBy: null,
+  auditTrail: [],
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function normalizePortalConfig(value: unknown): WorkspaceTwilioOpsConfig {
+  if (!isRecord(value)) {
+    return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
+  }
+
+  const defaultMessageIntent =
+    typeof value.defaultMessageIntent === "string" &&
+    TWILIO_MESSAGE_INTENTS.has(value.defaultMessageIntent)
+      ? value.defaultMessageIntent
+      : null;
+
+  return {
+    ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
+    trafficClass: typeof value.trafficClass === "string" ? value.trafficClass : "unknown",
+    throughputProduct: typeof value.throughputProduct === "string" ? value.throughputProduct : "none",
+    multiTenancyMode: typeof value.multiTenancyMode === "string" ? value.multiTenancyMode : "none",
+    trafficShapingEnabled:
+      typeof value.trafficShapingEnabled === "boolean" ? value.trafficShapingEnabled : false,
+    defaultMessageIntent,
+    sendMode: value.sendMode === "messaging_service" ? "messaging_service" : "from_number",
+    messagingServiceSid: parseOptionalString(value.messagingServiceSid),
+    onboardingStatus: typeof value.onboardingStatus === "string" ? value.onboardingStatus : "not_started",
+    supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
+    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
+    updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
+    auditTrail: Array.isArray(value.auditTrail)
+      ? (value.auditTrail as WorkspaceTwilioOpsConfig["auditTrail"])
+      : [],
+  };
+}
 
 // Link shortening function using TinyURL API
 async function shortenUrl(url: string): Promise<string> {
@@ -194,7 +283,7 @@ function processTemplateTags(text: string, contact: ContactData): string {
   result = processBraces(result);
   return result;
 }
-const baseUrl = 'https://nolrdvpusfcsjihzhnlp.supabase.co/functions/v1/';
+const baseUrl = `${getFunctionsBaseUrl()}/`;
 interface SendMessageParams {
   body: string;
   to: string;
@@ -206,11 +295,28 @@ interface SendMessageParams {
   contact_id: string | number;
   queue_id: number | string;
   user_id: string;
+  messageIntent?: string | null;
+  messagingServiceSid?: string | null;
 }
 const normalizePhoneNumber = (input: string): string => {
-  const cleaned = (input.replace(/[^0-9+]/g, ""))
-    .replace(/^\+?1?(\+|\d{10})$/, "+1$1")
-    .replace(/\+1\+/, "+1");
+  if (!input || typeof input !== "string") {
+    throw new Error("Phone number input must be a non-empty string");
+  }
+
+  // Keep this behavior aligned with app/lib/utils/phone.ts.
+  let cleaned = input.replace(/[^0-9+]/g, "");
+
+  if (cleaned.indexOf("+") > 0) {
+    cleaned = cleaned.replace(/\+/g, "");
+  }
+
+  if (!cleaned.startsWith("+")) {
+    cleaned = `+${cleaned}`;
+  }
+
+  if (cleaned.length < 12) {
+    cleaned = `+1${cleaned.replace("+", "")}`;
+  }
 
   if (cleaned.length !== 12) { // +1 plus 10 digits
     throw new Error("Invalid phone number length");
@@ -262,7 +368,11 @@ const createWorkspaceTwilioInstance = async ({
     twilio: new Twilio(
       workspace.twilio_data.sid,
       workspace.twilio_data.authToken
-    ), credits: workspace.credits
+    ),
+    credits: workspace.credits,
+    portalConfig: normalizePortalConfig(
+      isRecord(workspace.twilio_data) ? workspace.twilio_data.portalConfig : null,
+    ),
   };
 };
 
@@ -277,6 +387,8 @@ const sendMessage = async ({
   contact_id,
   queue_id,
   user_id,
+  messageIntent,
+  messagingServiceSid,
 }: SendMessageParams) => {
   let outreachAttemptId: string | null = null;
   try {
@@ -295,7 +407,7 @@ const sendMessage = async ({
       throw new Error("Insufficient credits to send message");
     }
 
-    const { twilio } = await createWorkspaceTwilioInstance({
+    const { twilio, portalConfig } = await createWorkspaceTwilioInstance({
       supabase,
       workspace_id: workspace,
     });
@@ -316,12 +428,18 @@ const sendMessage = async ({
     // Process URLs in the message body to shorten them
     const processedBody = await processUrls(body);
 
+    const resolvedMessagingServiceSid =
+      messagingServiceSid ??
+      (portalConfig.sendMode === "messaging_service" ? portalConfig.messagingServiceSid : null);
+    const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+
     const message = await twilio.messages.create({
       body: processedBody,
       to,
-      from,
       statusCallback: `${baseUrl}sms-status`,
       ...(media?.length && { mediaUrl: media }),
+      ...(resolvedMessagingServiceSid ? { messagingServiceSid: resolvedMessagingServiceSid } : { from }),
+      ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
     }).catch((e: Error) => ({ error: e }));
 
     if ('error' in message) {
@@ -413,13 +531,23 @@ const createOutreachAttempt = async ({
   return data;
 };
 
-Deno.serve(async (req) => {
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { to_number, campaign_id, workspace_id, contact_id, caller_id, queue_id, user_id } = await req.json();
+    const {
+      to_number,
+      campaign_id,
+      workspace_id,
+      contact_id,
+      caller_id,
+      queue_id,
+      user_id,
+      message_intent,
+      messaging_service_sid,
+    } = await req.json();
 
     // Check if campaign is still active
     const { data: campaign, error: campaignError } = await supabase
@@ -483,6 +611,8 @@ Deno.serve(async (req) => {
       contact_id,
       queue_id,
       user_id,
+      messageIntent: parseOptionalString(message_intent),
+      messagingServiceSid: parseOptionalString(messaging_service_sid),
     });
 
     if ('error' in result) {
@@ -515,4 +645,8 @@ Deno.serve(async (req) => {
       }
     );
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

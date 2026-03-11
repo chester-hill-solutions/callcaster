@@ -1,7 +1,10 @@
 import { useFetcher } from "@remix-run/react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Section, SectionHeader } from "@/components/shared/Section";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 type ApiKeyRecord = {
@@ -94,14 +97,13 @@ export default function ApiKeysSection({
   if (!hasAccess) return null;
 
   return (
-    <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+    <Section className="flex flex-[40%] flex-col justify-between bg-brand-secondary dark:bg-zinc-900">
       <div className="flex-1">
-        <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
-          API Keys
-        </h3>
-        <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-          Use API keys to send SMS programmatically (e.g. scripts, Zapier).
-        </p>
+        <SectionHeader
+          branded
+          title="API Keys"
+          description="Use API keys to send SMS programmatically (for example from scripts or Zapier)."
+        />
         <div className="flex flex-col py-4">
           <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
             Keys
@@ -110,7 +112,10 @@ export default function ApiKeysSection({
             <p className="text-sm text-red-600">{listFetcher.data.error}</p>
           )}
           {isLoading && keys.length === 0 ? (
-            <p className="text-sm text-gray-500">Loading…</p>
+            <div className="space-y-2">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
           ) : keys.length === 0 && !showCreateForm ? (
             <p className="text-sm text-gray-500">No API keys yet.</p>
           ) : (
@@ -172,17 +177,17 @@ export default function ApiKeysSection({
 
           {showCreateForm ? (
             <form onSubmit={handleCreate} className="mt-4 flex flex-col gap-2">
-              <label className="font-sans text-sm font-semibold uppercase tracking-tighter text-gray-600">
-                Key name
-              </label>
-              <input
-                type="text"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="e.g. Production, Zapier"
-                className="rounded border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-zinc-800"
-                autoFocus
-              />
+              <FormField htmlFor="api-key-name" label="Key name">
+                <Input
+                  aria-label="Key name"
+                  id="api-key-name"
+                  type="text"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  placeholder="e.g. Production, Zapier"
+                  className="bg-white dark:bg-zinc-800"
+                />
+              </FormField>
               <div className="flex gap-2">
                 <Button
                   type="submit"
@@ -213,6 +218,6 @@ export default function ApiKeysSection({
           )}
         </div>
       </div>
-    </Card>
+    </Section>
   );
 }

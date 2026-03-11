@@ -6,17 +6,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const toNumber = formData.get('To') as string;
   const baseUrl = env.BASE_URL();
-  let twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = new Twilio.twiml.VoiceResponse();
 
   if (isAValidPhoneNumber(toNumber)) {
-    let dial = twiml.dial({
+    const dial = twiml.dial({
       callerId: env.TWILIO_PHONE_NUMBER(),
       record: 'record-from-answer',
       recordingStatusCallback: `${baseUrl}/api/recording`,
-      recordingStatusCallbackEvent: 'completed',
+      recordingStatusCallbackEvent: ['completed'],
       transcribe: true,
-      transcribeCallback: `${baseUrl}/api/transcribe`
-    });
+      transcribeCallback: `${baseUrl}/api/transcribe`,
+    } as any);
     dial.number(toNumber);
   } else {
     twiml.say('The provided phone number is invalid.');
@@ -30,5 +30,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 function isAValidPhoneNumber(number: string): boolean {
-  return /^[\d\+\-\(\) ]+$/.test(number);
+  return /^[\d+\-() ]+$/.test(number);
 }

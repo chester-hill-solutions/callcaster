@@ -1,8 +1,9 @@
 import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { useLoaderData, Link } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -45,8 +46,15 @@ export default function WorkspaceUsers() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Workspace Users</CardTitle>
-                <CardDescription>Users with access to this workspace</CardDescription>
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <CardTitle>Workspace Users</CardTitle>
+                        <CardDescription>Users with access to this workspace</CardDescription>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link to="../invite">Manage Access</Link>
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent>
                 {workspaceUsers.length > 0 ? (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useFetcher } from "@remix-run/react";
+import { useParams, useNavigate } from "@remix-run/react";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck } from "react-icons/md";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
 
-const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
+export const VALID_HEADERS = ["firstname", "surname", "phone", "email", "opt_out", "address", "city", "province", "postal", "country", "carrier", "other_data"];
 
 // Parse CSV with columns option for better mapping
-const parseCSV = (csvString: string) => {
+export const parseCSV = (csvString: string) => {
   try {
     const records = parse(csvString, {
       columns: true,
@@ -33,13 +33,13 @@ const parseCSV = (csvString: string) => {
   }
 };
 
-const parseCSVHeaders = (unparsedHeaders: string[]) => {
+export const parseCSVHeaders = (unparsedHeaders: string[]) => {
   return unparsedHeaders.map((header) => header.toLowerCase().trim());
 };
 
 type CSVRecord = Record<string, string | number | null | undefined>;
 
-const parseCSVData = (records: CSVRecord[], headers: string[]) => {
+export const parseCSVData = (records: CSVRecord[], headers: string[]) => {
   return records.map((record) => {
     const contact: Record<string, string> = {};
     headers.forEach((header) => {
@@ -58,9 +58,6 @@ type AudienceUploaderProps = {
   supabase: SupabaseClient<Database>;
   onUploadComplete?: (audienceId: string) => void;
 };
-
-// Add a type for the fetcher state
-type FetcherState = "idle" | "submitting" | "loading";
 
 export default function AudienceUploader({ 
   audienceName = "", 
@@ -84,48 +81,75 @@ export default function AudienceUploader({
   
   // Upload progress state
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadWarning, setUploadWarning] = useState<string | null>(null);
   const [audienceId, setAudienceId] = useState<string | null>(existingAudienceId || null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [totalContacts, setTotalContacts] = useState(0);
   const [processedContacts, setProcessedContacts] = useState(0);
   
-  // Use fetcher instead of submit for better control over the submission and response
-  const fetcher = useFetcher();
-
   // Add new state for status polling
   const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(null);
+  const [pollFailureCount, setPollFailureCount] = useState(0);
 
-  // Listen for changes to the audience status
+  const applyUploadState = (nextState: {
+    status?: string | null;
+    total_contacts?: number | null;
+    processed_contacts?: number | null;
+    error_message?: string | null;
+    audience_id?: string | number | null;
+    stage?: string | null;
+  }) => {
+    const nextStatus = nextState.status || null;
+    const nextTotal = nextState.total_contacts || 0;
+    const nextProcessed = nextState.processed_contacts || 0;
+
+    setUploadStatus(nextStatus);
+    setTotalContacts(nextTotal);
+    setProcessedContacts(nextProcessed);
+
+    if (typeof nextState.audience_id !== "undefined" && nextState.audience_id !== null) {
+      setAudienceId(String(nextState.audience_id));
+    }
+
+    if (nextState.stage) {
+      setUploadWarning(null);
+    }
+
+    if (nextTotal > 0) {
+      setUploadProgress(Math.round((nextProcessed / nextTotal) * 100));
+    }
+
+    if (nextStatus === "completed") {
+      setUploadProgress(100);
+      setStatusPollingEnabled(false);
+      if (onUploadComplete && nextState.audience_id) {
+        onUploadComplete(String(nextState.audience_id));
+      }
+    }
+
+    if (nextStatus === "error") {
+      setUploadError(nextState.error_message || "An error occurred during upload");
+      setStatusPollingEnabled(false);
+    }
+  };
+
+  // Listen for changes to the upload record so the UI follows audience_upload directly.
   useSupabaseRealtimeSubscription({
     supabase,
-    table: "audience",
-    ...(audienceId ? { filter: `id=eq.${audienceId}` } : {}),
+    table: "audience_upload",
+    ...(currentUploadId ? { filter: `id=eq.${currentUploadId}` } : {}),
     onChange: (payload) => {
       if (payload.eventType === "UPDATE" && payload.new) {
         const newData = payload.new as {
           status?: string;
           total_contacts?: number;
           processed_contacts?: number;
-          id?: string | number;
+          audience_id?: string | number;
           error_message?: string;
         };
-        setUploadStatus(newData.status || null);
-        setTotalContacts(newData.total_contacts || 0);
-        setProcessedContacts(newData.processed_contacts || 0);
-        
-        if (newData.status === "completed") {
-          setUploadProgress(100);
-          if (onUploadComplete && newData.id) {
-            onUploadComplete(String(newData.id));
-          }
-        } else if (newData.status === "error") {
-          setUploadError(newData.error_message || "An error occurred during upload");
-        } else if (newData.total_contacts && newData.total_contacts > 0 && newData.processed_contacts !== undefined) {
-          const progress = Math.round((newData.processed_contacts / newData.total_contacts) * 100);
-          setUploadProgress(progress);
-        }
+        applyUploadState(newData);
       }
     },
   });
@@ -142,42 +166,33 @@ export default function AudienceUploader({
         const data = await response.json();
 
         if (data.error) {
-          setUploadError(data.error);
-          setStatusPollingEnabled(false);
+          setPollFailureCount((count) => count + 1);
+          setUploadWarning("Live progress is delayed. Retrying automatically...");
           return;
         }
 
-        if (data.status === "completed") {
-          setUploadStatus("completed");
-          setUploadProgress(100);
-          setStatusPollingEnabled(false);
-          if (onUploadComplete) {
-            onUploadComplete(data.audienceId.toString());
-          }
-        } else if (data.status === "error") {
-          setUploadError(data.error_message || "An error occurred during upload");
-          setUploadStatus("error");
-          setStatusPollingEnabled(false);
-        } else {
-          setUploadStatus(data.status);
-          setTotalContacts(data.total_contacts || 0);
-          setProcessedContacts(data.processed_contacts || 0);
-          if (data.total_contacts > 0) {
-            const progress = Math.round((data.processed_contacts / data.total_contacts) * 100);
-            setUploadProgress(progress);
-          }
-        }
+        setPollFailureCount(0);
+        setUploadWarning(null);
+        applyUploadState(data);
       } catch (error) {
         logger.error("Error polling status:", error);
-        setUploadError("Error checking upload status");
-        setStatusPollingEnabled(false);
+        setPollFailureCount((count) => count + 1);
+        setUploadWarning("Live progress is delayed. Retrying automatically...");
       }
     },
     statusPollingEnabled ? 2000 : null // Poll every 2 seconds when enabled
   );
 
+  useEffect(() => {
+    if (pollFailureCount < 5) {
+      return;
+    }
+
+    setUploadError("We could not refresh upload progress right now. You can stay on this page or try again in a moment.");
+    setStatusPollingEnabled(false);
+  }, [pollFailureCount]);
+
   const displayFileToUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const filePath = e.target.value;
     const file = e.target.files?.[0];
     if (!file) return;
     
@@ -218,7 +233,7 @@ export default function AudienceUploader({
     }, {} as Record<string, string>);
 
     setHeaderMapping(initialMapping);
-    setPendingFileName(filePath.split("\\").at(-1) || "");
+    setPendingFileName(file.name);
     setPendingContactHeaders(headers);
     setPreviewData(cleanPreviewData as unknown as Contact[]);
     setIsHeaderMappingConfirmed(false);
@@ -235,9 +250,7 @@ export default function AudienceUploader({
     setPendingFileName("");
     setSelectedFile(null); // Clear the stored file
     const fileInput = document.getElementById("contacts") as HTMLInputElement;
-    if (fileInput) {
-      fileInput.value = "";
-    }
+    fileInput.value = "";
     setIsHeaderMappingConfirmed(false);
   };
 
@@ -251,19 +264,12 @@ export default function AudienceUploader({
 
   const handleUploadContacts = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!pendingFileName || !isHeaderMappingConfirmed) {
-      return;
-    }
-    
+
     setUploadError(null);
+    setUploadWarning(null);
     setUploadStatus("submitting");
     
     try {
-      if (!selectedFile) {
-        throw new Error("No file selected");
-      }
-      
       const formData = new FormData();
       formData.append("workspace_id", workspaceId as string);
       
@@ -273,7 +279,7 @@ export default function AudienceUploader({
         formData.append("audience_name", audienceName);
       }
       
-      formData.append("contacts", selectedFile);
+      formData.append("contacts", selectedFile!);
       formData.append("header_mapping", JSON.stringify(headerMapping));
       if (splitNameColumn) {
         formData.append("split_name_column", splitNameColumn);
@@ -293,6 +299,7 @@ export default function AudienceUploader({
       // Start polling for status
       setCurrentUploadId(data.upload_id);
       setStatusPollingEnabled(true);
+      setPollFailureCount(0);
       setUploadStatus("processing");
       setAudienceId(data.audience_id);
       
@@ -302,27 +309,6 @@ export default function AudienceUploader({
       setUploadStatus("error");
     }
   };
-
-  // Handle fetcher state changes
-  useEffect(() => {
-    const currentState = fetcher.state as FetcherState;
-    
-    if (currentState === "submitting") {
-      // Form is being submitted
-      setUploadStatus("submitting");
-    } else if (currentState === "loading") {
-      // Transition from submitting to loading means the server has responded
-      const data = fetcher.data as { error?: string; audience_id?: string; success?: boolean } | undefined;
-      
-      if (data?.error) {
-        setUploadError(data.error);
-        setUploadStatus("error");
-      } else if (data?.audience_id) {
-        setAudienceId(data.audience_id);
-        setUploadStatus("processing");
-      }
-    }
-  }, [fetcher.state, fetcher.data]);
 
   // Redirect to audience page when upload is complete
   useEffect(() => {
@@ -413,7 +399,7 @@ export default function AudienceUploader({
                       <TableCell>
                         <select
                           className="rounded-md border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-zinc-800"
-                          value={headerMapping[header] || 'other_data'}
+                          value={headerMapping[header]}
                           onChange={(e) => updateHeaderMapping(header, e.target.value)}
                         >
                           {VALID_HEADERS.map(validHeader => (
@@ -432,7 +418,7 @@ export default function AudienceUploader({
                               id="split-name"
                               className="rounded border-gray-300"
                               checked={Boolean(splitNameColumn)}
-                              onChange={(e) => setSplitNameColumn(e.target.checked ? header : null)}
+                              onChange={() => setSplitNameColumn(null)}
                             />
                             <label htmlFor="split-name">Split into First/Last Name</label>
                           </div>
@@ -502,6 +488,13 @@ export default function AudienceUploader({
           <AlertDescription>{uploadError}</AlertDescription>
         </Alert>
       )}
+
+      {uploadWarning && !uploadError && (
+        <Alert>
+          <AlertTitle>Upload still running</AlertTitle>
+          <AlertDescription>{uploadWarning}</AlertDescription>
+        </Alert>
+      )}
       
       {uploadStatus && (
         <div className="space-y-2">
@@ -520,14 +513,14 @@ export default function AudienceUploader({
         </div>
       )}
       
-      {(fetcher.state as FetcherState) === "idle" && !uploadStatus ? (
+      {!uploadStatus ? (
         <div className="flex justify-end">
           <Button
             onClick={handleUploadContacts}
-            disabled={!pendingFileName || !isHeaderMappingConfirmed || (fetcher.state as FetcherState) !== "idle"}
+            disabled={!pendingFileName || !isHeaderMappingConfirmed}
             className="bg-brand-primary text-white hover:bg-brand-secondary"
           >
-            {(fetcher.state as FetcherState) !== "idle" ? "Uploading..." : "Start Upload"}
+            Start Upload
           </Button>
         </div>
       ) : (
@@ -544,6 +537,8 @@ export default function AudienceUploader({
               onClick={() => {
                 setUploadStatus(null);
                 setUploadError(null);
+                setUploadWarning(null);
+                setPollFailureCount(0);
               }}
               variant="outline"
               className="mt-4"

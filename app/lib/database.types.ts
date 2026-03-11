@@ -466,36 +466,45 @@ export type Json =
         }
         campaign_queue: {
           Row: {
+            assigned_to_user_id: string | null
             attempts: number
             campaign_id: number
             contact_id: number
             created_at: string
             id: number
+            provider_status: string | null
             queue_order: number | null
+            queue_state: string | null
             status: string
             dequeued_by: string | null
             dequeued_at: string | null
             dequeued_reason: string | null
           }
           Insert: {
+            assigned_to_user_id?: string | null
             attempts?: number
             campaign_id: number
             contact_id: number
             created_at?: string
             id?: number
+            provider_status?: string | null
             queue_order?: number | null
+            queue_state?: string | null
             status?: string
             dequeued_by?: string | null
             dequeued_at?: string | null
             dequeued_reason?: string | null
           }
           Update: {
+            assigned_to_user_id?: string | null
             attempts?: number
             campaign_id?: number
             contact_id?: number
             created_at?: string
             id?: number
+            provider_status?: string | null
             queue_order?: number | null
+            queue_state?: string | null
             status?: string
             dequeued_by?: string | null
             dequeued_at?: string | null
@@ -1429,6 +1438,51 @@ export type Json =
             },
           ]
         }
+        handset_session: {
+          Row: {
+            id: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status: string
+            created_at: string
+            expires_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            workspace_id: string
+            client_identity: string
+            status?: string
+            created_at?: string
+            expires_at: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            workspace_id?: string
+            client_identity?: string
+            status?: string
+            created_at?: string
+            expires_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "handset_session_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
+              referencedColumns: ["id"]
+            },
+            {
+              foreignKeyName: "handset_session_workspace_id_fkey"
+              columns: ["workspace_id"]
+              isOneToOne: false
+              referencedRelation: "workspace"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
         workspace_number: {
           Row: {
             capabilities: Json | null
@@ -1612,6 +1666,41 @@ export type Json =
               columns: ["user_id"]
               isOneToOne: false
               referencedRelation: "users"
+              referencedColumns: ["id"]
+            }
+          ]
+        }
+        verification_session: {
+          Row: {
+            id: string
+            user_id: string
+            expected_caller: string
+            status: string
+            expires_at: string
+            created_at: string
+          }
+          Insert: {
+            id?: string
+            user_id: string
+            expected_caller: string
+            status?: string
+            expires_at: string
+            created_at?: string
+          }
+          Update: {
+            id?: string
+            user_id?: string
+            expected_caller?: string
+            status?: string
+            expires_at?: string
+            created_at?: string
+          }
+          Relationships: [
+            {
+              foreignKeyName: "verification_session_user_id_fkey"
+              columns: ["user_id"]
+              isOneToOne: false
+              referencedRelation: "user"
               referencedColumns: ["id"]
             }
           ]

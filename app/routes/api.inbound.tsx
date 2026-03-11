@@ -9,9 +9,9 @@ import type { TwilioInboundCallWebhook, WebhookEvent } from "@/lib/twilio.types"
 import type { Database } from "@/lib/database.types";
 
 interface WorkspaceNumberData {
+  handset_enabled: boolean | null;
   inbound_action: string | null;
   inbound_audio: string | null;
-  handset_enabled: boolean | null;
   type: string | null;
   workspace: {
     id: string;
@@ -42,12 +42,12 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     .from("workspace_number")
     .select(
       `
+      handset_enabled,
       inbound_action,
       inbound_audio,
-      handset_enabled,
       type,
       workspace,
-      ...workspace!inner(twilio_data, webhook(*))`,
+      ...workspace!inner(id, twilio_data, webhook(*))`,
     )
     .eq("phone_number", data.Called)
     .single() as {
@@ -62,11 +62,36 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     throw { status: 500, statusText: "Internal Server Error" };
   }
 
-  const { data: voicemail, error: voicemailError } = number?.inbound_audio
-    ? await supabase.storage
-      .from(`workspaceAudio`)
-      .createSignedUrl(`${number.workspace}/${number.inbound_audio}`, 3600)
-    : { data: null, error: null };
+  const workspaceId =
+    (number.workspace && typeof number.workspace === "object" && "id" in number.workspace
+      ? number.workspace.id
+      : typeof number.workspace === "string"
+        ? number.workspace
+        : null) ?? null;
+
+  let voicemail: { signedUrl: string } | null = null;
+  if (number?.inbound_audio && workspaceId) {
+    // Prefer treating inbound_audio as storage path (filename); fallback to resolving by id via list
+    const { data: signedByPath } = await supabase.storage
+      .from("workspaceAudio")
+      .createSignedUrl(`${workspaceId}/${number.inbound_audio}`, 3600);
+    if (signedByPath?.signedUrl) {
+      voicemail = { signedUrl: signedByPath.signedUrl };
+    } else {
+      const { data: files } = await supabase.storage
+        .from("workspaceAudio")
+        .list(workspaceId);
+      const file = files?.find(
+        (f) => String(f.id) === String(number.inbound_audio) || f.name === number.inbound_audio
+      );
+      if (file) {
+        const { data: signed } = await supabase.storage
+          .from("workspaceAudio")
+          .createSignedUrl(`${workspaceId}/${file.name}`, 3600);
+        if (signed?.signedUrl) voicemail = { signedUrl: signed.signedUrl };
+      }
+    }
+  }
   
   // Insert call record
   if (!data.CallSid || typeof data.CallSid !== 'string') {
@@ -117,12 +142,12 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  const workspaceId = number.workspace?.id ?? null;
-  if (number?.handset_enabled && workspaceId) {
+  const workspaceIdForHandset = number.workspace?.id ?? null;
+  if (number?.handset_enabled && workspaceIdForHandset) {
     const { data: session } = await (supabase as import("@supabase/supabase-js").SupabaseClient<Record<string, unknown>>)
       .from("handset_session")
       .select("client_identity")
-      .eq("workspace_id", workspaceId)
+      .eq("workspace_id", workspaceIdForHandset)
       .eq("status", "active")
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false })
@@ -143,7 +168,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  if (isPhoneNumber(number?.inbound_action)) {
+  if (typeof number?.inbound_action === "string" && isPhoneNumber(number.inbound_action)) {
     twiml.pause({ length: 1 });
     twiml.dial(number.inbound_action || '');
     return new Response(twiml.toString(), {
@@ -151,7 +176,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
         "Content-Type": "text/xml",
       },
     });
-  } else if (isEmail(number?.inbound_action)) {
+  } else if (typeof number?.inbound_action === "string" && isEmail(number.inbound_action)) {
     const phoneNumber = data.Called;
     if (voicemail?.signedUrl) {
       twiml.play(voicemail.signedUrl);

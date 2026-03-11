@@ -1,5 +1,5 @@
 import { Button, buttonVariants } from '@/components/ui/button';
-import type { CalendarProps, Calendar } from '@/components/ui/calendar';
+import type { CalendarProps } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -226,7 +226,7 @@ function genYears(yearRange = 50) {
 
 // ---------- utils end ----------
 
-function Calendar({
+function DateCalendar({
   className,
   classNames,
   showOutsideDays = true,
@@ -290,8 +290,6 @@ function Calendar({
     />
   );
 }
-Calendar.displayName = 'Calendar';
-
 interface PeriodSelectorProps {
   period: Period;
   setPeriod?: (m: Period) => void;
@@ -390,6 +388,8 @@ const TimePickerInput = React.forwardRef<HTMLInputElement, TimePickerInputProps>
 
         return () => clearTimeout(timer);
       }
+
+      return undefined;
     }, [flag]);
 
     const calculatedValue = React.useMemo(() => {
@@ -679,7 +679,7 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
-          <Calendar
+          <DateCalendar
             mode="single"
             selected={value}
             month={month}

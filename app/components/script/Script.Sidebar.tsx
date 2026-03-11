@@ -2,10 +2,10 @@ import React from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Script } from '@/lib/types';
+import { Flow, Script } from '@/lib/types';
 
 type SidebarProps = {
-  scriptData: Script['steps'];
+  scriptData: Flow;
   currentPage: string | null;
   setCurrentPage: (pageId: string) => void;
   openBlock: string | null;
@@ -35,7 +35,7 @@ export default function Sidebar({
           <Button className="mb-4 w-full" onClick={addPage}>
             Add Section <FaPlus size="16px" className="ml-2 inline" />
           </Button>
-          {Object.values(scriptData?.pages || {}).map((page) => (
+          {Object.values(scriptData.pages || {}).map((page) => (
             <Button
               key={page.id}
               className={`mb-2 w-full justify-start ${
@@ -54,7 +54,7 @@ export default function Sidebar({
             Add Block <FaPlus size="16px" className="ml-2 inline" />
           </Button>
           {currentPage &&
-            scriptData?.pages[currentPage]?.blocks?.map((blockId) => (
+            scriptData.pages[currentPage]?.blocks?.map((blockId: string) => (
               <Button
                 key={blockId}
                 className={`mb-2 w-full justify-start ${
@@ -64,7 +64,7 @@ export default function Sidebar({
                 }`}
                 onClick={() => setOpenBlock(blockId)}
               >
-                {(scriptData?.blocks && scriptData?.blocks[blockId].title) ||
+                {scriptData.blocks[blockId]?.title ||
                   blockId}
               </Button>
             ))}
@@ -85,7 +85,7 @@ export default function Sidebar({
                   </SelectTrigger>
                   <SelectContent>
                     {scripts.map((script) => (
-                      <SelectItem key={script.id} value={script.id}>
+                      <SelectItem key={script.id} value={String(script.id)}>
                         {script.name} - {script.type}
                       </SelectItem>
                     ))}

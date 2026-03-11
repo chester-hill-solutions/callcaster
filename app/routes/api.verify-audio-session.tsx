@@ -4,31 +4,7 @@ import Twilio from "twilio";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
-
-
-function normalizePhoneNumber(input: string) {
-    let cleaned = input.replace(/[^0-9+]/g, '');
-
-    if (cleaned.indexOf('+') > 0) {
-        cleaned = cleaned.replace(/\+/g, '');
-    }
-    if (!cleaned.startsWith('+')) {
-        cleaned = '+' + cleaned;
-    }
-
-    const validLength = 11;
-    const minLength = 11;
-
-    if (cleaned.length < minLength + 1) { // +1 for the +
-        cleaned = '+1' + cleaned.replace('+', '');
-    }
-
-    if (cleaned.length !== validLength + 1) { // +1 for the +
-        throw new Error('Invalid phone number length');
-    }
-
-    return cleaned;
-}
+import { normalizePhoneNumber } from "@/lib/utils";
 export const loader = async ({ request }: { request: Request }) => {
     const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
     if (!user) {

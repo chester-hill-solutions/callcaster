@@ -75,7 +75,7 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
                 return currentNumbers;
               }
               return currentNumbers.map((item) => 
-                item.id === payload.new?.id ? payload.new : item
+                item?.id === payload.new?.id ? payload.new : item
               );
             }
             break;
@@ -88,7 +88,7 @@ export const usePhoneNumbers = (initialPhoneNumbers: WorkspaceNumbers[], workspa
               logger.error('DELETE event missing id');
               return currentNumbers;
             }
-            return currentNumbers.filter((item) => item.id !== payload.old?.id);
+            return currentNumbers.filter((item) => item?.id !== payload.old?.id);
           default:
             logger.warn(`Unknown event type: ${payload.eventType}`);
             return currentNumbers;

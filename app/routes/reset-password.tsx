@@ -1,8 +1,11 @@
 import { Form, useActionData } from "@remix-run/react";
 import { Button } from "@/components/ui/button";
+import { AuthCard } from "@/components/shared/AuthCard";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 
 import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect } from "react";
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -35,11 +38,6 @@ export async function action({ request }: ActionFunctionArgs) {
   return json({ success: updateUser, error: updateUserError }, { headers });
 }
 
-const fieldLabelStyles =
-  "flex w-full flex-col font-Zilla-Slab text-2xl font-bold tracking-[1px] text-black dark:text-white";
-const fieldInputStyles =
-  "w-full rounded-sm border-2 border-black bg-transparent px-4 py-2 text-black dark:border-white dark:text-white";
-
 export default function ResetPassword() {
   const actionData = useActionData<typeof action>();
 
@@ -50,15 +48,12 @@ export default function ResetPassword() {
   }, [actionData]);
 
   return (
-    <main className="flex h-[calc(100vh-80px)] w-full flex-col items-center justify-center py-16 text-white">
-      <div
+    <main className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center px-4 py-16 text-white">
+      <AuthCard
         id="login-hero"
-        className="flex flex-col items-center justify-center gap-5 rounded-md bg-brand-secondary px-24 py-16 shadow-lg dark:border-2 dark:border-white dark:bg-transparent dark:shadow-none"
+        title="Choose New Password"
+        description="Set a new password for your account to complete recovery."
       >
-        <h1 className="mb-4 font-Zilla-Slab text-6xl font-bold text-brand-primary dark:text-white">
-          Choose New Password
-        </h1>
-
         {actionData?.error && (
           <p className="w-full font-Zilla-Slab text-2xl font-bold tracking-[1px] text-brand-primary">
             {actionData.error.message}
@@ -70,41 +65,32 @@ export default function ResetPassword() {
           className="flex w-full flex-col gap-4"
           id="password-reset-form"
         >
-          <label htmlFor="password" className={fieldLabelStyles}>
-            {/* {passwordError && (
-              <p className="font-Zilla-Slab font-bold text-brand-primary">
-                {passwordError}
-              </p>
-            )} */}
-            New Password
-            <input
+          <FormField htmlFor="password" label="New Password">
+            <Input
               type="password"
               name="password"
               id="password"
-              className={fieldInputStyles}
+              className="border-border bg-white/90 dark:bg-background/80 dark:text-white"
               required
             />
-          </label>
-          <label htmlFor="confirmPassword" className={fieldLabelStyles}>
-            Confirm New Password
-            <input
+          </FormField>
+          <FormField htmlFor="confirmPassword" label="Confirm New Password">
+            <Input
               type="password"
               name="confirmPassword"
               id="confirmPassword"
-              className={fieldInputStyles}
+              className="border-border bg-white/90 dark:bg-background/80 dark:text-white"
               required
             />
-          </label>
+          </FormField>
           <Button
-            className="min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-3xl font-bold tracking-[1px] text-white
-          transition-colors duration-150 ease-in-out hover:bg-white hover:text-black"
+            className="min-h-[48px] w-full font-Zilla-Slab text-3xl font-bold tracking-[1px]"
             type="submit"
           >
             Reset Password
           </Button>
         </Form>
-      </div>
-      <Toaster richColors visibleToasts={1} />
+      </AuthCard>
     </main>
   );
 }

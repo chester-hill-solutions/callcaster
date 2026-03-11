@@ -1,5 +1,5 @@
 import { json } from "@remix-run/node";
-import { safeParseJson } from "@/lib/database.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { twilio } from "@/twilio.server";
 import { logger } from "@/lib/logger.server";
@@ -13,7 +13,24 @@ export const action = async ({ request }: { request: Request }) => {
         return json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { phoneNumber, workspaceId, campaignId } = await safeParseJson(request);
+    const { phoneNumber, workspaceId, campaignId } = await safeParseJson<{
+        phoneNumber: string;
+        workspaceId: string;
+        campaignId?: string | number;
+    }>(request);
+    if (
+        typeof phoneNumber !== "string" ||
+        typeof workspaceId !== "string" ||
+        (typeof campaignId !== "string" && typeof campaignId !== "number")
+    ) {
+        return json({ error: "Invalid connect phone payload" }, { status: 400, headers });
+    }
+
+    await requireWorkspaceAccess({
+        supabaseClient: supabase,
+        user,
+        workspaceId,
+    });
 
     try {
         // Call the user's phone and connect them to the campaign conference

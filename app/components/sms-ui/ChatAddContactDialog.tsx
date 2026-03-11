@@ -22,7 +22,7 @@ const getDisplayName = (contact: Partial<Contact>) => {
 
 interface ChatAddContactDialogProps {
   isDialogOpen: boolean;
-  setDialog: (open: boolean | null) => void;
+  setDialog: (open: boolean) => void;
   contact_number: string;
   workspace_id: string;
   existingContact?: Contact | null;
@@ -54,7 +54,7 @@ const ChatAddContactDialog = ({
     setDialog(false);
   };
   return (
-    <Dialog open={isDialogOpen} onOpenChange={() => setDialog(null)}>
+    <Dialog open={isDialogOpen} onOpenChange={setDialog}>
       <DialogContent className="flex w-[450px] flex-col items-center bg-card">
         <DialogHeader>
           <DialogTitle className="text-center text-xl">

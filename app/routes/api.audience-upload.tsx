@@ -29,7 +29,9 @@ interface MappedContact {
 }
 
 // Type guard for other_data array
-function isOtherDataArray(value: unknown): value is Array<{ key: string; value: unknown }> {
+export function isOtherDataArray(
+  value: unknown,
+): value is Array<{ key: string; value: unknown }> {
   return Array.isArray(value) && value.every(item => 
     typeof item === 'object' && 
     item !== null && 
@@ -39,14 +41,14 @@ function isOtherDataArray(value: unknown): value is Array<{ key: string; value: 
 }
 
 // Generate a unique ID without using uuid package
-const generateUniqueId = () => {
+export const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);
   const randomStr = Math.random().toString(36).substring(2, 10);
   return `${timestamp}-${randomStr}`;
 };
 
 // Process audience upload in background
-const processAudienceUpload = async (
+export const processAudienceUpload = async (
   supabaseClient: SupabaseClient<Database>,
   uploadId: number,
   audienceId: number,
@@ -54,7 +56,8 @@ const processAudienceUpload = async (
   userId: string,
   fileContent: string,
   headerMapping: Record<string, string>,
-  splitNameColumn: string | null
+  splitNameColumn: string | null,
+  deps: { parseCSV: typeof parseCSV } = { parseCSV },
 ) => {
   // Initialize status data at the top level so it's available in catch block
   const statusData = {
@@ -101,7 +104,7 @@ const processAudienceUpload = async (
 
     // Parse the CSV content
     const decodedContent = Buffer.from(fileContent, 'base64').toString('utf-8');
-    const { contacts: parsedContacts, headers } = parseCSV(decodedContent);
+    const { contacts: parsedContacts, headers } = deps.parseCSV(decodedContent);
 
     // Create case-insensitive header lookup
     const headerLookup = new Map(
@@ -207,14 +210,15 @@ const processAudienceUpload = async (
         .select('id, firstname, surname, other_data');
 
       if (insertError) {
+        const firstMappedContact = mappedContacts[0];
         logger.error("Insert error details:", {
           error: insertError,
-          firstContact: mappedContacts[0],
+          firstContact: firstMappedContact,
           mappingUsed: headerMapping,
           sampleData: {
             workspace: workspaceId,
             created_by: userId,
-            mappedFields: Object.keys(mappedContacts[0])
+            mappedFields: firstMappedContact ? Object.keys(firstMappedContact) : []
           }
         });
         throw new Error(`Error inserting contacts: ${insertError.message}`);
@@ -322,8 +326,27 @@ const processAudienceUpload = async (
   }
 };
 
-export const action = async ({ request }: { request: Request }) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+type AudienceUploadDeps = Partial<{
+  verifyAuth: typeof verifyAuth;
+  processAudienceUpload: typeof processAudienceUpload;
+}>;
+
+const resolveDeps = (deps?: AudienceUploadDeps) => {
+  return {
+    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
+  } as Required<AudienceUploadDeps>;
+};
+
+export const action = async ({
+  request,
+  deps,
+}: {
+  request: Request;
+  deps?: AudienceUploadDeps;
+}) => {
+  const d = resolveDeps(deps);
+  const { supabaseClient, headers, user } = await d.verifyAuth(request);
   
   if (!user) {
     return json({ error: "Unauthorized" }, { status: 401, headers });
@@ -438,7 +461,7 @@ export const action = async ({ request }: { request: Request }) => {
     const uploadId = uploadData.id;
 
     // Start background processing
-    processAudienceUpload(
+    d.processAudienceUpload(
       supabaseClient,
       uploadId,
       finalAudienceId,

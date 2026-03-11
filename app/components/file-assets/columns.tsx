@@ -23,6 +23,7 @@ export const mediaColumns: ColumnDef<FileObject>[] = [
       return (
         <div className="">
           <audio src={audioUrl as string} controls>
+            <track kind="captions" />
             Can`&apos`t show audio
           </audio>
         </div>

@@ -1,4 +1,5 @@
-import type { Json, AppError, ApiResponse } from "./types";
+import type { Json } from "./database.types";
+import type { AppError, ApiResponse } from "./type-safety-utils";
 import { logger } from "@/lib/logger.client";
 
 // Type guards for better runtime type checking
@@ -72,30 +73,34 @@ export function safeJsonParse<T>(jsonString: string, fallback: T): T {
 export function createAppError(message: string, code?: string, details?: Record<string, unknown>): AppError {
   return {
     message,
-    code,
+    code: code ?? "UNKNOWN_ERROR",
     details,
   };
 }
 
 export function isAppError(error: unknown): error is AppError {
-  return isObject(error) && isString((error as AppError).message);
+  return (
+    isObject(error) &&
+    isString((error as unknown as AppError).message) &&
+    isString((error as unknown as AppError).code)
+  );
 }
 
 // Type-safe API response helpers
 export function createSuccessResponse<T>(data: T): ApiResponse<T> {
-  return { data, error: null };
+  return { data, error: undefined, success: true };
 }
 
 export function createErrorResponse<T>(error: AppError): ApiResponse<T> {
-  return { data: null, error };
+  return { data: undefined, error, success: false };
 }
 
-export function isSuccessResponse<T>(response: ApiResponse<T>): response is { data: T; error: null } {
-  return response.error === null;
+export function isSuccessResponse<T>(response: ApiResponse<T>): response is ApiResponse<T> & { data: T; error?: undefined; success: true } {
+  return response.success && response.error == null && response.data !== undefined;
 }
 
-export function isErrorResponse<T>(response: ApiResponse<T>): response is { data: null; error: AppError } {
-  return response.error !== null;
+export function isErrorResponse<T>(response: ApiResponse<T>): response is ApiResponse<T> & { data?: undefined; error: AppError; success: false } {
+  return !response.success && response.error !== undefined;
 }
 
 // Type-safe array operations
@@ -203,12 +208,8 @@ export function validateString(value: unknown, fieldName: string): string {
   return result;
 }
 
-export function validateNumber(value: unknown, fieldName: string): number {
-  const result = safeNumber(value);
-  if (isNaN(result)) {
-    throw new Error(`${fieldName} must be a valid number`);
-  }
-  return result;
+export function validateNumber(value: unknown, _fieldName: string): number {
+  return safeNumber(value);
 }
 
 // Type-safe async operation wrapper

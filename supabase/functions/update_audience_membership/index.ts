@@ -208,7 +208,7 @@ const handleEvent = async (source, type, record, old_record)=>{
     throw error;
   }
 };
-Deno.serve(async (req)=>{
+export async function handleRequest(req: Request): Promise<Response> {
   try {
     const { source, type, record, old_record } = await req.json();
     console.log("Initiating audience membership update:", source, type, record, old_record);
@@ -232,4 +232,8 @@ Deno.serve(async (req)=>{
       status: 500
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleRequest);
+}

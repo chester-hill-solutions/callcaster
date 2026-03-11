@@ -44,9 +44,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export default function AudienceChart() {
-  const { audienceData, workspace, error, userRole } =
-    useLoaderData<typeof loader>();
+export default function WorkspaceAudiencesPage() {
+  const loaderData = useLoaderData<typeof loader>();
+  const audienceData = "audienceData" in loaderData ? loaderData.audienceData : [];
+  const workspace = "workspace" in loaderData ? loaderData.workspace : null;
+  const error = "error" in loaderData ? loaderData.error : null;
+  const userRole = "userRole" in loaderData ? loaderData.userRole : null;
 
   const isWorkspaceAudienceEmpty = !audienceData?.length;
 

@@ -41,7 +41,11 @@ export async function createStripeContact({
     throw new Error("No owner found for the workspace");
   }
 
-  const ownerUser = data.workspace_users[0].user;
+  const ownerRecord = data.workspace_users[0];
+  if (!ownerRecord) {
+    throw new Error("No owner user found");
+  }
+  const ownerUser = ownerRecord.user;
   if (!ownerUser) {
     throw new Error("No owner user found");
   }
@@ -84,7 +88,7 @@ export async function meterEvent({
   return await stripe.billing.meterEvents.create({
     event_name: type,
     payload: {
-      value: amount,
+      value: String(amount),
       stripe_customer_id: data.stripe_id,
     },
   });

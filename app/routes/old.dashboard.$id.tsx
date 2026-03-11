@@ -77,7 +77,7 @@ export default function Call() {
 
   function createWavFileFromBuffers(wavFiles: string[], sampleRate: number) {
     const wav = new wavefile.WaveFile();
-    let allSamples: Float32Array[] = [];
+    const allSamples: Float32Array[] = [];
 
     wavFiles.forEach((file) => {
       const wav = new wavefile.WaveFile();

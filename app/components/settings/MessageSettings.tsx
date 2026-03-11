@@ -1,8 +1,7 @@
-import { MdAddAPhoto } from "react-icons/md";
-import { MdTag } from "react-icons/md";
-import { Suspense, useRef, useState, useCallback, useEffect } from "react";
-import { Await, Form, useSubmit } from "@remix-run/react";
-import { logger } from "@/lib/logger.client";
+import { MdAddAPhoto , MdTag } from "react-icons/md";
+import { useRef, useState, useEffect } from "react";
+import { useFetcher } from "@remix-run/react";
+import { getSmsSegmentInfo } from "@/lib/sms-segments";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -47,13 +46,28 @@ interface MessageSettingsProps {
   surveys: Survey[];
 }
 
+type MessageMediaActionData = {
+  success?: boolean;
+  error?: { message?: string } | string | null;
+  campaignUpdate?: Array<{ message_media?: string[] | null }>;
+  uploadedFileName?: string;
+  removedFileName?: string;
+  url?: string;
+};
+
+function getErrorMessage(error: MessageMediaActionData["error"]) {
+  if (!error) return null;
+  return typeof error === "string" ? error : error.message ?? "Message media could not be updated";
+}
+
 export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
     const [displayText, setDisplayText] = useState(details?.body_text || '');
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [showTemplateTags, setShowTemplateTags] = useState(false);
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+    const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    logger.debug("MessageSettings surveys", surveys);
+    const mediaFetcher = useFetcher<MessageMediaActionData>();
+    const segmentInfo = getSmsSegmentInfo(displayText);
     const FUNCTION_EXAMPLES = [
         {
             label: 'Base64 encode phone and external ID',
@@ -86,8 +100,36 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     useEffect(() => {
         setDisplayText(details?.body_text || '');
     }, [details?.body_text]);
+    
+    useEffect(() => {
+        setResolvedMediaLinks(mediaLinks);
+    }, [mediaLinks]);
 
-    const submit = useSubmit();
+    useEffect(() => {
+        if (mediaFetcher.state !== "idle" || !mediaFetcher.data?.success) {
+            return;
+        }
+
+        const nextMedia = mediaFetcher.data.campaignUpdate?.[0]?.message_media;
+        if (Array.isArray(nextMedia)) {
+            onChange("message_media", nextMedia);
+        }
+
+        if (mediaFetcher.data.uploadedFileName && mediaFetcher.data.url) {
+            setResolvedMediaLinks((current) => [...current, mediaFetcher.data?.url as string]);
+            return;
+        }
+
+        if (mediaFetcher.data.removedFileName) {
+            const currentMedia = details.message_media ?? [];
+            const removedIndex = currentMedia.findIndex(
+                (mediaName) => mediaName === mediaFetcher.data?.removedFileName,
+            );
+            if (removedIndex >= 0) {
+                setResolvedMediaLinks((current) => current.filter((_, index) => index !== removedIndex));
+            }
+        }
+    }, [details.message_media, mediaFetcher.data, mediaFetcher.state, onChange]);
     const showErase = (imageId: string) => {
         setEraseVisible((prevState) => ({
             ...prevState,
@@ -105,13 +147,12 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     const removeImage = (imageId: string) => {
         const formData = new FormData();
         formData.append("fileName", imageId);
-        submit(formData, {
+        formData.append("workspaceId", details.workspace);
+        formData.append("campaignId", String(details.campaign_id ?? ""));
+        mediaFetcher.submit(formData, {
             method: "DELETE",
             action: "/api/message_media",
-            navigate: false
         });
-        const current = details.message_media ?? [];
-        onChange("message_media", current.filter((img) => img !== imageId));
     };
 
     const handleAddMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,11 +163,10 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         formData.append("workspaceId", details.workspace);
         formData.append("fileName", file.name);
         formData.append("campaignId", String(details.campaign_id ?? ""));
-        submit(formData, {
+        mediaFetcher.submit(formData, {
             method: "POST",
             encType: "multipart/form-data",
             action: "/api/message_media",
-            navigate: false,
         });
     };
 
@@ -186,8 +226,8 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         setShowTemplateTags(false);
     };
 
-    const renderMediaContent = (resolvedMediaLinks: string[]) => {
-        if (!details.message_media || !resolvedMediaLinks) return null;
+    const renderMediaContent = () => {
+        if (!details.message_media || !resolvedMediaLinks.length) return null;
 
         return (
             <div className="flex flex-wrap justify-between">
@@ -222,18 +262,11 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         );
     };
 
-    const handleBodyTextChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleBodyTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newText = event.target.value;
         setDisplayText(newText);
-
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
-
-        debounceRef.current = setTimeout(() => {
-            onChange("body_text", newText);
-        }, 500);
-    }, [onChange]);
+        onChange("body_text", newText);
+    };
 
     return (
         <div className="flex flex-col items-center">
@@ -245,43 +278,50 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
 
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
-                {true ? (
-                    <div className="flex flex-col">
-                        <Suspense fallback={<div>Loading media...</div>}>
-                            <Await
-                                resolve={mediaLinks}
-                                errorElement={<div>Error loading media</div>}
-                            >
-                                {renderMediaContent}
-                            </Await>
-                        </Suspense>
+                <div className="flex flex-col">
+                        {renderMediaContent()}
                         <div>
-                            <Form >
-                                <div className="text-sm leading-snug text-gray-700">
-                                    <textarea
-                                        ref={textareaRef}
-                                        name="body_text"
-                                        className="h-fit w-full cursor-text resize-none border-none bg-transparent pb-2 pl-4 pr-4 pt-2 outline-none"
-                                        style={{ caretColor: "black" }}
-                                        rows={5}
-                                        value={displayText}
-                                        onChange={handleBodyTextChange}
-                                    />
-                                </div>
-                                <div className="flex justify-end my-2">
-                                </div>
-                            </Form>
+                            <div className="text-sm leading-snug text-gray-700">
+                                <textarea
+                                    ref={textareaRef}
+                                    name="body_text"
+                                    className="h-fit w-full cursor-text resize-none rounded-md border-none bg-white pb-2 pl-4 pr-4 pt-2 text-gray-900 outline-none"
+                                    style={{ caretColor: "black" }}
+                                    rows={5}
+                                    value={displayText}
+                                    onChange={handleBodyTextChange}
+                                />
+                            </div>
+                            <div className="flex justify-end my-2">
+                            </div>
                         </div>
+                        {getErrorMessage(mediaFetcher.data?.error) && (
+                            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                                {getErrorMessage(mediaFetcher.data?.error)}
+                            </div>
+                        )}
+                        {mediaFetcher.data?.success && mediaFetcher.state === "idle" && (
+                            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700">
+                                {mediaFetcher.data.uploadedFileName
+                                    ? "Media uploaded."
+                                    : mediaFetcher.data.removedFileName
+                                        ? "Media removed."
+                                        : "Media updated."}
+                            </div>
+                        )}
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-gray-700">
                                 <div>
-                                    {(details.body_text?.length || 0) % 140} /{" "}
-                                    {Math.max(1, Math.ceil(((details.body_text?.length || 0) / 140))) * 140}{" "}
-                                    character{details.body_text?.length !== 1 && 's'}
+                                    {segmentInfo.unitsUsedInCurrentSegment} / {segmentInfo.unitsPerSegment}{" "}
+                                    {segmentInfo.encoding === "GSM-7" ? "units" : "characters"} used
                                 </div>
                                 <div>
-                                    {Math.ceil((details.body_text?.length || 0) / 140)} part
-                                    {(Math.ceil((details.body_text?.length || 0) / 140)) !== 1 && 's'}
+                                    {segmentInfo.segmentCount} segment
+                                    {segmentInfo.segmentCount !== 1 && 's'} ({segmentInfo.encoding})
+                                </div>
+                                <div>
+                                    {segmentInfo.totalCharacters} visible character
+                                    {segmentInfo.totalCharacters !== 1 && 's'}
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -360,9 +400,15 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                     id="add-image"
                                     hidden
                                     onChange={handleAddMedia}
+                                    disabled={mediaFetcher.state !== "idle"}
                                 />
                             </div>
                         </div>
+                        {mediaFetcher.state !== "idle" && (
+                            <div className="text-xs text-muted-foreground">
+                                Updating media...
+                            </div>
+                        )}
 
                         {/* Template Tags Preview */}
                         {displayText && (
@@ -465,9 +511,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             })()
                         )}
                     </div>
-                ) : (
-                    <div></div>
-                )}
             </div>
         </div>
     )

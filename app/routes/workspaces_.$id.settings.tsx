@@ -30,7 +30,7 @@ import {
   testWebhook,
 } from "@/lib/workspace-settings/WorkspaceSettingUtils";
 
-import { toast, Toaster } from "sonner";
+import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
@@ -38,6 +38,9 @@ import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import Workspace from "./workspaces_.$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
 
 type UserWithRole = Partial<User> & { role: string };
 
@@ -180,9 +183,20 @@ export default function WorkspaceSettings() {
     phoneNumbers,
     pendingInvites,
     webhook,
+    workspace,
   } = useLoaderData<LoaderData>();
-  const {workspace} = useOutletContext<{workspace: WorkspaceData}>();
-    const actionData = useActionData<typeof action>();
+  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
+  const { workspace: outletWorkspace } = useOutletContext<{
+    workspace: WorkspaceData;
+  }>();
+  const actionData = useActionData<typeof action>();
+  const canManageWebhook =
+    hasAccess &&
+    outletWorkspace != null &&
+    "id" in outletWorkspace &&
+    typeof outletWorkspace.id === "string";
+  const webhookWorkspaceId = canManageWebhook ? String(outletWorkspace.id) : "";
+  const webhookUserId = String(activeUserId);
   const workspaceOwner = users?.find(
     (user) => user?.role === "owner"
   ) as UserWithRole | undefined;
@@ -207,23 +221,19 @@ export default function WorkspaceSettings() {
       )}
       <div className="flex gap-2">
         <input type="hidden" name="formName" value="addUser" />
-        <label
-          htmlFor="username"
-          className="flex w-full flex-col text-xl font-semibold dark:text-white"
-        >
-          Email
-          <input
+        <FormField htmlFor="username" label="Email" className="w-full">
+          <Input
             type="text"
             name="username"
             id="username"
-            className="rounded-md border border-black bg-transparent px-4 py-2 dark:border-white"
+            className="bg-transparent"
           />
-        </label>
-        <label
+        </FormField>
+        <FormField
           htmlFor="new_user_workspace_role"
-          className="flex w-full flex-col text-xl font-semibold dark:text-white"
+          label="Role"
+          className="w-full"
         >
-          Role
           <select
             className="rounded-md border-2 border-black px-2 py-2 dark:border-white dark:font-normal"
             name="new_user_workspace_role"
@@ -253,7 +263,7 @@ export default function WorkspaceSettings() {
               );
             })}
           </select>
-        </label>
+        </FormField>
       </div>
       <Button
         type="submit"
@@ -291,9 +301,9 @@ export default function WorkspaceSettings() {
   return (
     <main className="mt-8 flex h-fit flex-col">
       <div className="flex justify-center">
-        <h1 className="mb-4 font-Zilla-Slab text-4xl font-bold text-brand-primary dark:text-white">
+        <Heading className="mb-4" branded>
           Workspace Settings
-        </h1>
+        </Heading>
       </div>
       <div className="flex flex-wrap items-stretch gap-4">
         <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex justify-between">
@@ -430,7 +440,7 @@ export default function WorkspaceSettings() {
           )}
         </Card>
         {hasAccess && (
-          <ApiKeysSection workspaceId={workspace?.id ?? ""} hasAccess={hasAccess} />
+          <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
         )}
         {hasAccess && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
           <div className="flex-1">
@@ -438,13 +448,13 @@ export default function WorkspaceSettings() {
               Manage Webhook
             </h3>
             <div className="flex flex-col py-4">
-              {hasAccess && workspace && 'id' in workspace && typeof workspace.id === 'string' ? (
+              {canManageWebhook ? (
                 <WebhookEditor initialWebhook={webhook ? {
                   id: String(webhook.id || ''),
                   destination_url: webhook.destination_url || '',
                   events: Array.isArray(webhook.event) ? webhook.event.map((e: string) => ({ category: 'inbound_call' as const, type: e as 'INSERT' | 'UPDATE' })) : [],
                   custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
-                } : undefined} userId={activeUserId} workspaceId={workspace.id} />
+                } : undefined} userId={webhookUserId} workspaceId={webhookWorkspaceId} />
               ) : (
                 <p className="text-center text-gray-600">
                   You don't have permission to manage webhooks.
@@ -454,7 +464,6 @@ export default function WorkspaceSettings() {
           </div>
         </Card>}
       </div>
-      <Toaster richColors />
     </main>
   );
 }

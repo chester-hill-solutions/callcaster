@@ -1,14 +1,54 @@
 import { json, ActionFunctionArgs } from "@remix-run/node";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { findPotentialContacts } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhook } from "@/twilio.server";
 
+async function findMatchingContactIds(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  phoneNumber: string,
+): Promise<number[]> {
+  const { data: contacts, error } = await findPotentialContacts(
+    supabase,
+    phoneNumber,
+    workspaceId,
+  );
+
+  if (error) {
+    logger.error("Contact lookup error:", error);
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      (contacts ?? [])
+        .map((contact) => contact?.id)
+        .filter((contactId): contactId is number => typeof contactId === "number"),
+    ),
+  );
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const supabase = createClient<Database>(
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
+  );
   const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
   if (validation instanceof Response) return validation;
   const data = validation.params as Record<string, unknown>;
+  const toNumber = typeof data.To === "string" ? data.To : "";
+  const fromNumber = typeof data.From === "string" ? data.From : "";
+  const messageSid = typeof data.MessageSid === "string" ? data.MessageSid : "";
+  const accountSid = typeof data.AccountSid === "string" ? data.AccountSid : "";
+  const body = typeof data.Body === "string" ? data.Body : "";
+  const status = typeof data.Status === "string" ? data.Status : "";
+  const numMedia = Number.parseInt(typeof data.NumMedia === "string" ? data.NumMedia : "0", 10) || 0;
+  const numSegments =
+    Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
   const { data: number, error: numberError } = await supabase
     .from("workspace_number")
     .select(
@@ -16,19 +56,29 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         workspace,
         ...workspace!inner(twilio_data, webhook(*))`,
     )
-    .eq("phone_number", data.To)
+    .eq("phone_number", toNumber)
     .single();
 
   if (number) {
+    const workspaceNumber = number as unknown as {
+      workspace: string;
+      twilio_data: { sid: string; authToken: string } | null;
+      webhook: Array<{ events?: Array<{ category: string }> }>;
+    };
+    if (!workspaceNumber.twilio_data) {
+      logger.error("Workspace missing Twilio credentials for inbound SMS");
+      return json({ error: "Workspace Twilio credentials missing" }, 500);
+    }
     const media = [];
     const now = new Date();
-    for (let i = 0; i < parseInt(data.NumMedia as string); i++) {
+    const nowIso = now.toISOString();
+    for (let i = 0; i < numMedia; i++) {
       try {
         const mediaResponse = await fetch(
           data[`MediaUrl${i}`] as string,
           {
             headers: {
-              Authorization: `Basic ${Buffer.from(`${number.twilio_data.sid}:${number.twilio_data.authToken}`).toString("base64")}`,
+              Authorization: `Basic ${Buffer.from(`${workspaceNumber.twilio_data.sid}:${workspaceNumber.twilio_data.authToken}`).toString("base64")}`,
             },
           },
         );
@@ -38,7 +88,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
 
         const newMedia = await mediaResponse.blob();
-        const fileName = `${number.workspace}/sms-${data.MessageSid}-${i}-${now.toISOString()}`;
+        const fileName = `${workspaceNumber.workspace}/sms-${messageSid}-${i}-${now.toISOString()}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("messageMedia")
           .upload(fileName, newMedia, {
@@ -57,69 +107,46 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       }
     }
 
-    const { data: contact, error: contactError } = await supabase
-      .from("contact")
-      .select("id")
-      .ilike("phone", data.From as string)
-      .eq("workspace", number.workspace);
-
-    if (contactError) {
-      logger.error('Contact lookup error:', contactError);
-    }
-
-    const messageData = {
-      sid: data.MessageSid,
-      account_sid: data.AccountSid,
-      body: data.Body,
-      from: data.From,
-      to: data.To,
-      num_media: parseInt(data.NumMedia as string),
-      num_segments: parseInt(data.NumSegments as string),
-      workspace: number.workspace,
+    const matchingContactIds = await findMatchingContactIds(
+      supabase,
+      workspaceNumber.workspace,
+      fromNumber,
+    );
+    const matchedContactId =
+      matchingContactIds.length === 1 ? matchingContactIds[0] : null;
+    const messagePayload: Database["public"]["Tables"]["message"]["Insert"] = {
+      sid: messageSid,
+      account_sid: accountSid,
+      body,
+      from: fromNumber,
+      to: toNumber,
+      num_media: String(numMedia),
+      num_segments: String(numSegments),
+      workspace: workspaceNumber.workspace,
       direction: "inbound",
-      date_created: now,
-      date_sent: now,
+      date_created: nowIso,
+      date_sent: nowIso,
       status: "received",
       ...(media.length > 0 && { inbound_media: media }),
-      ...(contact && contact.length > 0 && { contact_id: contact[0].id }),
+      ...(matchedContactId != null && { contact_id: matchedContactId }),
     };
 
     const { data: message, error: messageError } = await supabase
       .from("message")
-      .insert(messageData)
+      .insert(messagePayload)
       .select();
 
-    if ((data.Body as string).toLowerCase() === "stop" || (data.Body as string).toLowerCase() === '"stop"') {
-      const { data: contact, error: contactError } = await supabase
-        .from("contact")
-        .select("id")
-        .ilike("phone", data.From as string)
-        .eq("workspace", number.workspace);
-
-      if (contactError) {
-        logger.error('Contact lookup error:', contactError);
-      }
-
-      if (contact && contact.length > 0) {
+    if (body.toLowerCase() === "stop" || body.toLowerCase() === '"stop"') {
+      if (matchingContactIds.length > 0) {
         await supabase.from("contact").update({
           opt_out: true,
-        }).in("id", contact.map((c) => c.id));
+        }).in("id", matchingContactIds);
       }
-    } else if ((data.Body as string).toLowerCase() === "start" || (data.Body as string).toLowerCase() === '"start"') {
-      const { data: contact, error: contactError } = await supabase
-        .from("contact")
-        .select("id")
-        .ilike("phone", data.From as string)
-        .eq("workspace", number.workspace);
-
-      if (contactError) {
-        logger.error('Contact lookup error:', contactError);
-      }
-
-      if (contact && contact.length > 0) {
+    } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
+      if (matchingContactIds.length > 0) {
         await supabase.from("contact").update({
           opt_out: false,
-        }).in("id", contact.map((c) => c.id));
+        }).in("id", matchingContactIds);
       }
     }
 
@@ -127,19 +154,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       logger.error('Message insert error:', messageError);
       return json({ messageError }, 400);
     }
-    const smsWebhook = number.webhook.map((webhook: any) => webhook.events.filter((event: any) => event.category === "inbound_sms")).flat()
+    const smsWebhook = workspaceNumber.webhook
+      .map((webhook) => (webhook.events ?? []).filter((event) => event.category === "inbound_sms"))
+      .flat();
     if (smsWebhook.length > 0) {
       await sendWebhookNotification({
         eventCategory: "inbound_sms",
         eventType: "INSERT",
-        workspaceId: number.workspace,
+        workspaceId: workspaceNumber.workspace,
         payload: {
-          message_sid: data.MessageSid,
-          from: data.From,
-          to: data.To,
-          body: data.Body,
-          status: data.Status,
-          num_media: parseInt(data.NumMedia as string),
+          message_sid: messageSid,
+          from: fromNumber,
+          to: toNumber,
+          body,
+          status,
+          num_media: numMedia,
           media_urls: media.length > 0 ? media : null,
           timestamp: now.toISOString(),
         },

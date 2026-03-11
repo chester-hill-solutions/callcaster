@@ -53,7 +53,7 @@ export enum ErrorCode {
  */
 export class AppError extends Error {
   constructor(
-    public message: string,
+    public override message: string,
     public statusCode: number = 500,
     public code: ErrorCode = ErrorCode.INTERNAL_SERVER_ERROR,
     public details?: unknown

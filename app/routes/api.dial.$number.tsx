@@ -11,7 +11,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const dial = twiml.dial({
             callerId: formData.get('From') as string,
             record: 'record-from-answer',
-            recordingStatusCallbackEvent: 'in-progress'
+            recordingStatusCallbackEvent: ['in-progress']
         })
 
         dial.number({

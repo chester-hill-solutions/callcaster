@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import type {
   LinksFunction,
   LoaderFunctionArgs,
@@ -18,7 +17,8 @@ import {
   useNavigate,
 } from "@remix-run/react";
 import { createBrowserClient } from "@supabase/ssr";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
+import { Toaster } from "sonner";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 
 import Navbar from "@/components/layout/Navbar";
@@ -123,9 +123,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function App() {
   const { env, session, workspaces, user, params } = useLoaderData<LoaderData>();
 
-  const supabase = createBrowserClient<Database>(
-    env.SUPABASE_URL!,
-    env.SUPABASE_KEY!,
+  const supabase = useMemo(
+    () =>
+      createBrowserClient<Database>(
+        env.SUPABASE_URL!,
+        env.SUPABASE_KEY!,
+      ),
+    [env.SUPABASE_KEY, env.SUPABASE_URL],
   );
   
   const serverAccessToken = session?.access_token;
@@ -142,16 +146,16 @@ export default function App() {
   }
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
-        redirect("/reset")
+        navigate("/reset");
       }
     });
 
     return () => {
       data.subscription.unsubscribe();
     };
-  }, [serverAccessToken, supabase]);
+  }, [navigate, serverAccessToken, supabase]);
 
   return (
     <html lang="en">
@@ -172,6 +176,7 @@ export default function App() {
           params={params}
         />
         <Outlet context={{ env, supabase }} />
+        <Toaster position="top-right" richColors visibleToasts={3} />
         <ScrollRestoration />
         <Scripts />
         <LiveReload />

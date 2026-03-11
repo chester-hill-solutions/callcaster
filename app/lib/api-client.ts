@@ -1,4 +1,4 @@
-import type { AppError } from "./types";
+import type { AppError } from "./type-safety-utils";
 
 // Type-safe API response wrapper
 export interface ApiResponse<T = unknown> {
@@ -20,6 +20,29 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   body?: unknown;
   signal?: AbortSignal;
+}
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+  if (response.status === 204 || response.status === 205) {
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const responseText = await response.text();
+
+  if (!responseText) {
+    return null;
+  }
+
+  const trimmedResponseText = responseText.trim();
+  const looksLikeJson =
+    trimmedResponseText.startsWith("{") || trimmedResponseText.startsWith("[");
+
+  if (contentType.includes("application/json") || looksLikeJson) {
+    return JSON.parse(responseText) as unknown;
+  }
+
+  return responseText;
 }
 
 // Type-safe API client class
@@ -53,15 +76,23 @@ export class ApiClient {
       }
 
       const response = await fetch(url, requestOptions);
-      const data = await response.json();
+      const data = await parseResponseBody(response);
 
       if (!response.ok) {
+        const errorDetails =
+          data && typeof data === "object"
+            ? (data as Record<string, unknown>)
+            : { response: data };
+
         return {
           success: false,
           error: {
-            message: data.error || `HTTP ${response.status}`,
+            message:
+              data && typeof data === "object" && "error" in data
+                ? String(data.error)
+                : `HTTP ${response.status}`,
             code: `HTTP_${response.status}`,
-            details: data,
+            details: errorDetails,
           },
         };
       }

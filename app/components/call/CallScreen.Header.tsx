@@ -1,6 +1,5 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
-import { logger } from "@/lib/logger.client";
 import {
   Mic,
   MicOff,
@@ -71,7 +70,11 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   onVerifyNewNumber,
   pin
 }) => {
-  logger.debug("Verified numbers", verifiedNumbers);
+  const microphoneSelectId = "campaign-microphone-select";
+  const speakerSelectId = "campaign-speaker-select";
+  const defaultMicrophoneId = availableMicrophones[0]?.deviceId ?? "";
+  const defaultSpeakerId = availableSpeakers[0]?.deviceId ?? "";
+
   return (
     <div className="flex flex-col gap-6 p-6 w-full">
       <div className="flex justify-between items-center">
@@ -114,10 +117,15 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label
+            htmlFor={microphoneSelectId}
+            className="text-sm font-medium text-gray-700 flex items-center gap-2"
+          >
             <Mic size={16} /> Microphone
           </label>
           <select
+            id={microphoneSelectId}
+            defaultValue={defaultMicrophoneId}
             onChange={handleMicrophoneChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -125,7 +133,6 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={microphone.deviceId}
                 value={microphone.deviceId}
-                selected={microphone.deviceId === availableMicrophones[0]?.deviceId}
               >
                 {microphone.label}
               </option>
@@ -134,10 +141,15 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label
+            htmlFor={speakerSelectId}
+            className="text-sm font-medium text-gray-700 flex items-center gap-2"
+          >
             <Headphones size={16} /> Speaker
           </label>
           <select
+            id={speakerSelectId}
+            defaultValue={defaultSpeakerId}
             onChange={handleSpeakerChange}
             className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -145,7 +157,6 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
               <option
                 key={speaker.deviceId}
                 value={speaker.deviceId}
-                selected={speaker.deviceId === availableSpeakers[0]?.deviceId}
               >
                 {speaker.label}
               </option>

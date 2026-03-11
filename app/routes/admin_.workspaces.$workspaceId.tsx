@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
@@ -72,7 +72,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Get workspace details
     const { data: workspace } = await supabaseClient
         .from("workspace")
-        .select("*")
+        .select("*, campaign(*)")
         .eq("id", workspaceId)
         .single();
 
@@ -144,6 +144,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         logger.error("Error fetching Twilio information:", error);
     }
 
+    const twilioPortalSnapshot = await getWorkspaceTwilioPortalSnapshot({
+        supabaseClient,
+        workspaceId,
+    }).catch((error) => {
+        logger.error("Error fetching Twilio portal snapshot:", error);
+        return null;
+    });
+
     return json({ 
         user: userData, 
         workspace, 
@@ -151,12 +159,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         phoneNumbers: phoneNumbers || [],
         twilioAccountInfo,
         twilioNumbers,
-        twilioUsage
+        twilioUsage,
+        twilioPortalSnapshot,
     });
 };
 
 export default function WorkspaceDetails() {
-    const { workspace, workspaceUsers, phoneNumbers, twilioAccountInfo, twilioNumbers, twilioUsage } = useLoaderData<typeof loader>();
+    const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData<typeof loader>();
     const location = useLocation();
     
     // Determine active tab from URL
@@ -164,17 +173,9 @@ export default function WorkspaceDetails() {
         const path = location.pathname;
         if (path.endsWith('/twilio')) return 'twilio';
         if (path.endsWith('/users')) return 'users';
+        if (path.endsWith('/invite')) return 'access';
         if (path.endsWith('/campaigns')) return 'campaigns';
         return 'overview';
-    };
-
-    // Format currency
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
-        }).format(amount);
     };
 
     return (
@@ -190,6 +191,19 @@ export default function WorkspaceDetails() {
                 <Badge variant={workspace.disabled ? "destructive" : "secondary"}>
                     {workspace.disabled ? "Disabled" : "Active"}
                 </Badge>
+                {twilioPortalSnapshot?.syncSnapshot && (
+                    <Badge
+                        variant={
+                            twilioPortalSnapshot.syncSnapshot.lastSyncStatus === "error"
+                                ? "destructive"
+                                : twilioPortalSnapshot.syncSnapshot.lastSyncStatus === "healthy"
+                                    ? "secondary"
+                                    : "outline"
+                        }
+                    >
+                        Twilio: {twilioPortalSnapshot.syncSnapshot.lastSyncStatus}
+                    </Badge>
+                )}
             </div>
 
             <Tabs value={getActiveTab()} className="w-full">
@@ -203,6 +217,9 @@ export default function WorkspaceDetails() {
                     <TabsTrigger value="users" asChild>
                         <Link to="users">Users</Link>
                     </TabsTrigger>
+                    <TabsTrigger value="access" asChild>
+                        <Link to="invite">Access</Link>
+                    </TabsTrigger>
                     <TabsTrigger value="campaigns" asChild>
                         <Link to="campaigns">Campaigns</Link>
                     </TabsTrigger>
@@ -211,7 +228,8 @@ export default function WorkspaceDetails() {
                  <WorkspaceOverview 
                     workspace={workspace as any} 
                     workspaceUsers={workspaceUsers} 
-                    phoneNumbers={phoneNumbers}    
+                    phoneNumbers={phoneNumbers}
+                    twilioSnapshot={twilioPortalSnapshot}
                  />
                 ) : (
                     <Outlet context={{ workspace, workspaceUsers, phoneNumbers }} />

@@ -2,6 +2,14 @@ import React, { RefObject, useState } from "react";
 import { MdEdit, MdExpandMore } from "react-icons/md";
 import { Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { ChevronLeft, Menu } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 
 const getSortableName = (contact: Contact) => {
   if (contact.firstname && contact.surname) {
@@ -50,13 +58,14 @@ interface ChatHeaderParams {
   toggleContactMenu: () => void;
   isContactMenuOpen: boolean;
   handleContactSelect: (contact: Contact) => void;
-  dropdownRef: RefObject<HTMLElement | null>;
+  dropdownRef: RefObject<HTMLDivElement | null>;
   searchError?: string;
   existingConversation?: Chat & { phoneNumber?: string; latestMessage?: string; date?: string } | null;
   handleExistingConversationClick: (phoneNumber: string) => void;
   potentialContacts: Contact[];
   contactNumber?: string;
   setDialog: (contact: Partial<Contact>) => void;
+  onShowConversationList?: () => void;
 }
 
 export default function ChatHeader({
@@ -77,8 +86,14 @@ export default function ChatHeader({
   potentialContacts,
   contactNumber,
   setDialog,
+  onShowConversationList,
 }:ChatHeaderParams) {
   const [isContactListOpen, setIsContactListOpen] = useState(false);
+  const activeContactLabel = contact
+    ? getDisplayName(contact)
+    : selectedContact
+      ? getDisplayName(selectedContact)
+      : contactNumber;
 
   const allContacts = React.useMemo(() => {
     const potenialFiltered = potentialContacts?.length > 0 ? [...potentialContacts] : [];
@@ -93,25 +108,81 @@ export default function ChatHeader({
     );
   }, [contacts, potentialContacts]);
 
+  const actionButton = !!outlet && !contact && allContacts.length > 0 ? (
+    <DropdownMenu open={isContactListOpen} onOpenChange={setIsContactListOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" className="gap-2">
+          Edit Contacts
+          <MdExpandMore className="h-5 w-5" aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {allContacts.map((contactItem) => (
+          <DropdownMenuItem
+            key={contactItem.id || contactItem.phone}
+            className="flex items-center justify-between gap-3"
+            onSelect={() => setDialog(contactItem)}
+          >
+            <div className="min-w-0">
+              <p className="truncate font-medium">{getDisplayName(contactItem)}</p>
+              <p className="truncate text-xs text-muted-foreground">{contactItem.phone}</p>
+            </div>
+            <MdEdit className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : (
+    <Button
+      type="button"
+      onClick={() =>
+        setDialog(
+          contact
+            ? contact
+            : ({ phone: phoneNumber || "", firstname: "", surname: "" } as Contact),
+        )
+      }
+    >
+      {contact ? "Edit Contact" : phoneNumber ? `Add ${phoneNumber}` : "Add Contact"}
+    </Button>
+  );
+
   return (
-    <div className="sticky top-0 z-10 flex p-4 shadow">
-      <div className="flex flex-auto items-end justify-between gap-2">
-        <h2 className="text-xl font-semibold">
-          Chat{" "}
-          {!!outlet &&
-            `with ${contact ? `${contact.firstname} ${contact.surname}` : contactNumber}`}
-        </h2>
+    <div className="sticky top-0 z-10 border-b bg-background p-3 shadow sm:p-4">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {onShowConversationList ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                onClick={onShowConversationList}
+              >
+                {outlet ? <ChevronLeft className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                <span>Chats</span>
+              </Button>
+            ) : null}
+            <h2 className="truncate text-lg font-semibold sm:text-xl">
+              Chat{" "}
+              {!!outlet && `with ${activeContactLabel}`}
+            </h2>
+          </div>
+          <div className="shrink-0">{actionButton}</div>
+        </div>
+
         {!outlet && (
-          <div className="flex flex-auto items-center gap-2">
-            <div className="relative flex-auto">
-              <input
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="relative flex-1">
+              <Input
                 type="tel"
                 id="phone"
                 name="phone"
                 value={phoneNumber}
                 onChange={handlePhoneChange}
                 required
-                className={`mt-1 block w-full rounded-md ${
+                className={`mt-1 ${
                   isValid ? "border-gray-300" : "border-red-500"
                 } shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50`}
                 placeholder="Enter phone number"
@@ -129,8 +200,9 @@ export default function ChatHeader({
             </div>
 
             {existingConversation && (
-              <div className="absolute right-0 top-0 z-10 mt-2 w-56 rounded-md bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+              <div className="z-10 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-zinc-800 sm:mt-2 sm:w-56">
                 <button
+                  type="button"
                   onClick={() =>
                     handleExistingConversationClick(
                       existingConversation.phoneNumber || existingConversation.contact_phone,
@@ -140,7 +212,7 @@ export default function ChatHeader({
                 >
                   View Existing Conversation
                 </button>
-                <div className="mt-2 rounded-md bg-gray-100 dark:bg-zinc-700 p-2 text-sm">
+                <div className="mt-2 rounded-md bg-gray-100 p-2 text-sm dark:bg-zinc-700">
                   <p>
                     <strong>Latest message:</strong>{" "}
                     {existingConversation.latestMessage?.date || "No messages"}
@@ -153,12 +225,12 @@ export default function ChatHeader({
             )}
             {!existingConversation && allContacts.length > 0 && (
               <div
-                className="relative inline-block text-left"
-                ref={dropdownRef}
+                className="relative inline-block w-full text-left sm:w-auto"
+                ref={dropdownRef as React.RefObject<HTMLDivElement>}
               >
                 <button
                   type="button"
-                  className="inline-flex justify-center rounded-md border border-gray-300 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
+                  className="inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100 dark:bg-zinc-800 sm:w-auto"
                   onClick={toggleContactMenu}
                 >
                   {selectedContact
@@ -170,7 +242,7 @@ export default function ChatHeader({
                   />
                 </button>
                 {isContactMenuOpen && (
-                  <div className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-auto rounded-md bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                  <div className="absolute right-0 z-10 mt-2 max-h-60 w-full origin-top-right overflow-auto rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none dark:bg-zinc-800 sm:w-56">
                     <div
                       className="py-1"
                       role="menu"
@@ -193,50 +265,6 @@ export default function ChatHeader({
               </div>
             )}
           </div>
-        )}
-        {!!outlet && !contact && allContacts.length > 0 ? (
-          <div className="relative inline-block text-left">
-            <button
-              type="button"
-              className="inline-flex justify-center rounded-md border border-gray-300 bg-white dark:bg-zinc-800 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-gray-100"
-              onClick={() => setIsContactListOpen(!isContactListOpen)}
-            >
-              Edit Contacts
-              <MdExpandMore className="-mr-1 ml-2 h-5 w-5" aria-hidden="true" />
-            </button>
-            {isContactListOpen && (
-              <div className="absolute right-0 z-10 mt-2 w-64 origin-top-right rounded-md bg-white dark:bg-zinc-800 text-gray-300 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                <div
-                  className="py-1"
-                  role="menu"
-                  aria-orientation="vertical"
-                  aria-labelledby="options-menu"
-                >
-                  {allContacts.map((contact) => (
-                    <div
-                      key={contact.id || contact.phone}
-                      className="flex items-center justify-between px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-900"
-                    >
-                      <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-gray-300">
-                          {getDisplayName(contact)}
-                        </p>
-                        <p className="text-sm text-gray-600 ">{contact.phone}</p>
-                      </div>
-                      <button
-                        onClick={() => setDialog(contact)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        <MdEdit className="h-5 w-5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ):(
-          <Button onClick={() => setDialog({phone: phoneNumber || "", firstname: "", surname: ""} as Contact)}>Add {phoneNumber}</Button>
         )}
       </div>
     </div>
