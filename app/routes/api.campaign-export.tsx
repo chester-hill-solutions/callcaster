@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
-import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, escapeCsvCell } from "@/lib/csv";
+import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, escapeCsvCell, type CsvCell } from "@/lib/csv";
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
   const timestamp = Date.now().toString(36);
@@ -807,7 +807,7 @@ const processCallCampaignExport = async (
 };
 
 const escapeExportCell = (value: unknown): string =>
-  escapeCsvCell(value as any, { protectFromInjection: true });
+  escapeCsvCell(value as CsvCell, { protectFromInjection: true });
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);

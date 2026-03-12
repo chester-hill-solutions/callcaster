@@ -1,7 +1,6 @@
 import { type LoaderFunctionArgs } from "@remix-run/node";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
-import { User } from "@/lib/types";
 import type { Tables } from "@/lib/database.types";
 import type { ResponseAnswer, Contact } from "@/lib/types";
 import { csvResponse, toCsvString } from "@/lib/csv";
@@ -19,7 +18,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Get user role for this workspace
   const userRole = await getUserRole({
     supabaseClient,
-    user: user as unknown as User,
+    user,
     workspaceId,
   });
 

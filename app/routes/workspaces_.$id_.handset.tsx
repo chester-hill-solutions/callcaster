@@ -8,7 +8,7 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import type { Database } from "@/lib/database.types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import {
   requireWorkspaceAccess,
@@ -233,10 +233,11 @@ function HandsetConnected({
 }: HandsetConnectedProps) {
   const [incomingCallState, setIncomingCallState] = useState<Call | null>(null);
   const noop = useCallback(() => {}, []);
+  const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
 
   const connection = useTwilioConnection({
     token,
-    deviceOptions: { allowIncomingWhileBusy: true },
+    deviceOptions,
     onIncomingCall: (call) => setIncomingCallState(call),
     onStatusChange: noop,
     onError: (err) => onError(err.message),
@@ -591,9 +592,9 @@ function HandsetConnected({
               <p className="text-sm font-medium text-muted-foreground">Audio</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Microphone</label>
+                  <label htmlFor="handset-mic-select" className="text-xs text-muted-foreground">Microphone</label>
                   <Select value={selectedMicId || undefined} onValueChange={handleMicChange}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="handset-mic-select" className="w-full">
                       <SelectValue placeholder="Select microphone" />
                     </SelectTrigger>
                     <SelectContent>
@@ -619,9 +620,9 @@ function HandsetConnected({
                   </Button>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Speaker</label>
+                  <label htmlFor="handset-speaker-select" className="text-xs text-muted-foreground">Speaker</label>
                   <Select value={selectedSpeakerId || undefined} onValueChange={handleSpeakerChange}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger id="handset-speaker-select" className="w-full">
                       <SelectValue placeholder="Select speaker" />
                     </SelectTrigger>
                     <SelectContent>

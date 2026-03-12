@@ -122,11 +122,11 @@ export function isQueued(
   if (queue.queue_state) {
     return (
       queue.queue_state === QUEUE_STATUS_QUEUED &&
-      !Boolean(queue.dequeued_at)
+      !queue.dequeued_at
     );
   }
 
-  return queue.status === QUEUE_STATUS_QUEUED && !Boolean(queue.dequeued_at);
+  return queue.status === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
 }
 
 /**
