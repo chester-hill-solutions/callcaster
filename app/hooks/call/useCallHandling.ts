@@ -12,6 +12,8 @@ interface UseCallHandlingOptions {
   device: Device | null;
   workspaceId: string;
   incomingCall: Call | null;
+  /** If true, incoming calls where To contains "client" are accepted immediately. Default false (show incoming UI, user picks up). */
+  autoAcceptIncoming?: boolean;
   onCallStateChange?: (callState: string) => void;
   onActiveCallChange?: (call: Call | null) => void;
   onIncomingCallChange?: (call: Call | null) => void;
@@ -74,6 +76,7 @@ export function useCallHandling({
   device,
   workspaceId,
   incomingCall: initialIncomingCall,
+  autoAcceptIncoming = false,
   onCallStateChange,
   onActiveCallChange,
   onIncomingCallChange,
@@ -125,12 +128,15 @@ export function useCallHandling({
   // Handle incoming call setup
   const handleIncomingCall = useCallback((call: Call) => {
     updateIncomingCall(call);
-    
-    // Auto-accept client calls
-    if (typeof call.parameters.To === "string" && call.parameters.To.includes('client')) {
+
+    if (
+      autoAcceptIncoming &&
+      typeof call.parameters.To === "string" &&
+      call.parameters.To.includes("client")
+    ) {
       call.accept();
-      onStatusChange?.('connected');
-      updateCallState('connected');
+      onStatusChange?.("connected");
+      updateCallState("connected");
       updateActiveCall(call);
       updateIncomingCall(null);
       onConnect?.();
@@ -163,7 +169,7 @@ export function useCallHandling({
     call.on('disconnect', handleDisconnect);
     call.on('reject', handleReject);
     call.on('cancel', handleCancel);
-  }, [updateIncomingCall, updateActiveCall, updateCallState, onStatusChange, onConnect]);
+  }, [autoAcceptIncoming, updateIncomingCall, updateActiveCall, updateCallState, onStatusChange, onConnect]);
 
   // Sync incoming call prop changes and set up listeners; cleanup when call is replaced or unmount
   useEffect(() => {
