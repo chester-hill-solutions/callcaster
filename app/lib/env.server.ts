@@ -16,6 +16,7 @@ type EnvConfig = {
   TWILIO_PHONE_NUMBER: string;
   BASE_URL: string;
   STRIPE_SECRET_KEY: string;
+  STRIPE_WEBHOOK_SECRET?: string;
   RESEND_API_KEY: string;
   OPENAI_API_KEY?: string;
   VERIFICATION_PHONE_NUMBER?: string;
@@ -37,6 +38,7 @@ const requiredEnvVars: (keyof EnvConfig)[] = [
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
   'OPENAI_API_KEY',
+  'STRIPE_WEBHOOK_SECRET',
 ];
 
 /**
@@ -112,6 +114,7 @@ export const env = {
   TWILIO_PHONE_NUMBER: () => getEnv('TWILIO_PHONE_NUMBER'),
   BASE_URL: () => getEnv('BASE_URL'),
   STRIPE_SECRET_KEY: () => getEnv('STRIPE_SECRET_KEY'),
+  STRIPE_WEBHOOK_SECRET: () => getEnv('STRIPE_WEBHOOK_SECRET'),
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
   OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY'),
   VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),

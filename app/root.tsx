@@ -22,6 +22,7 @@ import { Toaster } from "sonner";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 
 import Navbar from "@/components/layout/Navbar";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import stylesheet from "@/tailwind.css";
 import { Database } from "./lib/database.types";
@@ -163,23 +164,33 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        {/* <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} /> */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
+          }}
+        />
         <Links />
       </head>
-      <body className={`min-h-screen bg-background`}>
-        <Navbar
-          className="bg-brand-secondary"
-          handleSignOut={signOut}
-          workspaces={workspaces}
-          isSignedIn={serverAccessToken != null}
-          user={user ?? null}
-          params={params}
-        />
-        <Outlet context={{ env, supabase }} />
-        <Toaster position="top-right" richColors visibleToasts={3} />
-        <ScrollRestoration />
-        <Scripts />
-        <LiveReload />
+      <body className="min-h-screen bg-background">
+        <ThemeProvider
+          defaultTheme="light"
+          storageKey="callcaster-theme"
+          attribute="class"
+        >
+          <Navbar
+            className="bg-brand-secondary"
+            handleSignOut={signOut}
+            workspaces={workspaces}
+            isSignedIn={serverAccessToken != null}
+            user={user ?? null}
+            params={params}
+          />
+          <Outlet context={{ env, supabase }} />
+          <Toaster position="top-right" richColors visibleToasts={3} />
+          <ScrollRestoration />
+          <Scripts />
+          <LiveReload />
+        </ThemeProvider>
       </body>
     </html>
   );

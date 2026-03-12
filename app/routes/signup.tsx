@@ -134,7 +134,7 @@ export default function SignUp() {
   }, [actionData, fetcher?.data]);
 
   return (
-    <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
+    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
       <Heading branded level={1} className="animate-fade-in-up my-4 font-Tabac-Slab">
         Sign Up
       </Heading>
@@ -156,7 +156,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
       <AuthCard
         title="Request Access"
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
-        className="min-w-[400px] flex-initial bg-secondary py-2 dark:bg-zinc-800"
+        className="min-w-[400px] flex-initial bg-secondary py-2"
       >
           <fetcher.Form
             className="space-y-4"
@@ -171,7 +171,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
                 id="name"
                 name="name"
                 required
-                className="bg-white dark:bg-zinc-700 dark:text-white"
+                className="bg-background text-foreground"
               />
             </FormField>
             <FormField htmlFor="email" label="Email">
@@ -180,7 +180,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
                 id="email"
                 name="email"
                 required
-                className="bg-white dark:bg-zinc-700 dark:text-white"
+                className="bg-background text-foreground"
               />
             </FormField>
             <FormField htmlFor="message" label="Message">
@@ -189,7 +189,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
                 name="message"
                 rows={4}
                 required
-                className="bg-white text-gray-900 dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="bg-background text-foreground border-input"
               />
             </FormField>
             <Button

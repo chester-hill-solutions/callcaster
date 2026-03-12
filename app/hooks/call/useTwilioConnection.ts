@@ -10,8 +10,14 @@ const getTwilioSDK = () => {
   return require('@twilio/voice-sdk');
 };
 
+export type DeviceOptions = {
+  allowIncomingWhileBusy?: boolean;
+  [key: string]: unknown;
+};
+
 interface UseTwilioConnectionOptions {
   token: string;
+  deviceOptions?: DeviceOptions;
   onIncomingCall?: (call: Call) => void;
   onStatusChange?: (status: string) => void;
   onError?: (error: Error) => void;
@@ -46,6 +52,7 @@ interface UseTwilioConnectionReturn {
  */
 export function useTwilioConnection({
   token,
+  deviceOptions,
   onIncomingCall,
   onStatusChange,
   onError,
@@ -78,7 +85,7 @@ export function useTwilioConnection({
     const SDK = getTwilioSDK();
     if (!SDK) return;
 
-    const device = new SDK.Device(token);
+    const device = new SDK.Device(token, deviceOptions ?? undefined);
     deviceRef.current = device;
 
     const handleRegistered = () => {
@@ -154,7 +161,7 @@ export function useTwilioConnection({
       device.removeAllListeners('incoming');
       deviceRef.current = null;
     };
-  }, [token, updateStatus, updateError, onIncomingCall, onCallStateChange, onDeviceBusyChange]);
+  }, [token, deviceOptions, updateStatus, updateError, onIncomingCall, onCallStateChange, onDeviceBusyChange]);
 
   return {
     device: deviceRef.current,

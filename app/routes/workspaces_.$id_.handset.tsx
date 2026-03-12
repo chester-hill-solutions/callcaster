@@ -19,7 +19,8 @@ import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import { Input } from "@/components/ui/input";
-import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Volume2, VolumeX, Pause, Play, ArrowLeftRight } from "lucide-react";
+import type { Call } from "@twilio/voice-sdk";
 import { normalizePhoneNumber } from "@/lib/utils/phone";
 import {
   Select,
@@ -230,11 +231,12 @@ function HandsetConnected({
   onError,
   onNavigateBack,
 }: HandsetConnectedProps) {
-  const [incomingCallState, setIncomingCallState] = useState<unknown>(null);
+  const [incomingCallState, setIncomingCallState] = useState<Call | null>(null);
   const noop = useCallback(() => {}, []);
 
   const connection = useTwilioConnection({
     token,
+    deviceOptions: { allowIncomingWhileBusy: true },
     onIncomingCall: (call) => setIncomingCallState(call),
     onStatusChange: noop,
     onError: (err) => onError(err.message),
@@ -256,7 +258,7 @@ function HandsetConnected({
     typeof incomingCall === "object" &&
     "parameters" in incomingCall &&
     typeof (incomingCall as { parameters?: { From?: string } }).parameters?.From === "string"
-      ? (incomingCall as { parameters: { From: string } }).parameters.From
+      ? (incomingCall as unknown as { parameters: { From: string } }).parameters.From
       : null;
 
   const handleAnswer = useCallback(() => {
@@ -275,16 +277,19 @@ function HandsetConnected({
   }, [incomingCall]);
 
   const handleEndSession = useCallback(async () => {
-    if (callHandling.activeCall) {
-      try {
-        await callHandling.hangUp();
-      } catch {
-        connection.device?.disconnectAll();
+    try {
+      for (const held of callHandling.heldCalls) {
+        await callHandling.hangUp(held);
       }
+      if (callHandling.activeCall) {
+        await callHandling.hangUp();
+      }
+    } catch {
+      connection.device?.disconnectAll();
     }
     endSession();
     onNavigateBack();
-  }, [callHandling.activeCall, callHandling.hangUp, connection.device, endSession, onNavigateBack]);
+  }, [callHandling.activeCall, callHandling.heldCalls, callHandling.hangUp, connection.device, endSession, onNavigateBack]);
 
   const activeCallRef = useRef(callHandling.activeCall);
   const hangUpRef = useRef(callHandling.hangUp);
@@ -337,6 +342,7 @@ function HandsetConnected({
   const [selectedSpeakerId, setSelectedSpeakerId] = useState<string>("");
   const [micMuted, setMicMuted] = useState(false);
   const [speakerMuted, setSpeakerMuted] = useState(false);
+  const [callOnHold, setCallOnHold] = useState(false);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -375,6 +381,10 @@ function HandsetConnected({
   const activeCall = callHandling.activeCall;
 
   useEffect(() => {
+    setCallOnHold(false);
+  }, [activeCall]);
+
+  useEffect(() => {
     if (!activeCall || !device?.audio) return;
     if (selectedMicId) device.audio.setInputDevice(selectedMicId).catch(() => {});
     if (selectedSpeakerId) device.audio.speakerDevices?.set(selectedSpeakerId).catch(() => {});
@@ -408,11 +418,32 @@ function HandsetConnected({
     if (!device?.audio) return;
     const next = !micMuted;
     setMicMuted(next);
+    if (next) setCallOnHold(false);
     device.audio.outgoing(next);
     if (activeCall && typeof (activeCall as { mute?: (m: boolean) => void }).mute === "function") {
       (activeCall as { mute: (m: boolean) => void }).mute(next);
     }
   }, [device, activeCall, micMuted]);
+
+  const handleHold = useCallback(() => {
+    if (!activeCall) return;
+    setCallOnHold(true);
+    setMicMuted(true);
+    if (device?.audio) device.audio.outgoing(true);
+    if (typeof (activeCall as { mute?: (m: boolean) => void }).mute === "function") {
+      (activeCall as { mute: (m: boolean) => void }).mute(true);
+    }
+  }, [activeCall, device]);
+
+  const handleResume = useCallback(() => {
+    if (!activeCall) return;
+    setCallOnHold(false);
+    setMicMuted(false);
+    if (device?.audio) device.audio.outgoing(false);
+    if (typeof (activeCall as { mute?: (m: boolean) => void }).mute === "function") {
+      (activeCall as { mute: (m: boolean) => void }).mute(false);
+    }
+  }, [activeCall, device]);
 
   const handleMuteSpeaker = useCallback(() => {
     if (!device?.audio) return;
@@ -436,7 +467,7 @@ function HandsetConnected({
           <p className="mt-1 text-lg font-mono">{handsetNumber}</p>
         </div>
 
-        {!callHandling.activeCall && !incomingCall && (
+        {!callHandling.activeCall && callHandling.heldCalls.length === 0 && !incomingCall && (
           <div className="mt-4 rounded-lg border p-4">
             <p className="text-sm font-medium text-muted-foreground">
               Dial out
@@ -471,25 +502,85 @@ function HandsetConnected({
         {incomingCall ? (
           <div className="mt-6 rounded-lg border-2 border-primary p-4">
             <p className="font-medium">Incoming call from {fromNumber ?? "unknown"}</p>
-            <div className="mt-3 flex gap-2">
-              <Button onClick={handleAnswer} className="flex-1 gap-2">
-                <Phone size={16} />
-                Answer
-              </Button>
-              <Button
-                onClick={handleDecline}
-                variant="destructive"
-                className="flex-1 gap-2"
-              >
-                <PhoneOff size={16} />
-                Decline
-              </Button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {callHandling.activeCall ? (
+                <>
+                  <Button onClick={callHandling.holdAndAnswer} className="flex-1 gap-2 min-w-[140px]">
+                    <Pause size={16} />
+                    Hold & answer
+                  </Button>
+                  <Button
+                    onClick={handleDecline}
+                    variant="outline"
+                    className="flex-1 gap-2 min-w-[100px]"
+                  >
+                    Decline
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button onClick={handleAnswer} className="flex-1 gap-2">
+                    <Phone size={16} />
+                    Answer
+                  </Button>
+                  <Button
+                    onClick={handleDecline}
+                    variant="destructive"
+                    className="flex-1 gap-2"
+                  >
+                    <PhoneOff size={16} />
+                    Decline
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         ) : (
           <p className="mt-6 text-center text-muted-foreground">
             Waiting for calls...
           </p>
+        )}
+
+        {callHandling.heldCalls.length > 0 && (
+          <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
+            <p className="text-sm font-medium text-muted-foreground">On hold ({callHandling.heldCalls.length})</p>
+            <ul className="mt-2 space-y-2">
+              {callHandling.heldCalls.map((held) => {
+                const params = (held as { parameters?: Record<string, string> }).parameters;
+                const from = typeof params?.From === "string" ? params.From : "Unknown";
+                return (
+                  <li
+                    key={(held as { parameters?: Record<string, string> }).parameters?.CallSid ?? `held-${from}`}
+                    className="flex items-center justify-between gap-2 rounded border bg-background px-3 py-2"
+                  >
+                    <span className="truncate font-mono text-sm">{from}</span>
+                    <div className="flex gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        onClick={() => callHandling.switchTo(held)}
+                      >
+                        <ArrowLeftRight size={14} />
+                        Switch
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-destructive hover:text-destructive"
+                        onClick={() => callHandling.hangUp(held)}
+                      >
+                        <PhoneOff size={14} />
+                        Hang up
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         )}
 
         {callHandling.activeCall && (
@@ -558,6 +649,28 @@ function HandsetConnected({
               </div>
             </div>
 
+            <div className="mt-3 flex flex-wrap gap-2">
+              {callOnHold ? (
+                <Button type="button" variant="outline" size="sm" className="gap-1" onClick={handleResume}>
+                  <Play size={14} />
+                  Resume
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" size="sm" className="gap-1" onClick={handleHold}>
+                  <Pause size={14} />
+                  Hold
+                </Button>
+              )}
+              <Button
+                onClick={() => callHandling.hangUp()}
+                variant="outline"
+                size="sm"
+                className="gap-1"
+              >
+                <PhoneOff size={14} />
+                Hang up
+              </Button>
+            </div>
             <div className="mt-3 grid grid-cols-3 gap-2 max-w-[140px]">
               {keypadKeys.map((key) => (
                 <Button
@@ -572,14 +685,6 @@ function HandsetConnected({
                 </Button>
               ))}
             </div>
-            <Button
-              onClick={callHandling.hangUp}
-              variant="outline"
-              size="sm"
-              className="mt-4"
-            >
-              Hang up
-            </Button>
           </div>
         )}
 

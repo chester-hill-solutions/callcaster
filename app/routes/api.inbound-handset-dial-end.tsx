@@ -17,8 +17,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (dialCallStatus === "no-answer") {
     twiml.say(
-      "No one is available to take your call. Please try again later.",
-      { voice: "alice" }
+      { voice: "alice" },
+      "No one is available to take your call. Please try again later."
     );
   }
 

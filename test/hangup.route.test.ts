@@ -25,6 +25,7 @@ function makeSupabase(options?: {
   rpcError?: any;
   outreachError?: any;
   queueRows?: any[];
+  callRecord?: { conference_id: string | null } | null;
 }) {
   const realtimeSend = vi.fn();
   const removeChannel = vi.fn();
@@ -34,6 +35,20 @@ function makeSupabase(options?: {
     realtime: { channel: (_id: string) => channelObj },
     removeChannel,
     from: (table: string) => {
+      if (table === "call") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: options?.callRecord ?? null,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
       if (table === "campaign_queue") {
         return {
           select: () => ({
@@ -107,7 +122,29 @@ describe("app/routes/api.hangup.tsx", () => {
     expect(removeChannel).toHaveBeenCalled();
   });
 
-  test("returns 400 for call not in-progress, else 500", async () => {
+  test("returns 200 when Twilio returns 21220 (call already ended)", async () => {
+    const { supabase, realtimeSend } = makeSupabase();
+    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
+    const err21220 = new Error("Call is not in-progress. Cannot redirect.") as Error & { code: number };
+    err21220.code = 21220;
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: () => ({
+        update: async () => {
+          throw err21220;
+        },
+      }),
+    });
+    const mod = await import("../app/routes/api.hangup");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(realtimeSend).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ status: "idle" }) }),
+    );
+  });
+
+  test("returns 500 when Twilio throws non-21220", async () => {
     const { supabase } = makeSupabase();
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
@@ -119,16 +156,21 @@ describe("app/routes/api.hangup.tsx", () => {
       }),
     });
     const mod = await import("../app/routes/api.hangup");
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
-    expect(res.status).toBe(400);
-
-    const { supabase: sup2 } = makeSupabase({ rpcError: new Error("nope") });
-    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: sup2, user: { id: "u1" } });
-    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  test("returns 200 when no queue entry (handset mode)", async () => {
+    const { supabase } = makeSupabase({ queueRows: [] });
+    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
+    const callUpdate = vi.fn(async () => ({}));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
+    const mod = await import("../app/routes/api.hangup");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true });
   });
 
   test("outreach update error is thrown and returns 500", async () => {

@@ -274,7 +274,7 @@ export default function WorkspaceContacts() {
         />
       )}
       <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
+        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary">
           {workspace != null
             ? `${workspace?.name} Contacts`
             : "No Workspace"}
@@ -303,13 +303,13 @@ export default function WorkspaceContacts() {
             placeholder="Search contacts..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 text-black dark:text-white bg-white dark:bg-gray-800"
+            className="pl-8 bg-background text-foreground"
           />
           {searchTerm && (
             <Button
               variant="ghost"
               size="sm"
-              className="absolute right-0 top-0 h-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="absolute right-0 top-0 h-full hover:bg-muted"
               onClick={() => setSearchTerm("")}
             >
               <X className="h-4 w-4" />
@@ -319,7 +319,7 @@ export default function WorkspaceContacts() {
         
         {/* Search Results Info */}
         {searchTerm && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-sm text-muted-foreground">
             {filteredContacts.length} of {contacts?.length || 0} contacts
           </div>
         )}
@@ -327,7 +327,7 @@ export default function WorkspaceContacts() {
       
       {/* Pagination Info */}
       {pagination.totalCount > 0 && !searchTerm && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-muted-foreground">
           Showing {((pagination.currentPage - 1) * pagination.pageSize) + 1} to{" "}
           {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)} of{" "}
           {pagination.totalCount} contacts
@@ -340,12 +340,12 @@ export default function WorkspaceContacts() {
         </h4>
       )}
       {isWorkspaceEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
+        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-foreground">
           Add Your Own Contacts to this Workspace!
         </h4>
       )}
       {isSearchEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
+        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-foreground">
           No contacts found matching "{searchTerm}"
         </h4>
       )}
@@ -353,7 +353,7 @@ export default function WorkspaceContacts() {
       {filteredContacts.length > 0 && (
         <>
           <DataTable
-            className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
+            className="rounded-md border-2 border-border font-semibold text-foreground"
             data={filteredContacts}
             columns={[
               {
@@ -385,7 +385,7 @@ export default function WorkspaceContacts() {
                 cell: ({ row }) => {
                   const otherData = row.original.other_data;
                   if (!otherData || !Array.isArray(otherData) || otherData.length === 0) {
-                    return <div className="text-gray-400">-</div>;
+                    return <div className="text-muted-foreground">-</div>;
                   }
                   
                   // Show first 2 items, then indicate if there are more
@@ -428,7 +428,7 @@ export default function WorkspaceContacts() {
                       <div className="space-y-1">
                         {formatOtherData(displayItems as unknown[])}
                         {hasMore && (
-                          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <div className="text-xs text-primary font-medium">
                             +{otherData.length - 2} more
                           </div>
                         )}
@@ -436,16 +436,16 @@ export default function WorkspaceContacts() {
                       
                       {/* Tooltip for all data */}
                       {hasMore && (
-                        <div className="absolute left-0 top-full z-50 hidden group-hover:block bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 min-w-64 max-w-80">
-                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        <div className="absolute left-0 top-full z-50 hidden group-hover:block bg-popover border border-border rounded-lg shadow-lg p-3 min-w-64 max-w-80">
+                          <div className="text-xs font-semibold text-foreground mb-2">
                             All Additional Data:
                           </div>
                           <div className="space-y-1">
                             {formatOtherData(otherData as unknown[])}
                           </div>
                           {/* Debug: Show raw data structure */}
-                          <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <div className="text-xs text-muted-foreground">
                               Raw data: {JSON.stringify(otherData)}
                             </div>
                           </div>

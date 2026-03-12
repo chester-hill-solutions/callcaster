@@ -14,6 +14,7 @@ import {
 import { FaBars, FaUserAlt } from "react-icons/fa";
 import { MdOutlineLogout } from "react-icons/md";
 import { capitalize } from "@/lib/utils";
+import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
 
 type NavbarProps = {
@@ -47,7 +48,7 @@ const UserDropdownMenu = ({ user, handleSignOut, workspaceId }: { user: User & {
     <DropdownMenuTrigger asChild>
       <Button
         variant="outline"
-        className="relative border-2 border-zinc-700/30 transition-colors duration-150 hover:border-black hover:bg-inherit dark:bg-inherit dark:text-black"
+        className="relative border-2 border-border transition-colors duration-150 hover:border-foreground hover:bg-accent dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-accent"
       >
         <FaUserAlt size="20px" />
         {user.workspace_invite.length > 0 && (
@@ -158,7 +159,7 @@ export default function Navbar({
               workspaceId={workspaceId}
             />
           )}
-          {/* <ModeToggle /> */}
+          <ModeToggle />
         </div>
         <button
           className="text-2xl sm:hidden"

@@ -34,7 +34,16 @@ export const action = async ({ request }: { request: Request }) => {
             ? supabase.realtime.channel(resolvedConferenceId)
             : null;
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: workspaceId});
-        await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
+        try {
+            await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
+        } catch (twilioErr: unknown) {
+            const code = (twilioErr as { code?: number })?.code;
+            if (code === 21220) {
+                // Call already ended (e.g. caller hung up); continue to broadcast + optional dequeue
+            } else {
+                throw twilioErr;
+            }
+        }
         realtime?.send({
             type: "broadcast", event: "message", payload: {
                 contact_id: null,
@@ -47,18 +56,21 @@ export const action = async ({ request }: { request: Request }) => {
             .is("dequeued_at", null);
         if (queueError) throw queueError;
         const queue = queueRows?.find((row) => isAssignedToUser(row, user.id));
-        if (!queue) {
-            throw new Error("No active assigned queue entry found for user");
+        if (queue) {
+            const { error } = await supabase.rpc('dequeue_contact', {
+                passed_contact_id: queue.contact_id,
+                group_on_household: queue.campaign.group_household_queue,
+                dequeued_by_id: user.id,
+                dequeued_reason_text: "Call completed"
+            });
+            if (error) throw error;
+            const { error: outreachError } = await supabase
+                .from("outreach_attempt")
+                .update({ disposition: "completed" })
+                .eq("contact_id", queue.contact_id)
+                .eq("workspace", workspaceId);
+            if (outreachError) throw outreachError;
         }
-        const { error } = await supabase.rpc('dequeue_contact', {
-            passed_contact_id: queue.contact_id, 
-            group_on_household: queue.campaign.group_household_queue,
-            dequeued_by_id: user.id,
-            dequeued_reason_text: "Call completed"
-        });
-        if (error) throw error;
-        const { error:outreachError } = await supabase.from("outreach_attempt").update({disposition:"completed"}).eq("contact_id", queue.contact_id).eq("workspace", workspaceId)
-        if (outreachError) throw outreachError;
         if (realtime) {
             supabase.removeChannel(realtime);
         }
@@ -66,10 +78,6 @@ export const action = async ({ request }: { request: Request }) => {
    
     } catch (error) {
         logger.error('Error hanging up call:', error);
-        if (error instanceof Error && (error.message.includes('Call is not in-progress'))) {
-            return json({ success: false, message: 'Call is already completed or not in progress' }, { status: 400 });
-        } else {
-            return json({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
-        }
+        return json({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
     }
 };
