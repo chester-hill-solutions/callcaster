@@ -888,15 +888,18 @@ export default function ChatsList() {
           .eq("workspace", workspace.id)
           .eq("status", "received")
           .or(`from.eq.${number},to.eq.${number}`)
-          .then(({ error }) => {
-            if (error) {
-              logger.error("Error marking messages as read:", error);
-            } else {
-              window.dispatchEvent(new CustomEvent("messages-read", {
-                detail: { contactNumber: number },
-              }));
-            }
-          });
+          .then(
+            ({ error }) => {
+              if (error) {
+                logger.error("Error marking messages as read:", error);
+              } else {
+                window.dispatchEvent(new CustomEvent("messages-read", {
+                  detail: { contactNumber: number },
+                }));
+              }
+            },
+            (err: unknown) => logger.error("Error marking messages as read:", err)
+          );
       }
       return null;
     },
@@ -922,15 +925,18 @@ export default function ChatsList() {
         .eq("workspace", workspace.id)
         .eq("status", "received")
         .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
-        .then(({ error }) => {
-          if (error) {
-            logger.error("Error marking messages as read:", error);
-          } else {
-            window.dispatchEvent(new CustomEvent("messages-read", {
-              detail: { contactNumber: phoneNumber },
-            }));
-          }
-        });
+        .then(
+          ({ error }) => {
+            if (error) {
+              logger.error("Error marking messages as read:", error);
+            } else {
+              window.dispatchEvent(new CustomEvent("messages-read", {
+                detail: { contactNumber: phoneNumber },
+              }));
+            }
+          },
+          (err: unknown) => logger.error("Error marking messages as read:", err)
+        );
     },
     [closeMobileConversationList, navigate, supabase, workspace.id]
   );
