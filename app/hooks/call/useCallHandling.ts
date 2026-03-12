@@ -165,9 +165,16 @@ export function useCallHandling({
     call.on('cancel', handleCancel);
   }, [updateIncomingCall, updateActiveCall, updateCallState, onStatusChange, onConnect]);
 
-  // Sync incoming call prop changes (after function definitions)
+  // Sync incoming call prop changes and set up listeners; cleanup when call is replaced or unmount
   useEffect(() => {
-    if (initialIncomingCall !== previousIncomingCallRef.current) {
+    const prev = previousIncomingCallRef.current;
+    if (initialIncomingCall !== prev) {
+      if (prev && typeof prev.removeAllListeners === 'function') {
+        prev.removeAllListeners('accept');
+        prev.removeAllListeners('disconnect');
+        prev.removeAllListeners('reject');
+        prev.removeAllListeners('cancel');
+      }
       previousIncomingCallRef.current = initialIncomingCall;
       if (initialIncomingCall) {
         handleIncomingCall(initialIncomingCall);
@@ -175,6 +182,15 @@ export function useCallHandling({
         updateIncomingCall(null);
       }
     }
+    return () => {
+      const current = previousIncomingCallRef.current;
+      if (current && typeof current.removeAllListeners === 'function') {
+        current.removeAllListeners('accept');
+        current.removeAllListeners('disconnect');
+        current.removeAllListeners('reject');
+        current.removeAllListeners('cancel');
+      }
+    };
   }, [initialIncomingCall, handleIncomingCall, updateIncomingCall]);
 
   // Make an outgoing call
@@ -227,8 +243,8 @@ export function useCallHandling({
       }
 
       target.disconnect();
-      if (isActive && held.length === 0) {
-        device?.disconnectAll();
+      if (isActive && held.length === 0 && device) {
+        device.disconnectAll();
       }
 
       if (isActive) {
@@ -250,6 +266,7 @@ export function useCallHandling({
       }
     },
     [
+      device,
       workspaceId,
       updateCallState,
       onStatusChange,

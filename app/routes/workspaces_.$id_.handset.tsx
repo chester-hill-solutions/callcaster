@@ -235,12 +235,15 @@ function HandsetConnected({
   const noop = useCallback(() => {}, []);
   const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
 
+  const handleIncomingCall = useCallback((call: Call) => setIncomingCallState(call), []);
+  const handleConnectionError = useCallback((err: Error) => onError(err.message), [onError]);
+
   const connection = useTwilioConnection({
     token,
     deviceOptions,
-    onIncomingCall: (call) => setIncomingCallState(call),
+    onIncomingCall: handleIncomingCall,
     onStatusChange: noop,
-    onError: (err) => onError(err.message),
+    onError: handleConnectionError,
     onDeviceBusyChange: noop,
   });
 
@@ -294,16 +297,19 @@ function HandsetConnected({
 
   const activeCallRef = useRef(callHandling.activeCall);
   const hangUpRef = useRef(callHandling.hangUp);
+  const deviceRef = useRef(connection.device);
   activeCallRef.current = callHandling.activeCall;
   hangUpRef.current = callHandling.hangUp;
+  deviceRef.current = connection.device;
+
   useEffect(() => {
     return () => {
       if (activeCallRef.current) {
         hangUpRef.current?.().catch(() => {});
-        connection.device?.disconnectAll();
       }
+      deviceRef.current?.disconnectAll();
     };
-  }, [connection.device]);
+  }, []);
 
   const handleKeypadPress = useCallback(
     (key: string) => {
@@ -520,14 +526,14 @@ function HandsetConnected({
                 </>
               ) : (
                 <>
-                  <Button onClick={handleAnswer} className="flex-1 gap-2">
+                  <Button onClick={handleAnswer} className="flex-1 gap-2 min-w-[140px]">
                     <Phone size={16} />
-                    Answer
+                    Pick up
                   </Button>
                   <Button
                     onClick={handleDecline}
                     variant="destructive"
-                    className="flex-1 gap-2"
+                    className="flex-1 gap-2 min-w-[100px]"
                   >
                     <PhoneOff size={16} />
                     Decline
