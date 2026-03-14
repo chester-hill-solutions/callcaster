@@ -2042,6 +2042,33 @@ export type Json =
             workspace: string | null
           }[]
         }
+        find_contacts_by_phones: {
+          Args: {
+            p_phone_numbers: string[]
+            p_workspace_id: string
+          }
+          Returns: {
+            address: string | null
+            address_id: string | null
+            carrier: string | null
+            city: string | null
+            country: string | null
+            created_at: string
+            created_by: string | null
+            date_updated: string | null
+            email: string | null
+            external_id: string | null
+            firstname: string | null
+            id: number
+            opt_out: boolean | null
+            other_data: Json[]
+            phone: string | null
+            postal: string | null
+            province: string | null
+            surname: string | null
+            workspace: string | null
+          }[]
+        }
         fullname: {
           Args: {
             "": unknown

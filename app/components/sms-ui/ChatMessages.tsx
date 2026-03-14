@@ -36,8 +36,8 @@ export default function ChatMessages({
             <div
               className={`max-w-[85%] rounded-lg px-3 py-2 sm:max-w-[70%] sm:p-3 ${
                 message.direction !== "inbound"
-                  ? "bg-secondary text-slate-900"
-                  : "bg-white dark:bg-zinc-500"
+                  ? "bg-secondary text-secondary-foreground"
+                  : "border border-border/70 bg-card text-card-foreground"
               }`}
             >
               <p className="text-sm">{message.body}</p>
@@ -67,7 +67,7 @@ export default function ChatMessages({
         ))
       ) : (
         <div className="flex h-full items-center justify-center">
-          <p className="text-gray-500">No messages yet</p>
+          <p className="text-sm text-muted-foreground">No messages yet</p>
         </div>
       )}
       <div ref={messagesEndRef as React.RefObject<HTMLDivElement>} />

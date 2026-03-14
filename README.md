@@ -4,6 +4,8 @@ Version 1
 
 ## Documentation
 
+- **[Docs index](docs/README.md)** - Central index for active docs and archived root notes.
+- **[Archive index](archive/README.md)** - Location and purpose of deprecated/legacy files moved out of root.
 - **[Local development](docs/local-development.md)** - Run the app locally, including Supabase, Localtunnel, and Twilio calling setup.
 - **[Script JSON format](docs/script-json-format.md)** – Script structure for campaigns (pages, blocks).
 - **[Create campaign with script (one-shot API)](docs/api-create-campaign-with-script.md)** – `POST /api/campaigns/create-with-script`: create a campaign with script, caller ID, and audiences in a single request (session or API key).

@@ -1,15 +1,13 @@
-import { Context, Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { Suspense } from "react";
 import { defer, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Await,
-  json,
   redirect,
   useLoaderData,
   Outlet,
   useOutlet,
   useOutletContext,
 } from "@remix-run/react";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
@@ -22,7 +20,6 @@ import {
 import { verifyAuth } from "@/lib/supabase.server";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
-import CampaignsList from "@/components/campaign/CampaignList";
 import { Campaign, ContextType, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
@@ -42,7 +39,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Error("No workspace found");
   }
 
-  const userRole = (await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string }))?.role;
+  const userRole = (
+    await getUserRole({
+      supabaseClient: supabaseClient as SupabaseClient,
+      user: user as unknown as User,
+      workspaceId: workspaceId as string,
+    })
+  )?.role;
   try {
     const pathname = new URL(request.url).pathname;
     const [onboarding, phoneNumbersResult] = await Promise.all([
@@ -75,17 +78,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const workspacePromise = getWorkspaceInfoWithDetails({
       supabaseClient,
       workspaceId,
-      userId: user.id
+      userId: user.id,
     });
 
     return defer({
       userRole: userRole,
       workspaceData: workspacePromise,
       onboardingReadiness: readiness,
-      headers
+      headers,
     });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "PGRST116") {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "PGRST116"
+    ) {
       throw redirect("/workspaces", { headers });
     }
     throw error;
@@ -96,16 +104,12 @@ function WorkspaceResolvedView({
   resolvedData,
   userRole,
   outlet,
-  campaignsListOpen,
-  setCampaignsListOpen,
   context,
   onboardingReadiness,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
   outlet: ReturnType<typeof useOutlet>;
-  campaignsListOpen: boolean;
-  setCampaignsListOpen: Dispatch<SetStateAction<boolean>>;
   context: ContextType;
   onboardingReadiness: ReturnType<typeof deriveWorkspaceMessagingReadiness>;
 }) {
@@ -125,9 +129,15 @@ function WorkspaceResolvedView({
         ? normalizedWorkspace.credits
         : 0,
   };
-  const audiences = (resolvedData.audiences ?? []) as Array<{ id: string | number }>;
-  const campaigns = (resolvedData.campaigns ?? []) as Array<{ id: string | number }>;
-  const phoneNumbers = ((resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>).filter(Boolean);
+  const audiences = (resolvedData.audiences ?? []) as Array<{
+    id: string | number;
+  }>;
+  const campaigns = (resolvedData.campaigns ?? []) as Array<{
+    id: string | number;
+  }>;
+  const phoneNumbers = (
+    (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
+  ).filter(Boolean);
   const { data: workspaceData } = useRealtimeData(
     context.supabase,
     workspace.id,
@@ -154,94 +164,80 @@ function WorkspaceResolvedView({
   );
 
   return (
-    <>
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <WorkspaceNav
-        workspace={workspaceData?.[0] ?? {
-          id: workspace.id,
-          name: workspace.name,
-          credits: workspace.credits,
-        }}
-        userRole={(userRole as MemberRole | null | undefined) ?? MemberRole.Member}
+        workspace={
+          workspaceData?.[0] ?? {
+            id: workspace.id,
+            name: workspace.name,
+            credits: workspace.credits,
+          }
+        }
+        userRole={
+          (userRole as MemberRole | null | undefined) ?? MemberRole.Member
+        }
       />
-      <div className="flex flex-grow flex-col gap-4 sm:flex-row">
-        <div className="relative w-full flex-shrink-0 rounded-lg border-2 border-gray-300 bg-secondary dark:bg-slate-900 sm:w-[250px]">
-          <Button
-            variant="outline"
-            className="flex w-full items-center justify-between md:hidden"
-            onClick={() => setCampaignsListOpen(!campaignsListOpen)}
-          >
-            <span>Campaigns</span>
-            {campaignsListOpen ? <FaChevronUp /> : <FaChevronDown />}
-          </Button>
-          <div
-            className={`${campaignsListOpen ? "block" : "hidden"} h-full md:flex`}
-          >
-            <CampaignsList
-              campaigns={campaignsData?.flat().filter(Boolean) as Campaign[] || []}
-              userRole={(userRole as MemberRole | null | undefined) ?? MemberRole.Member}
-              setCampaignsListOpen={setCampaignsListOpen}
+      <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
+        {!outlet ? (
+          <div className="space-y-4">
+            {onboardingReadiness.shouldShowOnboardingBanner ? (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+                <div className="font-medium">
+                  Messaging onboarding still has required steps.
+                </div>
+                <p className="mt-1">{onboardingReadiness.warnings.join(" ")}</p>
+                {userRole === "admin" || userRole === "owner" ? (
+                  <Button asChild className="mt-3">
+                    <a href={`/workspaces/${workspace.id}/onboarding`}>
+                      Continue onboarding
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+            <CampaignEmptyState
+              hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
+              type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
             />
           </div>
-        </div>
-        <div className="flex flex-auto flex-col contain-content">
-          {!outlet ? (
-            <div className="space-y-4">
-              {onboardingReadiness.shouldShowOnboardingBanner ? (
-                <div className="rounded-lg border border-amber-500/50 bg-amber-50 p-4 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
-                  <div className="font-medium">Messaging onboarding still has required steps.</div>
-                  <p className="mt-1">
-                    {onboardingReadiness.warnings.join(" ")}
-                  </p>
-                  {userRole === "admin" || userRole === "owner" ? (
-                    <Button asChild className="mt-3">
-                      <a href={`/workspaces/${workspace.id}/onboarding`}>
-                        Continue onboarding
-                      </a>
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-              <CampaignEmptyState
-                hasAccess={Boolean(userRole === "admin" || userRole === "owner")}
-                type={(phoneNumbersData?.length ?? 0) > 0 ? "campaign" : "number"}
-              />
-            </div>
-          ) : (
-            <Outlet
-              context={{
-                workspace: workspaceData?.[0],
-                audiences: audiencesData,
-                campaigns: campaignsData,
-                phoneNumbers: phoneNumbersData,
-                userRole,
-                ...context,
-              }}
-            />
-          )}
-        </div>
+        ) : (
+          <Outlet
+            context={{
+              workspace: workspaceData?.[0],
+              audiences: audiencesData,
+              campaigns: campaignsData,
+              phoneNumbers: phoneNumbersData,
+              userRole,
+              ...context,
+            }}
+          />
+        )}
       </div>
-    </>
+    </div>
   );
 }
 
 export default function Workspace() {
-  const { workspaceData, userRole, onboardingReadiness } = useLoaderData<typeof loader>();
-  const [campaignsListOpen, setCampaignsListOpen] = useState(false);
+  const { workspaceData, userRole, onboardingReadiness } =
+    useLoaderData<typeof loader>();
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
 
   return (
-    <main className="container mx-auto flex min-h-[80vh] flex-col pt-10 pb-20">
+    <main className="mx-auto flex min-h-[80vh] w-full max-w-[1500px] flex-col px-4 py-6 sm:px-6">
       <Suspense fallback={<div>Loading workspace...</div>}>
-        <Await resolve={workspaceData} errorElement={<div>Error loading workspace</div>}>
+        <Await
+          resolve={workspaceData}
+          errorElement={<div>Error loading workspace</div>}
+        >
           {(resolvedData) => {
             return (
               <WorkspaceResolvedView
-                resolvedData={resolvedData as unknown as WorkspaceInfoWithDetails}
+                resolvedData={
+                  resolvedData as unknown as WorkspaceInfoWithDetails
+                }
                 userRole={userRole}
                 outlet={outlet}
-                campaignsListOpen={campaignsListOpen}
-                setCampaignsListOpen={setCampaignsListOpen}
                 context={context}
                 onboardingReadiness={onboardingReadiness}
               />

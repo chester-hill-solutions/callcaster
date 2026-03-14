@@ -1,13 +1,18 @@
 /** @type {import('@remix-run/dev').AppConfig} */
 export default {
-  ignoredRouteFiles: ["**/.*", "**/*.test.{js,jsx,ts,tsx}", "**/twilio-serverless/**", "**/*.css"],
+  ignoredRouteFiles: [
+    "**/.*",
+    "**/*.test.{js,jsx,ts,tsx}",
+    "**/archive/deprecated/twilio-serverless/**",
+    "**/*.css",
+  ],
   // Bundle server-only deps so they are available when running the built server
   serverDependenciesToBundle: ["resend"],
   // appDirectory: "app",
   // assetsBuildDirectory: "public/build",
   // publicPath: "/build/",
   // serverBuildPath: "build/index.js",
-  serverModuleFormat: 'esm',
+  serverModuleFormat: "esm",
   browserNodeBuiltinsPolyfill: {
     modules: {
       util: true, // Provide a JSPM polyfill
@@ -18,10 +23,10 @@ export default {
       buffer: true, // Provide a JSPM polyfill
       fs: "empty", // Provide an empty polyfill
       events: true,
-      window: true
+      window: true,
     },
     globals: {
       Buffer: true,
-    }
-  }
+    },
+  },
 };

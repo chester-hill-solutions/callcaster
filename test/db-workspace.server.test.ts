@@ -1159,10 +1159,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     };
 
     const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
-      expect(fn).toBe("find_contact_by_phone");
+      expect(fn).toBe("find_contacts_by_phones");
       expect(args).toEqual({
         p_workspace_id: "w1",
-        p_phone_number: "+15550000001",
+        p_phone_numbers: ["+15550000001"],
       });
 
       return {
@@ -1171,12 +1171,6 @@ describe("app/lib/database/workspace.server.ts", () => {
             id: 44,
             firstname: "Jamie",
             surname: "Fallback",
-            phone: "+15550000001",
-          },
-          {
-            id: 45,
-            firstname: "Second",
-            surname: "Match",
             phone: "+15550000001",
           },
         ],

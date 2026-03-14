@@ -1480,7 +1480,7 @@ type FetchConversationSummaryOptions = {
 
 type ConversationMessageRow = Pick<
   Database["public"]["Tables"]["message"]["Row"],
-  "campaign_id" | "contact_id" | "date_created" | "direction" | "from" | "status" | "to"
+  "body" | "campaign_id" | "contact_id" | "date_created" | "direction" | "from" | "status" | "to"
 >;
 
 type ContactNameRow = Pick<
@@ -1540,7 +1540,7 @@ export async function fetchConversationSummary(
 
   let messageQuery = supabaseClient
     .from("message")
-    .select("campaign_id, contact_id, date_created, direction, from, status, to")
+    .select("body, campaign_id, contact_id, date_created, direction, from, status, to")
     .eq("workspace", workspaceId)
     .not("date_created", "is", null)
     .neq("status", "failed")
@@ -1618,6 +1618,8 @@ export async function fetchConversationSummary(
         contact_firstname: contact?.firstname ?? null,
         contact_surname: contact?.surname ?? null,
         has_replied: hasReplied,
+        last_inbound_body:
+          hasReplied && message.body != null ? message.body : null,
       });
       continue;
     }
@@ -1626,6 +1628,13 @@ export async function fetchConversationSummary(
     existingConversation.unread_count += unreadIncrement;
     existingConversation.has_replied =
       existingConversation.has_replied === true || hasReplied;
+    if (
+      existingConversation.last_inbound_body == null &&
+      hasReplied &&
+      message.body != null
+    ) {
+      existingConversation.last_inbound_body = message.body;
+    }
 
     if (
       compareConversationDates(
@@ -1674,42 +1683,31 @@ export async function fetchConversationSummary(
 
     if (phonesMissingNames.length > 0) {
       const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
-      await Promise.all(
-        phonesMissingNames.map(async (contactPhone) => {
-          try {
-            const { data, error } = await supabaseClient.rpc("find_contact_by_phone", {
-              p_workspace_id: workspaceId,
-              p_phone_number: contactPhone,
-            });
+      const { data, error } = await supabaseClient.rpc("find_contacts_by_phones", {
+        p_workspace_id: workspaceId,
+        p_phone_numbers: phonesMissingNames,
+      });
 
-            if (error || !data?.[0]) {
-              if (error) {
-                logger.error("Error loading contact by phone for conversation", {
-                  contactPhone,
-                  error,
-                  workspaceId,
-                });
-              }
-              return;
-            }
-
-            phoneMatchedContacts.set(contactPhone, data[0]);
-          } catch (error) {
-            logger.error("Unexpected error loading contact by phone for conversation", {
-              contactPhone,
-              error,
-              workspaceId,
-            });
-          }
-        }),
-      );
+      if (error) {
+        logger.error("Error loading contacts by phones for conversations", {
+          error,
+          workspaceId,
+          phoneCount: phonesMissingNames.length,
+        });
+      } else if (data?.length) {
+        for (const row of data) {
+          const key = getConversationPhoneKey(row.phone) ?? row.phone;
+          if (key) phoneMatchedContacts.set(key, row);
+        }
+      }
 
       for (const conversation of conversationMap.values()) {
         if (!conversationNeedsPhoneMatchedContact(conversation)) {
           continue;
         }
 
-        const matchedContact = phoneMatchedContacts.get(conversation.contact_phone);
+        const lookupKey = getConversationPhoneKey(conversation.contact_phone) ?? conversation.contact_phone;
+        const matchedContact = lookupKey ? phoneMatchedContacts.get(lookupKey) : undefined;
         if (!matchedContact) {
           continue;
         }

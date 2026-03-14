@@ -1,4 +1,20 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+
+vi.mock("../app/lib/messaging-onboarding.server", () => ({
+  getWorkspaceMessagingOnboardingFromTwilioData: (twilioData: any) => ({
+    status: twilioData?.onboardingStatus ?? "not_started",
+  }),
+  deriveWorkspaceMessagingReadiness: ({ onboarding }: any) => {
+    const status = onboarding?.status;
+    return {
+      warnings: status === "warn" ? ["warning"] : [],
+      shouldRedirectToOnboarding: status === "redirect",
+      sendMode: status === "readiness_ms" ? "messaging_service" : "from_number",
+      voiceReady: status !== "voice_not_ready",
+      legacyMode: status === "legacy",
+    };
+  },
+}));
 
 import {
   deriveWorkspaceAdminRows,
@@ -6,163 +22,370 @@ import {
   sortWorkspaceAdminRows,
 } from "../app/lib/admin-workspaces";
 
+function makeBaseWorkspace(
+  id: string,
+  name: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    name,
+    created_at: "2024-01-01T00:00:00.000Z",
+    credits: 10,
+    disabled: false,
+    cutoff_time: "",
+    feature_flags: {},
+    key: null,
+    owner: null,
+    stripe_id: null,
+    token: null,
+    users: null,
+    twilio_data: {},
+    campaign: [],
+    ...overrides,
+  };
+}
+
 describe("admin workspace helpers", () => {
-  const rows = deriveWorkspaceAdminRows({
-    workspaces: [
-      {
-        id: "w1",
-        name: "Alpha",
-        created_at: "2024-01-01T00:00:00.000Z",
-        credits: 100,
-        disabled: false,
-        cutoff_time: "",
-        feature_flags: {},
-        key: null,
-        owner: null,
-        stripe_id: null,
-        token: null,
-        users: null,
-        twilio_data: {
-          sid: "AC1",
-          authToken: "auth",
-          portalConfig: {
-            trafficClass: "unknown",
-            throughputProduct: "none",
-            multiTenancyMode: "none",
-            trafficShapingEnabled: false,
-            defaultMessageIntent: null,
-            sendMode: "messaging_service",
-            messagingServiceSid: null,
-            onboardingStatus: "not_started",
-            supportNotes: "",
-            updatedAt: null,
-            updatedBy: null,
-            auditTrail: [],
+  test("derives workspace rows across twilio and readiness states", () => {
+    const rows = deriveWorkspaceAdminRows({
+      workspaces: [
+        makeBaseWorkspace("w-ready", "Ready", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+              accountStatus: "active",
+              lastSyncedAt: " 2024-02-01T00:00:00.000Z ",
+              lastSyncError: "",
+              numberTypes: ["sms", 42, "voice"],
+            },
+            portalConfig: {
+              sendMode: "from_number",
+            },
+            onboardingStatus: "done",
           },
-          portalSync: {
-            accountStatus: "active",
-            accountFriendlyName: "Alpha",
-            phoneNumberCount: 2,
-            numberTypes: ["sms"],
-            recentUsageCount: 3,
-            usageTotalPrice: 12,
-            lastSyncedAt: "2024-02-01T00:00:00.000Z",
-            lastSyncStatus: "healthy",
-            lastSyncError: null,
+          campaign: [{ id: 1 }, null],
+        }),
+        makeBaseWorkspace("w-pending-sync", "Pending Sync", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "syncing",
+              numberTypes: [],
+            },
           },
+        }),
+        makeBaseWorkspace("w-pending-never", "Pending Never", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "mystery",
+            },
+          },
+        }),
+        makeBaseWorkspace("w-attention-error", "Attention Error", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "error",
+              lastSyncError: "down",
+            },
+          },
+        }),
+        makeBaseWorkspace("w-attention-config", "Attention Config", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+            },
+            portalConfig: {
+              sendMode: "messaging_service",
+              messagingServiceSid: "",
+            },
+          },
+        }),
+        makeBaseWorkspace("w-attention-warning", "Attention Warning", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+            },
+            onboardingStatus: "warn",
+          },
+        }),
+        makeBaseWorkspace("w-pending-redirect", "Pending Redirect", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+              numberTypes: [],
+            },
+            onboardingStatus: "redirect",
+          },
+        }),
+        makeBaseWorkspace("w-legacy", "Legacy", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+            },
+            onboardingStatus: "legacy",
+          },
+        }),
+        makeBaseWorkspace("w-ms-readiness", "Messaging Service", {
+          twilio_data: {
+            portalSync: {
+              lastSyncStatus: "healthy",
+            },
+            portalConfig: {
+              sendMode: "from_number",
+              messagingServiceSid: "  MG123  ",
+            },
+            onboardingStatus: "readiness_ms",
+          },
+          campaign: null,
+        }),
+        makeBaseWorkspace("w-raw-data", "Raw Data", {
+          twilio_data: [],
+        }),
+      ] as any,
+      users: [
+        {
+          id: "u1",
+          username: "owner@example.com",
+          first_name: null,
+          last_name: null,
+          organization: null,
+          access_level: "sudo",
+          activity: {},
+          created_at: "2024-01-01T00:00:00.000Z",
+          verified_audio_numbers: null,
         },
-        campaign: [{ id: 1 }, { id: 2 }] as any,
-      },
-      {
-        id: "w2",
-        name: "Beta",
-        created_at: "2024-03-01T00:00:00.000Z",
-        credits: 5,
-        disabled: true,
-        cutoff_time: "",
-        feature_flags: {},
-        key: null,
-        owner: null,
-        stripe_id: null,
-        token: null,
-        users: null,
-        twilio_data: {
-          sid: "AC2",
-          authToken: "auth",
-          portalConfig: {
-            trafficClass: "unknown",
-            throughputProduct: "none",
-            multiTenancyMode: "none",
-            trafficShapingEnabled: false,
-            defaultMessageIntent: null,
-            sendMode: "from_number",
-            messagingServiceSid: null,
-            onboardingStatus: "not_started",
-            supportNotes: "",
-            updatedAt: null,
-            updatedBy: null,
-            auditTrail: [],
-          },
-          portalSync: {
-            accountStatus: null,
-            accountFriendlyName: null,
-            phoneNumberCount: 0,
-            numberTypes: [],
-            recentUsageCount: 0,
-            usageTotalPrice: null,
-            lastSyncedAt: null,
-            lastSyncStatus: "error",
-            lastSyncError: "twilio down",
-          },
+      ] as any,
+      workspaceUsers: [
+        {
+          id: 1,
+          workspace_id: "w-ready",
+          user_id: "u1",
+          role: "owner",
+          created_at: "2024-01-01T00:00:00.000Z",
         },
-        campaign: [] as any,
-      },
-    ] as any,
-    users: [
-      {
-        id: "u1",
-        username: "owner@example.com",
-        first_name: null,
-        last_name: null,
-        organization: null,
-        access_level: "sudo",
-        activity: {},
-        created_at: "2024-01-01T00:00:00.000Z",
-        verified_audio_numbers: null,
-      },
-    ] as any,
-    workspaceUsers: [
-      {
-        id: 1,
-        workspace_id: "w1",
-        user_id: "u1",
-        role: "owner",
-        created_at: "2024-01-01T00:00:00.000Z",
-      },
-      {
-        id: 2,
-        workspace_id: "w2",
-        user_id: "u1",
-        role: "owner",
-        created_at: "2024-01-01T00:00:00.000Z",
-      },
-    ] as any,
-    workspaceNumbers: [
-      { id: 1, workspace: "w1", type: "local", created_at: "", capabilities: null, friendly_name: null, inbound_action: null, inbound_audio: null, phone_number: null },
-      { id: 2, workspace: "w1", type: "toll-free", created_at: "", capabilities: null, friendly_name: null, inbound_action: null, inbound_audio: null, phone_number: null },
-    ] as any,
-  });
+        {
+          id: 2,
+          workspace_id: "w-raw-data",
+          user_id: "missing-user",
+          role: "owner",
+          created_at: "2024-01-01T00:00:00.000Z",
+        },
+      ] as any,
+      workspaceNumbers: [
+        {
+          id: 1,
+          workspace: "w-pending-sync",
+          type: "local",
+          created_at: "",
+          capabilities: null,
+          friendly_name: null,
+          inbound_action: null,
+          inbound_audio: null,
+          phone_number: null,
+        },
+        {
+          id: 2,
+          workspace: "w-pending-sync",
+          type: "toll-free",
+          created_at: "",
+          capabilities: null,
+          friendly_name: null,
+          inbound_action: null,
+          inbound_audio: null,
+          phone_number: null,
+        },
+      ] as any,
+    });
 
-  test("derives counts and ops state", () => {
-    expect(rows[0]).toMatchObject({
-      id: "w1",
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+
+    expect(byId["w-ready"]).toMatchObject({
       ownerUsername: "owner@example.com",
-      campaignCount: 2,
+      ownerUserId: "u1",
+      campaignCount: 1,
       memberCount: 1,
-      phoneNumberCount: 2,
-      opsState: "attention",
+      twilioSyncStatus: "healthy",
+      twilioAccountStatus: "active",
+      twilioLastSyncedAt: "2024-02-01T00:00:00.000Z",
+      twilioLastSyncError: null,
+      twilioNumberTypes: ["sms", "voice"],
+      opsState: "ready",
+      sendMode: "from_number",
+      onboardingStatus: "done",
+      voiceReady: true,
+      legacyMode: false,
     });
-    expect(rows[1]).toMatchObject({
-      id: "w2",
-      disabled: true,
-      opsState: "attention",
+
+    expect(byId["w-pending-sync"]?.opsState).toBe("pending");
+    expect(byId["w-pending-sync"]?.twilioNumberTypes).toEqual([
+      "local",
+      "toll-free",
+    ]);
+    expect(byId["w-pending-never"]?.twilioSyncStatus).toBe("never_synced");
+    expect(byId["w-pending-never"]?.opsState).toBe("pending");
+    expect(byId["w-attention-error"]?.opsState).toBe("attention");
+    expect(byId["w-attention-config"]?.opsState).toBe("attention");
+    expect(byId["w-attention-warning"]?.opsState).toBe("attention");
+    expect(byId["w-pending-redirect"]?.opsState).toBe("pending");
+    expect(byId["w-legacy"]?.opsState).toBe("ready");
+    expect(byId["w-ms-readiness"]?.sendMode).toBe("messaging_service");
+    expect(byId["w-ms-readiness"]?.campaignCount).toBe(0);
+    expect(byId["w-raw-data"]).toMatchObject({
+      ownerUsername: "No owner",
+      ownerUserId: null,
+      twilioSyncStatus: "never_synced",
+      opsState: "pending",
     });
   });
 
-  test("filters by search/status/ops state", () => {
-    const filtered = filterWorkspaceAdminRows(rows, {
-      search: "alpha",
-      status: "active",
-      owner: "all",
-      opsState: "attention",
-    });
+  test("filters by search status owner and ops state", () => {
+    const rows = [
+      {
+        id: "a-1",
+        name: "Alpha",
+        ownerUsername: "Owner",
+        ownerUserId: "u1",
+        credits: 5,
+        disabled: false,
+        campaignCount: 1,
+        memberCount: 2,
+        phoneNumberCount: 3,
+        createdAt: "2024-01-01",
+        twilioSyncStatus: "healthy",
+        twilioAccountStatus: null,
+        twilioLastSyncedAt: null,
+        twilioLastSyncError: null,
+        twilioNumberTypes: [],
+        opsState: "ready",
+        sendMode: "from_number",
+        onboardingStatus: "done",
+        voiceReady: true,
+        legacyMode: false,
+      },
+      {
+        id: "b-2",
+        name: "Beta",
+        ownerUsername: "Team",
+        ownerUserId: "u2",
+        credits: 1,
+        disabled: true,
+        campaignCount: 0,
+        memberCount: 1,
+        phoneNumberCount: 0,
+        createdAt: "2024-02-01",
+        twilioSyncStatus: "error",
+        twilioAccountStatus: null,
+        twilioLastSyncedAt: null,
+        twilioLastSyncError: "err",
+        twilioNumberTypes: [],
+        opsState: "attention",
+        sendMode: "from_number",
+        onboardingStatus: "warn",
+        voiceReady: false,
+        legacyMode: true,
+      },
+    ] as const;
 
-    expect(filtered).toHaveLength(1);
-    expect(filtered[0]?.id).toBe("w1");
+    expect(
+      filterWorkspaceAdminRows(rows as any, {
+        search: "  ",
+        status: "all",
+        owner: "all",
+        opsState: "all",
+      }).map((row) => row.id),
+    ).toEqual(["a-1", "b-2"]);
+
+    expect(
+      filterWorkspaceAdminRows(rows as any, {
+        search: "owner",
+        status: "active",
+        owner: "u1",
+        opsState: "ready",
+      }).map((row) => row.id),
+    ).toEqual(["a-1"]);
+
+    expect(
+      filterWorkspaceAdminRows(rows as any, {
+        search: "b-2",
+        status: "disabled",
+        owner: "u2",
+        opsState: "attention",
+      }).map((row) => row.id),
+    ).toEqual(["b-2"]);
   });
 
-  test("sorts by credits descending", () => {
-    const sorted = sortWorkspaceAdminRows(rows, "credits", "desc");
-    expect(sorted.map((row) => row.id)).toEqual(["w1", "w2"]);
+  test("sorts by every sort key in both directions", () => {
+    const rows = [
+      {
+        id: "z",
+        name: "Zulu",
+        ownerUsername: "u",
+        ownerUserId: "u",
+        credits: 1,
+        disabled: false,
+        campaignCount: 2,
+        memberCount: 3,
+        phoneNumberCount: 4,
+        createdAt: "2024-02-01",
+        twilioSyncStatus: "healthy",
+        twilioAccountStatus: null,
+        twilioLastSyncedAt: null,
+        twilioLastSyncError: null,
+        twilioNumberTypes: [],
+        opsState: "ready",
+        sendMode: "from_number",
+        onboardingStatus: "done",
+        voiceReady: true,
+        legacyMode: false,
+      },
+      {
+        id: "a",
+        name: "Alpha",
+        ownerUsername: "u",
+        ownerUserId: "u",
+        credits: 10,
+        disabled: false,
+        campaignCount: 1,
+        memberCount: 2,
+        phoneNumberCount: 1,
+        createdAt: "2024-01-01",
+        twilioSyncStatus: "healthy",
+        twilioAccountStatus: null,
+        twilioLastSyncedAt: null,
+        twilioLastSyncError: null,
+        twilioNumberTypes: [],
+        opsState: "ready",
+        sendMode: "from_number",
+        onboardingStatus: "done",
+        voiceReady: true,
+        legacyMode: false,
+      },
+    ] as any;
+
+    expect(
+      sortWorkspaceAdminRows(rows, "name", "asc").map((row) => row.id),
+    ).toEqual(["a", "z"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "name", "desc").map((row) => row.id),
+    ).toEqual(["z", "a"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "created_at", "asc").map((row) => row.id),
+    ).toEqual(["a", "z"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "credits", "asc").map((row) => row.id),
+    ).toEqual(["z", "a"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "campaign_count", "asc").map(
+        (row) => row.id,
+      ),
+    ).toEqual(["a", "z"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "member_count", "asc").map((row) => row.id),
+    ).toEqual(["a", "z"]);
+    expect(
+      sortWorkspaceAdminRows(rows, "phone_number_count", "asc").map(
+        (row) => row.id,
+      ),
+    ).toEqual(["a", "z"]);
   });
 });

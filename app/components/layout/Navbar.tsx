@@ -24,18 +24,26 @@ type NavbarProps = {
   >;
   workspaces: WorkspaceData[] | null;
   isSignedIn: boolean;
-  user: User & { workspace_invite: WorkspaceInvite[] } | null;
+  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   params: Params<string>;
 };
 
-export const NavButton = ({ to, children, className = "" }: { to: string, children: React.ReactNode, className?: string }) => (
+export const NavButton = ({
+  to,
+  children,
+  className = "",
+}: {
+  to: string;
+  children: React.ReactNode;
+  className?: string;
+}) => (
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `rounded-md px-3 py-2 font-Zilla-Slab text-lg font-bold transition-colors duration-150 ease-in-out ${
+      `rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-bold transition-colors duration-150 ease-in-out ${
         isActive
-          ? "bg-brand-primary text-white"
-          : "bg-secondary text-brand-primary hover:bg-white"
+          ? "border-brand-primary bg-brand-primary text-white"
+          : "border-transparent bg-background/70 text-brand-primary hover:border-border hover:bg-background"
       } ${className}`
     }
   >
@@ -43,66 +51,77 @@ export const NavButton = ({ to, children, className = "" }: { to: string, childr
   </NavLink>
 );
 
-const UserDropdownMenu = ({ user, handleSignOut, workspaceId }: { user: User & { workspace_invite: WorkspaceInvite[] } | null, handleSignOut: () => Promise<TypedResponse<{ success: string | null; error: string | null }>>, workspaceId: string | undefined }) => user && (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button
-        variant="outline"
-        className="relative border-2 border-border transition-colors duration-150 hover:border-foreground hover:bg-accent dark:bg-secondary dark:text-secondary-foreground dark:hover:bg-accent"
-      >
-        <FaUserAlt size="20px" />
-        {user.workspace_invite.length > 0 && (
-          <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
-            {user.workspace_invite.length}
-          </div>
-        )}
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent className="w-56">
-      <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuLabel className="font-normal">
-        {capitalize(user.first_name ?? "")}
-      </DropdownMenuLabel>
-      <DropdownMenuLabel className="font-normal">
-        {user.username}
-      </DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem asChild>
-        <NavLink
-          to={"/accept-invite"}
-          className={
-            user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
-          }
-        >
-          {user.workspace_invite.length} Pending Invitation
-          {user.workspace_invite.length !== 1 ? "s" : ""}
-        </NavLink>
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem asChild>
+const UserDropdownMenu = ({
+  user,
+  handleSignOut,
+  workspaceId,
+}: {
+  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  handleSignOut: () => Promise<
+    TypedResponse<{ success: string | null; error: string | null }>
+  >;
+  workspaceId: string | undefined;
+}) =>
+  user && (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
-          id="logoutButton"
-          variant="ghost"
-          className="w-full justify-start font-Zilla-Slab"
-          onClick={handleSignOut}
+          variant="outline"
+          className="relative border border-border bg-background/90 transition-colors duration-150 hover:border-foreground hover:bg-accent dark:text-secondary-foreground dark:hover:bg-accent"
         >
-          <MdOutlineLogout className="mr-2 h-4 w-4" />
-          <span>Log Out</span>
+          <FaUserAlt size="20px" />
+          {user.workspace_invite.length > 0 && (
+            <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
+              {user.workspace_invite.length}
+            </div>
+          )}
         </Button>
-      </DropdownMenuItem>
-      {workspaceId && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link to={`/workspaces/${workspaceId}/settings`}>Users</Link>
-          </DropdownMenuItem>
-        </>
-      )}
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56">
+        <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="font-normal">
+          {capitalize(user.first_name ?? "")}
+        </DropdownMenuLabel>
+        <DropdownMenuLabel className="font-normal">
+          {user.username}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <NavLink
+            to={"/accept-invite"}
+            className={
+              user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
+            }
+          >
+            {user.workspace_invite.length} Pending Invitation
+            {user.workspace_invite.length !== 1 ? "s" : ""}
+          </NavLink>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Button
+            id="logoutButton"
+            variant="ghost"
+            className="w-full justify-start font-Zilla-Slab"
+            onClick={handleSignOut}
+          >
+            <MdOutlineLogout className="mr-2 h-4 w-4" />
+            <span>Log Out</span>
+          </Button>
+        </DropdownMenuItem>
+        {workspaceId && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
+            <DropdownMenuItem asChild>
+              <Link to={`/workspaces/${workspaceId}/settings`}>Users</Link>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
 export default function Navbar({
   className,
@@ -122,12 +141,14 @@ export default function Navbar({
       setMobileMenuOpen(false);
       setLoc(location);
     }
-  }, [loc, location]);  
-  return loc.pathname.endsWith("call") || loc.pathname.includes("survey") && !loc.pathname.includes("workspaces") ? (
+  }, [loc, location]);
+  return loc.pathname.endsWith("call") ||
+    (loc.pathname.includes("survey") &&
+      !loc.pathname.includes("workspaces")) ? (
     <div></div>
   ) : (
-    <header className={`w-full ${className}`}>
-      <nav className="relative flex w-full items-center justify-between px-4 py-4 sm:h-[80px] sm:px-8">
+    <header className={`w-full border-b border-border/70 ${className}`}>
+      <nav className="relative mx-auto flex w-full max-w-[1500px] items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
         <Link
           to="/"
           className="hidden font-Tabac-Slab text-4xl font-black text-brand-primary sm:block"
@@ -140,7 +161,7 @@ export default function Navbar({
         >
           CC
         </Link>
-        <div className="hidden items-center space-x-4 sm:flex">
+        <div className="hidden items-center space-x-3 sm:flex">
           <NavButton to="/pricing">Pricing</NavButton>
           {/* <NavButton to="/">Home</NavButton> */}
           {/*           <NavButton to="/services">Services</NavButton>
@@ -162,7 +183,7 @@ export default function Navbar({
           <ModeToggle />
         </div>
         <button
-          className="text-2xl sm:hidden"
+          className="rounded-md border border-border bg-background/80 p-2 text-2xl sm:hidden"
           onClick={() => setMobileMenuOpen(true)}
         >
           <FaBars />
