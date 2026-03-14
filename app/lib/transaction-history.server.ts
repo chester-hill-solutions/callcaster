@@ -4,39 +4,20 @@ import { logger } from "@/lib/logger.server";
 
 export type TransactionType = "DEBIT" | "CREDIT";
 
-const transactionHistoryInsertLocks = new Map<string, Promise<void>>();
-
-async function withTransactionHistoryInsertLock<T>(
-  key: string,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const previous = transactionHistoryInsertLocks.get(key) ?? Promise.resolve();
-  let release!: () => void;
-  const current = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const queued = previous.then(() => current);
-  transactionHistoryInsertLocks.set(key, queued);
-
-  await previous;
-
-  try {
-    return await fn();
-  } finally {
-    release();
-    if (transactionHistoryInsertLocks.get(key) === queued) {
-      transactionHistoryInsertLocks.delete(key);
-    }
+function isUniqueViolation(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
   }
+
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && code === "23505";
 }
 
 /**
- * Best-effort idempotent insert for transaction_history.
+ * DB-backed idempotent insert for transaction_history.
  *
- * Twilio webhooks can be delivered more than once, and we currently have multiple
- * handlers that can record billing. Until we have a DB-level unique constraint,
- * we prevent duplicates by embedding an idempotency marker in `note` and
- * checking for an existing row before insert.
+ * Uses a deterministic idempotency key stored in the transaction_history table
+ * and enforced by a unique DB index/constraint.
  */
 export async function insertTransactionHistoryIdempotent(args: {
   supabase: SupabaseClient<Database>;
@@ -46,54 +27,71 @@ export async function insertTransactionHistoryIdempotent(args: {
   note: string;
   idempotencyKey: string;
 }): Promise<{ inserted: boolean; existingId?: number }> {
-  const marker = `[idempotency:${args.idempotencyKey}]`;
-  const noteWithMarker = args.note.includes(marker)
-    ? args.note
-    : `${args.note} ${marker}`;
+  const idempotencyKey = args.idempotencyKey.trim();
+  if (!idempotencyKey) {
+    throw new Error(
+      "idempotencyKey is required for transaction history insert",
+    );
+  }
 
-  return withTransactionHistoryInsertLock(
-    `${args.workspaceId}:${args.type}:${args.idempotencyKey}`,
-    async () => {
-      try {
-        const { data: existing, error: existingError } = await args.supabase
-          .from("transaction_history")
-          .select("id")
-          .eq("workspace", args.workspaceId)
-          .eq("type", args.type)
-          .like("note", `%${marker}%`)
-          .order("created_at", { ascending: false })
-          .limit(1);
+  try {
+    const { data, error } = await args.supabase
+      .from("transaction_history")
+      .insert({
+        workspace: args.workspaceId,
+        type: args.type,
+        amount: args.amount,
+        note: args.note,
+        idempotency_key: idempotencyKey,
+      })
+      .select("id")
+      .single();
 
-        if (!existingError && existing && existing.length > 0) {
-          return {
-            inserted: false,
-            existingId: existing[0]?.id as number | undefined,
-          };
-        }
+    if (!error) {
+      return { inserted: true, existingId: data?.id as number | undefined };
+    }
 
-        const { data, error } = await args.supabase
-          .from("transaction_history")
-          .insert({
-            workspace: args.workspaceId,
-            type: args.type,
-            amount: args.amount,
-            note: noteWithMarker,
-          })
-          .select("id")
-          .single();
+    if (!isUniqueViolation(error)) {
+      logger.error("transaction_history insert failed", {
+        error,
+        workspaceId: args.workspaceId,
+        type: args.type,
+        idempotencyKey,
+      });
+      throw error;
+    }
 
-        if (error) {
-          logger.error("transaction_history insert failed", { error, noteWithMarker });
-          throw error;
-        }
+    const { data: existing, error: existingError } = await args.supabase
+      .from("transaction_history")
+      .select("id")
+      .eq("workspace", args.workspaceId)
+      .eq("type", args.type)
+      .eq("idempotency_key", idempotencyKey)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-        return { inserted: true, existingId: data?.id as number | undefined };
-      } catch (e) {
-        logger.error("transaction_history idempotent insert error", e);
-        throw e;
-      }
-    },
-  );
+    if (existingError) {
+      logger.error("transaction_history duplicate lookup failed", {
+        error: existingError,
+        workspaceId: args.workspaceId,
+        type: args.type,
+        idempotencyKey,
+      });
+      throw existingError;
+    }
+
+    if (!existing?.id) {
+      throw new Error(
+        `transaction_history duplicate insert detected but existing row not found for key ${idempotencyKey}`,
+      );
+    }
+
+    return { inserted: false, existingId: existing.id };
+  } catch (e) {
+    logger.error("transaction_history idempotent insert error", e);
+    throw e;
+  }
 }
 
 export function getTransactionDisplayDescription(args: {
@@ -102,8 +100,12 @@ export function getTransactionDisplayDescription(args: {
   note?: string | null;
 }): string {
   const rawNote = args.note ?? "";
-  const withoutMarker = rawNote.replace(/\s*\[idempotency:[^\]]+\]\s*/g, " ").trim();
-  const withoutStripeSession = withoutMarker.replace(/,?\s*stripe_session:[^\s,]+/g, "").trim();
+  const withoutMarker = rawNote
+    .replace(/\s*\[idempotency:[^\]]+\]\s*/g, " ")
+    .trim();
+  const withoutStripeSession = withoutMarker
+    .replace(/,?\s*stripe_session:[^\s,]+/g, "")
+    .trim();
 
   if (withoutStripeSession) {
     return withoutStripeSession;
@@ -115,4 +117,3 @@ export function getTransactionDisplayDescription(args: {
 
   return `Used ${args.amount} credits`;
 }
-

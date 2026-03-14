@@ -13,20 +13,45 @@ interface Message {
 interface ChatMessagesProps {
   messages?: Message[];
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  /** Ref for the scrollable container (e.g. for scroll position restore when loading older) */
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Ref for the "load older" sentinel at the top (infinite scroll) */
+  loadMoreSentinelRef?: (node: Element | null) => void;
+  /** Whether more older messages are available */
+  hasMoreOlder?: boolean;
+  /** Whether older messages are currently loading */
+  loadingOlder?: boolean;
 }
 
 export default function ChatMessages({
   messages,
   messagesEndRef,
+  scrollContainerRef,
+  loadMoreSentinelRef,
+  hasMoreOlder = false,
+  loadingOlder = false,
 }: ChatMessagesProps) {
   const safeMessages = messages ?? [];
 
   return (
-    <div className="h-full overflow-y-auto p-3 sm:p-4">
+    <div
+      ref={
+        scrollContainerRef as React.RefObject<HTMLDivElement> | undefined
+      }
+      className="h-full overflow-y-auto p-3 sm:p-4"
+    >
+      {hasMoreOlder ? (
+        <div
+          ref={loadMoreSentinelRef}
+          className="flex min-h-8 items-center justify-center py-2 text-sm text-muted-foreground"
+        >
+          {loadingOlder ? "Loading older messages…" : "\u00a0"}
+        </div>
+      ) : null}
       {safeMessages.length > 0 ? (
         safeMessages.map((message: Message, index: number) => (
           <div
-            key={index}
+            key={message.sid ?? `msg-${index}`}
             className={`message-item mb-4 flex ${
               message.direction !== "inbound" ? "justify-end" : "justify-start"
             }`}

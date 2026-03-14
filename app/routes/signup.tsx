@@ -17,83 +17,35 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { Heading } from "@/components/ui/typography";
 
 type ActionData =
-  | { emailError: string | null; passwordError: string | null; error?: undefined; data?: undefined }
-  | { passwordError: string; emailError?: null; error?: undefined; data?: undefined }
+  | {
+      emailError: string | null;
+      passwordError: string | null;
+      error?: undefined;
+      data?: undefined;
+    }
+  | {
+      passwordError: string;
+      emailError?: null;
+      error?: undefined;
+      data?: undefined;
+    }
   | { error: string; emailError?: null; passwordError?: null; data?: undefined }
   | { data: unknown; error: null; emailError?: null; passwordError?: null };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabaseClient: supabase, headers } = await verifyAuth(request);
+  const { headers } = createSupabaseServerClient(request);
 
-  const formData = await request.formData();
-
-  const entries = Object.fromEntries(formData);
-  const email: string = typeof entries["email"] === 'string' ? (entries["email"] as string) : '';
-  const password: string = typeof entries["password"] === 'string' ? (entries["password"] as string) : '';
-  const confirmEmail: string = typeof entries["confirmEmail"] === 'string' ? (entries["confirmEmail"] as string) : '';
-  const confirmPassword: string = typeof entries["confirmPassword"] === 'string' ? (entries["confirmPassword"] as string) : '';
-  const firstName: string = typeof entries["firstName"] === 'string' ? (entries["firstName"] as string) : '';
-  const lastName: string = typeof entries["lastName"] === 'string' ? (entries["lastName"] as string) : '';
-
-  // const passwordPattern = new RegExp(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}/);
-
-  // if (!passwordPattern.test(password.toString())) {
-  //   return json({ error: "Password not strong enough!" });
-  // }
-
-  let emailError = null;
-  let passwordError = null;
-
-  if (email !== confirmEmail) {
-    emailError = "Emails do not match";
-  }
-
-  if (password !== confirmPassword) {
-    passwordError = "Passwords do not match";
-  }
-
-  if (emailError || passwordError) {
-    return json<ActionData>({ emailError, passwordError }, { headers });
-  }
-
-  let userName: string = email ?? "";
-  userName = userName.split("@")[0] ?? "";
-  const alphaNumericRegex = new RegExp(/([^a-zA-Z\d])/g);
-  userName = userName.replace(alphaNumericRegex, "");
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        username: userName,
-        first_name: firstName,
-        last_name: lastName,
-      },
+  return json<ActionData>(
+    {
+      error:
+        "Registration is invite-only. Please use your invitation link or request access through the contact form.",
     },
-  });
-
-  if (error) {
-    logger.error("Sign-up error", error);
-    if (error.message === "Password should be at least 6 characters.") {
-      return json<ActionData>({ passwordError: error.message }, { headers });
-    }
-    if (error.message === "Unable to validate email address: invalid format") {
-      return json<ActionData>({ error: "Please enter an email address" }, { headers });
-    }
-    return json<ActionData>({ error: error.message }, { headers });
-  }
-
-  // if (data.user) {
-  //   return redirect("/signin", { headers });
-  // }
-
-  return json<ActionData>({ data, error: null }, { headers });
+    { headers, status: 403 },
+  );
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -108,9 +60,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 // Removed unused legacy styles
 
-type FetcherData = {
-  success?: boolean;
-} | undefined;
+type FetcherData =
+  | {
+      success?: boolean;
+    }
+  | undefined;
 
 export default function SignUp() {
   const actionData = useActionData<ActionData>();
@@ -125,7 +79,11 @@ export default function SignUp() {
       toast.success(
         "You have successfully signed-up! Redirecting to your dashboard...",
       ); */
-    if (fetcher?.data && typeof (fetcher.data as any).success === 'boolean' && (fetcher.data as any).success) {
+    if (
+      fetcher?.data &&
+      typeof (fetcher.data as any).success === "boolean" &&
+      (fetcher.data as any).success
+    ) {
       toast.success("Your request has been sent! We'll be in touch soon.");
       formRef.current?.reset();
     }
@@ -135,11 +93,19 @@ export default function SignUp() {
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
-      <Heading branded level={1} className="animate-fade-in-up my-4 font-Tabac-Slab">
+      <Heading
+        branded
+        level={1}
+        className="animate-fade-in-up my-4 font-Tabac-Slab"
+      >
         Sign Up
       </Heading>
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
-        <ContactForm isBusy={state !== "idle"} formRef={formRef} fetcher={fetcher}/>
+        <ContactForm
+          isBusy={state !== "idle"}
+          formRef={formRef}
+          fetcher={fetcher}
+        />
       </div>
     </main>
   );
@@ -158,48 +124,48 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
         className="min-w-[400px] flex-initial bg-secondary py-2"
       >
-          <fetcher.Form
-            className="space-y-4"
-            action="/api/contact-form"
-            method="POST"
-            ref={formRef}
+        <fetcher.Form
+          className="space-y-4"
+          action="/api/contact-form"
+          method="POST"
+          ref={formRef}
+        >
+          <input type="hidden" value={"signup"} id="signup" name="signup" />
+          <FormField htmlFor="name" label="Name">
+            <Input
+              type="text"
+              id="name"
+              name="name"
+              required
+              className="bg-background text-foreground"
+            />
+          </FormField>
+          <FormField htmlFor="email" label="Email">
+            <Input
+              type="email"
+              id="email"
+              name="email"
+              required
+              className="bg-background text-foreground"
+            />
+          </FormField>
+          <FormField htmlFor="message" label="Message">
+            <Textarea
+              id="message"
+              name="message"
+              rows={4}
+              required
+              className="border-input bg-background text-foreground"
+            />
+          </FormField>
+          <Button
+            disabled={isBusy}
+            type="submit"
+            className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
           >
-            <input type="hidden" value={"signup"} id="signup" name="signup" />
-            <FormField htmlFor="name" label="Name">
-              <Input
-                type="text"
-                id="name"
-                name="name"
-                required
-                className="bg-background text-foreground"
-              />
-            </FormField>
-            <FormField htmlFor="email" label="Email">
-              <Input
-                type="email"
-                id="email"
-                name="email"
-                required
-                className="bg-background text-foreground"
-              />
-            </FormField>
-            <FormField htmlFor="message" label="Message">
-              <Textarea
-                id="message"
-                name="message"
-                rows={4}
-                required
-                className="bg-background text-foreground border-input"
-              />
-            </FormField>
-            <Button
-              disabled={isBusy}
-              type="submit"
-              className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
-            >
-              Send Message
-            </Button>
-          </fetcher.Form>
+            Send Message
+          </Button>
+        </fetcher.Form>
       </AuthCard>
     </div>
   </div>

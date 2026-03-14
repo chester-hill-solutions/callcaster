@@ -13,6 +13,7 @@ import {
   useNavigate,
   useOutlet,
   useOutletContext,
+  useParams,
   useSearchParams,
   useRouteError,
 } from "@remix-run/react";
@@ -112,6 +113,7 @@ type ConversationSidebarProps = {
   searchParams: URLSearchParams;
   sortBy: string;
   hideStopConversations: boolean;
+  onHideStopChange: (checked: boolean) => void;
   optOutKeywords: string[];
   updateFilters: (
     updater: (params: URLSearchParams) => URLSearchParams,
@@ -250,6 +252,7 @@ function ConversationSidebar({
   searchParams,
   sortBy,
   hideStopConversations,
+  onHideStopChange,
   optOutKeywords,
   updateFilters,
 }: ConversationSidebarProps) {
@@ -257,14 +260,14 @@ function ConversationSidebar({
 
   const [loadMoreRef] = useInfiniteScroll({
     root: scrollRoot,
-    hasMore: paginationState.hasMore,
+    hasMore: !contactNumber && paginationState.hasMore,
     loading: paginationFetcherState !== "idle",
     onLoadMore,
     rootMargin: "120px",
   });
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Button
         className="flex items-center justify-center rounded-none bg-brand-primary p-4 font-Zilla-Slab text-base font-semibold text-white hover:bg-brand-primary/90"
         asChild
@@ -343,20 +346,11 @@ function ConversationSidebar({
         <span className="text-sm font-medium">Hide STOP-only</span>
         <Switch
           checked={hideStopConversations}
-          onCheckedChange={(checked) => {
-            updateFilters((nextParams) => {
-              if (checked) {
-                nextParams.set("hide_stop", "1");
-              } else {
-                nextParams.delete("hide_stop");
-              }
-              return nextParams;
-            });
-          }}
+          onCheckedChange={onHideStopChange}
           aria-label="Hide conversations whose last reply is STOP/opt-out"
         />
       </div>
-      <div ref={(el) => setScrollRoot(el)} className="flex-1 overflow-y-auto">
+      <div ref={(el) => setScrollRoot(el)} className="min-h-0 flex-1 overflow-y-auto">
         {chatsError ? (
           <p className="border-b px-4 py-2 text-sm text-red-500">
             {chatsError}
@@ -730,7 +724,13 @@ export default function ChatsList() {
     optOutKeywords,
   } = useLoaderData<LoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const hideStopConversations = searchParams.get("hide_stop") === "1";
+  // Keep in state so toggling doesn't trigger loader re-run (setSearchParams causes full navigation)
+  const [hideStopConversations, setHideStopConversations] = useState(
+    () => searchParams.get("hide_stop") === "1",
+  );
+  useEffect(() => {
+    setHideStopConversations(searchParams.get("hide_stop") === "1");
+  }, [searchParams]);
   const messageFetcher = useFetcher({ key: "messages" });
   const paginationFetcher = useFetcher<LoaderData>({ key: "chat-pages" });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -753,9 +753,10 @@ export default function ChatsList() {
   const [isMobileConversationListOpen, setIsMobileConversationListOpen] =
     useState(false);
   const outlet = useOutlet();
+  const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const contact_number = outlet ? location.pathname.split("/").pop() || "" : "";
+  const contact_number = params["contact_number"] ?? "";
   const formatDate = formatMessageTimestamp;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const [loadedChats, setLoadedChats] = useState<ConversationSummary[]>(chats);
@@ -838,12 +839,16 @@ export default function ChatsList() {
     initialContact: contact,
   });
 
-  // Navigate away if phone number is invalid
+  // Navigate away if phone number is invalid (decode in case path segment is encoded, e.g. %2B).
+  // Only when outlet is present (viewing a conversation) and skip while sidebar pagination is
+  // loading to avoid redirect races from fetcher revalidation.
   useEffect(() => {
-    if (contact_number && !phoneRegex.test(contact_number)) {
+    if (!outlet || paginationFetcher.state !== "idle") return;
+    const decoded = contact_number ? decodeURIComponent(contact_number) : "";
+    if (decoded && !phoneRegex.test(decoded)) {
       navigate(".");
     }
-  }, [contact_number, navigate]);
+  }, [contact_number, navigate, outlet, paginationFetcher.state]);
 
   useSupabaseRealtimeSubscription({
     supabase,
@@ -1020,7 +1025,12 @@ export default function ChatsList() {
   const handleExistingConversationClick = useCallback(
     (phoneNumber: string) => {
       closeMobileConversationList();
-      navigate(`./${phoneNumber}`);
+      const search = new URLSearchParams(searchParams);
+      if (hideStopConversations) search.set("hide_stop", "1");
+      else search.delete("hide_stop");
+      const query = search.toString();
+      const path = `./${encodeURIComponent(phoneNumber)}`;
+      navigate(query ? `${path}?${query}` : path);
 
       setLoadedChats((currentChats) =>
         currentChats.map((chat) =>
@@ -1052,7 +1062,14 @@ export default function ChatsList() {
             logger.error("Error marking messages as read:", err),
         );
     },
-    [closeMobileConversationList, navigate, supabase, workspace.id],
+    [
+      closeMobileConversationList,
+      navigate,
+      searchParams,
+      hideStopConversations,
+      supabase,
+      workspace.id,
+    ],
   );
 
   // Adapter functions to match ChatHeader's expected types
@@ -1117,13 +1134,22 @@ export default function ChatsList() {
     [setSearchParams],
   );
 
+  const handleHideStopChange = useCallback((checked: boolean) => {
+    setHideStopConversations(checked);
+    // Update URL without triggering loader (replaceState = no Remix navigation)
+    const url = new URL(window.location.href);
+    if (checked) url.searchParams.set("hide_stop", "1");
+    else url.searchParams.delete("hide_stop");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
   const handleNewChatClick = useCallback(() => {
     closeMobileConversationList();
   }, [closeMobileConversationList]);
 
   return (
     <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row">
-      <Card className="hidden min-h-[68vh] flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5">
+      <Card className="flex h-[68vh] max-h-[68vh] hidden flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5">
         <ConversationSidebar
           campaigns={campaigns}
           chats={displayedChats}
@@ -1132,6 +1158,7 @@ export default function ChatsList() {
           formatDate={formatDate}
           handleExistingConversationClick={handleExistingConversationClick}
           hideStopConversations={hideStopConversations}
+          onHideStopChange={handleHideStopChange}
           onLoadMore={handleLoadMore}
           onNewChatClick={handleNewChatClick}
           optOutKeywords={optOutKeywords}
@@ -1210,6 +1237,7 @@ export default function ChatsList() {
               formatDate={formatDate}
               handleExistingConversationClick={handleExistingConversationClick}
               hideStopConversations={hideStopConversations}
+              onHideStopChange={handleHideStopChange}
               onLoadMore={handleLoadMore}
               onNewChatClick={handleNewChatClick}
               optOutKeywords={optOutKeywords}

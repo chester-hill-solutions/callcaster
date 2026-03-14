@@ -1,23 +1,22 @@
 import { FaPlus } from "react-icons/fa";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  json,
+  LoaderFunctionArgs,
+  redirect,
+} from "@remix-run/node";
 import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
 import { useState, useEffect, useCallback } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import ContactDetails from "@/components/contact/ContactDetails";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { Audience, Contact, ContactAudience, WorkspaceData, User } from "@/lib/types";
+import type { Audience, Contact, WorkspaceData, User } from "@/lib/types";
 import type { MemberRole } from "@/components/workspace/TeamMember";
 import { logger } from "@/lib/logger.server";
-
-// Enhanced type definitions
-export interface AudienceChanges {
-  additions: ContactAudience[];
-  deletions: ContactAudience[];
-}
 
 export { ErrorBoundary };
 
@@ -51,22 +50,35 @@ export interface ContactScreenState {
   hasChanges: boolean;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs): Promise<Response> => {
+export const loader = async ({
+  request,
+  params,
+}: LoaderFunctionArgs): Promise<Response> => {
   const { id: workspace_id, contactId: selected_id } = params;
-  
+
   if (!workspace_id) {
     return redirect("/workspaces");
   }
-  
+
   if (!selected_id) {
     return redirect(`/workspaces/${workspace_id}`);
   }
 
   try {
     const { supabaseClient, headers, user } = await verifyAuth(request);
-    
+
     if (!user) {
       return redirect("/signin");
+    }
+
+    const userRole = await getUserRole({
+      supabaseClient: supabaseClient as SupabaseClient,
+      user: user as unknown as User,
+      workspaceId: workspace_id,
+    });
+
+    if (!userRole?.role) {
+      return redirect(`/workspaces/${workspace_id}`);
     }
 
     const { data: workspaceData, error: workspaceError } = await supabaseClient
@@ -74,35 +86,29 @@ export const loader = async ({ request, params }: LoaderFunctionArgs): Promise<R
       .select()
       .eq("id", workspace_id)
       .single();
-      
+
     if (workspaceError) {
       throw workspaceError;
     }
 
-    const userRole = await getUserRole({ 
-      supabaseClient: supabaseClient as SupabaseClient, 
-      user: user as unknown as User, 
-      workspaceId: workspace_id 
-    });
-
     let contact: Contact | null = null;
-    
-    if (selected_id !== 'new') {
+
+    if (selected_id !== "new") {
       const { data, error: contactError } = await supabaseClient
         .from("contact")
         .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
         .eq("id", Number(selected_id) || 0)
-        .filter("outreach_attempt.workspace", 'eq', workspace_id)
+        .filter("outreach_attempt.workspace", "eq", workspace_id)
         .single();
-        
+
       if (contactError) {
         throw contactError;
       }
-      
+
       contact = data;
-         } else {
-       contact = null;
-     }
+    } else {
+      contact = null;
+    }
 
     const { data: audiences, error: audiencesError } = await supabaseClient
       .from("audience")
@@ -122,87 +128,51 @@ export const loader = async ({ request, params }: LoaderFunctionArgs): Promise<R
       audiences: audiences || [],
     });
   } catch (error) {
-    logger.error('Error in contact loader:', error);
+    logger.error("Error in contact loader:", error);
     return redirect(`/workspaces/${workspace_id}`);
   }
 };
 
-function compareContactAudiences(
-  contactId: string,
-  initialAudiences: ContactAudience[],
-  currentAudiences: ContactAudience[],
-): AudienceChanges {
-  const additions: ContactAudience[] = [];
-  const deletions: ContactAudience[] = [];
-  
-  try {
-    currentAudiences?.forEach((currentAudience) => {
-      if (currentAudience && currentAudience.audience_id) {
-        if (
-          !initialAudiences.some(
-            (initialAudience) =>
-              initialAudience && initialAudience.audience_id === currentAudience.audience_id,
-          )
-        ) {
-          additions.push({
-            contact_id: Number(contactId),
-            audience_id: currentAudience.audience_id,
-            created_at: new Date().toISOString(),
-          });
-        }
-      }
-    });
-    
-    initialAudiences.forEach((initialAudience) => {
-      if (initialAudience && initialAudience.audience_id) {
-        if (
-          !currentAudiences.some(
-            (currentAudience) =>
-              currentAudience && currentAudience.audience_id === initialAudience.audience_id,
-          )
-        ) {
-          deletions.push(initialAudience);
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Error comparing contact audiences:', error);
-  }
-  
-  return { additions, deletions };
-}
-
-export const action = async ({ request, params }: ActionFunctionArgs): Promise<Response> => {
+export const action = async ({
+  request,
+  params,
+}: ActionFunctionArgs): Promise<Response> => {
   const { id: workspace_id, contactId: selected_id } = params;
-  
+
   if (!workspace_id || !selected_id) {
     return json({ error: "Missing required parameters" }, { status: 400 });
   }
 
   try {
     const { supabaseClient, headers, user } = await verifyAuth(request);
-    
+
     if (!user) {
       return redirect("/signin");
     }
 
+    await requireWorkspaceAccess({
+      supabaseClient,
+      user: { id: user.id },
+      workspaceId: workspace_id,
+    });
+
     const formData = await request.formData();
     const contactData: ContactFormData = {
-      id: formData.get('id') ? Number(formData.get('id')) : undefined,
-      firstname: formData.get('firstname') as string || undefined,
-      surname: formData.get('surname') as string || undefined,
-      phone: formData.get('phone') as string || undefined,
-      email: formData.get('email') as string || undefined,
-      address: formData.get('address') as string || undefined,
-      city: formData.get('city') as string || undefined,
-      province: formData.get('province') as string || undefined,
-      postal: formData.get('postal') as string || undefined,
-      country: formData.get('country') as string || undefined,
-      external_id: formData.get('external_id') as string || undefined,
+      id: formData.get("id") ? Number(formData.get("id")) : undefined,
+      firstname: (formData.get("firstname") as string) || undefined,
+      surname: (formData.get("surname") as string) || undefined,
+      phone: (formData.get("phone") as string) || undefined,
+      email: (formData.get("email") as string) || undefined,
+      address: (formData.get("address") as string) || undefined,
+      city: (formData.get("city") as string) || undefined,
+      province: (formData.get("province") as string) || undefined,
+      postal: (formData.get("postal") as string) || undefined,
+      country: (formData.get("country") as string) || undefined,
+      external_id: (formData.get("external_id") as string) || undefined,
       workspace: workspace_id,
     };
 
-    if (selected_id === 'new') {
+    if (selected_id === "new") {
       // Create new contact
       const { data: newContact, error: createError } = await supabaseClient
         .from("contact")
@@ -231,16 +201,19 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<R
       return json({ success: true, contact: updatedContact });
     }
   } catch (error) {
-    logger.error('Error in contact action:', error);
+    logger.error("Error in contact action:", error);
     return json({ error: "Failed to save contact" }, { status: 500 });
   }
 };
 
 export default function ContactScreen(): JSX.Element {
-  const { contact, workspace_id, selected_id, userRole, audiences } = useLoaderData<LoaderData>();
-  const { setContact } = useOutletContext<{ setContact: (contact: Contact) => void }>();
+  const { contact, workspace_id, selected_id, userRole, audiences } =
+    useLoaderData<LoaderData>();
+  const { setContact } = useOutletContext<{
+    setContact: (contact: Contact) => void;
+  }>();
   const submit = useSubmit();
-  
+
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
@@ -250,7 +223,7 @@ export default function ContactScreen(): JSX.Element {
       setIsSaving(true);
       submit({}, { method: "post" });
     } catch (error) {
-      logger.error('Error saving contact:', error);
+      logger.error("Error saving contact:", error);
     } finally {
       setIsSaving(false);
     }
@@ -261,21 +234,21 @@ export default function ContactScreen(): JSX.Element {
       setIsDirty(false);
       setHasChanges(false);
     } catch (error) {
-      logger.error('Error resetting contact:', error);
+      logger.error("Error resetting contact:", error);
     }
   }, []);
 
   useEffect(() => {
-    if (contact && typeof contact.id === 'number') {
+    if (contact && typeof contact.id === "number") {
       setContact(contact);
     }
   }, [contact, setContact]);
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold">
-          {selected_id === 'new' ? 'New Contact' : 'Edit Contact'}
+          {selected_id === "new" ? "New Contact" : "Edit Contact"}
         </h1>
         <div className="flex items-center space-x-2">
           <Button
@@ -290,7 +263,7 @@ export default function ContactScreen(): JSX.Element {
             disabled={!hasChanges || isSaving}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>

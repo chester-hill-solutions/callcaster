@@ -1,7 +1,13 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useOutletContext, useParams } from "@remix-run/react";
+import {
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useOutletContext,
+  useParams,
+} from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import ChatMessages from "@/components/sms-ui/ChatMessages";
@@ -10,6 +16,9 @@ import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { useInfiniteScroll } from "@/hooks";
+
+const MESSAGES_PAGE_SIZE = 50;
 
 const getMessageMedia = async ({
   messages,
@@ -38,11 +47,55 @@ const getMessageMedia = async ({
   );
 };
 
+async function fetchMessagePage({
+  supabaseClient,
+  workspaceId,
+  contactFilter,
+  before,
+}: {
+  supabaseClient: SupabaseClient;
+  workspaceId: string;
+  contactFilter: string;
+  before?: string | null;
+}): Promise<{ messages: Message[]; hasMore: boolean }> {
+  let query = supabaseClient
+    .from("message")
+    .select(`*, outreach_attempt(campaign_id)`)
+    .or(`from.eq.${contactFilter},to.eq.${contactFilter}`)
+    .eq("workspace", workspaceId)
+    .not("date_created", "is", null)
+    .neq("status", "failed")
+    .order("date_created", { ascending: false })
+    .limit(MESSAGES_PAGE_SIZE + 1);
+
+  if (before) {
+    query = query.lt("date_created", before);
+  }
+
+  const { data: rows, error } = await query;
+  if (error) {
+    logger.error("Error fetching messages:", error);
+    return { messages: [], hasMore: false };
+  }
+
+  const hasMore = (rows?.length ?? 0) > MESSAGES_PAGE_SIZE;
+  const slice = (rows ?? []).slice(0, MESSAGES_PAGE_SIZE) as Message[];
+  const chronological = slice.reverse();
+  const withMedia = await getMessageMedia({
+    messages: chronological,
+    supabaseClient,
+  });
+  return { messages: withMedia, hasMore };
+}
+
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id, contact_number } = params;
   const { supabaseClient, headers } = await verifyAuth(request);
-  const messages: Message[] = [];
-  let normalizedNumber = null;
+  const url = new URL(request.url);
+  const before = url.searchParams.get("before");
+  let messages: Message[] = [];
+  let hasMore = false;
+  let normalizedNumber: string | null = null;
   let optOutKeywords = parseOptOutKeywords(null);
 
   if (id) {
@@ -61,55 +114,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (contact_number !== "new") {
     try {
-      // Try to normalize the phone number for more consistent querying
       normalizedNumber = normalizePhoneNumber(contact_number || "");
-      
-      // Create a query with multiple OR conditions to match different phone number formats
-      const { data: messagesData, error: messagesError } = await supabaseClient
-        .from("message")
-        .select(`*, outreach_attempt(campaign_id)`)
-        .or(`from.eq.${normalizedNumber},to.eq.${normalizedNumber}`)
-        .eq('workspace', id as string)
-        .not('date_created', 'is', null)
-        .neq('status', 'failed')
-        .order("date_created", { ascending: true });
-      
-      if (messagesError) {
-        logger.error("Error fetching messages:", messagesError);
-      } else {
-        messages.push(
-          ...(await getMessageMedia({
-            messages: messagesData as Message[],
-            supabaseClient,
-          })),
-        );
-      }
-    } catch (error) {
-      logger.error("Error processing contact number:", error);
-      // If normalization fails, still try to fetch with the raw number
-      const { data: messagesData, error: messagesError } = await supabaseClient
-        .from("message")
-        .select(`*, outreach_attempt(campaign_id)`)
-        .or(`from.eq.${contact_number},to.eq.${contact_number}`)
-        .eq('workspace', id as string)
-        .not('date_created', 'is', null)
-        .neq('status', 'failed')
-        .order("date_created", { ascending: true });
-      
-      if (!messagesError) {
-        messages.push(
-          ...(await getMessageMedia({
-            messages: messagesData as Message[],
-            supabaseClient,
-          })),
-        );
-      }
+    } catch {
+      // use raw number below
     }
 
-    // Mark messages as read on the server side when loading the conversation
-    if (normalizedNumber) {
+    const contactFilter = normalizedNumber ?? contact_number ?? "";
+    if (contactFilter) {
+      const result = await fetchMessagePage({
+        supabaseClient,
+        workspaceId: id as string,
+        contactFilter,
+        before: before || null,
+      });
+      messages = result.messages;
+      hasMore = result.hasMore;
+    }
+
+    // Mark messages as read on initial load (no "before" = first page)
+    if (normalizedNumber && !before) {
       try {
-        // Update all received messages for this contact to delivered
         await supabaseClient
           .from("message")
           .update({ status: "delivered" })
@@ -125,6 +149,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return json(
     {
       messages,
+      hasMore,
       contact_number: normalizedNumber || contact_number,
       optOutKeywords,
     },
@@ -141,20 +166,35 @@ export default function ChatScreen() {
   }>();
   const {
     messages: initialMessages,
+    hasMore: initialHasMore,
     contact_number: loaderContactNumber,
   } = useLoaderData<{
     messages: Message[];
+    hasMore: boolean;
     contact_number: string;
     optOutKeywords: string[];
   }>();
   const { contact_number: paramContactNumber } = useParams();
+  const location = useLocation();
 
   const contact_number = loaderContactNumber || paramContactNumber;
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef<number>(initialMessages.length);
   const scrollPositionRef = useRef<number>(0);
   const hasMarkedAsReadRef = useRef<boolean>(false);
+  const savedScrollRef = useRef<{ height: number; top: number } | null>(null);
+  const didPrependRef = useRef(false);
+  const lastMergedFetcherDataRef = useRef<unknown>(null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore);
+
+  const olderFetcher = useFetcher<{
+    messages: Message[];
+    hasMore: boolean;
+    contact_number: string;
+    optOutKeywords: string[];
+  }>();
 
   const { messages, setMessages, addOptimisticMessage } = useChatRealTime({
     supabase,
@@ -162,6 +202,73 @@ export default function ChatScreen() {
     workspace: workspace.id,
     contact_number,
   });
+
+  useEffect(() => {
+    setHasMoreOlder(initialHasMore);
+  }, [initialHasMore]);
+
+  useEffect(() => {
+    lastMergedFetcherDataRef.current = null;
+  }, [contact_number]);
+
+  const loadingOlder =
+    olderFetcher.state === "loading" || olderFetcher.state === "submitting";
+
+  const loadOlder = useCallback(() => {
+    if (loadingOlder || !hasMoreOlder || messages.length === 0) return;
+    const oldest = messages[0];
+    const before = oldest?.date_created;
+    if (!before) return;
+    const beforeStr =
+      typeof before === "string" ? before : new Date(before).toISOString();
+    if (scrollContainerRef.current) {
+      savedScrollRef.current = {
+        height: scrollContainerRef.current.scrollHeight,
+        top: scrollContainerRef.current.scrollTop,
+      };
+    }
+    olderFetcher.load(
+      `${location.pathname}?before=${encodeURIComponent(beforeStr)}`,
+    );
+  }, [location.pathname, loadingOlder, hasMoreOlder, messages]);
+
+  const [loadMoreSentinelRef] = useInfiniteScroll({
+    onLoadMore: loadOlder,
+    hasMore: hasMoreOlder,
+    loading: loadingOlder,
+    rootMargin: "120px",
+  });
+
+  // Merge older page when fetcher returns (once per response)
+  useEffect(() => {
+    const data = olderFetcher.data;
+    if (!data?.messages?.length || data === lastMergedFetcherDataRef.current)
+      return;
+    lastMergedFetcherDataRef.current = data;
+    const older = data.messages as Message[];
+    setHasMoreOlder(data.hasMore === true);
+    setMessages((prev) => {
+      const ids = new Set(prev.map((m) => m?.sid).filter(Boolean));
+      const prepend = older.filter((m) => m?.sid && !ids.has(m.sid));
+      return [...prepend, ...prev];
+    });
+    didPrependRef.current = true;
+  }, [olderFetcher.data, setMessages]);
+
+  // Restore scroll position after prepending older messages
+  useEffect(() => {
+    if (
+      didPrependRef.current &&
+      savedScrollRef.current &&
+      scrollContainerRef.current
+    ) {
+      const { height, top } = savedScrollRef.current;
+      scrollContainerRef.current.scrollTop =
+        top + (scrollContainerRef.current.scrollHeight - height);
+      didPrependRef.current = false;
+      savedScrollRef.current = null;
+    }
+  }, [messages.length]);
 
   useEffect(() => {
     lastMessageCountRef.current = messages.length;
@@ -320,6 +427,10 @@ export default function ChatScreen() {
           messages as React.ComponentProps<typeof ChatMessages>["messages"]
         }
         messagesEndRef={messagesEndRef}
+        scrollContainerRef={scrollContainerRef}
+        loadMoreSentinelRef={loadMoreSentinelRef}
+        hasMoreOlder={hasMoreOlder}
+        loadingOlder={loadingOlder}
       />
     </div>
   );

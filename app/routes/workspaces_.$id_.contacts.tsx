@@ -8,7 +8,6 @@ import {
 } from "@remix-run/react";
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
-import { useState, useMemo } from "react";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
@@ -22,11 +21,56 @@ import { logger } from "@/lib/logger.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
+const SHORT_QUERY_MAX_LENGTH = 2;
+const PHONE_SUBSTRING_MIN_LENGTH = 4;
+
+function escapeIlikeTerm(raw: string): string {
+  return raw
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_")
+    .replaceAll(",", " ")
+    .trim();
+}
+
+function buildContactSearchFilter(rawSearchQuery: string): string {
+  const escapedQuery = escapeIlikeTerm(rawSearchQuery);
+  if (!escapedQuery) {
+    return "";
+  }
+
+  const isShortQuery = escapedQuery.length <= SHORT_QUERY_MAX_LENGTH;
+  const textSearchPattern = isShortQuery
+    ? `${escapedQuery}%`
+    : `%${escapedQuery}%`;
+  const normalizedDigits = rawSearchQuery.replace(/\D/g, "");
+  const escapedDigits = escapeIlikeTerm(normalizedDigits);
+  const filters = [
+    `firstname.ilike.${textSearchPattern}`,
+    `surname.ilike.${textSearchPattern}`,
+    `email.ilike.${textSearchPattern}`,
+    `address.ilike.${textSearchPattern}`,
+    `city.ilike.${textSearchPattern}`,
+  ];
+
+  if (normalizedDigits.length >= PHONE_SUBSTRING_MIN_LENGTH && escapedDigits) {
+    filters.push(
+      `phone.eq.${escapedDigits}`,
+      `phone.ilike.${escapedDigits}%`,
+      `phone.ilike.%${escapedDigits}%`,
+    );
+  } else {
+    filters.push(`phone.ilike.${textSearchPattern}`);
+  }
+
+  return filters.join(",");
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     const { supabaseClient, headers, user } = await verifyAuth(request);
     const url = new URL(request.url);
+    const rawSearchQuery = url.searchParams.get("q") ?? "";
+    const searchQuery = rawSearchQuery.trim().replaceAll(",", " ");
 
     // Validate and parse pagination parameters
     const pageParam = url.searchParams.get("page");
@@ -78,6 +122,28 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     // Parallel database queries for better performance
+    const countQuery = supabaseClient
+      .from("contact")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace", workspaceId);
+
+    const contactsQuery = supabaseClient
+      .from("contact")
+      .select(
+        "id, firstname, surname, phone, email, address, city, other_data, created_at",
+      )
+      .eq("workspace", workspaceId)
+      .range((page - 1) * pageSize, page * pageSize - 1)
+      .order("created_at", { ascending: false });
+
+    if (searchQuery) {
+      const searchFilter = buildContactSearchFilter(searchQuery);
+      if (searchFilter) {
+        countQuery.or(searchFilter);
+        contactsQuery.or(searchFilter);
+      }
+    }
+
     const [
       userRoleResult,
       workspaceResult,
@@ -100,18 +166,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         .select("feature_flags")
         .eq("id", workspaceId)
         .single(),
-      supabaseClient
-        .from("contact")
-        .select("*", { count: "exact", head: true })
-        .eq("workspace", workspaceId),
-      supabaseClient
-        .from("contact")
-        .select(
-          "id, firstname, surname, phone, email, address, city, other_data, created_at",
-        )
-        .eq("workspace", workspaceId)
-        .range((page - 1) * pageSize, page * pageSize - 1)
-        .order("created_at", { ascending: false }),
+      countQuery,
+      contactsQuery,
     ]);
 
     // Extract data and handle errors
@@ -219,6 +275,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           totalCount: totalCountValue,
           pageSize,
         },
+        searchQuery,
       },
       { headers },
     );
@@ -247,7 +304,7 @@ export default function WorkspaceContacts() {
   const { contacts, error, userRole, workspace, flags, pagination } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchTerm = searchParams.get("q") ?? "";
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -255,33 +312,20 @@ export default function WorkspaceContacts() {
     setSearchParams(params);
   };
 
-  // Filter contacts based on search term (client-side filtering)
-  const filteredContacts = useMemo(() => {
-    if (!contacts) return [];
-
-    if (!searchTerm) return contacts;
-
-    const searchLower = searchTerm.toLowerCase();
-    return contacts.filter((contact) => {
-      return (
-        contact.firstname?.toLowerCase().includes(searchLower) ||
-        false ||
-        contact.surname?.toLowerCase().includes(searchLower) ||
-        false ||
-        contact.email?.toLowerCase().includes(searchLower) ||
-        false ||
-        contact.phone?.toLowerCase().includes(searchLower) ||
-        false ||
-        contact.address?.toLowerCase().includes(searchLower) ||
-        false ||
-        contact.city?.toLowerCase().includes(searchLower) ||
-        false
-      );
-    });
-  }, [contacts, searchTerm]);
+  const handleSearchChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    const trimmedValue = value.trim();
+    if (trimmedValue) {
+      params.set("q", trimmedValue);
+    } else {
+      params.delete("q");
+    }
+    params.set("page", "1");
+    setSearchParams(params);
+  };
 
   const isWorkspaceEmpty = !contacts?.length;
-  const isSearchEmpty = filteredContacts.length === 0 && searchTerm;
+  const isSearchEmpty = (contacts?.length ?? 0) === 0 && searchTerm;
 
   return (
     <main className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-4 px-4 py-6 sm:px-6">
@@ -322,7 +366,7 @@ export default function WorkspaceContacts() {
               <Input
                 placeholder="Search contacts..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="bg-background pl-8 text-foreground"
               />
               {searchTerm && (
@@ -330,7 +374,7 @@ export default function WorkspaceContacts() {
                   variant="ghost"
                   size="sm"
                   className="absolute right-0 top-0 h-full hover:bg-muted"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => handleSearchChange("")}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -340,7 +384,7 @@ export default function WorkspaceContacts() {
             {/* Search Results Info */}
             {searchTerm && (
               <div className="text-sm text-muted-foreground">
-                {filteredContacts.length} of {contacts?.length || 0} contacts
+                {contacts?.length || 0} of {pagination.totalCount} contacts
               </div>
             )}
           </div>
@@ -374,11 +418,11 @@ export default function WorkspaceContacts() {
             </h4>
           )}
 
-          {filteredContacts.length > 0 && (
+          {(contacts?.length ?? 0) > 0 && (
             <>
               <DataTable
                 className="rounded-md border-2 border-border font-semibold text-foreground"
-                data={filteredContacts}
+                data={contacts ?? []}
                 columns={[
                   {
                     accessorKey: "firstname",
@@ -532,8 +576,7 @@ export default function WorkspaceContacts() {
                 ]}
               />
 
-              {/* Pagination - Only show when not searching */}
-              {!searchTerm && pagination.totalPages > 1 && (
+              {pagination.totalPages > 1 && (
                 <div className="mb-8 mt-4 flex justify-center">
                   <TablePagination
                     currentPage={pagination.currentPage}
