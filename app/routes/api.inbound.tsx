@@ -108,16 +108,31 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     | Record<string, unknown>
     | null
     | undefined;
+  const authTokenSource =
+    typeof twilioData?.authToken === "string"
+      ? "workspace.twilio_data.authToken"
+      : typeof twilioData?.auth_token === "string"
+        ? "workspace.twilio_data.auth_token"
+        : "env.TWILIO_AUTH_TOKEN";
   const authToken =
     typeof twilioData?.authToken === "string"
       ? twilioData.authToken
       : typeof twilioData?.auth_token === "string"
         ? twilioData.auth_token
-        : null;
+        : env.TWILIO_AUTH_TOKEN(); // fallback for local dev when workspace twilio_data missing
   const signature = request.headers.get("x-twilio-signature");
   const requestUrl = new URL(request.url).href;
+
+  logger.info("api.inbound webhook received", {
+    Called: data.Called,
+    CallSid: data.CallSid,
+    workspaceId: number.workspace?.id,
+    authTokenSource,
+    hasSignature: Boolean(signature),
+    requestUrl,
+  });
+
   if (
-    !authToken ||
     !validateTwilioWebhookParams(
       data as Record<string, string>,
       signature,
@@ -125,6 +140,14 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       authToken,
     )
   ) {
+    logger.warn("api.inbound Twilio signature validation failed", {
+      Called: data.Called,
+      CallSid: data.CallSid,
+      workspaceId: number.workspace?.id,
+      authTokenSource,
+      hasSignature: Boolean(signature),
+      requestUrl,
+    });
     throw { status: 403, statusText: "Invalid Twilio signature" };
   }
 
@@ -249,6 +272,11 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       });
     }
     if (clientIdentity) {
+      logger.info("api.inbound routing to handset", {
+        workspaceId,
+        CallSid: data.CallSid,
+        clientIdentity,
+      });
       const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
       const dial = handsetTwiml.dial({
@@ -266,6 +294,11 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     typeof number?.inbound_action === "string" &&
     isPhoneNumber(number.inbound_action)
   ) {
+    logger.info("api.inbound routing to phone", {
+      workspaceId,
+      CallSid: data.CallSid,
+      inbound_action: number.inbound_action,
+    });
     twiml.pause({ length: 1 });
     twiml.dial(number.inbound_action || "");
     return new Response(twiml.toString(), {
@@ -277,6 +310,11 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     typeof number?.inbound_action === "string" &&
     isEmail(number.inbound_action)
   ) {
+    logger.info("api.inbound routing to voicemail", {
+      workspaceId,
+      CallSid: data.CallSid,
+      inbound_action: number.inbound_action,
+    });
     const phoneNumber = data.Called;
     if (voicemail?.signedUrl) {
       twiml.play(voicemail.signedUrl);
@@ -298,6 +336,10 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       },
     });
   } else {
+    logger.info("api.inbound default fallback (say + hangup)", {
+      workspaceId,
+      CallSid: data.CallSid,
+    });
     const phoneNumber = data.Called;
     twiml.say(
       `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please try again later.`,

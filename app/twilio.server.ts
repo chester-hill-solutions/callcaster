@@ -1,6 +1,7 @@
 import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 /**
  * Validates that a request came from Twilio using the X-Twilio-Signature header.
@@ -18,6 +19,11 @@ export async function validateTwilioWebhook(
   // TODO: Re-enable Twilio signature validation
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+  logger.debug("validateTwilioWebhook", {
+    url: new URL(request.url).href,
+    hasSignature: Boolean(request.headers.get("x-twilio-signature")),
+    paramKeys: Object.keys(params),
+  });
   return { params };
 }
 
@@ -32,6 +38,11 @@ export function validateTwilioWebhookParams(
   _authToken: string
 ): boolean {
   // TODO: Re-enable Twilio signature validation
+  logger.debug("validateTwilioWebhookParams", {
+    url: _url,
+    hasSignature: Boolean(_signature),
+    paramKeys: Object.keys(_params),
+  });
   return true; // if (!signature) return false; return Twilio.validateRequest(...)
 }
 
