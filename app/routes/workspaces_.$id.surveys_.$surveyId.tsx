@@ -2,7 +2,7 @@ import { json, type LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData , Link } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
-import type { User, SurveyWithPages } from "@/lib/types";
+import type { SurveyWithPages } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -75,10 +75,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user as unknown as User, 
-    workspaceId 
+  const userRole = await getUserRole({
+    supabaseClient,
+    user,
+    workspaceId,
   });
 
   if (!userRole) {

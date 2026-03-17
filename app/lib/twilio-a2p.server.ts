@@ -8,11 +8,10 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib/types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import type {
+  TwilioAccountData,
+  WorkspaceMessagingOnboardingState,
+} from "@/lib/types";
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -63,12 +62,11 @@ async function persistOnboardingState({
   twilioData: TwilioAccountData;
   onboarding: WorkspaceMessagingOnboardingState;
 }) {
-  const baseData = isRecord(twilioData) ? twilioData : {};
   const { error } = await supabaseClient
     .from("workspace")
     .update({
       twilio_data: {
-        ...baseData,
+        ...twilioData,
         onboarding,
       } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
     })
@@ -98,10 +96,14 @@ function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
     issues.push("Messaging Service must be provisioned first.");
   }
   if (!onboarding.a2p10dlc.customerProfileBundleSid) {
-    issues.push("Customer Profile Bundle SID is required before A2P registration can be submitted.");
+    issues.push(
+      "Customer Profile Bundle SID is required before A2P registration can be submitted.",
+    );
   }
   if (!onboarding.a2p10dlc.trustProductSid) {
-    issues.push("A2P Messaging Profile Bundle SID is required before A2P registration can be submitted.");
+    issues.push(
+      "A2P Messaging Profile Bundle SID is required before A2P registration can be submitted.",
+    );
   }
 
   return issues;
@@ -178,7 +180,8 @@ export async function provisionWorkspaceA2P({
 
     if (!brandSid && messagingApi?.brandRegistrations?.create) {
       const brand = await messagingApi.brandRegistrations.create({
-        customerProfileBundleSid: nextOnboarding.a2p10dlc.customerProfileBundleSid!,
+        customerProfileBundleSid:
+          nextOnboarding.a2p10dlc.customerProfileBundleSid!,
         a2PProfileBundleSid: nextOnboarding.a2p10dlc.trustProductSid!,
         ...(nextOnboarding.a2p10dlc.brandType
           ? { brandType: nextOnboarding.a2p10dlc.brandType }
@@ -207,7 +210,7 @@ export async function provisionWorkspaceA2P({
         ...nextOnboarding.a2p10dlc,
         brandSid,
         campaignSid,
-        status: campaignSid ? "in_review" : brandSid ? "in_review" : "submitting",
+        status: brandSid ? "in_review" : "submitting",
         lastSyncedAt: new Date().toISOString(),
       },
       steps: buildOnboardingStepsForState(nextOnboarding),

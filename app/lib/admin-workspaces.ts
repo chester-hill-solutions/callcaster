@@ -22,9 +22,14 @@ function parseOptionalString(value: unknown): string | null {
 }
 
 function getPortalConfigFromTwilioData(twilioData: unknown) {
-  const config = isRecord(twilioData) && isRecord(twilioData.portalConfig) ? twilioData.portalConfig : {};
+  const config =
+    isRecord(twilioData) && isRecord(twilioData.portalConfig)
+      ? twilioData.portalConfig
+      : {};
   const sendMode: WorkspaceAdminRow["sendMode"] =
-    config.sendMode === "messaging_service" ? "messaging_service" : "from_number";
+    config.sendMode === "messaging_service"
+      ? "messaging_service"
+      : "from_number";
 
   return {
     sendMode,
@@ -33,7 +38,10 @@ function getPortalConfigFromTwilioData(twilioData: unknown) {
 }
 
 function getPortalSyncFromTwilioData(twilioData: unknown) {
-  const sync = isRecord(twilioData) && isRecord(twilioData.portalSync) ? twilioData.portalSync : {};
+  const sync =
+    isRecord(twilioData) && isRecord(twilioData.portalSync)
+      ? twilioData.portalSync
+      : {};
   const lastSyncStatus: WorkspaceAdminRow["twilioSyncStatus"] =
     sync.lastSyncStatus === "syncing" ||
     sync.lastSyncStatus === "healthy" ||
@@ -48,7 +56,9 @@ function getPortalSyncFromTwilioData(twilioData: unknown) {
     lastSyncError: parseOptionalString(sync.lastSyncError),
     lastSyncStatus,
     numberTypes: Array.isArray(sync.numberTypes)
-      ? sync.numberTypes.filter((item): item is string => typeof item === "string")
+      ? sync.numberTypes.filter(
+          (item): item is string => typeof item === "string",
+        )
       : [],
   };
 }
@@ -96,15 +106,22 @@ export function deriveWorkspaceAdminRows({
   workspaceNumbers: WorkspaceNumberRecord[];
 }): WorkspaceAdminRow[] {
   return workspaces.map((workspace) => {
-    const members = workspaceUsers.filter((workspaceUser) => workspaceUser.workspace_id === workspace.id);
-    const ownerMembership = members.find((workspaceUser) => workspaceUser.role === "owner") ?? null;
+    const members = workspaceUsers.filter(
+      (workspaceUser) => workspaceUser.workspace_id === workspace.id,
+    );
+    const ownerMembership =
+      members.find((workspaceUser) => workspaceUser.role === "owner") ?? null;
     const ownerUser = ownerMembership
-      ? users.find((user) => user.id === ownerMembership.user_id) ?? null
+      ? (users.find((user) => user.id === ownerMembership.user_id) ?? null)
       : null;
-    const phoneNumbers = workspaceNumbers.filter((number) => number.workspace === workspace.id);
+    const phoneNumbers = workspaceNumbers.filter(
+      (number) => number.workspace === workspace.id,
+    );
     const portalConfig = getPortalConfigFromTwilioData(workspace.twilio_data);
     const syncSnapshot = getPortalSyncFromTwilioData(workspace.twilio_data);
-    const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(workspace.twilio_data);
+    const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(
+      workspace.twilio_data,
+    );
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding,
       workspaceNumbers: phoneNumbers.map((number) => ({
@@ -126,7 +143,8 @@ export function deriveWorkspaceAdminRows({
       opsState = "pending";
     } else if (
       syncSnapshot.lastSyncStatus === "error" ||
-      (portalConfig.sendMode === "messaging_service" && !portalConfig.messagingServiceSid) ||
+      (portalConfig.sendMode === "messaging_service" &&
+        !portalConfig.messagingServiceSid) ||
       readiness.warnings.length > 0
     ) {
       opsState = "attention";
@@ -156,7 +174,8 @@ export function deriveWorkspaceAdminRows({
           ? "pending"
           : opsState,
       sendMode:
-        portalConfig.sendMode === "messaging_service" || readiness.sendMode === "messaging_service"
+        portalConfig.sendMode === "messaging_service" ||
+        readiness.sendMode === "messaging_service"
           ? "messaging_service"
           : "from_number",
       onboardingStatus: onboarding.status,
@@ -187,8 +206,10 @@ export function filterWorkspaceAdminRows(
       filters.status === "all" ||
       (filters.status === "active" && !row.disabled) ||
       (filters.status === "disabled" && row.disabled);
-    const matchesOwner = filters.owner === "all" || row.ownerUserId === filters.owner;
-    const matchesOpsState = filters.opsState === "all" || row.opsState === filters.opsState;
+    const matchesOwner =
+      filters.owner === "all" || row.ownerUserId === filters.owner;
+    const matchesOpsState =
+      filters.opsState === "all" || row.opsState === filters.opsState;
 
     return matchesSearch && matchesStatus && matchesOwner && matchesOpsState;
   });
@@ -213,10 +234,6 @@ export function sortWorkspaceAdminRows(
         return left.memberCount - right.memberCount;
       case "phone_number_count":
         return left.phoneNumberCount - right.phoneNumberCount;
-      default: {
-        const exhaustiveCheck: never = sortKey;
-        return exhaustiveCheck;
-      }
     }
   });
 

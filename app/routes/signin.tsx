@@ -55,7 +55,7 @@ export default function SignIn() {
   }, [actionData]);
 
   return (
-    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
+    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
       <AuthCard
         title="Login"
         description="Sign in to manage your workspaces, calls, and messaging."
@@ -101,14 +101,14 @@ export default function SignIn() {
         </Button>
         <NavLink
           to={"/signup"}
-          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all duration-150 hover:text-brand-primary hover:underline dark:text-brand-secondary dark:hover:text-brand-primary"
+          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-all duration-150 hover:text-brand-primary hover:underline dark:text-secondary-foreground dark:hover:text-brand-primary"
         >
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
         </NavLink>
         <NavLink
           to={"/remember"}
-          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-gray-500 hover:text-brand-primary hover:underline dark:text-brand-tertiary"
+          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground hover:text-brand-primary hover:underline dark:text-brand-tertiary"
         >
           I forgot my password
         </NavLink>

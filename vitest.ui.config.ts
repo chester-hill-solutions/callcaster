@@ -27,10 +27,9 @@ export default mergeConfig(
           "app/routes/archive/**",
           "app/routes/old.*",
           "supabase/functions/**",
-          "twilio-serverless/**",
+          "archive/deprecated/twilio-serverless/**",
         ],
       },
     },
   }),
 );
-

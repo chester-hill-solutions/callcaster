@@ -1,6 +1,11 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "@remix-run/node";
+import {
+  ActionFunctionArgs,
+  LoaderFunctionArgs,
+  redirect,
+  TypedResponse,
+} from "@remix-run/node";
 import {
   Form,
   json,
@@ -14,8 +19,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   getUserRole,
+  requireWorkspaceAccess,
   getWorkspacePhoneNumbers,
-  getWorkspaceUsers,  
+  getWorkspaceUsers,
   removeWorkspacePhoneNumber,
   updateCallerId,
   updateWorkspacePhoneNumber,
@@ -38,7 +44,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 type LoaderData = {
   phoneNumbers: WorkspaceNumbers;
   workspaceId: string;
-  mediaNames: { id: number; name: string; }[];
+  mediaNames: { id: number; name: string }[];
   users: User[];
   user: User;
 };
@@ -55,7 +61,7 @@ export type ActionData = {
   data: {
     validationRequest?: ValidationRequest;
     numberRequest?: NumberRequest;
-  }
+  };
   error?: string;
 };
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -74,7 +80,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .from("workspaceAudio")
     .list(workspaceId);
   if (user) {
-    const userRole = await getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
+    const userRole = await getUserRole({
+      supabaseClient,
+      user: user as unknown as User,
+      workspaceId,
+    });
     const hasAccess = userRole?.role !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
     return json(
@@ -142,14 +152,36 @@ interface FormData {
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
-  const data = Object.fromEntries(await request.formData()) as Record<string, FormDataEntryValue>;
+  const data = Object.fromEntries(await request.formData()) as Record<
+    string,
+    FormDataEntryValue
+  >;
   const formName = data.formName;
   const workspace_id = params.id;
   if (!workspace_id) return { error: "Workspace ID is required" };
 
+  if (!user) {
+    return { error: "Unauthorized" };
+  }
+
+  await requireWorkspaceAccess({
+    supabaseClient,
+    user: { id: user.id },
+    workspaceId: workspace_id,
+  });
+
+  const userRole = await getUserRole({
+    supabaseClient,
+    user: user as unknown as User,
+    workspaceId: workspace_id,
+  });
+  if (userRole?.role === MemberRole.Caller) {
+    return { error: "You do not have permission to update phone numbers" };
+  }
+
   if (formName === "caller-id") {
     const { formName: _ignoredFormName, ...callerIdData } = data;
-    const res = await fetch(`${process.env['BASE_URL']}/api/caller-id`, {
+    const res = await fetch(`${process.env["BASE_URL"]}/api/caller-id`, {
       body: JSON.stringify({ ...callerIdData, workspace_id }),
       headers: {
         "Content-Type": "application/json",
@@ -160,17 +192,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { validationRequest, numberRequest }: CallerIDResponse =
       await res.json();
     return { validationRequest, numberRequest };
-
   } else if (formName === "remove-number") {
     const { formName: _ignoredFormName, ...removeNumberData } = data;
     const { error } = await removeWorkspacePhoneNumber({
       supabaseClient,
-      numberId: BigInt(String(removeNumberData.numberId || '0')),
+      numberId: BigInt(String(removeNumberData.numberId || "0")),
       workspaceId: workspace_id as string,
     });
     if (error) return { error };
     return null;
-
   } else if (formName === "update-incoming-activity") {
     const { numberId, incomingActivity } = data;
     const { error: incomingActivityError } = await updateWorkspacePhoneNumber({
@@ -181,7 +211,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     if (incomingActivityError) return { error: incomingActivityError };
     return null;
-
   } else if (formName === "update-incoming-voice-message") {
     const { numberId: voiceNumberId, incomingVoiceMessage } = data;
     const { error: incomingVoiceMessageError } =
@@ -193,7 +222,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       });
     if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
     return null;
-
   } else if (formName === "update-handset") {
     const { numberId, handsetEnabled } = data;
     const { error: handsetError } = await updateWorkspacePhoneNumber({
@@ -204,7 +232,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     if (handsetError) return { error: handsetError };
     return null;
-
   } else if (formName === "update-caller-id") {
     const { numberId: voiceNumberId, friendly_name } = data;
     const { data: number, error: friendlyNameError } =
@@ -237,7 +264,9 @@ const WorkspaceSettings = () => {
   } = useLoaderData<LoaderData>();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const actionData = useActionData<CallerIDResponse>();
-  const [isDialogOpen, setDialog] = useState<boolean>(!!actionData?.validationRequest);
+  const [isDialogOpen, setDialog] = useState<boolean>(
+    !!actionData?.validationRequest,
+  );
   const fetcher = useFetcher<FetcherData>();
   const updateFetcher = useFetcher();
 
@@ -246,16 +275,20 @@ const WorkspaceSettings = () => {
     user,
     workspace: workspaceId,
     init: {
-      phoneNumbers: Array.isArray(initNumbers) ? initNumbers : (initNumbers ? [initNumbers] : []),
+      phoneNumbers: Array.isArray(initNumbers)
+        ? initNumbers
+        : initNumbers
+          ? [initNumbers]
+          : [],
       queue: [],
       callsList: [],
       predictiveQueue: [],
       attempts: [],
       recentCall: null,
       recentAttempt: null,
-      nextRecipient: null
+      nextRecipient: null,
     },
-    campaign_id: '',
+    campaign_id: "",
     predictive: false,
     setQuestionContact: () => null,
     setCallDuration: () => null,
@@ -273,36 +306,55 @@ const WorkspaceSettings = () => {
 
   const handleIncomingActivityChange = (numberId: number, value: string) => {
     updateFetcher.submit(
-      { formName: "update-incoming-activity", numberId: String(numberId), incomingActivity: value },
-      { method: "POST" }
+      {
+        formName: "update-incoming-activity",
+        numberId: String(numberId),
+        incomingActivity: value,
+      },
+      { method: "POST" },
     );
   };
 
-  const handleIncomingVoiceMessageChange = (numberId: number, value: string) => {
+  const handleIncomingVoiceMessageChange = (
+    numberId: number,
+    value: string,
+  ) => {
     updateFetcher.submit(
-      { formName: "update-incoming-voice-message", numberId: String(numberId), incomingVoiceMessage: value },
-      { method: "POST" }
+      {
+        formName: "update-incoming-voice-message",
+        numberId: String(numberId),
+        incomingVoiceMessage: value,
+      },
+      { method: "POST" },
     );
   };
 
   const handleCallerIdChange = (numberId: number, value: string) => {
     updateFetcher.submit(
-      { formName: "update-caller-id", numberId: String(numberId), friendly_name: value },
-      { method: "POST" }
+      {
+        formName: "update-caller-id",
+        numberId: String(numberId),
+        friendly_name: value,
+      },
+      { method: "POST" },
     );
   };
 
   const handleHandsetChange = (numberId: number, enabled: boolean) => {
     updateFetcher.submit(
-      { formName: "update-handset", numberId: String(numberId), handsetEnabled: String(enabled) },
-      { method: "POST" }
+      {
+        formName: "update-handset",
+        numberId: String(numberId),
+        handsetEnabled: String(enabled),
+      },
+      { method: "POST" },
     );
   };
 
   const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId: String(numberId) },
-      { method: "POST" }
+      { method: "POST" },
     );
   };
 
@@ -313,10 +365,10 @@ const WorkspaceSettings = () => {
         onOpenChange={setDialog}
         validationRequest={actionData?.validationRequest as ValidationRequest}
       />
-      <div className="flex flex-col min-h-screen">
+      <div className="flex min-h-screen flex-col">
         <BackButton disabled={updateFetcher.state !== "idle"} />
-        <div className="flex flex-wrap p-4 gap-4">
-          <Panel className="flex-grow flex-shrink-0 basis-full lg:basis-[calc(66.666%-1rem)]">
+        <div className="flex flex-wrap gap-4 p-4">
+          <Panel className="flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
             <NumbersTable
               phoneNumbers={phoneNumbers || []}
               users={users}
@@ -329,12 +381,15 @@ const WorkspaceSettings = () => {
               isBusy={updateFetcher.state !== "idle"}
             />
           </Panel>
-          <div className="flex flex-col flex-grow flex-shrink-0 basis-full lg:basis-[calc(33.333%-1rem)] gap-4">
-            <Panel className="" >
+          <div className="flex flex-shrink-0 flex-grow basis-full flex-col gap-4 lg:basis-[calc(33.333%-1rem)]">
+            <Panel className="">
               <NumberCallerId />
             </Panel>
             <Panel className="">
-              <NumberPurchase fetcher={fetcher} workspaceId={workspaceId ?? ""} />
+              <NumberPurchase
+                fetcher={fetcher}
+                workspaceId={workspaceId ?? ""}
+              />
             </Panel>
           </div>
         </div>
@@ -343,7 +398,15 @@ const WorkspaceSettings = () => {
   );
 };
 
-const VerificationDialog = ({ isOpen, onOpenChange, validationRequest }: { isOpen: boolean, onOpenChange: (open: boolean) => void, validationRequest: ValidationRequest }) => (
+const VerificationDialog = ({
+  isOpen,
+  onOpenChange,
+  validationRequest,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  validationRequest: ValidationRequest;
+}) => (
   <Dialog open={isOpen} onOpenChange={onOpenChange}>
     <DialogContent className="flex w-[450px] flex-col items-center bg-card">
       <DialogHeader>
@@ -381,8 +444,16 @@ const BackButton = ({ disabled }: { disabled: boolean }) => (
   </div>
 );
 
-const Panel = ({ children, className }: { children: React.ReactNode, className: string }) => (
-  <div className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}>
+const Panel = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className: string;
+}) => (
+  <div
+    className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}
+  >
     {children}
   </div>
 );

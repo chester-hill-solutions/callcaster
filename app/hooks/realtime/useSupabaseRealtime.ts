@@ -294,28 +294,32 @@ export const useSupabaseRealtime = ({
               .select("*, contact(*)")
               .eq("id", queueItem.id)
               .maybeSingle()
-              .then(({ data, error }) => {
-                if (error) {
-                  logger.error("Failed to hydrate queue item from realtime payload", error);
-                  return;
-                }
+              .then(
+                ({ data, error }) => {
+                  if (error) {
+                    logger.error("Failed to hydrate queue item from realtime payload", error);
+                    return;
+                  }
 
-                if (data?.contact) {
-                  updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
-                  return;
-                }
+                  if (data?.contact) {
+                    updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
+                    return;
+                  }
 
-                const existingContact =
-                  queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
-                if (existingContact) {
-                  updateQueue({
-                    new: {
-                      ...queueItem,
-                      contact: existingContact,
-                    } as Tables<"campaign_queue"> & { contact: Contact },
-                  });
-                }
-              });
+                  const existingContact =
+                    queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
+                  if (existingContact) {
+                    updateQueue({
+                      new: {
+                        ...queueItem,
+                        contact: existingContact,
+                      } as Tables<"campaign_queue"> & { contact: Contact },
+                    });
+                  }
+                },
+                (err: unknown) =>
+                  logger.error("Failed to hydrate queue item from realtime payload", err)
+              );
           }
           break;
         case "workspace_number":

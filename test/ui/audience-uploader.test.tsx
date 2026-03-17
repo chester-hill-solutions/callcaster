@@ -1,5 +1,12 @@
 import React from "react";
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -8,7 +15,10 @@ const mocks = vi.hoisted(() => {
     navigate: vi.fn(),
     fetcher: { state: "idle", data: undefined as any },
     realtimeOpts: null as any,
-    interval: { cb: null as null | (() => Promise<void> | void), ms: null as any },
+    interval: {
+      cb: null as null | (() => Promise<void> | void),
+      ms: null as any,
+    },
     logger: { error: vi.fn() },
     onUploadComplete: vi.fn(),
   };
@@ -96,31 +106,45 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("renders with default audienceName", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} />);
-    expect(screen.getByText("Upload contacts (.csv file):")).toBeInTheDocument();
+    expect(
+      screen.getByText("Upload contacts (.csv file):"),
+    ).toBeInTheDocument();
   });
 
   test("realtime ignores non-UPDATE events and missing payload.new", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
-      mocks.realtimeOpts.onChange({ eventType: "INSERT", new: { status: "completed", id: 1 } });
+      mocks.realtimeOpts.onChange({
+        eventType: "INSERT",
+        new: { status: "completed", id: 1 },
+      });
       mocks.realtimeOpts.onChange({ eventType: "UPDATE" });
     });
 
     expect(screen.queryByText("Completed!")).toBeNull();
-    expect(screen.getByRole("button", { name: "Start Upload" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
   });
 
   test("file selection parses CSV, shows mapping table + preview, supports mapping edits + split-name toggle, confirm/reset, and remove file", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Name,Phone,Weird", "Alice,123,null", "Bob,,x"].join("\n");
     const file = new File([csv], "contacts.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -138,7 +162,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     // splitNameColumn inferred from "Name" header -> options column appears + checkbox checked
     expect(screen.getByText("Options")).toBeInTheDocument();
-    const split = screen.getByLabelText("Split into First/Last Name") as HTMLInputElement;
+    const split = screen.getByLabelText(
+      "Split into First/Last Name",
+    ) as HTMLInputElement;
     expect(split.checked).toBe(true);
     fireEvent.click(split);
     expect(screen.queryByLabelText("Split into First/Last Name")).toBeNull();
@@ -146,7 +172,9 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     // mapping select changes
     const rows = screen.getAllByRole("row");
-    const weirdRow = rows.find((r) => (r as HTMLElement).textContent?.includes("weird")) as HTMLElement;
+    const weirdRow = rows.find((r) =>
+      (r as HTMLElement).textContent?.includes("weird"),
+    ) as HTMLElement;
     const sel = weirdRow.querySelector("select") as HTMLSelectElement;
     fireEvent.change(sel, { target: { value: "city" } });
     expect(sel.value).toBe("city");
@@ -171,12 +199,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("file selection infers split from 'Full Name' header", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Full Name,Phone", "Alice A,123"].join("\n");
     const file = new File([csv], "contacts.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -186,17 +219,24 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     expect(screen.getByText("Options")).toBeInTheDocument();
-    expect(screen.getByLabelText("Split into First/Last Name")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Split into First/Last Name"),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("full name").length).toBeGreaterThanOrEqual(1);
   });
 
   test("file selection with empty file contents is a no-op", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const file = new File([""], "empty.csv", { type: "text/csv" });
     (file as any).text = async () => "";
 
@@ -208,15 +248,22 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.queryByText("Map CSV Headers")).toBeNull();
   });
 
-  test(
-    "upload flow: submits to /api/audience-upload, enables polling, and completes via polling (calls onUploadComplete)",
-    async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+  test("upload flow: submits to /api/audience-upload, enables polling, and completes via polling (calls onUploadComplete)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" onUploadComplete={mocks.onUploadComplete} />);
+    const { container } = render(
+      <AudienceUploader
+        supabase={supabase}
+        audienceName="A1"
+        onUploadComplete={mocks.onUploadComplete}
+      />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Name,Phone", "Alice,123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -231,7 +278,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         return {
           ok: true,
           async json() {
-            return { status: "completed", audienceId: 5 };
+            return { status: "completed", audience_id: 5 };
           },
         } as any;
       }
@@ -245,7 +292,12 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
           },
         } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
@@ -260,19 +312,20 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     expect(screen.getByText("Completed!")).toBeInTheDocument();
     expect(mocks.onUploadComplete).toHaveBeenCalledWith("5");
-    },
-    15000,
-  );
+  }, 15000);
 
-  test(
-    "polling completion without onUploadComplete triggers redirect after 2s",
-    async () => {
+  test("polling completion without onUploadComplete triggers redirect after 2s", async () => {
     vi.useFakeTimers();
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -283,12 +336,27 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
 
     (globalThis as any).fetch = vi.fn(async (url: string) => {
       if (String(url).includes("/api/audience-upload-status")) {
-        return { ok: true, async json() { return { status: "completed", audienceId: 777 }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { status: "completed", audienceId: 777 };
+          },
+        } as any;
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "777" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "777" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -301,40 +369,59 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     expect(screen.getByText("Completed!")).toBeInTheDocument();
-    expect(screen.getByText("Redirecting to audience page...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Redirecting to audience page..."),
+    ).toBeInTheDocument();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(mocks.navigate).toHaveBeenCalledWith("/workspaces/w1/audiences/777");
-    },
-    15000,
-  );
+  }, 15000);
 
   test("completed without onUploadComplete redirects after 2s", async () => {
     vi.useFakeTimers();
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    render(<AudienceUploader supabase={supabase} audienceName="A1" existingAudienceId="777" />);
+    render(
+      <AudienceUploader
+        supabase={supabase}
+        audienceName="A1"
+        existingAudienceId="777"
+      />,
+    );
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "777", status: "completed", total_contacts: 1, processed_contacts: 1 },
+        new: {
+          id: "777",
+          status: "completed",
+          total_contacts: 1,
+          processed_contacts: 1,
+        },
       });
     });
 
-    expect(screen.getByText("Redirecting to audience page...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Redirecting to audience page..."),
+    ).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(2000);
     expect(mocks.navigate).toHaveBeenCalledWith("/workspaces/w1/audiences/777");
   });
 
-  test("upload error response shows error, Try Again clears status/error, and polling error stops polling", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+  test("upload error response shows error, Try Again clears status/error, and polling error shows warning", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const file = new File(["Phone\n123"], "x.csv", { type: "text/csv" });
     (file as any).text = async () => "Phone\n123";
     await act(async () => {
@@ -357,24 +444,45 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     setFetchJsonOnce({ upload_id: 1, audience_id: "a1" });
     fireEvent.click(screen.getByRole("button", { name: "Start Upload" }));
     (globalThis as any).fetch = vi.fn(async () => {
-      return { ok: true, async json() { return { error: "nope" }; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return { error: "nope" };
+        },
+      } as any;
     });
     await waitFor(() => expect(mocks.interval.ms).toBe(2000));
     await act(async () => {
       await mocks.interval.cb?.();
     });
-    await waitFor(() => expect(screen.getByText("nope")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(
+        screen.getByText("Live progress is delayed. Retrying automatically..."),
+      ).toBeInTheDocument(),
+    );
   });
 
   test("realtime UPDATE handles error status and progress calculation", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
-    render(<AudienceUploader supabase={supabase} audienceName="A1" onUploadComplete={mocks.onUploadComplete} />);
+    render(
+      <AudienceUploader
+        supabase={supabase}
+        audienceName="A1"
+        onUploadComplete={mocks.onUploadComplete}
+      />,
+    );
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "processing", total_contacts: 10, processed_contacts: 3 },
+        new: {
+          id: "1",
+          status: "processing",
+          total_contacts: 10,
+          processed_contacts: 3,
+        },
       });
     });
     expect(screen.getByText("Processing...")).toBeInTheDocument();
@@ -390,7 +498,8 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("realtime UPDATE with missing status sets uploadStatus to null", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
@@ -401,11 +510,14 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     expect(screen.queryByText("Processing...")).toBeNull();
-    expect(screen.getByRole("button", { name: "Start Upload" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
   });
 
   test("realtime UPDATE error without error_message uses fallback", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
@@ -415,17 +527,25 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       });
     });
 
-    expect(screen.getByText("An error occurred during upload")).toBeInTheDocument();
+    expect(
+      screen.getByText("An error occurred during upload"),
+    ).toBeInTheDocument();
   });
 
   test("realtime UPDATE with total_contacts negative does not compute progress", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "processing", total_contacts: -1, processed_contacts: 0 },
+        new: {
+          id: "1",
+          status: "processing",
+          total_contacts: -1,
+          processed_contacts: 0,
+        },
       });
     });
 
@@ -434,7 +554,8 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("realtime UPDATE with processed_contacts undefined does not compute progress", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
@@ -450,14 +571,27 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("realtime UPDATE completed calls onUploadComplete", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
-    render(<AudienceUploader supabase={supabase} audienceName="A1" onUploadComplete={mocks.onUploadComplete} />);
+    render(
+      <AudienceUploader
+        supabase={supabase}
+        audienceName="A1"
+        onUploadComplete={mocks.onUploadComplete}
+      />,
+    );
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: 123, status: "completed", total_contacts: 1, processed_contacts: 1 },
+        new: {
+          id: 123,
+          audience_id: 123,
+          status: "completed",
+          total_contacts: 1,
+          processed_contacts: 1,
+        },
       });
     });
 
@@ -467,13 +601,19 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("unknown uploadStatus renders as Preparing...", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     await act(async () => {
       mocks.realtimeOpts.onChange({
         eventType: "UPDATE",
-        new: { id: "1", status: "pending", total_contacts: 0, processed_contacts: 0 },
+        new: {
+          id: "1",
+          status: "pending",
+          total_contacts: 0,
+          processed_contacts: 0,
+        },
       });
     });
 
@@ -481,11 +621,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("polling callback returns early when no uploadId", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
     (globalThis as any).fetch = vi.fn(async () => {
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -495,64 +641,77 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect((globalThis as any).fetch).not.toHaveBeenCalled();
   });
 
-  test("fetcher state: submitting sets uploadStatus to submitting", async () => {
+  test("fetcher state: submitting does not affect uploader state", async () => {
     mocks.fetcher.state = "submitting";
     mocks.fetcher.data = undefined;
 
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Submitting...")).toBeInTheDocument();
-    });
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
   });
 
-  test("fetcher state: loading with error sets uploadError + uploadStatus error", async () => {
+  test("fetcher state: loading with error does not affect uploader state", async () => {
     mocks.fetcher.state = "loading";
     mocks.fetcher.data = { error: "boom" };
 
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("boom")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
-    });
+    expect(screen.queryByText("boom")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
   });
 
-  test("fetcher state: loading with audience_id sets audienceId + processing", async () => {
+  test("fetcher state: loading with audience_id does not affect uploader state", async () => {
     mocks.fetcher.state = "loading";
     mocks.fetcher.data = { audience_id: "55" };
 
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Processing...")).toBeInTheDocument();
-      expect(mocks.realtimeOpts.filter).toBe("id=eq.55");
-    });
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
+    expect(mocks.realtimeOpts.filter).toBeUndefined();
   });
 
-  test("fetcher state: loading with no error/audience_id does nothing", async () => {
+  test("fetcher state: loading with no error/audience_id keeps default state", async () => {
     mocks.fetcher.state = "loading";
     mocks.fetcher.data = { success: true };
 
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     render(<AudienceUploader supabase={makeSupabase()} audienceName="A1" />);
 
-    expect(screen.getByText("Please wait while your contacts are being processed...")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Start Upload" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Error")).toBeNull();
   });
 
   test("upload with existingAudienceId appends audience_id (not audience_name)", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
     const { container } = render(
-      <AudienceUploader supabase={supabase} existingAudienceId="777" audienceName="ignored" />
+      <AudienceUploader
+        supabase={supabase}
+        existingAudienceId="777"
+        audienceName="ignored"
+      />,
     );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -566,9 +725,19 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         const body = init?.body as FormData;
         expect(body.get("audience_id")).toBe("777");
         expect(body.get("audience_name")).toBeNull();
-        return { ok: true, async json() { return { upload_id: 1, audience_id: "777" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 1, audience_id: "777" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -579,12 +748,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("upload POST throws non-Error -> shows generic unexpected error", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -602,18 +776,27 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("An unexpected error occurred")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+      expect(
+        screen.getByText("An unexpected error occurred"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Try Again" }),
+      ).toBeInTheDocument();
     });
   });
 
-  test("polling throws -> shows generic error and disables polling", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+  test("polling throws -> shows warning and logs error", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -627,9 +810,19 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         throw new Error("network");
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "a1" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -641,17 +834,24 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       await mocks.interval.cb?.();
     });
 
-    expect(screen.getByText("Error checking upload status")).toBeInTheDocument();
+    expect(
+      screen.getByText("Live progress is delayed. Retrying automatically..."),
+    ).toBeInTheDocument();
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("polling status=processing updates counts and progress", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -665,14 +865,28 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         return {
           ok: true,
           async json() {
-            return { status: "processing", total_contacts: 10, processed_contacts: 4 };
+            return {
+              status: "processing",
+              total_contacts: 10,
+              processed_contacts: 4,
+            };
           },
         } as any;
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "a1" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -690,12 +904,17 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
   });
 
   test("polling status=error sets uploadStatus error + message and stops polling", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -714,9 +933,19 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         } as any;
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "a1" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -729,17 +958,24 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
 
     expect(screen.getByText("poll-bad")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Try Again" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Try Again" }),
+    ).toBeInTheDocument();
     expect(mocks.interval.ms).toBeNull();
   });
 
   test("polling status=error without error_message uses fallback", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -758,9 +994,19 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         } as any;
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "a1" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -772,16 +1018,23 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       await mocks.interval.cb?.();
     });
 
-    expect(screen.getByText("An error occurred during upload")).toBeInTheDocument();
+    expect(
+      screen.getByText("An error occurred during upload"),
+    ).toBeInTheDocument();
   });
 
   test("polling status=processing with total_contacts=0 does not update progress", async () => {
-    const { default: AudienceUploader } = await import("@/components/audience/AudienceUploader");
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
     const supabase = makeSupabase();
 
-    const { container } = render(<AudienceUploader supabase={supabase} audienceName="A1" />);
+    const { container } = render(
+      <AudienceUploader supabase={supabase} audienceName="A1" />,
+    );
 
-    const fileInput = container.querySelector('input[type="file"]#contacts') as HTMLInputElement;
+    const fileInput = container.querySelector(
+      'input[type="file"]#contacts',
+    ) as HTMLInputElement;
     const csv = ["Phone", "123"].join("\n");
     const file = new File([csv], "x.csv", { type: "text/csv" });
     (file as any).text = async () => csv;
@@ -795,14 +1048,28 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
         return {
           ok: true,
           async json() {
-            return { status: "processing", total_contacts: 0, processed_contacts: 0 };
+            return {
+              status: "processing",
+              total_contacts: 0,
+              processed_contacts: 0,
+            };
           },
         } as any;
       }
       if (String(url).includes("/api/audience-upload")) {
-        return { ok: true, async json() { return { upload_id: 9, audience_id: "a1" }; } } as any;
+        return {
+          ok: true,
+          async json() {
+            return { upload_id: 9, audience_id: "a1" };
+          },
+        } as any;
       }
-      return { ok: true, async json() { return {}; } } as any;
+      return {
+        ok: true,
+        async json() {
+          return {};
+        },
+      } as any;
     });
 
     await act(async () => {
@@ -819,4 +1086,3 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByRole("progressbar").textContent).toBe("0");
   });
 });
-

@@ -12,6 +12,8 @@ interface UseCallHandlingOptions {
   device: Device | null;
   workspaceId: string;
   incomingCall: Call | null;
+  /** If true, incoming calls where To contains "client" are accepted immediately. Default false (show incoming UI, user picks up). */
+  autoAcceptIncoming?: boolean;
   onCallStateChange?: (callState: string) => void;
   onActiveCallChange?: (call: Call | null) => void;
   onIncomingCallChange?: (call: Call | null) => void;
@@ -21,13 +23,25 @@ interface UseCallHandlingOptions {
   onConnect?: () => void;
 }
 
+function muteCall(call: Call, muted: boolean): void {
+  if (typeof (call as Call & { mute?: (m: boolean) => void }).mute === 'function') {
+    (call as Call & { mute: (m: boolean) => void }).mute(muted);
+  }
+}
+
 interface UseCallHandlingReturn {
   activeCall: Call | null;
+  /** Calls that are connected but on hold (muted). */
+  heldCalls: Call[];
   incomingCall: Call | null;
   callState: string;
   makeCall: (params: CallConnectParams) => void;
-  hangUp: () => Promise<void>;
+  hangUp: (call?: Call) => Promise<void>;
   answer: () => void;
+  /** Put the current active call on hold and answer the incoming call. */
+  holdAndAnswer: () => void;
+  /** Switch to a held call (put current on hold, activate the selected call). */
+  switchTo: (call: Call) => void;
   setIncomingCall: (call: Call | null) => void;
   setActiveCall: (call: Call | null) => void;
 }
@@ -62,6 +76,7 @@ export function useCallHandling({
   device,
   workspaceId,
   incomingCall: initialIncomingCall,
+  autoAcceptIncoming = false,
   onCallStateChange,
   onActiveCallChange,
   onIncomingCallChange,
@@ -71,10 +86,20 @@ export function useCallHandling({
   onConnect,
 }: UseCallHandlingOptions): UseCallHandlingReturn {
   const [activeCall, setActiveCallState] = useState<Call | null>(null);
+  const [heldCalls, setHeldCalls] = useState<Call[]>([]);
   const [incomingCall, setIncomingCallState] = useState<Call | null>(initialIncomingCall || null);
   const [callState, setCallState] = useState<string>('idle');
   const incomingCallRef = useRef<Call | null>(initialIncomingCall || null);
   const previousIncomingCallRef = useRef<Call | null>(initialIncomingCall || null);
+  const heldCallsRef = useRef<Call[]>([]);
+  const activeCallRef = useRef<Call | null>(null);
+
+  useEffect(() => {
+    heldCallsRef.current = heldCalls;
+  }, [heldCalls]);
+  useEffect(() => {
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   // Sync incoming call ref with state
   useEffect(() => {
@@ -103,12 +128,15 @@ export function useCallHandling({
   // Handle incoming call setup
   const handleIncomingCall = useCallback((call: Call) => {
     updateIncomingCall(call);
-    
-    // Auto-accept client calls
-    if (typeof call.parameters.To === "string" && call.parameters.To.includes('client')) {
+
+    if (
+      autoAcceptIncoming &&
+      typeof call.parameters.To === "string" &&
+      call.parameters.To.includes("client")
+    ) {
       call.accept();
-      onStatusChange?.('connected');
-      updateCallState('connected');
+      onStatusChange?.("connected");
+      updateCallState("connected");
       updateActiveCall(call);
       updateIncomingCall(null);
       onConnect?.();
@@ -141,11 +169,18 @@ export function useCallHandling({
     call.on('disconnect', handleDisconnect);
     call.on('reject', handleReject);
     call.on('cancel', handleCancel);
-  }, [updateIncomingCall, updateActiveCall, updateCallState, onStatusChange, onConnect]);
+  }, [autoAcceptIncoming, updateIncomingCall, updateActiveCall, updateCallState, onStatusChange, onConnect]);
 
-  // Sync incoming call prop changes (after function definitions)
+  // Sync incoming call prop changes and set up listeners; cleanup when call is replaced or unmount
   useEffect(() => {
-    if (initialIncomingCall !== previousIncomingCallRef.current) {
+    const prev = previousIncomingCallRef.current;
+    if (initialIncomingCall !== prev) {
+      if (prev && typeof prev.removeAllListeners === 'function') {
+        prev.removeAllListeners('accept');
+        prev.removeAllListeners('disconnect');
+        prev.removeAllListeners('reject');
+        prev.removeAllListeners('cancel');
+      }
       previousIncomingCallRef.current = initialIncomingCall;
       if (initialIncomingCall) {
         handleIncomingCall(initialIncomingCall);
@@ -153,6 +188,15 @@ export function useCallHandling({
         updateIncomingCall(null);
       }
     }
+    return () => {
+      const current = previousIncomingCallRef.current;
+      if (current && typeof current.removeAllListeners === 'function') {
+        current.removeAllListeners('accept');
+        current.removeAllListeners('disconnect');
+        current.removeAllListeners('reject');
+        current.removeAllListeners('cancel');
+      }
+    };
   }, [initialIncomingCall, handleIncomingCall, updateIncomingCall]);
 
   // Make an outgoing call
@@ -173,56 +217,112 @@ export function useCallHandling({
     });
   }, [device, updateActiveCall, updateCallState, onError]);
 
-  // Hang up the active call
-  const hangUp = useCallback(async () => {
-    onDeviceBusyChange?.(false);
-    
-    if (!activeCall) {
-      logger.error('No active call to hang up');
-      onError?.(new Error('No active call to hang up'));
-      return;
-    }
-
-    try {
-      const callSid = activeCall.parameters.CallSid;
-      if (!callSid) {
-        throw new Error("Active call is missing a CallSid");
+  // Hang up a specific call or the active call; if active is hung up and there are held calls, promote first held
+  const hangUp = useCallback(
+    async (call?: Call) => {
+      const target = call ?? activeCallRef.current;
+      if (!target) {
+        logger.error('No call to hang up');
+        onError?.(new Error('No call to hang up'));
+        return;
       }
 
-      await hangupCall({
-        callSid,
-        workspaceId,
-      });
+      const isActive = target === activeCallRef.current;
+      const held = heldCallsRef.current;
 
-      onStatusChange?.('Registered');
-      activeCall.disconnect();
-      device?.disconnectAll();
-      updateActiveCall(null);
-      updateCallState('completed');
-    } catch (err) {
-      logger.error('Error hanging up call:', err);
-      if (err instanceof Error && err.message === 'Call is not in-progress. Cannot redirect.') {
-        logger.debug('Call was already disconnected');
-        onStatusChange?.('Registered');
-        updateActiveCall(null);
-        updateCallState('completed');
+      try {
+        const callSid = target.parameters.CallSid;
+        if (!callSid) {
+          throw new Error("Call is missing a CallSid");
+        }
+        await hangupCall({ callSid, workspaceId });
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message === 'Call is not in-progress. Cannot redirect.'
+        ) {
+          logger.debug('Call was already disconnected');
+        } else {
+          logger.error('Error hanging up call:', err);
+          onError?.(err instanceof Error ? err : new Error('Failed to hang up call'));
+        }
+      }
+
+      target.disconnect();
+      if (isActive && held.length === 0 && device) {
+        device.disconnectAll();
+      }
+
+      if (isActive) {
+        setActiveCallState(null);
+        const nextHeld = held[0];
+        if (held.length > 0 && nextHeld) {
+          setHeldCalls((prev) => prev.slice(1));
+          muteCall(nextHeld, false);
+          setActiveCallState(nextHeld);
+          onStatusChange?.('connected');
+          updateCallState('connected');
+        } else {
+          onStatusChange?.('Registered');
+          updateCallState('completed');
+          onDeviceBusyChange?.(false);
+        }
       } else {
-        onError?.(err instanceof Error ? err : new Error('Failed to hang up call'));
+        setHeldCalls((prev) => prev.filter((c) => c !== target));
       }
-    }
-  }, [activeCall, device, workspaceId, updateActiveCall, updateCallState, onStatusChange, onError, onDeviceBusyChange]);
+    },
+    [
+      device,
+      workspaceId,
+      updateCallState,
+      onStatusChange,
+      onError,
+      onDeviceBusyChange,
+    ]
+  );
 
-  // Answer an incoming call
+  // Answer an incoming call (or hold current and answer if already on a call)
   const answer = useCallback(() => {
     const currentIncomingCall = incomingCallRef.current;
-    if (currentIncomingCall) {
-      currentIncomingCall.accept();
-      updateCallState('connected');
-    } else {
+    if (!currentIncomingCall) {
       logger.error('No incoming call to answer');
       onError?.(new Error('No incoming call to answer'));
+      return;
     }
+    const currentActive = activeCallRef.current;
+    if (currentActive) {
+      muteCall(currentActive, true);
+      setHeldCalls((prev) => [...prev, currentActive]);
+      setActiveCallState(null);
+    }
+    currentIncomingCall.accept();
+    updateCallState('connected');
   }, [updateCallState, onError]);
+
+  const holdAndAnswer = useCallback(() => {
+    answer();
+  }, [answer]);
+
+  const switchTo = useCallback(
+    (call: Call) => {
+      const currentActive = activeCallRef.current;
+      if (currentActive) {
+        muteCall(currentActive, true);
+        setHeldCalls((prev) => {
+          const next = prev.filter((c) => c !== call);
+          next.push(currentActive);
+          return next;
+        });
+      } else {
+        setHeldCalls((prev) => prev.filter((c) => c !== call));
+      }
+      muteCall(call, false);
+      setActiveCallState(call);
+      onStatusChange?.('connected');
+      updateCallState('connected');
+    },
+    [onStatusChange, updateCallState]
+  );
 
   // Handle active call events
   useEffect(() => {
@@ -238,10 +338,20 @@ export function useCallHandling({
 
     const handleDisconnect = () => {
       logger.debug('Call ended');
-      updateActiveCall(null);
-      onStatusChange?.('Registered');
-      updateCallState('completed');
-      onDeviceBusyChange?.(false);
+      const held = heldCallsRef.current;
+      const next = held[0];
+      if (held.length > 0 && next) {
+        setHeldCalls((prev) => prev.slice(1));
+        muteCall(next, false);
+        updateActiveCall(next);
+        onStatusChange?.('connected');
+        updateCallState('connected');
+      } else {
+        updateActiveCall(null);
+        onStatusChange?.('Registered');
+        updateCallState('completed');
+        onDeviceBusyChange?.(false);
+      }
     };
 
     const handleError = (err: Error) => {
@@ -265,13 +375,29 @@ export function useCallHandling({
     };
   }, [activeCall, updateCallState, updateActiveCall, onStatusChange, onError, onDeviceBusyChange]);
 
+  // When a held call disconnects, remove it from heldCalls
+  useEffect(() => {
+    const cleanups: (() => void)[] = [];
+    heldCalls.forEach((call) => {
+      const onDisconnect = () => {
+        setHeldCalls((prev) => prev.filter((c) => c !== call));
+      };
+      call.on('disconnect', onDisconnect);
+      cleanups.push(() => call.removeAllListeners('disconnect'));
+    });
+    return () => cleanups.forEach((fn) => fn());
+  }, [heldCalls]);
+
   return {
     activeCall,
+    heldCalls,
     incomingCall,
     callState,
     makeCall,
     hangUp,
     answer,
+    holdAndAnswer,
+    switchTo,
     setIncomingCall: updateIncomingCall,
     setActiveCall: updateActiveCall,
   };

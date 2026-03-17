@@ -2,6 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import {
   buildRepliedContactKeys,
+  getChatSortOption,
+  getConversationParticipantPhones,
+  getConversationPhoneKey,
+  normalizeConversationPhone,
   sortConversationSummaries,
   type ConversationSummary,
 } from "../app/lib/chat-conversation-sort";
@@ -40,9 +44,11 @@ describe("chat conversation sorting", () => {
     );
 
     expect(
-      sortConversationSummaries(conversations, "hasReplied", repliedContactKeys).map(
-        (conversation) => conversation.contact_phone,
-      ),
+      sortConversationSummaries(
+        conversations,
+        "hasReplied",
+        repliedContactKeys,
+      ).map((conversation) => conversation.contact_phone),
     ).toEqual(["+15550000002", "+15550000001"]);
   });
 
@@ -86,5 +92,98 @@ describe("chat conversation sorting", () => {
         (conversation) => conversation.contact_phone,
       ),
     ).toEqual(["+15550000002", "+15550000001"]);
+  });
+
+  test("falls back to recent activity when hasReplied ties", () => {
+    const conversations = [
+      createConversation({
+        contact_phone: "+15550000001",
+        has_replied: true,
+        conversation_last_update: "2026-03-03T00:00:00.000Z",
+      }),
+      createConversation({
+        contact_phone: "+15550000002",
+        has_replied: true,
+        conversation_last_update: "2026-03-04T00:00:00.000Z",
+      }),
+    ];
+
+    expect(
+      sortConversationSummaries(conversations, "hasReplied", new Set()).map(
+        (conversation) => conversation.contact_phone,
+      ),
+    ).toEqual(["+15550000002", "+15550000001"]);
+  });
+
+  test("normalizes and keys phone numbers across formats", () => {
+    expect(normalizeConversationPhone(null)).toBeNull();
+    expect(normalizeConversationPhone("not-a-number")).toBeNull();
+    expect(normalizeConversationPhone("5550000000")).toBe("+15550000000");
+    expect(normalizeConversationPhone("15550000000")).toBe("+15550000000");
+    expect(normalizeConversationPhone("+447700900123")).toBe("+447700900123");
+    expect(normalizeConversationPhone("447700900123")).toBe("+447700900123");
+    expect(getConversationPhoneKey("(555) 000-0000")).toBe("15550000000");
+    expect(getConversationPhoneKey("+447700900123")).toBe("447700900123");
+    expect(getConversationPhoneKey(null)).toBeNull();
+  });
+
+  test("handles hasReplied sort when contact keys cannot be normalized", () => {
+    const conversations = [
+      createConversation({
+        contact_phone: "not-a-number" as any,
+        conversation_last_update: "2026-03-04T00:00:00.000Z",
+      }),
+      createConversation({
+        contact_phone: "+15550000002",
+        has_replied: true,
+        conversation_last_update: "2026-03-03T00:00:00.000Z",
+      }),
+    ];
+
+    expect(
+      sortConversationSummaries(conversations, "hasReplied", new Set()).map(
+        (conversation) => conversation.contact_phone,
+      ),
+    ).toEqual(["+15550000002", "not-a-number"]);
+  });
+
+  test("detects participant roles from workspace phones and direction", () => {
+    const workspacePhoneKeys = new Set(["15551111111"]);
+
+    expect(
+      getConversationParticipantPhones(
+        { from: "+15551111111", to: "+15550000000", direction: "outbound" },
+        workspacePhoneKeys,
+      ),
+    ).toEqual({ contactPhone: "+15550000000", userPhone: "+15551111111" });
+
+    expect(
+      getConversationParticipantPhones(
+        { from: "+15550000000", to: "+15551111111", direction: "inbound" },
+        workspacePhoneKeys,
+      ),
+    ).toEqual({ contactPhone: "+15550000000", userPhone: "+15551111111" });
+
+    expect(
+      getConversationParticipantPhones(
+        { from: "+15550000000", to: "+15552222222", direction: "inbound" },
+        new Set(),
+      ),
+    ).toEqual({ contactPhone: "+15550000000", userPhone: "+15552222222" });
+
+    expect(
+      getConversationParticipantPhones(
+        { from: "+15550000000", to: "+15552222222", direction: "outbound-api" },
+        new Set(),
+      ),
+    ).toEqual({ contactPhone: "+15552222222", userPhone: "+15550000000" });
+  });
+
+  test("normalizes sort option values", () => {
+    expect(getChatSortOption("hasReplied")).toBe("hasReplied");
+    expect(getChatSortOption("hasUnreadReply")).toBe("hasUnreadReply");
+    expect(getChatSortOption("recent")).toBe("recent");
+    expect(getChatSortOption("other")).toBe("recent");
+    expect(getChatSortOption(null)).toBe("recent");
   });
 });
