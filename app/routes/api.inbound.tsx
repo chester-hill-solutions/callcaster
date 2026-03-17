@@ -12,6 +12,7 @@ import type {
 import type { Database } from "@/lib/database.types";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { extendHandsetSessionExpiry } from "@/lib/handset.server";
+import { buildInboundFallbackTwiml } from "@/lib/inbound-handler.server";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -67,7 +68,6 @@ function dispatchInboundCallWebhookNotification(args: {
 }
 
 export const action = async ({ request }: LoaderFunctionArgs) => {
-  const twiml = new Twilio.twiml.VoiceResponse();
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
@@ -324,64 +324,25 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  if (
-    typeof number?.inbound_action === "string" &&
-    isPhoneNumber(number.inbound_action)
-  ) {
-    logger.info("api.inbound routing to phone", {
-      workspaceId,
-      CallSid: data.CallSid,
-      inbound_action: number.inbound_action,
-    });
-    twiml.pause({ length: 1 });
-    twiml.dial(number.inbound_action || "");
-    return new Response(twiml.toString(), {
-      headers: {
-        "Content-Type": "text/xml",
-      },
-    });
-  } else if (
-    typeof number?.inbound_action === "string" &&
-    isEmail(number.inbound_action)
-  ) {
-    logger.info("api.inbound routing to voicemail", {
-      workspaceId,
-      CallSid: data.CallSid,
-      inbound_action: number.inbound_action,
-    });
-    const phoneNumber = data.Called;
-    if (voicemail?.signedUrl) {
-      twiml.play(voicemail.signedUrl);
-    } else {
-      twiml.say(
-        `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`,
-      );
-    }
-    twiml.pause({ length: 1 });
-    twiml.record({
-      transcribe: true,
-      timeout: 10,
-      playBeep: true,
-      recordingStatusCallback: "/api/email-vm",
-    });
-    return new Response(twiml.toString(), {
-      headers: {
-        "Content-Type": "text/xml",
-      },
-    });
-  } else {
-    logger.info("api.inbound default fallback (say + hangup)", {
-      workspaceId,
-      CallSid: data.CallSid,
-    });
-    const phoneNumber = data.Called;
-    twiml.say(
-      `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please try again later.`,
-    );
-    return new Response(twiml.toString(), {
-      headers: {
-        "Content-Type": "text/xml",
-      },
-    });
-  }
+  const inboundAction = number?.inbound_action;
+  const isPhone = typeof inboundAction === "string" && isPhoneNumber(inboundAction);
+  const isVoicemail = typeof inboundAction === "string" && isEmail(inboundAction);
+  logger.info("api.inbound routing to fallback", {
+    workspaceId,
+    CallSid: data.CallSid,
+    inbound_action: inboundAction,
+    fallbackType: isPhone ? "phone" : isVoicemail ? "voicemail" : "default",
+  });
+  const fallbackTwiml = buildInboundFallbackTwiml({
+    number: {
+      handset_enabled: number?.handset_enabled ?? null,
+      inbound_action: number?.inbound_action ?? null,
+      inbound_audio: number?.inbound_audio ?? null,
+    },
+    voicemail,
+    called: data.Called ?? "",
+  });
+  return new Response(fallbackTwiml, {
+    headers: { "Content-Type": "text/xml" },
+  });
 };
