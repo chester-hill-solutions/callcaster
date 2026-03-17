@@ -113,11 +113,10 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       ? twilioData.authToken
       : typeof twilioData?.auth_token === "string"
         ? twilioData.auth_token
-        : null;
+        : env.TWILIO_AUTH_TOKEN(); // fallback for local dev when workspace twilio_data missing
   const signature = request.headers.get("x-twilio-signature");
   const requestUrl = new URL(request.url).href;
   if (
-    !authToken ||
     !validateTwilioWebhookParams(
       data as Record<string, string>,
       signature,
