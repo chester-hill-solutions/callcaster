@@ -11,6 +11,7 @@ import type {
 } from "@/lib/twilio.types";
 import type { Database } from "@/lib/database.types";
 import { validateTwilioWebhookParams } from "@/twilio.server";
+import { extendHandsetSessionExpiry } from "@/lib/handset.server";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -304,6 +305,12 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
         CallSid: data.CallSid,
         clientIdentity,
       });
+      await supabase
+        .from("handset_session")
+        .update({ expires_at: extendHandsetSessionExpiry() })
+        .eq("workspace_id", workspaceId)
+        .eq("client_identity", clientIdentity)
+        .eq("status", "active");
       const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
       const dial = handsetTwiml.dial({

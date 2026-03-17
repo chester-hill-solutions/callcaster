@@ -2,6 +2,7 @@ import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
+import { extendHandsetSessionExpiry } from "@/lib/handset.server";
 import { logger } from "@/lib/logger.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
@@ -45,6 +46,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         headers: { "Content-Type": "text/xml" },
       });
     }
+
+    await supabase
+      .from("handset_session")
+      .update({ expires_at: extendHandsetSessionExpiry() })
+      .eq("workspace_id", workspaceId)
+      .eq("client_identity", clientIdentity)
+      .eq("status", "active");
 
     const { data: handset } = await supabase
       .from("workspace_number")
