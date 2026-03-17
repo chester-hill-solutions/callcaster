@@ -314,7 +314,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
       const dial = handsetTwiml.dial({
-        timeout: 30,
+        timeout: 18, // ~3 rings (6s per ring cycle)
         action: `${baseUrl}/api/inbound-handset-dial-end`,
       });
       dial.client(clientIdentity);

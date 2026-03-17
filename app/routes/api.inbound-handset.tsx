@@ -70,7 +70,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     .eq("client_identity", session.client_identity)
     .eq("status", "active");
 
-  twiml.dial().client(session.client_identity);
+  const baseUrl = env.BASE_URL();
+  twiml
+    .dial({
+      timeout: 18, // ~3 rings (6s per ring cycle)
+      action: `${baseUrl}/api/inbound-handset-dial-end`,
+    })
+    .client(session.client_identity);
 
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
