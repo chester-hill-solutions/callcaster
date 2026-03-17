@@ -114,6 +114,13 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       : typeof twilioData?.auth_token === "string"
         ? "workspace.twilio_data.auth_token"
         : "env.TWILIO_AUTH_TOKEN";
+  if (authTokenSource === "env.TWILIO_AUTH_TOKEN" && twilioData) {
+    logger.debug("api.inbound using env fallback; twilio_data keys", {
+      twilioDataKeys: Object.keys(twilioData),
+      hasAuthToken: "authToken" in twilioData,
+      hasAuth_token: "auth_token" in twilioData,
+    });
+  }
   const authToken =
     typeof twilioData?.authToken === "string"
       ? twilioData.authToken
@@ -122,11 +129,17 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
         : env.TWILIO_AUTH_TOKEN(); // fallback for local dev when workspace twilio_data missing
   const signature = request.headers.get("x-twilio-signature");
   const requestUrl = new URL(request.url).href;
+  const workspaceIdForLog =
+    number.workspace && typeof number.workspace === "object" && "id" in number.workspace
+      ? (number.workspace as { id: string }).id
+      : typeof number.workspace === "string"
+        ? number.workspace
+        : null;
 
   logger.info("api.inbound webhook received", {
     Called: data.Called,
     CallSid: data.CallSid,
-    workspaceId: number.workspace?.id,
+    workspaceId: workspaceIdForLog,
     authTokenSource,
     hasSignature: Boolean(signature),
     requestUrl,
@@ -143,7 +156,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
     logger.warn("api.inbound Twilio signature validation failed", {
       Called: data.Called,
       CallSid: data.CallSid,
-      workspaceId: number.workspace?.id,
+      workspaceId: workspaceIdForLog,
       authTokenSource,
       hasSignature: Boolean(signature),
       requestUrl,
