@@ -14,6 +14,7 @@ import {
   requireWorkspaceAccess,
   getHandsetNumberForWorkspace,
 } from "@/lib/database.server";
+import { extendHandsetSessionExpiry } from "@/lib/handset.server";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { Button } from "@/components/ui/button";
@@ -29,8 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const SESSION_EXPIRY_MINUTES = 60;
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (request.method !== "POST") return null;
@@ -93,9 +92,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const clientIdentity = `handset-${crypto.randomUUID()}`;
-  const expiresAt = new Date(
-    Date.now() + SESSION_EXPIRY_MINUTES * 60 * 1000
-  ).toISOString();
+  const expiresAt = extendHandsetSessionExpiry();
 
   const { error } = await supabase.from("handset_session").insert({
     user_id: user.id,
