@@ -61,6 +61,10 @@ module.exports = {
         "import/no-named-as-default": "off",
         "react/prop-types": "off",
         "react/no-unescaped-entities": "off",
+        "react/no-unstable-nested-components": [
+          "error",
+          { allowAsProps: true },
+        ],
       },
       settings: {
         "import/internal-regex": "^~/",

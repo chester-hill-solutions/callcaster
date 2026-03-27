@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@/tailwind.css", () => ({ default: "/tailwind.css" }));
 
-vi.mock("@/components/layout/Navbar", () => ({
+vi.mock("@/components/layout/navbar", () => ({
   default: (props: any) => {
     mocks.navbarProps = props;
     return null;

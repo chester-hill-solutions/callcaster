@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { ArrowDown, ArrowUp, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -136,20 +136,13 @@ const IVRQuestionBlock = ({
   onToggle: () => void;
   mediaNames: AudioFile[];
 }) => {
-  const [localBlock, setLocalBlock] = useState(block);
-
-  useEffect(() => {
-    setLocalBlock(block);
-  }, [block]);
-
   const handleChange = (field: keyof IVRBlock, value: string | IVROption[] | "recorded" | "synthetic" | "dtmf" | "speech" | "dtmf speech" | null) => {
-    const updatedBlock = { ...localBlock, [field]: value };
-    setLocalBlock(updatedBlock);
+    const updatedBlock = { ...block, [field]: value };
     onUpdate(updatedBlock);
   };
 
   const handleNextChange = (index: number, value: string) => {
-    const newOptions = localBlock.options.map((opt, i) => {
+    const newOptions = block.options.map((opt, i) => {
       if (i !== index) return opt;
       return {
         ...opt,
@@ -160,18 +153,18 @@ const IVRQuestionBlock = ({
   };
 
   const handleOptionChange = (index: number, newOption: IVROption) => {
-    const newOptions = [...localBlock.options];
+    const newOptions = [...block.options];
     newOptions[index] = newOption;
     handleChange("options", newOptions as IVROption[]);
   };
 
   const handleAddOption = () => {
-    const newOptions = [...localBlock.options, { content: "", next: "" }];
+    const newOptions = [...block.options, { content: "", next: "" }];
     handleChange("options", newOptions as IVROption[]);
   };
 
   const handleRemoveOption = (index: number) => {
-    const newOptions = localBlock.options.filter((_, i) => i !== index);
+    const newOptions = block.options.filter((_, i) => i !== index);
     handleChange("options", newOptions as IVROption[]);
   };
 
@@ -180,7 +173,7 @@ const IVRQuestionBlock = ({
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="w-full" onClick={onToggle}>
-            {localBlock.title || `Block ${localBlock.id}`}
+            {block.title || `Block ${block.id}`}
           </CardTitle>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="icon" onClick={onMoveUp}>
@@ -200,14 +193,14 @@ const IVRQuestionBlock = ({
           <div className="space-y-4">
             <Input
               name="title"
-              value={localBlock.title}
+              value={block.title}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange("title", e.target.value)}
               placeholder="Block Title"
               className="w-full"
               disabled={false}
             />
             <Select
-              value={localBlock.speechType}
+              value={block.speechType}
               onValueChange={(value) => handleChange("speechType", value)}
             >
               <SelectTrigger className="bg-white dark:bg-transparent">
@@ -224,19 +217,19 @@ const IVRQuestionBlock = ({
                 ))}
               </SelectContent>
             </Select>
-            {localBlock.speechType === "synthetic" && (
+            {block.speechType === "synthetic" && (
               <textarea
-                value={localBlock.audioFile}
+                value={block.audioFile}
                 onChange={(e) => handleChange("audioFile", e.target.value)}
                 placeholder="Your synthetic greeting"
-                rows={Math.max(3, Math.ceil((localBlock?.audioFile || 1) as number / 40))}
+                rows={Math.max(3, Math.ceil((block?.audioFile || 1) as number / 40))}
                 className="w-full resize-none rounded-md border bg-white p-3 text-gray-900 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
               />
             )}
-            {localBlock.speechType === "recorded" && (
+            {block.speechType === "recorded" && (
               <div className="flex gap-2">
                 <Select
-                  value={localBlock.audioFile}
+                  value={block.audioFile}
                   onValueChange={(value) => handleChange("audioFile", value)}
                 >
                   <SelectTrigger className="bg-white dark:bg-transparent">
@@ -268,7 +261,7 @@ const IVRQuestionBlock = ({
                 <MdAddCircleOutline />
               </Button>{" "}
             </div>
-            {localBlock.options.map((option, index) => (
+            {block.options.map((option, index) => (
               <IVRQuestionBlockOption
                 key={option.value || index }
                 option={option as IVROption}

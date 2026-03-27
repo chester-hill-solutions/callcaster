@@ -4,4 +4,4 @@ export {
   BrandedCardContent as CardContent,
   BrandedCardSecondaryActions as CardSecondaryActions,
   BrandedCardTitle as CardTitle,
-} from "@/components/shared/BrandedCard";
+} from "@/components/shared/branded-card";

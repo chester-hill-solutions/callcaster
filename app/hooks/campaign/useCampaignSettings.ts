@@ -121,8 +121,9 @@ export function useCampaignSettings({
     }
 
     const [state, setState] = useState<CampaignState>(initialState);
-    const [uiState, setUIState] = useState<CampaignUIState>({
-        isChanged: false,
+    const [uiState, setUIState] = useState<
+        Omit<CampaignUIState, "isChanged">
+    >({
         confirmStatus: "none",
         scheduleDisabled: false,
         joinDisabled: null,
@@ -130,14 +131,7 @@ export function useCampaignSettings({
     const snapshotRef = useRef<CampaignState | null>(null);
 
     const isLoading = fetcher.state === 'submitting' || fetcher.state === 'loading';
-
-    useEffect(() => {
-        if (!deepEqual(state, initialState)) {
-            setUIState(prev => ({ ...prev, isChanged: true }));
-        } else {
-            setUIState(prev => ({ ...prev, isChanged: false }));
-        }
-    }, [state, initialState]);
+    const isChanged = !deepEqual(state, initialState);
 
     const updateCampaignField = <K extends keyof CampaignState>(field: K, value: CampaignState[K]) => {
         setState(prev => ({
@@ -148,7 +142,6 @@ export function useCampaignSettings({
 
     const resetState = () => {
         setState(initialState);
-        setUIState(prev => ({ ...prev, isChanged: false }));
     };
 
     const handleAudienceChange = (audience: NonNullable<CampaignAudience>, isChecked: boolean) => {
@@ -225,7 +218,6 @@ export function useCampaignSettings({
         if (fetcher.state === 'idle' && data) {
             if (data.success && data.campaign && data.campaignDetails) {
                 snapshotRef.current = null;
-                setUIState(prev => ({ ...prev, isChanged: false }));
                 setState(prevState => ({
                     ...prevState,
                     ...(data.campaign as Partial<CampaignState>),
@@ -245,7 +237,7 @@ export function useCampaignSettings({
 
     return {
         state,
-        uiState,
+        uiState: { ...uiState, isChanged },
         isLoading,
         updateCampaignField,
         resetState,

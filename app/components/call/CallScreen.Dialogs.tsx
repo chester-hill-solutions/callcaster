@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,6 +48,16 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   const [errorDescription, setErrorDescription] = useState<string>('');
   const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(!!creditsError);
   const { state } = useNavigation();
+  const creditsNavRef = useRef({ state, creditsError });
+  if (state === "idle") {
+    const p = creditsNavRef.current;
+    if (p.state !== state || p.creditsError !== creditsError) {
+      creditsNavRef.current = { state, creditsError };
+      setCreditsDialogOpen(!!creditsError);
+    }
+  } else {
+    creditsNavRef.current = { state, creditsError };
+  }
   const fetcher = useFetcher();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
@@ -64,12 +74,6 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       },
     );
   };
-
-  useEffect(() => {
-    if (state === 'idle') {
-      setCreditsDialogOpen(!!creditsError)
-    }
-  }, [creditsError, state])
 
   return (
     <>

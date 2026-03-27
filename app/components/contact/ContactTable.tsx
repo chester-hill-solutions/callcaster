@@ -33,6 +33,14 @@ export interface ContactTableState {
   selectedContacts: number[];
 }
 
+function ContactTableSectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+      {children}
+    </div>
+  );
+}
+
 const ContactTable: React.FC<ContactTableProps> = ({
   contacts,
   audience_id,
@@ -133,18 +141,12 @@ const ContactTable: React.FC<ContactTableProps> = ({
     );
   };
 
-  const TableHeader: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-      {children}
-    </div>
-  );
-
   return (
     <div className="space-y-4">
       {renderBulkActionBar()}
       
       <div className="bg-white rounded-lg shadow">
-        <TableHeader>
+        <ContactTableSectionHeader>
           <div className="flex items-center space-x-4">
             <input
               type="checkbox"
@@ -154,7 +156,7 @@ const ContactTable: React.FC<ContactTableProps> = ({
             />
             <span className="font-medium">Contacts ({contacts.length})</span>
           </div>
-        </TableHeader>
+        </ContactTableSectionHeader>
 
         <div className="divide-y divide-gray-200">
           {contacts.map((contact) => (

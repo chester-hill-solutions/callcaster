@@ -33,7 +33,7 @@ import {
   NoResultsYet,
   ErrorLoadingResults,
   LoadingResults,
-} from "@/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
+} from "@/components/campaign/home/CampaignHomeScreen/campaign-result-display";
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -182,7 +182,6 @@ const MergedQuestionBlock = ({
     dropPosition: "top" | "bottom",
   ) => void;
 }) => {
-  const [localBlock, setLocalBlock] = useState<ScriptEditorBlock>(block);
   const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
     "none",
   );
@@ -207,10 +206,6 @@ const MergedQuestionBlock = ({
     { value: "dtmf speech", label: "DTMF and Speech (Best for complex IVR)" },
   ];
 
-  useEffect(() => {
-    setLocalBlock(block);
-  }, [block]);
-
   const handleChange = (
     field: keyof Block | keyof IVRBlock,
     value:
@@ -221,12 +216,11 @@ const MergedQuestionBlock = ({
       | (BlockOption | IVROption)[],
   ) => {
     const updatedBlock = {
-      ...localBlock,
+      ...block,
       [field]: value,
       ...(field === "content" &&
         typeof value === "string" && { value: value.toLowerCase() }),
     };
-    setLocalBlock(updatedBlock);
     onUpdate(updatedBlock);
   };
 
@@ -234,13 +228,13 @@ const MergedQuestionBlock = ({
     index: number,
     newOption: BlockOption | IVROption,
   ) => {
-    const newOptions = [...(localBlock.options || [])];
+    const newOptions = [...(block.options || [])];
     newOptions[index] = newOption;
     handleChange("options", newOptions);
   };
 
   const handleNextChange = (index: number, value: string) => {
-    const newOptions = (localBlock.options || []).map((opt, i) => {
+    const newOptions = (block.options || []).map((opt, i) => {
       if (i !== index) return opt;
       return { ...opt, next: value };
     });
@@ -249,14 +243,14 @@ const MergedQuestionBlock = ({
 
   const handleAddOption = () => {
     const newOptions = [
-      ...(localBlock.options || []),
+      ...(block.options || []),
       { content: "", next: "", value: type === "ivr" ? "vx-any" : "" },
     ];
     handleChange("options", newOptions);
   };
 
   const handleRemoveOption = (index: number) => {
-    const newOptions = (localBlock.options || []).filter((_, i) => i !== index);
+    const newOptions = (block.options || []).filter((_, i) => i !== index);
     handleChange("options", newOptions);
   };
 
@@ -264,7 +258,7 @@ const MergedQuestionBlock = ({
     if (type === "script") {
       return (
         <Textarea
-          value={localBlock.content}
+          value={block.content}
           onChange={(e) => handleChange("content", e.target.value)}
           placeholder="Your script or question"
           className="min-h-[100px] bg-white"
@@ -272,14 +266,14 @@ const MergedQuestionBlock = ({
       );
     }
 
-    if (!isIVRBlock(localBlock)) {
+    if (!isIVRBlock(block)) {
       return null;
     }
 
-    if (localBlock.speechType === "synthetic") {
+    if (block.speechType === "synthetic") {
       return (
         <Textarea
-          value={localBlock.audioFile}
+          value={block.audioFile}
           onChange={(e) => handleChange("audioFile", e.target.value)}
           placeholder="Your synthetic greeting"
           className="min-h-[100px] bg-white"
@@ -287,11 +281,11 @@ const MergedQuestionBlock = ({
       );
     }
 
-    if (localBlock.speechType === "recorded") {
+    if (block.speechType === "recorded") {
       return (
         <div className="flex gap-2">
           <Select
-            value={localBlock.audioFile}
+            value={block.audioFile}
             onValueChange={(value) => handleChange("audioFile", value)}
           >
             <SelectTrigger className="w-full bg-white">
@@ -323,10 +317,10 @@ const MergedQuestionBlock = ({
     event.stopPropagation();
     const droppedBlockData = JSON.parse(event.dataTransfer.getData("cardData"));
 
-    if (droppedBlockData.id !== localBlock.id) {
+    if (droppedBlockData.id !== block.id) {
       onReorder(
         droppedBlockData.id,
-        localBlock.id,
+        block.id,
         acceptDrop as "top" | "bottom",
       );
     }
@@ -351,7 +345,7 @@ const MergedQuestionBlock = ({
             event.dataTransfer.effectAllowed = "move";
             event.dataTransfer.setData(
               "cardData",
-              JSON.stringify({ title: localBlock.title, id: localBlock.id }),
+              JSON.stringify({ title: block.title, id: block.id }),
             );
           }}
           onDragOver={(event) => {
@@ -374,7 +368,7 @@ const MergedQuestionBlock = ({
                   setOpenBlock(openBlock === block.id ? null : block.id)
                 }
               >
-                {localBlock?.title || `Block ${localBlock?.id}`}
+                {block?.title || `Block ${block?.id}`}
               </CardTitle>
               <div className="flex items-center space-x-2">
                 <Button
@@ -407,14 +401,14 @@ const MergedQuestionBlock = ({
             <CardContent>
               <div className="space-y-4">
                 <Input
-                  value={localBlock?.title}
+                  value={block?.title}
                   onChange={(e) => handleChange("title", e.target.value)}
                   placeholder="Block Title"
                   className="bg-white"
                 />
                 {type === "script" ? (
                   <Select
-                    value={localBlock.type}
+                    value={block.type}
                     onValueChange={(value) => handleChange("type", value)}
                   >
                     <SelectTrigger className="bg-white">
@@ -431,9 +425,9 @@ const MergedQuestionBlock = ({
                       ))}
                     </SelectContent>
                   </Select>
-                ) : isIVRBlock(localBlock) ? (
+                ) : isIVRBlock(block) ? (
                   <Select
-                    value={localBlock.speechType}
+                    value={block.speechType}
                     onValueChange={(value) => handleChange("speechType", value)}
                   >
                     <SelectTrigger className="bg-white">
@@ -452,9 +446,9 @@ const MergedQuestionBlock = ({
                   </Select>
                 ) : null}
                 {renderContentInput()}
-                {type === "ivr" && isIVRBlock(localBlock) && (
+                {type === "ivr" && isIVRBlock(block) && (
                   <Select
-                    defaultValue={localBlock.responseType ?? undefined}
+                    defaultValue={block.responseType ?? undefined}
                     onValueChange={(value) =>
                       handleChange("responseType", value)
                     }
@@ -473,7 +467,7 @@ const MergedQuestionBlock = ({
                 )}
               </div>
               {((type === "script" &&
-                ["radio", "dropdown", "multi"].includes(localBlock.type)) ||
+                ["radio", "dropdown", "multi"].includes(block.type)) ||
                 type === "ivr") && (
                 <div className="mt-4">
                   <div className="flex flex-col gap-2">
@@ -481,9 +475,9 @@ const MergedQuestionBlock = ({
                       <h3 className="text-lg font-semibold">Options</h3>
                       {(type === "script" ||
                         (type === "ivr" &&
-                          isIVRBlock(localBlock) &&
-                          localBlock.responseType &&
-                          localBlock.responseType !== "speech")) && (
+                          isIVRBlock(block) &&
+                          block.responseType &&
+                          block.responseType !== "speech")) && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -496,15 +490,15 @@ const MergedQuestionBlock = ({
                       )}
                     </div>
                     {type === "ivr" &&
-                      isIVRBlock(localBlock) &&
-                      !localBlock.responseType && (
+                      isIVRBlock(block) &&
+                      !block.responseType && (
                         <p className="text-sm text-muted-foreground">
                           Please select a response type first
                         </p>
                       )}
                     {type === "ivr" &&
-                      isIVRBlock(localBlock) &&
-                      localBlock.responseType === "speech" && (
+                      isIVRBlock(block) &&
+                      block.responseType === "speech" && (
                         <p className="text-sm text-muted-foreground">
                           Speech response type does not support options - will
                           record response and continue to next block
@@ -512,16 +506,16 @@ const MergedQuestionBlock = ({
                       )}
                     {(type === "script" ||
                       (type === "ivr" &&
-                        isIVRBlock(localBlock) &&
-                        localBlock.responseType &&
-                        localBlock.responseType !== "speech")) && (
+                        isIVRBlock(block) &&
+                        block.responseType &&
+                        block.responseType !== "speech")) && (
                       <>
-                        {localBlock.options?.length === 0 && (
+                        {block.options?.length === 0 && (
                           <p className="text-sm text-muted-foreground">
                             No options added - will continue to next block
                           </p>
                         )}
-                        {localBlock.options?.map(
+                        {block.options?.map(
                           (option: BlockOption | IVROption, index: number) => (
                             <QuestionBlockOption
                               key={index}

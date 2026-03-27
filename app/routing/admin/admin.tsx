@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -227,6 +227,30 @@ export default function Admin() {
         search: "",
         accessLevel: "all"
     });
+
+    const setCampaignFilterWithPageReset = useCallback(
+        (action: React.SetStateAction<typeof campaignFilter>) => {
+            setCampaignFilter(action);
+            setCurrentPage(1);
+        },
+        [],
+    );
+
+    const setUserFilterWithPageReset = useCallback(
+        (action: React.SetStateAction<typeof userFilter>) => {
+            setUserFilter(action);
+            setUserCurrentPage(1);
+        },
+        [],
+    );
+
+    const setWorkspaceFilterWithPageReset = useCallback(
+        (action: React.SetStateAction<typeof workspaceFilter>) => {
+            setWorkspaceFilter(action);
+            setWorkspaceCurrentPage(1);
+        },
+        [],
+    );
     
     // Apply filters to campaigns
     const filteredCampaigns = campaigns.filter(campaign => {
@@ -361,19 +385,6 @@ export default function Admin() {
         });
     };
     
-    // Reset pagination when filters change
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [campaignFilter]);
-
-    useEffect(() => {
-        setUserCurrentPage(1);
-    }, [userFilter]);
-
-    useEffect(() => {
-        setWorkspaceCurrentPage(1);
-    }, [workspaceFilter]);
-
     // Show toast notifications for action results
     useEffect(() => {
         if (actionData && 'success' in actionData) {
@@ -414,14 +425,14 @@ export default function Admin() {
                                     placeholder="Search campaigns..."
                                     className="pl-8"
                                     value={campaignFilter.search}
-                                    onChange={(e) => setCampaignFilter(prev => ({ ...prev, search: e.target.value }))}
+                                    onChange={(e) => setCampaignFilterWithPageReset(prev => ({ ...prev, search: e.target.value }))}
                                 />
                             </div>
                         </div>
                         <div className="w-[150px]">
                             <Select 
                                 value={campaignFilter.status} 
-                                onValueChange={(value) => setCampaignFilter(prev => ({ ...prev, status: value }))}
+                                onValueChange={(value) => setCampaignFilterWithPageReset(prev => ({ ...prev, status: value }))}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Status" />
@@ -437,7 +448,7 @@ export default function Admin() {
                         <div className="w-[150px]">
                             <Select 
                                 value={campaignFilter.type} 
-                                onValueChange={(value) => setCampaignFilter(prev => ({ ...prev, type: value }))}
+                                onValueChange={(value) => setCampaignFilterWithPageReset(prev => ({ ...prev, type: value }))}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Type" />
@@ -453,7 +464,7 @@ export default function Admin() {
                         <div className="w-[200px]">
                             <Select 
                                 value={campaignFilter.workspace} 
-                                onValueChange={(value) => setCampaignFilter(prev => ({ ...prev, workspace: value }))}
+                                onValueChange={(value) => setCampaignFilterWithPageReset(prev => ({ ...prev, workspace: value }))}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Workspace" />
@@ -468,7 +479,7 @@ export default function Admin() {
                         </div>
                         <Button 
                             variant="outline" 
-                            onClick={() => setCampaignFilter({ search: "", status: "all", type: "all", workspace: "all" })}
+                            onClick={() => setCampaignFilterWithPageReset({ search: "", status: "all", type: "all", workspace: "all" })}
                         >
                             Clear Filters
                         </Button>
@@ -731,7 +742,7 @@ export default function Admin() {
                                             placeholder="Search name, ID, or owner..."
                                             className="pl-8"
                                             value={workspaceFilter.search}
-                                            onChange={(e) => setWorkspaceFilter((prev) => ({ ...prev, search: e.target.value }))}
+                                            onChange={(e) => setWorkspaceFilterWithPageReset((prev) => ({ ...prev, search: e.target.value }))}
                                         />
                                     </div>
                                 </div>
@@ -739,7 +750,7 @@ export default function Admin() {
                                     <Select
                                         value={workspaceFilter.status}
                                         onValueChange={(value: "all" | "active" | "disabled") =>
-                                            setWorkspaceFilter((prev) => ({ ...prev, status: value }))
+                                            setWorkspaceFilterWithPageReset((prev) => ({ ...prev, status: value }))
                                         }
                                     >
                                         <SelectTrigger>
@@ -755,7 +766,7 @@ export default function Admin() {
                                 <div className="w-[180px]">
                                     <Select
                                         value={workspaceFilter.owner}
-                                        onValueChange={(value) => setWorkspaceFilter((prev) => ({ ...prev, owner: value }))}
+                                        onValueChange={(value) => setWorkspaceFilterWithPageReset((prev) => ({ ...prev, owner: value }))}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Owner" />
@@ -774,7 +785,7 @@ export default function Admin() {
                                     <Select
                                         value={workspaceFilter.opsState}
                                         onValueChange={(value: "all" | "ready" | "attention" | "pending") =>
-                                            setWorkspaceFilter((prev) => ({ ...prev, opsState: value }))
+                                            setWorkspaceFilterWithPageReset((prev) => ({ ...prev, opsState: value }))
                                         }
                                     >
                                         <SelectTrigger>
@@ -792,7 +803,7 @@ export default function Admin() {
                                     <Select
                                         value={workspaceFilter.sortKey}
                                         onValueChange={(value: WorkspaceSortKey) =>
-                                            setWorkspaceFilter((prev) => ({ ...prev, sortKey: value }))
+                                            setWorkspaceFilterWithPageReset((prev) => ({ ...prev, sortKey: value }))
                                         }
                                     >
                                         <SelectTrigger>
@@ -812,7 +823,7 @@ export default function Admin() {
                                     <Select
                                         value={workspaceFilter.sortDirection}
                                         onValueChange={(value: "asc" | "desc") =>
-                                            setWorkspaceFilter((prev) => ({ ...prev, sortDirection: value }))
+                                            setWorkspaceFilterWithPageReset((prev) => ({ ...prev, sortDirection: value }))
                                         }
                                     >
                                         <SelectTrigger>
@@ -827,7 +838,7 @@ export default function Admin() {
                                 <Button
                                     variant="outline"
                                     onClick={() =>
-                                        setWorkspaceFilter({
+                                        setWorkspaceFilterWithPageReset({
                                             search: "",
                                             status: "all",
                                             owner: "all",
@@ -1075,14 +1086,14 @@ export default function Admin() {
                                             placeholder="Search users..."
                                             className="pl-8"
                                             value={userFilter.search}
-                                            onChange={(e) => setUserFilter(prev => ({ ...prev, search: e.target.value }))}
+                                            onChange={(e) => setUserFilterWithPageReset(prev => ({ ...prev, search: e.target.value }))}
                                         />
                                     </div>
                                 </div>
                                 <div className="w-[150px]">
                                     <Select 
                                         value={userFilter.accessLevel} 
-                                        onValueChange={(value) => setUserFilter(prev => ({ ...prev, accessLevel: value }))}
+                                        onValueChange={(value) => setUserFilterWithPageReset(prev => ({ ...prev, accessLevel: value }))}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Access Level" />
@@ -1097,7 +1108,7 @@ export default function Admin() {
                                 </div>
                                 <Button 
                                     variant="outline" 
-                                    onClick={() => setUserFilter({ search: "", accessLevel: "all" })}
+                                    onClick={() => setUserFilterWithPageReset({ search: "", accessLevel: "all" })}
                                 >
                                     Clear Filters
                                 </Button>

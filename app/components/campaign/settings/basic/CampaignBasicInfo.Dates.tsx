@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import WeeklyScheduleTable from "./CampaignBasicInfo.Schedule";
 import { Button } from "@/components/ui/button";
 import { DateTimePicker } from "@/components/ui/datetime";
@@ -92,7 +92,11 @@ function parseSchedule(schedule: Campaign["schedule"]): Record<DayName, Schedule
   }
 }
 
-export default function SelectDates({
+export default function SelectDates(props: SelectDatesProps) {
+  return <SelectDatesInner key={String(props.campaignData.id)} {...props} />;
+}
+
+function SelectDatesInner({
   campaignData,
   handleInputChange,
 }: SelectDatesProps) {
@@ -100,10 +104,15 @@ export default function SelectDates({
   const [currentSchedule, setCurrentSchedule] = useState<Record<DayName, ScheduleDay>>(() =>
     parseSchedule(campaignData.schedule),
   );
-
-  useEffect(() => {
+  const scheduleSourceKey =
+    typeof campaignData.schedule === "string"
+      ? campaignData.schedule
+      : JSON.stringify(campaignData.schedule ?? null);
+  const [prevScheduleSourceKey, setPrevScheduleSourceKey] = useState(scheduleSourceKey);
+  if (scheduleSourceKey !== prevScheduleSourceKey) {
+    setPrevScheduleSourceKey(scheduleSourceKey);
     setCurrentSchedule(parseSchedule(campaignData.schedule));
-  }, [campaignData.schedule]);
+  }
 
   const utcToLocal = (utcTime: string) => {
     if (!utcTime) return "";

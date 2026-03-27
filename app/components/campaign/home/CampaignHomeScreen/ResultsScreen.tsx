@@ -1,7 +1,7 @@
-import { TotalCalls } from "./ResultsScreen.TotalCalls";
+import { TotalCalls } from "./results-screen-totals";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
-import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
+import { KeyMetrics } from "./results-screen-key-metrics";
 import { useParams } from "@remix-run/react";
 
 type CampaignResult = {

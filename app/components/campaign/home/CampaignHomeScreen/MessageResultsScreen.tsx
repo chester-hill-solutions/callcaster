@@ -1,8 +1,8 @@
 import { ResultsScreenProps, DispositionResult } from "@/lib/types";
-import { TotalMessages } from "./ResultsScreen.TotalCalls";
+import { TotalMessages } from "./results-screen-totals";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
-import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
+import { KeyMessageMetrics } from "./results-screen-key-metrics";
 import { NavLink, useNavigation, useParams } from "@remix-run/react";
 
 interface MessageResultsScreenProps {

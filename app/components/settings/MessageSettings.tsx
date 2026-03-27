@@ -60,11 +60,31 @@ function getErrorMessage(error: MessageMediaActionData["error"]) {
   return typeof error === "string" ? error : error.message ?? "Message media could not be updated";
 }
 
-export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
+function messageSettingsInstanceKey(details: CampaignDetails) {
+    return `${details.workspace}-${String(details.campaign_id ?? "")}`;
+}
+
+export const MessageSettings = (props: MessageSettingsProps) => (
+    <MessageSettingsInner key={messageSettingsInstanceKey(props.details)} {...props} />
+);
+
+function MessageSettingsInner({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) {
     const [displayText, setDisplayText] = useState(details?.body_text || '');
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [showTemplateTags, setShowTemplateTags] = useState(false);
     const [resolvedMediaLinks, setResolvedMediaLinks] = useState<string[]>(mediaLinks);
+    const serverBodyText = details?.body_text || "";
+    const [prevServerBodyText, setPrevServerBodyText] = useState(serverBodyText);
+    if (serverBodyText !== prevServerBodyText) {
+        setPrevServerBodyText(serverBodyText);
+        setDisplayText(serverBodyText);
+    }
+    const mediaLinksKey = JSON.stringify(mediaLinks);
+    const [prevMediaLinksKey, setPrevMediaLinksKey] = useState(mediaLinksKey);
+    if (mediaLinksKey !== prevMediaLinksKey) {
+        setPrevMediaLinksKey(mediaLinksKey);
+        setResolvedMediaLinks(mediaLinks);
+    }
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const mediaFetcher = useFetcher<MessageMediaActionData>();
     const segmentInfo = getSmsSegmentInfo(displayText);
@@ -95,15 +115,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             : []
         )
     ];
-
-
-    useEffect(() => {
-        setDisplayText(details?.body_text || '');
-    }, [details?.body_text]);
-    
-    useEffect(() => {
-        setResolvedMediaLinks(mediaLinks);
-    }, [mediaLinks]);
 
     useEffect(() => {
         if (mediaFetcher.state !== "idle" || !mediaFetcher.data?.success) {
@@ -513,5 +524,5 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                     </div>
             </div>
         </div>
-    )
+    );
 }

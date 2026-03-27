@@ -18,7 +18,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
-import { Section, SectionHeader } from "@/components/shared/Section";
+import { Section, SectionHeader } from "@/components/shared/section";
 import {
   Dialog,
   DialogClose,

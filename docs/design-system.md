@@ -5,18 +5,18 @@ This project uses a single canonical design system. Follow these conventions so 
 ## Primitives
 
 - **Use [app/components/ui/](app/components/ui/) as the only primitive layer.** Prefer `Input`, `Select`, `Textarea`, `Label`, `Checkbox`, `Switch`, `Button`, `Card`, `Table`, `Badge`, `Alert`, `Dialog`, `Sheet`, `Tabs`, `Pagination`, etc. from `ui/`.
-- **Typography:** Use `Heading` and `Text` from [app/components/ui/typography.tsx](app/components/ui/typography.tsx) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired.
+- **Typography:** Use `Heading` and `Text` from [app/components/ui/typography/](app/components/ui/typography/) for titles and body copy. Use the `branded` variant where the app’s Zilla Slab look is desired.
 - **Loading:** Use `Skeleton` from [app/components/ui/skeleton.tsx](app/components/ui/skeleton.tsx) for table rows, cards, and form placeholders while data loads.
 
 ## Form layout
 
-- **Use `FormField`** from [app/components/ui/form-field.tsx](app/components/ui/form-field.tsx) for every form field. It provides label, optional description, optional error message, and consistent spacing. Put the control (Input, Select, Textarea, Switch, etc.) as the child of `FormField`.
+- **Use `FormField`** from [app/components/ui/form-field/](app/components/ui/form-field/) for every form field. It provides label, optional description, optional error message, and consistent spacing. Put the control (Input, Select, Textarea, Switch, etc.) as the child of `FormField`.
 
 ## Page structure
 
 - **Auth flows:** Use `AuthCard` from [app/components/shared/AuthCard.tsx](app/components/shared/AuthCard.tsx) for signin, signup, password reset, and invite acceptance. It provides a centered card with branded title and description slot.
-- **Settings and creation:** Use `Section` and `SectionHeader` from [app/components/shared/Section.tsx](app/components/shared/Section.tsx) for settings blocks and creation flows. Use `SectionHeader` for title + optional description + actions.
-- **Branded cards:** For creation wizards and settings blocks that need the Zilla Slab title and actions layout, use `BrandedCard`, `BrandedCardTitle`, `BrandedCardContent`, `BrandedCardActions` from [app/components/shared/BrandedCard.tsx](app/components/shared/BrandedCard.tsx) (or the re-exports via `CustomCard` for backward compatibility).
+- **Settings and creation:** Use `Section` and `SectionHeader` from [app/components/shared/section/](app/components/shared/section/) for settings blocks and creation flows. Use `SectionHeader` for title + optional description + actions.
+- **Branded cards:** For creation wizards and settings blocks that need the Zilla Slab title and actions layout, use `BrandedCard`, `BrandedCardTitle`, `BrandedCardContent`, `BrandedCardActions` from [app/components/shared/branded-card/](app/components/shared/branded-card/) (or the re-exports via `CustomCard` for backward compatibility).
 
 ## Tables and pagination
 

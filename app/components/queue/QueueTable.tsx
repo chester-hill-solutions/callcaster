@@ -90,10 +90,6 @@ export function QueueTable({
         address: defaultFilters.address || ""
     });
 
-    useEffect(() => {
-        setOptimisticQueue(queue);
-    }, [queue]);
-
     const snapshotRef = useRef<QueueItem[]>(queue ?? []);
     const fallbackFetcher = useFetcher();
     useOptimisticMutation({
@@ -106,14 +102,25 @@ export function QueueTable({
     });
 
     useEffect(() => {
+        setOptimisticQueue(queue);
         setOptimisticInputs({
             name: defaultFilters.name || "",
             phone: defaultFilters.phone || "",
             email: defaultFilters.email || "",
-            address: defaultFilters.address || ""
+            address: defaultFilters.address || "",
         });
         setOptimisticDisposition(defaultFilters.disposition || "");
-    }, [defaultFilters]);
+        setOptimisticAudience(defaultFilters.audiences || "");
+    }, [
+        queue,
+        defaultFilters.name,
+        defaultFilters.phone,
+        defaultFilters.email,
+        defaultFilters.address,
+        defaultFilters.disposition,
+        defaultFilters.audiences,
+        defaultFilters.queueStatus,
+    ]);
 
     const selectAllVisible = useCallback(() => {
         const newSelection: RowSelectionState = {};

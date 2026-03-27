@@ -226,6 +226,16 @@ function genYears(yearRange = 50) {
 
 // ---------- utils end ----------
 
+function DatePickerIconLeft() {
+  return <ChevronLeft className="h-4 w-4" />
+}
+DatePickerIconLeft.displayName = "IconLeft"
+
+function DatePickerIconRight() {
+  return <ChevronRight className="h-4 w-4" />
+}
+DatePickerIconRight.displayName = "IconRight"
+
 function DateCalendar({
   className,
   classNames,
@@ -283,8 +293,8 @@ function DateCalendar({
         ...classNames,
       }}
       components={{
-        IconLeft: () => <ChevronLeft className="h-4 w-4" />,
-        IconRight: () => <ChevronRight className="h-4 w-4" />,
+        IconLeft: DatePickerIconLeft,
+        IconRight: DatePickerIconRight,
       }}
       {...props}
     />

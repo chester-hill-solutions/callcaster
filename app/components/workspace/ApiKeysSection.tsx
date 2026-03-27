@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Section, SectionHeader } from "@/components/shared/Section";
+import { Section, SectionHeader } from "@/components/shared/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 

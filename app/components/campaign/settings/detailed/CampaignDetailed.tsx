@@ -10,7 +10,7 @@ import SelectVoiceDrop from "./live/CampaignDetailed.Live.SelectVoiceDrop";
 import {
   DialTypeSwitch,
   HouseholdSwitch,
-} from "./live/CampaignDetailed.Live.Switches";
+} from "./live/campaign-live-switches";
 import { Campaign, IVRCampaign, LiveCampaign, MessageCampaign, Script, Survey, Schedule } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
 import { Tables } from "@/lib/database.types";

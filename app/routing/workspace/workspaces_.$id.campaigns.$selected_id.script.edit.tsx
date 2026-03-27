@@ -1,6 +1,6 @@
 import { json, redirect } from "@remix-run/node";
 import { useLoaderData, useSubmit } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "@/lib/utils";
@@ -263,8 +263,16 @@ export default function ScriptEditor() {
   const [initData, setInitData] = useState<PageData>(data);
   const submit = useSubmit();
   const [pageData, setPageData] = useState<PageData>(data);
-  const [isChanged, setChanged] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  const isChanged = useMemo(
+    () =>
+      !deepEqual(
+        normalizeScriptPageDataForComparison(initData),
+        normalizeScriptPageDataForComparison(pageData),
+      ),
+    [initData, pageData],
+  );
 
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
     try {
@@ -280,7 +288,6 @@ export default function ScriptEditor() {
         navigate: false,
       });
       setInitData(pageData);
-      setChanged(false);
       setShowSaveModal(false);
     } catch (error) {
       loggerClient.error("Error saving update:", error);
@@ -289,21 +296,12 @@ export default function ScriptEditor() {
 
   const handleReset = () => {
     setPageData(data);
-    setChanged(false);
+    setInitData(data);
   };
 
   const handlePageDataChange = (newPageData: PageData) => {
     setPageData(newPageData);
-    const obj1 = normalizeScriptPageDataForComparison(initData);
-    const obj2 = normalizeScriptPageDataForComparison(newPageData);
-    setChanged(!deepEqual(obj1, obj2));
   };
-
-  useEffect(() => {
-    const obj1 = normalizeScriptPageDataForComparison(initData);
-    const obj2 = normalizeScriptPageDataForComparison(pageData);
-    setChanged(!deepEqual(obj1, obj2));
-  }, [data, initData, pageData]);
 
   const renderCampaignSettingsScript = (mediaNames: string[] = []) => {
     if (!pageData.campaignDetails.script) return null;

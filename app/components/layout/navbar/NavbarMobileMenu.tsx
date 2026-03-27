@@ -1,12 +1,11 @@
-import { capitalize } from "@/lib/utils";
-
+import { TypedResponse } from "@remix-run/node";
 import { Link, NavLink } from "@remix-run/react";
 import { FaTimes } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceInvite } from "@/lib/types";
-import { TypedResponse } from "@remix-run/node";
+import { capitalize } from "@/lib/utils";
 
-type MobileMenuProps = {
+type NavbarMobileMenuProps = {
   isSignedIn: boolean;
   user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   handleSignOut: () => Promise<
@@ -15,12 +14,12 @@ type MobileMenuProps = {
   onClose: () => void;
 };
 
-export const MobileMenu = ({
+export function NavbarMobileMenu({
   isSignedIn,
   user,
   handleSignOut,
   onClose,
-}: MobileMenuProps) => {
+}: NavbarMobileMenuProps) {
   const navLinkClass =
     "rounded-lg border border-transparent px-3 py-2 font-Zilla-Slab text-lg font-semibold text-foreground transition-colors hover:border-border hover:bg-muted";
 
@@ -104,4 +103,4 @@ export const MobileMenu = ({
       </div>
     </div>
   );
-};
+}

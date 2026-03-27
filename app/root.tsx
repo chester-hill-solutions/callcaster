@@ -21,7 +21,7 @@ import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 
-import Navbar from "@/components/layout/Navbar";
+import Navbar from "@/components/layout/navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import stylesheetUrl from "@/tailwind.css?url";

@@ -1,6 +1,6 @@
 import React from "react";
 import { NavLink } from "@remix-run/react";
-import { TotalCalls } from "./ResultsScreen.TotalCalls";
+import { TotalCalls } from "./results-screen-totals";
 import { Button } from "@/components/ui/button";
 
 interface CampaignInstructionsProps {

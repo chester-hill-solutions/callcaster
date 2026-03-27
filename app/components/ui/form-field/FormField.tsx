@@ -1,14 +1,9 @@
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
-type FormFieldContextValue = {
-  descriptionId?: string;
-  errorId?: string;
-};
-
-const FormFieldContext = React.createContext<FormFieldContextValue>({});
+import { FormFieldContext } from "./FormFieldContext";
 
 export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   label?: React.ReactNode;
@@ -54,23 +49,5 @@ export function FormField({
         ) : null}
       </div>
     </FormFieldContext.Provider>
-  );
-}
-
-export interface FormFieldControlProps
-  extends React.HTMLAttributes<HTMLDivElement> {}
-
-export function FormFieldControl({
-  children,
-  className,
-  ...props
-}: FormFieldControlProps) {
-  const { descriptionId, errorId } = React.useContext(FormFieldContext);
-  const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
-
-  return (
-    <div className={className} aria-describedby={describedBy} {...props}>
-      {children}
-    </div>
   );
 }
