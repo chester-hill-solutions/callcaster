@@ -55,7 +55,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
         }),
       }),
     });
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -94,7 +94,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
@@ -145,7 +145,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("VerificationStatus", "failed");
@@ -192,7 +192,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
 
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -219,7 +219,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -243,7 +243,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routing/api/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");

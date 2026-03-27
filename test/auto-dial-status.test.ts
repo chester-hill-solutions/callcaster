@@ -48,6 +48,7 @@ type TransactionRow = {
   type: "DEBIT" | "CREDIT";
   amount: number;
   note: string;
+  idempotency_key?: string;
   created_at: string;
 };
 
@@ -165,37 +166,26 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     }
 
     if (table === "transaction_history") {
-      const q: { workspace?: string; type?: string; like?: string } = {};
       const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = (col: string, val: any) => {
-        if (col === "workspace") q.workspace = String(val);
-        if (col === "type") q.type = String(val);
-        return builder;
-      };
-      builder.like = (_col: string, pattern: string) => {
-        q.like = pattern.replace(/^%/, "").replace(/%$/, "");
-        return builder;
-      };
-      builder.order = () => builder;
-      builder.limit = async () => {
-        const matches = transactionRows.filter(
-          (r) =>
-            (!q.workspace || r.workspace === q.workspace) &&
-            (!q.type || r.type === q.type) &&
-            (!q.like || r.note.includes(q.like)),
-        );
-        return { data: matches.slice(0, 1), error: null };
-      };
       builder.insert = (row: any) => ({
         select: () => ({
           single: async () => {
+            const dup = transactionRows.some(
+              (r) =>
+                r.workspace === row.workspace &&
+                r.type === row.type &&
+                r.idempotency_key === row.idempotency_key,
+            );
+            if (dup) {
+              return { data: null, error: { code: "23505" } };
+            }
             const created: TransactionRow = {
               id: nextId++,
               workspace: row.workspace,
               type: row.type,
               amount: row.amount,
               note: row.note,
+              idempotency_key: row.idempotency_key,
               created_at: new Date().toISOString(),
             };
             transactionRows.push(created);
@@ -203,6 +193,37 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
           },
         }),
       });
+      builder.select = () => {
+        const filters: Record<string, string> = {};
+        const chain: any = {};
+        chain.eq = (col: string, val: any) => {
+          filters[col] = String(val);
+          return chain;
+        };
+        chain.like = (_col: string, pattern: string) => {
+          filters.likeNote = pattern.replace(/^%/, "").replace(/%$/, "");
+          return chain;
+        };
+        chain.order = () => chain;
+        chain.limit = () => ({
+          maybeSingle: async () => {
+            let matches = transactionRows.filter((r) => {
+              if (filters.workspace && r.workspace !== filters.workspace) return false;
+              if (filters.type && r.type !== filters.type) return false;
+              if (filters.idempotency_key && r.idempotency_key !== filters.idempotency_key)
+                return false;
+              if (filters.likeNote && !r.note.includes(filters.likeNote)) return false;
+              return true;
+            });
+            matches = [...matches].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+            );
+            const hit = matches[matches.length - 1];
+            return { data: hit ? { id: hit.id } : null, error: null };
+          },
+        });
+        return chain;
+      };
       return builder;
     }
 
@@ -243,7 +264,7 @@ describe("api.auto-dial.status", () => {
 
   test("rejects invalid Twilio signature", async () => {
     twilioValidation.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -262,7 +283,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("bills idempotently for completed calls (same CallSid)", async () => {
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("CallSid", "CA_DUP");
@@ -284,8 +305,8 @@ describe("api.auto-dial.status", () => {
     expect(r2.status).toBe(200);
 
     expect(supabaseStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = supabaseStub._transactionRows.filter((r) =>
-      r.note.includes("[idempotency:call:CA_DUP]"),
+    const matching = supabaseStub._transactionRows.filter(
+      (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });
@@ -293,7 +314,7 @@ describe("api.auto-dial.status", () => {
   test("does not overwrite terminal disposition (completed -> busy)", async () => {
     supabaseStub = makeSupabaseStub({ outreachDisposition: "completed" });
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "busy");
@@ -320,7 +341,7 @@ describe("api.auto-dial.status", () => {
     supabaseStub = makeSupabaseStub({ callSelectError: new Error("no call") } as any);
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -348,7 +369,7 @@ describe("api.auto-dial.status", () => {
       },
     );
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -379,7 +400,7 @@ describe("api.auto-dial.status", () => {
     } as any);
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -402,7 +423,7 @@ describe("api.auto-dial.status", () => {
 
   test("participant-leave completes conferences and sets completed status", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF_A" }, { sid: "CONF_B" }]);
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -426,7 +447,7 @@ describe("api.auto-dial.status", () => {
   test("call status busy triggers dialer when conferences exist and status not completed", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 200 })));
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");
     fd.set("CallStatus", "busy");
@@ -447,7 +468,7 @@ describe("api.auto-dial.status", () => {
   test("triggerAutoDialer error bubbles to 500 when fetch not ok", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
     vi.stubGlobal("fetch", vi.fn(async () => new Response("bad", { status: 500 })));
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");
     fd.set("CallStatus", "busy");
@@ -472,7 +493,7 @@ describe("api.auto-dial.status", () => {
     } as any);
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -495,8 +516,8 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt works without disposition (covers else path)", async () => {
-    const mod = await import("../app/routes/api.auto-dial.status");
-    const res = await mod.updateOutreachAttempt("oa1", {
+    const ops = await import("../app/lib/api-auto-dial-status.server");
+    const res = await ops.updateOutreachAttempt("oa1", {
       answered_at: new Date().toISOString(),
     } as any);
     expect(res).toMatchObject({ answered_at: expect.any(String) });
@@ -506,8 +527,8 @@ describe("api.auto-dial.status", () => {
   test("updateOutreachAttempt catch formats non-Error as Unknown error", async () => {
     supabaseStub = makeSupabaseStub({ outreachUpdateThrows: "nope" } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
-    const res = (await mod.updateOutreachAttempt("oa1", {
+    const ops = await import("../app/lib/api-auto-dial-status.server");
+    const res = (await ops.updateOutreachAttempt("oa1", {
       answered_at: new Date().toISOString(),
     } as any)) as any;
     expect(res).toBeInstanceOf(Response);
@@ -518,7 +539,7 @@ describe("api.auto-dial.status", () => {
   test("updateCall error path returns 500", async () => {
     supabaseStub = makeSupabaseStub({ callUpdateError: new Error("up") } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -540,7 +561,7 @@ describe("api.auto-dial.status", () => {
   test("rpc dequeue_contact error returns 500", async () => {
     supabaseStub = makeSupabaseStub({ rpcDequeueError: new Error("dq") } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "busy");
@@ -562,7 +583,7 @@ describe("api.auto-dial.status", () => {
   test("participant-leave outreach fetch error returns 500", async () => {
     supabaseStub = makeSupabaseStub({ outreachFetchError: new Error("out") } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -585,7 +606,7 @@ describe("api.auto-dial.status", () => {
 
   test("participant-leave catch branch returns 500 when conferences.list throws", async () => {
     twilioClientMock.conferences.list.mockRejectedValueOnce(new Error("list"));
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -622,7 +643,7 @@ describe("api.auto-dial.status", () => {
       },
     } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -641,7 +662,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("CallStatus failed is handled", async () => {
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "failed");
@@ -660,7 +681,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("default branch does nothing when callback event not recognized", async () => {
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");
@@ -681,7 +702,7 @@ describe("api.auto-dial.status", () => {
     const dbMod = await import("../app/lib/database.server");
     (dbMod.createWorkspaceTwilioInstance as any).mockRejectedValueOnce("nope");
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "completed");
@@ -704,7 +725,7 @@ describe("api.auto-dial.status", () => {
     supabaseStub = makeSupabaseStub({ campaignQueueUpdateError: new Error("cq") } as any);
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api.auto-dial.status");
+    const mod = await import("../app/routing/api/api.auto-dial.status");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("CallStatus", "ringing");

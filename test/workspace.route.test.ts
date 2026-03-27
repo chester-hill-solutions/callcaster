@@ -30,13 +30,21 @@ vi.mock("@/lib/supabase.server", () => ({
   })),
 }));
 
-function makeSupabaseUpdateSingle(result: { data: any; error: any }) {
+function makeWorkspaceSupabase(args: {
+  fetchRow: { data: any; error: any };
+  updateResult: { data: any; error: any };
+}) {
   return {
     from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          single: vi.fn(async () => args.fetchRow),
+        })),
+      })),
       update: vi.fn(() => ({
         eq: vi.fn(() => ({
           select: vi.fn(() => ({
-            single: vi.fn(async () => result),
+            single: vi.fn(async () => args.updateResult),
           })),
         })),
       })),
@@ -57,15 +65,24 @@ describe("app/routes/api.workspace.tsx", () => {
   });
 
   test("returns 200 with updated row", async () => {
-    mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w1" });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      workspace_id: "w1",
+      update: { brand: "acme" },
+    });
     mocks.createClient.mockReturnValueOnce(
-      makeSupabaseUpdateSingle({
-        data: { id: "w1", twilio_data: {} },
-        error: null,
+      makeWorkspaceSupabase({
+        fetchRow: {
+          data: { id: "w1", twilio_data: { existing: true } },
+          error: null,
+        },
+        updateResult: {
+          data: { id: "w1", twilio_data: { existing: true, brand: "acme" } },
+          error: null,
+        },
       }),
     );
 
-    const mod = await import("../app/routes/api.workspace");
+    const mod = await import("../app/routing/api/api.workspace");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",
@@ -74,7 +91,10 @@ describe("app/routes/api.workspace.tsx", () => {
     } as any);
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ id: "w1", twilio_data: {} });
+    await expect(res.json()).resolves.toEqual({
+      id: "w1",
+      twilio_data: { existing: true, brand: "acme" },
+    });
     expect(mocks.createClient).toHaveBeenCalledWith(
       "http://supabase",
       "service",
@@ -82,12 +102,21 @@ describe("app/routes/api.workspace.tsx", () => {
   });
 
   test("returns 500 and logs when update throws", async () => {
-    mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w2" });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      workspace_id: "w2",
+      update: { name: "x" },
+    });
     mocks.createClient.mockReturnValueOnce(
-      makeSupabaseUpdateSingle({ data: null, error: { message: "bad" } }),
+      makeWorkspaceSupabase({
+        fetchRow: {
+          data: { id: "w2", twilio_data: {} },
+          error: null,
+        },
+        updateResult: { data: null, error: { message: "bad" } },
+      }),
     );
 
-    const mod = await import("../app/routes/api.workspace");
+    const mod = await import("../app/routing/api/api.workspace");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",

@@ -63,7 +63,7 @@ describe("app/routes/admin.tsx action", () => {
     });
     mocks.syncWorkspaceTwilioSnapshot.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin");
+    const mod = await import("../app/routing/admin/admin");
     const formData = new FormData();
     formData.set("_action", "sync_workspace_twilio");
     formData.set("workspaceId", "w1");
@@ -86,7 +86,7 @@ describe("app/routes/admin.tsx action", () => {
       user: { id: "u1" },
     });
 
-    const mod = await import("../app/routes/admin");
+    const mod = await import("../app/routing/admin/admin");
     const formData = new FormData();
     formData.set("_action", "toggle_workspace_status");
     formData.set("workspaceId", "w2");

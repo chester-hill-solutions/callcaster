@@ -11,6 +11,11 @@ import type {
   WorkspaceOnboardingChannel,
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
+import {
+  TWILIO_RCS_DOCS_URL,
+  TWILIO_RCS_PROVIDER,
+  TWILIO_RCS_SENDERS_URL,
+} from "@/lib/rcs-onboarding.shared";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -22,10 +27,6 @@ const DEFAULT_RCS_PREREQUISITES = [
   "Create the Twilio RCS sender, attach webhook URLs, and submit Google or carrier compliance review.",
   "Invite test devices and confirm inbound and status callbacks before moving to production.",
 ];
-
-const TWILIO_RCS_PROVIDER = "Twilio";
-const TWILIO_RCS_DOCS_URL = "https://www.twilio.com/docs/rcs/onboarding";
-const TWILIO_RCS_SENDERS_URL = "https://console.twilio.com/us1/develop/rcs/senders";
 
 const COUNTRY_CODE_TO_REGION: Record<string, string> = {
   AU: "Australia",

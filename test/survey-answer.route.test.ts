@@ -107,14 +107,14 @@ describe("app/routes/api.survey-answer.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
     const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and invalid survey/contact IDs", async () => {
     mocks.createSupabaseServerClient.mockReturnValue({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
 
     const fd0 = new FormData();
     const r0 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd0 }) } as any);
@@ -139,7 +139,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
   });
 
   test("returns 404 when survey missing or inactive", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ surveyRow: null, surveyError: null }),
@@ -165,7 +165,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
   });
 
   test("unique-violation on survey_response insert fetches existing; update progress error only logs", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({
         insertSurveyResponseError: { code: "23505" },
@@ -185,7 +185,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
   });
 
   test("non-unique insert error returns 500; fetch-existing error returns 500", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ insertSurveyResponseError: { code: "X" } }),
@@ -214,7 +214,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ insertSurveyResponseData: null, insertSurveyResponseError: null }),
     });
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
     const fd = new FormData();
     fd.set("surveyId", "1");
     fd.set("questionId", "Q1");
@@ -228,7 +228,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
   });
 
   test("returns 404 when question not found; answer insert unique violation updates; update error returns 500", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ questionRow: null, questionError: null }),
@@ -265,7 +265,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
   });
 
   test("non-unique answer insert error returns 500; catch returns 500 internal", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routing/api/api.survey-answer");
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ answerInsertError: { code: "X" } }),
     });

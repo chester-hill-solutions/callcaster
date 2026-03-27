@@ -66,7 +66,7 @@ export default function TeamMember({
   const memberIsOwner = memberRole === MemberRole.Owner;
   // console.log("User role :", userRole);
   return (
-    <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
+    <div className="flex w-full justify-between rounded-md border border-border/80 bg-transparent p-2 text-xl shadow-sm dark:border-white">
       <div className="flex items-center gap-2">
         <div className={iconStyles} />
         <p className="pr-4 font-semibold">{member.username}</p>

@@ -52,7 +52,7 @@ describe("app/routes/api.contacts.tsx", () => {
     mocks.parseRequestData.mockResolvedValueOnce({ id: 1 });
     mocks.updateContact.mockResolvedValueOnce({ id: 1, ok: true });
 
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "PATCH" }),
     } as any);
@@ -66,7 +66,7 @@ describe("app/routes/api.contacts.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
 
     mocks.parseRequestData.mockResolvedValueOnce({
       contacts: [{ id: 1 }],
@@ -90,7 +90,7 @@ describe("app/routes/api.contacts.tsx", () => {
   test("action default unsupported method", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "PUT" }),
     } as any);
@@ -100,7 +100,7 @@ describe("app/routes/api.contacts.tsx", () => {
   test("action returns 415 for unsupported content type error", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("Unsupported content type"));
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any);
@@ -110,7 +110,7 @@ describe("app/routes/api.contacts.tsx", () => {
   test("action other errors go through handleError (non-Error)", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce("nope");
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any);
@@ -121,7 +121,7 @@ describe("app/routes/api.contacts.tsx", () => {
   test("action errors go through handleError (Error instance)", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers(), user: { id: "u1" } });
     mocks.parseRequestData.mockRejectedValueOnce(new Error("boom"));
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
     } as any);
@@ -131,7 +131,7 @@ describe("app/routes/api.contacts.tsx", () => {
 
   test("loader returns [] when q missing", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: { id: "u1" } });
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.loader({
       request: new Request("http://localhost/api/contacts"),
     } as any);
@@ -183,7 +183,7 @@ describe("app/routes/api.contacts.tsx", () => {
       throw new Error("unexpected");
     };
 
-    const mod = await import("../app/routes/api.contacts");
+    const mod = await import("../app/routing/api/api.contacts");
     const res = await mod.loader({
       request: new Request("http://localhost/api/contacts?q=A&workspace_id=w1&campaign_id=9"),
     } as any);

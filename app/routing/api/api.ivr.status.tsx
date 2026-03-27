@@ -1,0 +1,212 @@
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import Twilio from "twilio";
+import { json } from "@remix-run/node";
+import { createWorkspaceTwilioInstance } from "../../lib/database.server";
+import { validateTwilioWebhookParams } from "@/twilio.server";
+import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+
+export interface CallEvent {
+    Called: string;
+    ToState: string;
+    CallerCountry: string;
+    Direction: string;
+    Timestamp: string;
+    CallbackSource: string;
+    SipResponseCode: string;
+    CallerState: string;
+    ToZip: string;
+    SequenceNumber: string;
+    CallSid: string;
+    To: string;
+    CallerZip: string;
+    ToCountry: string;
+    CalledZip: string;
+    ApiVersion: string;
+    CalledCity: string;
+    CallStatus: string;
+    Duration: string;
+    From: string;
+    CallDuration: string;
+    AccountSid: string;
+    CalledCountry: string;
+    CallerCity: string;
+    ToCity: string;
+    FromCountry: string;
+    Caller: string;
+    FromCity: string;
+    CalledState: string;
+    FromZip: string;
+    AnsweredBy: string;
+    FromState: string;
+  }
+
+  const updateResult = async (supabase: SupabaseClient, outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
+    if (!outreach_attempt_id) {
+        throw new Error("outreach_attempt_id is undefined");
+    }
+    const { error } = await supabase
+        .from('outreach_attempt')
+        .update(update)
+        .eq('id', outreach_attempt_id);
+    if (error) throw error;
+};
+
+const updateCallStatus = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string): Promise<void> => {
+    const { error } = await supabase
+        .from('call')
+        .update({ end_time: new Date(timestamp).toISOString(), status })
+        .eq('sid', callSid);
+    if (error) throw error;
+};
+
+import type { Block } from "@/lib/types";
+
+interface ScriptSteps {
+    pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
+    blocks?: Record<string, Block>;
+}
+
+function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }> | undefined): { title: string; blocks: string[]; speechType?: string; say?: string } | null {
+    if (!pagesObject) return null;
+    for (const pageId in pagesObject) {
+        const page = pagesObject[pageId];
+        if (!page) {
+            continue;
+        }
+        if (page.title.toLowerCase() === "voicemail") {
+            return page;
+        }
+    }
+    return null;
+}
+
+const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
+    const call = twilio.calls(callSid);
+    await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
+    const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
+    const step = findVoicemailPage(scriptSteps?.pages);
+    if (!step) {
+        await call.update({
+            twiml: `<Response><Hangup/></Response>`
+        });
+    } else {
+        if (step.speechType === 'synthetic') {
+            await call.update({
+                twiml: `<Response><Pause length="1"/><Say>${step.say}</Say></Response>`
+            });
+        } else {
+            if (!campaign.voicemail_file) {
+                throw new Error("Voicemail file is undefined");
+            }
+            const { data, error } = await supabase.storage
+                .from(`workspaceAudio`)
+                .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
+            if (error) throw { 'Status_Error': error };
+            if (!data?.signedUrl) {
+                throw new Error("Failed to create signed URL for voicemail file");
+            }
+            await call.update({
+                twiml: `<Response><Pause length="1"/><Play>${data.signedUrl}</Play></Response>`
+            });
+        }
+    }
+};
+
+const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: number | null | undefined, disposition: string): Promise<void> => {
+    await Promise.all([
+        updateCallStatus(supabase, callSid, status, timestamp),
+        updateResult(supabase, outreach_attempt_id, { disposition })
+    ]);
+};
+
+export const action = async ({ request }: { request: Request }) => {
+    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+    const formData = await request.formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const parsedBody = params as unknown as CallEvent;
+    const callSid = parsedBody.CallSid;
+
+    try {
+        const { data: dbCall, error: callError } = await supabase
+            .from('call')
+            .select('outreach_attempt_id, workspace, campaign(*, ivr_campaign(*, script(*)))')
+            .eq('sid', callSid)
+            .single();
+        if (callError) throw callError;
+        if (!dbCall) throw new Error("Call not found");
+
+        const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
+        const authToken = workspace.data?.twilio_data?.authToken;
+        if (!authToken) throw new Error("Workspace auth token not found");
+        const signature = request.headers.get("x-twilio-signature");
+        const url = new URL(request.url).href;
+        const isValid = validateTwilioWebhookParams(params, signature, url, authToken);
+        if (!isValid) return json({ error: "Invalid Twilio signature" }, { status: 403 });
+
+        const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
+        
+        const callStatus = parsedBody.CallStatus;
+        const timestamp = String(parsedBody.Timestamp || '');
+
+        const answeredBy = parsedBody.AnsweredBy;
+        const isMachine =
+            Boolean(answeredBy) &&
+            answeredBy.includes('machine') &&
+            !answeredBy.includes('other') &&
+            callStatus !== 'completed';
+
+        if (isMachine) {
+            await handleVoicemail(
+                twilio,
+                callSid,
+                dbCall as unknown as Call,
+                dbCall.campaign as unknown as Campaign & { ivr_campaign: IVRCampaign & { script: Script } },
+                supabase,
+            );
+        } else {
+            switch (callStatus) {
+                case 'failed': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'failed',
+                    );
+                    break;
+                }
+                case 'no-answer': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'no-answer',
+                    );
+                    break;
+                }
+                case 'completed': {
+                    await handleCallStatusUpdate(
+                        supabase,
+                        callSid,
+                        callStatus,
+                        timestamp,
+                        dbCall.outreach_attempt_id as number | null,
+                        'completed',
+                    );
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    } catch (error) {
+        logger.error("Error processing IVR status:", error);
+        return json({ success: false, error });
+    }
+    return json({ success: true });
+};

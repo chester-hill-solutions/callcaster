@@ -49,14 +49,14 @@ describe("app/routes/api.survey-complete.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
     const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
     expect(res.status).toBe(405);
   });
 
   test("validates required fields", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
     const fd = new FormData();
     fd.set("surveyId", "S1");
     const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
@@ -64,7 +64,7 @@ describe("app/routes/api.survey-complete.tsx", () => {
   });
 
   test("returns 404 when survey not found and 400 when inactive", async () => {
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ survey: null, surveyError: null }),
@@ -86,7 +86,7 @@ describe("app/routes/api.survey-complete.tsx", () => {
   });
 
   test("updates completed_at when completed=true and when completed!=true", async () => {
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
     const supabase = makeSupabase({ survey: { id: 1, is_active: true } });
     mocks.createSupabaseServerClient.mockReturnValue({ supabaseClient: supabase });
 
@@ -109,7 +109,7 @@ describe("app/routes/api.survey-complete.tsx", () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ survey: { id: 1, is_active: true }, updateError: { message: "u" } }),
     });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
     const fd = new FormData();
     fd.set("surveyId", "S1");
     fd.set("resultId", "R1");
@@ -120,7 +120,7 @@ describe("app/routes/api.survey-complete.tsx", () => {
 
   test("returns 500 on unexpected error (formData throws) and logs", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routing/api/api.survey-complete");
     const res = await mod.action({
       request: {
         method: "POST",

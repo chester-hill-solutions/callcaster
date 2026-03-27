@@ -36,7 +36,7 @@ describe("app/routes/api.verify-audio-pin.$pin.tsx", () => {
     const prev = process.env.BASE_URL;
     process.env.BASE_URL = "http://base";
 
-    const mod = await import("../app/routes/api.verify-audio-pin.$pin");
+    const mod = await import("../app/routing/api/api.verify-audio-pin.$pin");
     const res = await mod.loader();
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");

@@ -40,7 +40,7 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: { rpc: async () => ({ data: null, error: new Error("rpc") }) },
     });
-    const mod = await import("../app/routes/api.initiate-ivr");
+    const mod = await import("../app/routing/api/api.initiate-ivr");
     await expect(mod.action({ request: new Request("http://x", { method: "POST" }) } as any)).rejects.toThrow("rpc");
   });
 
@@ -52,7 +52,7 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.fetch.mockResolvedValueOnce({
       json: async () => ({ creditsError: true }),
     } as any);
-    const mod = await import("../app/routes/api.initiate-ivr");
+    const mod = await import("../app/routing/api/api.initiate-ivr");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res).toEqual({ creditsError: true });
   });
@@ -65,7 +65,7 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     });
     mocks.fetch.mockRejectedValueOnce(new Error("net"));
 
-    const mod = await import("../app/routes/api.initiate-ivr");
+    const mod = await import("../app/routing/api/api.initiate-ivr");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res).toEqual(queue);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error initiating IVR call:", expect.any(Error));

@@ -10,12 +10,11 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const APP_PORT = process.env.PORT ?? "3000";
-const BUILD_PATH = path.resolve("build/index.js");
+const BUILD_PATH = path.resolve("build/server/index.js");
 const BUILD_DIR = path.dirname(BUILD_PATH);
-const CLIENT_BUILD_DIR = path.resolve("public/build");
-const REMIX_BIN = resolveLocalBin("remix");
+const CLIENT_BUILD_DIR = path.resolve("build/client");
+const VITE_BIN = resolveLocalBin("vite");
 const SERVER_ENTRY = path.resolve("server/index.js");
-const startupTimestamp = Date.now();
 
 let appProcess = null;
 let isShuttingDown = false;
@@ -52,12 +51,15 @@ const DEV_ENV = {
   REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
 };
 
-const watchProcess = spawn(REMIX_BIN, ["watch"], {
+/** Used so we wait for output from *this* vite run, not a pre-existing build. */
+const watchSpawnTimeMs = Date.now();
+
+const watchProcess = spawn(VITE_BIN, ["build", "--watch"], {
   env: DEV_ENV,
   stdio: ["inherit", "pipe", "pipe"],
 });
 
-pipeOutput("remix-watch", watchProcess);
+pipeOutput("vite-watch", watchProcess);
 
 watchProcess.on("exit", (code, signal) => {
   if (isShuttingDown) {
@@ -65,12 +67,13 @@ watchProcess.on("exit", (code, signal) => {
   }
 
   console.error(
-    `[remix-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
+    `[vite-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
   );
   shutdown(code ?? 1);
 });
 
 await waitForInitialBuild();
+printDevStableReadyBanner();
 await startAppServer();
 
 buildWatcher = watch(BUILD_DIR, (eventType, fileName) => {
@@ -98,13 +101,53 @@ function resolveLocalBin(name) {
 }
 
 function pipeOutput(label, childProcess) {
-  childProcess.stdout?.on("data", (chunk) => {
-    process.stdout.write(`[${label}] ${chunk}`);
+  pipeLinesPrefixed(label, process.stdout, childProcess.stdout, childProcess);
+  pipeLinesPrefixed(label, process.stderr, childProcess.stderr, childProcess);
+}
+
+/**
+ * Prefix each *line* of child output. Raw chunk prefixing breaks Vite’s progress lines
+ * (labels appear mid-path) and makes logs hard to read.
+ */
+function pipeLinesPrefixed(label, sink, childStream, childProc) {
+  if (!childStream) {
+    return;
+  }
+
+  let buf = "";
+
+  childStream.on("data", (chunk) => {
+    buf += chunk.toString().replace(/\r\n/g, "\n");
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      sink.write(`[${label}] ${line}\n`);
+    }
   });
 
-  childProcess.stderr?.on("data", (chunk) => {
-    process.stderr.write(`[${label}] ${chunk}`);
-  });
+  const flushTail = () => {
+    if (buf.length > 0) {
+      sink.write(`[${label}] ${buf}\n`);
+      buf = "";
+    }
+  };
+
+  childStream.on("end", flushTail);
+  childProc.once("close", flushTail);
+}
+
+function printDevStableReadyBanner() {
+  const port = String(APP_PORT);
+  const url = `http://127.0.0.1:${port}`;
+  // stderr: line-buffered in many terminals, so this stays visible above Vite stdout spam
+  console.error("");
+  console.error("────────────────────────────────────────────────────────────");
+  console.error("  dev-stable: initial Vite build finished.");
+  console.error(`  Starting Express + Remix on port ${port}…`);
+  console.error(`  When you see 'server listening', open ${url}`);
+  console.error("  Ctrl+C stops Vite and the app (you may see ^C before the next log line).");
+  console.error("────────────────────────────────────────────────────────────");
+  console.error("");
 }
 
 async function waitForInitialBuild() {
@@ -117,7 +160,8 @@ async function waitForInitialBuild() {
   }
 
   throw new Error(
-    `Timed out waiting for initial build output at ${BUILD_PATH} and ${CLIENT_BUILD_DIR}`,
+    `Timed out waiting for initial build output at ${BUILD_PATH} and ${CLIENT_BUILD_DIR}. ` +
+      `serverNewest=${getNewestMtimeMs(BUILD_DIR, 20)} clientNewest=${getNewestMtimeMs(CLIENT_BUILD_DIR, 24)} watchSpawn=${watchSpawnTimeMs}`,
   );
 }
 
@@ -126,22 +170,52 @@ function hasFreshBuildOutput() {
     return false;
   }
 
-  const serverBuildMtime = statSync(BUILD_PATH).mtimeMs;
+  const serverNewest = getNewestMtimeMs(BUILD_DIR, 20);
+  const clientNewest = getNewestMtimeMs(CLIENT_BUILD_DIR, 24);
 
-  if (serverBuildMtime < startupTimestamp) {
-    return false;
+  // Vite may refresh only client or only server on a watch/cached pass; the other tree
+  // can keep older mtimes while still being valid. Require both trees to have content and
+  // at least one file touched after this process spawned vite.
+  return (
+    serverNewest > 0 &&
+    clientNewest > 0 &&
+    Math.max(serverNewest, clientNewest) >= watchSpawnTimeMs
+  );
+}
+
+/**
+ * Latest mtime among files under dir (recursive, bounded directory depth).
+ * Files always contribute their mtime; maxDepth only limits how many directory levels we descend.
+ * (Older versions decremented depth before statting files, so leaves under a depth-0 dir returned 0.)
+ */
+function getNewestMtimeMs(entryPath, maxDirDepth) {
+  if (!existsSync(entryPath)) {
+    return 0;
   }
 
-  const clientEntries = readdirSync(CLIENT_BUILD_DIR);
+  try {
+    const st = statSync(entryPath);
+    if (st.isFile()) {
+      return st.mtimeMs;
+    }
+    if (!st.isDirectory()) {
+      return 0;
+    }
+    if (maxDirDepth < 0) {
+      return 0;
+    }
 
-  if (clientEntries.length === 0) {
-    return false;
+    let max = 0;
+    for (const name of readdirSync(entryPath)) {
+      const m = getNewestMtimeMs(path.join(entryPath, name), maxDirDepth - 1);
+      if (m > max) {
+        max = m;
+      }
+    }
+    return max;
+  } catch {
+    return 0;
   }
-
-  return clientEntries.some((entry) => {
-    const entryPath = path.join(CLIENT_BUILD_DIR, entry);
-    return statSync(entryPath).mtimeMs >= startupTimestamp;
-  });
 }
 
 async function startAppServer() {
@@ -244,7 +318,7 @@ async function shutdown(exitCode) {
   await Promise.all(
     processes.map(
       (childProcess) =>
-        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-watch"),
+        terminateProcess(childProcess, childProcess === appProcess ? "app" : "vite-watch"),
     ),
   );
 

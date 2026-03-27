@@ -100,7 +100,7 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
+    const mod = await import("../app/routing/workspace/workspaces_.$id_.contacts");
     const res = await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=jo`,
@@ -151,7 +151,7 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
+    const mod = await import("../app/routing/workspace/workspaces_.$id_.contacts");
     await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=example.com`,
@@ -199,7 +199,7 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
+    const mod = await import("../app/routing/workspace/workspaces_.$id_.contacts");
     await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=1234`,

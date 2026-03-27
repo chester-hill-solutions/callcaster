@@ -16,8 +16,8 @@ vi.mock("../app/lib/messaging-onboarding.server", () => ({
   },
 }));
 
+import { deriveWorkspaceAdminRows } from "../app/lib/admin-workspaces.server";
 import {
-  deriveWorkspaceAdminRows,
   filterWorkspaceAdminRows,
   sortWorkspaceAdminRows,
 } from "../app/lib/admin-workspaces";

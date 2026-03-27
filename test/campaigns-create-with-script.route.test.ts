@@ -109,7 +109,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
   });
 
   test("returns 405 for non-POST", async () => {
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
     expect(res.status).toBe(405);
     await expect(res.json()).resolves.toEqual({ error: "Method not allowed" });
@@ -117,7 +117,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
 
   test("returns auth error when verifyApiKeyOrSession fails", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "no", status: 401 });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "no" });
@@ -126,7 +126,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
   test("returns 400 on invalid JSON body", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: {} } as any);
     mocks.safeParseJson.mockRejectedValueOnce(new Error("bad json"));
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid JSON body" });
@@ -145,7 +145,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script_id: 1,
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -163,7 +163,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script_id: 1,
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
@@ -172,7 +172,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
   test("validates title/type/caller_id/script requirements", async () => {
     const supabase = makeSupabaseForValidations({});
     mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: "w1", supabase });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
 
     mocks.safeParseJson.mockResolvedValueOnce({ type: "live_call", caller_id: "+1555", script_id: 1 });
     const r1 = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
@@ -201,7 +201,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script_id: 1,
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to validate caller_id" });
@@ -218,7 +218,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script_id: 1,
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
   });
@@ -240,13 +240,13 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script_id: 1,
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
   });
 
   test("validates audience_ids: audError (500) and invalid ids (400)", async () => {
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
 
     const supabaseErr = makeSupabaseForValidations({ audError: { message: "aud" }, audiences: [] });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: supabaseErr });
@@ -286,7 +286,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       script_id: 999,
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -305,7 +305,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       script_id: 1,
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({
@@ -336,7 +336,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       script_id: 1,
       audience_ids: [1],
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
   });
@@ -365,7 +365,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       caller_id: "+1555",
       script: { name: "s", steps: {} },
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const r1 = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(r1.status).toBe(500);
 
@@ -435,7 +435,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaign: { id: 1 },
       campaignDetails: { campaign_id: 1 },
     });
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     const json = await res.json();
@@ -453,7 +453,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       script_id: 1,
     });
     mocks.createCampaign.mockRejectedValueOnce(new Error("nope"));
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const r1 = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(r1.status).toBe(400);
 
@@ -568,7 +568,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: campaignId },
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -596,7 +596,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: 1 },
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -662,7 +662,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: 7 },
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -721,7 +721,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: 7 },
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -788,7 +788,7 @@ describe("app/routes/api.campaigns.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: 7 },
     });
 
-    const mod = await import("../app/routes/api.campaigns.create-with-script");
+    const mod = await import("../app/routing/api/api.campaigns.create-with-script");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({

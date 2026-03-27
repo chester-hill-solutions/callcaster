@@ -10,8 +10,9 @@ const mocks = vi.hoisted(() => {
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
+      TWILIO_AUTH_TOKEN: () => "twilio-token",
     },
-    logger: { error: vi.fn(), warn: vi.fn() },
+    logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
   };
 });
 
@@ -134,7 +135,7 @@ describe("app/routes/api.inbound.tsx", () => {
   test("throws 400-like object when Called missing", async () => {
     const supabase = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     await expect(
       mod.action({
         request: new Request("http://x", {
@@ -149,7 +150,7 @@ describe("app/routes/api.inbound.tsx", () => {
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ number: null, numberError: null }),
     );
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
     await expect(
@@ -194,7 +195,7 @@ describe("app/routes/api.inbound.tsx", () => {
       }),
     );
 
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
@@ -225,7 +226,7 @@ describe("app/routes/api.inbound.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     let res = await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any);
@@ -307,7 +308,7 @@ describe("app/routes/api.inbound.tsx", () => {
     );
     const fd = new FormData();
     fd.set("Called", "+1");
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     await expect(
       mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
@@ -334,9 +335,9 @@ describe("app/routes/api.inbound.tsx", () => {
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
 
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
 
-    // No workspace credentials => signature validation fails
+    // No workspace on the number: still passes validateTwilioWebhookParams while signature checks are stubbed; uses env token fallback.
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(false);
     mocks.createClient.mockReturnValueOnce(
@@ -349,11 +350,13 @@ describe("app/routes/api.inbound.tsx", () => {
         },
       }),
     );
-    await expect(
-      mod.action({
+    {
+      const res = await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
-    ).rejects.toMatchObject({ status: 403 });
+      } as any);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain("unable to answer");
+    }
 
     // Workspace id empty string => workspaceId fallback "" in webhook notification
     mocks.isPhoneNumber.mockReturnValue(true);
@@ -401,7 +404,7 @@ describe("app/routes/api.inbound.tsx", () => {
   });
 
   test("webhook notification failures are handled without blocking response", async () => {
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routing/api/api.inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");

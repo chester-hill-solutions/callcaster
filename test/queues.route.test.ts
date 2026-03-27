@@ -26,7 +26,7 @@ describe("app/routes/api.queues.tsx", () => {
 
   test("loader returns [] when limit is 0", async () => {
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: {} });
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
     } as any);
@@ -36,7 +36,7 @@ describe("app/routes/api.queues.tsx", () => {
   test("loader uses default limit when missing", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc } });
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
     } as any);
@@ -50,7 +50,7 @@ describe("app/routes/api.queues.tsx", () => {
   test("loader returns [] when rpc returns empty", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc } });
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
     } as any);
@@ -64,7 +64,7 @@ describe("app/routes/api.queues.tsx", () => {
     const from = vi.fn().mockReturnValueOnce({ select });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc, from } });
 
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=99&limit=2"),
     } as any);
@@ -87,7 +87,7 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.action({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
     } as any);
@@ -111,7 +111,7 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.action({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
     } as any);
@@ -131,7 +131,7 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.action({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
     } as any);
@@ -152,7 +152,7 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.action({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
     } as any);
@@ -175,7 +175,7 @@ describe("app/routes/api.queues.tsx", () => {
       supabaseClient: {},
       serverSession: { user: { id: "u1" } },
     });
-    const mod = await import("../app/routes/api.queues");
+    const mod = await import("../app/routing/api/api.queues");
     const res = await mod.action({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),
     } as any);

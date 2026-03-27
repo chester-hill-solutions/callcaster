@@ -11,7 +11,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("returns creditsError when workspace has no credits", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const supabase: any = {
       from: (table: string) => {
@@ -48,7 +48,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("returns 400 JSON when required parameters are missing", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const res = await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
@@ -72,7 +72,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("throws when workspace credits query errors", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const supabase: any = {
       from: () => ({
@@ -106,7 +106,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("creates call, upserts call row, and returns JSON Response", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const upsertSelect = vi.fn(async () => ({ error: null }));
     const sequence: string[] = [];
@@ -204,7 +204,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("uses client target when selected_device is not a string", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const supabase: any = {
       from: (table: string) => {
@@ -264,7 +264,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("stores null campaign_id when payload campaign_id is not a number", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const upsertSelect = vi.fn(async () => ({ error: null }));
     const supabase: any = {
@@ -320,7 +320,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("returns success:false Response when twilio call create throws", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
     const logger = { error: vi.fn() };
     const pendingUpdateEq = vi.fn(async () => ({ error: null }));
 
@@ -445,7 +445,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
     }));
     vi.doMock("@/lib/logger.server", () => ({ logger }));
 
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
     const res = await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
         method: "POST",
@@ -460,7 +460,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("returns 401 when no authenticated user is found", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const res = await mod.action({
       request: new Request("http://localhost/api/auto-dial", {
@@ -483,7 +483,7 @@ describe("app/routes/api.auto-dial.tsx", () => {
   });
 
   test("returns 403 when workspace access is denied", async () => {
-    const mod = await import("../app/routes/api.auto-dial");
+    const mod = await import("../app/routing/api/api.auto-dial");
 
     const res = await mod.action({
       request: new Request("http://localhost/api/auto-dial", {

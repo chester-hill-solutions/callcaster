@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { processAudienceUpload } from "../app/lib/audience-upload-process.server";
 
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
@@ -22,7 +23,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     new Request("http://localhost/api/audience-upload", { method, body: fd });
 
   test("exports: isOtherDataArray + generateUniqueId", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
     expect(mod.isOtherDataArray([{ key: "a", value: 1 }])).toBe(true);
     expect(mod.isOtherDataArray([{ key: "a" } as any])).toBe(false);
     expect(mod.isOtherDataArray("no" as any)).toBe(false);
@@ -34,7 +35,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: unauthorized, method not allowed, and validation errors", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       supabaseClient: {} as any,
@@ -83,7 +84,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: audienceId path validates audience, creates upload record, and starts background processing", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const processAudienceUpload = vi.fn(async () => {});
     const supabaseClient: any = {
@@ -141,7 +142,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: audienceId path returns 404 when audience missing", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const supabaseClient: any = {
       from: (table: string) => {
@@ -174,7 +175,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: create-audience path handles audience insert/upload insert errors and catches invalid JSON", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       headers: new Headers(),
@@ -249,7 +250,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
 
   test("action: create-audience success message and background .catch logging", async () => {
     vi.resetModules();
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const processAudienceUpload = vi.fn(async () => {
       throw new Error("bg");
@@ -295,12 +296,12 @@ describe("app/routes/api.audience-upload.tsx", () => {
     const body = await res.json();
     expect(body.message).toContain("Audience created");
 
-    // let the background rejection propagate to the attached .catch
-    await Promise.resolve();
-    expect(logger.error).toHaveBeenCalledWith(
-      "Background processing error:",
-      expect.any(Error),
-    );
+    await vi.waitFor(() => {
+      expect(logger.error).toHaveBeenCalledWith(
+        "Background processing error:",
+        expect.any(Error),
+      );
+    });
   }, 30000);
 
   test("action: calling without deps hits verifyAuth fallback", async () => {
@@ -320,7 +321,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     }));
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
 
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_name", "A");
@@ -331,7 +332,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: catch branch returns Unknown error for non-Error throw", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routing/api/api.audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       supabaseClient: {
@@ -352,8 +353,6 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload: happy path maps contacts, writes progress, and completes", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
-
     const uploads: any[] = [];
     const updates: any[] = [];
     const inserts: any[] = [];
@@ -409,7 +408,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
       contacts: [{ Name: "Ada Lovelace", Email: "a@b.co" }],
     }));
 
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       supabaseClient,
       1,
       2,
@@ -434,8 +433,6 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload: header mismatch and insert errors go through catch and write error status", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
-
     const uploads: any[] = [];
     const supabaseClient: any = {
       storage: {
@@ -464,7 +461,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     };
 
     // Missing headers -> error
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       supabaseClient,
       1,
       2,
@@ -478,7 +475,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     expect(uploads.some((u) => u.body.includes('"status":"error"'))).toBe(true);
 
     // Insert error -> error path
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       supabaseClient,
       1,
       2,
@@ -493,10 +490,8 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload covers bucket/status/link errors and default deps branch", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
-
     // bucketError
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: null, error: { message: "b" } }),
@@ -515,7 +510,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // missing bucket + createBucket error
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: [], error: null }),
@@ -535,7 +530,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // missing bucket + createBucket success (covers else path for createError)
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: [], error: null }),
@@ -561,7 +556,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // statusError
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
@@ -580,7 +575,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // mapping warn branch via empty-string header
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
@@ -610,7 +605,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // other_data mapping branch with defined value + splitNameColumn actualHeader present (and empty name => '' fallbacks)
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
@@ -645,7 +640,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     );
 
     // Cover "Unknown error" branches in catch (non-Error throw)
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       {
         storage: {
           listBuckets: async () => {
@@ -680,7 +675,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
       },
     };
     const csv = "Email\nx@y.co\n";
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       supabaseOk,
       1,
       2,
@@ -693,8 +688,6 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload covers remaining else-branches (splitNameColumn missing header, undefined values, and i!==0)", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
-
     const supabaseClient: any = {
       storage: {
         listBuckets: async () => ({ data: [{ name: "audience-uploads" }], error: null }),
@@ -724,7 +717,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
       return { Name: "N", Email: "x@y.co", Custom: undefined };
     });
 
-    await mod.processAudienceUpload(
+    await processAudienceUpload(
       supabaseClient,
       1,
       2,

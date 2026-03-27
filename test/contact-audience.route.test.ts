@@ -35,7 +35,7 @@ describe("app/routes/api.contact-audience.tsx", () => {
       headers: new Headers({ "X-Test": "1" }),
     });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
-    const mod = await import("../app/routes/api.contact-audience");
+    const mod = await import("../app/routing/api/api.contact-audience");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any);
@@ -50,7 +50,7 @@ describe("app/routes/api.contact-audience.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
-    const mod = await import("../app/routes/api.contact-audience");
+    const mod = await import("../app/routing/api/api.contact-audience");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any);
@@ -65,7 +65,7 @@ describe("app/routes/api.contact-audience.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
-    const mod = await import("../app/routes/api.contact-audience");
+    const mod = await import("../app/routing/api/api.contact-audience");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
     } as any);
@@ -75,7 +75,7 @@ describe("app/routes/api.contact-audience.tsx", () => {
 
   test("non-DELETE returns json(undefined) with headers", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
-    const mod = await import("../app/routes/api.contact-audience");
+    const mod = await import("../app/routing/api/api.contact-audience");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),
     } as any);

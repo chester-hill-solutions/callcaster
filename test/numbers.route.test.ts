@@ -148,7 +148,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const prevToken = process.env.TWILIO_AUTH_TOKEN;
     delete process.env.TWILIO_SID;
     delete process.env.TWILIO_AUTH_TOKEN;
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.loader({
       request: new Request("http://localhost/api/numbers"),
     } as any);
@@ -166,7 +166,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const prevToken = process.env.TWILIO_AUTH_TOKEN;
     process.env.TWILIO_SID = "sid";
     process.env.TWILIO_AUTH_TOKEN = "token";
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.loader({
       request: new Request("http://localhost/api/numbers?areaCode=415"),
     } as any);
@@ -180,7 +180,7 @@ describe("app/routes/api.numbers.tsx", () => {
 
   test("loader returns 500 and logs on Twilio error", async () => {
     listMock.mockRejectedValueOnce(new Error("boom"));
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.loader({
       request: new Request("http://localhost/api/numbers"),
     } as any);
@@ -200,7 +200,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -225,7 +225,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -261,7 +261,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -304,7 +304,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1666");
     fd.set("workspace_id", "w2");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -360,7 +360,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "w3");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -383,7 +383,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1777");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -409,7 +409,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1888");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -436,7 +436,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -477,7 +477,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
@@ -510,7 +510,7 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
+    const mod = await import("../app/routing/api/api.numbers");
     const res = await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",

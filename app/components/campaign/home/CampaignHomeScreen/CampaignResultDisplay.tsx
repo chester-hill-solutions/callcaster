@@ -1,7 +1,7 @@
 import { useNavigation } from "@remix-run/react";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
-import { CampaignState } from "@/routes/workspaces_.$id.campaigns.$selected_id";
+import { CampaignState } from "@/routing/workspace/workspaces_.$id.campaigns.$selected_id";
 import { Campaign } from "@/lib/types";
 
 type CampaignResult = {

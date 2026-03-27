@@ -417,6 +417,18 @@ export interface WorkspaceMessagingReadiness {
   warnings: string[];
 }
 
+/** Twilio admin portal snapshot (matches getWorkspaceTwilioPortalSnapshot; safe for client types). */
+export type WorkspaceTwilioPortalPageSnapshot = {
+  config: WorkspaceTwilioOpsConfig;
+  onboarding: WorkspaceMessagingOnboardingState;
+  readiness: WorkspaceMessagingReadiness;
+  detectedTrafficClass: string;
+  metrics: WorkspaceTwilioPortalMetrics;
+  recommendations: WorkspaceTwilioPortalRecommendation[];
+  supportRequestSummary: string;
+  syncSnapshot: WorkspaceTwilioSyncSnapshot;
+};
+
 export type TwilioAccountData = (Partial<AccountInstance> & {
   sid?: string;
   authToken?: string;

@@ -80,7 +80,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       headers: new Headers(),
       user: null,
     });
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
     } as any);
@@ -96,7 +96,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: vi.fn() } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     await expect(
       mod.loader({
         request: new Request(
@@ -116,7 +116,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       user: { id: "u1" },
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: vi.fn() } });
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
     } as any);
@@ -133,7 +133,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     const create = vi.fn(async () => ({ sid: "CA1" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
     } as any);
@@ -165,7 +165,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     const create = vi.fn(async () => ({ sid: "CA2" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request(
         "http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=1%2B5551234567&fromNumber=5551234567"
@@ -188,7 +188,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       calls: { create: vi.fn(async () => ({ sid: "CA3" })) },
     });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request(
         "http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=%2B15551234567&fromNumber=%2B15551234567"
@@ -216,7 +216,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
     } as any);
@@ -231,7 +231,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
   });
 
   test("action returns TwiML xml", async () => {
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routing/api/api.verify-audio-session");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toBe("<Response />");

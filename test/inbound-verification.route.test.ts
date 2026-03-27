@@ -104,7 +104,7 @@ describe("app/routes/api.inbound-verification.tsx", () => {
       makeSupabase({ session: { data: null, error: null } })
     );
     const formData = new FormData();
-    const mod = await import("../app/routes/api.inbound-verification");
+    const mod = await import("../app/routing/api/api.inbound-verification");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",
@@ -124,7 +124,7 @@ describe("app/routes/api.inbound-verification.tsx", () => {
     mocks.createClient.mockReturnValue(supabase);
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
+    const mod = await import("../app/routing/api/api.inbound-verification");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",
@@ -158,7 +158,7 @@ describe("app/routes/api.inbound-verification.tsx", () => {
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
+    const mod = await import("../app/routing/api/api.inbound-verification");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",
@@ -191,7 +191,7 @@ describe("app/routes/api.inbound-verification.tsx", () => {
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
+    const mod = await import("../app/routing/api/api.inbound-verification");
     const res = await mod.action({
       request: new Request("http://x", {
         method: "POST",

@@ -152,7 +152,7 @@ describe("app/routes/api.call-status.tsx", () => {
 
   test("rejects invalid Twilio signature", async () => {
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any);
@@ -161,7 +161,7 @@ describe("app/routes/api.call-status.tsx", () => {
 
   test("returns 500 when call upsert fails", async () => {
     supabase._set.upsertError(new Error("upsert"));
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any);
@@ -178,7 +178,7 @@ describe("app/routes/api.call-status.tsx", () => {
       expect(tok).toBe("ws-token");
       return true;
     });
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any);
@@ -195,7 +195,7 @@ describe("app/routes/api.call-status.tsx", () => {
     supabase._set.parentCall({ workspace: "w_parent", outreach_attempt_id: 77 });
     supabase._set.attemptFetchError(new Error("fetch"));
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed" }),
     } as any);
@@ -212,7 +212,7 @@ describe("app/routes/api.call-status.tsx", () => {
       parent_call_sid: null,
     });
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
     } as any);
@@ -228,7 +228,7 @@ describe("app/routes/api.call-status.tsx", () => {
 
   test("updates disposition when transition allowed; returns 500 on updateError", async () => {
     supabase._set.attemptUpdateError(new Error("upd"));
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
     } as any);
@@ -240,7 +240,7 @@ describe("app/routes/api.call-status.tsx", () => {
     supabase._set.currentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
     supabase._set.upsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({
         call_sid: "CA1",
@@ -260,7 +260,7 @@ describe("app/routes/api.call-status.tsx", () => {
       expect(tok).toBe("test");
       return true;
     });
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing" }),
     } as any);
@@ -274,7 +274,7 @@ describe("app/routes/api.call-status.tsx", () => {
       return true;
     });
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u1" }),
     } as any);
@@ -283,7 +283,7 @@ describe("app/routes/api.call-status.tsx", () => {
   });
 
   test("covers lowercase sid/status fallbacks and getString non-string via File", async () => {
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
 
     const fd = new FormData();
     fd.set("call_sid", "CA_FALLBACK");
@@ -313,7 +313,7 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.currentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy", CalledVia: "client:u3" }),
     } as any);
@@ -334,7 +334,7 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.parentCall({ workspace: null, outreach_attempt_id: null });
     supabase._set.currentAttempt(null);
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
     } as any);
@@ -350,7 +350,7 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.parentCall(null);
     supabase._set.currentAttempt(null);
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
     } as any);
@@ -365,7 +365,7 @@ describe("app/routes/api.call-status.tsx", () => {
       workspace: "w1",
       parent_call_sid: null,
     });
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routing/api/api.call-status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
     } as any);

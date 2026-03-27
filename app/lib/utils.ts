@@ -2,12 +2,10 @@ import { type ClassValue, clsx } from "clsx";
 import { parse } from "csv-parse/sync";
 import { twMerge } from "tailwind-merge";
 import { ContentAndApprovalsPage } from "twilio/lib/rest/content/v1/contentAndApprovals";
-import { OutreachExportData } from "./database.server";
+import type { OutreachExportData } from "./database.server";
 import type { Json } from "./database.types";
 import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
 import { normalizePhoneNumber as normalizeNorthAmericanPhoneNumber } from "./utils/phone";
-import { logger } from "@/lib/logger.server";
-
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -332,7 +330,7 @@ export const parseCSV = (csvString: string) => {
 
     return { headers, contacts };
   } catch (error) {
-    logger.error("Error parsing CSV:", error);
+    console.error("Error parsing CSV:", error);
     throw new Error("Failed to parse CSV file");
   }
 };

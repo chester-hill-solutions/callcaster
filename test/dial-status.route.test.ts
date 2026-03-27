@@ -142,7 +142,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
     const res = await mod.action({ request: makeReq({}) } as any);
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
@@ -152,7 +152,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     supabase._set.callError(new Error("call"));
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
     let res = await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human" }), // omit CallStatus => null
     } as any);
@@ -183,7 +183,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
 
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
     const res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any);
@@ -195,7 +195,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     supabase._set.callRow(null);
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
     let res = await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
     } as any);
@@ -216,7 +216,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     const { supabase, twilio } = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
 
     // voicemail present
     let res = await mod.action({
@@ -265,7 +265,7 @@ describe("app/routes/api.dial.status.tsx", () => {
     const { supabase, twilio } = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
 
     let res = await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
@@ -302,7 +302,7 @@ describe("app/routes/api.dial.status.tsx", () => {
   });
 
   test("covers campaign not found + no voicemail_file path + outreachError throw in voicemail-present path", async () => {
-    const mod = await import("../app/routes/api.dial.status");
+    const mod = await import("../app/routing/api/api.dial.status");
 
     // campaign not found
     const { supabase, twilio } = makeSupabase();

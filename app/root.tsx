@@ -24,7 +24,7 @@ import { createSupabaseServerClient } from "@/lib/supabase.server";
 import Navbar from "@/components/layout/Navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
-import stylesheet from "@/tailwind.css";
+import stylesheetUrl from "@/tailwind.css?url";
 import { Database } from "./lib/database.types";
 
 import { Session } from "@supabase/supabase-js";
@@ -41,7 +41,7 @@ type LoaderData = {
 };  
 
 export const links: LinksFunction = () => [
-  { rel: "stylesheet", href: stylesheet },
+  { rel: "stylesheet", href: stylesheetUrl },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",

@@ -86,7 +86,7 @@ vi.mock("@/lib/supabase.server", () => {
 describe("export endpoints authz", () => {
   test("campaign-export-status enforces workspace access", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.campaign-export-status");
+    const mod = await import("../app/routing/api/api.campaign-export-status");
     const request = new Request(
       "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
     );
@@ -100,7 +100,7 @@ describe("export endpoints authz", () => {
 
   test("api.audiences CSV export enforces workspace access via audience workspace", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routing/api/api.audiences");
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123",
     );
@@ -112,7 +112,7 @@ describe("export endpoints authz", () => {
 
   test("api.campaign-export enforces workspace access for requested workspaceId", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.campaign-export");
+    const mod = await import("../app/routing/api/api.campaign-export");
     const fd = new FormData();
     fd.set("campaignId", "123");
     fd.set("workspaceId", "w1");

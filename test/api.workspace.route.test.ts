@@ -68,7 +68,7 @@ describe("app/routes/api.workspace.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValue({ workspace_id: "w1", update: {} });
 
-    const mod = await import("../app/routes/api.workspace");
+    const mod = await import("../app/routing/api/api.workspace");
     const response = await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any);
@@ -122,7 +122,7 @@ describe("app/routes/api.workspace.tsx", () => {
       update: { onboardingStatus: "enabled" },
     });
 
-    const mod = await import("../app/routes/api.workspace");
+    const mod = await import("../app/routing/api/api.workspace");
     await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any);

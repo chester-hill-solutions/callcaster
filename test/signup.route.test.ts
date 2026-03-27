@@ -15,7 +15,7 @@ vi.mock("@/lib/supabase.server", () => ({
 
 describe("app/routes/signup.tsx", () => {
   test("rejects direct signup POST when registration is invite-only", async () => {
-    const mod = await import("../app/routes/signup");
+    const mod = await import("../app/routing/marketing/signup");
     const response = await mod.action({
       request: new Request("http://localhost/signup", { method: "POST" }),
     } as any);

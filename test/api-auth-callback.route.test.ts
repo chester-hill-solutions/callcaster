@@ -36,7 +36,7 @@ describe("app/routes/api.auth.callback.tsx", () => {
       serialize: serializeMock,
     }));
 
-    const mod = await import("../app/routes/api.auth.callback");
+    const mod = await import("../app/routing/api/api.auth.callback");
     const res = await mod.loader({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
@@ -64,7 +64,7 @@ describe("app/routes/api.auth.callback.tsx", () => {
     }));
 
     const { logger } = await import("@/lib/logger.server");
-    const mod = await import("../app/routes/api.auth.callback");
+    const mod = await import("../app/routing/api/api.auth.callback");
     const res = await mod.loader({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=%2Fok",
@@ -86,7 +86,7 @@ describe("app/routes/api.auth.callback.tsx", () => {
       serialize: vi.fn((k: string, v: string) => `${k}=${v}`),
     }));
 
-    const mod = await import("../app/routes/api.auth.callback");
+    const mod = await import("../app/routing/api/api.auth.callback");
     const res = await mod.loader({
       request: new Request(
         "http://localhost/api/auth/callback?token_hash=th&type=signup&next=https%3A%2F%2Fevil.example",
@@ -104,7 +104,7 @@ describe("app/routes/api.auth.callback.tsx", () => {
       serialize: vi.fn((k: string, v: string) => `${k}=${v}`),
     }));
 
-    const mod = await import("../app/routes/api.auth.callback");
+    const mod = await import("../app/routing/api/api.auth.callback");
     const res1 = await mod.loader({
       request: new Request("http://localhost/api/auth/callback?type=signup"),
     } as any);

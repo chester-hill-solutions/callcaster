@@ -62,7 +62,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.queue"
     );
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
@@ -96,7 +96,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.queue"
     );
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
@@ -135,7 +135,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.queue"
     );
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
@@ -198,7 +198,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.queue"
     );
 
     await mod.loader({
@@ -267,7 +267,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.queue"
     );
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),

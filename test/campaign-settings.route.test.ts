@@ -141,7 +141,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 0, fullCount: 0 });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.settings");
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
@@ -169,7 +169,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 2, fullCount: 2 });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.settings");
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
@@ -191,7 +191,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       campaignData: JSON.stringify({ title: "Missing details" }),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.settings");
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
@@ -217,7 +217,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       campaignData: JSON.stringify({ title: "Copy me", type: "message" }),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.campaigns.$selected_id.settings");
     const res = await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },

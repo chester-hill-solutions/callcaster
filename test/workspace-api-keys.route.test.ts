@@ -72,14 +72,14 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       supabaseClient: makeSupabase({}),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routing/api/api.workspace-api-keys");
     const res = await mod.loader({ request: new Request("http://x/api/workspace-api-keys") } as any);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id is required" });
   });
 
   test("loader 500s when select errors; success returns keys ?? []", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routing/api/api.workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ list: { data: null, error: { message: "bad" } } }),
@@ -106,7 +106,7 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
   });
 
   test("action POST validates body (including json catch) and creates key; errors 500", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routing/api/api.workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     const badJson = new Request("http://x", { method: "POST", body: "nope", headers: { "Content-Type": "application/json" } });
@@ -149,7 +149,7 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
   });
 
   test("action DELETE validates body and deletes; errors 500; other method 405", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routing/api/api.workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     const r0 = await mod.action({

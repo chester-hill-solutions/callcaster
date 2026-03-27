@@ -1,6 +1,8 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
 
+export { getAudioUploadAcceptValue } from "./audio.accept";
+
 const ALLOWED_AUDIO_EXTENSIONS = new Set([
   ".aac",
   ".flac",
@@ -48,19 +50,6 @@ export class AudioUploadError extends Error {
 type NormalizeUploadedAudioDeps = Partial<{
   transcodeAudioBuffer: typeof transcodeAudioBuffer;
 }>;
-
-export function getAudioUploadAcceptValue() {
-  return [
-    ".aac",
-    ".flac",
-    ".m4a",
-    ".mp3",
-    ".ogg",
-    ".wav",
-    ".webm",
-    "audio/*",
-  ].join(",");
-}
 
 export function getSafeMediaBaseName(mediaName: string) {
   const trimmed = mediaName.trim();

@@ -85,7 +85,7 @@ vi.mock("@/lib/supabase.server", () => {
 describe("api.audiences CSV export contract", () => {
   test("returns BOM + CRLF CSV with no-store headers and enforces workspace access", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routing/api/api.audiences");
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );
@@ -112,7 +112,7 @@ describe("api.audiences CSV export contract", () => {
   });
 
   test("applies search + contact-field sort and produces deterministic headers", async () => {
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routing/api/api.audiences");
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );

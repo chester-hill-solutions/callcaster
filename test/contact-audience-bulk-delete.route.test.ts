@@ -33,7 +33,7 @@ describe("app/routes/api.contact-audience.bulk-delete.tsx", () => {
       headers: new Headers(),
       user: null,
     });
-    const mod = await import("../app/routes/api.contact-audience.bulk-delete");
+    const mod = await import("../app/routing/api/api.contact-audience.bulk-delete");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any);
@@ -46,7 +46,7 @@ describe("app/routes/api.contact-audience.bulk-delete.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.contact-audience.bulk-delete");
+    const mod = await import("../app/routing/api/api.contact-audience.bulk-delete");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "POST" }),
     } as any);
@@ -59,7 +59,7 @@ describe("app/routes/api.contact-audience.bulk-delete.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.contact-audience.bulk-delete");
+    const mod = await import("../app/routing/api/api.contact-audience.bulk-delete");
 
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: null, "contact_ids[]": ["1"] });
     const r1 = await mod.action({
@@ -91,7 +91,7 @@ describe("app/routes/api.contact-audience.bulk-delete.tsx", () => {
       new_total: 5,
     });
 
-    const mod = await import("../app/routes/api.contact-audience.bulk-delete");
+    const mod = await import("../app/routing/api/api.contact-audience.bulk-delete");
     const res = await mod.action({
       request: new Request("http://localhost/api/contact-audience/bulk-delete", { method: "DELETE" }),
     } as any);
@@ -112,7 +112,7 @@ describe("app/routes/api.contact-audience.bulk-delete.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.contact-audience.bulk-delete");
+    const mod = await import("../app/routing/api/api.contact-audience.bulk-delete");
 
     mocks.parseActionRequest.mockResolvedValueOnce({ audience_id: "1", "contact_ids[]": "2" });
     mocks.removeContactsFromAudience.mockRejectedValueOnce(new Error("boom"));

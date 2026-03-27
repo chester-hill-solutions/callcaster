@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { useEffect, useState } from "react";
 
-import { AvailableNumber, FetcherData } from "@/routes/workspaces_.$id_.settings_.numbers";
+import { AvailableNumber, FetcherData } from "@/routing/workspace/workspaces_.$id_.settings_.numbers";
 
 type PurchaseFetcherData = { newNumber?: string; creditsError?: boolean };
 

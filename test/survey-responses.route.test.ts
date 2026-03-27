@@ -98,14 +98,14 @@ describe("app/routes/api.survey-responses.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and bad JSON", async () => {
     mocks.verifyAuth.mockResolvedValue({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
 
     const r0 = await mod.action({ request: makeReq({ surveyId: "S1" }) } as any);
     expect(r0.status).toBe(400);
@@ -122,7 +122,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
   });
 
   test("returns 404 when survey missing and 400 when inactive", async () => {
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ survey: { data: null, error: null } }),
@@ -142,7 +142,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
   });
 
   test("non-unique insert error 500; unique violation fetch existing error 500", async () => {
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({
@@ -173,7 +173,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         existingResponse: { data: { id: 11 }, error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -196,7 +196,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         existingResponse: { data: { id: 12 }, error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -218,7 +218,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -268,7 +268,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
     });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -292,7 +292,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -312,7 +312,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: { code: "X" } },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -333,7 +333,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: "boom" },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: makeReq({
         surveyId: "S1",
@@ -349,7 +349,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
 
   test("returns 500 on unexpected error (formData throws)", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routing/api/api.survey-responses");
     const res = await mod.action({
       request: {
         method: "POST",

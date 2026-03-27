@@ -28,7 +28,7 @@ describe("app/routes/api.contact-form.tsx", () => {
   });
 
   test("validates missing/invalid email and length limits", async () => {
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routing/api/api.contact-form");
 
     const fd1 = new FormData();
     // omit email entirely to cover String(data.email ?? "") branch
@@ -55,7 +55,7 @@ describe("app/routes/api.contact-form.tsx", () => {
 
   test("sends email (signup vs normal subject) and returns success", async () => {
     mocks.send.mockResolvedValueOnce({ id: "em1" });
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routing/api/api.contact-form");
 
     const fd = new FormData();
     fd.set("email", "a@b.com");
@@ -79,7 +79,7 @@ describe("app/routes/api.contact-form.tsx", () => {
 
   test("returns 500 on resend error", async () => {
     mocks.send.mockRejectedValueOnce(new Error("nope"));
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routing/api/api.contact-form");
     const fd = new FormData();
     fd.set("email", "a@b.com");
     const res = await mod.action({

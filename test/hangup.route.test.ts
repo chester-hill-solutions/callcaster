@@ -113,7 +113,7 @@ describe("app/routes/api.hangup.tsx", () => {
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
 
-    const mod = await import("../app/routes/api.hangup");
+    const mod = await import("../app/routing/api/api.hangup");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(realtimeSend).toHaveBeenCalledWith(
@@ -135,7 +135,7 @@ describe("app/routes/api.hangup.tsx", () => {
         },
       }),
     });
-    const mod = await import("../app/routes/api.hangup");
+    const mod = await import("../app/routing/api/api.hangup");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -155,7 +155,7 @@ describe("app/routes/api.hangup.tsx", () => {
         },
       }),
     });
-    const mod = await import("../app/routes/api.hangup");
+    const mod = await import("../app/routing/api/api.hangup");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -167,7 +167,7 @@ describe("app/routes/api.hangup.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "conf", workspaceId: "w1", callSid: "CA1" });
     const callUpdate = vi.fn(async () => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: (_sid: string) => ({ update: callUpdate }) });
-    const mod = await import("../app/routes/api.hangup");
+    const mod = await import("../app/routing/api/api.hangup");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -178,7 +178,7 @@ describe("app/routes/api.hangup.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase, user: { id: "u1" } });
     mocks.parseActionRequest.mockResolvedValueOnce({ conference_id: "c", workspaceId: "w1", callSid: "CA1" });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const mod = await import("../app/routes/api.hangup");
+    const mod = await import("../app/routing/api/api.hangup");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(500);
   });

@@ -76,7 +76,7 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       extension: "mp3",
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.audios_.new");
     const formData = new FormData();
     formData.set("media-name", " Greeting ");
     formData.set(
@@ -117,7 +117,7 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       headers: new Headers(),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.audios_.new");
     const formData = new FormData();
     formData.set("media-name", "Greeting");
 
@@ -148,7 +148,7 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       new mocks.AudioUploadError("Unsupported audio format.", 400),
     );
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routing/workspace/workspaces_.$id.audios_.new");
     const formData = new FormData();
     formData.set("media-name", "Greeting");
     formData.set(

@@ -30,7 +30,7 @@ describe("app/routes/api.test-webhook.tsx", () => {
       destination_url: 123,
       custom_headers: JSON.stringify([]),
     });
-    const mod = await import("../app/routes/api.test-webhook");
+    const mod = await import("../app/routing/api/api.test-webhook");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid input" });
@@ -44,7 +44,7 @@ describe("app/routes/api.test-webhook.tsx", () => {
       custom_headers: JSON.stringify([["X-Test", "1"]]),
     });
     mocks.testWebhook.mockResolvedValueOnce({ ok: true });
-    const mod = await import("../app/routes/api.test-webhook");
+    const mod = await import("../app/routing/api/api.test-webhook");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });

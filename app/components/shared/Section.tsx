@@ -9,7 +9,7 @@ export function Section({ children, className, ...props }: SectionProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-border/80 bg-card p-6 text-card-foreground shadow-sm",
+        " p-6 text-card-foreground shadow-sm",
         className,
       )}
       {...props}
