@@ -1,5 +1,5 @@
 import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
+import { Await, useFetcher, useLoaderData, useRouteError, useSearchParams } from "@remix-run/react";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { parseActionRequest } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -7,7 +7,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { useCampaignSelectedOutletContext } from "@/lib/remix-outlet-context";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
 import type { AppError } from "@/lib/errors.server";
 import {
@@ -467,12 +468,8 @@ function QueueResolvedContent({
 }
 
 export default function Queue() {
-    const { campaignData, campaignDetails, audiences, supabase } = useOutletContext<{
-        campaignData: NonNullable<Campaign> & { workspace: string },
-        campaignDetails: IVRCampaign | MessageCampaign | LiveCampaign,
-        audiences: NonNullable<Audience>[],
-        supabase: SupabaseClient
-    }>();
+    const { campaignData, campaignDetails, audiences, supabase } =
+        useCampaignSelectedOutletContext();
     const { queuePromise, campaignId, selectedAudienceIds } = useLoaderData<typeof loader>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
@@ -490,7 +487,7 @@ export default function Queue() {
                             selectedAudienceIds={selectedAudienceIds}
                             audiences={audiences}
                             supabase={supabase}
-                            campaignWorkspace={campaignData.workspace}
+                            campaignWorkspace={campaignData.workspace ?? ""}
                             isSelectingAudience={isSelectingAudience}
                             selectedAudience={selectedAudience}
                             setIsSelectingAudience={setIsSelectingAudience}

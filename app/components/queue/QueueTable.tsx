@@ -1,5 +1,5 @@
 import { Audience, Contact, QueueItem } from "@/lib/types";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, useNavigation, Form, useFetcher } from "@remix-run/react";
 import { useOptimisticMutation } from "@/hooks/utils/useOptimisticMutation";
@@ -101,7 +101,37 @@ export function QueueTable({
         errorMessage: "Queue update failed. Changes reverted.",
     });
 
-    useEffect(() => {
+    const serverQueueSyncRef = useRef({
+        queue,
+        name: defaultFilters.name,
+        phone: defaultFilters.phone,
+        email: defaultFilters.email,
+        address: defaultFilters.address,
+        disposition: defaultFilters.disposition,
+        audiences: defaultFilters.audiences,
+        queueStatus: defaultFilters.queueStatus,
+    });
+    const sq = serverQueueSyncRef.current;
+    if (
+        queue !== sq.queue ||
+        defaultFilters.name !== sq.name ||
+        defaultFilters.phone !== sq.phone ||
+        defaultFilters.email !== sq.email ||
+        defaultFilters.address !== sq.address ||
+        defaultFilters.disposition !== sq.disposition ||
+        defaultFilters.audiences !== sq.audiences ||
+        defaultFilters.queueStatus !== sq.queueStatus
+    ) {
+        serverQueueSyncRef.current = {
+            queue,
+            name: defaultFilters.name,
+            phone: defaultFilters.phone,
+            email: defaultFilters.email,
+            address: defaultFilters.address,
+            disposition: defaultFilters.disposition,
+            audiences: defaultFilters.audiences,
+            queueStatus: defaultFilters.queueStatus,
+        };
         setOptimisticQueue(queue);
         setOptimisticInputs({
             name: defaultFilters.name || "",
@@ -111,16 +141,7 @@ export function QueueTable({
         });
         setOptimisticDisposition(defaultFilters.disposition || "");
         setOptimisticAudience(defaultFilters.audiences || "");
-    }, [
-        queue,
-        defaultFilters.name,
-        defaultFilters.phone,
-        defaultFilters.email,
-        defaultFilters.address,
-        defaultFilters.disposition,
-        defaultFilters.audiences,
-        defaultFilters.queueStatus,
-    ]);
+    }
 
     const selectAllVisible = useCallback(() => {
         const newSelection: RowSelectionState = {};

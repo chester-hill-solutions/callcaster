@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { LoaderFunctionArgs, ActionFunctionArgs, json, redirect } from "@remix-run/node";
 import { toast } from "sonner";
 import { verifyAuth } from "@/lib/supabase.server";
-import { useEffect } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabaseClient } = await verifyAuth(request);
   const { data: { session } } = await supabaseClient.auth.getSession();
@@ -41,11 +41,11 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function ResetPassword() {
   const actionData = useActionData<typeof action>();
 
-  useEffect(() => {
-    if (actionData?.success != null) {
-      toast.success("Email successfully updated! Redirecting...");
-    }
-  }, [actionData]);
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData?.success != null,
+    () => toast.success("Email successfully updated! Redirecting..."),
+  );
 
   return (
     <main className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center px-4 py-16 text-white">

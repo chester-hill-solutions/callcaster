@@ -6,8 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AdminAsyncExportButton } from "@/components/campaign/home/CampaignHomeScreen/AdminAsyncExportButton";
@@ -385,17 +386,19 @@ export default function Admin() {
         });
     };
     
-    // Show toast notifications for action results
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
-    
+    useToastOnNewJsonPayload(
+        actionData,
+        actionData != null,
+        () => {
+            if (actionData && "success" in actionData && actionData.success) {
+                toast.success(actionData.success);
+            }
+            if (actionData && "error" in actionData && actionData.error) {
+                toast.error(actionData.error);
+            }
+        },
+    );
+
     // Replace the Campaigns Tab content with the following:
     const renderCampaignsTab = () => (
         <TabsContent value="campaigns">

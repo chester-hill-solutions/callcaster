@@ -1,7 +1,7 @@
 import { json, redirect } from "@remix-run/node";
 import { Form, NavLink, useActionData } from "@remix-run/react";
-import { useEffect } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -48,11 +48,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function SignIn() {
   const actionData = useActionData<typeof action>();
 
-  useEffect(() => {
-    if (actionData?.error != null) {
-      toast.error(actionData.error, { duration: 4000 });
-    }
-  }, [actionData]);
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData?.error != null,
+    () => {
+      const err = actionData?.error;
+      if (err != null) toast.error(err, { duration: 4000 });
+    },
+  );
 
   return (
     <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">

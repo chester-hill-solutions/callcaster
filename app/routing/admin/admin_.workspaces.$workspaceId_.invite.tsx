@@ -1,6 +1,7 @@
 import { ActionFunctionArgs, json, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useLoaderData } from "@remix-run/react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
@@ -279,20 +280,24 @@ export default function WorkspaceUsers() {
   };
   const formRef = useRef<HTMLFormElement | null>(null);
   
-  useEffect(() => {
-    if (actionData && 'error' in actionData && actionData.error) {
-      toast.error(actionData.error as string);
-    }
-    if (actionData) {
-      if ('success' in actionData && actionData.success) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
-      } else if ('data' in actionData && actionData.data) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData != null,
+    () => {
+      if (actionData && "error" in actionData && actionData.error) {
+        toast.error(actionData.error as string);
       }
-    }
-  }, [actionData]);
+      if (actionData) {
+        if ("success" in actionData && actionData.success) {
+          toast.success("Action completed successfully!");
+          formRef?.current?.reset();
+        } else if ("data" in actionData && actionData.data) {
+          toast.success("Action completed successfully!");
+          formRef?.current?.reset();
+        }
+      }
+    },
+  );
 
   if (!hasAccess) {
     return (

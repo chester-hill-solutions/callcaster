@@ -11,7 +11,6 @@ import {
   useActionData,
   useLoaderData,
   useLocation,
-  useOutletContext,
   useRevalidator,
 } from "@remix-run/react";
 import { Suspense, useEffect, useRef } from "react";
@@ -48,7 +47,8 @@ import {
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
+import { useCampaignRailOutletContext } from "@/lib/remix-outlet-context";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
@@ -228,14 +228,7 @@ export default function CampaignScreen() {
     queueCounts,
   } = useLoaderData<typeof loader>();
   const { audiences, campaigns, phoneNumbers, workspace, supabase } =
-    useOutletContext<{
-      audiences: Audience[];
-      campaigns: Campaign[];
-      phoneNumbers: WorkspaceNumbers[];
-      userRole: MemberRole;
-      workspace: WorkspaceData;
-      supabase: SupabaseClient;
-    }>();
+    useCampaignRailOutletContext();
   const campaignData = campaigns.find((c) => c?.id.toString() === selected_id);
   const csvData = useActionData() as { csvContent: string; filename: string };
   const location = useLocation();

@@ -1,11 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { useOutletContext } from "@remix-run/react";
 import { formatDistanceToNow } from "date-fns";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { Loader2 } from "lucide-react";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.client";
+import { useRootOutletContext } from "@/lib/remix-outlet-context";
 
 interface AudienceUploadHistoryProps {
   audienceId: number;
@@ -24,17 +22,8 @@ interface AudienceUpload {
   error_message: string | null;
 }
 
-type OutletContext = {
-  supabase: SupabaseClient<Database>;
-  env: {
-    SUPABASE_URL: string;
-    SUPABASE_KEY: string;
-    BASE_URL: string;
-  };
-};
-
 export default function AudienceUploadHistory({ audienceId }: AudienceUploadHistoryProps) {
-  const { supabase } = useOutletContext<OutletContext>();
+  const { supabase } = useRootOutletContext();
   const [uploads, setUploads] = useState<AudienceUpload[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

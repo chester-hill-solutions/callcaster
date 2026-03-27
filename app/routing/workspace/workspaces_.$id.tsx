@@ -21,6 +21,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import { Campaign, ContextType, User } from "@/lib/types";
+import type { WorkspaceOutletContext } from "@/lib/remix-outlet-context";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
@@ -30,9 +31,6 @@ import {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
 
   const workspaceId = params.id;
   if (!workspaceId) {
@@ -202,14 +200,16 @@ function WorkspaceResolvedView({
           </div>
         ) : (
           <Outlet
-            context={{
-              workspace: workspaceData?.[0],
-              audiences: audiencesData,
-              campaigns: campaignsData,
-              phoneNumbers: phoneNumbersData,
-              userRole,
-              ...context,
-            }}
+            context={
+              {
+                workspace: workspaceData?.[0],
+                audiences: audiencesData,
+                campaigns: campaignsData,
+                phoneNumbers: phoneNumbersData,
+                userRole,
+                ...context,
+              } as WorkspaceOutletContext
+            }
           />
         )}
       </div>

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("@/tailwind.css", () => ({ default: "/tailwind.css" }));
+vi.mock("@/tailwind.css?url", () => ({ default: "/tailwind.css" }));
 
 vi.mock("@/components/layout/navbar", () => ({
   default: (props: any) => {
@@ -86,9 +87,26 @@ describe("root.tsx", () => {
 
   test("links includes stylesheet", async () => {
     const mod = await import("../../app/root");
-    expect(mod.links()).toEqual(
-      expect.arrayContaining([{ rel: "stylesheet", href: "/tailwind.css" }])
+    const links = mod.links();
+    expect(links).toEqual(
+      expect.arrayContaining([
+        { rel: "stylesheet", href: "/tailwind.css" },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Zilla+Slab:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&display=swap",
+        },
+      ])
     );
+    const stylesheets = links.filter(
+      (l: { rel: string }) => l.rel === "stylesheet"
+    );
+    expect(stylesheets.length).toBe(2);
   });
 
   test("loader redirects when q decodes to contactId:surveyId", async () => {

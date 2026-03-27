@@ -1,6 +1,6 @@
 import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
 import { Form } from "@remix-run/react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
@@ -37,11 +37,11 @@ export const NumbersTable = ({
   isBusy: boolean;
 }) => {
   const [numbers, setNumbers] = useState(phoneNumbers);
-
-  useEffect(() => {
-
+  const phoneNumbersRef = useRef(phoneNumbers);
+  if (phoneNumbers !== phoneNumbersRef.current) {
+    phoneNumbersRef.current = phoneNumbers;
     setNumbers(phoneNumbers);
-  }, [phoneNumbers]);
+  }
 
   const updateNumber = useCallback(
     (id: number, updates: Partial<WorkspaceNumbers>) => {

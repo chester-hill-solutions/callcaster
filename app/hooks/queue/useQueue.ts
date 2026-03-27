@@ -1,5 +1,5 @@
 import { User } from "@supabase/supabase-js";
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Tables } from "@/lib/database.types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
 import { Contact, QueueItem } from "@/lib/types";
@@ -82,7 +82,7 @@ export const useQueue = ({
   const [predictiveQueue, setPredictiveQueue] = useState<QueueItem[]>(
     initialPredictiveQueue,
   );
-  const [householdMap, setHouseholdMap] = useState(createHouseholdMap(queue));
+  const householdMap = useMemo(() => createHouseholdMap(queue), [queue]);
   const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(() => {
     return !isPredictive && queue.length > 0 ? (queue[0] ?? null) : null;
   });
@@ -169,10 +169,6 @@ export const useQueue = ({
     },
     [isPredictive, user?.id, setCallDuration, isDuplicate],
   );
-
-  useEffect(() => {
-    setHouseholdMap(createHouseholdMap(queue));
-  }, [queue]);
 
   useEffect(() => {
     if (!nextRecipient && queue.length > 0 && !isPredictive) {

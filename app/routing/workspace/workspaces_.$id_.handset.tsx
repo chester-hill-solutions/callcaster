@@ -387,9 +387,11 @@ function HandsetConnected({
   const device = connection.device;
   const activeCall = callHandling.activeCall;
 
-  useEffect(() => {
+  const activeCallSyncRef = useRef(activeCall);
+  if (activeCall !== activeCallSyncRef.current) {
+    activeCallSyncRef.current = activeCall;
     setCallOnHold(false);
-  }, [activeCall]);
+  }
 
   useEffect(() => {
     if (!activeCall || !device?.audio) return;

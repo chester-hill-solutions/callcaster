@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import SupportButton from "./SupportButton";
 import { iconMapping, IconType } from "./Result.IconMap";
 import {
@@ -35,10 +35,14 @@ const Result = ({
   const [result, setResult] = useState<string | boolean | string[]>(
     initResult || "",
   );
-
-  useEffect(() => {
+  const resultSourceRef = useRef({ initResult, qType: questions.type });
+  if (
+    initResult !== resultSourceRef.current.initResult ||
+    questions.type !== resultSourceRef.current.qType
+  ) {
+    resultSourceRef.current = { initResult, qType: questions.type };
     setResult(initResult || (questions.type === "multi" ? [] : ""));
-  }, [initResult, questions.type]);
+  }
 
   const handleChange = (id: string, value: string | boolean) => {
     const newValue = result === value ? "" : value;

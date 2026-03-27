@@ -129,9 +129,16 @@ export function useCampaignSettings({
         joinDisabled: null,
     });
     const snapshotRef = useRef<CampaignState | null>(null);
+    const baselineRef = useRef<CampaignState>(initialState);
+    const initialPropRef = useRef<CampaignState>(initialState);
+    if (!deepEqual(initialState, initialPropRef.current)) {
+        initialPropRef.current = initialState;
+        baselineRef.current = initialState;
+        setState(initialState);
+    }
 
     const isLoading = fetcher.state === 'submitting' || fetcher.state === 'loading';
-    const isChanged = !deepEqual(state, initialState);
+    const isChanged = !deepEqual(state, baselineRef.current);
 
     const updateCampaignField = <K extends keyof CampaignState>(field: K, value: CampaignState[K]) => {
         setState(prev => ({
@@ -142,6 +149,7 @@ export function useCampaignSettings({
 
     const resetState = () => {
         setState(initialState);
+        baselineRef.current = initialState;
     };
 
     const handleAudienceChange = (audience: NonNullable<CampaignAudience>, isChecked: boolean) => {
@@ -218,11 +226,15 @@ export function useCampaignSettings({
         if (fetcher.state === 'idle' && data) {
             if (data.success && data.campaign && data.campaignDetails) {
                 snapshotRef.current = null;
-                setState(prevState => ({
-                    ...prevState,
-                    ...(data.campaign as Partial<CampaignState>),
-                    details: data.campaignDetails as CampaignState['details']
-                }));
+                setState(prevState => {
+                    const next = {
+                        ...prevState,
+                        ...(data.campaign as Partial<CampaignState>),
+                        details: data.campaignDetails as CampaignState['details'],
+                    };
+                    baselineRef.current = next;
+                    return next;
+                });
             } else if (data.error || (!data.success && data.campaign === undefined)) {
                 logger.error('Campaign update failed:', data.error || 'Unknown error');
                 if (snapshotRef.current) {

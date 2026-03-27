@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import {
   Form,
@@ -17,6 +17,7 @@ import { createNewWorkspace } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import { Section, SectionHeader } from "@/components/shared/section";
 import {
@@ -196,17 +197,17 @@ export default function Workspaces() {
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
-    if (error) {
-      toast.error(error);
-    }
-    if (paymentStatus === "error" && paymentMessage) {
-      toast.error(paymentMessage);
-    }
-  }, [actionData, error, paymentMessage, paymentStatus]);
+  useToastOnNewJsonPayload(
+    actionData?.error ?? null,
+    Boolean(actionData?.error),
+    () => toast.error(actionData!.error!),
+  );
+  useToastOnNewJsonPayload(error, Boolean(error), () => toast.error(error!));
+  useToastOnNewJsonPayload(
+    { paymentStatus, paymentMessage },
+    paymentStatus === "error" && Boolean(paymentMessage),
+    () => toast.error(paymentMessage!),
+  );
   return (
     <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
       <Heading className="text-center" branded>

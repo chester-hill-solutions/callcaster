@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request);
@@ -109,15 +109,18 @@ export default function EditUser() {
     const { currentUser, targetUser } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
 
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useToastOnNewJsonPayload(
+        actionData,
+        actionData != null,
+        () => {
+            if (actionData && "success" in actionData && actionData.success) {
+                toast.success(actionData.success);
+            }
+            if (actionData && "error" in actionData && actionData.error) {
+                toast.error(actionData.error);
+            }
+        },
+    );
 
     return (
         <div className="container mx-auto py-8 px-4">

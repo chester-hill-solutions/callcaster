@@ -1,5 +1,5 @@
 import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
+import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
 import {
@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { deepEqual } from "@/lib/utils";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { useCampaignSelectedOutletContext } from "@/lib/remix-outlet-context";
 import {
   Dialog,
   DialogContent,
@@ -48,17 +49,6 @@ type CampaignWithAudiences = Campaign & {
 type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
   script?: Script;
   mediaLinks?: string[];
-};
-
-type Context = {
-  supabase: SupabaseClient;
-  joinDisabled: string | null;
-  audiences: Audience[];
-  campaignData: CampaignWithAudiences;
-  campaignDetails: CampaignDetails;
-  scheduleDisabled: string | boolean;
-  phoneNumbers: WorkspaceNumbers[];
-  workspace: WorkspaceData; 
 };
 
 type ActionData = {
@@ -446,7 +436,7 @@ export default function CampaignSettingsRoute() {
     campaignDetails,
     phoneNumbers,
     workspace,
-  } = useOutletContext<Context>();
+  } = useCampaignSelectedOutletContext();
 
   const {
     workspace_id,

@@ -1,5 +1,10 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext , Link } from "@remix-run/react";
+import {
+  json,
+  LoaderFunctionArgs,
+  redirect,
+  type SerializeFrom,
+} from "@remix-run/node";
+import { Link, useLoaderData, useParams, useRouteLoaderData } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { Campaign } from "@/lib/types";
@@ -7,13 +12,10 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-
+import { ROUTE_ID_WORKSPACE_LAYOUT } from "@/lib/remix-route-ids";
+import type { loader as workspaceLayoutLoader } from "./workspaces_.$id";
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, user, headers } = await verifyAuth(request);
-  
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (!workspaceId) {
@@ -53,7 +55,13 @@ const StatusBadge = ({ status }: { status: string }) => {
 
 export default function ArchivedCampaigns() {
   const { archivedCampaigns } = useLoaderData<typeof loader>();
-  const { workspace } = useOutletContext<{ workspace: { id: string } }>();
+  const params = useParams();
+  const workspaceId = params.id ?? "";
+  const layoutData = useRouteLoaderData(
+    ROUTE_ID_WORKSPACE_LAYOUT,
+  ) as SerializeFrom<typeof workspaceLayoutLoader> | undefined;
+  const canCreateCampaign =
+    layoutData?.userRole === "owner" || layoutData?.userRole === "admin";
 
   return (
     <div className="container mx-auto p-6">
@@ -65,7 +73,7 @@ export default function ArchivedCampaigns() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link to={`/workspaces/${workspace.id}/campaigns`}>
+          <Link to={`/workspaces/${workspaceId}/campaigns`}>
             Back to Campaigns
           </Link>
         </Button>
@@ -77,11 +85,13 @@ export default function ArchivedCampaigns() {
             <p className="text-muted-foreground text-lg">
               No archived campaigns found
             </p>
-            <Button asChild className="mt-4">
-              <Link to={`/workspaces/${workspace.id}/campaigns/new`}>
-                Create Your First Campaign
-              </Link>
-            </Button>
+            {canCreateCampaign ? (
+              <Button asChild className="mt-4">
+                <Link to={`/workspaces/${workspaceId}/campaigns/new`}>
+                  Create Your First Campaign
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : (
@@ -117,7 +127,7 @@ export default function ArchivedCampaigns() {
                 </div>
                 <div className="mt-4">
                   <Button asChild variant="outline" className="w-full">
-                    <Link to={`/workspaces/${workspace.id}/campaigns/${campaign.id}`}>
+                    <Link to={`/workspaces/${workspaceId}/campaigns/${campaign.id}`}>
                       View Details
                     </Link>
                   </Button>
@@ -132,4 +142,3 @@ export default function ArchivedCampaigns() {
 }
 
 export { ErrorBoundary };
-

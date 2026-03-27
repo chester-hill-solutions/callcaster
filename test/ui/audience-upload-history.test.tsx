@@ -11,8 +11,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@remix-run/react", () => ({
-  useOutletContext: () => mocks.outletContext,
+vi.mock("@/lib/remix-outlet-context", () => ({
+  useRootOutletContext: () => mocks.outletContext,
 }));
 
 vi.mock("date-fns", () => ({

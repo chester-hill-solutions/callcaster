@@ -66,6 +66,11 @@ export function QueueContent({
 }: QueueContentProps) {
     const [queueCount, setQueueCount] = useState(queueValue.totalCount ?? 0);
     const [queueData, setQueueData] = useState(queueValue.queueData ?? []);
+    const serverQueueDataRef = useRef(queueValue.queueData);
+    if (queueValue.queueData !== serverQueueDataRef.current) {
+      serverQueueDataRef.current = queueValue.queueData;
+      setQueueData(queueValue.queueData ?? []);
+    }
     const pendingUpdates = useRef<Set<number>>(new Set());
 
     const fetchContactById = async (id: number) => {
@@ -132,11 +137,6 @@ export function QueueContent({
             supabase.removeChannel(channel);
         }
     }, [campaignId, supabase]);
-
-    // Update queue data when parent data changes
-    useEffect(() => {
-        setQueueData(queueValue.queueData ?? []);
-    }, [queueValue.queueData]);
 
     if (queueValue?.queueError) return <div>{queueValue.queueError.message}</div>;
 

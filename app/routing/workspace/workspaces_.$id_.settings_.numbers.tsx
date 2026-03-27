@@ -16,6 +16,7 @@ import {
   useOutletContext,
 } from "@remix-run/react";
 import { useCallback, useEffect, useState } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Button } from "@/components/ui/button";
 import {
   getUserRole,
@@ -295,10 +296,13 @@ const WorkspaceSettings = () => {
     setUpdate: () => null,
   });
 
+  useToastOnNewJsonPayload(
+    actionData?.error ?? null,
+    Boolean(actionData?.error),
+    () => toast.error(actionData!.error!),
+  );
+
   useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
     if (actionData?.validationRequest) {
       setDialog(true);
     }

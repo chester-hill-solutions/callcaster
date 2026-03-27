@@ -3,7 +3,6 @@ import {
   useFetcher,
   useLoaderData,
   useLocation,
-  useOutletContext,
   useParams,
 } from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -11,11 +10,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import ChatMessages from "@/components/sms-ui/ChatMessages";
-import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
+import { Message } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { useChatsThreadOutletContext } from "@/lib/remix-outlet-context";
 import { useInfiniteScroll } from "@/hooks";
 
 const MESSAGES_PAGE_SIZE = 50;
@@ -158,12 +158,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function ChatScreen() {
-  const { supabase, workspace, workspaceNumbers, registerChatActions } = useOutletContext<{
-    supabase: SupabaseClient;
-    workspace: NonNullable<Workspace>;
-    workspaceNumbers: WorkspaceNumber[];
-    registerChatActions?: (actions: { addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null) => void;
-  }>();
+  const { supabase, workspace, workspaceNumbers, registerChatActions } =
+    useChatsThreadOutletContext();
   const {
     messages: initialMessages,
     hasMore: initialHasMore,
@@ -188,6 +184,11 @@ export default function ChatScreen() {
   const didPrependRef = useRef(false);
   const lastMergedFetcherDataRef = useRef<unknown>(null);
   const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore);
+  const initialHasMoreRef = useRef(initialHasMore);
+  if (initialHasMore !== initialHasMoreRef.current) {
+    initialHasMoreRef.current = initialHasMore;
+    setHasMoreOlder(initialHasMore);
+  }
 
   const olderFetcher = useFetcher<{
     messages: Message[];
@@ -202,10 +203,6 @@ export default function ChatScreen() {
     workspace: workspace.id,
     contact_number,
   });
-
-  useEffect(() => {
-    setHasMoreOlder(initialHasMore);
-  }, [initialHasMore]);
 
   useEffect(() => {
     lastMergedFetcherDataRef.current = null;

@@ -2,15 +2,14 @@ import {
   Form,
   json,
   redirect,
-  useActionData,
   useFetcher,
-  useNavigate,
   useNavigation,
 } from "@remix-run/react";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -67,29 +66,22 @@ type FetcherData =
   | undefined;
 
 export default function SignUp() {
-  const actionData = useActionData<ActionData>();
   const { state } = useNavigation();
   const fetcher = useFetcher<FetcherData>();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // legacy error UI removed; keep actionData for toast only
-
-  useEffect(() => {
-    /* if (actionData?.data != null && actionData.data.user != null) {
-      toast.success(
-        "You have successfully signed-up! Redirecting to your dashboard...",
-      ); */
-    if (
-      fetcher?.data &&
-      typeof (fetcher.data as any).success === "boolean" &&
-      (fetcher.data as any).success
-    ) {
+  useToastOnNewJsonPayload(
+    fetcher.data,
+    Boolean(
+      fetcher.data &&
+        typeof (fetcher.data as { success?: boolean }).success === "boolean" &&
+        (fetcher.data as { success: boolean }).success,
+    ),
+    () => {
       toast.success("Your request has been sent! We'll be in touch soon.");
       formRef.current?.reset();
-    }
-    const timeout = setTimeout(() => /* navigate("/workspaces") */ null, 2000);
-    return () => clearTimeout(timeout);
-  }, [actionData, fetcher?.data]);
+    },
+  );
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">

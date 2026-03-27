@@ -1,5 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import { MutableRefObject, useEffect, useState, useCallback } from "react";
+import { MutableRefObject, useEffect, useState, useCallback, useRef } from "react";
 import { Contact } from "@/lib/types";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
@@ -98,6 +98,19 @@ export function useContactSearch({
   const [isValid, setIsValid] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(contact_number);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(initialContact);
+  const contactNumberRouteRef = useRef(contact_number);
+  if (contact_number !== contactNumberRouteRef.current) {
+    contactNumberRouteRef.current = contact_number;
+    if (isValidPhoneNumber(contact_number)) {
+      setPhoneNumber(contact_number);
+      setIsValid(true);
+    }
+  }
+  const initialContactRef = useRef(initialContact);
+  if (initialContact !== initialContactRef.current) {
+    initialContactRef.current = initialContact;
+    setSelectedContact(initialContact);
+  }
   const [isContactMenuOpen, setIsContactMenuOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>(potentialContacts || []);
@@ -188,17 +201,6 @@ export function useContactSearch({
       setExistingConversation(null);
     }
   }, [supabase, workspace_id]);
-
-  useEffect(() => {
-    if (isValidPhoneNumber(contact_number)) {
-      setPhoneNumber(contact_number);
-      setIsValid(true);
-    }
-  }, [contact_number]);
-
-  useEffect(() => {
-    setSelectedContact(initialContact);
-  }, [initialContact]);
 
   useEffect(() => {
     if (isValid && phoneNumber) {

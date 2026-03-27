@@ -12,7 +12,6 @@ import {
   useLocation,
   useNavigate,
   useOutlet,
-  useOutletContext,
   useParams,
   useSearchParams,
   useRouteError,
@@ -64,6 +63,7 @@ import type {
   BaseUser,
   WorkspaceNumber,
 } from "@/lib/types";
+import { useWorkspaceOutletContext } from "@/lib/remix-outlet-context";
 import { logger } from "@/lib/logger.client";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import {
@@ -141,18 +141,6 @@ type ImageFetcherData = {
   success: boolean;
   url: string;
   error?: string;
-};
-
-type WorkspaceContextType = {
-  supabase: SupabaseClient<Database>;
-  workspace: {
-    id: string;
-    name: string;
-    owner: string | null;
-    users: string[] | null;
-    workspace_number?: RouteWorkspaceNumber[];
-    created_at: string;
-  };
 };
 
 function getConversationDisplayName(chat: ConversationSummary): string {
@@ -712,7 +700,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function ChatsList() {
-  const { supabase, workspace } = useOutletContext<WorkspaceContextType>();
+  const { supabase, workspace: workspaceMaybe } = useWorkspaceOutletContext();
+  const workspace = workspaceMaybe!;
   const {
     chats,
     chatsError,
@@ -728,9 +717,12 @@ export default function ChatsList() {
   const [hideStopConversations, setHideStopConversations] = useState(
     () => searchParams.get("hide_stop") === "1",
   );
-  useEffect(() => {
+  const hideStopSearchKeyRef = useRef<string | null>(null);
+  const hideStopSpKey = searchParams.toString();
+  if (hideStopSearchKeyRef.current !== hideStopSpKey) {
+    hideStopSearchKeyRef.current = hideStopSpKey;
     setHideStopConversations(searchParams.get("hide_stop") === "1");
-  }, [searchParams]);
+  }
   const messageFetcher = useFetcher({ key: "messages" });
   const paginationFetcher = useFetcher<LoaderData>({ key: "chat-pages" });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -782,11 +774,18 @@ export default function ChatsList() {
     setIsMobileConversationListOpen(false);
   }, []);
 
-  useEffect(() => {
+  const loaderChatsSyncRef = useRef(chats);
+  const loaderPaginationSyncRef = useRef(pagination);
+  if (
+    chats !== loaderChatsSyncRef.current ||
+    pagination !== loaderPaginationSyncRef.current
+  ) {
+    loaderChatsSyncRef.current = chats;
+    loaderPaginationSyncRef.current = pagination;
     setLoadedChats(chats);
     setPaginationState(pagination);
     requestedPageRef.current = pagination.page;
-  }, [chats, pagination]);
+  }
 
   useEffect(() => {
     if (!paginationFetcher.data) {

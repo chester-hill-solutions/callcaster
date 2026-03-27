@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Form,
@@ -11,6 +11,7 @@ import {
 
 import { MdAdd, MdClose } from "react-icons/md";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CardContent } from "@/components/ui/card";
@@ -157,23 +158,30 @@ export default function NewScript() {
   const [pendingFileName, setPendingFileName] = useState("");
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (actionData?.success && createdScript) {
-      toast.success("Script successfully added to your workspace!");
-      setTimeout(
-        () => navigate(`../${createdScript.id}`, { relative: "path" }),
-        750,
-      );
-    } else if (actionData?.error) {
-      const errorMessage =
-        actionData.error instanceof Error
-          ? actionData.error.message
-          : typeof actionData.error === "string"
-            ? actionData.error
-            : "An error occurred";
-      toast.error(`Error: ${errorMessage}`);
-    }
-  }, [actionData, createdScript, navigate]);
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData != null,
+    () => {
+      if (actionData?.success && createdScript) {
+        toast.success("Script successfully added to your workspace!");
+        const navTimeout = setTimeout(
+          () => navigate(`../${createdScript.id}`, { relative: "path" }),
+          750,
+        );
+        return () => clearTimeout(navTimeout);
+      }
+      if (actionData?.error) {
+        const errorMessage =
+          actionData.error instanceof Error
+            ? actionData.error.message
+            : typeof actionData.error === "string"
+              ? actionData.error
+              : "An error occurred";
+        toast.error(`Error: ${errorMessage}`);
+      }
+      return undefined;
+    },
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

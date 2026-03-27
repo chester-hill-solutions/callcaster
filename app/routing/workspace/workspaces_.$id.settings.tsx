@@ -10,7 +10,8 @@ import {
   useLoaderData,
   useOutletContext,
 } from "@remix-run/react";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Button } from "@/components/ui/button";
 import {
   getUserRole,
@@ -202,15 +203,23 @@ export default function WorkspaceSettings() {
   ) as UserWithRole | undefined;
   users?.sort((a, b) => compareMembersByRole(a, b));
   const formRef = useRef<HTMLFormElement | null>(null);
-  useEffect(() => {
-    if (actionData && actionData?.error) {
-      toast.error(JSON.stringify(actionData.error));
-    }
-    if (actionData && (('data' in actionData && actionData.data) || ('success' in actionData && actionData.success))) {
-      toast.success("Action completed succesfully!");
-      formRef?.current?.reset();
-    }
-  }, [actionData]);
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData != null,
+    () => {
+      if (actionData && actionData.error) {
+        toast.error(JSON.stringify(actionData.error));
+      }
+      if (
+        actionData &&
+        (("data" in actionData && actionData.data) ||
+          ("success" in actionData && actionData.success))
+      ) {
+        toast.success("Action completed succesfully!");
+        formRef?.current?.reset();
+      }
+    },
+  );
 
   const addUserTabs = (
     <Form method="POST" className="flex w-full flex-col gap-2" ref={formRef}>

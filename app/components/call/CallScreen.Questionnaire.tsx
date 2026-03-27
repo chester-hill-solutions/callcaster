@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import Result from "@/components/call-list/records/participant/Result";
 import { Button } from "@/components/ui/button";
 import { Tables } from "@/lib/database.types";
@@ -51,10 +51,11 @@ const CallQuestionnaire = ({
     pageKeys[0] || undefined
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
-
-  useEffect(() => {
+  const updatePropRef = useRef(update);
+  if (update !== updatePropRef.current) {
+    updatePropRef.current = update;
     setLocalUpdate(update || {});
-  }, [update]);
+  }
 
   const handleBlockResponse = (blockId: string, value: string | boolean | string[]) => {
     const pageId = currentPageId!;

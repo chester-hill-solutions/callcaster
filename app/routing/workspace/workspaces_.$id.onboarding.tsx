@@ -1,7 +1,7 @@
 import { ActionFunctionArgs, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
-import { useEffect } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -596,14 +596,18 @@ export default function WorkspaceMessagingOnboardingRoute() {
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
-    if (actionData?.success) {
-      toast.success(actionData.success);
-    }
-  }, [actionData]);
+  useToastOnNewJsonPayload(
+    actionData,
+    actionData != null,
+    () => {
+      if (actionData?.error) {
+        toast.error(actionData.error);
+      }
+      if (actionData?.success) {
+        toast.success(actionData.success);
+      }
+    },
+  );
 
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const pendingAction =

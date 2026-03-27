@@ -3,20 +3,18 @@ import { redirect, useLoaderData, useOutletContext } from "@remix-run/react";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
-import { getUserRole } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Workspace } from "@/lib/types";
 import type { FileObject } from "@supabase/storage-js";
 import { logger } from "@/lib/logger.server";
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+  const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params["id"];
   if (!workspaceId) {
    return redirect("/workspaces") 
   }
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId, { sortBy: { column: 'created_at', order: 'desc' } });

@@ -391,9 +391,11 @@ export const useSupabaseRealtime = ({
     [setRecentAttempt],
   );
 
-  useEffect(() => {
+  const questionContactRecipientRef = useRef(nextRecipient);
+  if (nextRecipient !== questionContactRecipientRef.current) {
+    questionContactRecipientRef.current = nextRecipient;
     setQuestionContact(nextRecipient);
-  }, [nextRecipient, setQuestionContact]);
+  }
 
   return {
     queue,

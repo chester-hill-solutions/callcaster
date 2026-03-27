@@ -7,9 +7,10 @@ import {
   useNavigate,
   useNavigation,
 } from "@remix-run/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
 import { getAudioUploadAcceptValue } from "@/lib/audio.accept";
@@ -99,12 +100,15 @@ export default function Media() {
   const navigate = useNavigate();
   const {state} = useNavigation();
 
-  useEffect(() => {
-    if (actionData?.success) {
+  useToastOnNewJsonPayload(
+    actionData,
+    Boolean(actionData?.success),
+    () => {
       toast.success("Media successfully uploaded to your workspace!");
-      setTimeout(() => navigate("../", { relative: "path" }), 750);
-    }
-  }, [actionData]);
+      const navTimeout = setTimeout(() => navigate("../", { relative: "path" }), 750);
+      return () => clearTimeout(navTimeout);
+    },
+  );
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;

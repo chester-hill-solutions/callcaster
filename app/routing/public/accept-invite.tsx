@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
 import { toast } from "sonner";
-import { useEffect } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 
@@ -417,22 +417,28 @@ export default function AcceptInvite() {
   const verifiedEmail =
     loaderData.status === "verified" ? loaderData.email ?? "" : "";
 
-  useEffect(() => {
-    if (
-      state === "idle" &&
-      actionData &&
-      (actionData.status === "accepted" || actionData.status === "updated")
-    ) {
-      toast.success("Successfully signed up and accepted invitation");
-      const timeout = setTimeout(() => navigate("/workspaces"), 3000);
-
-      return () => clearTimeout(timeout);
-    }
-    if (state === "idle" && actionData?.status === "accept_failed") {
-      toast.error("We could not accept all invitations. Please try again.");
-    }
-    return undefined;
-  }, [actionData, navigate, state]);
+  useToastOnNewJsonPayload(
+    actionData,
+    state === "idle" &&
+      actionData != null &&
+      (actionData.status === "accepted" ||
+        actionData.status === "updated" ||
+        actionData.status === "accept_failed"),
+    () => {
+      if (
+        actionData!.status === "accepted" ||
+        actionData!.status === "updated"
+      ) {
+        toast.success("Successfully signed up and accepted invitation");
+        const timeout = setTimeout(() => navigate("/workspaces"), 3000);
+        return () => clearTimeout(timeout);
+      }
+      if (actionData!.status === "accept_failed") {
+        toast.error("We could not accept all invitations. Please try again.");
+      }
+      return undefined;
+    },
+  );
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">
