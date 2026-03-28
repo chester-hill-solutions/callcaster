@@ -1,7 +1,7 @@
 import { Form, useActionData } from "@remix-run/react";
 import { json } from "@remix-run/node";
-import { useEffect } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -34,11 +34,17 @@ type ActionData = {
 export default function Remember() {
   const actionData = useActionData<ActionData>();
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(typeof actionData.error === 'string' ? actionData.error : actionData.error?.message);
-    }
-  }, [actionData]);
+  useToastOnNewJsonPayload(
+    actionData?.error ?? null,
+    Boolean(actionData?.error),
+    () => {
+      const err = actionData?.error;
+      if (!err) return;
+      toast.error(
+        typeof err === "string" ? err : err?.message ?? "Something went wrong",
+      );
+    },
+  );
   return (
     <main className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
       <AuthCard

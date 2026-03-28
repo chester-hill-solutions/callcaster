@@ -1,5 +1,5 @@
-import React from "react";
-import { NavLink } from "@remix-run/react";
+import React, { useState } from "react";
+import { NavLink, useLocation } from "@remix-run/react";
 import {
   MdCampaign,
   MdChat,
@@ -12,6 +12,7 @@ import {
   MdUploadFile,
 } from "react-icons/md";
 
+import CampaignsList from "@/components/campaign/CampaignList";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -21,6 +22,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import type { Campaign } from "@/lib/types";
 import { MemberRole } from "./TeamMember";
 
 interface NavItem {
@@ -32,7 +34,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { name: "Campaigns", path: "", end: true, icon: MdCampaign },
+  { name: "Campaigns", path: "campaigns", icon: MdCampaign },
   { name: "Chats", path: "chats", icon: MdChat },
   { name: "Handset", path: "handset", icon: MdHeadsetMic },
   { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
@@ -48,18 +50,26 @@ interface WorkspaceNavProps {
     credits: number;
   };
   userRole: MemberRole;
+  /** Campaign rows for the sidebar list when viewing campaign routes */
+  campaigns?: (Campaign | undefined)[];
   className?: string;
 }
 
 const WorkspaceNav = ({
   workspace,
   userRole,
+  campaigns = [],
   className = "",
 }: WorkspaceNavProps) => {
+  const location = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const userIsCaller = userRole === MemberRole.Caller;
   const isAdmin =
     userRole === MemberRole.Admin || userRole === MemberRole.Owner;
   const baseUrl = `/workspaces/${workspace.id}`;
+  const showCampaignSidebar = location.pathname.startsWith(
+    `${baseUrl}/campaigns`,
+  );
   const filteredItems = NAV_ITEMS.filter(
     (item) => !userIsCaller || !item.callerHidden,
   );
@@ -89,8 +99,8 @@ const WorkspaceNav = ({
         </h2>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-6 px-3 py-4">
-        <nav className="space-y-1">
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+        <nav className="shrink-0 space-y-1">
           {filteredItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -107,7 +117,19 @@ const WorkspaceNav = ({
           })}
         </nav>
 
-        <div className="rounded-lg border border-border/80 bg-card/70 p-2">
+        {showCampaignSidebar ? (
+          <div className="min-h-0 flex-1 overflow-y-auto border-t border-border/60 pt-3">
+            <CampaignsList
+              campaigns={campaigns}
+              userRole={userRole}
+              workspaceBasePath={baseUrl}
+              setCampaignsListOpen={setMobileNavOpen}
+              variant="sidebar"
+            />
+          </div>
+        ) : null}
+
+        <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
           <NavLink to={`${baseUrl}/settings`} className={utilityLinkClass} end>
             <span className="inline-flex items-center gap-2">
               <MdSettings className="h-4 w-4" />
@@ -135,7 +157,7 @@ const WorkspaceNav = ({
       <aside
         className={`hidden h-[calc(100vh-112px)] min-h-[560px] w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
       >
-        <div className="flex h-full w-full flex-col">{navBody}</div>
+        <div className="flex h-full min-h-0 w-full flex-col">{navBody}</div>
       </aside>
 
       <div className="mb-2 flex items-center justify-between gap-2 lg:hidden">
@@ -147,7 +169,7 @@ const WorkspaceNav = ({
             {workspace.name}
           </h2>
         </div>
-        <Sheet>
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" className="font-Zilla-Slab font-semibold">
               Browse Workspace

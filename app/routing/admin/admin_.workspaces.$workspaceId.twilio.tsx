@@ -1,9 +1,10 @@
 import { ActionFunctionArgs, LoaderFunctionArgs, defer, json, redirect } from "@remix-run/node";
 import { Await, Form, useActionData, useLoaderData } from "@remix-run/react";
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { FileText, Image, Loader2, MessageSquare, Phone, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -1201,15 +1202,18 @@ export default function WorkspaceTwilio() {
     const { twilioData } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
 
-    useEffect(() => {
-        if (actionData && "success" in actionData) {
-            toast.success(actionData.success);
-        }
-
-        if (actionData && "error" in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useToastOnNewJsonPayload(
+        actionData,
+        actionData != null,
+        () => {
+            if (actionData && "success" in actionData && actionData.success) {
+                toast.success(actionData.success);
+            }
+            if (actionData && "error" in actionData && actionData.error) {
+                toast.error(actionData.error);
+            }
+        },
+    );
 
     return (
         <div className="grid grid-cols-1 gap-6">

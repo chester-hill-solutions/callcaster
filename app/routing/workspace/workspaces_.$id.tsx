@@ -130,9 +130,7 @@ function WorkspaceResolvedView({
   const audiences = (resolvedData.audiences ?? []) as Array<{
     id: string | number;
   }>;
-  const campaigns = (resolvedData.campaigns ?? []) as Array<{
-    id: string | number;
-  }>;
+  const campaignsInitial = (resolvedData.campaigns ?? []) as Campaign[];
   const phoneNumbers = (
     (resolvedData.phoneNumbers ?? []) as Array<{ id: string | number } | null>
   ).filter(Boolean);
@@ -142,11 +140,11 @@ function WorkspaceResolvedView({
     "workspace",
     workspace ? [workspace] : [],
   );
-  const { data: campaignsData } = useRealtimeData(
+  const { data: campaignsData } = useRealtimeData<Campaign>(
     context.supabase,
     workspace.id,
     "campaign",
-    campaigns,
+    campaignsInitial,
   );
   const { data: phoneNumbersData } = useRealtimeData(
     context.supabase,
@@ -174,6 +172,7 @@ function WorkspaceResolvedView({
         userRole={
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
+        campaigns={campaignsData ?? campaignsInitial}
       />
       <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
         {!outlet ? (

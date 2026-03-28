@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
 import { toast } from "sonner";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { supabaseClient, user } = await verifyAuth(request)
@@ -121,17 +121,19 @@ export default function Admin() {
         });
     };
 
-    // Show toast notifications for action results
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
-    
+    useToastOnNewJsonPayload(
+        actionData,
+        actionData != null,
+        () => {
+            if (actionData && "success" in actionData && actionData.success) {
+                toast.success(actionData.success);
+            }
+            if (actionData && "error" in actionData && actionData.error) {
+                toast.error(actionData.error);
+            }
+        },
+    );
+
     return (
         <div className="container mx-auto py-8 px-4">
             <div className="flex justify-between items-center mb-8">

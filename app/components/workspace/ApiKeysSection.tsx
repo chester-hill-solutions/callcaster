@@ -1,5 +1,6 @@
 import { useFetcher } from "@remix-run/react";
 import { useEffect, useState } from "react";
+import { useToastOnNewJsonPayload } from "@/hooks/utils/useToastOnNewJsonPayload";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,21 @@ export default function ApiKeysSection({
     }
   }, [workspaceId, hasAccess]);
 
+  useToastOnNewJsonPayload(
+    mutateFetcher.data && "error" in mutateFetcher.data
+      ? mutateFetcher.data.error
+      : null,
+    Boolean(
+      mutateFetcher.data &&
+        "error" in mutateFetcher.data &&
+        mutateFetcher.data.error,
+    ),
+    () =>
+      toast.error(
+        (mutateFetcher.data as { error: string }).error,
+      ),
+  );
+
   useEffect(() => {
     if (mutateFetcher.data && "key" in mutateFetcher.data && mutateFetcher.data.key) {
       setNewKeyReveal(mutateFetcher.data.key);
@@ -50,13 +66,10 @@ export default function ApiKeysSection({
       setCreateName("");
       listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
     }
-    if (mutateFetcher.data && "error" in mutateFetcher.data && mutateFetcher.data.error) {
-      toast.error(mutateFetcher.data.error);
-    }
     if (mutateFetcher.data && "success" in mutateFetcher.data) {
       listFetcher.load(`/api/workspace-api-keys?workspace_id=${encodeURIComponent(workspaceId)}`);
     }
-  }, [mutateFetcher.data]);
+  }, [mutateFetcher.data, workspaceId]);
 
   const keys: ApiKeyRecord[] = listFetcher.data?.keys ?? [];
   const isLoading = listFetcher.state === "loading" || listFetcher.state === "idle";
