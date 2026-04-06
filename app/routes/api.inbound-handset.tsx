@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { env } from "@/lib/env.server";
+import { extendHandsetSessionExpiry } from "@/lib/handset.server";
 import { logger } from "@/lib/logger.server";
 import type { Database } from "@/lib/database.types";
 
@@ -62,7 +63,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  twiml.dial().client(session.client_identity);
+  await supabase
+    .from("handset_session")
+    .update({ expires_at: extendHandsetSessionExpiry() })
+    .eq("workspace_id", workspaceId)
+    .eq("client_identity", session.client_identity)
+    .eq("status", "active");
+
+  const baseUrl = env.BASE_URL();
+  twiml
+    .dial({
+      timeout: 18, // ~3 rings (6s per ring cycle)
+      action: `${baseUrl}/api/inbound-handset-dial-end`,
+    })
+    .client(session.client_identity);
 
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
