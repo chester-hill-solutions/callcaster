@@ -11,6 +11,7 @@ This directory contains project documentation and archived implementation notes.
 - `error-handling.md`
 - `stripe-webhook.md`
 - `api-create-campaign-with-script.md`
+- `script-structure.md`
 - `script-json-format.md`
 - `csv-export-contract.md`
 - `queue-status-normalization-rollout.md`
