@@ -54,7 +54,7 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
           explore how CallCaster can elevate your communication strategy!
         </p>
       </div>
-      <Card className="min-w-[300px] flex-1 bg-secondary py-8 dark:bg-zinc-800">
+      <Card className="min-w-[300px] flex-1 bg-secondary py-8">
         <CardContent>
           <Form
             className="space-y-4"
@@ -65,7 +65,7 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+                className="block text-sm font-medium text-foreground"
               >
                 Name
               </label>
@@ -74,13 +74,13 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
                 id="name"
                 name="name"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 shadow-sm text-foreground focus:border-brand-primary focus:outline-none focus:ring-brand-primary"
               />
             </div>
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+                className="block text-sm font-medium text-foreground"
               >
                 Email
               </label>
@@ -89,13 +89,13 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
                 id="email"
                 name="email"
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-700 dark:text-white"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 shadow-sm text-foreground focus:border-brand-primary focus:outline-none focus:ring-brand-primary"
               />
             </div>
             <div>
               <label
                 htmlFor="message"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+                className="block text-sm font-medium text-foreground"
               >
                 Message
               </label>
@@ -104,7 +104,7 @@ const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
                 name="message"
                 rows={4}
                 required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-foreground shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary"
               ></textarea>
             </div>
             <Button
@@ -125,7 +125,7 @@ const FeatureCard = ({
   icon: Icon,
   title,
   description,
-  bgColor = "bg-white dark:bg-zinc-800",
+  bgColor = "bg-card",
 }: {
   icon: React.ElementType;
   title: string;
@@ -146,7 +146,7 @@ const HeroSection = () => (
     <h1 className="animate-fade-in-up font-Tabac-Slab text-6xl font-bold text-brand-primary">
       CallCaster
     </h1>
-    <p className="animate-fade-in-up animation-delay-300 text-3xl font-semibold text-slate-800 dark:text-slate-200">
+    <p className="animate-fade-in-up animation-delay-300 text-3xl font-semibold text-foreground">
       Real Time Connections. Real Conversations. Real Results.
     </p>
   </div>
@@ -208,7 +208,7 @@ const ServiceShowcase = () => (
   <div className="animate-fade-in-up animation-delay-900 mb-16 font-Zilla-Slab">
     <h2 className="mb-6 text-center text-3xl font-bold">Our Services</h2>
     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-      <Card className="p-8 bg-brand-secondary dark:bg-blue-900">
+      <Card className="p-8 bg-brand-secondary">
         <h3 className="mb-4 text-2xl font-bold">
           Predictive Dialer <br />& PowerDialer
         </h3>
@@ -234,7 +234,7 @@ const ServiceShowcase = () => (
         <p className="text-xl font-bold">Affordable per Dial pricing</p>
       </Card>
 
-      <Card className="p-8 bg-brand-secondary dark:bg-blue-900">
+      <Card className="p-8 bg-brand-secondary">
         <h3 className="mb-4 text-2xl font-bold">
           Interactive Voice Recordings & Voicedrops
         </h3>
@@ -259,7 +259,7 @@ const ServiceShowcase = () => (
         <p className="text-xl font-bold">Pricing based on volume</p>
       </Card>
 
-      <Card className="p-8 bg-brand-secondary dark:bg-blue-900">
+      <Card className="p-8 bg-brand-secondary">
         <h3 className="mb-4 text-2xl font-bold">
           Text Messaging Blasts & Two-Way Conversations
         </h3>
@@ -297,19 +297,16 @@ const EnhancedOutreachSection = () => (
         icon={MessageSquare}
         title="Interactive Voice Response (IVR)"
         description="Create dynamic, branching conversations to gather voter input and provide information efficiently."
-        bgColor="bg-white dark:bg-zinc-800"
       />
       <FeatureCard
         icon={VolumeX}
         title="Voicedrops"
         description="Deliver targeted voice messages to large groups of voters quickly and cost-effectively."
-        bgColor="bg-white dark:bg-zinc-800"
       />
       <FeatureCard
         icon={MessageCircle}
         title="Text Messaging"
         description="Engage voters with instant, personalized text messages for rapid communication and response."
-        bgColor="bg-white dark:bg-zinc-800"
       />
     </div>
   </div>
@@ -319,7 +316,7 @@ export default function Index() {
   const { state } = useNavigation();
   const isBusy = state !== "idle";
   return (
-    <main className="to-gray-150 flex min-h-screen flex-col items-center bg-gradient-to-b from-gray-100 px-4 py-8 dark:from-gray-900 dark:to-black sm:px-6 lg:px-8">
+    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
       <div className="z-10 w-full max-w-6xl space-y-16">
         <HeroSection />
         <WhyPhoneCalls />

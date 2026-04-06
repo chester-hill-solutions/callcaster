@@ -1,7 +1,13 @@
 import { LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useOutletContext, useParams } from "@remix-run/react";
+import {
+  useFetcher,
+  useLoaderData,
+  useLocation,
+  useOutletContext,
+  useParams,
+} from "@remix-run/react";
 import { verifyAuth } from "@/lib/supabase.server";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
 import ChatMessages from "@/components/sms-ui/ChatMessages";
@@ -9,9 +15,10 @@ import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
+import { parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { useInfiniteScroll } from "@/hooks";
+
+const MESSAGES_PAGE_SIZE = 50;
 
 const getMessageMedia = async ({
   messages,
@@ -40,11 +47,55 @@ const getMessageMedia = async ({
   );
 };
 
+async function fetchMessagePage({
+  supabaseClient,
+  workspaceId,
+  contactFilter,
+  before,
+}: {
+  supabaseClient: SupabaseClient;
+  workspaceId: string;
+  contactFilter: string;
+  before?: string | null;
+}): Promise<{ messages: Message[]; hasMore: boolean }> {
+  let query = supabaseClient
+    .from("message")
+    .select(`*, outreach_attempt(campaign_id)`)
+    .or(`from.eq.${contactFilter},to.eq.${contactFilter}`)
+    .eq("workspace", workspaceId)
+    .not("date_created", "is", null)
+    .neq("status", "failed")
+    .order("date_created", { ascending: false })
+    .limit(MESSAGES_PAGE_SIZE + 1);
+
+  if (before) {
+    query = query.lt("date_created", before);
+  }
+
+  const { data: rows, error } = await query;
+  if (error) {
+    logger.error("Error fetching messages:", error);
+    return { messages: [], hasMore: false };
+  }
+
+  const hasMore = (rows?.length ?? 0) > MESSAGES_PAGE_SIZE;
+  const slice = (rows ?? []).slice(0, MESSAGES_PAGE_SIZE) as Message[];
+  const chronological = slice.reverse();
+  const withMedia = await getMessageMedia({
+    messages: chronological,
+    supabaseClient,
+  });
+  return { messages: withMedia, hasMore };
+}
+
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { id, contact_number } = params;
   const { supabaseClient, headers } = await verifyAuth(request);
-  const messages: Message[] = [];
-  let normalizedNumber = null;
+  const url = new URL(request.url);
+  const before = url.searchParams.get("before");
+  let messages: Message[] = [];
+  let hasMore = false;
+  let normalizedNumber: string | null = null;
   let optOutKeywords = parseOptOutKeywords(null);
 
   if (id) {
@@ -63,55 +114,26 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (contact_number !== "new") {
     try {
-      // Try to normalize the phone number for more consistent querying
       normalizedNumber = normalizePhoneNumber(contact_number || "");
-      
-      // Create a query with multiple OR conditions to match different phone number formats
-      const { data: messagesData, error: messagesError } = await supabaseClient
-        .from("message")
-        .select(`*, outreach_attempt(campaign_id)`)
-        .or(`from.eq.${normalizedNumber},to.eq.${normalizedNumber}`)
-        .eq('workspace', id as string)
-        .not('date_created', 'is', null)
-        .neq('status', 'failed')
-        .order("date_created", { ascending: true });
-      
-      if (messagesError) {
-        logger.error("Error fetching messages:", messagesError);
-      } else {
-        messages.push(
-          ...(await getMessageMedia({
-            messages: messagesData as Message[],
-            supabaseClient,
-          })),
-        );
-      }
-    } catch (error) {
-      logger.error("Error processing contact number:", error);
-      // If normalization fails, still try to fetch with the raw number
-      const { data: messagesData, error: messagesError } = await supabaseClient
-        .from("message")
-        .select(`*, outreach_attempt(campaign_id)`)
-        .or(`from.eq.${contact_number},to.eq.${contact_number}`)
-        .eq('workspace', id as string)
-        .not('date_created', 'is', null)
-        .neq('status', 'failed')
-        .order("date_created", { ascending: true });
-      
-      if (!messagesError) {
-        messages.push(
-          ...(await getMessageMedia({
-            messages: messagesData as Message[],
-            supabaseClient,
-          })),
-        );
-      }
+    } catch {
+      // use raw number below
     }
 
-    // Mark messages as read on the server side when loading the conversation
-    if (normalizedNumber) {
+    const contactFilter = normalizedNumber ?? contact_number ?? "";
+    if (contactFilter) {
+      const result = await fetchMessagePage({
+        supabaseClient,
+        workspaceId: id as string,
+        contactFilter,
+        before: before || null,
+      });
+      messages = result.messages;
+      hasMore = result.hasMore;
+    }
+
+    // Mark messages as read on initial load (no "before" = first page)
+    if (normalizedNumber && !before) {
       try {
-        // Update all received messages for this contact to delivered
         await supabaseClient
           .from("message")
           .update({ status: "delivered" })
@@ -127,6 +149,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return json(
     {
       messages,
+      hasMore,
       contact_number: normalizedNumber || contact_number,
       optOutKeywords,
     },
@@ -143,28 +166,35 @@ export default function ChatScreen() {
   }>();
   const {
     messages: initialMessages,
+    hasMore: initialHasMore,
     contact_number: loaderContactNumber,
-    optOutKeywords,
   } = useLoaderData<{
     messages: Message[];
+    hasMore: boolean;
     contact_number: string;
     optOutKeywords: string[];
   }>();
   const { contact_number: paramContactNumber } = useParams();
+  const location = useLocation();
 
   const contact_number = loaderContactNumber || paramContactNumber;
-  const [hideOptOutMessages, setHideOptOutMessages] = useState(true);
-  const initialFilteredMessageCount = useMemo(
-    () =>
-      initialMessages.filter((message) => !isOptOutMessage(message?.body, optOutKeywords))
-        .length,
-    [initialMessages, optOutKeywords],
-  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMessageCountRef = useRef<number>(initialFilteredMessageCount);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef<number>(initialMessages.length);
   const scrollPositionRef = useRef<number>(0);
   const hasMarkedAsReadRef = useRef<boolean>(false);
+  const savedScrollRef = useRef<{ height: number; top: number } | null>(null);
+  const didPrependRef = useRef(false);
+  const lastMergedFetcherDataRef = useRef<unknown>(null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(initialHasMore);
+
+  const olderFetcher = useFetcher<{
+    messages: Message[];
+    hasMore: boolean;
+    contact_number: string;
+    optOutKeywords: string[];
+  }>();
 
   const { messages, setMessages, addOptimisticMessage } = useChatRealTime({
     supabase,
@@ -172,32 +202,77 @@ export default function ChatScreen() {
     workspace: workspace.id,
     contact_number,
   });
-  const hiddenMessageCount = useMemo(
-    () =>
-      messages.filter(
-        (message) => Boolean(message) && isOptOutMessage(message?.body, optOutKeywords),
-      ).length,
-    [messages, optOutKeywords],
-  );
-  const displayedMessages = useMemo(
-    () =>
-      messages.filter((message): message is Message => {
-        if (!message) {
-          return false;
-        }
-
-        if (!hideOptOutMessages) {
-          return true;
-        }
-
-        return !isOptOutMessage(message.body, optOutKeywords);
-      }),
-    [hideOptOutMessages, messages, optOutKeywords],
-  );
 
   useEffect(() => {
-    lastMessageCountRef.current = displayedMessages.length;
-  }, [hideOptOutMessages]); // Reset message count tracking when the filter view changes
+    setHasMoreOlder(initialHasMore);
+  }, [initialHasMore]);
+
+  useEffect(() => {
+    lastMergedFetcherDataRef.current = null;
+  }, [contact_number]);
+
+  const loadingOlder =
+    olderFetcher.state === "loading" || olderFetcher.state === "submitting";
+
+  const loadOlder = useCallback(() => {
+    if (loadingOlder || !hasMoreOlder || messages.length === 0) return;
+    const oldest = messages[0];
+    const before = oldest?.date_created;
+    if (!before) return;
+    const beforeStr =
+      typeof before === "string" ? before : new Date(before).toISOString();
+    if (scrollContainerRef.current) {
+      savedScrollRef.current = {
+        height: scrollContainerRef.current.scrollHeight,
+        top: scrollContainerRef.current.scrollTop,
+      };
+    }
+    olderFetcher.load(
+      `${location.pathname}?before=${encodeURIComponent(beforeStr)}`,
+    );
+  }, [location.pathname, loadingOlder, hasMoreOlder, messages]);
+
+  const [loadMoreSentinelRef] = useInfiniteScroll({
+    onLoadMore: loadOlder,
+    hasMore: hasMoreOlder,
+    loading: loadingOlder,
+    rootMargin: "120px",
+  });
+
+  // Merge older page when fetcher returns (once per response)
+  useEffect(() => {
+    const data = olderFetcher.data;
+    if (!data?.messages?.length || data === lastMergedFetcherDataRef.current)
+      return;
+    lastMergedFetcherDataRef.current = data;
+    const older = data.messages as Message[];
+    setHasMoreOlder(data.hasMore === true);
+    setMessages((prev) => {
+      const ids = new Set(prev.map((m) => m?.sid).filter(Boolean));
+      const prepend = older.filter((m) => m?.sid && !ids.has(m.sid));
+      return [...prepend, ...prev];
+    });
+    didPrependRef.current = true;
+  }, [olderFetcher.data, setMessages]);
+
+  // Restore scroll position after prepending older messages
+  useEffect(() => {
+    if (
+      didPrependRef.current &&
+      savedScrollRef.current &&
+      scrollContainerRef.current
+    ) {
+      const { height, top } = savedScrollRef.current;
+      scrollContainerRef.current.scrollTop =
+        top + (scrollContainerRef.current.scrollHeight - height);
+      didPrependRef.current = false;
+      savedScrollRef.current = null;
+    }
+  }, [messages.length]);
+
+  useEffect(() => {
+    lastMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   useEffect(() => {
     registerChatActions?.({ addOptimisticMessage });
@@ -319,7 +394,7 @@ export default function ChatScreen() {
     return () => {
       observer.disconnect();
     };
-  }, [displayedMessages]);
+  }, [messages]);
 
   // Intelligent scroll handling
   useEffect(() => {
@@ -329,7 +404,7 @@ export default function ChatScreen() {
     if (!container) return;
 
     const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-    const hasNewMessages = displayedMessages.length > lastMessageCountRef.current;
+    const hasNewMessages = messages.length > lastMessageCountRef.current;
 
     if (hasNewMessages) {
       if (isAtBottom) {
@@ -343,66 +418,19 @@ export default function ChatScreen() {
         });
       }
     }
-  }, [displayedMessages]);
+  }, [messages]);
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-3 pt-3 sm:px-4">
-        <div className="flex flex-col gap-2 rounded-lg border bg-background/80 px-3 py-2">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">Chat filters</span>
-              {hiddenMessageCount > 0 ? (
-                <Badge variant="secondary" className="font-medium">
-                  {hideOptOutMessages
-                    ? `${hiddenMessageCount} STOP hidden`
-                    : `${hiddenMessageCount} STOP shown`}
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="font-normal">
-                  No STOP replies
-                </Badge>
-              )}
-            </div>
-            <label
-              htmlFor="hide-opt-out-replies"
-              className="flex items-center gap-3 text-sm"
-            >
-              <span className="text-sm font-medium">Hide STOP replies</span>
-              <Switch
-                id="hide-opt-out-replies"
-                checked={hideOptOutMessages}
-                onCheckedChange={setHideOptOutMessages}
-                aria-label="Hide STOP replies"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {optOutKeywords.slice(0, 4).map((keyword) => (
-              <Badge
-                key={keyword}
-                variant="outline"
-                className="bg-background px-2 py-0 text-[11px] font-normal text-muted-foreground"
-              >
-                {keyword}
-              </Badge>
-            ))}
-            {optOutKeywords.length > 4 ? (
-              <Badge
-                variant="outline"
-                className="bg-background px-2 py-0 text-[11px] font-normal text-muted-foreground"
-              >
-                +{optOutKeywords.length - 4}
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-      </div>
       <ChatMessages
         messages={
-          displayedMessages as React.ComponentProps<typeof ChatMessages>["messages"]
+          messages as React.ComponentProps<typeof ChatMessages>["messages"]
         }
         messagesEndRef={messagesEndRef}
+        scrollContainerRef={scrollContainerRef}
+        loadMoreSentinelRef={loadMoreSentinelRef}
+        hasMoreOlder={hasMoreOlder}
+        loadingOlder={loadingOlder}
       />
     </div>
   );

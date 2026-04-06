@@ -79,21 +79,30 @@ describe("database.server helpers", () => {
       headers: { "Content-Type": "application/json; charset=UTF-8" },
       body: JSON.stringify({ a: 2 }),
     });
-    await expect(mod.parseRequestData(jsonCharsetReq)).resolves.toEqual({ a: 2 });
+    await expect(mod.parseRequestData(jsonCharsetReq)).resolves.toEqual({
+      a: 2,
+    });
 
     const urlReq = new Request("http://localhost/x", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      },
       body: new URLSearchParams({ a: "1", b: "2" }),
     });
-    await expect(mod.parseRequestData(urlReq)).resolves.toEqual({ a: "1", b: "2" });
+    await expect(mod.parseRequestData(urlReq)).resolves.toEqual({
+      a: "1",
+      b: "2",
+    });
 
     const bad = new Request("http://localhost/x", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: "x",
     });
-    await expect(mod.parseRequestData(bad)).rejects.toThrow("Unsupported content type");
+    await expect(mod.parseRequestData(bad)).rejects.toThrow(
+      "Unsupported content type",
+    );
   }, 30000);
 
   test("safeParseJson returns data, throws 400 Response on SyntaxError, and rethrows non-SyntaxError", async () => {
@@ -117,7 +126,9 @@ describe("database.server helpers", () => {
     } catch (e: any) {
       expect(e).toBeInstanceOf(Response);
       expect((e as Response).status).toBe(400);
-      await expect((e as Response).json()).resolves.toEqual({ error: "Invalid JSON" });
+      await expect((e as Response).json()).resolves.toEqual({
+        error: "Invalid JSON",
+      });
     }
 
     const nonSyntaxReq = {
@@ -148,11 +159,17 @@ describe("database.server helpers", () => {
         ["x", "y"],
       ]),
     });
-    await expect(mod.parseActionRequest(urlReq)).resolves.toEqual({ k: ["1", "2", "3"], x: "y" });
+    await expect(mod.parseActionRequest(urlReq)).resolves.toEqual({
+      k: ["1", "2", "3"],
+      x: "y",
+    });
 
     const fd = new FormData();
     fd.append("file", new File(["x"], "x.txt", { type: "text/plain" }));
-    const fdReq = new Request("http://localhost/x", { method: "POST", body: fd });
+    const fdReq = new Request("http://localhost/x", {
+      method: "POST",
+      body: fd,
+    });
     const parsed = await mod.parseActionRequest(fdReq);
     expect(parsed.file).toBeInstanceOf(File);
 
@@ -192,7 +209,11 @@ describe("database.server helpers", () => {
     } as any;
 
     await expect(
-      mod.endConferenceByUser({ workspace_id: "w1", user_id: "u1", supabaseClient }),
+      mod.endConferenceByUser({
+        workspace_id: "w1",
+        user_id: "u1",
+        supabaseClient,
+      }),
     ).rejects.toThrow("no row");
 
     const supabaseNoDataNoError = {
@@ -217,7 +238,11 @@ describe("database.server helpers", () => {
         select: () => ({
           eq: () => ({
             single: async () => ({
-              data: { twilio_data: { sid: "AC", authToken: "t" }, key: "", token: "" },
+              data: {
+                twilio_data: { sid: "AC", authToken: "t" },
+                key: "",
+                token: "",
+              },
               error: null,
             }),
           }),
@@ -226,7 +251,11 @@ describe("database.server helpers", () => {
     } as any;
 
     await expect(
-      mod.endConferenceByUser({ workspace_id: "w1", user_id: "", supabaseClient: supabaseOk }),
+      mod.endConferenceByUser({
+        workspace_id: "w1",
+        user_id: "",
+        supabaseClient: supabaseOk,
+      }),
     ).rejects.toThrow("User ID is required");
   });
 
@@ -240,7 +269,11 @@ describe("database.server helpers", () => {
             select: () => ({
               eq: () => ({
                 single: async () => ({
-                  data: { twilio_data: { sid: "AC", authToken: "t" }, key: "", token: "" },
+                  data: {
+                    twilio_data: { sid: "AC", authToken: "t" },
+                    key: "",
+                    token: "",
+                  },
                   error: null,
                 }),
               }),
@@ -250,7 +283,10 @@ describe("database.server helpers", () => {
         if (table === "call") {
           return {
             select: () => ({
-              eq: async () => ({ data: [{ sid: "CA1" }, { sid: "CA2" }], error: null }),
+              eq: async () => ({
+                data: [{ sid: "CA1" }, { sid: "CA2" }],
+                error: null,
+              }),
             }),
           };
         }
@@ -263,12 +299,15 @@ describe("database.server helpers", () => {
       .mockResolvedValueOnce({}) // CA1 ok
       .mockRejectedValueOnce(new Error("call-update-failed")); // CA2 fails -> logged
 
-    const conferencesUpdate = vi.fn().mockRejectedValueOnce(new Error("conf-update-failed")); // first conf fails -> logged
+    const conferencesUpdate = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("conf-update-failed")); // first conf fails -> logged
 
     twilioMocks.instance = {
       conferences: Object.assign(
         (sid: string) => ({
-          update: sid === "CONF_BAD" ? conferencesUpdate : vi.fn(async () => ({})),
+          update:
+            sid === "CONF_BAD" ? conferencesUpdate : vi.fn(async () => ({})),
         }),
         {
           list: vi.fn(async () => [{ sid: "CONF_BAD" }, { sid: "CONF_OK" }]),
@@ -281,7 +320,11 @@ describe("database.server helpers", () => {
     };
 
     await expect(
-      mod.endConferenceByUser({ workspace_id: "w1", user_id: "u1", supabaseClient }),
+      mod.endConferenceByUser({
+        workspace_id: "w1",
+        user_id: "u1",
+        supabaseClient,
+      }),
     ).resolves.toBeUndefined();
 
     expect(loggerMocks.error).toHaveBeenCalled(); // at least one error for conf/call
@@ -297,7 +340,11 @@ describe("database.server helpers", () => {
             select: () => ({
               eq: () => ({
                 single: async () => ({
-                  data: { twilio_data: { sid: "AC", authToken: "t" }, key: "", token: "" },
+                  data: {
+                    twilio_data: { sid: "AC", authToken: "t" },
+                    key: "",
+                    token: "",
+                  },
                   error: null,
                 }),
               }),
@@ -307,7 +354,10 @@ describe("database.server helpers", () => {
         if (table === "call") {
           return {
             select: () => ({
-              eq: async () => ({ data: [], error: new Error("call-select-failed") }),
+              eq: async () => ({
+                data: [],
+                error: new Error("call-select-failed"),
+              }),
             }),
           };
         }
@@ -326,7 +376,11 @@ describe("database.server helpers", () => {
     };
 
     await expect(
-      mod.endConferenceByUser({ workspace_id: "w1", user_id: "u1", supabaseClient }),
+      mod.endConferenceByUser({
+        workspace_id: "w1",
+        user_id: "u1",
+        supabaseClient,
+      }),
     ).resolves.toBeUndefined();
     expect(loggerMocks.error).toHaveBeenCalled();
   });
@@ -351,7 +405,8 @@ describe("database.server helpers", () => {
         {
           list: async () => {
             listCalls++;
-            if (listCalls === 1) return [{ sid: "CA1" }, { sid: "CA2" }, { sid: "CA3" }];
+            if (listCalls === 1)
+              return [{ sid: "CA1" }, { sid: "CA2" }, { sid: "CA3" }];
             return [];
           },
         },
@@ -360,8 +415,12 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedCalls(twilio, supabase, 2);
     expect(res.canceledCalls).toEqual(["CA1"]);
-    expect(res.errors.join("\n")).toMatch(/Error canceling call CA2: Unknown error/);
-    expect(res.errors.join("\n")).toMatch(/Error canceling call CA3: call update failed/);
+    expect(res.errors.join("\n")).toMatch(
+      /Error canceling call CA2: Unknown error/,
+    );
+    expect(res.errors.join("\n")).toMatch(
+      /Error canceling call CA3: call update failed/,
+    );
 
     const twilioFail = {
       calls: { list: async () => Promise.reject(new Error("list failed")) },
@@ -402,7 +461,8 @@ describe("database.server helpers", () => {
         {
           list: async () => {
             listMessages++;
-            if (listMessages === 1) return [{ sid: "SM1" }, { sid: "SM2" }, { sid: "SM3" }];
+            if (listMessages === 1)
+              return [{ sid: "SM1" }, { sid: "SM2" }, { sid: "SM3" }];
             return [];
           },
         },
@@ -411,8 +471,12 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessages(twilio, supabase, 2);
     expect(res.canceledMessages).toEqual(["SM1"]);
-    expect(res.errors.join("\n")).toMatch(/Error canceling call SM2: msg update failed/);
-    expect(res.errors.join("\n")).toMatch(/Error canceling call SM3: Unknown error/);
+    expect(res.errors.join("\n")).toMatch(
+      /Error canceling call SM2: msg update failed/,
+    );
+    expect(res.errors.join("\n")).toMatch(
+      /Error canceling call SM3: Unknown error/,
+    );
 
     const twilioFail = {
       messages: { list: async () => Promise.reject("nope") },
@@ -478,10 +542,188 @@ describe("database.server helpers", () => {
       })) as any,
     } as any;
 
-    const res = await mod.cancelQueuedMessagesForCampaign(twilio, supabase, 77, 10);
+    const res = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabase,
+      77,
+      10,
+    );
     expect(res).toEqual({ canceledMessages: ["SM1", "SM2"], errors: [] });
     expect(update).toHaveBeenCalledTimes(2);
     expect(supabase.rpc).toHaveBeenCalledTimes(2);
+
+    // Covers default batchSize = 100 path.
+    const supabaseEmpty = {
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.in = () => builder;
+        builder.limit = async () => ({ data: [], error: null });
+        return builder;
+      }),
+    } as any;
+    const resDefault = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseEmpty,
+      99,
+    );
+    expect(resDefault).toEqual({ canceledMessages: [], errors: [] });
+  });
+
+  test("cancelQueuedMessagesForCampaign handles query errors and thrown exceptions", async () => {
+    const mod = await import("../app/lib/database.server");
+
+    const twilio = {
+      messages: ((sid: string) => ({ update: async () => ({ sid }) })) as any,
+    } as any;
+
+    const supabaseQueryError = {
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.in = () => builder;
+        builder.limit = async () => ({
+          data: null,
+          error: { message: "db down" },
+        });
+        return builder;
+      }),
+    } as any;
+
+    const queryErrorRes = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseQueryError,
+      1,
+      5,
+    );
+    expect(queryErrorRes).toEqual({
+      canceledMessages: [],
+      errors: ["Error retrieving messages: db down"],
+    });
+
+    const supabaseQueryUnknown = {
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.in = () => builder;
+        builder.limit = async () => ({
+          data: null,
+          error: { message: "" },
+        });
+        return builder;
+      }),
+    } as any;
+
+    const unknownMessageRes = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseQueryUnknown,
+      1,
+      5,
+    );
+    expect(unknownMessageRes).toEqual({
+      canceledMessages: [],
+      errors: ["Error retrieving messages: Unknown error"],
+    });
+
+    const supabaseThrown = {
+      from: vi.fn(() => {
+        throw new Error("explode");
+      }),
+    } as any;
+
+    const thrownRes = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseThrown,
+      1,
+      5,
+    );
+    expect(thrownRes).toEqual({
+      canceledMessages: [],
+      errors: ["Error retrieving messages: explode"],
+    });
+
+    const supabaseThrownUnknown = {
+      from: vi.fn(() => {
+        throw "nope";
+      }),
+    } as any;
+
+    const unknownThrownRes = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseThrownUnknown,
+      1,
+      5,
+    );
+    expect(unknownThrownRes).toEqual({
+      canceledMessages: [],
+      errors: ["Error retrieving messages: Unknown error"],
+    });
+  });
+
+  test("cancelQueuedMessagesForCampaign continues when page size equals batch size", async () => {
+    const mod = await import("../app/lib/database.server");
+
+    const update = vi.fn(async (sid: string) => ({ sid }));
+    let page = 0;
+    const supabase = {
+      rpc: vi.fn(async () => ({})),
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.in = () => builder;
+        builder.limit = async () => {
+          page += 1;
+          if (page === 1) {
+            return { data: [{ sid: "SM1" }, { sid: "SM2" }], error: null };
+          }
+          return { data: [], error: null };
+        };
+        return builder;
+      }),
+    } as any;
+
+    const twilio = {
+      messages: ((sid: string) => ({ update: async () => update(sid) })) as any,
+    } as any;
+
+    const res = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabase,
+      55,
+      2,
+    );
+    expect(res).toEqual({ canceledMessages: ["SM1", "SM2"], errors: [] });
+    expect(page).toBe(2);
+  });
+
+  test("cancelQueuedMessagesForCampaign handles null queuedMessages payload", async () => {
+    const mod = await import("../app/lib/database.server");
+
+    const supabaseNullData = {
+      from: vi.fn(() => {
+        const builder: any = {};
+        builder.select = () => builder;
+        builder.eq = () => builder;
+        builder.in = () => builder;
+        builder.limit = async () => ({ data: null, error: null });
+        return builder;
+      }),
+    } as any;
+
+    const twilio = {
+      messages: ((sid: string) => ({ update: async () => ({ sid }) })) as any,
+    } as any;
+
+    const res = await mod.cancelQueuedMessagesForCampaign(
+      twilio,
+      supabaseNullData,
+      12,
+      3,
+    );
+    expect(res).toEqual({ canceledMessages: [], errors: [] });
   });
 });
-

@@ -16,42 +16,111 @@ function dedupeContactsById(contacts: Contact[]): Contact[] {
   );
 }
 
+function buildExactPhoneCandidates(fullNumber: string): string[] {
+  const candidates = new Set<string>();
+
+  if (!fullNumber) {
+    return [];
+  }
+
+  candidates.add(fullNumber);
+  candidates.add(`+${fullNumber}`);
+
+  const last10 = fullNumber.slice(-10);
+  if (last10.length === 10) {
+    const areaCode = last10.slice(0, 3);
+    const prefix = last10.slice(3, 6);
+    const lineNumber = last10.slice(6);
+
+    candidates.add(last10);
+    candidates.add(`1${last10}`);
+    candidates.add(`+1${last10}`);
+    candidates.add(`(${areaCode}) ${prefix}${lineNumber}`);
+    candidates.add(`(${areaCode})${prefix}${lineNumber}`);
+    candidates.add(`(${areaCode}) ${prefix}-${lineNumber}`);
+    candidates.add(`${areaCode}-${prefix}-${lineNumber}`);
+    candidates.add(`${areaCode}.${prefix}.${lineNumber}`);
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+function buildPrefixPhoneCandidates(fullNumber: string): string[] {
+  if (!fullNumber) {
+    return [];
+  }
+
+  const candidates = new Set<string>([fullNumber, `+${fullNumber}`]);
+  const last10 = fullNumber.slice(-10);
+
+  if (last10.length === 10) {
+    candidates.add(last10);
+    candidates.add(`1${last10}`);
+    candidates.add(`+1${last10}`);
+  }
+
+  return Array.from(candidates);
+}
+
 export const findPotentialContacts = async (
   supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
   workspaceId: string,
 ) => {
   const fullNumber = phoneNumber.replace(/\D/g, "");
-  const last10 = fullNumber.slice(-10);
-  const last7 = fullNumber.slice(-7);
-  const areaCode = last10.slice(0, 3);
-  const data = await supabaseClient
+  if (!fullNumber) {
+    return { data: [], error: null };
+  }
+
+  const rpcResult = await supabaseClient.rpc("find_contact_by_phone", {
+    p_workspace_id: workspaceId,
+    p_phone_number: phoneNumber,
+  });
+  if (!rpcResult.error) {
+    return rpcResult;
+  }
+
+  logger.warn(
+    "find_contact_by_phone RPC failed, falling back to legacy search",
+    {
+      workspaceId,
+      message: rpcResult.error.message,
+      code: (rpcResult.error as { code?: string }).code,
+    },
+  );
+
+  const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
+  if (exactPhoneCandidates.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const exactMatchResult = await supabaseClient
     .from("contact")
     .select()
     .eq("workspace", workspaceId)
-    .or(
-      `phone.eq.${fullNumber},` +
-        `phone.eq.+${fullNumber},` +
-        `phone.eq.+1${fullNumber},` +
-        `phone.eq.1${fullNumber},` +
-        `phone.eq.(${areaCode}) ${last7},` +
-        `phone.eq.(${areaCode})${last7},` +
-        `phone.eq.${areaCode}-${last7},` +
-        `phone.eq.${areaCode}.${last7},` +
-        `phone.eq.(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)},` +
-        `phone.ilike.%${fullNumber},` +
-        `phone.ilike.%+${fullNumber},` +
-        `phone.ilike.%+1${fullNumber},` +
-        `phone.ilike.%1${fullNumber},` +
-        `phone.ilike.%(${areaCode})%${last7},` +
-        `phone.ilike.%${areaCode}-%${last7},` +
-        `phone.ilike.%${areaCode}.%${last7},` +
-        `phone.ilike.%(${areaCode}) ${last7.slice(0, 3)}-${last7.slice(3)}%,` +
-        `phone.ilike.${last10}%`,
-    )
+    .in("phone", exactPhoneCandidates)
     .not("phone", "is", null)
     .neq("phone", "");
-  return data;
+
+  if (exactMatchResult.error || (exactMatchResult.data?.length ?? 0) > 0) {
+    return exactMatchResult;
+  }
+
+  const prefixFilters = buildPrefixPhoneCandidates(fullNumber)
+    .map((candidate) => `phone.ilike.${candidate}%`)
+    .join(",");
+
+  if (!prefixFilters) {
+    return exactMatchResult;
+  }
+
+  return supabaseClient
+    .from("contact")
+    .select()
+    .eq("workspace", workspaceId)
+    .or(prefixFilters)
+    .not("phone", "is", null)
+    .neq("phone", "");
 };
 
 export async function fetchContactData(
@@ -161,7 +230,7 @@ export const createContact = async (
 
 export const bulkCreateContacts = async (
   supabaseClient: SupabaseClient,
-  contacts: Partial<Contact[]>,
+  contacts: Partial<Contact>[],
   workspace_id: string,
   audience_id: string,
   user_id: string,
@@ -187,8 +256,30 @@ export const bulkCreateContacts = async (
   const { data: audience_insert, error: audience_insert_error } =
     await supabaseClient.from("contact_audience").insert(audienceMap).select();
 
-  if (audience_insert_error) throw audience_insert_error;
+  if (audience_insert_error) {
+    const insertedIds = insert.map((contact) => contact.id);
+    if (insertedIds.length > 0) {
+      const { error: rollbackError } = await supabaseClient
+        .from("contact")
+        .delete()
+        .eq("workspace", workspace_id)
+        .in("id", insertedIds);
+
+      if (rollbackError) {
+        logger.error(
+          "Failed to roll back contacts after audience insert failure",
+          {
+            workspace_id,
+            insertedIds,
+            rollbackError,
+            originalError: audience_insert_error,
+          },
+        );
+      }
+    }
+
+    throw audience_insert_error;
+  }
 
   return { insert, audience_insert };
 };
-

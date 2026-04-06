@@ -235,7 +235,7 @@ export default function WorkspaceSettings() {
           className="w-full"
         >
           <select
-            className="rounded-md border-2 border-black px-2 py-2 dark:border-white dark:font-normal"
+            className="rounded-md border-2 border-border px-2 py-2 bg-background text-foreground"
             name="new_user_workspace_role"
             id="new_user_workspace_role"
             defaultValue={MemberRole.Caller}
@@ -288,7 +288,7 @@ export default function WorkspaceSettings() {
         <Button
           asChild
           variant="outline"
-          className="h-full w-1/3 border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
+          className="h-full w-1/3 border border-border bg-primary font-Zilla-Slab text-2xl font-semibold text-primary-foreground"
         >
           <Link to=".." relative="path">
             Back
@@ -306,13 +306,13 @@ export default function WorkspaceSettings() {
         </Heading>
       </div>
       <div className="flex flex-wrap items-stretch gap-4">
-        <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex justify-between">
+        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex justify-between">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Team Members
             </h3>
             <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
                 Owner
               </p>
               {workspaceOwner && <TeamMember
@@ -323,7 +323,7 @@ export default function WorkspaceSettings() {
               />}
             </div>
             <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
                 Members
               </p>
               <ul className=" flex w-full flex-col items-center gap-2">
@@ -368,19 +368,19 @@ export default function WorkspaceSettings() {
             </div>
           </div>
           <div className="flex flex-col pt-4">
-            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
               {hasAccess && "Invite User"}
             </p>
             {hasAccess ? addUserTabs : callerSelfDeleteForm}
           </div>
         </Card>
-        <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Phone Numbers
             </h3>
             <div className="flex flex-col py-4">
-              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
                 Phone Numbers
               </p>
               <ul className="flex w-full flex-col items-center gap-2">
@@ -390,7 +390,7 @@ export default function WorkspaceSettings() {
                   } 
                   return (
                     <li key={number.id} className="w-full">
-                      <div className="flex w-full items-center justify-between bg-transparent p-2 text-xl shadow-sm dark:border-white">
+                      <div className="flex w-full items-center justify-between border-b border-border bg-transparent p-2 text-xl shadow-sm">
                         <p className="font-semibold">{number.phone_number}</p>
                         <div>
                           {number.capabilities?.verification_status ===
@@ -442,7 +442,7 @@ export default function WorkspaceSettings() {
         {hasAccess && (
           <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
         )}
-        {hasAccess && <Card bgColor="bg-brand-secondary dark:bg-zinc-900 flex-[40%] flex-col flex">
+        {hasAccess && <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
               Manage Webhook
@@ -456,7 +456,7 @@ export default function WorkspaceSettings() {
                   custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
                 } : undefined} userId={webhookUserId} workspaceId={webhookWorkspaceId} />
               ) : (
-                <p className="text-center text-gray-600">
+                <p className="text-center text-muted-foreground">
                   You don't have permission to manage webhooks.
                 </p>
               )}

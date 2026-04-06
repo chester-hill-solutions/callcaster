@@ -5,12 +5,11 @@ import { Enums } from "@/lib/database.types";
 
 type HeaderProps = {
   title: string;
-  isDesktop:boolean;
-  status: Enums<"campaign_status">
-}
+  isDesktop: boolean;
+  status: Enums<"campaign_status">;
+};
 
-
-const getStatusColor = (status:Enums<"campaign_status">) => {
+const getStatusColor = (status: Enums<"campaign_status">) => {
   switch (status) {
     case "pending":
       return "bg-yellow-200 text-yellow-800";
@@ -29,20 +28,27 @@ const getStatusColor = (status:Enums<"campaign_status">) => {
   }
 };
 
-export const CampaignHeader = ({ title, isDesktop = false, status }:HeaderProps) => {
+export const CampaignHeader = ({
+  title,
+  isDesktop = false,
+  status,
+}: HeaderProps) => {
   return (
-  <div className={`mt-2 ${isDesktop ? 'hidden sm:flex' : 'flex sm:hidden'} justify-center gap-2 ${isDesktop ? 'rounded-xl border-2 border-zinc-900 p-2 hover:border-brand-primary' : ''}`}>
-    <NavLink
-      className={`${isDesktop ? 'flex items-center gap-2' : ''} text-zinc-800 hover:text-brand-primary`}
-      to="."
-      relative="path"
-      end
+    <div
+      className={`mt-2 ${isDesktop ? "hidden sm:flex" : "flex sm:hidden"} justify-center gap-2 ${isDesktop ? "rounded-xl border border-border/80 bg-card/70 p-2" : ""}`}
     >
-      {isDesktop && <MdCampaign size={18} />}
-      <h3 className="font-Zilla-Slab text-2xl font-semibold">{title}</h3>
-      <Badge variant="outline" className={`ml-2 ${getStatusColor(status)}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    </NavLink>
-  </div>
-)};
+      <NavLink
+        className={`${isDesktop ? "flex items-center gap-2" : ""} text-foreground hover:text-brand-primary`}
+        to="."
+        relative="path"
+        end
+      >
+        {isDesktop && <MdCampaign size={18} />}
+        <h3 className="font-Zilla-Slab text-2xl font-semibold">{title}</h3>
+        <Badge variant="outline" className={`ml-2 ${getStatusColor(status)}`}>
+          {status.charAt(0).toUpperCase() + status.slice(1)}
+        </Badge>
+      </NavLink>
+    </div>
+  );
+};

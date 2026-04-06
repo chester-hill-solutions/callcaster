@@ -8,6 +8,8 @@ export type ConversationSummary = {
   contact_firstname: string | null;
   contact_surname: string | null;
   has_replied?: boolean;
+  /** Body of the most recent inbound message; used to filter STOP-only conversations. */
+  last_inbound_body?: string | null;
 };
 
 type ConversationMessageLike = {
@@ -18,7 +20,9 @@ type ConversationMessageLike = {
 
 export type ChatSortOption = "recent" | "hasReplied" | "hasUnreadReply";
 
-export function normalizeConversationPhone(phone: string | null): string | null {
+export function normalizeConversationPhone(
+  phone: string | null,
+): string | null {
   if (!phone) return null;
 
   const digits = phone.replace(/\D/g, "");
@@ -34,10 +38,9 @@ export function getConversationPhoneKey(phone: string | null): string | null {
   if (!normalizedPhone) return null;
 
   const digits = normalizedPhone.replace(/\D/g, "");
-  if (digits.length === 10) return `1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return digits;
 
-  return digits || null;
+  return digits;
 }
 
 export function getConversationParticipantPhones(
@@ -132,12 +135,14 @@ export function sortConversationSummaries(
   }
 
   return sortedConversations.sort((left, right) => {
+    const leftContactKey = getConversationPhoneKey(left.contact_phone);
+    const rightContactKey = getConversationPhoneKey(right.contact_phone);
     const leftHasReplied =
       left.has_replied === true ||
-      repliedContactKeys.has(getConversationPhoneKey(left.contact_phone) ?? "");
+      (leftContactKey !== null && repliedContactKeys.has(leftContactKey));
     const rightHasReplied =
       right.has_replied === true ||
-      repliedContactKeys.has(getConversationPhoneKey(right.contact_phone) ?? "");
+      (rightContactKey !== null && repliedContactKeys.has(rightContactKey));
     const repliedDelta = Number(rightHasReplied) - Number(leftHasReplied);
 
     if (repliedDelta !== 0) {

@@ -12,7 +12,15 @@ const mocks = vi.hoisted(() => {
 vi.mock("@remix-run/react", () => {
   return {
     Form: (props: any) => <form {...props} />,
-    useSubmit: () => (...args: any[]) => mocks.submit(...args),
+    useSubmit:
+      () =>
+      (...args: any[]) =>
+        mocks.submit(...args),
+    useFetcher: () => ({
+      submit: (...args: any[]) => mocks.submit(...args),
+      state: "idle",
+      data: null,
+    }),
     // Minimal Await impl: call render prop immediately.
     Await: ({ resolve, children }: any) => {
       return typeof children === "function" ? children(resolve) : children;
@@ -54,7 +62,7 @@ describe("app/components/MessageSettings.tsx", () => {
     vi.useRealTimers();
   });
 
-  test("renders media, toggles erase on hover, and removes image (DELETE submit + onChange filter)", async () => {
+  test("renders media, toggles erase on hover, and removes image via DELETE submit", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
     const props = baseProps();
 
@@ -64,17 +72,21 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByAltText("Campaign media 1")).toBeInTheDocument();
 
     // Hover shows remove button for a real imageId
-    fireEvent.mouseEnter(screen.getByAltText("Campaign media 1").closest("div") as HTMLElement);
+    fireEvent.mouseEnter(
+      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
+    );
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     expect(mocks.submit).toHaveBeenCalled();
-    expect(props.onChange).toHaveBeenCalledWith("message_media", ["b.png"]);
+    expect(props.onChange).not.toHaveBeenCalledWith("message_media", ["b.png"]);
 
-    fireEvent.mouseLeave(screen.getByAltText("Campaign media 1").closest("div") as HTMLElement);
+    fireEvent.mouseLeave(
+      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
+    );
   });
 
-  test("removeImage uses message_media ?? [] fallback (mutable details object)", async () => {
+  test("removeImage still submits when details.message_media becomes null", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
     const onChange = vi.fn();
     const details: any = {
@@ -93,21 +105,29 @@ describe("app/components/MessageSettings.tsx", () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByAltText("Campaign media 1").closest("div") as HTMLElement);
+    fireEvent.mouseEnter(
+      screen.getByAltText("Campaign media 1").closest("div") as HTMLElement,
+    );
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
 
-    // mutate prop object before click to exercise ?? [] branch inside removeImage
+    // mutate prop object before click; remove flow should still submit
     details.message_media = null;
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
 
-    expect(onChange).toHaveBeenCalledWith("message_media", []);
+    expect(mocks.submit).toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalledWith("message_media", []);
   });
 
   test("media render returns null when message_media is missing; hover guards when imageId missing", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props = baseProps({
-      details: { body_text: "", workspace: "w1", campaign_id: 1, message_media: null },
+      details: {
+        body_text: "",
+        workspace: "w1",
+        campaign_id: 1,
+        message_media: null,
+      },
     });
     const { container } = render(<MessageSettings {...props} />);
     expect(container.querySelector("img")).toBeFalsy();
@@ -123,7 +143,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.queryByRole("button", { name: "Remove" })).toBeNull();
   });
 
-  test("debounces body_text changes (clears prior timer) and syncs when details.body_text prop changes", async () => {
+  test("updates body_text immediately and syncs when details.body_text prop changes", async () => {
     vi.useFakeTimers();
     const { MessageSettings } = await import("@/components/MessageSettings");
 
@@ -132,7 +152,11 @@ describe("app/components/MessageSettings.tsx", () => {
       <MessageSettings
         {...baseProps({
           onChange,
-          details: { ...baseProps().details, body_text: "x", message_media: [] },
+          details: {
+            ...baseProps().details,
+            body_text: "x",
+            message_media: [],
+          },
           mediaLinks: [],
         })}
       />,
@@ -144,8 +168,7 @@ describe("app/components/MessageSettings.tsx", () => {
     fireEvent.change(textarea, { target: { value: "hello" } });
     fireEvent.change(textarea, { target: { value: "hello2" } });
 
-    expect(onChange).not.toHaveBeenCalledWith("body_text", "hello");
-    await vi.advanceTimersByTimeAsync(500);
+    expect(onChange).toHaveBeenCalledWith("body_text", "hello");
     expect(onChange).toHaveBeenCalledWith("body_text", "hello2");
 
     // prop -> state sync effect
@@ -153,12 +176,18 @@ describe("app/components/MessageSettings.tsx", () => {
       <MessageSettings
         {...baseProps({
           onChange,
-          details: { ...baseProps().details, body_text: "new", message_media: [] },
+          details: {
+            ...baseProps().details,
+            body_text: "new",
+            message_media: [],
+          },
           mediaLinks: [],
         })}
       />,
     );
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("new");
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(
+      "new",
+    );
   });
 
   test("template tags dropdown inserts tags, function examples, and survey functions; closes after insert", async () => {
@@ -177,10 +206,13 @@ describe("app/components/MessageSettings.tsx", () => {
 
     const { container } = render(<MessageSettings {...props} />);
 
-    const tagBtn = container.querySelector('button[title="Insert template tags"]') as HTMLButtonElement;
+    const tagBtn = container.querySelector(
+      'button[title="Insert template tags"]',
+    ) as HTMLButtonElement;
     fireEvent.click(tagBtn);
     expect(screen.getByText("Template Tags")).toBeInTheDocument();
-    const dropdown = screen.getByText("Template Tags").closest("div")?.parentElement as HTMLElement;
+    const dropdown = screen.getByText("Template Tags").closest("div")
+      ?.parentElement as HTMLElement;
 
     const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
     textarea.focus();
@@ -198,18 +230,28 @@ describe("app/components/MessageSettings.tsx", () => {
     // reopen and insert a non-survey function example
     fireEvent.click(tagBtn);
     const funcHeading = screen.getByText("Function Examples");
-    const funcSection = funcHeading.closest("div")?.parentElement as HTMLElement;
-    const exText = within(funcSection).getAllByText('btoa({{phone}}:{{external_id}})')[0] as HTMLElement;
+    const funcSection = funcHeading.closest("div")
+      ?.parentElement as HTMLElement;
+    const exText = within(funcSection).getAllByText(
+      "btoa({{phone}}:{{external_id}})",
+    )[0] as HTMLElement;
     fireEvent.click(exText.closest("button") as HTMLButtonElement);
     expect(textarea.value).toContain("btoa(");
-    expect(onChange).toHaveBeenCalledWith("body_text", expect.stringContaining("btoa("));
+    expect(onChange).toHaveBeenCalledWith(
+      "body_text",
+      expect.stringContaining("btoa("),
+    );
     expect(screen.queryByText("Template Tags")).toBeNull();
 
     await vi.runAllTimersAsync();
 
     // reopen and insert survey function from surveys list
     fireEvent.click(tagBtn);
-    fireEvent.click(screen.getByText("Generate survey link for S1").closest("button") as HTMLButtonElement);
+    fireEvent.click(
+      screen
+        .getByText("Generate survey link for S1")
+        .closest("button") as HTMLButtonElement,
+    );
     expect(textarea.value).toContain('survey({{contact_id}}, "s1")');
     expect(onChange).toHaveBeenCalledWith(
       "body_text",
@@ -222,8 +264,11 @@ describe("app/components/MessageSettings.tsx", () => {
     // reopen and insert survey function where surveyTitle is falsy (covers surveyTitle || "")
     fireEvent.click(tagBtn);
     const funcHeading2 = screen.getByText("Function Examples");
-    const funcSection2 = funcHeading2.closest("div")?.parentElement as HTMLElement;
-    const ex2 = within(funcSection2).getByText('survey({{contact_id}}, "s2")') as HTMLElement;
+    const funcSection2 = funcHeading2.closest("div")
+      ?.parentElement as HTMLElement;
+    const ex2 = within(funcSection2).getByText(
+      'survey({{contact_id}}, "s2")',
+    ) as HTMLElement;
     fireEvent.click(ex2.closest("button") as HTMLButtonElement);
     expect(textarea.value).toContain('survey({{contact_id}}, "s2")');
     await vi.runAllTimersAsync();
@@ -246,7 +291,8 @@ describe("app/components/MessageSettings.tsx", () => {
     render(<MessageSettings {...props} />);
 
     expect(screen.getByText("Template Tags Found:")).toBeInTheDocument();
-    const preview = screen.getByText("Template Tags Found:").closest("div")?.parentElement as HTMLElement;
+    const preview = screen.getByText("Template Tags Found:").closest("div")
+      ?.parentElement as HTMLElement;
     expect(within(preview).getByText(/{{firstname}}/)).toBeInTheDocument();
     // firstname fallback should be detected but NOT added as a separate foundTag (already present)
     expect(within(preview).queryByText(/{{firstname\|"x"}}/)).toBeNull();
@@ -256,9 +302,13 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(within(preview).getAllByText(/Survey link function/).length).toBe(2);
 
     // Survey link preview exists and includes extracted + unknown survey id
-    const surveyPreview = screen.getByText("Survey Links Preview:").closest("div")?.parentElement as HTMLElement;
+    const surveyPreview = screen
+      .getByText("Survey Links Preview:")
+      .closest("div")?.parentElement as HTMLElement;
     expect(within(surveyPreview).getAllByText(/contact_id:s1/).length).toBe(2);
-    expect(within(surveyPreview).getByText(/contact_id:unknown/)).toBeInTheDocument();
+    expect(
+      within(surveyPreview).getByText(/contact_id:unknown/),
+    ).toBeInTheDocument();
   });
 
   test("handleAddMedia no-ops when no file; submits multipart when file provided (campaignId nullish branch)", async () => {
@@ -269,7 +319,9 @@ describe("app/components/MessageSettings.tsx", () => {
     });
 
     const { container } = render(<MessageSettings {...props} />);
-    const input = container.querySelector('input[type="file"]#add-image') as HTMLInputElement;
+    const input = container.querySelector(
+      'input[type="file"]#add-image',
+    ) as HTMLInputElement;
 
     fireEvent.change(input, { target: { files: [] } });
     expect(mocks.submit).not.toHaveBeenCalled();
@@ -294,7 +346,11 @@ describe("app/components/MessageSettings.tsx", () => {
     unmount();
     const props2 = baseProps({
       mediaLinks: [],
-      details: { ...baseProps().details, message_media: [], body_text: "^".repeat(81) },
+      details: {
+        ...baseProps().details,
+        message_media: [],
+        body_text: "^".repeat(81),
+      },
     });
     const r2 = render(<MessageSettings {...props2} />);
     expect(screen.getByText("9 / 153 units used")).toBeInTheDocument();
@@ -309,7 +365,11 @@ describe("app/components/MessageSettings.tsx", () => {
 
     const props3 = baseProps({
       mediaLinks: [],
-      details: { ...baseProps().details, message_media: [], body_text: "🔥".repeat(71) },
+      details: {
+        ...baseProps().details,
+        message_media: [],
+        body_text: "🔥".repeat(71),
+      },
     });
     render(<MessageSettings {...props3} />);
     expect(screen.getByText("4 / 67 characters used")).toBeInTheDocument();
@@ -317,4 +377,3 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("71 visible characters")).toBeInTheDocument();
   });
 });
-

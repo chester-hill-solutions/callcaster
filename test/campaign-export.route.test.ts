@@ -16,7 +16,14 @@ vi.mock("@/lib/database.server", async () => {
 
 const loggerError = vi.fn();
 vi.mock("@/lib/logger.server", () => {
-  return { logger: { error: loggerError, info: vi.fn(), warn: vi.fn(), debug: vi.fn() } };
+  return {
+    logger: {
+      error: loggerError,
+      info: vi.fn(),
+      warn: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
 });
 
 type UploadBehavior = "ok" | "error" | "throw" | "throwNonError";
@@ -126,7 +133,8 @@ function makeSupabase(config: ExportSupabaseConfig) {
         "ok";
       if (behavior === "throw") throw new Error("upload throw");
       if (behavior === "throwNonError") throw "upload throw";
-      if (behavior === "error") return { data: null, error: { message: "upload error" } };
+      if (behavior === "error")
+        return { data: null, error: { message: "upload error" } };
       return { data: {}, error: null };
     }),
     createSignedUrl: vi.fn(async () => {
@@ -152,24 +160,33 @@ function makeSupabase(config: ExportSupabaseConfig) {
           );
           if (isExportQuery) {
             if (config.campaignExportError) {
-              return { data: null, error: { message: config.campaignExportError } };
+              return {
+                data: null,
+                error: { message: config.campaignExportError },
+              };
             }
             if (config.campaignExportMissing) {
               return { data: null, error: null };
             }
           }
 
-          if (config.campaignError) return { data: null, error: { message: config.campaignError } };
+          if (config.campaignError)
+            return { data: null, error: { message: config.campaignError } };
           if (qb.singleMode) return { data: campaign, error: null };
           return { data: [campaign], error: null };
         }
 
         if (table === "campaign_queue") {
           if (config.campaignQueueError != null) {
-            return { data: null, error: { message: config.campaignQueueError } };
+            return {
+              data: null,
+              error: { message: config.campaignQueueError },
+            };
           }
           return {
-            data: (config.campaignQueueContactIds ?? []).map((contact_id) => ({ contact_id })),
+            data: (config.campaignQueueContactIds ?? []).map((contact_id) => ({
+              contact_id,
+            })),
             error: null,
           };
         }
@@ -190,7 +207,9 @@ function makeSupabase(config: ExportSupabaseConfig) {
             (f) => f[0] === "eq" && f[1] === "campaign_id",
           )?.[2];
           const filteredMessages = (config.messages ?? []).filter((message) =>
-            campaignIdFilter == null ? true : message.campaign_id === campaignIdFilter,
+            campaignIdFilter == null
+              ? true
+              : message.campaign_id === campaignIdFilter,
           );
           if (wantsCount) {
             if (config.messageCountError != null)
@@ -211,11 +230,14 @@ function makeSupabase(config: ExportSupabaseConfig) {
         }
 
         if (table === "live_campaign" || table === "ivr_campaign") {
-          if (config.scriptError != null) return { data: null, error: { message: config.scriptError } };
+          if (config.scriptError != null)
+            return { data: null, error: { message: config.scriptError } };
           return {
             data: {
               script:
-                config.script === undefined ? { steps: { pages: {}, blocks: {} } } : config.script,
+                config.script === undefined
+                  ? { steps: { pages: {}, blocks: {} } }
+                  : config.script,
             },
             error: null,
           };
@@ -226,17 +248,29 @@ function makeSupabase(config: ExportSupabaseConfig) {
           const wantsCount = !!selectOpts?.count;
           if (wantsCount) {
             if (config.outreachAttemptCountError != null) {
-              return { data: null, error: { message: config.outreachAttemptCountError }, count: null };
+              return {
+                data: null,
+                error: { message: config.outreachAttemptCountError },
+                count: null,
+              };
             }
-            return { data: null, error: null, count: config.outreachAttemptCount ?? 0 };
+            return {
+              data: null,
+              error: null,
+              count: config.outreachAttemptCount ?? 0,
+            };
           }
           if (config.outreachAttemptsError != null)
-            return { data: null, error: { message: config.outreachAttemptsError } };
+            return {
+              data: null,
+              error: { message: config.outreachAttemptsError },
+            };
           return { data: config.outreachAttempts ?? [], error: null };
         }
 
         if (table === "call") {
-          if (config.callsError != null) return { data: null, error: { message: config.callsError } };
+          if (config.callsError != null)
+            return { data: null, error: { message: config.callsError } };
           return {
             data: config.calls === undefined ? [] : config.calls,
             error: null,
@@ -284,7 +318,9 @@ describe("api.campaign-export", () => {
   test("returns 401 when user missing", async () => {
     authUser = null;
     const mod = await import("../app/routes/api.campaign-export");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const res = await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any);
     expect(res.status).toBe(401);
   }, 60000);
 
@@ -343,7 +379,13 @@ describe("api.campaign-export", () => {
     supabaseForAuth = supabaseClient;
     const mod = await import("../app/routes/api.campaign-export");
 
-    const res = await mod.action({ request: { formData: () => { throw new Error("bad form"); } } } as any);
+    const res = await mod.action({
+      request: {
+        formData: () => {
+          throw new Error("bad form");
+        },
+      },
+    } as any);
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "bad form" });
 
@@ -370,13 +412,41 @@ describe("api.campaign-export", () => {
       },
       campaignQueueContactIds: [1, 2],
       contacts: [
-        { id: 1, firstname: "A", surname: "AA", phone: "+1 (555) 000-0000", opt_out: false, workspace: "w1" },
-        { id: 2, firstname: "B", surname: "BB", phone: null, opt_out: true, workspace: "w1" },
+        {
+          id: 1,
+          firstname: "A",
+          surname: "AA",
+          phone: "+1 (555) 000-0000",
+          opt_out: false,
+          workspace: "w1",
+        },
+        {
+          id: 2,
+          firstname: "B",
+          surname: "BB",
+          phone: null,
+          opt_out: true,
+          workspace: "w1",
+        },
       ],
       messageCount: 2,
       messages: [
-        { id: "m1", campaign_id: 1, body: "=HYPERLINK(\"x\")", from: "+1 (555) 000-0000", to: "1", date_created: new Date().toISOString() },
-        { id: "m2", campaign_id: 1, body: "no match", from: "000", to: "999", date_created: new Date().toISOString() },
+        {
+          id: "m1",
+          campaign_id: 1,
+          body: '=HYPERLINK("x")',
+          from: "+1 (555) 000-0000",
+          to: "1",
+          date_created: new Date().toISOString(),
+        },
+        {
+          id: "m2",
+          campaign_id: 1,
+          body: "no match",
+          from: "000",
+          to: "999",
+          date_created: new Date().toISOString(),
+        },
       ],
     });
     supabaseForAuth = supabaseClient;
@@ -414,11 +484,32 @@ describe("api.campaign-export", () => {
       },
       campaignQueueContactIds: [1],
       contacts: [
-        { id: 1, firstname: "A", surname: "AA", phone: "+1 (555) 000-0000", opt_out: false, workspace: "w1" },
+        {
+          id: 1,
+          firstname: "A",
+          surname: "AA",
+          phone: "+1 (555) 000-0000",
+          opt_out: false,
+          workspace: "w1",
+        },
       ],
       messages: [
-        { id: "m1", campaign_id: 81, body: "included", from: "+1 (555) 000-0000", to: "1", date_created: new Date().toISOString() },
-        { id: "m2", campaign_id: 999, body: "excluded", from: "+1 (555) 000-0000", to: "1", date_created: new Date().toISOString() },
+        {
+          id: "m1",
+          campaign_id: 81,
+          body: "included",
+          from: "+1 (555) 000-0000",
+          to: "1",
+          date_created: new Date().toISOString(),
+        },
+        {
+          id: "m2",
+          campaign_id: 999,
+          body: "excluded",
+          from: "+1 (555) 000-0000",
+          to: "1",
+          date_created: new Date().toISOString(),
+        },
       ],
     });
     supabaseForAuth = supabaseClient;
@@ -431,9 +522,9 @@ describe("api.campaign-export", () => {
 
     await vi.runAllTimersAsync();
 
-    const csvUpload = (supabaseClient.__uploads as Array<{ path: string; body: unknown }>).find((u) =>
-      String(u.path).endsWith(".csv"),
-    );
+    const csvUpload = (
+      supabaseClient.__uploads as Array<{ path: string; body: unknown }>
+    ).find((u) => String(u.path).endsWith(".csv"));
     expect(csvUpload).toBeTruthy();
     const csvText =
       csvUpload?.body instanceof Blob
@@ -605,7 +696,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("message export covers internal campaign error and missing-campaign fallback", async () => {
@@ -629,7 +723,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
 
     loggerError.mockClear();
     const { supabaseClient: sb2 } = makeSupabase({
@@ -649,7 +746,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res2.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("message export covers campaign queue/contact/message errors and CSV upload error", async () => {
@@ -726,7 +826,9 @@ describe("api.campaign-export", () => {
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (555) 555-5555", workspace: "w1" }],
       messageCount: 1,
-      messages: [{ id: "m", from: "0", to: "0", date_created: new Date().toISOString() }],
+      messages: [
+        { id: "m", from: "0", to: "0", date_created: new Date().toISOString() },
+      ],
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
     supabaseForAuth = sbCsvErr;
@@ -735,7 +837,10 @@ describe("api.campaign-export", () => {
     } as any);
 
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("message export covers no-matches and empty-messages break, and signed-url error path", async () => {
@@ -763,7 +868,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("message export covers opt_out=true match and from/to empty-string fallbacks", async () => {
@@ -778,11 +886,23 @@ describe("api.campaign-export", () => {
         end_date: new Date("2026-01-02").toISOString(),
       },
       campaignQueueContactIds: [1],
-      contacts: [{ id: 1, phone: "5550000000", opt_out: true, workspace: "w1" }],
+      contacts: [
+        { id: 1, phone: "5550000000", opt_out: true, workspace: "w1" },
+      ],
       messageCount: 2,
       messages: [
-        { id: "m1", from: "5550000000", to: null, date_created: new Date().toISOString() },
-        { id: "m2", from: null, to: undefined, date_created: new Date().toISOString() },
+        {
+          id: "m1",
+          from: "5550000000",
+          to: null,
+          date_created: new Date().toISOString(),
+        },
+        {
+          id: "m2",
+          from: null,
+          to: undefined,
+          date_created: new Date().toISOString(),
+        },
       ],
     });
     supabaseForAuth = supabaseClient;
@@ -877,7 +997,10 @@ describe("api.campaign-export", () => {
     } as any);
     await vi.runAllTimersAsync();
 
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("call export runs and covers result parsing (string/object/invalid), visited pages, and credits", async () => {
@@ -932,12 +1055,38 @@ describe("api.campaign-export", () => {
         },
       ],
       contacts: [
-        { id: "c1", firstname: "A", surname: "AA", phone: "1", opt_out: false, workspace: "w1" },
-        { id: "c2", firstname: "B", surname: "BB", phone: "2", opt_out: true, workspace: "w1" },
+        {
+          id: "c1",
+          firstname: "A",
+          surname: "AA",
+          phone: "1",
+          opt_out: false,
+          workspace: "w1",
+        },
+        {
+          id: "c2",
+          firstname: "B",
+          surname: "BB",
+          phone: "2",
+          opt_out: true,
+          workspace: "w1",
+        },
       ],
       calls: [
-        { outreach_attempt_id: "a1", sid: "s1", duration: "61", status: "completed", start_time: "st", end_time: "en" },
-        { outreach_attempt_id: "a2", sid: "s2", duration: null, status: "no-answer" },
+        {
+          outreach_attempt_id: "a1",
+          sid: "s1",
+          duration: "61",
+          status: "completed",
+          start_time: "st",
+          end_time: "en",
+        },
+        {
+          outreach_attempt_id: "a2",
+          sid: "s2",
+          duration: null,
+          status: "no-answer",
+        },
         { outreach_attempt_id: null, sid: "s3", duration: "0" }, // covers outreach_attempt_id guard
       ],
     });
@@ -986,7 +1135,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
 
     loggerError.mockClear();
     const { supabaseClient: sb2 } = makeSupabase({
@@ -1006,7 +1158,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res2.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("call export CSV upload error triggers catch", async () => {
@@ -1032,7 +1187,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("call export covers ivr_campaign selection and errors (script/count/calls)", async () => {
@@ -1058,7 +1216,10 @@ describe("api.campaign-export", () => {
     } as any);
     expect(res.status).toBe(200);
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
   });
 
   test("call export covers attempt chunk break, contacts/calls errors, status upload error, signed url error, and nested catch logging", async () => {
@@ -1368,7 +1529,9 @@ describe("api.campaign-export", () => {
         end_date: new Date("2026-01-02").toISOString(),
       },
       outreachAttemptCount: 1,
-      outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 78, result: null }],
+      outreachAttempts: [
+        { id: "a1", contact_id: "c1", campaign_id: 78, result: null },
+      ],
       contacts: null as any,
       calls: null as any,
     });
@@ -1409,7 +1572,10 @@ describe("api.campaign-export", () => {
     expect(res.status).toBe(200);
 
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
     expect(loggerError).toHaveBeenCalledWith(
       "Error updating error status:",
       expect.anything(),
@@ -1443,11 +1609,13 @@ describe("api.campaign-export", () => {
     expect(res.status).toBe(200);
 
     await vi.runAllTimersAsync();
-    expect(loggerError).toHaveBeenCalledWith("Export error:", expect.anything());
+    expect(loggerError).toHaveBeenCalledWith(
+      "Export error:",
+      expect.anything(),
+    );
     expect(loggerError).toHaveBeenCalledWith(
       "Error writing error status:",
       expect.anything(),
     );
   });
 });
-

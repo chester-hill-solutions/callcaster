@@ -33,7 +33,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     // Twilio is used via `new Twilio.Twilio(...)` and then various subresources.
     vi.doMock("twilio", () => {
       const newKeysCreate = vi.fn(async () => ({ sid: "SK1", secret: "sec" }));
-      const accountsCreate = vi.fn(async () => ({ sid: "AC_sub", authToken: "tok" }));
+      const accountsCreate = vi.fn(async () => ({
+        sid: "AC_sub",
+        authToken: "tok",
+      }));
 
       const outgoingRemove = vi.fn(async () => ({}));
       const incomingRemove = vi.fn(async () => ({}));
@@ -89,13 +92,17 @@ describe("app/lib/database/workspace.server.ts", () => {
     const supabaseNoSession: any = {
       auth: { getSession: async () => ({ data: { session: null } }) },
     };
-    await expect(mod.getUserWorkspaces({ supabaseClient: supabaseNoSession })).resolves.toEqual({
+    await expect(
+      mod.getUserWorkspaces({ supabaseClient: supabaseNoSession }),
+    ).resolves.toEqual({
       data: null,
       error: "No user session found",
     });
 
     const supabaseErr: any = {
-      auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
+      auth: {
+        getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
+      },
       from: () => ({
         select: () => ({
           order: async () => ({ data: [{ id: 1 }], error: { message: "x" } }),
@@ -112,7 +119,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     const mod = await import("../app/lib/database/workspace.server");
 
     const supabaseOk: any = {
-      auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
+      auth: {
+        getSession: async () => ({ data: { session: { user: { id: "u1" } } } }),
+      },
       from: () => ({
         select: () => ({
           order: async () => ({ data: [{ id: 1 }], error: null }),
@@ -129,11 +138,17 @@ describe("app/lib/database/workspace.server.ts", () => {
     const Twilio = (await import("twilio")).default as any;
     const mod = await import("../app/lib/database/workspace.server");
 
-    const ok = await mod.createKeys({ workspace_id: "w1", sid: "AC", token: "tok" });
+    const ok = await mod.createKeys({
+      workspace_id: "w1",
+      sid: "AC",
+      token: "tok",
+    });
     expect(ok).toMatchObject({ sid: "SK1", secret: "sec" });
 
     Twilio.__mocks.newKeysCreate.mockRejectedValueOnce(new Error("bad"));
-    await expect(mod.createKeys({ workspace_id: "w1", sid: "AC", token: "tok" })).rejects.toThrow("bad");
+    await expect(
+      mod.createKeys({ workspace_id: "w1", sid: "AC", token: "tok" }),
+    ).rejects.toThrow("bad");
     expect(logger.error).toHaveBeenCalled();
   });
 
@@ -166,7 +181,11 @@ describe("app/lib/database/workspace.server.ts", () => {
     };
 
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabase, workspaceName: "W", user_id: "u1" }),
+      mod.createNewWorkspace({
+        supabaseClient: supabase,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
     ).resolves.toEqual({ data: "w_new", error: null });
     expect(stripe.createStripeContact).toHaveBeenCalled();
 
@@ -180,7 +199,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabaseRpcErr, workspaceName: "W", user_id: "u1" }),
+      mod.createNewWorkspace({
+        supabaseClient: supabaseRpcErr,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
     ).resolves.toMatchObject({ data: null, error: "rpc" });
     expect(logger.error).toHaveBeenCalled();
 
@@ -194,7 +217,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabaseUpdateErr, workspaceName: "W", user_id: "u1" }),
+      mod.createNewWorkspace({
+        supabaseClient: supabaseUpdateErr,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
     ).resolves.toMatchObject({ data: null, error: "upd" });
 
     const Twilio = (await import("twilio")).default as any;
@@ -202,14 +229,28 @@ describe("app/lib/database/workspace.server.ts", () => {
     // Subaccount creation fails => specific error
     Twilio.__mocks.accountsCreate.mockRejectedValueOnce(new Error("nope"));
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabase, workspaceName: "W", user_id: "u1" }),
-    ).resolves.toMatchObject({ data: null, error: "Failed to create Twilio subaccount" });
+      mod.createNewWorkspace({
+        supabaseClient: supabase,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
+    ).resolves.toMatchObject({
+      data: null,
+      error: "Failed to create Twilio subaccount",
+    });
 
     // Keys creation returns falsy without throwing
     Twilio.__mocks.newKeysCreate.mockResolvedValueOnce(undefined);
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabase, workspaceName: "W", user_id: "u1" }),
-    ).resolves.toMatchObject({ data: null, error: "Failed to create Twilio API keys" });
+      mod.createNewWorkspace({
+        supabaseClient: supabase,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
+    ).resolves.toMatchObject({
+      data: null,
+      error: "Failed to create Twilio API keys",
+    });
 
     // Non-Error throws => generic message branch
     const supabaseThrows: any = {
@@ -218,7 +259,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.createNewWorkspace({ supabaseClient: supabaseThrows, workspaceName: "W", user_id: "u1" }),
+      mod.createNewWorkspace({
+        supabaseClient: supabaseThrows,
+        workspaceName: "W",
+        user_id: "u1",
+      }),
     ).resolves.toEqual({ data: null, error: "An unexpected error occurred" });
     expect(logger.error).toHaveBeenCalled();
   });
@@ -227,7 +272,12 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    await expect(mod.getWorkspaceInfo({ supabaseClient: {} as any, workspaceId: undefined })).resolves.toEqual({
+    await expect(
+      mod.getWorkspaceInfo({
+        supabaseClient: {} as any,
+        workspaceId: undefined,
+      }),
+    ).resolves.toEqual({
       error: "No workspace id",
     });
 
@@ -235,12 +285,18 @@ describe("app/lib/database/workspace.server.ts", () => {
       from: () => ({
         select: () => ({
           eq: () => ({
-            single: async () => ({ data: { name: "W" }, error: { details: "x" } }),
+            single: async () => ({
+              data: { name: "W" },
+              error: { details: "x" },
+            }),
           }),
         }),
       }),
     };
-    const res = await mod.getWorkspaceInfo({ supabaseClient: supabase, workspaceId: "w1" });
+    const res = await mod.getWorkspaceInfo({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
     expect(res.data).toEqual({ name: "W" });
     expect(logger.error).toHaveBeenCalled();
   });
@@ -257,7 +313,10 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const res = await mod.getWorkspaceInfo({ supabaseClient: supabaseOk, workspaceId: "w1" });
+    const res = await mod.getWorkspaceInfo({
+      supabaseClient: supabaseOk,
+      workspaceId: "w1",
+    });
     expect(res).toEqual({ data: { name: "W" }, error: null });
     expect(logger.error).not.toHaveBeenCalled();
   });
@@ -277,7 +336,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.getWorkspaceInfoWithDetails({ supabaseClient: supabaseErr, workspaceId: "w1", userId: "u1" }),
+      mod.getWorkspaceInfoWithDetails({
+        supabaseClient: supabaseErr,
+        workspaceId: "w1",
+        userId: "u1",
+      }),
     ).rejects.toThrow("x");
 
     const supabaseOk: any = {
@@ -302,9 +365,18 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const out = await mod.getWorkspaceInfoWithDetails({ supabaseClient: supabaseOk, workspaceId: "w1", userId: "u1" });
+    const out = await mod.getWorkspaceInfoWithDetails({
+      supabaseClient: supabaseOk,
+      workspaceId: "w1",
+      userId: "u1",
+    });
     expect(out).toMatchObject({
-      workspace: { id: "w1", name: "W", credits: 0, workspace_users: [{ role: "admin" }] },
+      workspace: {
+        id: "w1",
+        name: "W",
+        credits: 0,
+        workspace_users: [{ role: "admin" }],
+      },
       campaigns: [{ id: 1 }],
       phoneNumbers: [{ id: 1 }],
       audiences: [{ id: 1 }],
@@ -324,8 +396,14 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
 
-    await mod.getWorkspaceUsers({ supabaseClient: supabase, workspaceId: "w1" });
-    await mod.getWorkspacePhoneNumbers({ supabaseClient: supabase, workspaceId: "w1" });
+    await mod.getWorkspaceUsers({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
+    await mod.getWorkspacePhoneNumbers({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
     expect(logger.error).toHaveBeenCalled();
   });
 
@@ -341,8 +419,14 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    await mod.getWorkspaceUsers({ supabaseClient: supabase, workspaceId: "w1" });
-    await mod.getWorkspacePhoneNumbers({ supabaseClient: supabase, workspaceId: "w1" });
+    await mod.getWorkspaceUsers({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
+    await mod.getWorkspacePhoneNumbers({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -415,7 +499,13 @@ describe("app/lib/database/workspace.server.ts", () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
 
-    await expect(mod.getUserRole({ supabaseClient: {} as any, user: null as any, workspaceId: "w1" })).resolves.toBeNull();
+    await expect(
+      mod.getUserRole({
+        supabaseClient: {} as any,
+        user: null as any,
+        workspaceId: "w1",
+      }),
+    ).resolves.toBeNull();
 
     const supabase: any = {
       from: () => ({
@@ -428,7 +518,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const role = await mod.getUserRole({ supabaseClient: supabase, user: { id: "u1" } as any, workspaceId: "w1" });
+    const role = await mod.getUserRole({
+      supabaseClient: supabase,
+      user: { id: "u1" } as any,
+      workspaceId: "w1",
+    });
     expect(role).toBeNull();
     expect(logger.error).toHaveBeenCalled();
   });
@@ -448,7 +542,11 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.requireWorkspaceAccess({ supabaseClient: supabaseForbidden, user: { id: "u1" }, workspaceId: "w1" }),
+      mod.requireWorkspaceAccess({
+        supabaseClient: supabaseForbidden,
+        user: { id: "u1" },
+        workspaceId: "w1",
+      }),
     ).rejects.toMatchObject({ statusCode: 403 });
 
     const supabaseAllowed: any = {
@@ -463,23 +561,37 @@ describe("app/lib/database/workspace.server.ts", () => {
       }),
     };
     await expect(
-      mod.requireWorkspaceAccess({ supabaseClient: supabaseAllowed, user: { id: "u1" }, workspaceId: "w1" }),
+      mod.requireWorkspaceAccess({
+        supabaseClient: supabaseAllowed,
+        user: { id: "u1" },
+        workspaceId: "w1",
+      }),
     ).resolves.toBeUndefined();
   });
 
   test("updateUserWorkspaceAccessDate logs on rpc error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = { rpc: async () => ({ data: null, error: new Error("x") }) };
-    await mod.updateUserWorkspaceAccessDate({ supabaseClient: supabase, workspaceId: "w1" });
+    const supabase: any = {
+      rpc: async () => ({ data: null, error: new Error("x") }),
+    };
+    await mod.updateUserWorkspaceAccessDate({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
     expect(logger.error).toHaveBeenCalled();
   });
 
   test("updateUserWorkspaceAccessDate success does not log", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
-    const supabase: any = { rpc: async () => ({ data: { ok: 1 }, error: null }) };
-    await mod.updateUserWorkspaceAccessDate({ supabaseClient: supabase, workspaceId: "w1" });
+    const supabase: any = {
+      rpc: async () => ({ data: { ok: 1 }, error: null }),
+    };
+    await mod.updateUserWorkspaceAccessDate({
+      supabaseClient: supabase,
+      workspaceId: "w1",
+    });
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -495,7 +607,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r1 = await mod.handleExistingUserSession(supabaseErr, serverSession, headers);
+    const r1 = await mod.handleExistingUserSession(
+      supabaseErr,
+      serverSession,
+      headers,
+    );
     expect(r1.status).toBe(200);
     expect(await r1.json()).toMatchObject({ invites: [], newSession: null });
 
@@ -506,8 +622,15 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r2 = await mod.handleExistingUserSession(supabaseOk, serverSession, headers);
-    expect(await r2.json()).toMatchObject({ newSession: serverSession, error: null });
+    const r2 = await mod.handleExistingUserSession(
+      supabaseOk,
+      serverSession,
+      headers,
+    );
+    expect(await r2.json()).toMatchObject({
+      newSession: serverSession,
+      error: null,
+    });
   });
 
   test("handleNewUserOTPVerification covers all branches", async () => {
@@ -515,33 +638,61 @@ describe("app/lib/database/workspace.server.ts", () => {
     const headers = new Headers();
 
     const supabaseNoHash: any = { auth: {} };
-    const r0 = await mod.handleNewUserOTPVerification(supabaseNoHash, "", "signup" as any, headers);
+    const r0 = await mod.handleNewUserOTPVerification(
+      supabaseNoHash,
+      "",
+      "signup" as any,
+      headers,
+    );
     expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
 
     const supabaseVerifyErr: any = {
       auth: { verifyOtp: async () => ({ data: null, error: new Error("x") }) },
     };
-    const r1 = await mod.handleNewUserOTPVerification(supabaseVerifyErr, "th", "signup" as any, headers);
-    expect((await r1.json() as any).error).toBeTruthy();
+    const r1 = await mod.handleNewUserOTPVerification(
+      supabaseVerifyErr,
+      "th",
+      "signup" as any,
+      headers,
+    );
+    expect(((await r1.json()) as any).error).toBeTruthy();
 
     const supabaseNoSession: any = {
-      auth: { verifyOtp: async () => ({ data: { session: null }, error: null }) },
+      auth: {
+        verifyOtp: async () => ({ data: { session: null }, error: null }),
+      },
     };
-    const r2 = await mod.handleNewUserOTPVerification(supabaseNoSession, "th", "signup" as any, headers);
+    const r2 = await mod.handleNewUserOTPVerification(
+      supabaseNoSession,
+      "th",
+      "signup" as any,
+      headers,
+    );
     expect(await r2.json()).toEqual({ error: "Failed to create session" });
 
     const supabaseSessionErr: any = {
       auth: {
-        verifyOtp: async () => ({ data: { session: { user: { id: "u1" } } }, error: null }),
+        verifyOtp: async () => ({
+          data: { session: { user: { id: "u1" } } },
+          error: null,
+        }),
         setSession: async () => ({ error: new Error("set") }),
       },
     };
-    const r3 = await mod.handleNewUserOTPVerification(supabaseSessionErr, "th", "signup" as any, headers);
-    expect((await r3.json() as any).error).toBeTruthy();
+    const r3 = await mod.handleNewUserOTPVerification(
+      supabaseSessionErr,
+      "th",
+      "signup" as any,
+      headers,
+    );
+    expect(((await r3.json()) as any).error).toBeTruthy();
 
     const supabaseInviteErr: any = {
       auth: {
-        verifyOtp: async () => ({ data: { session: { user: { id: "u1" } } }, error: null }),
+        verifyOtp: async () => ({
+          data: { session: { user: { id: "u1" } } },
+          error: null,
+        }),
         setSession: async () => ({ error: null }),
       },
       from: () => ({
@@ -550,12 +701,20 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r4 = await mod.handleNewUserOTPVerification(supabaseInviteErr, "th", "signup" as any, headers);
-    expect((await r4.json() as any).error).toBeTruthy();
+    const r4 = await mod.handleNewUserOTPVerification(
+      supabaseInviteErr,
+      "th",
+      "signup" as any,
+      headers,
+    );
+    expect(((await r4.json()) as any).error).toBeTruthy();
 
     const supabaseOk: any = {
       auth: {
-        verifyOtp: async () => ({ data: { session: { user: { id: "u1" } } }, error: null }),
+        verifyOtp: async () => ({
+          data: { session: { user: { id: "u1" } } },
+          error: null,
+        }),
         setSession: async () => ({ error: null }),
       },
       from: () => ({
@@ -564,7 +723,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r5 = await mod.handleNewUserOTPVerification(supabaseOk, "th", "signup" as any, headers);
+    const r5 = await mod.handleNewUserOTPVerification(
+      supabaseOk,
+      "th",
+      "signup" as any,
+      headers,
+    );
     expect(await r5.json()).toMatchObject({ invites: [{ id: 1 }] });
   });
 
@@ -579,18 +743,29 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    await expect(mod.createWorkspaceTwilioInstance({ supabase: supabaseErr, workspace_id: "w1" })).rejects.toThrow("x");
+    await expect(
+      mod.createWorkspaceTwilioInstance({
+        supabase: supabaseErr,
+        workspace_id: "w1",
+      }),
+    ).rejects.toThrow("x");
 
     const supabaseOk: any = {
       from: () => ({
         select: () => ({
           eq: () => ({
-            single: async () => ({ data: { twilio_data: { sid: "AC", authToken: "tok" } }, error: null }),
+            single: async () => ({
+              data: { twilio_data: { sid: "AC", authToken: "tok" } },
+              error: null,
+            }),
           }),
         }),
       }),
     };
-    const twilio = await mod.createWorkspaceTwilioInstance({ supabase: supabaseOk, workspace_id: "w1" });
+    const twilio = await mod.createWorkspaceTwilioInstance({
+      supabase: supabaseOk,
+      workspace_id: "w1",
+    });
     expect(twilio).toMatchObject({ outgoingCallerIds: expect.any(Function) });
   });
 
@@ -604,7 +779,10 @@ describe("app/lib/database/workspace.server.ts", () => {
           return {
             select: () => ({
               eq: () => ({
-                single: async () => ({ data: { friendly_name: "FN", phone_number: "+1" }, error: null }),
+                single: async () => ({
+                  data: { friendly_name: "FN", phone_number: "+1" },
+                  error: null,
+                }),
               }),
             }),
             delete: () => ({
@@ -617,7 +795,11 @@ describe("app/lib/database/workspace.server.ts", () => {
             select: () => ({
               eq: () => ({
                 single: async () => ({
-                  data: { twilio_data: { sid: "AC", authToken: "tok" }, key: "k", token: "t" },
+                  data: {
+                    twilio_data: { sid: "AC", authToken: "tok" },
+                    key: "k",
+                    token: "t",
+                  },
                   error: null,
                 }),
               }),
@@ -644,7 +826,10 @@ describe("app/lib/database/workspace.server.ts", () => {
           return {
             select: () => ({
               eq: () => ({
-                single: async () => ({ data: { friendly_name: "", phone_number: "+1" }, error: null }),
+                single: async () => ({
+                  data: { friendly_name: "", phone_number: "+1" },
+                  error: null,
+                }),
               }),
             }),
           };
@@ -688,7 +873,10 @@ describe("app/lib/database/workspace.server.ts", () => {
           return {
             select: () => ({
               eq: () => ({
-                single: async () => ({ data: { friendly_name: "FN", phone_number: "+1" }, error: null }),
+                single: async () => ({
+                  data: { friendly_name: "FN", phone_number: "+1" },
+                  error: null,
+                }),
               }),
             }),
             delete: () => ({
@@ -782,7 +970,10 @@ describe("app/lib/database/workspace.server.ts", () => {
       },
       storage: {
         from: () => ({
-          createSignedUrl: async (_p: string) => ({ data: { signedUrl: "u" }, error: null }),
+          createSignedUrl: async (_p: string) => ({
+            data: { signedUrl: "u" },
+            error: null,
+          }),
           list: async () => ({ data: [{ name: "a" }], error: new Error("x") }),
         }),
       },
@@ -791,7 +982,10 @@ describe("app/lib/database/workspace.server.ts", () => {
     const w = await mod.fetchWorkspaceData(supabase, "w1");
     expect(w).toMatchObject({ workspace: { id: "w1" } });
 
-    const scripts = await mod.getWorkspaceScripts({ workspace: "w1", supabase });
+    const scripts = await mod.getWorkspaceScripts({
+      workspace: "w1",
+      supabase,
+    });
     expect(scripts).toEqual([{ id: 1 }]);
     expect(logger.error).toHaveBeenCalled();
 
@@ -808,18 +1002,31 @@ describe("app/lib/database/workspace.server.ts", () => {
         return supabase.from(table);
       },
     };
-    const scriptsOk = await mod.getWorkspaceScripts({ workspace: "w1", supabase: supabaseScriptsOk });
+    const scriptsOk = await mod.getWorkspaceScripts({
+      workspace: "w1",
+      supabase: supabaseScriptsOk,
+    });
     expect(scriptsOk).toEqual([{ id: 1 }]);
 
     expect(mod.getRecordingFileNames("no" as any)).toEqual([]);
     expect(logger.warn).toHaveBeenCalled();
-    expect(mod.getRecordingFileNames([{ speechType: "recorded", say: "f.wav" } as any])).toEqual(["f.wav"]);
-    expect(mod.getRecordingFileNames([{ speechType: "text", say: "x" } as any])).toEqual([]);
     expect(
-      mod.getRecordingFileNames([{ speechType: "recorded", say: "Enter your question here" } as any]),
+      mod.getRecordingFileNames([
+        { speechType: "recorded", say: "f.wav" } as any,
+      ]),
+    ).toEqual(["f.wav"]);
+    expect(
+      mod.getRecordingFileNames([{ speechType: "text", say: "x" } as any]),
+    ).toEqual([]);
+    expect(
+      mod.getRecordingFileNames([
+        { speechType: "recorded", say: "Enter your question here" } as any,
+      ]),
     ).toEqual([]);
 
-    await expect(mod.getMedia(["a.wav"], supabase, "w1")).resolves.toEqual([{ "a.wav": "u" }]);
+    await expect(mod.getMedia(["a.wav"], supabase, "w1")).resolves.toEqual([
+      { "a.wav": "u" },
+    ]);
     const supabaseMediaErr: any = {
       ...supabase,
       storage: {
@@ -828,9 +1035,13 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       },
     };
-    await expect(mod.getMedia(["a.wav"], supabaseMediaErr, "w1")).rejects.toThrow("x");
+    await expect(
+      mod.getMedia(["a.wav"], supabaseMediaErr, "w1"),
+    ).rejects.toThrow("x");
 
-    await expect(mod.listMedia(supabase, "w1")).resolves.toEqual([{ name: "a" }]);
+    await expect(mod.listMedia(supabase, "w1")).resolves.toEqual([
+      { name: "a" },
+    ]);
     expect(logger.error).toHaveBeenCalled();
     const supabaseListOk: any = {
       ...supabase,
@@ -840,9 +1051,13 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       },
     };
-    await expect(mod.listMedia(supabaseListOk, "w1")).resolves.toEqual([{ name: "a" }]);
+    await expect(mod.listMedia(supabaseListOk, "w1")).resolves.toEqual([
+      { name: "a" },
+    ]);
 
-    await expect(mod.getSignedUrls(supabase, "w1", ["m.png"])).resolves.toEqual(["u"]);
+    await expect(mod.getSignedUrls(supabase, "w1", ["m.png"])).resolves.toEqual(
+      ["u"],
+    );
     const supabaseSignedErr: any = {
       ...supabase,
       storage: {
@@ -851,23 +1066,33 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       },
     };
-    await expect(mod.getSignedUrls(supabaseSignedErr, "w1", ["m.png"])).rejects.toThrow("x");
+    await expect(
+      mod.getSignedUrls(supabaseSignedErr, "w1", ["m.png"]),
+    ).rejects.toThrow("x");
   });
 
-  test("acceptWorkspaceInvitations aggregates errors (only processes first id due to early return)", async () => {
+  test("acceptWorkspaceInvitations aggregates per-invitation errors after batched fetch", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
+    const deletedIds: string[] = [];
     const supabase: any = {
       from: (table: string) => {
         if (table === "workspace_invite") {
           return {
             select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { workspace: "w1", role: "member" }, error: new Error("inv") }),
+              in: async () => ({
+                data: [
+                  { id: "i1", workspace: "w1", role: "member" },
+                  { id: "i2", workspace: "w2", role: "member" },
+                ],
+                error: null,
               }),
             }),
             delete: () => ({
-              eq: async () => ({ error: new Error("del") }),
+              eq: async (_column: string, id: string) => {
+                deletedIds.push(id);
+                return { error: id === "i1" ? new Error("del") : null };
+              },
             }),
           };
         }
@@ -884,8 +1109,19 @@ describe("app/lib/database/workspace.server.ts", () => {
       },
     };
 
-    const out = await mod.acceptWorkspaceInvitations(supabase, ["i1", "i2"], "u1");
-    expect(out.errors.length).toBeGreaterThan(0);
+    const out = await mod.acceptWorkspaceInvitations(
+      supabase,
+      ["i1", "i2"],
+      "u1",
+    );
+    expect(deletedIds.sort()).toEqual(["i1", "i2"]);
+    expect(out.errors).toEqual(
+      expect.arrayContaining([
+        { invitationId: "i1", type: "workspace" },
+        { invitationId: "i2", type: "workspace" },
+        { invitationId: "i1", type: "deletion" },
+      ]),
+    );
   });
 
   test("acceptWorkspaceInvitations success path has empty errors", async () => {
@@ -895,8 +1131,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         if (table === "workspace_invite") {
           return {
             select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { workspace: "w1", role: "member" }, error: null }),
+              in: async () => ({
+                data: [{ id: "i1", workspace: "w1", role: "member" }],
+                error: null,
               }),
             }),
             delete: () => ({
@@ -920,6 +1157,47 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(out.errors).toEqual([]);
   });
 
+  test("acceptWorkspaceInvitations marks missing invites as invite errors", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+    const supabase: any = {
+      from: (table: string) => {
+        if (table === "workspace_invite") {
+          return {
+            select: () => ({
+              in: async () => ({
+                data: [{ id: "i1", workspace: "w1", role: "member" }],
+                error: null,
+              }),
+            }),
+            delete: () => ({
+              eq: async () => ({ error: null }),
+            }),
+          };
+        }
+        if (table === "workspace_users") {
+          return {
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: { id: 1 }, error: null }),
+              }),
+            }),
+          };
+        }
+        throw new Error("unexpected");
+      },
+    };
+
+    const out = await mod.acceptWorkspaceInvitations(
+      supabase,
+      ["i1", "missing"],
+      "u1",
+    );
+    expect(out.errors).toContainEqual({
+      invitationId: "missing",
+      type: "invite",
+    });
+  });
+
   test("getInvitesByUserId throws on error and returns data on success", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 
@@ -930,7 +1208,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    await expect(mod.getInvitesByUserId(supabaseErr, "u1")).rejects.toThrow("x");
+    await expect(mod.getInvitesByUserId(supabaseErr, "u1")).rejects.toThrow(
+      "x",
+    );
 
     const supabaseOk: any = {
       from: () => ({
@@ -939,7 +1219,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    await expect(mod.getInvitesByUserId(supabaseOk, "u1")).resolves.toEqual([{ id: 1 }]);
+    await expect(mod.getInvitesByUserId(supabaseOk, "u1")).resolves.toEqual([
+      { id: 1 },
+    ]);
   });
 
   test("fetchConversationSummary paginates and applies campaign filtering", async () => {
@@ -1003,6 +1285,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       not: vi.fn(() => messageQuery),
       neq: vi.fn(() => messageQuery),
       order: vi.fn(() => messageQuery),
+      range: vi.fn(() => messageQuery),
       then: (resolve: (value: unknown) => void) =>
         resolve({
           data: messageRows.filter((row) =>
@@ -1016,13 +1299,26 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const contactQuery = {
       select: vi.fn(() => contactQuery),
-      in: vi.fn(() => Promise.resolve({
-        data: [
-          { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
-          { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
-        ],
-        error: null,
-      })),
+      eq: vi.fn(() => contactQuery),
+      in: vi.fn(() =>
+        Promise.resolve({
+          data: [
+            {
+              id: 10,
+              firstname: "Taylor",
+              surname: "One",
+              phone: "+15550000001",
+            },
+            {
+              id: 11,
+              firstname: "Jordan",
+              surname: "Two",
+              phone: "+15550000002",
+            },
+          ],
+          error: null,
+        }),
+      ),
     };
 
     const supabase: any = {
@@ -1069,6 +1365,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       not: vi.fn(() => messageQuery),
       neq: vi.fn(() => messageQuery),
       order: vi.fn(() => messageQuery),
+      range: vi.fn(() => messageQuery),
       then: (resolve: (value: unknown) => void) =>
         resolve({
           data: [
@@ -1088,12 +1385,20 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const contactQuery = {
       select: vi.fn(() => contactQuery),
-      in: vi.fn(() => Promise.resolve({
-        data: [
-          { id: 10, firstname: "Wrong", surname: "Person", phone: "+15559999999" },
-        ],
-        error: null,
-      })),
+      eq: vi.fn(() => contactQuery),
+      in: vi.fn(() =>
+        Promise.resolve({
+          data: [
+            {
+              id: 10,
+              firstname: "Wrong",
+              surname: "Person",
+              phone: "+15559999999",
+            },
+          ],
+          error: null,
+        }),
+      ),
     };
 
     const supabase: any = {
@@ -1136,6 +1441,7 @@ describe("app/lib/database/workspace.server.ts", () => {
       not: vi.fn(() => messageQuery),
       neq: vi.fn(() => messageQuery),
       order: vi.fn(() => messageQuery),
+      range: vi.fn(() => messageQuery),
       then: (resolve: (value: unknown) => void) =>
         resolve({
           data: [
@@ -1155,15 +1461,17 @@ describe("app/lib/database/workspace.server.ts", () => {
 
     const contactQuery = {
       select: vi.fn(() => contactQuery),
+      eq: vi.fn(() => contactQuery),
       in: vi.fn(() => Promise.resolve({ data: [], error: null })),
     };
 
     const rpc = vi.fn(async (fn: string, args: Record<string, unknown>) => {
-      expect(fn).toBe("find_contact_by_phone");
-      expect(args).toEqual({
-        p_workspace_id: "w1",
-        p_phone_number: "+15550000001",
-      });
+      expect(fn).toBe("find_contacts_by_phones");
+      expect(args.p_workspace_id).toBe("w1");
+      expect((args.p_phone_numbers as string[]).length).toBeGreaterThanOrEqual(
+        1,
+      );
+      expect(args.p_phone_numbers as string[]).toContain("+15550000001");
 
       return {
         data: [
@@ -1171,12 +1479,6 @@ describe("app/lib/database/workspace.server.ts", () => {
             id: 44,
             firstname: "Jamie",
             surname: "Fallback",
-            phone: "+15550000001",
-          },
-          {
-            id: 45,
-            firstname: "Second",
-            surname: "Match",
             phone: "+15550000001",
           },
         ],
@@ -1334,4 +1636,3 @@ describe("app/lib/database/workspace.server.ts", () => {
     expect(config.onboardingStatus).toBe("requested");
   });
 });
-
