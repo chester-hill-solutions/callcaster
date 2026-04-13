@@ -877,6 +877,42 @@ export async function createSubaccount({
   return account;
 }
 
+/** Twilio `AccountInstance` is not JSON-serializable (circular `_version`); tests may return plain objects without `toJSON`. */
+function twilioAccountToPersistableJson(account: unknown): Record<string, unknown> {
+  if (
+    typeof account === "object" &&
+    account !== null &&
+    "toJSON" in account &&
+    typeof (account as { toJSON?: unknown }).toJSON === "function"
+  ) {
+    const plain = (account as { toJSON: () => object }).toJSON();
+    return { ...(plain as Record<string, unknown>) };
+  }
+  if (typeof account !== "object" || account === null) {
+    return {};
+  }
+  const rec = account as Record<string, unknown>;
+  const keys = [
+    "authToken",
+    "dateCreated",
+    "dateUpdated",
+    "friendlyName",
+    "ownerAccountSid",
+    "sid",
+    "status",
+    "subresourceUris",
+    "type",
+    "uri",
+  ] as const;
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (k in rec && rec[k] !== undefined) {
+      out[k] = rec[k];
+    }
+  }
+  return out;
+}
+
 export async function createNewWorkspace({
   supabaseClient,
   workspaceName,
@@ -943,9 +979,9 @@ export async function createNewWorkspace({
       .from("workspace")
       .update({
         twilio_data: {
-          ...Object(account),
+          ...twilioAccountToPersistableJson(account),
           onboarding: seededOnboarding,
-        },
+        } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
         key: newKey.sid,
         token: newKey.secret,
         stripe_id: newStripeCustomer.id,
