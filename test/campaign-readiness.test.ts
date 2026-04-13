@@ -34,6 +34,58 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
   });
 
+  test("accepts overnight windows and UTC-shifted same-calendar-day spans", () => {
+    const overnight = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: {
+            active: true,
+            intervals: [{ start: "23:00", end: "02:00" }],
+          },
+        },
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: 1 },
+    );
+
+    expect(overnight.startIssues).not.toContain(
+      "Each active calling day needs at least one valid time window",
+    );
+    expect(overnight.startIssues).not.toContain("Calling hours are required");
+
+    const utcSpan = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: {
+            active: true,
+            intervals: [{ start: "05:00", end: "04:59" }],
+          },
+        },
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: 1 },
+    );
+
+    expect(utcSpan.startIssues).not.toContain(
+      "Each active calling day needs at least one valid time window",
+    );
+    expect(utcSpan.startIssues).not.toContain("Calling hours are required");
+  });
+
   test("flags invalid date order and invalid active schedule intervals", () => {
     const readiness = getCampaignReadiness(
       {
@@ -44,7 +96,7 @@ describe("app/lib/campaign-readiness.ts", () => {
         schedule: {
           monday: {
             active: true,
-            intervals: [{ start: "21:00", end: "13:00" }],
+            intervals: [{ start: "13:00", end: "13:00" }],
           },
         },
       } as any,
