@@ -7,6 +7,7 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhook } from "@/twilio.server";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 async function findMatchingContactIds(
   supabase: SupabaseClient<Database>,
@@ -233,7 +234,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     messagingServiceSid: messagingServiceSid || null,
   });
 
-  if (!workspaceNumber.twilio_data) {
+  const inboundTwilioCreds = readTwilioWorkspaceCredentials(
+    workspaceNumber.twilio_data,
+  );
+  if (!inboundTwilioCreds) {
     logger.error("Workspace missing Twilio credentials for inbound SMS", {
       workspace: workspaceNumber.workspace,
       attributionPath: resolved.attributionPath,
@@ -248,7 +252,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
       const mediaResponse = await fetch(data[`MediaUrl${i}`] as string, {
         headers: {
-          Authorization: `Basic ${Buffer.from(`${workspaceNumber.twilio_data.sid}:${workspaceNumber.twilio_data.authToken}`).toString("base64")}`,
+          Authorization: `Basic ${Buffer.from(`${inboundTwilioCreds.sid}:${inboundTwilioCreds.authToken}`).toString("base64")}`,
         },
       });
 

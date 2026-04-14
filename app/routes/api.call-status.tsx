@@ -7,6 +7,7 @@ import { env } from "@/lib/env.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -32,7 +33,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     let authToken = env.TWILIO_AUTH_TOKEN();
     if (existingCall?.workspace) {
       const { data: ws } = await supabase.from("workspace").select("twilio_data").eq("id", existingCall.workspace).single();
-      if (ws?.twilio_data?.authToken) authToken = ws.twilio_data.authToken;
+      const creds = readTwilioWorkspaceCredentials(ws?.twilio_data);
+      if (creds?.authToken) authToken = creds.authToken;
     }
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;

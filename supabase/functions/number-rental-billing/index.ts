@@ -12,6 +12,7 @@ import {
   resolveNotificationWindow,
   utcDayStart,
 } from "../_shared/number-rental-billing.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 type JsonObject = Record<string, unknown>;
 
@@ -222,20 +223,12 @@ async function removeTwilioNumber(args: {
   workspace: WorkspaceRow;
   number: WorkspaceNumberRow;
 }) {
-  const twilioData = asRecord(args.workspace.twilio_data);
-  const sid =
-    typeof twilioData.sid === "string" && twilioData.sid.length > 0
-      ? twilioData.sid
-      : null;
-  const authToken =
-    typeof twilioData.authToken === "string" && twilioData.authToken.length > 0
-      ? twilioData.authToken
-      : null;
-  if (!sid || !authToken) {
+  const creds = readTwilioWorkspaceCredentials(args.workspace.twilio_data);
+  if (!creds) {
     throw new Error(`Missing Twilio credentials for workspace ${args.workspace.id}`);
   }
 
-  const twilio = new Twilio(sid, authToken);
+  const twilio = new Twilio(creds.sid, creds.authToken);
   const phoneNumber = args.number.phone_number ?? undefined;
   const friendlyName = args.number.friendly_name ?? undefined;
 

@@ -5,6 +5,7 @@ import {
   OPEN_MESSAGE_STATUS_LIST,
   parseTwilioOpenSyncBody,
   staleBeforeIso,
+  TWILIO_OPEN_SYNC_MIN_DATE_CREATED,
 } from "../supabase/functions/_shared/twilio-open-sync-candidates.ts";
 import {
   CALL_STATUSES_BILLABLE_ON_COMPLETION,
@@ -13,6 +14,10 @@ import {
 } from "../supabase/functions/_shared/call-provider-status.ts";
 
 describe("twilio-open-sync-candidates", () => {
+  test("TWILIO_OPEN_SYNC_MIN_DATE_CREATED is Apr 1 2026 (UTC calendar day)", () => {
+    expect(TWILIO_OPEN_SYNC_MIN_DATE_CREATED).toBe("2026-04-01");
+  });
+
   test("parseTwilioOpenSyncBody caps and defaults", () => {
     expect(parseTwilioOpenSyncBody(null)).toEqual({
       callLimit: 100,
@@ -55,6 +60,8 @@ describe("twilio-open-sync-candidates", () => {
 describe("call-provider-status (edge shared)", () => {
   test("normalizeProviderStatus", () => {
     expect(normalizeProviderStatus("in-progress")).toBe("in-progress");
+    expect(normalizeProviderStatus("in_progress")).toBe("in-progress");
+    expect(normalizeProviderStatus("no_answer")).toBe("no-answer");
     expect(normalizeProviderStatus("COMPLETED")).toBe("completed");
     expect(normalizeProviderStatus("weird")).toBeNull();
   });

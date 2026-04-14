@@ -8,6 +8,7 @@ import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6"
 import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 import { resolveTwilioSmsMessagingServiceSid } from "../_shared/sms-send-resolve.ts";
 
 const TWILIO_MESSAGE_INTENTS = new Set([
@@ -369,11 +370,13 @@ const createWorkspaceTwilioInstance = async ({
     throw new Error("Failed to get workspace Twilio credentials");
   }
 
+  const creds = readTwilioWorkspaceCredentials(workspace.twilio_data);
+  if (!creds) {
+    throw new Error("Failed to get workspace Twilio credentials");
+  }
+
   return {
-    twilio: new Twilio(
-      workspace.twilio_data.sid,
-      workspace.twilio_data.authToken
-    ),
+    twilio: new Twilio(creds.sid, creds.authToken),
     credits: workspace.credits,
     portalConfig: normalizePortalConfig(
       isRecord(workspace.twilio_data) ? workspace.twilio_data.portalConfig : null,

@@ -86,6 +86,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Workspace ID is required",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: 1,
             totalPages: 0,
@@ -110,6 +111,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Invalid workspace ID format",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: 1,
             totalPages: 0,
@@ -136,6 +138,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .range((page - 1) * pageSize, page * pageSize - 1)
       .order("created_at", { ascending: false });
 
+    const campaignsQuery = supabaseClient
+      .from("campaign")
+      .select("id, title, status")
+      .eq("workspace", workspaceId)
+      .order("created_at", { ascending: false });
+
     if (searchQuery) {
       const searchFilter = buildContactSearchFilter(searchQuery);
       if (searchFilter) {
@@ -150,6 +158,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       flagsResult,
       countResult,
       contactsResult,
+      campaignsResult,
     ] = await Promise.all([
       getUserRole({
         supabaseClient,
@@ -168,6 +177,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         .single(),
       countQuery,
       contactsQuery,
+      campaignsQuery,
     ]);
 
     // Extract data and handle errors
@@ -176,6 +186,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const { data: flags, error: flagsError } = flagsResult;
     const { count: totalCount, error: countError } = countResult;
     const { data: contacts, error: contactError } = contactsResult;
+    const { data: navCampaigns, error: campaignsError } = campaignsResult;
+    if (campaignsError) {
+      logger.error("Failed to load campaigns for workspace nav:", campaignsError);
+    }
+    const campaigns = navCampaigns ?? [];
 
     // Check for workspace access
     if (!userRole) {
@@ -186,6 +201,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "You don't have access to this workspace",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -206,6 +222,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Workspace not found",
           userRole,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -228,6 +245,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Failed to load contacts. Please try again.",
           userRole,
           flags: null,
+          campaigns,
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -251,6 +269,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: `Page ${page} does not exist. Total pages: ${totalPages}`,
           userRole,
           flags,
+          campaigns,
           pagination: {
             currentPage: 1,
             totalPages,
@@ -269,6 +288,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         error: null,
         userRole,
         flags,
+        campaigns,
         pagination: {
           currentPage: page,
           totalPages,
@@ -288,6 +308,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         error: "An unexpected error occurred. Please try again.",
         userRole: null,
         flags: null,
+        campaigns: [],
         pagination: {
           currentPage: 1,
           totalPages: 0,
@@ -301,7 +322,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function WorkspaceContacts() {
-  const { contacts, error, userRole, workspace, flags, pagination } =
+  const { contacts, error, userRole, workspace, flags, pagination, campaigns } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("q") ?? "";
@@ -331,7 +352,11 @@ export default function WorkspaceContacts() {
     <main className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-4 px-4 py-6 sm:px-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         {workspace && (
-          <WorkspaceNav workspace={workspace} userRole={userRole} />
+          <WorkspaceNav
+            workspace={workspace}
+            campaigns={campaigns}
+            userRole={userRole}
+          />
         )}
         <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">

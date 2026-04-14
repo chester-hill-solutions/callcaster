@@ -83,6 +83,14 @@ export type CampaignState = {
 
 type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
 
+/** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
+const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
+  "campaign_queue",
+  "outreach_attempt",
+  "call",
+  "message",
+] as const;
+
 const getTable = (
   campaignType: string | null | undefined,
 ): CampaignTable | null => {
@@ -259,7 +267,10 @@ export default function CampaignScreen() {
 
   useSupabaseRealtimeSubscription({
     supabase,
-    table: "campaign_queue",
+    channelTopic: selected_id
+      ? `campaign-dashboard-counts-${selected_id}`
+      : "campaign-dashboard-counts-none",
+    table: [...CAMPAIGN_DASHBOARD_COUNT_TABLES],
     filter: selected_id ? `campaign_id=eq.${selected_id}` : "campaign_id=eq.-1",
     onChange: () => {
       const now = Date.now();

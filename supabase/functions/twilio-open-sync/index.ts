@@ -22,20 +22,13 @@ import {
   OPEN_MESSAGE_STATUS_LIST,
   parseTwilioOpenSyncBody,
   staleBeforeIso,
+  TWILIO_OPEN_SYNC_MIN_DATE_CREATED,
 } from "../_shared/twilio-open-sync-candidates.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
-type TwilioData = { sid?: string; authToken?: string };
-
-function readTwilioCredentials(twilio_data: unknown): {
-  sid: string;
-  authToken: string;
-} | null {
-  if (!twilio_data || typeof twilio_data !== "object") return null;
-  const o = twilio_data as TwilioData;
-  const sid = typeof o.sid === "string" ? o.sid : "";
-  const authToken = typeof o.authToken === "string" ? o.authToken : "";
-  if (!sid || !authToken) return null;
-  return { sid, authToken };
+function clipDiag(s: string, max = 280): string {
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}…`;
 }
 
 async function sleepMs(ms: number) {
@@ -55,16 +48,26 @@ async function getOrCreateTwilioClient(
     .eq("id", workspaceId)
     .single();
   if (error || !data) return null;
-  const creds = readTwilioCredentials(data.twilio_data);
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
   if (!creds) return null;
   const client = new Twilio(creds.sid, creds.authToken);
   cache.set(workspaceId, client);
   return client;
 }
 
+/** Twilio REST credentials always come from the row's `workspace` (tenant FK). `account_sid` is metadata only. */
+function credentialWorkspaceId(
+  workspace: string | null | undefined,
+): string | null {
+  const w =
+    typeof workspace === "string" && workspace.trim() ? workspace.trim() : "";
+  return w || null;
+}
+
 type CallRow = {
   sid: string;
   workspace: string | null;
+  account_sid: string | null;
   outreach_attempt_id: number | null;
   parent_call_sid: string | null;
   status: string | null;
@@ -117,6 +120,13 @@ async function syncCallRow(
     }
     if (twilioCall.duration != null) {
       patch.duration = String(twilioCall.duration);
+    }
+    const callAccountSid =
+      typeof (twilioCall as { accountSid?: unknown }).accountSid === "string"
+        ? String((twilioCall as { accountSid: string }).accountSid).trim()
+        : "";
+    if (callAccountSid && callAccountSid !== String(row.account_sid ?? "")) {
+      patch.account_sid = callAccountSid;
     }
 
     const { error: updateCallError } = await supabase
@@ -198,6 +208,7 @@ async function syncCallRow(
 type MessageRow = {
   sid: string;
   workspace: string | null;
+  account_sid: string | null;
   direction: string | null;
   status: string | null;
   outreach_attempt_id: number | null;
@@ -233,6 +244,15 @@ async function syncMessageRow(
     const dbStatus = String(row.status ?? "").toLowerCase();
     const statusChanged = dbStatus !== status;
 
+    const msgAccountSid =
+      typeof (twilioMsg as { accountSid?: unknown }).accountSid === "string"
+        ? String((twilioMsg as { accountSid: string }).accountSid).trim()
+        : "";
+    const accountPatch =
+      msgAccountSid && msgAccountSid !== String(row.account_sid ?? "")
+        ? { account_sid: msgAccountSid }
+        : {};
+
     const { error: updateError } = await supabase
       .from("message")
       .update(
@@ -240,12 +260,13 @@ async function syncMessageRow(
           ? {
             status,
             date_updated: dateUpdated,
+            ...accountPatch,
             ...(errorCode != null && Number.isFinite(errorCode)
               ? { error_code: errorCode }
               : {}),
             ...(errorMessage ? { error_message: errorMessage } : {}),
           }
-          : { date_updated: new Date().toISOString() },
+          : { date_updated: new Date().toISOString(), ...accountPatch },
       )
       .eq("sid", row.sid);
 
@@ -398,12 +419,13 @@ export async function handleRequest(req: Request): Promise<Response> {
   const { data: calls, error: callsErr } = await supabase
     .from("call")
     .select(
-      "sid, workspace, outreach_attempt_id, parent_call_sid, status, date_updated",
+      "sid, workspace, account_sid, outreach_attempt_id, parent_call_sid, status, date_updated",
     )
+    .gte("date_created", TWILIO_OPEN_SYNC_MIN_DATE_CREATED)
     .in("status", ["initiated", "queued", "ringing", "in-progress"])
     .not("workspace", "is", null)
     .or(`date_updated.is.null,date_updated.lt.${staleIso}`)
-    .order("date_updated", { ascending: true, nullsFirst: true })
+    .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(callLimit);
 
   if (callsErr) {
@@ -414,16 +436,20 @@ export async function handleRequest(req: Request): Promise<Response> {
     });
   }
 
+  const minD = TWILIO_OPEN_SYNC_MIN_DATE_CREATED;
   const { data: messages, error: msgErr } = await supabase
     .from("message")
     .select(
-      "sid, workspace, direction, status, date_updated, outreach_attempt_id, campaign_id, from, to, body, num_media",
+      "sid, workspace, account_sid, direction, status, date_updated, outreach_attempt_id, campaign_id, from, to, body, num_media",
+    )
+    .or(
+      `date_created.gte.${minD},and(date_created.is.null,date_updated.gte.${minD})`,
     )
     .neq("direction", "inbound")
     .in("status", OPEN_MESSAGE_STATUS_LIST)
     .not("workspace", "is", null)
     .or(`date_updated.is.null,date_updated.lt.${staleIso}`)
-    .order("date_updated", { ascending: true, nullsFirst: true })
+    .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(messageLimit);
 
   if (msgErr) {
@@ -436,39 +462,62 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   const callResults = { ok: 0, fail: 0 };
   const messageResults = { ok: 0, fail: 0 };
+  const hints: { lastCallError?: string; lastMessageError?: string } = {};
 
   for (const row of calls ?? []) {
     const r = row as CallRow;
     if (!r.workspace) continue;
-    const client = await getOrCreateTwilioClient(supabase, r.workspace, twilioCache);
+    const credWorkspaceId = credentialWorkspaceId(r.workspace);
+    if (!credWorkspaceId) continue;
+    const client = await getOrCreateTwilioClient(
+      supabase,
+      credWorkspaceId,
+      twilioCache,
+    );
     if (!client) {
       callResults.fail++;
+      hints.lastCallError = "missing_workspace_twilio_credentials";
       continue;
     }
     const res = await syncCallRow(supabase, r, client);
     if (res.ok) callResults.ok++;
-    else callResults.fail++;
+    else {
+      callResults.fail++;
+      if (res.error) hints.lastCallError = clipDiag(res.error);
+    }
     await sleepMs(50);
   }
 
   for (const row of messages ?? []) {
     const r = row as MessageRow;
     if (!r.workspace) continue;
-    const client = await getOrCreateTwilioClient(supabase, r.workspace, twilioCache);
+    const credWorkspaceId = credentialWorkspaceId(r.workspace);
+    if (!credWorkspaceId) continue;
+    const client = await getOrCreateTwilioClient(
+      supabase,
+      credWorkspaceId,
+      twilioCache,
+    );
     if (!client) {
       messageResults.fail++;
+      hints.lastMessageError = "missing_workspace_twilio_credentials";
       continue;
     }
     const res = await syncMessageRow(supabase, r, client);
     if (res.ok) messageResults.ok++;
-    else messageResults.fail++;
+    else {
+      messageResults.fail++;
+      if (res.error) hints.lastMessageError = clipDiag(res.error);
+    }
     await sleepMs(50);
   }
 
   return new Response(
     JSON.stringify({
+      notBefore: TWILIO_OPEN_SYNC_MIN_DATE_CREATED,
       calls: { scanned: (calls ?? []).length, ...callResults },
       messages: { scanned: (messages ?? []).length, ...messageResults },
+      hints,
     }),
     { headers: { "Content-Type": "application/json" } },
   );

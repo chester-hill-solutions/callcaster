@@ -29,7 +29,13 @@ export function normalizeProviderStatus(
   providerStatus: string | null | undefined,
 ): CallStatusEnum | null {
   if (providerStatus == null || providerStatus === "") return null;
-  const lower = String(providerStatus).toLowerCase();
+  const raw = String(providerStatus).trim().toLowerCase();
+  /** Rare SDK / proxy variants; DB enum is always hyphenated. */
+  const lower = raw === "in_progress"
+    ? "in-progress"
+    : raw === "no_answer"
+    ? "no-answer"
+    : raw;
   if (VALID_CALL_STATUSES.includes(lower as CallStatusEnum)) {
     return lower as CallStatusEnum;
   }

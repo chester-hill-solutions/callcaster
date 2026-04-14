@@ -11,6 +11,7 @@ import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } fro
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 async function loadMessageRowForSmsStatus(args: {
   supabase: ReturnType<typeof createClient<Database>>;
@@ -43,7 +44,8 @@ async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
     throw new Error("Failed to load workspace Twilio credentials");
   }
 
-  return workspaceRecord?.twilio_data?.authToken || env.TWILIO_AUTH_TOKEN();
+  const creds = readTwilioWorkspaceCredentials(workspaceRecord?.twilio_data);
+  return creds?.authToken || env.TWILIO_AUTH_TOKEN();
 }
 
 export const action: ActionFunction = async ({ request }) => {
@@ -103,9 +105,17 @@ export const action: ActionFunction = async ({ request }) => {
       ? (status as TwilioSmsStatus)
       : "failed"; // Default to failed if invalid
 
+    const accountSidFromWebhook =
+      typeof payload.AccountSid === "string" && payload.AccountSid.trim()
+        ? payload.AccountSid.trim()
+        : null;
+
     const { data: messageData, error: messageError } = await supabase
       .from("message")
-      .update({ status: messageStatus })
+      .update({
+        status: messageStatus,
+        ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
+      })
       .eq("sid", sid)
       .select()
       .single();

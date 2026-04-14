@@ -7,6 +7,7 @@ import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSetti
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { Database } from "@/lib/database.types";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const resend = new Resend(env.RESEND_API_KEY());
 
@@ -53,7 +54,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (numberError) throw new Error(`Error fetching workspace number: ${numberError.message}`);
     if (!number.workspace) throw new Error(`Workspace not found`);
-    if (!number.workspace.twilio_data) throw new Error(`Workspace twilio data not found`);
+    const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);
+    if (!vmTwilioCreds) throw new Error(`Workspace twilio data not found`);
     const action = number.inbound_action;
     const now = new Date();
 
@@ -66,7 +68,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     
     const recordingResponse = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`, {
       headers: {
-        'Authorization': `Basic ${Buffer.from(`${number.workspace.twilio_data.sid}:${number.workspace.twilio_data.authToken}`).toString('base64')}`
+        'Authorization': `Basic ${Buffer.from(`${vmTwilioCreds.sid}:${vmTwilioCreds.authToken}`).toString('base64')}`
       }
     });
 

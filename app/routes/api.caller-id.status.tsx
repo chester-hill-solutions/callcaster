@@ -4,6 +4,7 @@ import { WorkspaceNumbers } from '@/lib/types';
 import { env } from '@/lib/env.server';
 import { logger } from '@/lib/logger.server';
 import { validateTwilioWebhookParams } from '@/twilio.server';
+import { readTwilioWorkspaceCredentials } from '@/lib/twilio-workspace-credentials';
 
 interface FormData {
   VerificationStatus: string;
@@ -43,14 +44,18 @@ export const action: ActionFunction = async ({ request }) => {
     }
 
     const isValidTwilioRequest = (candidateNumbers ?? []).some((row) => {
-      const authToken = (row as { workspace?: { twilio_data?: { authToken?: string } } }).workspace?.twilio_data?.authToken;
-      return typeof authToken === 'string'
-        && validateTwilioWebhookParams(
+      const twilioData = (row as { workspace?: { twilio_data?: unknown } }).workspace
+        ?.twilio_data;
+      const creds = readTwilioWorkspaceCredentials(twilioData);
+      return (
+        creds != null &&
+        validateTwilioWebhookParams(
           parsedBody,
           request.headers.get('x-twilio-signature'),
           request.url,
-          authToken
-        );
+          creds.authToken,
+        )
+      );
     });
 
     if (!isValidTwilioRequest) {

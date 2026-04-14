@@ -173,6 +173,7 @@ export const handleError = (error: Error, message: string, status = 500) => {
 import Twilio from "twilio";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 // Marked for deprecation
 export async function endConferenceByUser({
@@ -192,10 +193,11 @@ export async function endConferenceByUser({
   if (error || !data) {
     throw error || new Error("No workspace found");
   }
-  const twilio = new Twilio.Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
   if (!user_id) {
     throw new Error("User ID is required");
   }

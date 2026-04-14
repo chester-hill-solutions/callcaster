@@ -25,6 +25,7 @@ import {
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";
 import { createStripeContact } from "./stripe.server";
@@ -1334,10 +1335,11 @@ export async function createWorkspaceTwilioInstance({
     .eq("id", workspace_id)
     .single();
   if (error) throw error;
-  const twilio = new Twilio.Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
   return twilio;
 }
 

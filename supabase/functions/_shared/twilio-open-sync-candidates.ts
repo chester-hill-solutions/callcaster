@@ -4,6 +4,9 @@
 
 import type { TwilioSmsStatus } from "./sms-status-logic.ts";
 
+/** Only rows on/after this calendar date (UTC) are candidates (`date_created`, or `date_updated` if created is null). */
+export const TWILIO_OPEN_SYNC_MIN_DATE_CREATED = "2026-04-01";
+
 /** Outbound-ish directions we reconcile against Twilio SMS API. */
 export function isOutboundMessageDirectionForSync(
   direction: string | null | undefined,

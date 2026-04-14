@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "@/lib/logger.server";
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
@@ -104,9 +105,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             workspace_id: workspaceId 
         });
         
-        if (workspace.twilio_data?.sid) {
+        const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace.twilio_data);
+        if (adminTwilioCreds?.sid) {
             // Get account details
-            const account = await twilio.api.v2010.accounts(workspace.twilio_data.sid).fetch();
+            const account = await twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch();
             
             // Get phone numbers
             const numbers = await twilio.incomingPhoneNumbers.list({limit: 20});

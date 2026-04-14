@@ -16,11 +16,13 @@ import {
   shouldUpdateOutreachDisposition,
 } from "../_shared/sms-status-logic.ts";
 import { insertTransactionHistoryIdempotent } from "../_shared/ivr-status-logic.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
   SmsStatus?: string;
   MessageStatus?: string;
+  AccountSid?: string;
 }
 
 export async function handleRequest(req: Request): Promise<Response> {
@@ -32,7 +34,16 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     const formData = await req.formData();
     const payload: TwilioStatusEvent = Object.fromEntries(formData.entries());
-    const { SmsSid: sid, SmsStatus: smsStatus, MessageStatus: messageStatus } = payload;
+    const {
+      SmsSid: sid,
+      SmsStatus: smsStatus,
+      MessageStatus: messageStatus,
+      AccountSid: accountSidRaw,
+    } = payload;
+    const accountSidFromWebhook =
+      typeof accountSidRaw === "string" && accountSidRaw.trim()
+        ? accountSidRaw.trim()
+        : null;
     
     // Use either SmsStatus or MessageStatus depending on what Twilio sends
     const rawStatus = pickRawTwilioSmsStatus({ SmsStatus: smsStatus, MessageStatus: messageStatus });
@@ -65,7 +76,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       .eq("id", workspaceId)
       .single();
 
-    if (workspaceError || !workspace?.twilio_data?.authToken) {
+    const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+    if (workspaceError || !creds) {
       throw new Error(`Failed to get workspace data: ${workspaceError?.message || 'No auth token found'}`);
     }
 
@@ -73,7 +85,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     const twilioSignature = req.headers.get('x-twilio-signature');
     const url = getFunctionUrl("sms-status");
     const isValidRequest = Twilio.validateRequest(
-      workspace.twilio_data.authToken,
+      creds.authToken,
       twilioSignature || '',
       url,
       Object.fromEntries(formData)
@@ -83,10 +95,13 @@ export async function handleRequest(req: Request): Promise<Response> {
       return new Response("Invalid Twilio signature", { status: 403 });
     }
 
-    // Update message status
+    // Update message status (persist AccountSid for twilio-open-sync / multi-tenant)
     const { error: updateError } = await supabase
       .from("message")
-      .update({ status })
+      .update({
+        status,
+        ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
+      })
       .eq("sid", sid);
 
     if (updateError) {

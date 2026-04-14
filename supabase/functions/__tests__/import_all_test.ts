@@ -7,6 +7,7 @@ const modules = [
   "../_shared/queue-sync.ts",
   "../_shared/sms-status-logic.ts",
   "../_shared/twilio-open-sync-candidates.ts",
+  "../_shared/twilio-workspace-credentials.ts",
   "../call-server/index.ts",
   "../cancel_calls/index.ts",
   "../create_schedule_jobs/index.ts",
