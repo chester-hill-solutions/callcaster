@@ -18,6 +18,12 @@ export type CampaignReadiness = {
 
 type CampaignReadinessOptions = {
   queueCount?: number | null;
+  /**
+   * When `false`, message campaigns in messaging_service mode are blocked
+   * (e.g. no onboarding senders and no SMS-capable workspace numbers).
+   * When omitted, sender inventory is not validated here.
+   */
+  smsMessagingServiceSendersReady?: boolean;
 };
 
 type NormalizedSchedule = Record<string, ScheduleDay>;
@@ -187,8 +193,27 @@ export function getCampaignReadiness(
     commonIssues.push("Campaign type is required");
   }
 
+  const messageUsesMessagingService =
+    campaignData.type === "message" &&
+    campaignData.sms_send_mode === "messaging_service";
+
   if (!campaignData.caller_id) {
-    commonIssues.push("An outbound phone number is required");
+    if (!messageUsesMessagingService) {
+      commonIssues.push("An outbound phone number is required");
+    }
+  }
+
+  if (messageUsesMessagingService) {
+    if (!String(campaignData.sms_messaging_service_sid ?? "").trim()) {
+      commonIssues.push(
+        "Messaging Service SID is required for this send mode (save Messaging Service selection)",
+      );
+    }
+    if (options.smsMessagingServiceSendersReady === false) {
+      commonIssues.push(
+        "Messaging Service has no available sender numbers; attach senders in onboarding or use a phone number",
+      );
+    }
   }
 
   if (!campaignData.start_date || !campaignData.end_date) {

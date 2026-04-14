@@ -68,12 +68,25 @@ export function getSafeMediaBaseName(mediaName: string) {
     throw new AudioUploadError("Audio name is required.");
   }
 
-  const withoutExtension = trimmed.replace(/\.[^.]+$/, "").trim();
-  if (withoutExtension.length === 0) {
+  let baseName = trimmed;
+  while (true) {
+    const extensionMatch = baseName.match(/\.[^.]+$/);
+    const extension = extensionMatch?.[0]?.toLowerCase() ?? "";
+    if (extension.length === 0 || !ALLOWED_AUDIO_EXTENSIONS.has(extension)) {
+      break;
+    }
+
+    baseName = baseName.slice(0, -extension.length).trim();
+    if (baseName.length === 0) {
+      break;
+    }
+  }
+
+  if (baseName.length === 0) {
     throw new AudioUploadError("Audio name is required.");
   }
 
-  return withoutExtension;
+  return baseName;
 }
 
 export function assertValidAudioUpload(file: File) {

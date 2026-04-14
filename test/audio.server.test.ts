@@ -161,6 +161,9 @@ describe("app/lib/audio.server.ts", () => {
     const mod = await import("../app/lib/audio.server");
 
     expect(mod.getSafeMediaBaseName(" Greeting.wav ")).toBe("Greeting");
+    expect(mod.getSafeMediaBaseName("backup.mp3.wav")).toBe("backup");
+    expect(mod.getSafeMediaBaseName("track.mp3")).toBe("track");
+    expect(mod.getSafeMediaBaseName("a.wav.wav")).toBe("a");
     expect(() => mod.getSafeMediaBaseName(".wav")).toThrow(
       mod.AudioUploadError,
     );

@@ -36,6 +36,7 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import {
     TWILIO_MESSAGE_INTENT_VALUES,
     TWILIO_MULTI_TENANCY_MODE_VALUES,
@@ -203,13 +204,14 @@ export async function loadTwilioData(
             .eq("id", workspaceId)
             .single();
 
-        if (workspace?.twilio_data?.sid) {
+        const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+        if (adminTwilioCreds?.sid) {
             const twilio = await createWorkspaceTwilioInstance({
                 supabase: supabaseClient,
                 workspace_id: workspaceId,
             });
             const [account, numbers, usageRecords] = await Promise.all([
-                twilio.api.v2010.accounts(workspace.twilio_data.sid).fetch(),
+                twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
                 twilio.incomingPhoneNumbers.list({ limit: 20 }),
                 twilio.usage.records.list(),
             ]);

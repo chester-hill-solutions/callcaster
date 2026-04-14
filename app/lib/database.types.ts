@@ -379,6 +379,8 @@ export type Database = {
           is_active: boolean;
           next_queue_order: number;
           schedule: Json | null;
+          sms_messaging_service_sid: string | null;
+          sms_send_mode: string | null;
           start_date: string | null;
           status: Database["public"]["Enums"]["campaign_status"] | null;
           title: string;
@@ -398,6 +400,8 @@ export type Database = {
           is_active?: boolean;
           next_queue_order?: number;
           schedule?: Json | null;
+          sms_messaging_service_sid?: string | null;
+          sms_send_mode?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["campaign_status"] | null;
           title?: string;
@@ -417,6 +421,8 @@ export type Database = {
           is_active?: boolean;
           next_queue_order?: number;
           schedule?: Json | null;
+          sms_messaging_service_sid?: string | null;
+          sms_send_mode?: string | null;
           start_date?: string | null;
           status?: Database["public"]["Enums"]["campaign_status"] | null;
           title?: string;

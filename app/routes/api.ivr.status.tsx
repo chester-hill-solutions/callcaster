@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { json } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
 import { env } from "@/lib/env.server";
@@ -138,8 +139,8 @@ export const action = async ({ request }: { request: Request }) => {
         if (!dbCall) throw new Error("Call not found");
 
         const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
-        const authToken = workspace.data?.twilio_data?.authToken;
-        if (!authToken) throw new Error("Workspace auth token not found");
+        const creds = readTwilioWorkspaceCredentials(workspace.data?.twilio_data);
+        const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
         const signature = request.headers.get("x-twilio-signature");
         const url = new URL(request.url).href;
         const isValid = validateTwilioWebhookParams(params, signature, url, authToken);

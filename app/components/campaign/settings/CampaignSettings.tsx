@@ -16,6 +16,8 @@ import {
   Survey,
   Script,
   WorkspaceNumbers,
+  WorkspaceTwilioOpsConfig,
+  WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
 import { User } from "@supabase/supabase-js";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
@@ -68,6 +70,15 @@ export type CampaignSettingsProps = {
   feedbackTone?: "success" | "error" | null;
   credits: number;
   surveys: Pick<Survey, "survey_id" | "title">[];
+  outboundEstimateInputs: {
+    portalConfig: WorkspaceTwilioOpsConfig;
+    syncSnapshot: WorkspaceTwilioSyncSnapshot;
+  };
+  smsSendContext?: {
+    messagingServiceReady: boolean;
+    defaultMessagingServiceSid: string | null;
+    attachedSenderPhoneNumbers: string[];
+  };
 };
 
 export const CampaignSettings = ({
@@ -102,7 +113,9 @@ export const CampaignSettings = ({
   activeIntent,
   feedbackMessage,
   feedbackTone,
-  surveys,  
+  surveys,
+  outboundEstimateInputs,
+  smsSendContext,
 }: CampaignSettingsProps) => {
   const confirmActionLabel =
     confirmStatus === "play"
@@ -265,6 +278,10 @@ export const CampaignSettings = ({
                 readinessIssues={readinessIssues}
                 scheduleDisabled={scheduleDisabled}
                 isBusy={isBusy}
+                callerIdOptional={
+                  campaignData.type === "message" &&
+                  campaignData.sms_send_mode === "messaging_service"
+                }
               />
             </section>
             <section className="rounded-lg border p-4">
@@ -283,6 +300,10 @@ export const CampaignSettings = ({
                 scheduleDisabled={scheduleDisabled}
                 surveys={surveys}
                 handleNavigate={handleNavigate}
+                queueCount={queueCount}
+                phoneNumbers={phoneNumbers}
+                outboundEstimateInputs={outboundEstimateInputs}
+                smsSendContext={smsSendContext}
               />
             </section>
 

@@ -173,6 +173,7 @@ function WorkspaceResolvedView({
             credits: workspace.credits,
           }
         }
+        campaigns={(campaignsData as Campaign[] | undefined) ?? []}
         userRole={
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }

@@ -8,6 +8,7 @@ import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { normalizePhoneNumber } from "@/lib/utils";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 interface WorkspaceData {
   key: string;
@@ -50,15 +51,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const workspaceData = data as WorkspaceData;
 
-    if (!workspaceData.twilio_data) {
+    const creds = readTwilioWorkspaceCredentials(workspaceData.twilio_data);
+    if (!creds) {
       throw new Error("Workspace twilio_data not found");
     }
 
-    const twilio = new Twilio.Twilio(
-      workspaceData.twilio_data.sid,
-      workspaceData.twilio_data.authToken,
-      {accountSid: workspaceData.twilio_data.sid}
-    );
+    const twilio = new Twilio.Twilio(creds.sid, creds.authToken, {
+      accountSid: creds.sid,
+    });
 
     const validationRequest = await twilio.validationRequests.create({
       friendlyName,

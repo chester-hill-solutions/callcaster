@@ -25,6 +25,7 @@ import {
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";
 import { createStripeContact } from "./stripe.server";
@@ -43,6 +44,7 @@ import {
 import {
   getConversationParticipantPhones,
   getConversationPhoneKey,
+  isInboundMessageDirection,
   sortConversationSummaries,
   type ChatSortOption,
   type ConversationSummary,
@@ -1333,10 +1335,11 @@ export async function createWorkspaceTwilioInstance({
     .eq("id", workspace_id)
     .single();
   if (error) throw error;
-  const twilio = new Twilio.Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
   return twilio;
 }
 
@@ -1797,9 +1800,9 @@ export async function fetchConversationSummary(
       }
 
       const existingConversation = conversationMap.get(conversationKey);
-      const hasReplied = message.direction === "inbound";
+      const hasReplied = isInboundMessageDirection(message.direction);
       const unreadIncrement =
-        message.direction === "inbound" && message.status === "received"
+        isInboundMessageDirection(message.direction) && message.status === "received"
           ? 1
           : 0;
 
@@ -1972,11 +1975,11 @@ export async function fetchConversationSummary(
     }
   }
 
-  const sortedChats = sortConversationSummaries(
+  const filteredAndSortedChats = sortConversationSummaries(
     Array.from(conversationMap.values()),
     sort,
   );
-  const paginatedChats = sortedChats.slice(offset, offset + limit + 1);
+  const paginatedChats = filteredAndSortedChats.slice(offset, offset + limit + 1);
   const hasMore = paginatedChats.length > limit;
 
   return {

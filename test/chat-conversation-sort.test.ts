@@ -5,6 +5,7 @@ import {
   getChatSortOption,
   getConversationParticipantPhones,
   getConversationPhoneKey,
+  isInboundMessageDirection,
   normalizeConversationPhone,
   sortConversationSummaries,
   type ConversationSummary,
@@ -27,7 +28,7 @@ function createConversation(
 }
 
 describe("chat conversation sorting", () => {
-  test("sorts replied conversations ahead of unreplied conversations", () => {
+  test("filters out unreplied conversations for hasReplied", () => {
     const conversations = [
       createConversation({
         contact_phone: "+15550000001",
@@ -49,10 +50,10 @@ describe("chat conversation sorting", () => {
         "hasReplied",
         repliedContactKeys,
       ).map((conversation) => conversation.contact_phone),
-    ).toEqual(["+15550000002", "+15550000001"]);
+    ).toEqual(["+15550000002"]);
   });
 
-  test("sorts unread replies ahead of read conversations", () => {
+  test("filters out conversations without unread replies for hasUnreadReply", () => {
     const conversations = [
       createConversation({
         contact_phone: "+15550000001",
@@ -70,7 +71,7 @@ describe("chat conversation sorting", () => {
       sortConversationSummaries(conversations, "hasUnreadReply", new Set()).map(
         (conversation) => conversation.contact_phone,
       ),
-    ).toEqual(["+15550000002", "+15550000001"]);
+    ).toEqual(["+15550000002"]);
   });
 
   test("falls back to recent activity within the same sort bucket", () => {
@@ -127,7 +128,7 @@ describe("chat conversation sorting", () => {
     expect(getConversationPhoneKey(null)).toBeNull();
   });
 
-  test("handles hasReplied sort when contact keys cannot be normalized", () => {
+  test("excludes unreplied rows when contact keys cannot be normalized", () => {
     const conversations = [
       createConversation({
         contact_phone: "not-a-number" as any,
@@ -144,7 +145,7 @@ describe("chat conversation sorting", () => {
       sortConversationSummaries(conversations, "hasReplied", new Set()).map(
         (conversation) => conversation.contact_phone,
       ),
-    ).toEqual(["+15550000002", "not-a-number"]);
+    ).toEqual(["+15550000002"]);
   });
 
   test("detects participant roles from workspace phones and direction", () => {
@@ -177,6 +178,12 @@ describe("chat conversation sorting", () => {
         new Set(),
       ),
     ).toEqual({ contactPhone: "+15552222222", userPhone: "+15550000000" });
+  });
+
+  test("isInboundMessageDirection is true only for inbound", () => {
+    expect(isInboundMessageDirection("inbound")).toBe(true);
+    expect(isInboundMessageDirection("outbound-reply")).toBe(false);
+    expect(isInboundMessageDirection(null)).toBe(false);
   });
 
   test("normalizes sort option values", () => {

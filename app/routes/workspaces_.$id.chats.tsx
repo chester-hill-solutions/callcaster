@@ -70,6 +70,7 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import {
   getConversationParticipantPhones,
   getChatSortOption,
+  isInboundMessageDirection,
   normalizeConversationPhone,
   sortConversationSummaries,
   type ConversationSummary,
@@ -119,6 +120,8 @@ type ConversationSidebarProps = {
     updater: (params: URLSearchParams) => URLSearchParams,
   ) => void;
 };
+
+const ALL_CAMPAIGNS_VALUE = "all";
 
 type LoaderData = {
   campaigns: Campaign[];
@@ -257,6 +260,8 @@ function ConversationSidebar({
   updateFilters,
 }: ConversationSidebarProps) {
   const [scrollRoot, setScrollRoot] = useState<Element | null>(null);
+  const selectedCampaignId = searchParams.get("campaign_id");
+  const campaignFilterValue = selectedCampaignId ?? ALL_CAMPAIGNS_VALUE;
 
   const [loadMoreRef] = useInfiniteScroll({
     root: scrollRoot,
@@ -279,10 +284,14 @@ function ConversationSidebar({
       </Button>
       <div className="flex items-center border-b border-border/70 bg-background/80 p-2">
         <Select
-          value={searchParams.get("campaign_id") || ""}
+          value={campaignFilterValue}
           onValueChange={(value) => {
             updateFilters((nextParams) => {
-              nextParams.set("campaign_id", value);
+              if (value === ALL_CAMPAIGNS_VALUE) {
+                nextParams.delete("campaign_id");
+              } else {
+                nextParams.set("campaign_id", value);
+              }
               return nextParams;
             });
           }}
@@ -291,6 +300,9 @@ function ConversationSidebar({
             <SelectValue placeholder="Filter by Campaign" />
           </SelectTrigger>
           <SelectContent className="w-full">
+            <SelectItem value={ALL_CAMPAIGNS_VALUE} className="w-full p-4">
+              All campaigns
+            </SelectItem>
             {campaigns?.map((campaign: { id: number; title: string }) => (
               <SelectItem
                 value={`${campaign.id}`}
@@ -450,7 +462,7 @@ function upsertConversationFromMessage({
   }
 
   const nextTimestamp = message.date_created ?? new Date().toISOString();
-  const isInbound = message.direction === "inbound";
+  const isInbound = isInboundMessageDirection(message.direction);
   const isActiveConversation =
     Boolean(activeContactNumber) &&
     phoneNumbersMatch(contactPhone, activeContactNumber ?? null);
@@ -732,7 +744,14 @@ export default function ChatsList() {
     setHideStopConversations(searchParams.get("hide_stop") === "1");
   }, [searchParams]);
   const messageFetcher = useFetcher({ key: "messages" });
-  const paginationFetcher = useFetcher<LoaderData>({ key: "chat-pages" });
+  const paginationFilterKey = useMemo(() => {
+    const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
+    const sortFilter = getChatSortOption(searchParams.get("sort"));
+    return `${campaignFilter}:${sortFilter}`;
+  }, [searchParams]);
+  const paginationFetcher = useFetcher<LoaderData>({
+    key: `chat-pages-${workspace.id}-${paginationFilterKey}`,
+  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const chatActionsRef = useRef<{
     addOptimisticMessage?: (p: {
@@ -801,14 +820,14 @@ export default function ChatsList() {
   }, [paginationFetcher.data]);
 
   const displayedChats = useMemo(() => {
-    let list = sortConversationSummaries(loadedChats, sortBy);
+    let filteredAndSortedChats = sortConversationSummaries(loadedChats, sortBy);
     if (hideStopConversations) {
-      list = list.filter(
+      filteredAndSortedChats = filteredAndSortedChats.filter(
         (chat) =>
           !isOptOutMessage(chat.last_inbound_body ?? null, optOutKeywords),
       );
     }
-    return list;
+    return filteredAndSortedChats;
   }, [loadedChats, sortBy, hideStopConversations, optOutKeywords]);
 
   // Custom hooks for images

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     validateTwilioWebhook: vi.fn(),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -25,6 +25,9 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 function makeSupabase(opts?: {
   number?: any;
+  workspaceNumberError?: any;
+  workspaceMsMatches?: any[];
+  workspaceMsError?: any;
   messageError?: any;
   contactError?: any;
   contacts?: any[];
@@ -34,6 +37,10 @@ function makeSupabase(opts?: {
   insertedMessages?: Record<string, unknown>[];
 }) {
   const supabase: any = {
+    rpc: async () => ({
+      data: [],
+      error: { message: "stub rpc for tests", code: "stub" },
+    }),
     storage: {
       from: () => ({
         upload: async (_name: string, _b: any, _opts: any) => ({
@@ -47,10 +54,20 @@ function makeSupabase(opts?: {
         return {
           select: () => ({
             eq: () => ({
-              single: async () => ({
+              maybeSingle: async () => ({
                 data: opts?.number ?? null,
-                error: null,
+                error: opts?.workspaceNumberError ?? null,
               }),
+            }),
+          }),
+        };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            or: async () => ({
+              data: opts?.workspaceMsMatches ?? [],
+              error: opts?.workspaceMsError ?? null,
             }),
           }),
         };
@@ -60,6 +77,7 @@ function makeSupabase(opts?: {
           select: () => contactQuery,
           eq: () => contactQuery,
           or: () => contactQuery,
+          in: () => contactQuery,
           not: () => contactQuery,
           neq: async () => ({
             data: opts?.contacts ?? [],
@@ -113,6 +131,8 @@ describe("app/routes/api.inbound-sms.tsx", () => {
     mocks.validateTwilioWebhook.mockReset();
     mocks.sendWebhookNotification.mockReset();
     mocks.logger.error.mockReset();
+    mocks.logger.info.mockReset();
+    mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
   });
@@ -131,6 +151,60 @@ describe("app/routes/api.inbound-sms.tsx", () => {
     const mod = await import("../app/routes/api.inbound-sms");
     const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(404);
+  });
+
+  test("resolves workspace by MessagingServiceSid when To number is unknown", async () => {
+    mocks.validateTwilioWebhook.mockResolvedValueOnce({
+      params: makeParams({
+        To: "+19998887777",
+        MessagingServiceSid: "MG1234567890abcdef",
+        NumMedia: "0",
+      }),
+    });
+    const insertedMessages: Record<string, unknown>[] = [];
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        number: null,
+        workspaceMsMatches: [
+          {
+            id: "w-ms",
+            twilio_data: { sid: "sid", authToken: "tok" },
+            webhook: [],
+          },
+        ],
+        insertedMessages,
+      }),
+    );
+    const mod = await import("../app/routes/api.inbound-sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(201);
+    expect(insertedMessages[0]).toMatchObject({
+      workspace: "w-ms",
+      messaging_service_sid: "MG1234567890abcdef",
+      direction: "inbound",
+    });
+  });
+
+  test("returns 409 when MessagingServiceSid matches multiple workspaces", async () => {
+    mocks.validateTwilioWebhook.mockResolvedValueOnce({
+      params: makeParams({
+        To: "+19998887777",
+        MessagingServiceSid: "MGdup",
+        NumMedia: "0",
+      }),
+    });
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        number: null,
+        workspaceMsMatches: [
+          { id: "w1", twilio_data: {}, webhook: [] },
+          { id: "w2", twilio_data: {}, webhook: [] },
+        ],
+      }),
+    );
+    const mod = await import("../app/routes/api.inbound-sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(409);
   });
 
   test("processes media (handles fetch/upload failures), inserts message, opt-out stop/start, and sends webhook", async () => {

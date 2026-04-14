@@ -29,7 +29,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
     const { data: campaign, error: campaignError } = await supabase
       .from("campaign")
-      .select('is_active, group_household_queue, type')
+      .select("is_active, group_household_queue, type, sms_send_mode, sms_messaging_service_sid, caller_id")
       .eq("id", campaign_id)
       .single();
     if (campaignError) throw campaignError;
@@ -105,13 +105,15 @@ export async function handleRequest(req: Request): Promise<Response> {
             campaign_id: campaign_id,
             workspace_id: contact.workspace,
             contact_id: contact.contact_id,
-            caller_id: contact.caller_id,
+            caller_id: contact.caller_id || campaign.caller_id,
             queue_id: contact.id,
             user_id: owner,
             index: 0,
             total: data.length,
             isLastContact: 0 === data.length - 1,
-            type: campaign.type
+            type: campaign.type,
+            sms_send_mode: campaign.sms_send_mode,
+            sms_messaging_service_sid: campaign.sms_messaging_service_sid,
           })
         }
       );

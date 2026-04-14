@@ -10,6 +10,7 @@ This directory contains project documentation and archived implementation notes.
 - `testing-map.md`
 - `error-handling.md`
 - `stripe-webhook.md`
+- `number-rental-billing.md`
 - `api-create-campaign-with-script.md`
 - `script-structure.md`
 - `script-json-format.md`

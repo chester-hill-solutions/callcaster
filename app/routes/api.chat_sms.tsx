@@ -11,6 +11,7 @@ import { normalizePhoneNumber, processTemplateTags } from '@/lib/utils';
 import { logger } from '@/lib/logger.server';
 import { env } from '@/lib/env.server';
 import { processUrls } from '@/lib/sms.server';
+import { resolveTwilioSmsMessagingServiceSid } from '@/lib/sms-send-resolve';
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from '@/lib/types';
 
 function parseOptionalString(value: unknown): string | null {
@@ -34,10 +35,18 @@ function resolveSmsRequest({
     messagingServiceSid?: string | null;
     messageIntent?: TwilioMessageIntent | null;
 }) {
-    const resolvedMessagingServiceSid =
-        messagingServiceSid ??
-        (portalConfig.sendMode === "messaging_service" ? portalConfig.messagingServiceSid : null);
+    const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
+        explicitRequestSid: messagingServiceSid ?? null,
+        campaignSmsSendMode: null,
+        campaignSmsMessagingServiceSid: null,
+        portalConfig,
+    });
     const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+    const effectiveFrom = String(from ?? "").trim();
+
+    if (!resolvedMessagingServiceSid && !effectiveFrom) {
+        throw new Error("Missing sender: caller_id or Messaging Service required");
+    }
 
     return {
         body,
@@ -46,7 +55,7 @@ function resolveSmsRequest({
         ...(media.length > 0 && { mediaUrl: [...media] }),
         ...(resolvedMessagingServiceSid
             ? { messagingServiceSid: resolvedMessagingServiceSid }
-            : { from }),
+            : { from: effectiveFrom }),
         ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
     };
 }

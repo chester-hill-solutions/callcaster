@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
     updateWorkspaceMessagingOnboardingState: vi.fn(),
+    insertTransactionHistoryIdempotent: vi.fn(),
     env: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
@@ -51,6 +52,10 @@ vi.mock("../app/lib/messaging-onboarding.server", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/transaction-history.server", () => ({
+  insertTransactionHistoryIdempotent: (...args: any[]) =>
+    mocks.insertTransactionHistoryIdempotent(...args),
+}));
 vi.mock("@/lib/supabase.server", () => ({
   verifyAuth: vi.fn(async () => ({
     supabaseClient: {},
@@ -63,7 +68,6 @@ function makeSupabaseStub(opts: {
   credits?: number;
   creditsError?: any;
   workspaceNumberInsertError?: any;
-  transactionInsertError?: any;
   newNumber?: any;
 }) {
   const credits = opts.credits ?? 2000;
@@ -97,14 +101,6 @@ function makeSupabaseStub(opts: {
       };
     }
 
-    if (table === "transaction_history") {
-      return {
-        insert: vi.fn(async () => ({
-          error: opts.transactionInsertError ?? null,
-        })),
-      };
-    }
-
     throw new Error(`Unexpected table: ${table}`);
   });
 
@@ -128,6 +124,11 @@ describe("app/routes/api.numbers.tsx", () => {
     mocks.env.SUPABASE_SERVICE_KEY.mockClear();
     mocks.env.BASE_URL.mockClear();
     mocks.logger.error.mockReset();
+    mocks.insertTransactionHistoryIdempotent.mockReset();
+    mocks.insertTransactionHistoryIdempotent.mockResolvedValue({
+      inserted: true,
+      existingId: 1,
+    });
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
       messagingService: {
         serviceSid: null,
@@ -279,6 +280,13 @@ describe("app/routes/api.numbers.tsx", () => {
     )?.value.insert as any;
     expect(workspaceNumberInsert).toBeTruthy();
     expect(mocks.updateWorkspaceMessagingOnboardingState).toHaveBeenCalled();
+    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "w1",
+        type: "DEBIT",
+        amount: -1000,
+      }),
+    );
   });
 
   test("action covers pending verification_status and inbound_action null", async () => {
@@ -488,15 +496,16 @@ describe("app/routes/api.numbers.tsx", () => {
     expect(res.status).toBe(500);
   });
 
-  test("action returns 500 when transaction_history insert errors", async () => {
-    const supabase = makeSupabaseStub({
-      transactionInsertError: { message: "tx" },
-    });
+  test("action returns 500 when idempotent transaction insert errors", async () => {
+    const supabase = makeSupabaseStub({});
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.getWorkspaceUsers.mockResolvedValueOnce({
       data: [{ user_workspace_role: "owner", username: "alice" }],
       error: null,
     });
+    mocks.insertTransactionHistoryIdempotent.mockRejectedValueOnce(
+      new Error("tx"),
+    );
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       incomingPhoneNumbers: {
         create: vi.fn().mockResolvedValueOnce({

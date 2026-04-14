@@ -8,6 +8,8 @@ import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6"
 import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import { resolveTwilioSmsMessagingServiceSid } from "../_shared/sms-send-resolve.ts";
 
 const TWILIO_MESSAGE_INTENTS = new Set([
   "otp",
@@ -296,7 +298,9 @@ interface SendMessageParams {
   queue_id: number | string;
   user_id: string;
   messageIntent?: string | null;
-  messagingServiceSid?: string | null;
+  requestMessagingServiceSid?: string | null;
+  campaignSmsSendMode?: string | null;
+  campaignSmsMessagingServiceSid?: string | null;
 }
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
@@ -366,11 +370,13 @@ const createWorkspaceTwilioInstance = async ({
     throw new Error("Failed to get workspace Twilio credentials");
   }
 
+  const creds = readTwilioWorkspaceCredentials(workspace.twilio_data);
+  if (!creds) {
+    throw new Error("Failed to get workspace Twilio credentials");
+  }
+
   return {
-    twilio: new Twilio(
-      workspace.twilio_data.sid,
-      workspace.twilio_data.authToken
-    ),
+    twilio: new Twilio(creds.sid, creds.authToken),
     credits: workspace.credits,
     portalConfig: normalizePortalConfig(
       isRecord(workspace.twilio_data) ? workspace.twilio_data.portalConfig : null,
@@ -404,7 +410,9 @@ const sendMessage = async ({
   queue_id,
   user_id,
   messageIntent,
-  messagingServiceSid,
+  requestMessagingServiceSid,
+  campaignSmsSendMode,
+  campaignSmsMessagingServiceSid,
 }: SendMessageParams) => {
   let outreachAttemptId: string | null = null;
   try {
@@ -465,17 +473,27 @@ const sendMessage = async ({
     // Process URLs in the message body to shorten them
     const processedBody = await processUrls(body);
 
-    const resolvedMessagingServiceSid =
-      messagingServiceSid ??
-      (portalConfig.sendMode === "messaging_service" ? portalConfig.messagingServiceSid : null);
+    const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
+      explicitRequestSid: requestMessagingServiceSid ?? null,
+      campaignSmsSendMode,
+      campaignSmsMessagingServiceSid,
+      portalConfig,
+    });
     const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+
+    const effectiveFrom = String(from ?? "").trim();
+    if (!resolvedMessagingServiceSid && !effectiveFrom) {
+      throw new Error("Missing sender: set caller_id or Messaging Service on the campaign");
+    }
 
     const message = await twilio.messages.create({
       body: processedBody,
       to,
       statusCallback: `${baseUrl}sms-status`,
       ...(media?.length && { mediaUrl: media }),
-      ...(resolvedMessagingServiceSid ? { messagingServiceSid: resolvedMessagingServiceSid } : { from }),
+      ...(resolvedMessagingServiceSid
+        ? { messagingServiceSid: resolvedMessagingServiceSid }
+        : { from: effectiveFrom }),
       ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
     }).catch((e: Error) => ({ error: e }));
 
@@ -587,13 +605,13 @@ export async function handleRequest(req: Request): Promise<Response> {
     } = await req.json();
 
     // Check if campaign is still active
-    const { data: campaign, error: campaignError } = await supabase
+    const { data: campaignRow, error: campaignError } = await supabase
       .from("campaign")
-      .select("is_active")
+      .select("is_active, sms_send_mode, sms_messaging_service_sid, caller_id")
       .eq("id", campaign_id)
       .single();
 
-    if (campaignError || !campaign?.is_active) {
+    if (campaignError || !campaignRow?.is_active) {
       return new Response(
         JSON.stringify({ status: "campaign_completed" }),
         { headers: { "Content-Type": "application/json" } }
@@ -641,7 +659,9 @@ export async function handleRequest(req: Request): Promise<Response> {
       body: processedBody,
       media: media.filter(Boolean) as string[],
       to: normalizePhoneNumber(to_number),
-      from: caller_id,
+      from:
+        String(caller_id ?? "").trim() ||
+        String(campaignRow.caller_id ?? "").trim(),
       supabase,
       campaign_id,
       workspace: workspace_id,
@@ -649,7 +669,9 @@ export async function handleRequest(req: Request): Promise<Response> {
       queue_id,
       user_id,
       messageIntent: parseOptionalString(message_intent),
-      messagingServiceSid: parseOptionalString(messaging_service_sid),
+      requestMessagingServiceSid: parseOptionalString(messaging_service_sid),
+      campaignSmsSendMode: campaignRow.sms_send_mode,
+      campaignSmsMessagingServiceSid: campaignRow.sms_messaging_service_sid,
     });
 
     if ('error' in result) {

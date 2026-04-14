@@ -17,13 +17,45 @@ type CampaignCounts = {
   callCount: number | null;
 };
 
-const getTotalsByDisposition = (results: CampaignResult[]) => {
-  return results.reduce((acc, result) => {
-    acc[result.disposition as string] = (acc[result.disposition as string] || 0) + result.count;
-    return acc;
-  }, {} as Record<string, number>);
+const HIDDEN_DISPOSITIONS = new Set(["idle", "no disposition"]);
+
+const normalizeDispositionLabel = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const lowered = trimmed.toLowerCase();
+  if (lowered === "no disposition") return "No Disposition";
+  if (lowered === "idle") return "idle";
+  return lowered;
 };
 
+const aggregateDispositionResults = (results: CampaignResult[]) => {
+  const aggregated = new Map<string, CampaignResult>();
+
+  for (const result of results) {
+    const normalizedDisposition = normalizeDispositionLabel(result.disposition);
+    if (!normalizedDisposition) continue;
+
+    const existing = aggregated.get(normalizedDisposition);
+    if (!existing) {
+      aggregated.set(normalizedDisposition, {
+        ...result,
+        disposition: normalizedDisposition,
+      });
+      continue;
+    }
+
+    existing.count += result.count;
+    if (
+      (!existing.average_call_duration || existing.average_call_duration === "00:00:00") &&
+      result.average_call_duration
+    ) {
+      existing.average_call_duration = result.average_call_duration;
+    }
+  }
+
+  return Array.from(aggregated.values());
+};
 
 export const ResultsDisplay = ({ 
   results, 
@@ -41,13 +73,28 @@ export const ResultsDisplay = ({
 }) => {
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
-  const totalsByDisposition = getTotalsByDisposition(results);
-  const totalOfAllResults = results.reduce((acc, result) => acc + result.count, 0);
+  const normalizedResults = aggregateDispositionResults(results);
+  const baseVisibleResults = normalizedResults.filter(
+    (result) => !HIDDEN_DISPOSITIONS.has(result.disposition.toLowerCase()),
+  );
+  const visibleResults = baseVisibleResults;
+  const totalsByDisposition = visibleResults.reduce(
+    (acc, result) => {
+      acc[result.disposition] = result.count;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  const totalOfAllResults = visibleResults.reduce(
+    (acc, result) => acc + result.count,
+    0,
+  );
+
   return campaign?.type === "message" ? (
     <MessageResultsScreen
       totalsByDisposition={totalsByDisposition}
       totalOfAllResults={totalOfAllResults}
-      results={results}
+      results={visibleResults}
       type={campaign.type}
       hasAccess={hasAccess}
       queueCounts={queueCounts}
@@ -57,7 +104,7 @@ export const ResultsDisplay = ({
       totalsByDisposition={totalsByDisposition}
       totalOfAllResults={totalOfAllResults}
       isBusy={isBusy}
-      results={results}
+      results={visibleResults}
       hasAccess={hasAccess}
       queueCounts={queueCounts}
     />

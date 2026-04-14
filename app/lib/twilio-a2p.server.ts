@@ -8,6 +8,7 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
@@ -34,14 +35,12 @@ async function loadWorkspaceTwilioContext(
   const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
 
-  if (!workspace?.twilio_data?.sid || !workspace.twilio_data.authToken) {
+  const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+  if (!creds) {
     throw new Error("Workspace is missing Twilio subaccount credentials");
   }
 
-  const twilio = new Twilio.Twilio(
-    workspace.twilio_data.sid,
-    workspace.twilio_data.authToken,
-  );
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
 
   return {
     workspace,

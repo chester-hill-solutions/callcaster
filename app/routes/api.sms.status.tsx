@@ -3,39 +3,49 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { validateTwilioWebhook } from "@/twilio.server";
 import { cancelQueuedMessagesForCampaign } from "@/lib/database.server";
-import { Database } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/database.types";
 import { Campaign, OutreachAttempt } from "@/lib/types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } from "@/lib/twilio.types";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
+import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
-async function getWorkspaceTwilioAuthToken(args: {
+async function loadMessageRowForSmsStatus(args: {
   supabase: ReturnType<typeof createClient<Database>>;
   sid: string;
-}): Promise<string> {
-  const { data: messageRecord, error: messageLookupError } = await args.supabase
+}): Promise<Tables<"message"> | null> {
+  const { data, error } = await args.supabase
     .from("message")
-    .select("workspace")
+    .select("*")
     .eq("sid", args.sid)
     .single();
 
-  if (messageLookupError || !messageRecord?.workspace) {
-    throw new Error("Failed to find message workspace for SMS status webhook");
+  if (error || !data) {
+    return null;
   }
 
+  return data as Tables<"message">;
+}
+
+async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
+  supabase: ReturnType<typeof createClient<Database>>;
+  workspaceId: string;
+}): Promise<string> {
   const { data: workspaceRecord, error: workspaceLookupError } = await args.supabase
     .from("workspace")
     .select("twilio_data")
-    .eq("id", messageRecord.workspace)
+    .eq("id", args.workspaceId)
     .single();
 
   if (workspaceLookupError) {
     throw new Error("Failed to load workspace Twilio credentials");
   }
 
-  return workspaceRecord?.twilio_data?.authToken || env.TWILIO_AUTH_TOKEN();
+  const creds = readTwilioWorkspaceCredentials(workspaceRecord?.twilio_data);
+  return creds?.authToken || env.TWILIO_AUTH_TOKEN();
 }
 
 export const action: ActionFunction = async ({ request }) => {
@@ -59,9 +69,18 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
     }
 
-    const authToken = await getWorkspaceTwilioAuthToken({
+    const preUpdateMessage = await loadMessageRowForSmsStatus({
       supabase,
       sid: previewSid,
+    });
+
+    if (!preUpdateMessage?.workspace) {
+      throw new Error("Failed to find message workspace for SMS status webhook");
+    }
+
+    const authToken = await getWorkspaceTwilioAuthTokenForWorkspace({
+      supabase,
+      workspaceId: preUpdateMessage.workspace,
     });
 
     const validation = await validateTwilioWebhook(request, authToken);
@@ -73,6 +92,10 @@ export const action: ActionFunction = async ({ request }) => {
       return json({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
     }
 
+    if (isInboundMessageDirection(preUpdateMessage.direction)) {
+      return json({ message: preUpdateMessage, outreach: null });
+    }
+
     // Validate status is a valid Twilio SMS status
     const validStatuses: TwilioSmsStatus[] = [
       "accepted", "scheduled", "canceled", "queued", "sending", "sent",
@@ -82,9 +105,17 @@ export const action: ActionFunction = async ({ request }) => {
       ? (status as TwilioSmsStatus)
       : "failed"; // Default to failed if invalid
 
+    const accountSidFromWebhook =
+      typeof payload.AccountSid === "string" && payload.AccountSid.trim()
+        ? payload.AccountSid.trim()
+        : null;
+
     const { data: messageData, error: messageError } = await supabase
       .from("message")
-      .update({ status: messageStatus })
+      .update({
+        status: messageStatus,
+        ...(accountSidFromWebhook ? { account_sid: accountSidFromWebhook } : {}),
+      })
       .eq("sid", sid)
       .select()
       .single();
