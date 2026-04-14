@@ -722,14 +722,22 @@ export async function fetchCampaignsByType({
 export async function getCampaignQueueById({
   supabaseClient,
   campaign_id,
+  onlyQueued = false,
 }: {
   supabaseClient: SupabaseClient<Database>;
   campaign_id: string;
+  onlyQueued?: boolean;
 }) {
-  const { data, error } = await supabaseClient
+  let query = supabaseClient
     .from("campaign_queue")
     .select("*, contact(*)")
     .eq("campaign_id", Number(campaign_id));
+
+  if (onlyQueued) {
+    query = query.eq("status", "queued").is("dequeued_at", null);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return data;
 }

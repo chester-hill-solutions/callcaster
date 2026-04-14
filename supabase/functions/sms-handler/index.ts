@@ -298,6 +298,8 @@ interface SendMessageParams {
   messageIntent?: string | null;
   messagingServiceSid?: string | null;
 }
+const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
+
 const normalizePhoneNumber = (input: string): string => {
   if (!input || typeof input !== "string") {
     throw new Error("Phone number input must be a non-empty string");
@@ -376,6 +378,20 @@ const createWorkspaceTwilioInstance = async ({
   };
 };
 
+async function hasDuplicateCampaignSms(args: {
+  supabase: SupabaseClient;
+  campaignId: string;
+  to: string;
+}): Promise<boolean> {
+  const { count, error } = await args.supabase
+    .from("message")
+    .select("sid", { head: true, count: "exact" })
+    .eq("campaign_id", Number(args.campaignId))
+    .eq("to", args.to);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
 const sendMessage = async ({
   body,
   to,
@@ -392,6 +408,27 @@ const sendMessage = async ({
 }: SendMessageParams) => {
   let outreachAttemptId: string | null = null;
   try {
+    const duplicateExists = await hasDuplicateCampaignSms({
+      supabase,
+      campaignId: String(campaign_id),
+      to,
+    });
+    if (duplicateExists) {
+      await supabase
+        .from("campaign_queue")
+        .update({
+          status: "dequeued",
+          dequeued_at: new Date().toISOString(),
+          dequeued_by: user_id,
+          dequeued_reason: DUPLICATE_SMS_DEQUEUED_REASON,
+        })
+        .eq("id", queue_id);
+      return {
+        skipped: true,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      };
+    }
+
     // Check workspace credits before sending
     const { data: workspaceData, error: workspaceError } = await supabase
       .from("workspace")

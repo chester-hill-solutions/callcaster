@@ -53,8 +53,24 @@ interface SendMessageParams {
   messagingServiceSid?: string | null;
 }
 
+const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
+
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+async function hasDuplicateCampaignSms(args: {
+  supabase: SupabaseClient;
+  campaignId: string;
+  to: string;
+}): Promise<boolean> {
+  const { count, error } = await args.supabase
+    .from("message")
+    .select("sid", { head: true, count: "exact" })
+    .eq("campaign_id", Number(args.campaignId))
+    .eq("to", args.to);
+  if (error) throw error;
+  return (count ?? 0) > 0;
 }
 
 function resolveSmsRequest({
@@ -300,6 +316,7 @@ export const action = async ({ request }: { request: Request }) => {
       getCampaignQueueById({
         supabaseClient: supabase,
         campaign_id,
+        onlyQueued: true,
       }),
       getWorkspaceTwilioPortalConfig({
         supabaseClient: supabase,
@@ -320,11 +337,38 @@ export const action = async ({ request }: { request: Request }) => {
 
     const BATCH_SIZE = 25;
     const results = [];
+    const queueMembers = audience ?? [];
     
-    for (let i = 0; i < audience.length; i += BATCH_SIZE) {
-      const batch = audience.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < queueMembers.length; i += BATCH_SIZE) {
+      const batch = queueMembers.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
         batch.map(async member => {
+          const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
+          const duplicateExists = await hasDuplicateCampaignSms({
+            supabase,
+            campaignId: campaign_id,
+            to: normalizedPhone,
+          });
+
+          if (duplicateExists) {
+            await supabase
+              .from("campaign_queue")
+              .update(
+                buildDequeuedQueueUpdate(
+                  effectiveUserId as string,
+                  DUPLICATE_SMS_DEQUEUED_REASON,
+                ),
+              )
+              .eq("id", member.id);
+            return {
+              [member.contact_id]: {
+                success: true,
+                skipped: true,
+                reason: DUPLICATE_SMS_DEQUEUED_REASON,
+              },
+            };
+          }
+
           // Process template tags for this specific contact
           let processedBody = campaign.body_text;
           if (member.contact && campaign.body_text) {
@@ -334,7 +378,7 @@ export const action = async ({ request }: { request: Request }) => {
           return sendMessage({
             body: processedBody,
             media: media.filter(Boolean) as string[],
-            to: normalizePhoneNumber(member.contact?.phone || ''),
+            to: normalizedPhone,
             from: caller_id,
             supabase,
             campaign_id,

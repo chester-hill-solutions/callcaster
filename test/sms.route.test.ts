@@ -73,6 +73,7 @@ function makeSupabase(opts: {
   rpcResult?: { data: any; error: any };
   outreachUpdate?: { data: any; error: any };
   messageInsert?: any;
+  messageCount?: number;
   queueUpdate?: any;
   signedUrls?: Array<string | undefined>;
 } = {}) {
@@ -116,7 +117,14 @@ function makeSupabase(opts: {
         };
       }
       if (table === "message") {
+        const dedupeQuery: any = {
+          select: () => dedupeQuery,
+          eq: () => dedupeQuery,
+          then: (resolve: (value: any) => any) =>
+            resolve({ count: opts.messageCount ?? 0, error: null }),
+        };
         return {
+          select: () => dedupeQuery,
           insert: () => ({
             select: vi.fn(async () => opts.messageInsert ?? ({ data: [], error: null } as any)),
           }),
@@ -230,6 +238,9 @@ describe("app/routes/api.sms.tsx", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("responses");
+    expect(mocks.getCampaignQueueById).toHaveBeenCalledWith(
+      expect.objectContaining({ onlyQueued: true }),
+    );
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -291,6 +302,58 @@ describe("app/routes/api.sms.tsx", () => {
     expect(body.responses[0]).toHaveProperty("3");
     expect(body.responses[0]["3"].success).toBe(false);
     expect(body.responses[0]["3"].error).toBe("twilio");
+  });
+
+  test("skips send when duplicate exists for campaign and phone", async () => {
+    currentSupabase = makeSupabase({
+      campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
+      messageCount: 1,
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c-dup",
+      workspace_id: "w1",
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 20, contact_id: 12, contact: { phone: "+15551234567" } },
+    ]);
+    const create = vi.fn(async () => ({ sid: "should-not-send" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.responses[0]["12"]).toMatchObject({
+      success: true,
+      skipped: true,
+      reason: "Duplicate SMS prevented",
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  test("sends when campaign+phone duplicate does not exist", async () => {
+    currentSupabase = makeSupabase({
+      campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
+      messageCount: 0,
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c-no-dup",
+      workspace_id: "w1",
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 21, contact_id: 13, contact: { phone: "+15551234567" } },
+    ]);
+    const create = vi.fn(async () => ({ sid: "SM13", body: "Hi", to: "+15551234567" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   test("createOutreachAttempt rpc error returns per-member success=false", async () => {
@@ -419,7 +482,13 @@ describe("app/routes/api.sms.tsx", () => {
       if (table === "outreach_attempt") return makeSupabase({}).from("outreach_attempt");
       if (table === "campaign_queue") return makeSupabase({}).from("campaign_queue");
       if (table === "message") {
+        const dedupeQuery: any = {
+          select: () => dedupeQuery,
+          eq: () => dedupeQuery,
+          then: (resolve: (value: any) => any) => resolve({ count: 0, error: null }),
+        };
         return {
+          select: () => dedupeQuery,
           insert: (row: any) => {
             inserted.push(row);
             return { select: vi.fn(async () => ({ data: [], error: null })) };
