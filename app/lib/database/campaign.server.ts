@@ -458,7 +458,117 @@ export const fetchBasicResults = async (
     campaign_id_param: campaignId,
   });
   if (error) logger.error("Error fetching basic results:", error);
-  return data || [];
+  const baseResults = ((data as
+    | {
+        disposition: string;
+        count: number;
+        average_call_duration: string;
+        average_wait_time: string;
+        expected_total: number;
+      }[]
+    | null) ?? []);
+
+  const { data: campaign } = await supabaseClient
+    .from("campaign")
+    .select("type")
+    .eq("id", Number(campaignId))
+    .maybeSingle();
+
+  if (campaign?.type !== "message") {
+    return baseResults;
+  }
+
+  const [queueCounts, completedQueueResult, messageStatuses, attemptDispositions] = await Promise.all([
+    fetchQueueCounts(supabaseClient as SupabaseClient<Database>, campaignId),
+    supabaseClient
+      .from("campaign_queue")
+      .select("id, contact!inner(*)", { count: "exact", head: true })
+      .eq("campaign_id", Number(campaignId))
+      .or(COMPLETED_QUEUE_COUNT_FILTER)
+      .not("contact.phone", "is", null)
+      .neq("contact.phone", "")
+      .limit(1),
+    supabaseClient
+      .from("message")
+      .select("status")
+      .eq("campaign_id", Number(campaignId))
+      .not("status", "is", null),
+    supabaseClient
+      .from("outreach_attempt")
+      .select("disposition")
+      .eq("campaign_id", Number(campaignId))
+      .not("disposition", "is", null)
+      .neq("disposition", ""),
+  ]);
+
+  if (completedQueueResult.error) {
+    logger.error("Error fetching completed queue count for message stats:", completedQueueResult.error);
+  }
+  if (messageStatuses.error) {
+    logger.error("Error fetching message statuses for message stats:", messageStatuses.error);
+  }
+  if (attemptDispositions.error) {
+    logger.error(
+      "Error fetching outreach attempt dispositions for message stats:",
+      attemptDispositions.error,
+    );
+  }
+
+  const dispositionCounts = (messageStatuses.data ?? []).reduce(
+    (acc, row) => {
+      const disposition = row.status?.trim().toLowerCase();
+      if (!disposition) return acc;
+      acc[disposition] = (acc[disposition] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+  const attemptDispositionCounts = (attemptDispositions.data ?? []).reduce(
+    (acc, row) => {
+      const disposition = row.disposition?.trim().toLowerCase();
+      if (!disposition) return acc;
+      acc[disposition] = (acc[disposition] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  // Backfill key outcome buckets from outreach_attempt when message.status lacks them.
+  const outcomeFallbackKeys = ["failed", "undelivered", "delivered", "sent"] as const;
+  for (const key of outcomeFallbackKeys) {
+    if ((dispositionCounts[key] ?? 0) > 0) continue;
+    if ((attemptDispositionCounts[key] ?? 0) > 0) {
+      dispositionCounts[key] = (attemptDispositionCounts[key] ?? 0);
+    }
+  }
+
+  // Align queued with settings queue semantics.
+  dispositionCounts[QUEUE_STATUS_QUEUED] = queueCounts.queuedCount ?? 0;
+  const completedQueueCount = completedQueueResult.count ?? 0;
+  if (completedQueueCount > 0 && dispositionCounts.dequeued == null) {
+    dispositionCounts.dequeued = completedQueueCount;
+  }
+
+  logger.info("Message campaign stats assembled", {
+    campaignId,
+    queuedCount: queueCounts.queuedCount ?? 0,
+    completedQueueCount,
+    groupedStatuses: dispositionCounts,
+    groupedAttemptDispositions: attemptDispositionCounts,
+  });
+
+  const expectedTotal = queueCounts.fullCount ?? Number(baseResults[0]?.expected_total ?? 0);
+  const messageResults = Object.entries(dispositionCounts).map(
+    ([disposition, count]) => ({
+      disposition,
+      count,
+      average_call_duration: "00:00:00",
+      average_wait_time: "00:00:00",
+      expected_total: expectedTotal,
+    }),
+  );
+
+  return messageResults.length > 0 ? messageResults : baseResults;
 };
 
 export const fetchCampaignCounts = async (

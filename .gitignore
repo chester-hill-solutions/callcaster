@@ -5,7 +5,7 @@ node_modules
 /coverage
 /public/build
 .env
-migrations
+
 .DS_Store
 /public/exports
 /public/exports/*

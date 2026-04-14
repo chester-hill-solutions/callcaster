@@ -43,6 +43,7 @@ import {
 import {
   getConversationParticipantPhones,
   getConversationPhoneKey,
+  isInboundMessageDirection,
   sortConversationSummaries,
   type ChatSortOption,
   type ConversationSummary,
@@ -1797,9 +1798,9 @@ export async function fetchConversationSummary(
       }
 
       const existingConversation = conversationMap.get(conversationKey);
-      const hasReplied = message.direction === "inbound";
+      const hasReplied = isInboundMessageDirection(message.direction);
       const unreadIncrement =
-        message.direction === "inbound" && message.status === "received"
+        isInboundMessageDirection(message.direction) && message.status === "received"
           ? 1
           : 0;
 
@@ -1972,11 +1973,11 @@ export async function fetchConversationSummary(
     }
   }
 
-  const sortedChats = sortConversationSummaries(
+  const filteredAndSortedChats = sortConversationSummaries(
     Array.from(conversationMap.values()),
     sort,
   );
-  const paginatedChats = sortedChats.slice(offset, offset + limit + 1);
+  const paginatedChats = filteredAndSortedChats.slice(offset, offset + limit + 1);
   const hasMore = paginatedChats.length > limit;
 
   return {

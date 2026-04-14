@@ -316,6 +316,76 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
   });
 
+  test("message campaign in messaging_service mode does not require caller_id", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: null,
+        sms_send_mode: "messaging_service",
+        sms_messaging_service_sid: "MG123",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: validSchedule,
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: 1, smsMessagingServiceSendersReady: true },
+    );
+
+    expect(readiness.startIssues).not.toContain(
+      "An outbound phone number is required",
+    );
+    expect(readiness.startIssues).toEqual([]);
+  });
+
+  test("message campaign in messaging_service mode flags missing SID", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: null,
+        sms_send_mode: "messaging_service",
+        sms_messaging_service_sid: null,
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: validSchedule,
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: 1, smsMessagingServiceSendersReady: true },
+    );
+
+    expect(readiness.startIssues).toContain(
+      "Messaging Service SID is required for this send mode (save Messaging Service selection)",
+    );
+  });
+
+  test("message campaign in messaging_service mode flags unavailable senders", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: null,
+        sms_send_mode: "messaging_service",
+        sms_messaging_service_sid: "MG123",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: validSchedule,
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: 1, smsMessagingServiceSendersReady: false },
+    );
+
+    expect(readiness.startIssues).toContain(
+      "Messaging Service has no available sender numbers; attach senders in onboarding or use a phone number",
+    );
+  });
+
   test("handles active schedule days with non-array intervals", () => {
     const readiness = getCampaignReadiness(
       {

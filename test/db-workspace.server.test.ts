@@ -1349,6 +1349,192 @@ describe("app/lib/database/workspace.server.ts", () => {
     ]);
   });
 
+  test("fetchConversationSummary applies strict hasReplied filtering before pagination", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+
+    const messageRows = [
+      {
+        campaign_id: 1,
+        contact_id: 10,
+        date_created: "2026-03-05T00:00:00.000Z",
+        direction: "inbound",
+        from: "+15550000001",
+        status: "received",
+        to: "+15551111111",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 11,
+        date_created: "2026-03-04T00:00:00.000Z",
+        direction: "inbound",
+        from: "+15550000002",
+        status: "read",
+        to: "+15551111111",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 12,
+        date_created: "2026-03-03T00:00:00.000Z",
+        direction: "outbound",
+        from: "+15551111111",
+        status: "delivered",
+        to: "+15550000003",
+      },
+    ];
+
+    const workspaceNumberQuery = {
+      select: vi.fn(() => workspaceNumberQuery),
+      eq: vi.fn(() => workspaceNumberQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
+    };
+
+    const messageQuery = {
+      select: vi.fn(() => messageQuery),
+      eq: vi.fn(() => messageQuery),
+      not: vi.fn(() => messageQuery),
+      neq: vi.fn(() => messageQuery),
+      order: vi.fn(() => messageQuery),
+      range: vi.fn(() => messageQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({
+          data: messageRows,
+          error: null,
+        }),
+    };
+
+    const contactQuery = {
+      select: vi.fn(() => contactQuery),
+      eq: vi.fn(() => contactQuery),
+      in: vi.fn(() =>
+        Promise.resolve({
+          data: [
+            { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
+            { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
+            { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
+          ],
+          error: null,
+        }),
+      ),
+    };
+
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === "workspace_number") return workspaceNumberQuery;
+        if (table === "message") return messageQuery;
+        if (table === "contact") return contactQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+      limit: 1,
+      offset: 0,
+      sort: "hasReplied",
+    });
+
+    expect(result.hasMore).toBe(true);
+    expect(result.chats).toHaveLength(1);
+    expect(result.chats[0]).toEqual(
+      expect.objectContaining({
+        contact_phone: "+15550000001",
+      }),
+    );
+  });
+
+  test("fetchConversationSummary applies strict hasUnreadReply filtering", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+
+    const messageRows = [
+      {
+        campaign_id: 1,
+        contact_id: 10,
+        date_created: "2026-03-05T00:00:00.000Z",
+        direction: "inbound",
+        from: "+15550000001",
+        status: "received",
+        to: "+15551111111",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 11,
+        date_created: "2026-03-04T00:00:00.000Z",
+        direction: "inbound",
+        from: "+15550000002",
+        status: "read",
+        to: "+15551111111",
+      },
+      {
+        campaign_id: 1,
+        contact_id: 12,
+        date_created: "2026-03-03T00:00:00.000Z",
+        direction: "outbound",
+        from: "+15551111111",
+        status: "delivered",
+        to: "+15550000003",
+      },
+    ];
+
+    const workspaceNumberQuery = {
+      select: vi.fn(() => workspaceNumberQuery),
+      eq: vi.fn(() => workspaceNumberQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({ data: [{ phone_number: "+15551111111" }], error: null }),
+    };
+
+    const messageQuery = {
+      select: vi.fn(() => messageQuery),
+      eq: vi.fn(() => messageQuery),
+      not: vi.fn(() => messageQuery),
+      neq: vi.fn(() => messageQuery),
+      order: vi.fn(() => messageQuery),
+      range: vi.fn(() => messageQuery),
+      then: (resolve: (value: unknown) => void) =>
+        resolve({
+          data: messageRows,
+          error: null,
+        }),
+    };
+
+    const contactQuery = {
+      select: vi.fn(() => contactQuery),
+      eq: vi.fn(() => contactQuery),
+      in: vi.fn(() =>
+        Promise.resolve({
+          data: [
+            { id: 10, firstname: "Taylor", surname: "One", phone: "+15550000001" },
+            { id: 11, firstname: "Jordan", surname: "Two", phone: "+15550000002" },
+            { id: 12, firstname: "Casey", surname: "Three", phone: "+15550000003" },
+          ],
+          error: null,
+        }),
+      ),
+    };
+
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === "workspace_number") return workspaceNumberQuery;
+        if (table === "message") return messageQuery;
+        if (table === "contact") return contactQuery;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    const result = await mod.fetchConversationSummary(supabase, "w1", null, {
+      limit: 20,
+      offset: 0,
+      sort: "hasUnreadReply",
+    });
+
+    expect(result.hasMore).toBe(false);
+    expect(result.chats).toEqual([
+      expect.objectContaining({
+        contact_phone: "+15550000001",
+        unread_count: 1,
+      }),
+    ]);
+  });
+
   test("fetchConversationSummary ignores mismatched contact phone metadata", async () => {
     const mod = await import("../app/lib/database/workspace.server");
 

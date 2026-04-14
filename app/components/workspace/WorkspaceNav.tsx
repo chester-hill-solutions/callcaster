@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "@remix-run/react";
+import { NavLink, useLocation } from "@remix-run/react";
 import {
   MdCampaign,
   MdChat,
@@ -29,10 +29,29 @@ interface NavItem {
   end?: boolean;
   callerHidden?: boolean;
   icon: React.ComponentType<{ className?: string }>;
+  subItems?: Array<{
+    name: string;
+    path: string;
+  }>;
 }
 
+type CampaignNavSubItem = {
+  name: string;
+  path: string;
+  status?: string | null;
+};
+
 const NAV_ITEMS: NavItem[] = [
-  { name: "Campaigns", path: "", end: true, icon: MdCampaign },
+  {
+    name: "Campaigns",
+    path: "",
+    end: true,
+    icon: MdCampaign,
+    subItems: [
+      { name: "New Campaign", path: "campaigns/new" },
+      { name: "Archived Campaigns", path: "campaigns/archive" },
+    ],
+  },
   { name: "Chats", path: "chats", icon: MdChat },
   { name: "Handset", path: "handset", icon: MdHeadsetMic },
   { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
@@ -47,15 +66,22 @@ interface WorkspaceNavProps {
     name: string;
     credits: number;
   };
+  campaigns: Array<{
+    id: string | number;
+    title?: string | null;
+    status?: string | null;
+  }>;
   userRole: MemberRole;
   className?: string;
 }
 
 const WorkspaceNav = ({
   workspace,
+  campaigns,
   userRole,
   className = "",
 }: WorkspaceNavProps) => {
+  const location = useLocation();
   const userIsCaller = userRole === MemberRole.Caller;
   const isAdmin =
     userRole === MemberRole.Admin || userRole === MemberRole.Owner;
@@ -78,6 +104,47 @@ const WorkspaceNav = ({
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     }`;
 
+  const subLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center justify-between gap-2 rounded-md px-3 py-2 font-Zilla-Slab text-sm font-semibold transition-colors ${
+      isActive
+        ? "bg-brand-primary/10 text-brand-primary dark:bg-brand-secondary/20 dark:text-brand-secondary"
+        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    }`;
+
+  const campaignStatusClass = (status: string) => {
+    switch (status) {
+      case "active":
+      case "running":
+      case "in_progress":
+        return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
+      case "scheduled":
+      case "queued":
+        return "bg-amber-500/20 text-amber-700 dark:text-amber-300";
+      case "complete":
+      case "completed":
+      case "archived":
+        return "bg-slate-500/20 text-slate-700 dark:text-slate-300";
+      case "failed":
+      case "error":
+        return "bg-red-500/20 text-red-700 dark:text-red-300";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const formatCampaignStatus = (status: string) => {
+    const normalized = status.replaceAll("_", " ").trim();
+    if (normalized.length === 0) return "Unknown";
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const isWithinWorkspace =
+    location.pathname === baseUrl ||
+    location.pathname.startsWith(`${baseUrl}/`);
+  const isCampaignsParentActive =
+    location.pathname === baseUrl ||
+    location.pathname.startsWith(`${baseUrl}/campaigns`);
+
   const navBody = (
     <>
       <div className="border-b border-border/60 px-4 py-4">
@@ -93,16 +160,68 @@ const WorkspaceNav = ({
         <nav className="space-y-1">
           {filteredItems.map((item) => {
             const Icon = item.icon;
+            const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
+            const showCampaignSubNav =
+              item.name === "Campaigns" && isWithinWorkspace;
+            const campaignSubItems: CampaignNavSubItem[] =
+              item.name === "Campaigns"
+                ? [
+                    ...(item.subItems ?? []),
+                    ...campaigns.map((campaign) => ({
+                      name:
+                        campaign.title?.trim() ||
+                        `Campaign ${String(campaign.id)}`,
+                      path: `campaigns/${campaign.id}`,
+                      status: campaign.status,
+                    })),
+                  ]
+                : item.subItems ?? [];
+
             return (
-              <NavLink
-                key={item.name}
-                to={`${baseUrl}${item.path ? `/${item.path}` : ""}`}
-                className={primaryLinkClass}
-                end={item.end}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{item.name}</span>
-              </NavLink>
+              <div key={item.name} className="space-y-1">
+                <NavLink
+                  to={itemTo}
+                  className={(navState) =>
+                    primaryLinkClass({
+                      isActive:
+                        item.name === "Campaigns"
+                          ? isCampaignsParentActive
+                          : navState.isActive,
+                    })
+                  }
+                  end={item.end}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </NavLink>
+                {campaignSubItems.length > 0 && showCampaignSubNav ? (
+                  <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
+                    {campaignSubItems.map((subItem) => {
+                      const subItemTo = subItem.path
+                        ? `${baseUrl}/${subItem.path}`
+                        : baseUrl;
+                      return (
+                        <NavLink
+                          key={subItem.path || subItem.name}
+                          to={subItemTo}
+                          className={subLinkClass}
+                        >
+                          <span className="min-w-0 truncate">{subItem.name}</span>
+                          {subItem.status ? (
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
+                                subItem.status,
+                              )}`}
+                            >
+                              {formatCampaignStatus(subItem.status)}
+                            </span>
+                          ) : null}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </nav>

@@ -20,6 +20,11 @@ type ConversationMessageLike = {
 
 export type ChatSortOption = "recent" | "hasReplied" | "hasUnreadReply";
 
+/** Twilio / DB enum: inbound customer messages only (not outbound-reply). */
+export function isInboundMessageDirection(direction: string | null | undefined): boolean {
+  return direction === "inbound";
+}
+
 export function normalizeConversationPhone(
   phone: string | null,
 ): string | null {
@@ -67,7 +72,7 @@ export function getConversationParticipantPhones(
     };
   }
 
-  if (message.direction === "inbound") {
+  if (isInboundMessageDirection(message.direction)) {
     return {
       contactPhone: normalizeConversationPhone(message.from),
       userPhone: normalizeConversationPhone(message.to),
@@ -110,45 +115,41 @@ function compareByRecentActivity(
   );
 }
 
+function hasConversationReplied(
+  conversation: ConversationSummary,
+  repliedContactKeys: Set<string>,
+): boolean {
+  const contactKey = getConversationPhoneKey(conversation.contact_phone);
+  return (
+    conversation.has_replied === true ||
+    (contactKey !== null && repliedContactKeys.has(contactKey))
+  );
+}
+
+function matchesChatSortFilter(
+  conversation: ConversationSummary,
+  sortBy: ChatSortOption,
+  repliedContactKeys: Set<string>,
+): boolean {
+  if (sortBy === "hasUnreadReply") {
+    return conversation.unread_count > 0;
+  }
+
+  if (sortBy === "hasReplied") {
+    return hasConversationReplied(conversation, repliedContactKeys);
+  }
+
+  return true;
+}
+
 export function sortConversationSummaries(
   conversations: ConversationSummary[],
   sortBy: ChatSortOption,
   repliedContactKeys: Set<string> = new Set(),
 ): ConversationSummary[] {
-  const sortedConversations = [...conversations];
-
-  if (sortBy === "recent") {
-    return sortedConversations.sort(compareByRecentActivity);
-  }
-
-  if (sortBy === "hasUnreadReply") {
-    return sortedConversations.sort((left, right) => {
-      const unreadDelta =
-        Number(right.unread_count > 0) - Number(left.unread_count > 0);
-
-      if (unreadDelta !== 0) {
-        return unreadDelta;
-      }
-
-      return compareByRecentActivity(left, right);
-    });
-  }
-
-  return sortedConversations.sort((left, right) => {
-    const leftContactKey = getConversationPhoneKey(left.contact_phone);
-    const rightContactKey = getConversationPhoneKey(right.contact_phone);
-    const leftHasReplied =
-      left.has_replied === true ||
-      (leftContactKey !== null && repliedContactKeys.has(leftContactKey));
-    const rightHasReplied =
-      right.has_replied === true ||
-      (rightContactKey !== null && repliedContactKeys.has(rightContactKey));
-    const repliedDelta = Number(rightHasReplied) - Number(leftHasReplied);
-
-    if (repliedDelta !== 0) {
-      return repliedDelta;
-    }
-
-    return compareByRecentActivity(left, right);
-  });
+  return conversations
+    .filter((conversation) =>
+      matchesChatSortFilter(conversation, sortBy, repliedContactKeys),
+    )
+    .sort(compareByRecentActivity);
 }

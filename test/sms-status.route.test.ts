@@ -42,15 +42,23 @@ vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 function makeSupabase(opts: {
-  messageLookup?: { data: any; error: any };
+  messagePreload?: { data: any; error: any };
   messageUpdate?: { data: any; error: any };
   workspaceLookup?: { data: any; error: any };
   attemptSelect?: { data: any; error: any };
   outreachUpdate?: { data: any; error: any };
   webhookSelect?: { data: any; error: any };
 }) {
-  const messageLookup =
-    opts.messageLookup ?? { data: { workspace: "w1" }, error: null };
+  const messagePreload = opts.messagePreload ?? {
+    data: {
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM1",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    },
+    error: null,
+  };
   const messageUpdate = opts.messageUpdate ?? { data: null, error: null };
   const workspaceLookup =
     opts.workspaceLookup ??
@@ -64,7 +72,7 @@ function makeSupabase(opts: {
       return {
         select: () => ({
           eq: () => ({
-            single: async () => messageLookup,
+            single: async () => messagePreload,
           }),
         }),
         update: () => ({
@@ -180,7 +188,7 @@ describe("app/routes/api.sms.status.tsx", () => {
 
   test("returns 500 when message workspace lookup fails before validation", async () => {
     const supabase = makeSupabase({
-      messageLookup: { data: null, error: { message: "missing" } },
+      messagePreload: { data: null, error: { message: "missing" } },
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
@@ -194,6 +202,35 @@ describe("app/routes/api.sms.status.tsx", () => {
     } as any);
     expect(res.status).toBe(500);
     expect(mocks.validateTwilioWebhook).not.toHaveBeenCalled();
+  });
+
+  test("returns 200 without updating DB when message is inbound", async () => {
+    const supabase = makeSupabase({
+      messagePreload: {
+        data: {
+          sid: "SM1",
+          workspace: "w1",
+          direction: "inbound",
+          status: "received",
+        },
+        error: null,
+      },
+      messageUpdate: { data: null, error: { message: "update should not run" } },
+    });
+    mocks.createClient.mockReturnValueOnce(supabase);
+    mocks.validateTwilioWebhook.mockResolvedValueOnce({
+      params: { SmsSid: "SM1", SmsStatus: "delivered" },
+    });
+
+    const mod = await import("../app/routes/api.sms.status");
+    const res = await mod.action({
+      request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
+    } as any);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.message.direction).toBe("inbound");
+    expect(body.outreach).toBeNull();
+    expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 
   test("returns 500 when message update errors", async () => {
