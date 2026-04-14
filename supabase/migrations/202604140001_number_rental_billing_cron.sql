@@ -6,9 +6,7 @@ declare
   cron_command text;
 begin
   select exists(
-    select 1
-    from public.get_active_cron_jobs()
-    where jobname = 'number_rental_billing_daily'
+    select 1 from cron.job j where j.jobname = 'number_rental_billing_daily'
   ) into job_exists;
 
   if job_exists then

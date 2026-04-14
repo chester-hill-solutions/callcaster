@@ -11,9 +11,11 @@ create table if not exists public.workspace_api_key (
   constraint workspace_api_key_key_prefix_unique unique (key_prefix)
 );
 
-create index idx_workspace_api_key_prefix on public.workspace_api_key(key_prefix);
+create index if not exists idx_workspace_api_key_prefix on public.workspace_api_key(key_prefix);
 
 alter table public.workspace_api_key enable row level security;
+
+drop policy if exists "Workspace members can manage API keys" on public.workspace_api_key;
 
 create policy "Workspace members can manage API keys"
   on public.workspace_api_key for all

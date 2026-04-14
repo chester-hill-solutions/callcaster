@@ -20,6 +20,9 @@ create index if not exists verification_session_expires_at_idx
 -- RLS
 alter table public.verification_session enable row level security;
 
+drop policy if exists "Users can insert own verification sessions" on public.verification_session;
+drop policy if exists "Service role can manage verification sessions" on public.verification_session;
+
 create policy "Users can insert own verification sessions"
   on public.verification_session for insert
   to authenticated

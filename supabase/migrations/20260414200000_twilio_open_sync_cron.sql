@@ -15,9 +15,7 @@ declare
   headers jsonb;
 begin
   select exists(
-    select 1
-    from public.get_active_cron_jobs()
-    where jobname = 'twilio_open_sync_every_5m'
+    select 1 from cron.job j where j.jobname = 'twilio_open_sync_every_5m'
   ) into job_exists;
 
   if job_exists then

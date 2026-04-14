@@ -1,5 +1,4 @@
--- Set a longer statement timeout for these functions
-ALTER DATABASE CURRENT SET statement_timeout = '60s';
+-- Statement timeout is set per-session inside the functions (SET LOCAL).
 
 -- Function to count total messages for a campaign
 CREATE OR REPLACE FUNCTION public.get_campaign_messages_count(
@@ -62,6 +61,9 @@ BEGIN
     RETURN COALESCE(total_count, 0);
 END;
 $$;
+
+-- Replace prior version if OUT/return columns changed (CREATE OR REPLACE cannot change return type).
+DROP FUNCTION IF EXISTS public.get_campaign_messages_chunk(integer, uuid, integer, integer);
 
 -- Function to get messages in chunks
 CREATE OR REPLACE FUNCTION public.get_campaign_messages_chunk(
@@ -208,6 +210,8 @@ BEGIN
     RETURN COALESCE(total_count, 0);
 END;
 $$;
+
+DROP FUNCTION IF EXISTS public.get_campaign_attempts_chunk(integer, integer, integer);
 
 -- Function to get call attempts in chunks
 CREATE OR REPLACE FUNCTION public.get_campaign_attempts_chunk(

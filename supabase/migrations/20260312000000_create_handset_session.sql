@@ -19,6 +19,10 @@ create index if not exists handset_session_expires_at_idx
 
 alter table public.handset_session enable row level security;
 
+drop policy if exists "Users can insert own handset sessions" on public.handset_session;
+drop policy if exists "Users can update own handset sessions" on public.handset_session;
+drop policy if exists "Service role can manage handset sessions" on public.handset_session;
+
 create policy "Users can insert own handset sessions"
   on public.handset_session for insert
   to authenticated

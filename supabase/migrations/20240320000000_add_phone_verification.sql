@@ -18,6 +18,8 @@ CREATE INDEX IF NOT EXISTS idx_phone_verification_expires_at ON phone_verificati
 -- Add RLS policies
 ALTER TABLE phone_verification ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can only access their own phone verifications" ON phone_verification;
+
 CREATE POLICY "Users can only access their own phone verifications"
     ON phone_verification
     FOR ALL

@@ -15,7 +15,19 @@ alter table if exists public.campaign drop column if exists dial_ratio;
 
 -- WORKSPACE table: unused metadata
 alter table if exists public.workspace drop column if exists cutoff_time;
-alter table if exists public.workspace drop column if exists users;
+-- workspace.users may still be referenced by policies (e.g. on message); skip if not droppable.
+do $drop_users$
+begin
+  alter table if exists public.workspace drop column if exists users;
+exception
+  when others then
+    if sqlstate = '2BP01' then
+      raise notice 'Skipping workspace.users drop: %', sqlerrm;
+    else
+      raise;
+    end if;
+end
+$drop_users$;
 
 -- USER table: unused fields
 alter table if exists public."user" drop column if exists organization;
