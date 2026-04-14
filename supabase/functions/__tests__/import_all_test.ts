@@ -2,9 +2,11 @@ import { assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 
 const modules = [
   "../_shared/audience-upload.ts",
+  "../_shared/call-provider-status.ts",
   "../_shared/ivr-status-logic.ts",
   "../_shared/queue-sync.ts",
   "../_shared/sms-status-logic.ts",
+  "../_shared/twilio-open-sync-candidates.ts",
   "../call-server/index.ts",
   "../cancel_calls/index.ts",
   "../create_schedule_jobs/index.ts",
@@ -21,6 +23,7 @@ const modules = [
   "../queue-next/index.ts",
   "../sms-handler/index.ts",
   "../sms-status/index.ts",
+  "../twilio-open-sync/index.ts",
   "../update_audience_membership/index.ts",
   "../update_queue_by_campaign_audience/index.ts",
   "../workspace-twilio-sync/index.ts",
