@@ -13,11 +13,20 @@ import { logger } from "@/lib/logger.server";
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { processUrls } from "@/lib/sms.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
+import {
+  messageCampaignRequiresCallerId,
+  resolveTwilioSmsMessagingServiceSid,
+} from "@/lib/sms-send-resolve";
 
 interface CampaignData {
   body_text: string;
   message_media?: string[];
-  campaign: { end_time: string };
+  campaign: {
+    end_time: string;
+    sms_send_mode?: string | null;
+    sms_messaging_service_sid?: string | null;
+    caller_id?: string | null;
+  };
 }
 
 const getCampaignData = async ({ 
@@ -29,7 +38,9 @@ const getCampaignData = async ({
 }): Promise<CampaignData> => {
   const { data, error } = await supabase
     .from("message_campaign")
-    .select(`*, campaign(end_time)`)
+    .select(
+      `*, campaign(end_time, sms_send_mode, sms_messaging_service_sid, caller_id)`,
+    )
     .eq("campaign_id", campaign_id)
     .single();
 
@@ -50,36 +61,52 @@ interface SendMessageParams {
   user_id: string;
   portalConfig: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
-  messagingServiceSid?: string | null;
+  messagingServiceSidFromRequest: string | null;
+  campaignSmsRow?: CampaignData["campaign"];
 }
+
+const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function resolveSmsRequest({
+async function hasDuplicateCampaignSms(args: {
+  supabase: SupabaseClient;
+  campaignId: string;
+  to: string;
+}): Promise<boolean> {
+  const { count, error } = await args.supabase
+    .from("message")
+    .select("sid", { head: true, count: "exact" })
+    .eq("campaign_id", Number(args.campaignId))
+    .eq("to", args.to);
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
+function buildTwilioMessageCreateParams({
   body,
   to,
-  from,
   media,
-  portalConfig,
   messageIntent,
-  messagingServiceSid,
+  defaultMessageIntent,
+  resolvedMessagingServiceSid,
+  from,
 }: {
   body: string;
   to: string;
-  from: string;
   media: string[];
-  portalConfig: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
-  messagingServiceSid?: string | null;
+  defaultMessageIntent: TwilioMessageIntent | null;
+  resolvedMessagingServiceSid: string | null;
+  from: string;
 }) {
-  const resolvedMessagingServiceSid =
-    messagingServiceSid ??
-    (portalConfig.sendMode === "messaging_service"
-      ? portalConfig.messagingServiceSid
-      : null);
-  const resolvedMessageIntent = messageIntent ?? portalConfig.defaultMessageIntent;
+  const resolvedMessageIntent = messageIntent ?? defaultMessageIntent;
+  const effectiveFrom = from.trim();
+  if (!resolvedMessagingServiceSid && !effectiveFrom) {
+    throw new Error("Missing sender: caller_id or Messaging Service required");
+  }
 
   return {
     body,
@@ -88,7 +115,7 @@ function resolveSmsRequest({
     ...(media?.length && { mediaUrl: media }),
     ...(resolvedMessagingServiceSid
       ? { messagingServiceSid: resolvedMessagingServiceSid }
-      : { from }),
+      : { from: effectiveFrom }),
     ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
   };
 }
@@ -106,7 +133,8 @@ const sendMessage = async ({
   user_id,
   portalConfig,
   messageIntent,
-  messagingServiceSid,
+  messagingServiceSidFromRequest,
+  campaignSmsRow,
 }: SendMessageParams) => {
   
   const twilio = await createWorkspaceTwilioInstance({
@@ -117,17 +145,24 @@ const sendMessage = async ({
   // Process URLs in the message body to shorten them
   const processedBody = await processUrls(body);
 
+  const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
+    explicitRequestSid: messagingServiceSidFromRequest,
+    campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
+    campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
+    portalConfig,
+  });
+
   const [message, outreachAttempt] = await Promise.all([
     twilio.messages
       .create(
-        resolveSmsRequest({
+        buildTwilioMessageCreateParams({
           body: processedBody,
           to,
-          from,
           media,
-          portalConfig,
           messageIntent,
-          messagingServiceSid,
+          defaultMessageIntent: portalConfig.defaultMessageIntent,
+          resolvedMessagingServiceSid,
+          from,
         }),
       )
       .catch(e => ({ error: e })),
@@ -259,7 +294,6 @@ export const action = async ({ request }: { request: Request }) => {
     if (
       typeof campaign_id !== "string" ||
       typeof workspace_id !== "string" ||
-      typeof caller_id !== "string" ||
       (authResult.authType === "api_key" && typeof user_id !== "string")
     ) {
       return new Response(JSON.stringify({ error: "Invalid SMS payload" }), {
@@ -275,7 +309,11 @@ export const action = async ({ request }: { request: Request }) => {
       typeof message_intent === "string" && message_intent.trim()
         ? (message_intent.trim() as TwilioMessageIntent)
         : null;
-    const messagingServiceSid = parseOptionalString(messaging_service_sid);
+    const messagingServiceSidFromRequest = parseOptionalString(
+      messaging_service_sid,
+    );
+    const callerIdStr =
+      typeof caller_id === "string" ? caller_id.trim() : "";
 
     if (authResult.authType === "api_key") {
       if (workspace_id !== authResult.workspaceId) {
@@ -300,12 +338,26 @@ export const action = async ({ request }: { request: Request }) => {
       getCampaignQueueById({
         supabaseClient: supabase,
         campaign_id,
+        onlyQueued: true,
       }),
       getWorkspaceTwilioPortalConfig({
         supabaseClient: supabase,
         workspaceId: workspace_id,
       }),
     ]);
+
+    const requiresCallerId = messageCampaignRequiresCallerId(
+      campaign.campaign?.sms_send_mode,
+    );
+    if (requiresCallerId && !callerIdStr) {
+      return new Response(
+        JSON.stringify({ error: "caller_id is required for this campaign" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
 
     const media = campaign.message_media?.length 
       ? await Promise.all(
@@ -320,11 +372,38 @@ export const action = async ({ request }: { request: Request }) => {
 
     const BATCH_SIZE = 25;
     const results = [];
+    const queueMembers = audience ?? [];
     
-    for (let i = 0; i < audience.length; i += BATCH_SIZE) {
-      const batch = audience.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < queueMembers.length; i += BATCH_SIZE) {
+      const batch = queueMembers.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
         batch.map(async member => {
+          const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
+          const duplicateExists = await hasDuplicateCampaignSms({
+            supabase,
+            campaignId: campaign_id,
+            to: normalizedPhone,
+          });
+
+          if (duplicateExists) {
+            await supabase
+              .from("campaign_queue")
+              .update(
+                buildDequeuedQueueUpdate(
+                  effectiveUserId as string,
+                  DUPLICATE_SMS_DEQUEUED_REASON,
+                ),
+              )
+              .eq("id", member.id);
+            return {
+              [member.contact_id]: {
+                success: true,
+                skipped: true,
+                reason: DUPLICATE_SMS_DEQUEUED_REASON,
+              },
+            };
+          }
+
           // Process template tags for this specific contact
           let processedBody = campaign.body_text;
           if (member.contact && campaign.body_text) {
@@ -334,8 +413,10 @@ export const action = async ({ request }: { request: Request }) => {
           return sendMessage({
             body: processedBody,
             media: media.filter(Boolean) as string[],
-            to: normalizePhoneNumber(member.contact?.phone || ''),
-            from: caller_id,
+            to: normalizedPhone,
+            from:
+              callerIdStr ||
+              String(campaign.campaign?.caller_id ?? "").trim(),
             supabase,
             campaign_id,
             workspace: workspace_id,
@@ -344,7 +425,8 @@ export const action = async ({ request }: { request: Request }) => {
             user_id: effectiveUserId as string,
             portalConfig,
             messageIntent,
-            messagingServiceSid,
+            messagingServiceSidFromRequest,
+            campaignSmsRow: campaign.campaign,
           }).then(
             result => ({ [member.contact_id]: { success: true, ...result }}),
             error => ({ [member.contact_id]: { success: false, error: error.message }})

@@ -1,17 +1,18 @@
 import { redirect, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Outlet,
-  useOutlet,
-  useOutletContext,
-} from "@remix-run/react";
+import { Outlet, useOutlet, useOutletContext } from "@remix-run/react";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import { MemberRole } from "@/components/workspace/TeamMember";
-import { Audience, WorkspaceData, WorkspaceNumbers , Campaign } from "@/lib/types";
+import {
+  Audience,
+  WorkspaceData,
+  WorkspaceNumbers,
+  Campaign,
+} from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { headers, user } = await verifyAuth(request);  
+  const { headers, user } = await verifyAuth(request);
   if (!user) {
     return redirect("/signin", { headers });
   }
@@ -20,13 +21,35 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();
-  const { audiences, campaigns, phoneNumbers, userRole, workspace, supabase } = useOutletContext<{ audiences: Audience[], campaigns: Campaign[], phoneNumbers: WorkspaceNumbers[], userRole: MemberRole, workspace: WorkspaceData, supabase: SupabaseClient }>();
-  return !outlet ? (
-    <CampaignEmptyState
-      hasAccess={userRole === "admin" || userRole === "owner"}
-      type={phoneNumbers?.length > 0 ? "campaign" : "number"}
-    />
-  ) : (
-    <Outlet context={{ audiences, campaigns, phoneNumbers, userRole, workspace, supabase }} />
+  const { audiences, campaigns, phoneNumbers, userRole, workspace, supabase } =
+    useOutletContext<{
+      audiences: Audience[];
+      campaigns: Campaign[];
+      phoneNumbers: WorkspaceNumbers[];
+      userRole: MemberRole;
+      workspace: WorkspaceData;
+      supabase: SupabaseClient;
+    }>();
+
+  return (
+    <div className="min-w-0 flex-1">
+      {!outlet ? (
+        <CampaignEmptyState
+          hasAccess={userRole === "admin" || userRole === "owner"}
+          type={phoneNumbers?.length > 0 ? "campaign" : "number"}
+        />
+      ) : (
+        <Outlet
+          context={{
+            audiences,
+            campaigns,
+            phoneNumbers,
+            userRole,
+            workspace,
+            supabase,
+          }}
+        />
+      )}
+    </div>
   );
 }

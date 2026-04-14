@@ -2,9 +2,10 @@ node_modules
 
 /.cache
 /build
+/coverage
 /public/build
 .env
-migrations
+
 .DS_Store
 /public/exports
 /public/exports/*

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 type WorkspaceTwilioSyncSnapshot = {
   accountStatus: string | null;
@@ -49,8 +50,9 @@ async function syncWorkspace(workspace: {
   twilio_data: unknown;
 }, supabase: ReturnType<typeof createSupabase>) {
   const twilioData = normalizeTwilioData(workspace.twilio_data);
-  const sid = typeof twilioData.sid === "string" ? twilioData.sid : null;
-  const authToken = typeof twilioData.authToken === "string" ? twilioData.authToken : null;
+  const creds = readTwilioWorkspaceCredentials(workspace.twilio_data);
+  const sid = creds?.sid ?? null;
+  const authToken = creds?.authToken ?? null;
 
   if (!sid || !authToken) {
     const snapshot = buildErrorSnapshot("Missing workspace Twilio credentials");

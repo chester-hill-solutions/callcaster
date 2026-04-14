@@ -5,11 +5,16 @@ import { CampaignSettings } from "@/components/campaign/settings/CampaignSetting
 import {
   fetchCampaignAudience,
   fetchQueueCounts,
+  getWorkspacePhoneNumbers,
+  getWorkspaceTwilioPortalConfigFromTwilioData,
+  getWorkspaceTwilioSyncSnapshotFromTwilioData,
   getSignedUrls,
   getCampaignTableKey,
   parseActionRequest,
   updateCampaign,
 } from "@/lib/database.server";
+import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger.server";
 import {
@@ -24,6 +29,7 @@ import {
   MessageCampaign,
   IVRCampaign,
   Survey,
+  TwilioAccountData,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
@@ -400,16 +406,55 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
 
-  const campaignWithAudience = await fetchCampaignAudience(supabaseClient, selected_id, workspace_id);
-  const { data: campaignType } = await supabaseClient
-    .from("campaign")
-    .select("type")
-    .eq("id", Number(selected_id))
-    .eq("workspace", workspace_id)
-    .single();
-  const { data: surveys } = await supabaseClient.from('survey').select('survey_id, title').eq('workspace', workspace_id).eq('is_active', true);
-  const { data: mediaData } = await supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`);
+  const [
+    campaignWithAudience,
+    campaignTypeResult,
+    surveysResult,
+    workspaceAudioList,
+    workspaceTwilioResult,
+    phoneNumbersResult,
+  ] = await Promise.all([
+    fetchCampaignAudience(supabaseClient, selected_id, workspace_id),
+    supabaseClient
+      .from("campaign")
+      .select("type")
+      .eq("id", Number(selected_id))
+      .eq("workspace", workspace_id)
+      .single(),
+    supabaseClient
+      .from("survey")
+      .select("survey_id, title")
+      .eq("workspace", workspace_id)
+      .eq("is_active", true),
+    supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`),
+    supabaseClient
+      .from("workspace")
+      .select("twilio_data")
+      .eq("id", workspace_id)
+      .maybeSingle(),
+    getWorkspacePhoneNumbers({
+      supabaseClient,
+      workspaceId: workspace_id,
+    }),
+  ]);
+
+  const campaignType = campaignTypeResult.data;
+  const surveys = surveysResult.data;
+  const mediaData = workspaceAudioList.data;
   let mediaLinks: string[] = [];
+  const twilioData = (workspaceTwilioResult.data?.twilio_data ?? null) as TwilioAccountData;
+  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+  const portalConfig = getWorkspaceTwilioPortalConfigFromTwilioData(twilioData);
+  const defaultMessagingServiceSid = portalConfig.messagingServiceSid?.trim() ?? null;
+  const messagingServiceReady = workspaceMessagingServiceHasAvailableSenders({
+    messagingServiceSid: defaultMessagingServiceSid,
+    attachedSenderPhoneNumbers: onboarding.messagingService.attachedSenderPhoneNumbers,
+    workspaceNumbers: phoneNumbersResult.data ?? [],
+  });
+  const outboundEstimateInputs = {
+    portalConfig,
+    syncSnapshot: getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData),
+  };
 
   if (campaignType?.type === "message") {
     const { data: messageCampaign } = await supabaseClient
@@ -436,6 +481,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     user: user,
     mediaLinks,
     surveys,
+    outboundEstimateInputs,
+    smsSendContext: {
+      messagingServiceReady,
+      defaultMessagingServiceSid,
+      attachedSenderPhoneNumbers:
+        onboarding.messagingService.attachedSenderPhoneNumbers,
+    },
   });
 };
 
@@ -460,15 +512,37 @@ export default function CampaignSettingsRoute() {
     user,
     mediaLinks,
     surveys,
+    outboundEstimateInputs,
+    smsSendContext,
   } = useLoaderData<typeof loader>();
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();
   const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none">("none");
-  const initialCampaignData = useMemo(
-    () => normalizeCampaignData(campaignData),
-    [campaignData],
-  );
+  const initialCampaignData = useMemo(() => {
+    const normalized = normalizeCampaignData(campaignData);
+    if (normalized.type !== "message") {
+      return normalized;
+    }
+    if (normalized.sms_send_mode != null) {
+      return normalized;
+    }
+    if (
+      smsSendContext?.messagingServiceReady &&
+      smsSendContext.defaultMessagingServiceSid
+    ) {
+      return {
+        ...normalized,
+        sms_send_mode: "messaging_service" as const,
+        sms_messaging_service_sid: smsSendContext.defaultMessagingServiceSid,
+      };
+    }
+    return {
+      ...normalized,
+      sms_send_mode: "from_number" as const,
+      sms_messaging_service_sid: null,
+    };
+  }, [campaignData, smsSendContext]);
   const [savedCampaignData, setSavedCampaignData] = useState(initialCampaignData);
   const [savedCampaignDetails, setSavedCampaignDetails] = useState(campaignDetails);
   const [draftCampaignData, setDraftCampaignData] = useState(initialCampaignData);
@@ -537,8 +611,21 @@ export default function CampaignSettingsRoute() {
       : null;
 
   const readiness = useMemo(
-    () => getCampaignReadiness(draftCampaignData, draftCampaignDetails, { queueCount: queueCount ?? 0 }),
-    [draftCampaignData, draftCampaignDetails, queueCount],
+    () =>
+      getCampaignReadiness(draftCampaignData, draftCampaignDetails, {
+        queueCount: queueCount ?? 0,
+        smsMessagingServiceSendersReady:
+          draftCampaignData.type === "message" &&
+          draftCampaignData.sms_send_mode === "messaging_service"
+            ? smsSendContext?.messagingServiceReady
+            : undefined,
+      }),
+    [
+      draftCampaignData,
+      draftCampaignDetails,
+      queueCount,
+      smsSendContext?.messagingServiceReady,
+    ],
   );
   const startDisabledReason = isChanged
     ? "Save your changes before starting this campaign"
@@ -772,6 +859,8 @@ export default function CampaignSettingsRoute() {
         handleSave={handleSave}
         handleResetData={handleResetData}
         surveys={surveys || []}
+        outboundEstimateInputs={outboundEstimateInputs}
+        smsSendContext={smsSendContext}
       />
     </>
   );

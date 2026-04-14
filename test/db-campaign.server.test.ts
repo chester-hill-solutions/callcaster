@@ -585,7 +585,24 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults logs on error and returns []", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const supabase: any = { rpc: vi.fn(async () => ({ data: null, error: new Error("x") })) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({ data: null, error: new Error("x") })),
+      from: (table: string) => {
+        if (table !== "campaign") {
+          throw new Error(`unexpected from(${table})`);
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { type: "live_call" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      },
+    };
     const out = await mod.fetchBasicResults(supabase, "1");
     expect(out).toEqual([]);
     expect(logger.error).toHaveBeenCalled();
@@ -594,7 +611,24 @@ describe("app/lib/database/campaign.server.ts", () => {
   test("fetchBasicResults success returns data", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/campaign.server");
-    const supabase: any = { rpc: vi.fn(async () => ({ data: [{ ok: 1 }], error: null })) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({ data: [{ ok: 1 }], error: null })),
+      from: (table: string) => {
+        if (table !== "campaign") {
+          throw new Error(`unexpected from(${table})`);
+        }
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({
+                data: { type: "live_call" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      },
+    };
     const out = await mod.fetchBasicResults(supabase, "1");
     expect(out).toEqual([{ ok: 1 }]);
     expect(logger.error).not.toHaveBeenCalled();

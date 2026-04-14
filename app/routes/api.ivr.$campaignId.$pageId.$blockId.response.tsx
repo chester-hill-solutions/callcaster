@@ -5,6 +5,7 @@ import { validateTwilioWebhookParams } from "@/twilio.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase
@@ -144,10 +145,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       supabase.from("call").select("*").eq("sid", callSid).single(),
       getCampaignData(supabase, campaignId),
     ]);
-    const workspace = call?.workspace
+    const twilioDataJson = call?.workspace
       ? (await supabase.from("workspace").select("twilio_data").eq("id", call.workspace).single()).data?.twilio_data
       : null;
-    const authToken = workspace?.authToken ?? env.TWILIO_AUTH_TOKEN();
+    const creds = readTwilioWorkspaceCredentials(twilioDataJson);
+    const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(formParams, signature, url, authToken)) {

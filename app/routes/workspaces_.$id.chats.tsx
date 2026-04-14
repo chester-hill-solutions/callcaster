@@ -13,6 +13,7 @@ import {
   useNavigate,
   useOutlet,
   useOutletContext,
+  useParams,
   useSearchParams,
   useRouteError,
 } from "@remix-run/react";
@@ -24,15 +25,11 @@ import {
   fetchConversationSummary,
   getUserRole,
 } from "@/lib/database.server";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { verifyAuth } from "@/lib/supabase.server";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   Sheet,
@@ -44,7 +41,7 @@ import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useInfiniteScroll } from "@/hooks";
 import ChatHeader from "@/components/sms-ui/ChatHeader";
 import ChatInput from "@/components/sms-ui/ChatInput";
-import ChatAddContactDialog from "@/components/sms-ui/ChatAddContactDialog";  
+import ChatAddContactDialog from "@/components/sms-ui/ChatAddContactDialog";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
 import {
   Select,
@@ -54,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   RealtimePostgresChangesPayload,
   SupabaseClient,
@@ -72,6 +70,7 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import {
   getConversationParticipantPhones,
   getChatSortOption,
+  isInboundMessageDirection,
   normalizeConversationPhone,
   sortConversationSummaries,
   type ConversationSummary,
@@ -114,8 +113,15 @@ type ConversationSidebarProps = {
   paginationFetcherState: "idle" | "loading" | "submitting";
   searchParams: URLSearchParams;
   sortBy: string;
-  updateFilters: (updater: (params: URLSearchParams) => URLSearchParams) => void;
+  hideStopConversations: boolean;
+  onHideStopChange: (checked: boolean) => void;
+  optOutKeywords: string[];
+  updateFilters: (
+    updater: (params: URLSearchParams) => URLSearchParams,
+  ) => void;
 };
+
+const ALL_CAMPAIGNS_VALUE = "all";
 
 type LoaderData = {
   campaigns: Campaign[];
@@ -124,6 +130,7 @@ type LoaderData = {
   potentialContacts: Contact[];
   contact: Contact | null;
   error: string | null;
+  optOutKeywords: string[];
   userRole: string;
   contact_number: string | undefined;
   workspaceNumbers: RouteWorkspaceNumber[];
@@ -181,39 +188,48 @@ function ConversationList({
   );
 
   if (shapedChats.length === 0) {
-    return <div className="p-4 text-center text-gray-500">No conversations yet</div>;
+    return (
+      <div className="p-4 text-center text-sm text-muted-foreground">
+        No conversations yet
+      </div>
+    );
   }
 
   return (
     <>
       {shapedChats
-        .filter((chat): chat is ConversationSummary => Boolean(chat?.contact_phone))
+        .filter((chat): chat is ConversationSummary =>
+          Boolean(chat?.contact_phone),
+        )
         .map((chat) => (
           <button
             type="button"
             key={chat.contact_phone}
-            className={`flex w-full items-center justify-between border-b border-gray-100 p-4 text-left hover:bg-gray-50 ${
-              chat.contact_phone === contactNumber ? "bg-gray-50" : ""
+            className={`flex w-full items-center justify-between border-b border-border/70 p-4 text-left transition-colors hover:bg-muted/70 ${
+              chat.contact_phone === contactNumber ? "bg-secondary/50" : ""
             }`}
             onClick={() => handleExistingConversationClick(chat.contact_phone)}
           >
             <div className="flex items-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-200 text-gray-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
                 <MdChat size={20} />
               </div>
               <div className="ml-4">
-                <div className="font-medium">{getConversationDisplayName(chat)}</div>
-                <div className="line-clamp-1 text-sm text-gray-500">
-                  {chat.contact_phone} • {chat.message_count} {chat.message_count === 1 ? "message" : "messages"}
+                <div className="font-medium">
+                  {getConversationDisplayName(chat)}
+                </div>
+                <div className="line-clamp-1 text-sm text-muted-foreground">
+                  {chat.contact_phone} • {chat.message_count}{" "}
+                  {chat.message_count === 1 ? "message" : "messages"}
                 </div>
               </div>
             </div>
             <div className="flex flex-col items-end">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {formatDate(chat.conversation_last_update)}
               </div>
               {chat.unread_count > 0 && (
-                <div className="mt-1 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs text-white">
+                <div className="mt-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground">
                   {chat.unread_count}
                 </div>
               )}
@@ -238,22 +254,27 @@ function ConversationSidebar({
   paginationState,
   searchParams,
   sortBy,
+  hideStopConversations,
+  onHideStopChange,
+  optOutKeywords,
   updateFilters,
 }: ConversationSidebarProps) {
   const [scrollRoot, setScrollRoot] = useState<Element | null>(null);
+  const selectedCampaignId = searchParams.get("campaign_id");
+  const campaignFilterValue = selectedCampaignId ?? ALL_CAMPAIGNS_VALUE;
 
   const [loadMoreRef] = useInfiniteScroll({
     root: scrollRoot,
-    hasMore: paginationState.hasMore,
+    hasMore: !contactNumber && paginationState.hasMore,
     loading: paginationFetcherState !== "idle",
     onLoadMore,
     rootMargin: "120px",
   });
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <Button
-        className="flex items-center justify-center rounded-none bg-primary p-4 text-lg text-white hover:bg-primary/90"
+        className="flex items-center justify-center rounded-none bg-brand-primary p-4 font-Zilla-Slab text-base font-semibold text-white hover:bg-brand-primary/90"
         asChild
       >
         <NavLink to="." onClick={onNewChatClick}>
@@ -261,20 +282,27 @@ function ConversationSidebar({
           <MdAdd size={24} className="mr-2" />
         </NavLink>
       </Button>
-      <div className="flex">
+      <div className="flex items-center border-b border-border/70 bg-background/80 p-2">
         <Select
-          value={searchParams.get("campaign_id") || ""}
+          value={campaignFilterValue}
           onValueChange={(value) => {
             updateFilters((nextParams) => {
-              nextParams.set("campaign_id", value);
+              if (value === ALL_CAMPAIGNS_VALUE) {
+                nextParams.delete("campaign_id");
+              } else {
+                nextParams.set("campaign_id", value);
+              }
               return nextParams;
             });
           }}
         >
-          <SelectTrigger className="flex items-center p-2">
+          <SelectTrigger className="flex items-center border-border/70 bg-card/60 p-2">
             <SelectValue placeholder="Filter by Campaign" />
           </SelectTrigger>
-          <SelectContent className="w-full bg-slate-50">
+          <SelectContent className="w-full">
+            <SelectItem value={ALL_CAMPAIGNS_VALUE} className="w-full p-4">
+              All campaigns
+            </SelectItem>
             {campaigns?.map((campaign: { id: number; title: string }) => (
               <SelectItem
                 value={`${campaign.id}`}
@@ -299,7 +327,7 @@ function ConversationSidebar({
           <X />
         </Button>
       </div>
-      <div className="border-b p-2">
+      <div className="border-b border-border/70 p-2">
         <Select
           value={sortBy}
           onValueChange={(value) => {
@@ -316,20 +344,25 @@ function ConversationSidebar({
             });
           }}
         >
-          <SelectTrigger className="flex items-center">
+          <SelectTrigger className="flex items-center border-border/70 bg-card/60">
             <SelectValue placeholder="Sort chats" />
           </SelectTrigger>
-          <SelectContent className="w-full bg-slate-50">
+          <SelectContent className="w-full">
             <SelectItem value="recent">Recent activity</SelectItem>
             <SelectItem value="hasReplied">Has replied</SelectItem>
             <SelectItem value="hasUnreadReply">Has unread reply</SelectItem>
           </SelectContent>
         </Select>
       </div>
-      <div
-        ref={(el) => setScrollRoot(el)}
-        className="flex-1 overflow-y-auto"
-      >
+      <div className="flex items-center justify-between border-b border-border/70 px-3 py-2">
+        <span className="text-sm font-medium">Hide STOP-only</span>
+        <Switch
+          checked={hideStopConversations}
+          onCheckedChange={onHideStopChange}
+          aria-label="Hide conversations whose last reply is STOP/opt-out"
+        />
+      </div>
+      <div ref={(el) => setScrollRoot(el)} className="min-h-0 flex-1 overflow-y-auto">
         {chatsError ? (
           <p className="border-b px-4 py-2 text-sm text-red-500">
             {chatsError}
@@ -345,11 +378,16 @@ function ConversationSidebar({
           <p className="px-4 py-2 text-sm text-red-500">{paginationError}</p>
         ) : null}
         {paginationState.hasMore ? (
-          <div ref={loadMoreRef} className="px-4 py-3 text-center text-sm text-gray-500">
-            {paginationFetcherState === "idle" ? "Load more chats" : "Loading more chats..."}
+          <div
+            ref={loadMoreRef}
+            className="px-4 py-3 text-center text-sm text-muted-foreground"
+          >
+            {paginationFetcherState === "idle"
+              ? "Load more chats"
+              : "Loading more chats..."}
           </div>
         ) : chats.length > 0 ? (
-          <div className="px-4 py-3 text-center text-sm text-gray-400">
+          <div className="px-4 py-3 text-center text-sm text-muted-foreground">
             All chats loaded
           </div>
         ) : null}
@@ -385,7 +423,9 @@ function mergeConversationPages(
   return mergedChats;
 }
 
-function getWorkspacePhoneKeys(workspaceNumbers: RouteWorkspaceNumber[]): Set<string> {
+function getWorkspacePhoneKeys(
+  workspaceNumbers: RouteWorkspaceNumber[],
+): Set<string> {
   return new Set(
     workspaceNumbers
       .map((workspaceNumber) => workspaceNumber.phone_number)
@@ -422,7 +462,7 @@ function upsertConversationFromMessage({
   }
 
   const nextTimestamp = message.date_created ?? new Date().toISOString();
-  const isInbound = message.direction === "inbound";
+  const isInbound = isInboundMessageDirection(message.direction);
   const isActiveConversation =
     Boolean(activeContactNumber) &&
     phoneNumbersMatch(contactPhone, activeContactNumber ?? null);
@@ -489,12 +529,12 @@ function useImageHandling(workspace_id: string) {
         });
       }
     },
-    [workspace_id, imageFetcher]
+    [workspace_id, imageFetcher],
   );
 
   const handleImageRemove = useCallback((imageUrl: string) => {
     setSelectedImages((prevImages) =>
-      prevImages.filter((image) => image !== imageUrl)
+      prevImages.filter((image) => image !== imageUrl),
     );
   }, []);
 
@@ -521,10 +561,9 @@ function useImageHandling(workspace_id: string) {
     setSelectedImages,
     handleImageSelect,
     handleImageRemove,
-    imageFetcher
+    imageFetcher,
   };
 }
-
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -533,10 +572,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
   const sortBy = getChatSortOption(url.searchParams.get("sort"));
-  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1);
+  const page = Math.max(
+    1,
+    Number.parseInt(url.searchParams.get("page") || "1", 10) || 1,
+  );
   const pageSize = Math.min(
     100,
-    Math.max(10, Number.parseInt(url.searchParams.get("pageSize") || "20", 10) || 20),
+    Math.max(
+      10,
+      Number.parseInt(url.searchParams.get("pageSize") || "20", 10) || 20,
+    ),
   );
   const offset = (page - 1) * pageSize;
   const contact_number = params["contact_number"];
@@ -544,18 +589,50 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!workspaceId) {
     throw redirect("/workspaces");
   }
-  const userRole = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
+  const userRole = await getUserRole({
+    supabaseClient: supabaseClient as SupabaseClient,
+    user: user as unknown as User,
+    workspaceId: workspaceId as string,
+  });
+
+  let optOutKeywords = parseOptOutKeywords(null);
+  try {
+    const onboarding = await getWorkspaceMessagingOnboardingState({
+      supabaseClient,
+      workspaceId: workspaceId as string,
+    });
+    optOutKeywords = parseOptOutKeywords(
+      onboarding.businessProfile.optOutKeywords,
+    );
+  } catch {
+    // use default keywords if onboarding not available
+  }
 
   const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
-    supabaseClient.from("workspace_number").select("*").eq("workspace", workspaceId).eq('type', 'rented'),
-    contact_number ? fetchContactData(supabaseClient, workspaceId, contact_id, contact_number) : null,
+    supabaseClient
+      .from("workspace_number")
+      .select("*")
+      .eq("workspace", workspaceId)
+      .eq("type", "rented"),
+    contact_number
+      ? fetchContactData(
+          supabaseClient,
+          workspaceId,
+          contact_id,
+          contact_number,
+        )
+      : null,
     fetchCampaignsByType({
       supabaseClient,
       workspaceId,
       type: "message_campaign",
     }),
   ]);
-  const { contact, potentialContacts, contactError } = contactData || { contact: null, potentialContacts: [], contactError: null };
+  const { contact, potentialContacts, contactError } = contactData || {
+    contact: null,
+    potentialContacts: [],
+    contactError: null,
+  };
   if (contactError) {
     const contactErrorMessage =
       typeof contactError === "object" &&
@@ -571,6 +648,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         chatsError: null,
         contact: null,
         error: contactErrorMessage,
+        optOutKeywords,
         pagination: {
           page,
           pageSize,
@@ -608,6 +686,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       potentialContacts,
       contact,
       error: null,
+      optOutKeywords,
       userRole,
       contact_number,
       pagination: {
@@ -654,22 +733,49 @@ export default function ChatsList() {
     contact,
     campaigns,
     workspaceNumbers,
+    optOutKeywords,
   } = useLoaderData<LoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Keep in state so toggling doesn't trigger loader re-run (setSearchParams causes full navigation)
+  const [hideStopConversations, setHideStopConversations] = useState(
+    () => searchParams.get("hide_stop") === "1",
+  );
+  useEffect(() => {
+    setHideStopConversations(searchParams.get("hide_stop") === "1");
+  }, [searchParams]);
   const messageFetcher = useFetcher({ key: "messages" });
-  const paginationFetcher = useFetcher<LoaderData>({ key: "chat-pages" });
+  const paginationFilterKey = useMemo(() => {
+    const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
+    const sortFilter = getChatSortOption(searchParams.get("sort"));
+    return `${campaignFilter}:${sortFilter}`;
+  }, [searchParams]);
+  const paginationFetcher = useFetcher<LoaderData>({
+    key: `chat-pages-${workspace.id}-${paginationFilterKey}`,
+  });
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const chatActionsRef = useRef<{ addOptimisticMessage?: (p: { body: string; from: string; to: string; media?: string }) => void } | null>(null);
+  const chatActionsRef = useRef<{
+    addOptimisticMessage?: (p: {
+      body: string;
+      from: string;
+      to: string;
+      media?: string;
+    }) => void;
+  } | null>(null);
   const requestedPageRef = useRef(pagination.page);
-  const registerChatActions = useCallback((actions: typeof chatActionsRef.current) => {
-    chatActionsRef.current = actions;
-  }, []);
+  const registerChatActions = useCallback(
+    (actions: typeof chatActionsRef.current) => {
+      chatActionsRef.current = actions;
+    },
+    [],
+  );
   const [dialogContact, setDialog] = useState<Contact | null>(null);
-  const [isMobileConversationListOpen, setIsMobileConversationListOpen] = useState(false);
+  const [isMobileConversationListOpen, setIsMobileConversationListOpen] =
+    useState(false);
   const outlet = useOutlet();
+  const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const contact_number = outlet ? location.pathname.split("/").pop() || "" : "";
+  const contact_number = params["contact_number"] ?? "";
   const formatDate = formatMessageTimestamp;
   const sortBy = getChatSortOption(searchParams.get("sort"));
   const [loadedChats, setLoadedChats] = useState<ConversationSummary[]>(chats);
@@ -681,9 +787,8 @@ export default function ChatsList() {
   const chatInputWorkspaceNumbers = useMemo(
     () =>
       workspaceNumbers
-        .filter(
-          (workspaceNumber): workspaceNumber is RouteWorkspaceNumber =>
-            Boolean(workspaceNumber.phone_number),
+        .filter((workspaceNumber): workspaceNumber is RouteWorkspaceNumber =>
+          Boolean(workspaceNumber.phone_number),
         )
         .map((workspaceNumber) => ({
           id: String(workspaceNumber.id),
@@ -714,17 +819,23 @@ export default function ChatsList() {
     requestedPageRef.current = paginationFetcher.data.pagination.page;
   }, [paginationFetcher.data]);
 
-  const displayedChats = useMemo(
-    () => sortConversationSummaries(loadedChats, sortBy),
-    [loadedChats, sortBy],
-  );
+  const displayedChats = useMemo(() => {
+    let filteredAndSortedChats = sortConversationSummaries(loadedChats, sortBy);
+    if (hideStopConversations) {
+      filteredAndSortedChats = filteredAndSortedChats.filter(
+        (chat) =>
+          !isOptOutMessage(chat.last_inbound_body ?? null, optOutKeywords),
+      );
+    }
+    return filteredAndSortedChats;
+  }, [loadedChats, sortBy, hideStopConversations, optOutKeywords]);
 
   // Custom hooks for images
-  const { 
-    selectedImages, 
-    setSelectedImages, 
-    handleImageSelect, 
-    handleImageRemove 
+  const {
+    selectedImages,
+    setSelectedImages,
+    handleImageSelect,
+    handleImageRemove,
   } = useImageHandling(workspace.id);
 
   // Contact search hook with consolidated functionality
@@ -747,20 +858,25 @@ export default function ChatsList() {
     initialContact: contact,
   });
 
-  // Navigate away if phone number is invalid
+  // Navigate away if phone number is invalid (decode in case path segment is encoded, e.g. %2B).
+  // Only when outlet is present (viewing a conversation) and skip while sidebar pagination is
+  // loading to avoid redirect races from fetcher revalidation.
   useEffect(() => {
-    if (contact_number && !phoneRegex.test(contact_number)) {
+    if (!outlet || paginationFetcher.state !== "idle") return;
+    const decoded = contact_number ? decodeURIComponent(contact_number) : "";
+    if (decoded && !phoneRegex.test(decoded)) {
       navigate(".");
     }
-  }, [contact_number, navigate]);
+  }, [contact_number, navigate, outlet, paginationFetcher.state]);
 
   useSupabaseRealtimeSubscription({
     supabase,
     table: "message",
     filter: `workspace=eq.${workspace.id}`,
     onChange: (payload) => {
-      const typedPayload =
-        payload as RealtimePostgresChangesPayload<Tables<"message">>;
+      const typedPayload = payload as RealtimePostgresChangesPayload<
+        Tables<"message">
+      >;
       const selectedCampaignId = searchParams.get("campaign_id");
       const nextRow = typedPayload.new as Tables<"message"> | null;
 
@@ -854,17 +970,33 @@ export default function ChatsList() {
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
       const from =
-        (formData.get("from") as string) || workspaceNumbers?.[0]?.phone_number || "";
+        (formData.get("from") as string) ||
+        workspaceNumbers?.[0]?.phone_number ||
+        "";
       const media = formData.get("media") as string | undefined;
-      chatActionsRef.current?.addOptimisticMessage?.({ body, from, to: toNumber, media });
+      chatActionsRef.current?.addOptimisticMessage?.({
+        body,
+        from,
+        to: toNumber,
+        media,
+      });
 
       messageFetcher.submit(formData, { method: "POST" });
 
-      const messageBody = target.querySelector<HTMLInputElement>("#body") || target.querySelector<HTMLTextAreaElement>("#body");
+      const messageBody =
+        target.querySelector<HTMLInputElement>("#body") ||
+        target.querySelector<HTMLTextAreaElement>("#body");
       if (messageBody) messageBody.value = "";
       setSelectedImages([]);
     },
-    [contact_number, phoneNumber, messageFetcher, selectedImages, setSelectedImages, workspaceNumbers]
+    [
+      contact_number,
+      phoneNumber,
+      messageFetcher,
+      selectedImages,
+      setSelectedImages,
+      workspaceNumbers,
+    ],
   );
 
   // Enhanced contact selection handler with read status update
@@ -888,25 +1020,36 @@ export default function ChatsList() {
           .eq("workspace", workspace.id)
           .eq("status", "received")
           .or(`from.eq.${number},to.eq.${number}`)
-          .then(({ error }) => {
-            if (error) {
-              logger.error("Error marking messages as read:", error);
-            } else {
-              window.dispatchEvent(new CustomEvent("messages-read", {
-                detail: { contactNumber: number },
-              }));
-            }
-          });
+          .then(
+            ({ error }) => {
+              if (error) {
+                logger.error("Error marking messages as read:", error);
+              } else {
+                window.dispatchEvent(
+                  new CustomEvent("messages-read", {
+                    detail: { contactNumber: number },
+                  }),
+                );
+              }
+            },
+            (err: unknown) =>
+              logger.error("Error marking messages as read:", err),
+          );
       }
       return null;
     },
-    [closeMobileConversationList, navigate, supabase, workspace.id]
+    [closeMobileConversationList, navigate, supabase, workspace.id],
   );
 
   const handleExistingConversationClick = useCallback(
     (phoneNumber: string) => {
       closeMobileConversationList();
-      navigate(`./${phoneNumber}`);
+      const search = new URLSearchParams(searchParams);
+      if (hideStopConversations) search.set("hide_stop", "1");
+      else search.delete("hide_stop");
+      const query = search.toString();
+      const path = `./${encodeURIComponent(phoneNumber)}`;
+      navigate(query ? `${path}?${query}` : path);
 
       setLoadedChats((currentChats) =>
         currentChats.map((chat) =>
@@ -922,17 +1065,30 @@ export default function ChatsList() {
         .eq("workspace", workspace.id)
         .eq("status", "received")
         .or(`from.eq.${phoneNumber},to.eq.${phoneNumber}`)
-        .then(({ error }) => {
-          if (error) {
-            logger.error("Error marking messages as read:", error);
-          } else {
-            window.dispatchEvent(new CustomEvent("messages-read", {
-              detail: { contactNumber: phoneNumber },
-            }));
-          }
-        });
+        .then(
+          ({ error }) => {
+            if (error) {
+              logger.error("Error marking messages as read:", error);
+            } else {
+              window.dispatchEvent(
+                new CustomEvent("messages-read", {
+                  detail: { contactNumber: phoneNumber },
+                }),
+              );
+            }
+          },
+          (err: unknown) =>
+            logger.error("Error marking messages as read:", err),
+        );
     },
-    [closeMobileConversationList, navigate, supabase, workspace.id]
+    [
+      closeMobileConversationList,
+      navigate,
+      searchParams,
+      hideStopConversations,
+      supabase,
+      workspace.id,
+    ],
   );
 
   // Adapter functions to match ChatHeader's expected types
@@ -943,15 +1099,21 @@ export default function ChatsList() {
     return null;
   }, [toggleContactMenu]);
 
-  const handleContactSelectAdapter = useCallback((contact: Contact) => {
-    handleContactSelect(contact);
-    return null;
-  }, [handleContactSelect]);
+  const handleContactSelectAdapter = useCallback(
+    (contact: Contact) => {
+      handleContactSelect(contact);
+      return null;
+    },
+    [handleContactSelect],
+  );
 
-  const handleExistingConversationClickAdapter = useCallback((phoneNumber: string) => {
-    handleExistingConversationClick(phoneNumber);
-    return null;
-  }, [handleExistingConversationClick]);
+  const handleExistingConversationClickAdapter = useCallback(
+    (phoneNumber: string) => {
+      handleExistingConversationClick(phoneNumber);
+      return null;
+    },
+    [handleExistingConversationClick],
+  );
 
   useEffect(() => {
     const handleMessageRead = (event: Event) => {
@@ -991,13 +1153,22 @@ export default function ChatsList() {
     [setSearchParams],
   );
 
+  const handleHideStopChange = useCallback((checked: boolean) => {
+    setHideStopConversations(checked);
+    // Update URL without triggering loader (replaceState = no Remix navigation)
+    const url = new URL(window.location.href);
+    if (checked) url.searchParams.set("hide_stop", "1");
+    else url.searchParams.delete("hide_stop");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
   const handleNewChatClick = useCallback(() => {
     closeMobileConversationList();
   }, [closeMobileConversationList]);
 
   return (
-    <main className="flex h-[calc(100vh-80px)] w-full gap-4">
-      <Card className="hidden h-full flex-col overflow-hidden md:flex md:basis-2/5 md:max-w-[40%]">
+    <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row">
+      <Card className="flex h-[68vh] max-h-[68vh] hidden flex-col overflow-hidden border-border/80 bg-card/80 md:flex md:max-w-[40%] md:basis-2/5">
         <ConversationSidebar
           campaigns={campaigns}
           chats={displayedChats}
@@ -1005,8 +1176,11 @@ export default function ChatsList() {
           contactNumber={contact_number}
           formatDate={formatDate}
           handleExistingConversationClick={handleExistingConversationClick}
+          hideStopConversations={hideStopConversations}
+          onHideStopChange={handleHideStopChange}
           onLoadMore={handleLoadMore}
           onNewChatClick={handleNewChatClick}
+          optOutKeywords={optOutKeywords}
           paginationError={paginationFetcher.data?.chatsError ?? null}
           paginationFetcherState={paginationFetcher.state}
           paginationState={paginationState}
@@ -1016,7 +1190,7 @@ export default function ChatsList() {
         />
       </Card>
 
-      <Card className="flex h-full w-full min-w-0 flex-1 flex-col justify-stretch overflow-hidden rounded-sm md:basis-3/5">
+      <Card className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden border-border/80 bg-card/80 md:basis-3/5">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -1033,12 +1207,23 @@ export default function ChatsList() {
           dropdownRef={dropdownRef}
           searchError={searchError || undefined}
           existingConversation={existingConversation as unknown as Chat}
-          handleExistingConversationClick={handleExistingConversationClickAdapter}
-          setDialog={(nextContact: Partial<Contact>) => setDialog(nextContact as Contact)}
+          handleExistingConversationClick={
+            handleExistingConversationClickAdapter
+          }
+          setDialog={(nextContact: Partial<Contact>) =>
+            setDialog(nextContact as Contact)
+          }
           onShowConversationList={() => setIsMobileConversationListOpen(true)}
         />
-        <div className="flex h-[calc(100vh-250px)] flex-col overflow-y-auto bg-gray-100 dark:bg-zinc-900">
-          <Outlet context={{ supabase, workspace, workspaceNumbers, registerChatActions }} />
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-muted/30">
+          <Outlet
+            context={{
+              supabase,
+              workspace,
+              workspaceNumbers,
+              registerChatActions,
+            }}
+          />
         </div>
         <ChatInput
           isValid={isValid}
@@ -1070,8 +1255,11 @@ export default function ChatsList() {
               contactNumber={contact_number}
               formatDate={formatDate}
               handleExistingConversationClick={handleExistingConversationClick}
+              hideStopConversations={hideStopConversations}
+              onHideStopChange={handleHideStopChange}
               onLoadMore={handleLoadMore}
               onNewChatClick={handleNewChatClick}
+              optOutKeywords={optOutKeywords}
               paginationError={paginationFetcher.data?.chatsError ?? null}
               paginationFetcherState={paginationFetcher.state}
               paginationState={paginationState}
@@ -1085,7 +1273,9 @@ export default function ChatsList() {
       <ChatAddContactDialog
         existingContact={dialogContact}
         isDialogOpen={Boolean(dialogContact?.phone)}
-        setDialog={(open: boolean | null) => setDialog(open ? dialogContact : null)}
+        setDialog={(open: boolean | null) =>
+          setDialog(open ? dialogContact : null)
+        }
         contact_number={contact_number}
         workspace_id={workspace.id}
       />

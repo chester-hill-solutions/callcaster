@@ -5,6 +5,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
 import { env } from "@/lib/env.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import {
   buildOnboardingStepsForState,
   getWorkspaceMessagingOnboardingState,
@@ -141,14 +142,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             updates: nextOnboarding,
             actorUserId: owner?.id ?? null,
         });
-        const { error: updateError } = await supabase.from('transaction_history').insert({
-            workspace: workspace_id,
-            amount: -1000,
+        await insertTransactionHistoryIdempotent({
+            supabase,
+            workspaceId: workspace_id,
             type: "DEBIT",
-            note: "Rented number - " + number.friendlyName
+            amount: -1000,
+            note: "Rented number - " + number.friendlyName,
+            idempotencyKey: `number_rent_purchase:${workspace_id}:${number.sid}`,
         });
-
-        if (updateError) throw updateError;
         return new Response(JSON.stringify({ newNumber }), {
             headers: {
                 "Content-Type": "application/json"

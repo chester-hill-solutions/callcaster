@@ -8,7 +8,9 @@ const twilioMocks = vi.hoisted(() => {
 
 vi.mock("twilio", () => {
   class TwilioClient {
-    validationRequests = { create: (...args: any[]) => twilioMocks.validationCreate(...args) };
+    validationRequests = {
+      create: (...args: any[]) => twilioMocks.validationCreate(...args),
+    };
   }
   return {
     default: {
@@ -23,11 +25,31 @@ const supabaseMocks = vi.hoisted(() => {
   };
 });
 
+const authMocks = vi.hoisted(() => {
+  return {
+    verifyAuth: vi.fn(async () => ({
+      supabaseClient: {},
+      user: { id: "u1" },
+      headers: new Headers(),
+    })),
+    requireWorkspaceAccess: vi.fn(async () => undefined),
+  };
+});
+
 vi.mock("@supabase/supabase-js", () => {
   return {
     createClient: (...args: any[]) => supabaseMocks.createClient(...args),
   };
 });
+
+vi.mock("@/lib/supabase.server", () => ({
+  verifyAuth: authMocks.verifyAuth,
+}));
+
+vi.mock("@/lib/database.server", () => ({
+  safeParseJson: (request: Request) => request.json(),
+  requireWorkspaceAccess: authMocks.requireWorkspaceAccess,
+}));
 
 vi.mock("@/lib/env.server", () => {
   return {
@@ -55,7 +77,11 @@ describe("app/routes/api.caller-id.tsx", () => {
 
   function setSupabaseWorkspaceSingle(result: { data: any; error: any }) {
     const workspaceSingle = vi.fn(async () => result);
-    const workspaceChain: any = { select: () => workspaceChain, eq: () => workspaceChain, single: workspaceSingle };
+    const workspaceChain: any = {
+      select: () => workspaceChain,
+      eq: () => workspaceChain,
+      single: workspaceSingle,
+    };
     return { workspaceChain, workspaceSingle };
   }
 
@@ -76,44 +102,77 @@ describe("app/routes/api.caller-id.tsx", () => {
 
     // workspace query error
     {
-      const { workspaceChain } = setSupabaseWorkspaceSingle({ data: null, error: new Error("q") });
+      const { workspaceChain } = setSupabaseWorkspaceSingle({
+        data: null,
+        error: new Error("q"),
+      });
       supabaseMocks.createClient.mockReturnValueOnce({
         from: (t: string) => {
           if (t === "workspace") return workspaceChain;
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({ request: makeReq({ phoneNumber: "5555550100", workspace_id: "w1", friendlyName: "n" }) } as any);
+      const res = await mod.action({
+        request: makeReq({
+          phoneNumber: "5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
+      } as any);
       expect(res.status).toBe(500);
-      await expect(res.json()).resolves.toMatchObject({ error: "Supabase query error: q" });
+      await expect(res.json()).resolves.toMatchObject({
+        error: "Supabase query error: q",
+      });
     }
 
     // no workspace data
     {
-      const { workspaceChain } = setSupabaseWorkspaceSingle({ data: null, error: null });
+      const { workspaceChain } = setSupabaseWorkspaceSingle({
+        data: null,
+        error: null,
+      });
       supabaseMocks.createClient.mockReturnValueOnce({
         from: (t: string) => {
           if (t === "workspace") return workspaceChain;
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({ request: makeReq({ phoneNumber: "5555550100", workspace_id: "w1", friendlyName: "n" }) } as any);
+      const res = await mod.action({
+        request: makeReq({
+          phoneNumber: "5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
+      } as any);
       expect(res.status).toBe(500);
-      await expect(res.json()).resolves.toMatchObject({ error: "No workspace data found" });
+      await expect(res.json()).resolves.toMatchObject({
+        error: "No workspace data found",
+      });
     }
 
     // missing twilio_data
     {
-      const { workspaceChain } = setSupabaseWorkspaceSingle({ data: { key: "k", token: "t" }, error: null });
+      const { workspaceChain } = setSupabaseWorkspaceSingle({
+        data: { key: "k", token: "t" },
+        error: null,
+      });
       supabaseMocks.createClient.mockReturnValueOnce({
         from: (t: string) => {
           if (t === "workspace") return workspaceChain;
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({ request: makeReq({ phoneNumber: "5555550100", workspace_id: "w1", friendlyName: "n" }) } as any);
+      const res = await mod.action({
+        request: makeReq({
+          phoneNumber: "5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
+      } as any);
       expect(res.status).toBe(500);
-      await expect(res.json()).resolves.toMatchObject({ error: "Workspace twilio_data not found" });
+      await expect(res.json()).resolves.toMatchObject({
+        error: "Workspace twilio_data not found",
+      });
     }
   }, 20000);
 
@@ -132,23 +191,34 @@ describe("app/routes/api.caller-id.tsx", () => {
     const res = await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: "+123", workspace_id: "w1", friendlyName: "n" }),
+        body: JSON.stringify({
+          phoneNumber: "+123",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
         headers: { "Content-Type": "application/json" },
       }),
     } as any);
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Invalid phone number length" });
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Invalid phone number length",
+    });
   });
 
-  test("continues when Twilio validation request rejects (it is caught + logged)", async () => {
+  test("returns 500 when Twilio validation request rejects", async () => {
     const mod = await import("../app/routes/api.caller-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
     });
-    const { upsertChain } = setSupabaseUpsertSelect({ data: [{ id: 1 }], error: null });
+    const { upsertChain } = setSupabaseUpsertSelect({
+      data: [{ id: 1 }],
+      error: null,
+    });
 
-    twilioMocks.validationCreate.mockRejectedValueOnce(new Error("twilio down"));
+    twilioMocks.validationCreate.mockRejectedValueOnce(
+      new Error("twilio down"),
+    );
 
     supabaseMocks.createClient.mockReturnValueOnce({
       from: (t: string) => {
@@ -161,15 +231,20 @@ describe("app/routes/api.caller-id.tsx", () => {
     const res = await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: "5555550100", workspace_id: "w1", friendlyName: "n" }),
+        body: JSON.stringify({
+          phoneNumber: "5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
         headers: { "Content-Type": "application/json" },
       }),
     } as any);
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
     const body = await res.json();
-    expect(body).toMatchObject({ numberRequest: [{ id: 1 }] });
-    expect(body.validationRequest).toBeUndefined();
+    expect(body).toMatchObject({
+      error: "twilio down",
+    });
   });
 
   test("returns 500 on workspace_number upsert error", async () => {
@@ -178,7 +253,10 @@ describe("app/routes/api.caller-id.tsx", () => {
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
     });
-    const { upsertChain } = setSupabaseUpsertSelect({ data: null, error: new Error("ins") });
+    const { upsertChain } = setSupabaseUpsertSelect({
+      data: null,
+      error: new Error("ins"),
+    });
 
     supabaseMocks.createClient.mockReturnValueOnce({
       from: (t: string) => {
@@ -191,12 +269,18 @@ describe("app/routes/api.caller-id.tsx", () => {
     const res = await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: "5555550100", workspace_id: "w1", friendlyName: "n" }),
+        body: JSON.stringify({
+          phoneNumber: "5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
         headers: { "Content-Type": "application/json" },
       }),
     } as any);
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Error inserting workspace number: ins" });
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Error inserting workspace number: ins",
+    });
   });
 
   test("happy path returns validationRequest + numberRequest (covers + in middle normalization)", async () => {
@@ -205,7 +289,10 @@ describe("app/routes/api.caller-id.tsx", () => {
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
     });
-    const { upsertChain, upsertSelect } = setSupabaseUpsertSelect({ data: [{ id: 1 }], error: null });
+    const { upsertChain, upsertSelect } = setSupabaseUpsertSelect({
+      data: [{ id: 1 }],
+      error: null,
+    });
 
     twilioMocks.validationCreate.mockResolvedValueOnce({ sid: "VR1" });
 
@@ -220,7 +307,11 @@ describe("app/routes/api.caller-id.tsx", () => {
     const res = await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: "1+5555550100", workspace_id: "w1", friendlyName: "n" }),
+        body: JSON.stringify({
+          phoneNumber: "1+5555550100",
+          workspace_id: "w1",
+          friendlyName: "n",
+        }),
         headers: { "Content-Type": "application/json" },
       }),
     } as any);
@@ -232,4 +323,3 @@ describe("app/routes/api.caller-id.tsx", () => {
     expect(upsertSelect).toHaveBeenCalled();
   });
 });
-

@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../app/lib/twilio-bootstrap.server", () => ({
-  ensureWorkspaceTwilioBootstrap: (...args: any[]) => mocks.ensureWorkspaceTwilioBootstrap(...args),
+  ensureWorkspaceTwilioBootstrap: (...args: any[]) =>
+    mocks.ensureWorkspaceTwilioBootstrap(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({
@@ -140,8 +141,14 @@ function makeWorkspaceTwilioData(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeSupabase(twilioData: any) {
-  const updateEq = vi.fn(async () => ({ error: null }));
+function makeSupabase(
+  twilioData: any,
+  options?: {
+    selectError?: unknown;
+    updateError?: unknown;
+  },
+) {
+  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
   return {
     from: vi.fn((table: string) => {
       if (table !== "workspace") {
@@ -152,7 +159,7 @@ function makeSupabase(twilioData: any) {
           eq: () => ({
             single: vi.fn(async () => ({
               data: { id: "w1", name: "Workspace", twilio_data: twilioData },
-              error: null,
+              error: options?.selectError ?? null,
             })),
           }),
         }),
@@ -212,7 +219,22 @@ describe("twilio A2P service", () => {
     mocks.brandCreate.mockResolvedValueOnce({ sid: "BN123" });
     mocks.campaignCreate.mockResolvedValueOnce({ sid: "CP123" });
 
-    const supabase = makeSupabase(makeWorkspaceTwilioData());
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        a2p10dlc: {
+          status: "collecting_business",
+          brandSid: null,
+          campaignSid: null,
+          trustProductSid: "BU123",
+          customerProfileBundleSid: "BU456",
+          brandType: null,
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    );
     const mod = await import("../app/lib/twilio-a2p.server");
 
     const result = await mod.provisionWorkspaceA2P({
@@ -226,5 +248,250 @@ describe("twilio A2P service", () => {
     expect(result.a2p10dlc.brandSid).toBe("BN123");
     expect(result.a2p10dlc.campaignSid).toBe("CP123");
     expect(result.a2p10dlc.status).toBe("in_review");
+  });
+
+  test("syncWorkspaceA2PStatus updates onboarding sync timestamp", async () => {
+    const supabase = makeSupabase(makeWorkspaceTwilioData());
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.syncWorkspaceA2PStatus({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+    });
+
+    expect(result.a2p10dlc.lastSyncedAt).toMatch(/T/);
+    expect(supabase._updateEq).toHaveBeenCalled();
+  });
+
+  test("throws when workspace is missing Twilio credentials", async () => {
+    const supabase = makeSupabase({
+      onboarding: makeWorkspaceTwilioData().onboarding,
+    });
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    await expect(
+      mod.provisionWorkspaceA2P({
+        supabaseClient: supabase as any,
+        workspaceId: "w1",
+        actorUserId: "u1",
+      }),
+    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+  });
+
+  test("throws when auth token is missing even if sid exists", async () => {
+    const supabase = makeSupabase({
+      sid: "AC123",
+      onboarding: makeWorkspaceTwilioData().onboarding,
+    });
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    await expect(
+      mod.syncWorkspaceA2PStatus({
+        supabaseClient: supabase as any,
+        workspaceId: "w1",
+      }),
+    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+  });
+
+  test("throws when workspace twilio_data is null", async () => {
+    const supabase: any = {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            single: async () => ({
+              data: { id: "w1", name: "Workspace", twilio_data: null },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    };
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    await expect(
+      mod.syncWorkspaceA2PStatus({
+        supabaseClient: supabase,
+        workspaceId: "w1",
+      }),
+    ).rejects.toThrow("Workspace is missing Twilio subaccount credentials");
+  });
+
+  test("marks onboarding rejected when Twilio throws an Error", async () => {
+    mocks.brandCreate.mockRejectedValueOnce(new Error("Twilio failed"));
+
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        a2p10dlc: {
+          status: "collecting_business",
+          brandSid: null,
+          campaignSid: null,
+          trustProductSid: "BU123",
+          customerProfileBundleSid: "BU456",
+          brandType: null,
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    );
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.provisionWorkspaceA2P({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
+    expect(result.status).toBe("rejected");
+    expect(result.a2p10dlc.status).toBe("rejected");
+    expect(result.a2p10dlc.rejectionReason).toBe("Twilio failed");
+    expect(result.reviewState.lastError).toBe("Twilio failed");
+    expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  test("stores unknown error message for non-Error throws", async () => {
+    mocks.brandCreate.mockRejectedValueOnce("bad");
+
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        a2p10dlc: {
+          status: "collecting_business",
+          brandSid: null,
+          campaignSid: null,
+          trustProductSid: "BU123",
+          customerProfileBundleSid: "BU456",
+          brandType: null,
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    );
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.provisionWorkspaceA2P({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+      actorUserId: null,
+    });
+
+    expect(result.a2p10dlc.rejectionReason).toBe("Unknown A2P error");
+    expect(result.reviewState.lastError).toBe("Unknown A2P error");
+  });
+
+  test("throws select and update errors from Supabase", async () => {
+    const selectError = new Error("select failed");
+    const updateError = new Error("update failed");
+    const base = makeWorkspaceTwilioData();
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    await expect(
+      mod.provisionWorkspaceA2P({
+        supabaseClient: makeSupabase(base, { selectError }) as any,
+        workspaceId: "w1",
+        actorUserId: "u1",
+      }),
+    ).rejects.toThrow("select failed");
+
+    await expect(
+      mod.syncWorkspaceA2PStatus({
+        supabaseClient: makeSupabase(base, { updateError }) as any,
+        workspaceId: "w1",
+      }),
+    ).rejects.toThrow("update failed");
+  });
+
+  test("skips brand create when brand exists and trims campaign sid", async () => {
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        a2p10dlc: {
+          status: "collecting_business",
+          brandSid: "BN_EXISTING",
+          campaignSid: null,
+          trustProductSid: "BU123",
+          customerProfileBundleSid: "BU456",
+          brandType: "sole_proprietor",
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    );
+    mocks.campaignCreate.mockResolvedValueOnce({ sid: "  CP_TRIM  " });
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.provisionWorkspaceA2P({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
+    expect(mocks.brandCreate).not.toHaveBeenCalled();
+    expect(mocks.campaignCreate).toHaveBeenCalled();
+    expect(result.a2p10dlc.brandSid).toBe("BN_EXISTING");
+    expect(result.a2p10dlc.campaignSid).toBe("CP_TRIM");
+  });
+
+  test("adds blocking issue when messaging service is missing", async () => {
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        messagingService: {
+          ...makeWorkspaceTwilioData().onboarding.messagingService,
+          serviceSid: null,
+        },
+      }),
+    );
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.provisionWorkspaceA2P({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
+    expect(result.reviewState.blockingIssues).toContain(
+      "Messaging Service must be provisioned first.",
+    );
+    expect(result.status).toBe("collecting_business");
+  });
+
+  test("keeps onboarding in submitting when brand sid is not parseable", async () => {
+    mocks.brandCreate.mockResolvedValueOnce({ sid: 12345 });
+
+    const supabase = makeSupabase(
+      makeWorkspaceTwilioData({
+        a2p10dlc: {
+          status: "collecting_business",
+          brandSid: null,
+          campaignSid: null,
+          trustProductSid: "BU123",
+          customerProfileBundleSid: "BU456",
+          brandType: "sole_proprietor",
+          tcrId: null,
+          rejectionReason: null,
+          lastSubmittedAt: null,
+          lastSyncedAt: null,
+        },
+      }),
+    );
+    const mod = await import("../app/lib/twilio-a2p.server");
+
+    const result = await mod.provisionWorkspaceA2P({
+      supabaseClient: supabase as any,
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
+    expect(mocks.brandCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        brandType: "sole_proprietor",
+      }),
+    );
+    expect(mocks.campaignCreate).not.toHaveBeenCalled();
+    expect(result.a2p10dlc.brandSid).toBeNull();
+    expect(result.a2p10dlc.status).toBe("submitting");
   });
 });

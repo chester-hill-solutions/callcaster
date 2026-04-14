@@ -63,7 +63,7 @@ async function handleSaveAnswer(
 
     // Get-or-create survey response in an idempotent way (avoid select-then-insert races).
     const contactIdNum = contactId ? parseInt(contactId, 10) : null;
-    if (contactId && Number.isNaN(contactIdNum!)) {
+    if (contactIdNum !== null && Number.isNaN(contactIdNum)) {
       return json({ error: "Invalid contact ID" }, { status: 400 });
     }
 

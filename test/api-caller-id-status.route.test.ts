@@ -6,6 +6,10 @@ const supabaseMocks = vi.hoisted(() => {
   };
 });
 
+const twilioMocks = vi.hoisted(() => ({
+  validateTwilioWebhookParams: vi.fn(() => true),
+}));
+
 vi.mock("@supabase/supabase-js", () => {
   return {
     createClient: (...args: any[]) => supabaseMocks.createClient(...args),
@@ -28,12 +32,15 @@ vi.mock("@/lib/env.server", () => {
 });
 
 vi.mock("@/twilio.server", () => ({
-  validateTwilioWebhookParams: vi.fn(() => true),
+  validateTwilioWebhookParams: (...args: any[]) =>
+    (twilioMocks.validateTwilioWebhookParams as any)(...args),
 }));
 
 describe("app/routes/api.caller-id.status.tsx", () => {
   beforeEach(() => {
     supabaseMocks.createClient.mockReset();
+    twilioMocks.validateTwilioWebhookParams.mockReset();
+    twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
     vi.resetModules();
   });
 
@@ -53,9 +60,15 @@ describe("app/routes/api.caller-id.status.tsx", () => {
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
     const res = await mod.action({
-      request: new Request("http://localhost/api/caller-id/status", { method: "POST", body: fd }),
+      request: new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      }),
     } as any);
-    expect(await res.json()).toMatchObject({ VerificationStatus: "pending", To: "+15555550100" });
+    expect(await res.json()).toMatchObject({
+      VerificationStatus: "pending",
+      To: "+15555550100",
+    });
   });
 
   test("updates capabilities on success and returns first row", async () => {
@@ -64,27 +77,32 @@ describe("app/routes/api.caller-id.status.tsx", () => {
         select: async () => ({ data: [{ id: 1 }], error: null }),
       }),
     }));
-    supabaseMocks.createClient.mockReturnValueOnce({ from: (table: string) => {
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: async () => ({
-              data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
-              error: null,
+    supabaseMocks.createClient.mockReturnValueOnce({
+      from: (table: string) => {
+        if (table === "workspace_number") {
+          return {
+            select: () => ({
+              eq: async () => ({
+                data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+                error: null,
+              }),
             }),
-          }),
-          update,
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    } });
+            update,
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    });
 
     const mod = await import("../app/routes/api.caller-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
     const res = await mod.action({
-      request: new Request("http://localhost/api/caller-id/status", { method: "POST", body: fd }),
+      request: new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      }),
     } as any);
     expect(await res.json()).toEqual({ id: 1 });
     expect(update).toHaveBeenCalledWith(
@@ -132,7 +150,10 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       const fd = new FormData();
       fd.set("VerificationStatus", "failed");
       fd.set("To", "+15555550100");
-      return new Request("http://localhost/api/caller-id/status", { method: "POST", body: fd });
+      return new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      });
     };
 
     const r1 = await mod.action({ request: makeReq() } as any);
@@ -156,5 +177,84 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       }),
     );
   });
-});
 
+  test("returns 403 when Twilio signature does not validate", async () => {
+    supabaseMocks.createClient.mockReturnValueOnce({
+      from: () => ({
+        select: () => ({
+          eq: async () => ({
+            data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+            error: null,
+          }),
+        }),
+      }),
+    });
+
+    twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+
+    const mod = await import("../app/routes/api.caller-id.status");
+    const fd = new FormData();
+    fd.set("VerificationStatus", "pending");
+    fd.set("To", "+15555550100");
+    const res = await mod.action({
+      request: new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      }),
+    } as any);
+
+    const response = res as Response;
+    expect(response.status).toBe(403);
+  });
+
+  test("returns 500 when candidate lookup errors", async () => {
+    supabaseMocks.createClient.mockReturnValueOnce({
+      from: () => ({
+        select: () => ({
+          eq: async () => ({
+            data: null,
+            error: { message: "lookup failed" },
+          }),
+        }),
+      }),
+    });
+
+    const mod = await import("../app/routes/api.caller-id.status");
+    const fd = new FormData();
+    fd.set("VerificationStatus", "pending");
+    fd.set("To", "+15555550100");
+    const res = await mod.action({
+      request: new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      }),
+    } as any);
+
+    const response = res as Response;
+    expect(response.status).toBe(500);
+  });
+
+  test("returns 403 when candidate lookup returns null data", async () => {
+    supabaseMocks.createClient.mockReturnValueOnce({
+      from: () => ({
+        select: () => ({
+          eq: async () => ({ data: null, error: null }),
+        }),
+      }),
+    });
+
+    const mod = await import("../app/routes/api.caller-id.status");
+    const fd = new FormData();
+    fd.set("VerificationStatus", "pending");
+    fd.set("To", "+15555550100");
+    const res = await mod.action({
+      request: new Request("http://localhost/api/caller-id/status", {
+        method: "POST",
+        body: fd,
+      }),
+    } as any);
+
+    const response = res as Response;
+    expect(response.status).toBe(403);
+  });
+});

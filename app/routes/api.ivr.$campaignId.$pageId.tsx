@@ -5,11 +5,15 @@ import { validateTwilioWebhookParams } from "@/twilio.server";
 import type { ActionFunctionArgs } from "@remix-run/node";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200; 
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** IVR script steps shape from DB (script.steps is Json) */
+type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
 
 const getCallWithRetry = async (supabase: SupabaseClient<Database>, callSid: string, retries = 0) => {
   const { data, error } = await supabase
@@ -43,13 +47,14 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   try {
     const callData = await getCallWithRetry(supabase, callSid);
     const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", callData.workspace).single();
-    const authToken = workspace?.twilio_data?.authToken ?? env.TWILIO_AUTH_TOKEN();
+    const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+    const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(paramsObj, signature, url, authToken)) {
       return new Response("Invalid Twilio signature", { status: 403 });
     }
-    const script = (callData.campaign?.ivr_campaign?.[0]?.script?.steps as unknown) as { pages: Record<string, { blocks: string[] }> };
+    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as unknown as IvrScriptSteps | null | undefined;
     if (!script || !script.pages) {
       throw new Error("Invalid script structure");
     }

@@ -44,7 +44,7 @@ export default function ChatInput({
   isValid,
 }: ChatInputProps) {
   return (
-    <div className="border-t bg-white p-3 sm:p-4">
+    <div className="border-t border-border/70 bg-background/90 p-3 sm:p-4">
       <messageFetcher.Form
         method="POST"
         className="flex flex-col space-y-2"
@@ -58,7 +58,7 @@ export default function ChatInput({
             name="from"
             id="from"
             defaultValue={initialFrom}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm sm:flex-grow"
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground sm:flex-grow"
           >
             {workspaceNumbers?.map((num) => (
               <option key={num.id} value={num.phone_number}>
@@ -87,7 +87,7 @@ export default function ChatInput({
                 required
                 placeholder="Type your message"
                 rows={3}
-                className="min-h-[96px] flex-grow resize-none rounded-md border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="min-h-[96px] flex-grow resize-none rounded-md border border-input bg-background p-2 text-sm text-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
                 name="body"
                 id="body"
               />
@@ -99,7 +99,7 @@ export default function ChatInput({
               messageFetcher.state !== "idle" ||
               !(selectedContact || (phoneNumber && isValid))
             }
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-blue-500 px-4 text-white transition-colors hover:bg-blue-600 disabled:bg-gray-400 sm:w-10 sm:rounded-full sm:px-0"
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-primary-foreground transition-colors hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground sm:w-10 sm:rounded-full sm:px-0"
             aria-label="Send message"
           >
             <MdSend size={20} />

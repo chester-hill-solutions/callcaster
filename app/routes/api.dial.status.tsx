@@ -4,6 +4,7 @@ import { json , ActionFunction, ActionFunctionArgs } from "@remix-run/node";
 import { createWorkspaceTwilioInstance } from "../lib/database.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { env } from "@/lib/env.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient(
@@ -36,10 +37,8 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
     }
 
     const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
-    const authToken = workspace.data?.twilio_data?.authToken;
-    if (!authToken) {
-      return json({ success: false, error: "Workspace auth not found" }, { status: 500 });
-    }
+    const creds = readTwilioWorkspaceCredentials(workspace.data?.twilio_data);
+    const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(params, signature, url, authToken)) {

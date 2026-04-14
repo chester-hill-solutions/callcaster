@@ -73,20 +73,30 @@ describe("type-utils", () => {
     // Here we force a non-Json by parsing a number then expecting a typed object fallback.
     expect(safeJsonParse("1", { ok: 1 })).toEqual(1 as any);
 
-    const parseSpy = vi.spyOn(JSON, "parse").mockReturnValueOnce({ a: undefined } as any);
+    const parseSpy = vi
+      .spyOn(JSON, "parse")
+      .mockReturnValueOnce({ a: undefined } as any);
     expect(safeJsonParse('{"a":1}', { ok: 1 })).toEqual({ ok: 1 });
     parseSpy.mockRestore();
   });
 
   test("createAppError + response helpers + type guards", () => {
     const err = createAppError("m", "CODE", { a: 1 });
+    const fallbackErr = createAppError("fallback");
     expect(isAppError(err)).toBe(true);
     expect(isAppError({})).toBe(false);
+    expect(fallbackErr.code).toBe("UNKNOWN_ERROR");
 
     const ok = createSuccessResponse({ x: 1 });
     const bad = createErrorResponse(err);
+    const okWithNullError = {
+      data: { x: 2 },
+      error: null,
+      success: true,
+    } as any;
 
     expect(isSuccessResponse(ok)).toBe(true);
+    expect(isSuccessResponse(okWithNullError)).toBe(true);
     expect(isErrorResponse(ok)).toBe(false);
     expect(isSuccessResponse(bad)).toBe(false);
     expect(isErrorResponse(bad)).toBe(true);
@@ -94,7 +104,10 @@ describe("type-utils", () => {
 
   test("filterNonNull + mapNonNull", () => {
     expect(filterNonNull([1, null, 2, undefined, 3])).toEqual([1, 2, 3]);
-    expect(mapNonNull([1, 2, 3], (x) => (x % 2 ? String(x) : null))).toEqual(["1", "3"]);
+    expect(mapNonNull([1, 2, 3], (x) => (x % 2 ? String(x) : null))).toEqual([
+      "1",
+      "3",
+    ]);
   });
 
   test("optionalChain", () => {
@@ -143,7 +156,9 @@ describe("type-utils", () => {
     expect(() => validateRequired(null, "x")).toThrow("x is required");
     expect(validateRequired(1, "x")).toBe(1);
 
-    expect(() => validateString("", "name")).toThrow("name must be a non-empty string");
+    expect(() => validateString("", "name")).toThrow(
+      "name must be a non-empty string",
+    );
     expect(validateString("a", "name")).toBe("a");
 
     expect(validateNumber("3", "n")).toBe(3);
@@ -154,7 +169,11 @@ describe("type-utils", () => {
   test("safeAsync logs and returns fallback on failure", async () => {
     const errSpy = vi.spyOn(logger, "error");
     expect(await safeAsync(async () => 1, 0)).toBe(1);
-    expect(await safeAsync(async () => { throw new Error("boom"); }, 0)).toBe(0);
+    expect(
+      await safeAsync(async () => {
+        throw new Error("boom");
+      }, 0),
+    ).toBe(0);
     expect(errSpy).toHaveBeenCalled();
   });
 
@@ -184,4 +203,3 @@ describe("type-utils", () => {
     nowSpy.mockRestore();
   });
 });
-

@@ -62,7 +62,9 @@ describe("survey-utils", () => {
               question_type: "text",
               is_required: true,
               question_order: 1,
-              question_option: [{ option_value: "a", option_label: "A", option_order: 3 }],
+              question_option: [
+                { option_value: "a", option_label: "A", option_order: 3 },
+              ],
             },
           ],
         },
@@ -152,10 +154,17 @@ describe("survey-utils", () => {
     })!;
     expect(SurveyUtils.getCurrentPage(survey, -1)).toBeNull();
     expect(SurveyUtils.getCurrentPage(survey, 2)).toBeNull();
-    expect(SurveyUtils.getCurrentPage({ ...survey, survey_page: undefined }, 0)).toBeNull();
+    expect(
+      SurveyUtils.getCurrentPage({ ...survey, survey_page: undefined }, 0),
+    ).toBeNull();
+    const sparseSurvey = { ...survey, survey_page: [] as any[] } as any;
+    sparseSurvey.survey_page[0] = undefined;
+    expect(SurveyUtils.getCurrentPage(sparseSurvey, 0)).toBeNull();
     expect(SurveyUtils.getCurrentPage(survey, 0)?.page_id).toBe("p1");
     expect(SurveyUtils.getTotalPages(survey)).toBe(1);
-    expect(SurveyUtils.getTotalPages({ ...survey, survey_page: undefined })).toBe(0);
+    expect(
+      SurveyUtils.getTotalPages({ ...survey, survey_page: undefined }),
+    ).toBe(0);
     expect(SurveyUtils.calculateProgress(0, 0)).toBe(0);
     expect(SurveyUtils.calculateProgress(0, 4)).toBe(25);
   });
@@ -233,10 +242,12 @@ describe("survey-utils", () => {
     });
 
     // text + required(value) true but minLength false (array => required true, safeString => "")
-    expect(SurveyValidator.validateQuestion(requiredText, ["x"])).toMatchObject({
-      isValid: false,
-      errors: [{ code: "MIN_LENGTH" }],
-    });
+    expect(SurveyValidator.validateQuestion(requiredText, ["x"])).toMatchObject(
+      {
+        isValid: false,
+        errors: [{ code: "MIN_LENGTH" }],
+      },
+    );
 
     const radio: SurveyQuestionData = {
       ...requiredText,
@@ -244,7 +255,10 @@ describe("survey-utils", () => {
     };
     const radioRes = SurveyValidator.validateQuestion(radio, "");
     expect(radioRes.isValid).toBe(false);
-    expect(radioRes.errors.map((e) => e.code)).toEqual(["REQUIRED", "REQUIRED"]);
+    expect(radioRes.errors.map((e) => e.code)).toEqual([
+      "REQUIRED",
+      "REQUIRED",
+    ]);
 
     const checkbox: SurveyQuestionData = {
       ...requiredText,
@@ -252,7 +266,10 @@ describe("survey-utils", () => {
     };
     const checkboxRes = SurveyValidator.validateQuestion(checkbox, []);
     expect(checkboxRes.isValid).toBe(false);
-    expect(checkboxRes.errors.map((e) => e.code)).toEqual(["REQUIRED", "REQUIRED"]);
+    expect(checkboxRes.errors.map((e) => e.code)).toEqual([
+      "REQUIRED",
+      "REQUIRED",
+    ]);
 
     const optionalRadio: SurveyQuestionData = { ...radio, is_required: false };
     expect(SurveyValidator.validateQuestion(optionalRadio, "")).toEqual({
@@ -270,4 +287,3 @@ describe("survey-utils", () => {
     });
   });
 });
-

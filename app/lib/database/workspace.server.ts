@@ -25,6 +25,7 @@ import {
 import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "../logger.server";
 import { json } from "@remix-run/node";
 import { createStripeContact } from "./stripe.server";
@@ -36,10 +37,14 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import { ensureWorkspaceTwilioBootstrap, syncWorkspaceTwilioBootstrapState } from "@/lib/twilio-bootstrap.server";
+import {
+  ensureWorkspaceTwilioBootstrap,
+  syncWorkspaceTwilioBootstrapState,
+} from "@/lib/twilio-bootstrap.server";
 import {
   getConversationParticipantPhones,
   getConversationPhoneKey,
+  isInboundMessageDirection,
   sortConversationSummaries,
   type ChatSortOption,
   type ConversationSummary,
@@ -95,7 +100,9 @@ function pickEnumValue<const T extends readonly string[]>(
   allowedValues: T,
   fallback: T[number],
 ): T[number] {
-  return typeof value === "string" && allowedValues.includes(value) ? value : fallback;
+  return typeof value === "string" && allowedValues.includes(value)
+    ? value
+    : fallback;
 }
 
 function parseOptionalString(value: unknown): string | null {
@@ -110,16 +117,26 @@ function parseAuditTrail(value: unknown): WorkspaceTwilioOpsAuditEntry[] {
   return value
     .filter(isRecord)
     .map((entry) => ({
-      changedAt: typeof entry.changedAt === "string" ? entry.changedAt : new Date(0).toISOString(),
-      actorUserId: typeof entry.actorUserId === "string" ? entry.actorUserId : null,
-      actorUsername: typeof entry.actorUsername === "string" ? entry.actorUsername : null,
-      summary: typeof entry.summary === "string" ? entry.summary : "Saved Twilio portal settings",
+      changedAt:
+        typeof entry.changedAt === "string"
+          ? entry.changedAt
+          : new Date(0).toISOString(),
+      actorUserId:
+        typeof entry.actorUserId === "string" ? entry.actorUserId : null,
+      actorUsername:
+        typeof entry.actorUsername === "string" ? entry.actorUsername : null,
+      summary:
+        typeof entry.summary === "string"
+          ? entry.summary
+          : "Saved Twilio portal settings",
     }))
     .slice(0, 10);
 }
 
 function mapOnboardingStateToPortalStatus(
-  onboardingStatus: ReturnType<typeof getWorkspaceMessagingOnboardingFromTwilioData>["status"],
+  onboardingStatus: ReturnType<
+    typeof getWorkspaceMessagingOnboardingFromTwilioData
+  >["status"],
 ): WorkspaceTwilioOpsConfig["onboardingStatus"] {
   switch (onboardingStatus) {
     case "approved":
@@ -141,14 +158,18 @@ function mapOnboardingStateToPortalStatus(
   }
 }
 
-export function normalizeWorkspaceTwilioOpsConfig(value: unknown): WorkspaceTwilioOpsConfig {
+export function normalizeWorkspaceTwilioOpsConfig(
+  value: unknown,
+): WorkspaceTwilioOpsConfig {
   if (!isRecord(value)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
   const defaultMessageIntent =
     typeof value.defaultMessageIntent === "string" &&
-    TWILIO_MESSAGE_INTENT_VALUES.includes(value.defaultMessageIntent as TwilioMessageIntent)
+    TWILIO_MESSAGE_INTENT_VALUES.includes(
+      value.defaultMessageIntent as TwilioMessageIntent,
+    )
       ? (value.defaultMessageIntent as TwilioMessageIntent)
       : null;
 
@@ -184,7 +205,8 @@ export function normalizeWorkspaceTwilioOpsConfig(value: unknown): WorkspaceTwil
       TWILIO_ONBOARDING_STATUS_VALUES,
       DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.onboardingStatus,
     ),
-    supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
+    supportNotes:
+      typeof value.supportNotes === "string" ? value.supportNotes : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
     updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
     auditTrail: parseAuditTrail(value.auditTrail),
@@ -211,13 +233,16 @@ export function getWorkspaceTwilioPortalConfigFromTwilioData(
       onboarding.messagingService.serviceSid ?? config.messagingServiceSid,
     onboardingStatus: mapOnboardingStateToPortalStatus(onboarding.status),
     trafficClass:
-      onboarding.selectedChannels.includes("a2p10dlc") && config.trafficClass === "unknown"
+      onboarding.selectedChannels.includes("a2p10dlc") &&
+      config.trafficClass === "unknown"
         ? "a2p10dlc"
         : config.trafficClass,
   });
 }
 
-export function normalizeWorkspaceTwilioSyncSnapshot(value: unknown): WorkspaceTwilioSyncSnapshot {
+export function normalizeWorkspaceTwilioSyncSnapshot(
+  value: unknown,
+): WorkspaceTwilioSyncSnapshot {
   if (!isRecord(value)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT };
   }
@@ -233,11 +258,15 @@ export function normalizeWorkspaceTwilioSyncSnapshot(value: unknown): WorkspaceT
   return {
     accountStatus: parseOptionalString(value.accountStatus),
     accountFriendlyName: parseOptionalString(value.accountFriendlyName),
-    phoneNumberCount: typeof value.phoneNumberCount === "number" ? value.phoneNumberCount : 0,
+    phoneNumberCount:
+      typeof value.phoneNumberCount === "number" ? value.phoneNumberCount : 0,
     numberTypes: Array.isArray(value.numberTypes)
-      ? value.numberTypes.filter((item): item is string => typeof item === "string")
+      ? value.numberTypes.filter(
+          (item): item is string => typeof item === "string",
+        )
       : [],
-    recentUsageCount: typeof value.recentUsageCount === "number" ? value.recentUsageCount : 0,
+    recentUsageCount:
+      typeof value.recentUsageCount === "number" ? value.recentUsageCount : 0,
     usageTotalPrice:
       typeof value.usageTotalPrice === "number" ? value.usageTotalPrice : null,
     lastSyncedAt: parseOptionalString(value.lastSyncedAt),
@@ -256,7 +285,9 @@ export function getWorkspaceTwilioSyncSnapshotFromTwilioData(
   return normalizeWorkspaceTwilioSyncSnapshot(twilioData.portalSync);
 }
 
-export function detectTwilioTrafficClass(numberTypes: string[]): TwilioTrafficClass {
+export function detectTwilioTrafficClass(
+  numberTypes: string[],
+): TwilioTrafficClass {
   const normalizedTypes = numberTypes.map((value) => value.toLowerCase());
 
   if (normalizedTypes.some((value) => value.includes("short"))) {
@@ -313,9 +344,13 @@ function buildTwilioPortalAuditSummary(
   if (currentConfig.onboardingStatus !== nextConfig.onboardingStatus) {
     changedFields.push(`onboarding status to ${nextConfig.onboardingStatus}`);
   }
-  if (currentConfig.trafficShapingEnabled !== nextConfig.trafficShapingEnabled) {
+  if (
+    currentConfig.trafficShapingEnabled !== nextConfig.trafficShapingEnabled
+  ) {
     changedFields.push(
-      nextConfig.trafficShapingEnabled ? "enabled traffic shaping" : "disabled traffic shaping",
+      nextConfig.trafficShapingEnabled
+        ? "enabled traffic shaping"
+        : "disabled traffic shaping",
     );
   }
   if (currentConfig.supportNotes !== nextConfig.supportNotes) {
@@ -346,7 +381,9 @@ export async function getWorkspaceTwilioPortalConfig({
     throw error;
   }
 
-  return getWorkspaceTwilioPortalConfigFromTwilioData((data?.twilio_data ?? null) as TwilioAccountData);
+  return getWorkspaceTwilioPortalConfigFromTwilioData(
+    (data?.twilio_data ?? null) as TwilioAccountData,
+  );
 }
 
 export async function updateWorkspaceTwilioPortalConfig({
@@ -407,7 +444,10 @@ export async function updateWorkspaceTwilioPortalConfig({
 
   const { error: updateError } = await supabaseClient
     .from("workspace")
-    .update({ twilio_data: nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"] })
+    .update({
+      twilio_data:
+        nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
+    })
     .eq("id", workspaceId);
 
   if (updateError) {
@@ -444,7 +484,10 @@ export async function updateWorkspaceTwilioSyncSnapshot({
 
   const { error: updateError } = await supabaseClient
     .from("workspace")
-    .update({ twilio_data: nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"] })
+    .update({
+      twilio_data:
+        nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
+    })
     .eq("id", workspaceId);
 
   if (updateError) {
@@ -471,9 +514,12 @@ export async function syncWorkspaceTwilioSnapshot({
     throw error;
   }
 
-  const twilioData = isRecord(workspace?.twilio_data) ? workspace.twilio_data : {};
+  const twilioData = isRecord(workspace?.twilio_data)
+    ? workspace.twilio_data
+    : {};
   const sid = typeof twilioData.sid === "string" ? twilioData.sid : null;
-  const authToken = typeof twilioData.authToken === "string" ? twilioData.authToken : null;
+  const authToken =
+    typeof twilioData.authToken === "string" ? twilioData.authToken : null;
 
   if (!sid || !authToken) {
     const snapshot = await updateWorkspaceTwilioSyncSnapshot({
@@ -491,7 +537,10 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncError: "Missing workspace Twilio credentials",
       },
     });
-    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    await syncWorkspaceTwilioBootstrapStateSafely({
+      supabaseClient,
+      workspaceId,
+    });
     return snapshot;
   }
 
@@ -535,7 +584,10 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncError: null,
       },
     });
-    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    await syncWorkspaceTwilioBootstrapStateSafely({
+      supabaseClient,
+      workspaceId,
+    });
     return snapshot;
   } catch (syncError) {
     const snapshot = await updateWorkspaceTwilioSyncSnapshot({
@@ -551,10 +603,15 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncedAt: new Date().toISOString(),
         lastSyncStatus: "error",
         lastSyncError:
-          syncError instanceof Error ? syncError.message : "Unknown Twilio sync failure",
+          syncError instanceof Error
+            ? syncError.message
+            : "Unknown Twilio sync failure",
       },
     });
-    await syncWorkspaceTwilioBootstrapStateSafely({ supabaseClient, workspaceId });
+    await syncWorkspaceTwilioBootstrapStateSafely({
+      supabaseClient,
+      workspaceId,
+    });
     return snapshot;
   }
 }
@@ -570,7 +627,10 @@ function buildTwilioPortalRecommendations({
 }): WorkspaceTwilioPortalRecommendation[] {
   const recommendations: WorkspaceTwilioPortalRecommendation[] = [];
 
-  if (config.trafficClass === "a2p10dlc" && config.throughputProduct !== "none") {
+  if (
+    config.trafficClass === "a2p10dlc" &&
+    config.throughputProduct !== "none"
+  ) {
     recommendations.push({
       severity: "warning",
       message:
@@ -578,20 +638,15 @@ function buildTwilioPortalRecommendations({
     });
   }
 
-  if (
-    config.sendMode === "messaging_service" &&
-    !config.messagingServiceSid
-  ) {
+  if (config.sendMode === "messaging_service" && !config.messagingServiceSid) {
     recommendations.push({
       severity: "warning",
-      message: "This workspace is set to Messaging Service mode, but no Messaging Service SID is configured.",
+      message:
+        "This workspace is set to Messaging Service mode, but no Messaging Service SID is configured.",
     });
   }
 
-  if (
-    config.trafficShapingEnabled &&
-    !config.defaultMessageIntent
-  ) {
+  if (config.trafficShapingEnabled && !config.defaultMessageIntent) {
     recommendations.push({
       severity: "warning",
       message:
@@ -599,10 +654,7 @@ function buildTwilioPortalRecommendations({
     });
   }
 
-  if (
-    config.trafficClass === "unknown" &&
-    detectedTrafficClass !== "unknown"
-  ) {
+  if (config.trafficClass === "unknown" && detectedTrafficClass !== "unknown") {
     recommendations.push({
       severity: "info",
       message: `Workspace phone numbers suggest ${detectedTrafficClass} traffic. Update the saved traffic class if that matches current operations.`,
@@ -621,7 +673,10 @@ function buildTwilioPortalRecommendations({
     });
   }
 
-  if (metrics.recentOutboundCount > 0 && metrics.rawFromCount === metrics.recentOutboundCount) {
+  if (
+    metrics.recentOutboundCount > 0 &&
+    metrics.rawFromCount === metrics.recentOutboundCount
+  ) {
     recommendations.push({
       severity: "info",
       message:
@@ -639,21 +694,28 @@ export async function getWorkspaceTwilioPortalSnapshot({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const [{ data: workspace, error: workspaceError }, { data: workspaceNumbers, error: numbersError }, { data: recentMessages, error: messagesError }] =
-    await Promise.all([
-      supabaseClient.from("workspace").select("name, twilio_data").eq("id", workspaceId).single(),
-      supabaseClient
-        .from("workspace_number")
-        .select("type, phone_number, capabilities")
-        .eq("workspace", workspaceId),
-      supabaseClient
-        .from("message")
-        .select("status, messaging_service_sid")
-        .eq("workspace", workspaceId)
-        .eq("direction", "outbound-api")
-        .order("date_created", { ascending: false })
-        .limit(200),
-    ]);
+  const [
+    { data: workspace, error: workspaceError },
+    { data: workspaceNumbers, error: numbersError },
+    { data: recentMessages, error: messagesError },
+  ] = await Promise.all([
+    supabaseClient
+      .from("workspace")
+      .select("name, twilio_data")
+      .eq("id", workspaceId)
+      .single(),
+    supabaseClient
+      .from("workspace_number")
+      .select("type, phone_number, capabilities")
+      .eq("workspace", workspaceId),
+    supabaseClient
+      .from("message")
+      .select("status, messaging_service_sid")
+      .eq("workspace", workspaceId)
+      .eq("direction", "outbound-api")
+      .order("date_created", { ascending: false })
+      .limit(200),
+  ]);
 
   if (workspaceError) {
     throw workspaceError;
@@ -676,22 +738,27 @@ export async function getWorkspaceTwilioPortalSnapshot({
   );
   const numberTypes = (workspaceNumbers ?? [])
     .map((number) => number.type)
-    .filter((value): value is string => typeof value === "string" && value.length > 0);
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
   const detectedTrafficClass = detectTwilioTrafficClass(numberTypes);
-  const statusCounts = (recentMessages ?? []).reduce<WorkspaceTwilioPortalMetrics["statusCounts"]>(
-    (acc, message) => {
-      if (message.status) {
-        acc[message.status] = (acc[message.status] ?? 0) + 1;
-      }
-      return acc;
-    },
-    {},
-  );
+  const statusCounts = (recentMessages ?? []).reduce<
+    WorkspaceTwilioPortalMetrics["statusCounts"]
+  >((acc, message) => {
+    if (message.status) {
+      acc[message.status] = (acc[message.status] ?? 0) + 1;
+    }
+    return acc;
+  }, {});
 
   const metrics: WorkspaceTwilioPortalMetrics = {
     recentOutboundCount: recentMessages?.length ?? 0,
-    rawFromCount: (recentMessages ?? []).filter((message) => !message.messaging_service_sid).length,
-    messagingServiceCount: (recentMessages ?? []).filter((message) => !!message.messaging_service_sid).length,
+    rawFromCount: (recentMessages ?? []).filter(
+      (message) => !message.messaging_service_sid,
+    ).length,
+    messagingServiceCount: (recentMessages ?? []).filter(
+      (message) => !!message.messaging_service_sid,
+    ).length,
     statusCounts,
     numberTypes,
   };
@@ -801,10 +868,7 @@ export async function createSubaccount({
 }: {
   workspace_id: string;
 }) {
-  const twilio = new Twilio.Twilio(
-    env.TWILIO_SID(),
-    env.TWILIO_AUTH_TOKEN(),
-  );
+  const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
   const account = await twilio.api.v2010.accounts
     .create({
       friendlyName: workspace_id,
@@ -813,6 +877,42 @@ export async function createSubaccount({
       logger.error("Error creating subaccount", error);
     });
   return account;
+}
+
+/** Twilio `AccountInstance` is not JSON-serializable (circular `_version`); tests may return plain objects without `toJSON`. */
+function twilioAccountToPersistableJson(account: unknown): Record<string, unknown> {
+  if (
+    typeof account === "object" &&
+    account !== null &&
+    "toJSON" in account &&
+    typeof (account as { toJSON?: unknown }).toJSON === "function"
+  ) {
+    const plain = (account as { toJSON: () => object }).toJSON();
+    return { ...(plain as Record<string, unknown>) };
+  }
+  if (typeof account !== "object" || account === null) {
+    return {};
+  }
+  const rec = account as Record<string, unknown>;
+  const keys = [
+    "authToken",
+    "dateCreated",
+    "dateUpdated",
+    "friendlyName",
+    "ownerAccountSid",
+    "sid",
+    "status",
+    "subresourceUris",
+    "type",
+    "uri",
+  ] as const;
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (k in rec && rec[k] !== undefined) {
+      out[k] = rec[k];
+    }
+  }
+  return out;
 }
 
 export async function createNewWorkspace({
@@ -881,9 +981,9 @@ export async function createNewWorkspace({
       .from("workspace")
       .update({
         twilio_data: {
-          ...Object(account),
+          ...twilioAccountToPersistableJson(account),
           onboarding: seededOnboarding,
-        },
+        } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
         key: newKey.sid,
         token: newKey.secret,
         stripe_id: newStripeCustomer.id,
@@ -900,7 +1000,10 @@ export async function createNewWorkspace({
         actorUserId: user_id,
       });
     } catch (bootstrapError) {
-      logger.error("Workspace Twilio bootstrap failed after workspace creation:", bootstrapError);
+      logger.error(
+        "Workspace Twilio bootstrap failed after workspace creation:",
+        bootstrapError,
+      );
     }
 
     return { data: insertWorkspaceData, error: null };
@@ -908,7 +1011,8 @@ export async function createNewWorkspace({
     logger.error("Error in createNewWorkspace:", error);
     return {
       data: null,
-      error: error instanceof Error ? error.message : "An unexpected error occurred",
+      error:
+        error instanceof Error ? error.message : "An unexpected error occurred",
     };
   }
 }
@@ -959,7 +1063,7 @@ export async function getWorkspaceInfoWithDetails({
         workspace_users(id, role), 
         campaign(*), 
         workspace_number(id, phone_number, capabilities), 
-        audience(id, name)`
+        audience(id, name)`,
     )
     .eq("id", workspaceId)
     .eq("workspace_users.user_id", userId)
@@ -970,7 +1074,7 @@ export async function getWorkspaceInfoWithDetails({
     workspace: rest,
     campaigns: campaign,
     phoneNumbers: workspace_number,
-    audiences: audience
+    audiences: audience,
   } as unknown as WorkspaceInfoWithDetails;
 }
 
@@ -1018,7 +1122,10 @@ export async function getHandsetNumberForWorkspace({
 }: {
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
-}): Promise<{ data: { id: number; phone_number: string | null } | null; error: PostgrestError | null }> {
+}): Promise<{
+  data: { id: number; phone_number: string | null } | null;
+  error: PostgrestError | null;
+}> {
   const { data: handset } = await supabaseClient
     .from("workspace_number")
     .select("id, phone_number")
@@ -1093,14 +1200,22 @@ export async function getUserRole({
     return null;
   }
 
-  const {data: userRole, error: userRoleError} = await supabaseClient
+  const { data: userRole, error: userRoleError } = await supabaseClient
     .from("workspace_users")
     .select("role")
     .eq("user_id", user.id)
     .eq("workspace_id", workspaceId)
     .single();
   if (userRoleError) {
-    logger.error("No User Role found on this workspace");
+    const errorCode = (userRoleError as { code?: string }).code;
+    if (errorCode !== "PGRST116") {
+      logger.error("Failed to load user role for workspace", {
+        workspaceId,
+        userId: user.id,
+        code: errorCode,
+        message: userRoleError.message,
+      });
+    }
   }
 
   return userRole;
@@ -1220,10 +1335,11 @@ export async function createWorkspaceTwilioInstance({
     .eq("id", workspace_id)
     .single();
   if (error) throw error;
-  const twilio = new Twilio.Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
   return twilio;
 }
 
@@ -1315,10 +1431,7 @@ export async function updateCallerId({
       ),
     );
 
-    await Promise.all([
-      updatedOutgoing,
-      updatedIncoming,
-    ]);
+    await Promise.all([updatedOutgoing, updatedIncoming]);
     return { error: null };
   } catch (error) {
     logger.error("Error updating caller ID", error);
@@ -1429,34 +1542,82 @@ export async function acceptWorkspaceInvitations(
   userId: string,
 ) {
   const errors: Array<{ invitationId: string; type: string }> = [];
-  for (const invitationId of invitationIds) {
-    const { data: invite, error: inviteError } = await supabaseClient
-      .from("workspace_invite")
-      .select()
-      .eq("id", invitationId)
-      .single();
-    if (inviteError || !invite) {
-      errors.push({ invitationId, type: "invite" });
-      continue;
-    }
-
-    const { error: workspaceError } = await addUserToWorkspace({
-      supabaseClient: supabaseClient,
-      workspaceId: invite.workspace,
-      userId: userId,
-      role: invite.role,
-    });
-    if (workspaceError)
-      errors.push({ invitationId, type: "workspace" });
-
-    const { error: deletionError } = await supabaseClient
-      .from("workspace_invite")
-      .delete()
-      .eq("id", invitationId);
-
-    if (deletionError)
-      errors.push({ invitationId, type: "deletion" });
+  if (invitationIds.length === 0) {
+    return { errors };
   }
+
+  const { data: inviteRows, error: inviteQueryError } = await supabaseClient
+    .from("workspace_invite")
+    .select("id, workspace, role")
+    .in("id", invitationIds);
+
+  if (inviteQueryError) {
+    return {
+      errors: invitationIds.map((invitationId) => ({
+        invitationId,
+        type: "invite",
+      })),
+    };
+  }
+
+  const invitesById = new Map(
+    (inviteRows ?? []).map((invite) => [String(invite.id), invite]),
+  );
+
+  const processableInvites = invitationIds
+    .map((invitationId) => {
+      const invite = invitesById.get(invitationId);
+      if (!invite) {
+        errors.push({ invitationId, type: "invite" });
+        return null;
+      }
+      return { invitationId, invite };
+    })
+    .filter(
+      (
+        value,
+      ): value is {
+        invitationId: string;
+        invite: {
+          id: string;
+          workspace: string;
+          role: "owner" | "admin" | "caller" | "member";
+        };
+      } => value !== null,
+    );
+
+  const invitationResults = await Promise.all(
+    processableInvites.map(async ({ invitationId, invite }) => {
+      const invitationErrors: Array<{ invitationId: string; type: string }> =
+        [];
+
+      const { error: workspaceError } = await addUserToWorkspace({
+        supabaseClient,
+        workspaceId: invite.workspace,
+        userId,
+        role: invite.role,
+      });
+      if (workspaceError) {
+        invitationErrors.push({ invitationId, type: "workspace" });
+      }
+
+      const { error: deletionError } = await supabaseClient
+        .from("workspace_invite")
+        .delete()
+        .eq("id", invitationId);
+
+      if (deletionError) {
+        invitationErrors.push({ invitationId, type: "deletion" });
+      }
+
+      return invitationErrors;
+    }),
+  );
+
+  for (const invitationErrors of invitationResults) {
+    errors.push(...invitationErrors);
+  }
+
   return { errors };
 }
 
@@ -1480,7 +1641,14 @@ type FetchConversationSummaryOptions = {
 
 type ConversationMessageRow = Pick<
   Database["public"]["Tables"]["message"]["Row"],
-  "campaign_id" | "contact_id" | "date_created" | "direction" | "from" | "status" | "to"
+  | "body"
+  | "campaign_id"
+  | "contact_id"
+  | "date_created"
+  | "direction"
+  | "from"
+  | "status"
+  | "to"
 >;
 
 type ContactNameRow = Pick<
@@ -1503,13 +1671,31 @@ function contactMatchesConversationPhone(
     return false;
   }
 
-  return getConversationPhoneKey(contact.phone) === getConversationPhoneKey(contactPhone);
+  return (
+    getConversationPhoneKey(contact.phone) ===
+    getConversationPhoneKey(contactPhone)
+  );
 }
 
 function conversationNeedsPhoneMatchedContact(
   conversation: ConversationSummary,
 ): boolean {
   return !conversation.contact_firstname && !conversation.contact_surname;
+}
+
+/** Max messages to fetch when building conversation list; keeps contact/phone lookups bounded. */
+const CONVERSATION_MESSAGE_CAP = 30_000;
+const CONVERSATION_MESSAGE_PAGE_SIZE = 2_000;
+
+const CONTACT_IDS_BATCH_SIZE = 800;
+const PHONES_BATCH_SIZE = 800;
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
 }
 
 export async function fetchConversationSummary(
@@ -1538,127 +1724,195 @@ export async function fetchConversationSummary(
       .filter((phone): phone is string => Boolean(phone)),
   );
 
-  let messageQuery = supabaseClient
-    .from("message")
-    .select("campaign_id, contact_id, date_created, direction, from, status, to")
-    .eq("workspace", workspaceId)
-    .not("date_created", "is", null)
-    .neq("status", "failed")
-    .order("date_created", { ascending: false });
-
-  if (campaign_id) {
-    const numericCampaignId = Number(campaign_id);
-    if (!Number.isNaN(numericCampaignId)) {
-      messageQuery = messageQuery.eq("campaign_id", numericCampaignId);
-    }
-  }
-
-  const { data: messageRows, error: messagesError } = await messageQuery;
-  if (messagesError) {
-    return { chats: [], chatsError: messagesError, hasMore: false };
-  }
-
-  const contactIds = Array.from(
-    new Set(
-      (messageRows ?? [])
-        .map((message) => message.contact_id)
-        .filter((contactId): contactId is number => typeof contactId === "number"),
-    ),
-  );
-
-  let contactsById = new Map<number, ContactNameRow>();
-  if (contactIds.length > 0) {
-    const { data: contactRows, error: contactsError } = await supabaseClient
-      .from("contact")
-      .select("firstname, id, phone, surname")
-      .in("id", contactIds);
-
-    if (contactsError) {
-      logger.error("Error loading contact names for conversations", contactsError);
-    } else {
-      contactsById = new Map(
-        (contactRows ?? []).map((contact) => [contact.id, contact]),
-      );
-    }
-  }
-
   const conversationMap = new Map<string, ConversationSummary>();
+  const conversationContactIds = new Map<string, number>();
+  const contactIds = new Set<number>();
 
-  for (const message of (messageRows ?? []) as ConversationMessageRow[]) {
-    const { contactPhone, userPhone } = getConversationParticipantPhones(
-      message,
-      workspacePhoneKeys,
+  const numericCampaignId = campaign_id ? Number(campaign_id) : null;
+  const shouldFilterByCampaign =
+    numericCampaignId !== null && !Number.isNaN(numericCampaignId);
+
+  let scannedMessages = 0;
+  let cursor = 0;
+  let hasMoreRows = true;
+
+  while (hasMoreRows && scannedMessages < CONVERSATION_MESSAGE_CAP) {
+    const pageStart = cursor;
+    const pageLimit = Math.min(
+      CONVERSATION_MESSAGE_PAGE_SIZE,
+      CONVERSATION_MESSAGE_CAP - scannedMessages,
     );
-    const conversationKey = getConversationPhoneKey(contactPhone);
-    const timestamp = message.date_created ?? new Date().toISOString();
+    const pageEnd = pageStart + pageLimit - 1;
 
-    if (!contactPhone || !conversationKey) {
+    let pageQuery = supabaseClient
+      .from("message")
+      .select(
+        "body, campaign_id, contact_id, date_created, direction, from, status, to",
+      )
+      .eq("workspace", workspaceId)
+      .not("date_created", "is", null)
+      .neq("status", "failed")
+      .order("date_created", { ascending: false })
+      .range(pageStart, pageEnd);
+
+    if (shouldFilterByCampaign) {
+      pageQuery = pageQuery.eq("campaign_id", numericCampaignId as number);
+    }
+
+    const { data: pageRows, error: messagesError } = await pageQuery;
+    if (messagesError) {
+      return { chats: [], chatsError: messagesError, hasMore: false };
+    }
+
+    const typedRows = (pageRows ?? []) as ConversationMessageRow[];
+    if (typedRows.length === 0) {
+      hasMoreRows = false;
       continue;
     }
 
-    const candidateContact = typeof message.contact_id === "number"
-      ? contactsById.get(message.contact_id)
-      : undefined;
-    const contact = contactMatchesConversationPhone(candidateContact, contactPhone)
-      ? candidateContact
-      : undefined;
-    const existingConversation = conversationMap.get(conversationKey);
-    const hasReplied = message.direction === "inbound";
-    const unreadIncrement =
-      message.direction === "inbound" && message.status === "received" ? 1 : 0;
+    scannedMessages += typedRows.length;
+    cursor += typedRows.length;
+    hasMoreRows = typedRows.length === pageLimit;
 
-    if (!existingConversation) {
-      conversationMap.set(conversationKey, {
-        contact_phone: contactPhone,
-        user_phone: userPhone ?? "",
-        conversation_start: timestamp,
-        conversation_last_update: timestamp,
-        message_count: 1,
-        unread_count: unreadIncrement,
-        contact_firstname: contact?.firstname ?? null,
-        contact_surname: contact?.surname ?? null,
-        has_replied: hasReplied,
-      });
+    for (const message of typedRows) {
+      if (typeof message.contact_id === "number") {
+        contactIds.add(message.contact_id);
+      }
+
+      const { contactPhone, userPhone } = getConversationParticipantPhones(
+        message,
+        workspacePhoneKeys,
+      );
+      const conversationKey = getConversationPhoneKey(contactPhone);
+      const timestamp = message.date_created ?? new Date().toISOString();
+
+      if (!contactPhone || !conversationKey) {
+        continue;
+      }
+
+      if (
+        typeof message.contact_id === "number" &&
+        !conversationContactIds.has(conversationKey)
+      ) {
+        // Rows are scanned newest-first, so the first contact_id per conversation
+        // is the strongest candidate and keeps contact lookups bounded.
+        conversationContactIds.set(conversationKey, message.contact_id);
+      }
+
+      const existingConversation = conversationMap.get(conversationKey);
+      const hasReplied = isInboundMessageDirection(message.direction);
+      const unreadIncrement =
+        isInboundMessageDirection(message.direction) && message.status === "received"
+          ? 1
+          : 0;
+
+      if (!existingConversation) {
+        conversationMap.set(conversationKey, {
+          contact_phone: contactPhone,
+          user_phone: userPhone ?? "",
+          conversation_start: timestamp,
+          conversation_last_update: timestamp,
+          message_count: 1,
+          unread_count: unreadIncrement,
+          contact_firstname: null,
+          contact_surname: null,
+          has_replied: hasReplied,
+          last_inbound_body:
+            hasReplied && message.body != null ? message.body : null,
+        });
+        continue;
+      }
+
+      existingConversation.message_count += 1;
+      existingConversation.unread_count += unreadIncrement;
+      existingConversation.has_replied =
+        existingConversation.has_replied === true || hasReplied;
+      if (
+        existingConversation.last_inbound_body == null &&
+        hasReplied &&
+        message.body != null
+      ) {
+        existingConversation.last_inbound_body = message.body;
+      }
+
+      if (
+        compareConversationDates(
+          existingConversation.conversation_start,
+          timestamp,
+        ) > 0
+      ) {
+        existingConversation.conversation_start = timestamp;
+      }
+
+      if (
+        compareConversationDates(
+          existingConversation.conversation_last_update,
+          timestamp,
+        ) < 0
+      ) {
+        existingConversation.conversation_last_update = timestamp;
+      }
+
+      if (!existingConversation.user_phone && userPhone) {
+        existingConversation.user_phone = userPhone;
+      }
+
+      if (!existingConversation.contact_phone && contactPhone) {
+        existingConversation.contact_phone = contactPhone;
+      }
+    }
+  }
+
+  const contactsById = new Map<number, ContactNameRow>();
+  if (contactIds.size > 0) {
+    const batches = chunk(Array.from(contactIds), CONTACT_IDS_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batches.map((ids) =>
+        supabaseClient
+          .from("contact")
+          .select("firstname, id, phone, surname")
+          .eq("workspace", workspaceId)
+          .in("id", ids),
+      ),
+    );
+    for (const { data: contactRows, error: contactsError } of batchResults) {
+      if (contactsError) {
+        logger.error("Error loading contact names for conversations", {
+          message: contactsError.message,
+          code: (contactsError as { code?: string }).code,
+          details: (contactsError as { details?: string }).details,
+          contactIdsCount: contactIds.size,
+        });
+      } else if (contactRows?.length) {
+        for (const contact of contactRows) {
+          contactsById.set(contact.id, contact);
+        }
+      }
+    }
+  }
+
+  for (const [conversationKey, conversation] of conversationMap.entries()) {
+    const candidateContactId = conversationContactIds.get(conversationKey);
+    if (typeof candidateContactId !== "number") {
       continue;
     }
 
-    existingConversation.message_count += 1;
-    existingConversation.unread_count += unreadIncrement;
-    existingConversation.has_replied =
-      existingConversation.has_replied === true || hasReplied;
-
+    const candidateContact = contactsById.get(candidateContactId);
     if (
-      compareConversationDates(
-        existingConversation.conversation_start,
-        timestamp,
-      ) > 0
+      !contactMatchesConversationPhone(
+        candidateContact,
+        conversation.contact_phone,
+      )
     ) {
-      existingConversation.conversation_start = timestamp;
+      continue;
     }
 
-    if (
-      compareConversationDates(
-        existingConversation.conversation_last_update,
-        timestamp,
-      ) < 0
-    ) {
-      existingConversation.conversation_last_update = timestamp;
+    if (!conversation.contact_firstname && candidateContact.firstname) {
+      conversation.contact_firstname = candidateContact.firstname;
     }
 
-    if (!existingConversation.contact_firstname && contact?.firstname) {
-      existingConversation.contact_firstname = contact.firstname;
-    }
-
-    if (!existingConversation.contact_surname && contact?.surname) {
-      existingConversation.contact_surname = contact.surname;
-    }
-
-    if (!existingConversation.user_phone && userPhone) {
-      existingConversation.user_phone = userPhone;
-    }
-
-    if (!existingConversation.contact_phone && contactPhone) {
-      existingConversation.contact_phone = contactPhone;
+    if (!conversation.contact_surname && candidateContact.surname) {
+      conversation.contact_surname = candidateContact.surname;
     }
   }
 
@@ -1666,7 +1920,9 @@ export async function fetchConversationSummary(
     const phonesMissingNames = Array.from(
       new Set(
         Array.from(conversationMap.values())
-          .filter((conversation) => conversationNeedsPhoneMatchedContact(conversation))
+          .filter((conversation) =>
+            conversationNeedsPhoneMatchedContact(conversation),
+          )
           .map((conversation) => conversation.contact_phone)
           .filter((phone): phone is string => Boolean(phone)),
       ),
@@ -1674,42 +1930,41 @@ export async function fetchConversationSummary(
 
     if (phonesMissingNames.length > 0) {
       const phoneMatchedContacts = new Map<string, PhoneMatchedContactRow>();
-      await Promise.all(
-        phonesMissingNames.map(async (contactPhone) => {
-          try {
-            const { data, error } = await supabaseClient.rpc("find_contact_by_phone", {
-              p_workspace_id: workspaceId,
-              p_phone_number: contactPhone,
-            });
-
-            if (error || !data?.[0]) {
-              if (error) {
-                logger.error("Error loading contact by phone for conversation", {
-                  contactPhone,
-                  error,
-                  workspaceId,
-                });
-              }
-              return;
-            }
-
-            phoneMatchedContacts.set(contactPhone, data[0]);
-          } catch (error) {
-            logger.error("Unexpected error loading contact by phone for conversation", {
-              contactPhone,
-              error,
-              workspaceId,
-            });
-          }
-        }),
+      const phoneBatches = chunk(phonesMissingNames, PHONES_BATCH_SIZE);
+      const rpcResults = await Promise.all(
+        phoneBatches.map((phones) =>
+          supabaseClient.rpc("find_contacts_by_phones", {
+            p_workspace_id: workspaceId,
+            p_phone_numbers: phones,
+          }),
+        ),
       );
+      for (const { data, error } of rpcResults) {
+        if (error) {
+          logger.error("Error loading contacts by phones for conversations", {
+            error,
+            workspaceId,
+            phoneCount: phonesMissingNames.length,
+          });
+        } else if (data?.length) {
+          for (const row of data) {
+            const key = getConversationPhoneKey(row.phone) ?? row.phone;
+            if (key) phoneMatchedContacts.set(key, row);
+          }
+        }
+      }
 
       for (const conversation of conversationMap.values()) {
         if (!conversationNeedsPhoneMatchedContact(conversation)) {
           continue;
         }
 
-        const matchedContact = phoneMatchedContacts.get(conversation.contact_phone);
+        const lookupKey =
+          getConversationPhoneKey(conversation.contact_phone) ??
+          conversation.contact_phone;
+        const matchedContact = lookupKey
+          ? phoneMatchedContacts.get(lookupKey)
+          : undefined;
         if (!matchedContact) {
           continue;
         }
@@ -1720,11 +1975,11 @@ export async function fetchConversationSummary(
     }
   }
 
-  const sortedChats = sortConversationSummaries(
+  const filteredAndSortedChats = sortConversationSummaries(
     Array.from(conversationMap.values()),
     sort,
   );
-  const paginatedChats = sortedChats.slice(offset, offset + limit + 1);
+  const paginatedChats = filteredAndSortedChats.slice(offset, offset + limit + 1);
   const hasMore = paginatedChats.length > limit;
 
   return {
@@ -1733,4 +1988,3 @@ export async function fetchConversationSummary(
     hasMore,
   };
 }
-

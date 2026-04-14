@@ -8,6 +8,8 @@ export type ConversationSummary = {
   contact_firstname: string | null;
   contact_surname: string | null;
   has_replied?: boolean;
+  /** Body of the most recent inbound message; used to filter STOP-only conversations. */
+  last_inbound_body?: string | null;
 };
 
 type ConversationMessageLike = {
@@ -18,7 +20,14 @@ type ConversationMessageLike = {
 
 export type ChatSortOption = "recent" | "hasReplied" | "hasUnreadReply";
 
-export function normalizeConversationPhone(phone: string | null): string | null {
+/** Twilio / DB enum: inbound customer messages only (not outbound-reply). */
+export function isInboundMessageDirection(direction: string | null | undefined): boolean {
+  return direction === "inbound";
+}
+
+export function normalizeConversationPhone(
+  phone: string | null,
+): string | null {
   if (!phone) return null;
 
   const digits = phone.replace(/\D/g, "");
@@ -34,10 +43,9 @@ export function getConversationPhoneKey(phone: string | null): string | null {
   if (!normalizedPhone) return null;
 
   const digits = normalizedPhone.replace(/\D/g, "");
-  if (digits.length === 10) return `1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return digits;
 
-  return digits || null;
+  return digits;
 }
 
 export function getConversationParticipantPhones(
@@ -64,7 +72,7 @@ export function getConversationParticipantPhones(
     };
   }
 
-  if (message.direction === "inbound") {
+  if (isInboundMessageDirection(message.direction)) {
     return {
       contactPhone: normalizeConversationPhone(message.from),
       userPhone: normalizeConversationPhone(message.to),
@@ -107,43 +115,41 @@ function compareByRecentActivity(
   );
 }
 
+function hasConversationReplied(
+  conversation: ConversationSummary,
+  repliedContactKeys: Set<string>,
+): boolean {
+  const contactKey = getConversationPhoneKey(conversation.contact_phone);
+  return (
+    conversation.has_replied === true ||
+    (contactKey !== null && repliedContactKeys.has(contactKey))
+  );
+}
+
+function matchesChatSortFilter(
+  conversation: ConversationSummary,
+  sortBy: ChatSortOption,
+  repliedContactKeys: Set<string>,
+): boolean {
+  if (sortBy === "hasUnreadReply") {
+    return conversation.unread_count > 0;
+  }
+
+  if (sortBy === "hasReplied") {
+    return hasConversationReplied(conversation, repliedContactKeys);
+  }
+
+  return true;
+}
+
 export function sortConversationSummaries(
   conversations: ConversationSummary[],
   sortBy: ChatSortOption,
   repliedContactKeys: Set<string> = new Set(),
 ): ConversationSummary[] {
-  const sortedConversations = [...conversations];
-
-  if (sortBy === "recent") {
-    return sortedConversations.sort(compareByRecentActivity);
-  }
-
-  if (sortBy === "hasUnreadReply") {
-    return sortedConversations.sort((left, right) => {
-      const unreadDelta =
-        Number(right.unread_count > 0) - Number(left.unread_count > 0);
-
-      if (unreadDelta !== 0) {
-        return unreadDelta;
-      }
-
-      return compareByRecentActivity(left, right);
-    });
-  }
-
-  return sortedConversations.sort((left, right) => {
-    const leftHasReplied =
-      left.has_replied === true ||
-      repliedContactKeys.has(getConversationPhoneKey(left.contact_phone) ?? "");
-    const rightHasReplied =
-      right.has_replied === true ||
-      repliedContactKeys.has(getConversationPhoneKey(right.contact_phone) ?? "");
-    const repliedDelta = Number(rightHasReplied) - Number(leftHasReplied);
-
-    if (repliedDelta !== 0) {
-      return repliedDelta;
-    }
-
-    return compareByRecentActivity(left, right);
-  });
+  return conversations
+    .filter((conversation) =>
+      matchesChatSortFilter(conversation, sortBy, repliedContactKeys),
+    )
+    .sort(compareByRecentActivity);
 }

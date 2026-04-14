@@ -10,6 +10,7 @@ import {
   buildCanceledQueueUpdate,
   buildQueuedQueueUpdate,
 } from "../_shared/queue-writes.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 // Timeout wrapper for async operations
 const withTimeout = async <T>(promise: Promise<T>, timeoutMs: number, operationName: string): Promise<T> => {
@@ -79,10 +80,11 @@ export async function createWorkspaceTwilioInstance(
     .single();
   if (error) throw error;
 
-  const twilio = new Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio(creds.sid, creds.authToken);
   return twilio;
 }
 

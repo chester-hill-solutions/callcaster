@@ -8,7 +8,6 @@ import {
 } from "@remix-run/react";
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
-import { useState, useMemo } from "react";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
@@ -22,12 +21,57 @@ import { logger } from "@/lib/logger.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
+const SHORT_QUERY_MAX_LENGTH = 2;
+const PHONE_SUBSTRING_MIN_LENGTH = 4;
+
+function escapeIlikeTerm(raw: string): string {
+  return raw
+    .replaceAll("%", "\\%")
+    .replaceAll("_", "\\_")
+    .replaceAll(",", " ")
+    .trim();
+}
+
+function buildContactSearchFilter(rawSearchQuery: string): string {
+  const escapedQuery = escapeIlikeTerm(rawSearchQuery);
+  if (!escapedQuery) {
+    return "";
+  }
+
+  const isShortQuery = escapedQuery.length <= SHORT_QUERY_MAX_LENGTH;
+  const textSearchPattern = isShortQuery
+    ? `${escapedQuery}%`
+    : `%${escapedQuery}%`;
+  const normalizedDigits = rawSearchQuery.replace(/\D/g, "");
+  const escapedDigits = escapeIlikeTerm(normalizedDigits);
+  const filters = [
+    `firstname.ilike.${textSearchPattern}`,
+    `surname.ilike.${textSearchPattern}`,
+    `email.ilike.${textSearchPattern}`,
+    `address.ilike.${textSearchPattern}`,
+    `city.ilike.${textSearchPattern}`,
+  ];
+
+  if (normalizedDigits.length >= PHONE_SUBSTRING_MIN_LENGTH && escapedDigits) {
+    filters.push(
+      `phone.eq.${escapedDigits}`,
+      `phone.ilike.${escapedDigits}%`,
+      `phone.ilike.%${escapedDigits}%`,
+    );
+  } else {
+    filters.push(`phone.ilike.${textSearchPattern}`);
+  }
+
+  return filters.join(",");
+}
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     const { supabaseClient, headers, user } = await verifyAuth(request);
     const url = new URL(request.url);
-    
+    const rawSearchQuery = url.searchParams.get("q") ?? "";
+    const searchQuery = rawSearchQuery.trim().replaceAll(",", " ");
+
     // Validate and parse pagination parameters
     const pageParam = url.searchParams.get("page");
     const page = Math.max(1, parseInt(pageParam || "1"));
@@ -42,6 +86,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Workspace ID is required",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: 1,
             totalPages: 0,
@@ -54,7 +99,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     // Validate workspace ID format (assuming UUID format)
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workspaceId)) {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        workspaceId,
+      )
+    ) {
       return json(
         {
           contacts: null,
@@ -62,6 +111,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Invalid workspace ID format",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: 1,
             totalPages: 0,
@@ -74,14 +124,47 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     // Parallel database queries for better performance
+    const countQuery = supabaseClient
+      .from("contact")
+      .select("*", { count: "exact", head: true })
+      .eq("workspace", workspaceId);
+
+    const contactsQuery = supabaseClient
+      .from("contact")
+      .select(
+        "id, firstname, surname, phone, email, address, city, other_data, created_at",
+      )
+      .eq("workspace", workspaceId)
+      .range((page - 1) * pageSize, page * pageSize - 1)
+      .order("created_at", { ascending: false });
+
+    const campaignsQuery = supabaseClient
+      .from("campaign")
+      .select("id, title, status")
+      .eq("workspace", workspaceId)
+      .order("created_at", { ascending: false });
+
+    if (searchQuery) {
+      const searchFilter = buildContactSearchFilter(searchQuery);
+      if (searchFilter) {
+        countQuery.or(searchFilter);
+        contactsQuery.or(searchFilter);
+      }
+    }
+
     const [
       userRoleResult,
       workspaceResult,
       flagsResult,
       countResult,
-      contactsResult
+      contactsResult,
+      campaignsResult,
     ] = await Promise.all([
-      getUserRole({ supabaseClient, user: user as unknown as User, workspaceId }),
+      getUserRole({
+        supabaseClient,
+        user: user as unknown as User,
+        workspaceId,
+      }),
       supabaseClient
         .from("workspace")
         .select("id, name, credits, feature_flags")
@@ -92,16 +175,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         .select("feature_flags")
         .eq("id", workspaceId)
         .single(),
-      supabaseClient
-        .from("contact")
-        .select("*", { count: "exact", head: true })
-        .eq("workspace", workspaceId),
-      supabaseClient
-        .from("contact")
-        .select("id, firstname, surname, phone, email, address, city, other_data, created_at")
-        .eq("workspace", workspaceId)
-        .range((page - 1) * pageSize, page * pageSize - 1)
-        .order("created_at", { ascending: false })
+      countQuery,
+      contactsQuery,
+      campaignsQuery,
     ]);
 
     // Extract data and handle errors
@@ -110,6 +186,11 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const { data: flags, error: flagsError } = flagsResult;
     const { count: totalCount, error: countError } = countResult;
     const { data: contacts, error: contactError } = contactsResult;
+    const { data: navCampaigns, error: campaignsError } = campaignsResult;
+    if (campaignsError) {
+      logger.error("Failed to load campaigns for workspace nav:", campaignsError);
+    }
+    const campaigns = navCampaigns ?? [];
 
     // Check for workspace access
     if (!userRole) {
@@ -120,6 +201,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "You don't have access to this workspace",
           userRole: null,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -140,6 +222,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Workspace not found",
           userRole,
           flags: null,
+          campaigns: [],
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -162,6 +245,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: "Failed to load contacts. Please try again.",
           userRole,
           flags: null,
+          campaigns,
           pagination: {
             currentPage: page,
             totalPages: 0,
@@ -185,6 +269,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           error: `Page ${page} does not exist. Total pages: ${totalPages}`,
           userRole,
           flags,
+          campaigns,
           pagination: {
             currentPage: 1,
             totalPages,
@@ -196,20 +281,24 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       );
     }
 
-    return json({ 
-      contacts: contacts || [], 
-      workspace, 
-      error: null, 
-      userRole, 
-      flags,
-      pagination: {
-        currentPage: page,
-        totalPages,
-        totalCount: totalCountValue,
-        pageSize,
+    return json(
+      {
+        contacts: contacts || [],
+        workspace,
+        error: null,
+        userRole,
+        flags,
+        campaigns,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalCount: totalCountValue,
+          pageSize,
+        },
+        searchQuery,
       },
-    }, { headers });
-
+      { headers },
+    );
   } catch (error) {
     logger.error("Unexpected error in contacts loader:", error);
     return json(
@@ -219,6 +308,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         error: "An unexpected error occurred. Please try again.",
         userRole: null,
         flags: null,
+        campaigns: [],
         pagination: {
           currentPage: 1,
           totalPages: 0,
@@ -232,10 +322,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function WorkspaceContacts() {
-  const { contacts, error, userRole, workspace, flags, pagination } =
+  const { contacts, error, userRole, workspace, flags, pagination, campaigns } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState("");
+  const searchTerm = searchParams.get("q") ?? "";
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams);
@@ -243,256 +333,287 @@ export default function WorkspaceContacts() {
     setSearchParams(params);
   };
 
-  // Filter contacts based on search term (client-side filtering)
-  const filteredContacts = useMemo(() => {
-    if (!contacts) return [];
-    
-    if (!searchTerm) return contacts;
-    
-    const searchLower = searchTerm.toLowerCase();
-    return contacts.filter(contact => {
-      return (
-        (contact.firstname?.toLowerCase().includes(searchLower) || false) ||
-        (contact.surname?.toLowerCase().includes(searchLower) || false) ||
-        (contact.email?.toLowerCase().includes(searchLower) || false) ||
-        (contact.phone?.toLowerCase().includes(searchLower) || false) ||
-        (contact.address?.toLowerCase().includes(searchLower) || false) ||
-        (contact.city?.toLowerCase().includes(searchLower) || false)
-      );
-    });
-  }, [contacts, searchTerm]);
+  const handleSearchChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    const trimmedValue = value.trim();
+    if (trimmedValue) {
+      params.set("q", trimmedValue);
+    } else {
+      params.delete("q");
+    }
+    params.set("page", "1");
+    setSearchParams(params);
+  };
 
   const isWorkspaceEmpty = !contacts?.length;
-  const isSearchEmpty = filteredContacts.length === 0 && searchTerm;
-  
+  const isSearchEmpty = (contacts?.length ?? 0) === 0 && searchTerm;
+
   return (
-    <main className="mx-auto flex h-full w-[80%] flex-col gap-4 rounded-sm text-white py-8">
-      {workspace && (
-        <WorkspaceNav
-          workspace={workspace}
-          userRole={userRole}
-        />
-      )}
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {workspace != null
-            ? `${workspace?.name} Contacts`
-            : "No Workspace"}
-        </h1>
-        <div className="flex items-center gap-4">
-          <Button asChild className="font-Zilla-Slab text-xl font-semibold">
-            <Link to={`./new`}>Add Contact</Link>
-          </Button>
-          <Button
-            asChild
-            variant="outline"
-            className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-xl font-semibold text-white hover:bg-zinc-300 dark:border-white"
-          >
-            <Link to=".." relative="path">
-              Back
-            </Link>
-          </Button>
-        </div>
-      </div>
-      
-      {/* Search Bar */}
-      <div className="flex justify-between items-center">
-        <div className="relative w-72">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search contacts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8 text-black dark:text-white bg-white dark:bg-gray-800"
+    <main className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-4 px-4 py-6 sm:px-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        {workspace && (
+          <WorkspaceNav
+            workspace={workspace}
+            campaigns={campaigns}
+            userRole={userRole}
           />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-full hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        
-        {/* Search Results Info */}
-        {searchTerm && (
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {filteredContacts.length} of {contacts?.length || 0} contacts
-          </div>
         )}
-      </div>
-      
-      {/* Pagination Info */}
-      {pagination.totalCount > 0 && !searchTerm && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Showing {((pagination.currentPage - 1) * pagination.pageSize) + 1} to{" "}
-          {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalCount)} of{" "}
-          {pagination.totalCount} contacts
-        </div>
-      )}
+        <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary">
+              {workspace != null
+                ? `${workspace?.name} Contacts`
+                : "No Workspace"}
+            </h1>
+            <div className="flex items-center gap-4">
+              <Button
+                asChild
+                className="font-Zilla-Slab text-base font-semibold"
+              >
+                <Link to={`./new`}>Add Contact</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="font-Zilla-Slab text-base font-semibold"
+              >
+                <Link to=".." relative="path">
+                  Back
+                </Link>
+              </Button>
+            </div>
+          </div>
 
-      {error && !isWorkspaceEmpty && (
-        <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-          {error}
-        </h4>
-      )}
-      {isWorkspaceEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-black dark:text-white">
-          Add Your Own Contacts to this Workspace!
-        </h4>
-      )}
-      {isSearchEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
-          No contacts found matching "{searchTerm}"
-        </h4>
-      )}
-
-      {filteredContacts.length > 0 && (
-        <>
-          <DataTable
-            className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
-            data={filteredContacts}
-            columns={[
-              {
-                accessorKey: "firstname",
-                header: "First",
-              },
-              {
-                accessorKey: "surname",
-                header: "Last",
-              },
-              {
-                accessorKey: "phone",
-                header: "Phone Number",
-              },
-              {
-                accessorKey: "email",
-                header: "Email Address",
-              },
-              {
-                accessorKey: "address",
-                header: "Street Address",
-              },
-              {
-                accessorKey: "city",
-                header: "City",
-              },
-              {
-                header: "Other Data",
-                cell: ({ row }) => {
-                  const otherData = row.original.other_data;
-                  if (!otherData || !Array.isArray(otherData) || otherData.length === 0) {
-                    return <div className="text-gray-400">-</div>;
-                  }
-                  
-                  // Show first 2 items, then indicate if there are more
-                  const validItems = otherData.filter((item): item is NonNullable<typeof item> => item !== null && item !== undefined);
-                  const displayItems = validItems.slice(0, 2);
-                  const hasMore = validItems.length > 2;
-                  
-                  type OtherDataItem = { key: string; value: unknown } | Record<string, unknown> | string | number | boolean;
-                  
-                  const formatOtherData = (data: unknown[]) => {
-                    return data.filter((item): item is OtherDataItem => {
-                      if (item === null || item === undefined) return false;
-                      return typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || typeof item === 'object';
-                    }).map((item: OtherDataItem) => {
-                      let key: string | undefined, value: unknown;
-                      
-                      // Try to extract key and value based on common patterns
-                      if (typeof item === 'object' && item !== null) {
-                        // Check if it has explicit key/value properties
-                        if ('key' in item && typeof item.key === 'string' && 'value' in item) {
-                          key = item.key;
-                          value = item.value;
-                        }
-                        // Check if it's a simple object with one key-value pair
-                        else {
-                          const keys = Object.keys(item);
-                          const values = Object.values(item);
-                          if (keys.length === 1) {
-                            key = keys[0];
-                            value = values[0];
-                          }
-                        }
-                      }
-                      return key ? `${key}: ${String(value)}` : String(item);
-                    }).join(', ');
-                  };
-                  
-                  return (
-                    <div className="group relative">
-                      <div className="space-y-1">
-                        {formatOtherData(displayItems as unknown[])}
-                        {hasMore && (
-                          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                            +{otherData.length - 2} more
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Tooltip for all data */}
-                      {hasMore && (
-                        <div className="absolute left-0 top-full z-50 hidden group-hover:block bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 min-w-64 max-w-80">
-                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                            All Additional Data:
-                          </div>
-                          <div className="space-y-1">
-                            {formatOtherData(otherData as unknown[])}
-                          </div>
-                          {/* Debug: Show raw data structure */}
-                          <div className="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              Raw data: {JSON.stringify(otherData)}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                },
-              },
-              {
-                accessorKey: "created_at",
-                header: "Created",
-                cell: ({ row }) => {
-                  const formatted = formatDateToLocale(
-                    row.getValue("created_at"),
-                  );
-                  return <div className="">{formatted.split(",")[0]}</div>;
-                },
-              },
-              {
-                header: "Edit",
-                cell: ({ row }) => {
-                  const id = row.original.id;
-                  return (
-                    <Button variant="ghost" asChild>
-                      <NavLink to={`./${id}`} relative="path">
-                        <MdEdit />
-                      </NavLink>
-                    </Button>
-                  );
-                },
-              },
-            ]}
-          />
-          
-          {/* Pagination - Only show when not searching */}
-          {!searchTerm && pagination.totalPages > 1 && (
-            <div className="flex justify-center mt-4 mb-8">
-              <TablePagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={handlePageChange}
+          {/* Search Bar */}
+          <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-72">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search contacts..."
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="bg-background pl-8 text-foreground"
               />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full hover:bg-muted"
+                  onClick={() => handleSearchChange("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+
+            {/* Search Results Info */}
+            {searchTerm && (
+              <div className="text-sm text-muted-foreground">
+                {contacts?.length || 0} of {pagination.totalCount} contacts
+              </div>
+            )}
+          </div>
+
+          {/* Pagination Info */}
+          {pagination.totalCount > 0 && !searchTerm && (
+            <div className="text-sm text-muted-foreground">
+              Showing {(pagination.currentPage - 1) * pagination.pageSize + 1}{" "}
+              to{" "}
+              {Math.min(
+                pagination.currentPage * pagination.pageSize,
+                pagination.totalCount,
+              )}{" "}
+              of {pagination.totalCount} contacts
             </div>
           )}
-        </>
-      )}
+
+          {error && !isWorkspaceEmpty && (
+            <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
+              {error}
+            </h4>
+          )}
+          {isWorkspaceEmpty && (
+            <h4 className="py-16 text-center font-Zilla-Slab text-4xl font-bold text-foreground">
+              Add Your Own Contacts to this Workspace!
+            </h4>
+          )}
+          {isSearchEmpty && (
+            <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-foreground">
+              No contacts found matching "{searchTerm}"
+            </h4>
+          )}
+
+          {(contacts?.length ?? 0) > 0 && (
+            <>
+              <DataTable
+                className="rounded-md border-2 border-border font-semibold text-foreground"
+                data={contacts ?? []}
+                columns={[
+                  {
+                    accessorKey: "firstname",
+                    header: "First",
+                  },
+                  {
+                    accessorKey: "surname",
+                    header: "Last",
+                  },
+                  {
+                    accessorKey: "phone",
+                    header: "Phone Number",
+                  },
+                  {
+                    accessorKey: "email",
+                    header: "Email Address",
+                  },
+                  {
+                    accessorKey: "address",
+                    header: "Street Address",
+                  },
+                  {
+                    accessorKey: "city",
+                    header: "City",
+                  },
+                  {
+                    header: "Other Data",
+                    cell: ({ row }) => {
+                      const otherData = row.original.other_data;
+                      if (
+                        !otherData ||
+                        !Array.isArray(otherData) ||
+                        otherData.length === 0
+                      ) {
+                        return <div className="text-muted-foreground">-</div>;
+                      }
+
+                      // Show first 2 items, then indicate if there are more
+                      const validItems = otherData.filter(
+                        (item): item is NonNullable<typeof item> =>
+                          item !== null && item !== undefined,
+                      );
+                      const displayItems = validItems.slice(0, 2);
+                      const hasMore = validItems.length > 2;
+
+                      type OtherDataItem =
+                        | { key: string; value: unknown }
+                        | Record<string, unknown>
+                        | string
+                        | number
+                        | boolean;
+
+                      const formatOtherData = (data: unknown[]) => {
+                        return data
+                          .filter((item): item is OtherDataItem => {
+                            if (item === null || item === undefined)
+                              return false;
+                            return (
+                              typeof item === "string" ||
+                              typeof item === "number" ||
+                              typeof item === "boolean" ||
+                              typeof item === "object"
+                            );
+                          })
+                          .map((item: OtherDataItem) => {
+                            let key: string | undefined, value: unknown;
+
+                            // Try to extract key and value based on common patterns
+                            if (typeof item === "object" && item !== null) {
+                              // Check if it has explicit key/value properties
+                              if (
+                                "key" in item &&
+                                typeof item.key === "string" &&
+                                "value" in item
+                              ) {
+                                key = item.key;
+                                value = item.value;
+                              }
+                              // Check if it's a simple object with one key-value pair
+                              else {
+                                const keys = Object.keys(item);
+                                const values = Object.values(item);
+                                if (keys.length === 1) {
+                                  key = keys[0];
+                                  value = values[0];
+                                }
+                              }
+                            }
+                            return key
+                              ? `${key}: ${String(value)}`
+                              : String(item);
+                          })
+                          .join(", ");
+                      };
+
+                      return (
+                        <div className="group relative">
+                          <div className="space-y-1">
+                            {formatOtherData(displayItems as unknown[])}
+                            {hasMore && (
+                              <div className="text-xs font-medium text-primary">
+                                +{otherData.length - 2} more
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Tooltip for all data */}
+                          {hasMore && (
+                            <div className="absolute left-0 top-full z-50 hidden min-w-64 max-w-80 rounded-lg border border-border bg-popover p-3 shadow-lg group-hover:block">
+                              <div className="mb-2 text-xs font-semibold text-foreground">
+                                All Additional Data:
+                              </div>
+                              <div className="space-y-1">
+                                {formatOtherData(otherData as unknown[])}
+                              </div>
+                              {/* Debug: Show raw data structure */}
+                              <div className="mt-2 border-t border-border pt-2">
+                                <div className="text-xs text-muted-foreground">
+                                  Raw data: {JSON.stringify(otherData)}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    },
+                  },
+                  {
+                    accessorKey: "created_at",
+                    header: "Created",
+                    cell: ({ row }) => {
+                      const formatted = formatDateToLocale(
+                        row.getValue("created_at"),
+                      );
+                      return <div className="">{formatted.split(",")[0]}</div>;
+                    },
+                  },
+                  {
+                    header: "Edit",
+                    cell: ({ row }) => {
+                      const id = row.original.id;
+                      return (
+                        <Button variant="ghost" asChild>
+                          <NavLink to={`./${id}`} relative="path">
+                            <MdEdit />
+                          </NavLink>
+                        </Button>
+                      );
+                    },
+                  },
+                ]}
+              />
+
+              {pagination.totalPages > 1 && (
+                <div className="mb-8 mt-4 flex justify-center">
+                  <TablePagination
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </main>
   );
 }

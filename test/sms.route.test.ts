@@ -73,6 +73,7 @@ function makeSupabase(opts: {
   rpcResult?: { data: any; error: any };
   outreachUpdate?: { data: any; error: any };
   messageInsert?: any;
+  messageCount?: number;
   queueUpdate?: any;
   signedUrls?: Array<string | undefined>;
 } = {}) {
@@ -97,7 +98,12 @@ function makeSupabase(opts: {
             ({
               body_text: "hi",
               message_media: [],
-              campaign: { end_time: new Date().toISOString() },
+              campaign: {
+                end_time: new Date().toISOString(),
+                sms_send_mode: null,
+                sms_messaging_service_sid: null,
+                caller_id: "+15550001111",
+              },
             } as any),
           error: opts.campaignError ?? null,
         }));
@@ -116,7 +122,14 @@ function makeSupabase(opts: {
         };
       }
       if (table === "message") {
+        const dedupeQuery: any = {
+          select: () => dedupeQuery,
+          eq: () => dedupeQuery,
+          then: (resolve: (value: any) => any) =>
+            resolve({ count: opts.messageCount ?? 0, error: null }),
+        };
         return {
+          select: () => dedupeQuery,
           insert: () => ({
             select: vi.fn(async () => opts.messageInsert ?? ({ data: [], error: null } as any)),
           }),
@@ -230,6 +243,9 @@ describe("app/routes/api.sms.tsx", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("responses");
+    expect(mocks.getCampaignQueueById).toHaveBeenCalledWith(
+      expect.objectContaining({ onlyQueued: true }),
+    );
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -291,6 +307,58 @@ describe("app/routes/api.sms.tsx", () => {
     expect(body.responses[0]).toHaveProperty("3");
     expect(body.responses[0]["3"].success).toBe(false);
     expect(body.responses[0]["3"].error).toBe("twilio");
+  });
+
+  test("skips send when duplicate exists for campaign and phone", async () => {
+    currentSupabase = makeSupabase({
+      campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
+      messageCount: 1,
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c-dup",
+      workspace_id: "w1",
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 20, contact_id: 12, contact: { phone: "+15551234567" } },
+    ]);
+    const create = vi.fn(async () => ({ sid: "should-not-send" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.responses[0]["12"]).toMatchObject({
+      success: true,
+      skipped: true,
+      reason: "Duplicate SMS prevented",
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  test("sends when campaign+phone duplicate does not exist", async () => {
+    currentSupabase = makeSupabase({
+      campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
+      messageCount: 0,
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c-no-dup",
+      workspace_id: "w1",
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 21, contact_id: 13, contact: { phone: "+15551234567" } },
+    ]);
+    const create = vi.fn(async () => ({ sid: "SM13", body: "Hi", to: "+15551234567" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 
   test("createOutreachAttempt rpc error returns per-member success=false", async () => {
@@ -419,7 +487,13 @@ describe("app/routes/api.sms.tsx", () => {
       if (table === "outreach_attempt") return makeSupabase({}).from("outreach_attempt");
       if (table === "campaign_queue") return makeSupabase({}).from("campaign_queue");
       if (table === "message") {
+        const dedupeQuery: any = {
+          select: () => dedupeQuery,
+          eq: () => dedupeQuery,
+          then: (resolve: (value: any) => any) => resolve({ count: 0, error: null }),
+        };
         return {
+          select: () => dedupeQuery,
           insert: (row: any) => {
             inserted.push(row);
             return { select: vi.fn(async () => ({ data: [], error: null })) };
@@ -491,6 +565,89 @@ describe("app/routes/api.sms.tsx", () => {
       }),
     );
     expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ from: expect.anything() }));
+  });
+
+  test("allows empty caller_id when campaign sms_send_mode is messaging_service", async () => {
+    currentSupabase = makeSupabase({
+      campaign: {
+        body_text: "Hi",
+        message_media: [],
+        campaign: {
+          end_time: new Date().toISOString(),
+          sms_send_mode: "messaging_service",
+          sms_messaging_service_sid: "MG123",
+          caller_id: null,
+        },
+      },
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c11",
+      workspace_id: "w1",
+      caller_id: "",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      { id: 20, contact_id: 12, contact: { phone: "+15551234567" } },
+    ]);
+
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM11",
+      body: args.body,
+      numSegments: 1,
+      direction: "outbound-api",
+      from: null,
+      to: args.to,
+      dateUpdated: "x",
+      price: "0",
+      errorMessage: null,
+      accountSid: "AC",
+      uri: "/",
+      numMedia: "0",
+      status: "queued",
+      messagingServiceSid: args.messagingServiceSid,
+      dateSent: "x",
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(200);
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ messagingServiceSid: "MG123" }),
+    );
+  });
+
+  test("rejects empty caller_id when campaign requires from number", async () => {
+    currentSupabase = makeSupabase({
+      campaign: {
+        body_text: "Hi",
+        message_media: [],
+        campaign: {
+          end_time: new Date().toISOString(),
+          sms_send_mode: "from_number",
+          sms_messaging_service_sid: null,
+          caller_id: null,
+        },
+      },
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      campaign_id: "c12",
+      workspace_id: "w1",
+      caller_id: "",
+      user_id: "u1",
+    });
+    mocks.getCampaignQueueById.mockResolvedValueOnce([]);
+
+    const mod = await import("../app/routes/api.sms");
+    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "caller_id is required for this campaign",
+    });
   });
 
   test("campaign fetch error returns 500", async () => {
