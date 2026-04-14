@@ -39,17 +39,19 @@ export function parseTwilioOpenSyncBody(raw: unknown): {
   messageLimit: number;
   maxAgeMinutes: number;
 } {
-  const defaults = { callLimit: 30, messageLimit: 30, maxAgeMinutes: 2 };
+  /** Defaults apply when cron posts `{}`; tune for backlog without risking Edge timeouts. */
+  const defaults = { callLimit: 100, messageLimit: 100, maxAgeMinutes: 2 };
   if (raw == null || typeof raw !== "object") return defaults;
   const o = raw as Record<string, unknown>;
+  const maxPerKind = 250;
   const cap = (n: unknown, max: number, fallback: number) => {
     const v = typeof n === "number" ? n : typeof n === "string" ? Number(n) : NaN;
     if (!Number.isFinite(v) || v < 0) return fallback;
     return Math.min(Math.floor(v), max);
   };
   return {
-    callLimit: cap(o.callLimit, 100, defaults.callLimit),
-    messageLimit: cap(o.messageLimit, 100, defaults.messageLimit),
+    callLimit: cap(o.callLimit, maxPerKind, defaults.callLimit),
+    messageLimit: cap(o.messageLimit, maxPerKind, defaults.messageLimit),
     maxAgeMinutes: cap(o.maxAgeMinutes, 1440, defaults.maxAgeMinutes),
   };
 }

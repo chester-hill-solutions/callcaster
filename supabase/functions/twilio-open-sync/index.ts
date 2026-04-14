@@ -160,16 +160,23 @@ async function syncCallRow(
 
     const billingWorkspace = attempt?.workspace ?? workspaceId;
 
+    // Match api.call-status: debit only on transition into a billable terminal status,
+    // same idempotency key, same note shape (marker appended by insertTransactionHistoryIdempotent).
     if (
+      statusChanged &&
       billingWorkspace &&
       CALL_STATUSES_BILLABLE_ON_COMPLETION.has(normalized)
     ) {
       const amount = billingUnitsFromDurationSeconds(
         Number.isFinite(durationSeconds) ? durationSeconds : 0,
       );
-      const note = outreachAttemptId
-        ? `Call ${row.sid} outreach ${outreachAttemptId} (twilio-open-sync)`
-        : `Call ${row.sid} (twilio-open-sync)`;
+      const contactId = attempt?.contact_id;
+      const note =
+        outreachAttemptId != null && contactId != null
+          ? `Call ${row.sid}, Contact ${contactId}, Outreach Attempt ${outreachAttemptId}`
+          : outreachAttemptId != null
+          ? `Call ${row.sid}, Outreach Attempt ${outreachAttemptId}`
+          : `Call ${row.sid} (API/staffed dial)`;
       await insertTransactionHistoryIdempotent({
         supabase: supabase as never,
         workspaceId: billingWorkspace,
@@ -441,7 +448,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     const res = await syncCallRow(supabase, r, client);
     if (res.ok) callResults.ok++;
     else callResults.fail++;
-    await sleepMs(75);
+    await sleepMs(50);
   }
 
   for (const row of messages ?? []) {
@@ -455,7 +462,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     const res = await syncMessageRow(supabase, r, client);
     if (res.ok) messageResults.ok++;
     else messageResults.fail++;
-    await sleepMs(75);
+    await sleepMs(50);
   }
 
   return new Response(

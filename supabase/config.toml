@@ -148,7 +148,7 @@ s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
 
-# Twilio webhooks send X-Twilio-Signature, not a Supabase JWT — disable gateway JWT checks only for these public callbacks.
+# Twilio webhooks send X-Twilio-Signature, not a Supabase JWT — disable gateway JWT checks for these public callbacks.
 [functions.sms-status]
 verify_jwt = false
 
@@ -156,4 +156,11 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.ivr-recording]
+verify_jwt = false
+
+[functions.ivr-flow]
+verify_jwt = false
+
+# pg_cron net.http_post (see migrations) sends no Authorization header for this job.
+[functions.number-rental-billing]
 verify_jwt = false

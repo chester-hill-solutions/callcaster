@@ -15,8 +15,8 @@ import {
 describe("twilio-open-sync-candidates", () => {
   test("parseTwilioOpenSyncBody caps and defaults", () => {
     expect(parseTwilioOpenSyncBody(null)).toEqual({
-      callLimit: 30,
-      messageLimit: 30,
+      callLimit: 100,
+      messageLimit: 100,
       maxAgeMinutes: 2,
     });
     expect(
@@ -26,7 +26,7 @@ describe("twilio-open-sync-candidates", () => {
         maxAgeMinutes: -1,
       }),
     ).toEqual({
-      callLimit: 100,
+      callLimit: 250,
       messageLimit: 10,
       maxAgeMinutes: 2,
     });
