@@ -69,7 +69,7 @@ function makeSupabase(options?: {
 
   const from = (table: string) => {
     if (table === "handset_session") {
-      return {
+      const chain = {
         select: () => ({
           eq: () => ({
             eq: () => ({
@@ -83,7 +83,15 @@ function makeSupabase(options?: {
             }),
           }),
         }),
+        update: () => ({
+          eq: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ error: null }),
+            }),
+          }),
+        }),
       };
+      return chain;
     }
     if (table === "workspace_number") {
       return {
