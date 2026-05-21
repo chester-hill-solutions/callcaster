@@ -51,7 +51,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       from: () => ({
         select: () => ({
           eq: async () => ({
-            data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+            data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
             error: null,
           }),
         }),
@@ -85,7 +85,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
           return {
             select: () => ({
               eq: async () => ({
-                data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+                data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
                 error: null,
               }),
             }),
@@ -136,7 +136,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
           return {
             select: () => ({
               eq: async () => ({
-                data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+                data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
                 error: null,
               }),
             }),
@@ -185,7 +185,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       from: () => ({
         select: () => ({
           eq: async () => ({
-            data: [{ workspace: { twilio_data: { authToken: "auth" } } }],
+            data: [{ workspace: { twilio_data: { account_sid: "AC123", auth_token: "auth" } } }],
             error: null,
           }),
         }),

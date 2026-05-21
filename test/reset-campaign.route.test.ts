@@ -29,14 +29,14 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     const r1 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as any));
-    expect(r1).toEqual({ error: "Missing campaign_id" });
+    await expect(r1.json()).resolves.toEqual({ error: "Missing campaign_id" });
 
     const fd2 = new FormData();
     fd2.set("campaign_id", new File(["x"], "x.txt"));
     const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd2 }),
     } as any));
-    expect(r2).toEqual({ error: "Missing campaign_id" });
+    await expect(r2.json()).resolves.toEqual({ error: "Missing campaign_id" });
   }, 30000);
 
   test("returns error when campaign_id is not a number", async () => {
@@ -48,7 +48,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
-    expect(res).toEqual({ error: "Invalid campaign_id" });
+    await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
   test("throws when supabase rpc errors", async () => {
@@ -72,7 +72,7 @@ describe("app/routes/api+/reset_campaign/route.tsx", () => {
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
-    expect(res).toEqual({ success: true });
+    await expect(res.json()).resolves.toEqual({ success: true });
     expect(rpc).toHaveBeenCalledWith("reset_campaign", { campaign_id_prop: 10 });
   }, 30000);
 });
