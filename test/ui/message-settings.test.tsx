@@ -9,24 +9,13 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@remix-run/react", () => {
-  return {
-    Form: (props: any) => <form {...props} />,
-    useSubmit:
-      () =>
-      (...args: any[]) =>
-        mocks.submit(...args),
-    useFetcher: () => ({
-      submit: (...args: any[]) => mocks.submit(...args),
-      state: "idle",
-      data: null,
-    }),
-    // Minimal Await impl: call render prop immediately.
-    Await: ({ resolve, children }: any) => {
-      return typeof children === "function" ? children(resolve) : children;
-    },
-  };
-});
+vi.mock("react-router", () => ({
+  useFetcher: () => ({
+    submit: (...args: any[]) => mocks.submit(...args),
+    state: "idle",
+    data: null,
+  }),
+}));
 
 vi.mock("@/lib/logger.client", () => ({ logger: mocks.logger }));
 

@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@remix-run/react", () => ({
-  RemixBrowser: () => null,
+vi.mock("react-router/dom", () => ({
+  HydratedRouter: () => null,
 }));
 
 vi.mock("react-dom/client", () => ({

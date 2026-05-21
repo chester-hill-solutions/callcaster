@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@remix-run/react", () => ({
+vi.mock("react-router", () => ({
   useOutletContext: () => mocks.outletContext,
 }));
 

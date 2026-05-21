@@ -24,10 +24,9 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@remix-run/react", () => ({
+vi.mock("react-router", () => ({
   useParams: () => mocks.params,
   useNavigate: () => mocks.navigate,
-  useFetcher: () => mocks.fetcher,
 }));
 
 vi.mock("@/hooks/realtime/useSupabaseRealtime", () => ({
