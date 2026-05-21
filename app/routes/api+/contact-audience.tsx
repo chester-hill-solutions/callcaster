@@ -1,6 +1,6 @@
-import {  } from "react-router";
-import { parseActionRequest, removeContactFromAudience } from '@/lib/database.server";
-import { verifyAuth } from '@/lib/supabase.server";
+import { data as routeData } from "react-router";
+import { parseActionRequest, removeContactFromAudience } from '@/lib/database.server';
+import { verifyAuth } from '@/lib/supabase.server';
 import { createErrorResponse } from "@/lib/errors.server";
 
 export const action = async ({ request }: { request: Request }) => {
@@ -16,7 +16,7 @@ export const action = async ({ request }: { request: Request }) => {
         const audienceId = Number(data.audience_id);
 
         if (!contactId || !audienceId) {
-            return data({ error: "contact_id and audience_id are required" }, { status: 400, headers });
+            return routeData({ error: "contact_id and audience_id are required" }, { status: 400, headers });
         }
 
         try {
@@ -25,5 +25,5 @@ export const action = async ({ request }: { request: Request }) => {
             return createErrorResponse(updateError, "Failed to remove contact from audience", 500);
         }
     }
-    return data(response, {headers});
+    return routeData(response, {headers});
 };

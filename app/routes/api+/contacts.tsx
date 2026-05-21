@@ -1,6 +1,6 @@
-import { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from '@/lib/database.server";
-import { verifyAuth } from '@/lib/supabase.server";
+import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from '@/lib/database.server';
+import { verifyAuth } from '@/lib/supabase.server';
 import { Contact } from "@/lib/types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -13,24 +13,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     switch (method) {
       case 'PATCH': {
         const updatedContact = await updateContact(supabaseClient, data);
-        return data({ data: updatedContact }, { status: 200 });
+        return routeData({ data: updatedContact }, { status: 200 });
       }
 
       case 'POST':
         if (Array.isArray(data.contacts)) {
             const bulkResult = await bulkCreateContacts(supabaseClient, data.contacts, data.workspace_id, data.audience_id, user.id);
-          return data(bulkResult);
+          return routeData(bulkResult);
         } else {
           const newContact = await createContact(supabaseClient, data, data.audience_id, user.id);
-          return data(newContact);
+          return routeData(newContact);
         }
 
       default:
-        return data({ error: 'Unsupported request method' }, { status: 400 });
+        return routeData({ error: 'Unsupported request method' }, { status: 400 });
     }
   } catch (err) {
     if (err instanceof Error && err.message === 'Unsupported content type') {
-      return data({ error: 'Unsupported content type' }, { status: 415 });
+      return routeData({ error: 'Unsupported content type' }, { status: 415 });
     }
     return handleError(err instanceof Error ? err : new Error(String(err)), 'An unexpected error occurred');
   }
@@ -44,7 +44,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const campaignId = url.searchParams.get("campaign_id") || "";
 
   if (!searchQuery) {
-    return data({ data: [] });
+    return routeData({ data: [] });
   }
 
   try {
@@ -75,7 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (error || phoneError || emailError) throw error || phoneError || emailError;
     const allContacts = [...contacts, ...phoneContacts, ...emailContacts].filter(Boolean) as Contact[];
     if (allContacts.length === 0) {
-      return data({ contacts: [] });
+      return routeData({ contacts: [] });
     } else {
       const { data: queuedContacts, error: queuedError } = await supabaseClient
         .from('campaign_queue')
@@ -87,7 +87,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         ...contact,
         queued: queuedContacts.some((queuedContact) => queuedContact.contact_id === contact?.id)
       }));
-      return data({ contacts });
+      return routeData({ contacts });
     }
   } catch (err) {
     return handleError(err instanceof Error ? err : new Error(String(err)), 'Error searching contacts');

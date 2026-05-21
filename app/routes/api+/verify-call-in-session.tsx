@@ -1,4 +1,4 @@
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
@@ -9,12 +9,12 @@ const SESSION_EXPIRY_MINUTES = 10;
 export const loader = async ({ request }: { request: Request }) => {
   const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
   if (!user) {
-    return data({ error: "Unauthorized" }, { status: 401 });
+    return routeData({ error: "Unauthorized" }, { status: 401 });
   }
 
   const verificationNumber = env.VERIFICATION_PHONE_NUMBER();
   if (!verificationNumber) {
-    return data(
+    return routeData(
       { error: "Call-in verification is not configured" },
       { status: 503 }
     );
@@ -23,7 +23,7 @@ export const loader = async ({ request }: { request: Request }) => {
   const url = new URL(request.url);
   const phoneNumberParam = url.searchParams.get("phoneNumber");
   if (!phoneNumberParam || !isValidPhoneNumber(phoneNumberParam)) {
-    return data(
+    return routeData(
       { error: "Valid phone number is required" },
       { status: 400 }
     );
@@ -33,7 +33,7 @@ export const loader = async ({ request }: { request: Request }) => {
   try {
     expectedCaller = normalizePhoneNumber(phoneNumberParam);
   } catch {
-    return data({ error: "Invalid phone number format" }, { status: 400 });
+    return routeData({ error: "Invalid phone number format" }, { status: 400 });
   }
 
   const expiresAt = new Date(
@@ -52,10 +52,10 @@ export const loader = async ({ request }: { request: Request }) => {
     .single();
 
   if (error) {
-    return data({ error: error.message }, { status: 500 });
+    return routeData({ error: error.message }, { status: 500 });
   }
 
-  return data(
+  return routeData(
     {
       success: true,
       verificationId: session.id,

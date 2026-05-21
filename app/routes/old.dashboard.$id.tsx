@@ -1,8 +1,10 @@
-import {  } from "react-router";
-import { useLoaderData } from "react-router";
+
+
+import { data as routeData, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
-import type { LoaderFunctionArgs } from "react-router";
+
 import { logger } from "@/lib/logger.client";
 
 interface LoaderData {
@@ -20,9 +22,9 @@ interface AudioMessage {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id } = params;
   try {
-    return data({ success: true, message: "Call initiated", id });
+    return routeData({ success: true, message: "Call initiated", id });
   } catch (error) {
-    return data({
+    return routeData({
       success: false,
       message: "Failed to initiate call",
       error: error.message,

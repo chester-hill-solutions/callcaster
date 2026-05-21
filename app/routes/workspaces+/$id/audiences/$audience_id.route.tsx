@@ -1,6 +1,7 @@
-import { LoaderFunctionArgs } from "react-router";
+
+import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
+
 import { useEffect, useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
@@ -55,7 +56,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const audience_id = params.audience_id;
 
   if (!audience_id) {
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         contacts: null,
         workspace_id,
@@ -104,7 +105,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
 
   if (contactError) {
-    return json<LoaderData>({
+    return routeData<LoaderData>({
       contacts: null,
       workspace_id,
       audience: null,
@@ -123,7 +124,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }, { headers });
   }
 
-  return json<LoaderData>(
+  return routeData<LoaderData>(
     {
       contacts: contacts?.map(contact => ({ contact })) || null,
       workspace_id,

@@ -1,6 +1,6 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import {
   Form,
   Link,
@@ -37,7 +37,7 @@ import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
-import Workspace from "./workspaces_.$id";
+import Workspace from "./$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -84,7 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   workspace_users.forEach((user) => {
     users.push({role: user.role, id: user.user?.id, username: user.user?.username} as UserWithRole);
   });
-  return data(
+  return routeData(
       {
         workspace: rest,
         userRole,
@@ -104,7 +104,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (workspaceId == null) {
-    return data({ error: "No workspace_id found!" }, { headers });
+    return routeData({ error: "No workspace_id found!" }, { headers });
   }
 
   const formData = await request.formData();
@@ -150,7 +150,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
-  return data(
+  return routeData(
     { data: null, error: "Error: Unrecognized action called" },
     { headers },
   );

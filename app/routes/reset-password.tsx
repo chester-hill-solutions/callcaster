@@ -1,10 +1,10 @@
-import { Form, useActionData } from "react-router";
+
+import { data as routeData, Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
-import { LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { toast } from "sonner";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useEffect } from "react";
@@ -12,7 +12,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { supabaseClient } = await verifyAuth(request);
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) return redirect("/remember");
-  return data({});
+  return routeData({});
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -26,7 +26,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const confirmNewPassword = confirmNewPasswordRaw.trim();
 
   if (newPassword !== confirmNewPassword) {
-    return data({
+    return routeData({
       success: null,
       error: { message: "Passwords do not match" },
     });
@@ -35,7 +35,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const { data: updateUser, error: updateUserError } =
     await supabaseClient.auth.updateUser({ password: newPassword });
 
-  return data({ success: updateUser, error: updateUserError }, { headers });
+  return routeData({ success: updateUser, error: updateUserError }, { headers });
 }
 
 export default function ResetPassword() {

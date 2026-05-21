@@ -1,10 +1,9 @@
+import { Link, NavLink } from "react-router";
 import { capitalize } from "@/lib/utils";
 
-import { Link, NavLink } from "react-router";
 import { FaTimes } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceInvite } from "@/lib/types";
-import {  } from "react-router";
 
 type MobileMenuProps = {
   isSignedIn: boolean;

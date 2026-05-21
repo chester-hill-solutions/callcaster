@@ -1,8 +1,10 @@
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import Twilio from "twilio";
-import {  } from "react-router";
+
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import type { ActionFunctionArgs } from "react-router";
+
 import { env } from "@/lib/env.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
@@ -98,7 +100,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         `Error inserting workspace number: ${numberError.message}`,
       );
 
-    return data({ validationRequest, numberRequest });
+    return routeData({ validationRequest, numberRequest });
   } catch (error) {
     logger.error("Action error:", error);
     return createErrorResponse(error, "Failed to create caller ID");

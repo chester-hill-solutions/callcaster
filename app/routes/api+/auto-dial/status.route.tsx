@@ -1,11 +1,13 @@
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
-import {  } from "react-router";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server";
+
+import { createWorkspaceTwilioInstance } from '@/lib/database.server';
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
-import type { ActionFunctionArgs } from "react-router";
+
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { logger } from "@/lib/logger.server";
@@ -319,7 +321,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return data({ error: "Invalid Twilio signature" }, { status: 403 });
+      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
     const twilio = await createWorkspaceTwilioInstance({
@@ -352,10 +354,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     }
 
-    return data({ success: true });
+    return routeData({ success: true });
   } catch (error: unknown) {
     logger.error("Error processing action:", error);
-    return data(
+    return routeData(
       { error: "Failed to process action: " + (error instanceof Error ? error.message : "Unknown error") },
       { status: 500 },
     );

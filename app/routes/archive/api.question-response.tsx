@@ -1,7 +1,10 @@
-import {  } from "react-router";
-import { createClient } from '@supabase/supabase-js';
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import { createClient } from '@supabase/supabase-js';
+
 import { logger } from "@/lib/logger.server";
+import { env } from "@/lib/env.server";
 
 interface CallData {
   id: string;
@@ -25,7 +28,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (oldError) {
         logger.error('Error fetching call data:', oldError);
-        return data({ status: 'error', message: 'Failed to fetch call data' }, 500);
+        return routeData({ status: 'error', message: 'Failed to fetch call data' }, 500);
     }
 
     const responses = old.responses || {};
@@ -43,7 +46,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
         logger.error('Error updating call data:', error);
-        return data({ status: 'error', message: 'Failed to update call data' }, 500);
+        return routeData({ status: 'error', message: 'Failed to update call data' }, 500);
     }
 
     return new Response(`<Response><Redirect>/api/handle-questions</Redirect></Response>`.toString(), {

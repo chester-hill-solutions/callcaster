@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link } from "react-router";
+
+
+import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import type { SurveyWithPages } from "@/lib/types";
@@ -122,7 +123,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     logger.error("Error fetching responses:", responsesError);
   }
 
-  return data({
+  return routeData({
     survey,
     recentResponses: recentResponses || [],
     workspaceId,

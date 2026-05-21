@@ -1,4 +1,4 @@
-import { ActionFunctionArgs } from "react-router";
+import { data as routeData, ActionFunctionArgs } from "react-router";
 import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
@@ -7,11 +7,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (!user) {
-    return data({ error: "Unauthorized" }, { status: 401, headers });
+    return routeData({ error: "Unauthorized" }, { status: 401, headers });
   }
 
   if (request.method !== "DELETE") {
-    return data({ error: "Method not allowed" }, { status: 405, headers });
+    return routeData({ error: "Method not allowed" }, { status: 405, headers });
   }
 
   const data = await parseActionRequest(request);
@@ -24,11 +24,11 @@ export async function action({ request }: ActionFunctionArgs) {
     : [];
 
   if (!audienceIdStr) {
-    return data({ error: "Audience ID is required" }, { status: 400, headers });
+    return routeData({ error: "Audience ID is required" }, { status: 400, headers });
   }
 
   if (!contactIdsStr || contactIdsStr.length === 0) {
-    return data({ error: "At least one contact ID is required" }, { status: 400, headers });
+    return routeData({ error: "At least one contact ID is required" }, { status: 400, headers });
   }
 
   try {
@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
       contactIds
     );
 
-    return data(
+    return routeData(
       {
         success: true,
         message: `${removed_count} contacts removed from audience`,
@@ -53,6 +53,6 @@ export async function action({ request }: ActionFunctionArgs) {
   } catch (error) {
     logger.error("Error removing contacts from audience:", error);
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-    return data({ error: errorMessage }, { status: 500, headers });
+    return routeData({ error: errorMessage }, { status: 500, headers });
   }
 } 

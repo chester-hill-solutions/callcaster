@@ -1,4 +1,4 @@
-import { ActionFunction } from "react-router";
+import { data as routeData, ActionFunction } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils";
 import { logger } from "@/lib/logger.server";
@@ -9,12 +9,12 @@ export const action: ActionFunction = async ({ request }) => {
     const customHeaders = JSON.parse(custom_headers)
     if (typeof eventData !== "object" || typeof destination_url !== "string") {
     logger.warn('Invalid input for webhook test');
-    return data({ error: "Invalid input" }, { status: 400 });
+    return routeData({ error: "Invalid input" }, { status: 400 });
   }
   const cleanHeaders: Record<string, string> = {};
   customHeaders.map((header: [string, string]) => (cleanHeaders[header[0]] = header[1]));
 
   const result = await testWebhook(eventData, destination_url, cleanHeaders);
 
-  return data(result);
+  return routeData(result);
 };

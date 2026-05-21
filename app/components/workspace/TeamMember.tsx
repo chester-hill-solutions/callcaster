@@ -16,7 +16,8 @@ import { Form } from "react-router";
 import { MdCancel } from "react-icons/md";
 import { User } from "@/lib/types";
 
-export { MemberRole } from "@/lib/member-role";
+import { MemberRole } from "@/lib/member-role";
+export { MemberRole };
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
   clsx(

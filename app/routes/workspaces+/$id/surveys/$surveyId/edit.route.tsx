@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData, useSubmit, useNavigate } from "react-router";
+
+
+import { data as routeData, type LoaderFunctionArgs, Link, useLoaderData, useSubmit, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
@@ -66,7 +67,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })) || []
   };
 
-  return data({
+  return routeData({
     survey,
     formData,
     workspaceId,

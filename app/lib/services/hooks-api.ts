@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 /**
  * Hooks API Service Layer
  * Centralized API calls specifically for React hooks
@@ -53,11 +54,11 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Network response was not ok' }));
+      const errorData = await response.routeData().catch(() => ({ message: 'Network response was not ok' }));
       throw new Error(errorData.message || 'Network response was not ok');
     }
 
-    return await response.json();
+    return await response.routeData();
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -105,7 +106,7 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
-    const data = await response.json();
+    const data = await response.routeData();
 
     if (data.creditsError) {
       return {

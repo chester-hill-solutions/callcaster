@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, Link, useLoaderData } from "react-router";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
@@ -14,7 +15,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return data(
+    return routeData(
       {
         audioMedia: null,
         workspace: null,
@@ -33,7 +34,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", workspaceId)
     .single();
   if (workspaceError) {
-    return data(
+    return routeData(
       {
         audioMedia: null,
         workspace: null,
@@ -44,14 +45,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-
   const { data: mediaData, error: mediaError } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId);
 
   if (mediaError) {
     logger.warn("Media Error:", mediaError);
-    return data(
+    return routeData(
       {
         audioMedia: null,
         workspace: workspaceData,
@@ -64,7 +64,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (mediaData.length === 0) {
     logger.debug("No workspace folder exists");
-    return data(
+    return routeData(
       {
         audioMedia: null,
         workspace: workspaceData,
@@ -83,7 +83,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   if (signedUrlsError) {
     logger.warn("SignedUrls Error:", signedUrlsError);
-    return data({
+    return routeData({
       audioMedia: null,
       workspace: workspaceData,
       error: signedUrlsError.message,
@@ -99,7 +99,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     return signedUrl ? { ...media, signedUrl } : media;
   });
 
-  return data(
+  return routeData(
     { audioMedia: mediaWithSignedUrls, workspace: workspaceData, error: null, userRole },
     { headers },
   );

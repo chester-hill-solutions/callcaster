@@ -1,5 +1,7 @@
+
+
+import { data as routeData, Form, Link, useActionData, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const campaignId = params.campaign_id;
 
   if (workspaceId == null || campaignId == null) {
-    return data(
+    return routeData(
       {
         campaign: null,
         error:
@@ -33,10 +35,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
 
   if (campaignError) {
-    return data({ campaign: null, error: campaignError }, { headers });
+    return routeData({ campaign: null, error: campaignError }, { headers });
   }
 
-  return data({ campaign: campaignData, error: null }, { headers });
+  return routeData({ campaign: campaignData, error: null }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -46,7 +48,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const campaignId = params.campaign_id;
 
   if (!(workspaceId && campaignId)) {
-    return data(
+    return routeData(
       {
         audienceData: null,
         campaignAudienceData: null,
@@ -61,7 +63,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const contactsFile = formData.get("contacts") as File;
 
   if (!formData.get("audience-name")) {
-    return data(
+    return routeData(
       {
         success: false,
         error: "Audience name is required",
@@ -85,7 +87,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return data({ error: "Form Action not recognized" }, { headers });
+  return routeData({ error: "Form Action not recognized" }, { headers });
 }
 
 export default function NewAudience() {

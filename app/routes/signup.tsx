@@ -1,4 +1,6 @@
-import { Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
+
+import { data as routeData, Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -8,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { Heading } from "@/components/ui/typography";
 
@@ -31,7 +33,7 @@ type ActionData =
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { headers } = createSupabaseServerClient(request);
 
-  return json<ActionData>(
+  return routeData<ActionData>(
     {
       error:
         "Registration is invite-only. Please use your invitation link or request access through the contact form.",
@@ -47,7 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (serverSession && serverSession.session) {
     return redirect("/workspaces", { headers });
   }
-  return data({ serverSession }, { headers });
+  return routeData({ serverSession }, { headers });
 };
 
 // Removed unused legacy styles

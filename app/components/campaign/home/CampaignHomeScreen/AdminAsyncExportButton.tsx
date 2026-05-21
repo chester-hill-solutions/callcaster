@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Download } from "lucide-react";
@@ -30,7 +31,7 @@ export const AdminAsyncExportButton = ({ campaignId, workspaceId }: AdminAsyncEx
           const response = await fetch(
             `/api/campaign-export-status?exportId=${encodeURIComponent(exportId)}&workspaceId=${encodeURIComponent(workspaceIdStr)}`,
           );
-          const data = await response.json();
+          const data = await response.routeData();
           
           setExportStatus(data.status);
           if (data.progress) setProgress(data.progress);
@@ -99,7 +100,7 @@ export const AdminAsyncExportButton = ({ campaignId, workspaceId }: AdminAsyncEx
         body: formData,
       });
       
-      const data = await response.json();
+      const data = await response.routeData();
       
       if (response.ok) {
         setExportId(data.exportId);

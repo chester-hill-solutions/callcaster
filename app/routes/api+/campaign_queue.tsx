@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, redirect } from "react-router";
+import { data as routeData, ActionFunctionArgs, redirect } from "react-router";
 import { parseRequestData } from "@/lib/database.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -38,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             contactIds,
             { startOrder, requeue }
         );
-        return data({ success: true });
+        return routeData({ success: true });
     }
     if (request.method === "DELETE") {
         const { ids, campaign_id, filters } = data;
@@ -56,13 +56,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .in('id', batch)
                     .select();
 
-                if (error) return data({ error: error.message }, { status: 500 });
+                if (error) return routeData({ error: error.message }, { status: 500 });
                 results.push(...(deletedContacts as CampaignQueue[]));
             }
-            return data({ data: results });
+            return routeData({ data: results });
         } else {
             const { data: contactsToDelete, error: lookupError } = await filteredSearch('', filters, supabaseClient, ['id'], campaign_id);
-            if (lookupError) return data({ error: lookupError.message }, { status: 500 });
+            if (lookupError) return routeData({ error: lookupError.message }, { status: 500 });
 
             const results = [];
             const contacts = (contactsToDelete as unknown as ContactMapping[] | null)?.map((item) => ({
@@ -87,11 +87,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     .in('id', batch)
                     .select();
 
-                if (error) return data({ error: error.message }, { status: 500 });
+                if (error) return routeData({ error: error.message }, { status: 500 });
                 results.push(...(deletedContacts as CampaignQueue[]));
             }
-            return data({ data: results });
+            return routeData({ data: results });
         }
     }
-    return data({ error: "Method not allowed" }, { status: 405 });
+    return routeData({ error: "Method not allowed" }, { status: 405 });
 };

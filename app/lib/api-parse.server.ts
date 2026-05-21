@@ -1,4 +1,4 @@
-import { data } from "react-router";
+import { data as routeData } from "react-router";
 import type { ZodError, ZodType } from "zod";
 import { parseActionRequest, safeParseJson } from "@/lib/database.server";
 
@@ -13,7 +13,7 @@ export function formatZodError(error: ZodError): string {
 }
 
 export function validationErrorResponse(error: ZodError, status = 400): Response {
-  return data({ error: formatZodError(error) }, { status });
+  return routeData({ error: formatZodError(error) }, { status });
 }
 
 /**

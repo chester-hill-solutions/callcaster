@@ -1,6 +1,8 @@
-import {  } from "react-router";
-import Twilio from 'twilio';
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import Twilio from 'twilio';
+
 import { env } from "@/lib/env.server";
 
 const accountSid = env.TWILIO_SID();
@@ -28,8 +30,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             machineDetection:'DetectMessageEnd',
             statusCallback:'/api/audiodrop-status'
         });
-        return data({ success: true, message: 'Robocall initiated', callSid: call.sid });
+        return routeData({ success: true, message: 'Robocall initiated', callSid: call.sid });
     } catch (error) {
-        return data({ success: false, message: error.message }, { status: 500 });
+        return routeData({ success: false, message: error.message }, { status: 500 });
     }
 };

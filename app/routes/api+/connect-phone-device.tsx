@@ -1,4 +1,4 @@
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { twilio } from "@/twilio.server";
@@ -10,7 +10,7 @@ export const action = async ({ request }: { request: Request }) => {
     const { data, error } = await supabase.auth.getUser();
     const user = data.user;
     if (!user) {
-        return data({ error: "Unauthorized" }, { status: 401 });
+        return routeData({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { phoneNumber, workspaceId, campaignId } = await safeParseJson<{
@@ -23,7 +23,7 @@ export const action = async ({ request }: { request: Request }) => {
         typeof workspaceId !== "string" ||
         (typeof campaignId !== "string" && typeof campaignId !== "number")
     ) {
-        return data({ error: "Invalid connect phone payload" }, { status: 400, headers });
+        return routeData({ error: "Invalid connect phone payload" }, { status: 400, headers });
     }
 
     await requireWorkspaceAccess({
@@ -41,9 +41,9 @@ export const action = async ({ request }: { request: Request }) => {
             method: 'GET',
         });
 
-        return data({ success: true, callSid: call.sid }, { headers });
+        return routeData({ success: true, callSid: call.sid }, { headers });
     } catch (error: any) {
         logger.error('Error connecting phone device:', error);
-        return data({ error: error.message }, { status: 500 });
+        return routeData({ error: error.message }, { status: 500 });
     }
 } 

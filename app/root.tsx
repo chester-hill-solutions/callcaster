@@ -1,16 +1,7 @@
+
+
+import { data as routeData, Links, Meta, Outlet, Params, Scripts, ScrollRestoration, redirect, useLoaderData, useNavigate } from "react-router";
 import type { LinksFunction, LoaderFunctionArgs } from "react-router";
-import {
-  Links,
-  Meta,
-  Outlet,
-  Params,
-  Scripts,
-  ScrollRestoration,
-  data,
-  redirect,
-  useLoaderData,
-  useNavigate,
-} from "react-router";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
@@ -78,7 +69,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: { session } } = await supabase.auth.getSession();
   const user = await supabase.auth.getUser();
   if (!user.data.user) {
-    return data({
+    return routeData({
       env,
       session,  
       workspaces: null,
@@ -102,7 +93,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const workspaces = workspaceData?.map((data) => data.workspace);
   
-  return data(
+  return routeData(
     {
       env,
       session,
@@ -135,10 +126,10 @@ export default function App() {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
-      return data({ success: null, error: signOutError.message });
+      return routeData({ success: null, error: signOutError.message });
     }
     navigate("/");
-    return data({ success: "Sign off successful", error: null });
+    return routeData({ success: "Sign off successful", error: null });
   }
 
   useEffect(() => {

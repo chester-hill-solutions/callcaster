@@ -1,4 +1,6 @@
-import {  } from "react-router";
+
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import {
@@ -26,7 +28,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const workspaceId = url.searchParams.get("workspace_id");
 
   if (!workspaceId) {
-    return data(
+    return routeData(
       { error: "workspace_id is required" },
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
@@ -46,13 +48,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (error) {
     logger.error("Error listing API keys:", error);
-    return data(
+    return routeData(
       { error: error.message },
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  return data(
+  return routeData(
     { keys: keys ?? [] },
     { headers: { "Content-Type": "application/json" } }
   );
@@ -69,7 +71,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { workspace_id, name } = body;
 
     if (!workspace_id || !name?.trim()) {
-      return data(
+      return routeData(
         { error: "workspace_id and name are required" },
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
@@ -97,13 +99,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
       logger.error("Error creating API key:", error);
-      return data(
+      return routeData(
         { error: error.message },
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return data(
+    return routeData(
       { key, id: row.id, name: row.name, key_prefix: row.key_prefix, created_at: row.created_at },
       { status: 201, headers: { "Content-Type": "application/json" } }
     );
@@ -117,7 +119,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { id, workspace_id } = body;
 
     if (!id || !workspace_id) {
-      return data(
+      return routeData(
         { error: "id and workspace_id are required" },
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
@@ -137,19 +139,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
       logger.error("Error deleting API key:", error);
-      return data(
+      return routeData(
         { error: error.message },
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return data(
+    return routeData(
       { success: true },
       { headers: { "Content-Type": "application/json" } }
     );
   }
 
-  return data(
+  return routeData(
     { error: "Method not allowed" },
     { status: 405, headers: { "Content-Type": "application/json" } }
   );

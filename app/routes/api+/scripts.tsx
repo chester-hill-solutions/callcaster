@@ -1,6 +1,6 @@
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from '@/lib/supabase.server";
+import { verifyAuth } from '@/lib/supabase.server';
 import { logger } from "@/lib/logger.server";
 import type { TablesInsert } from "@/lib/database.types";
 
@@ -22,7 +22,7 @@ export const action = async ({ request }: { request: Request }) => {
       typeof workspace !== "string" ||
       (typeof id !== "number" && typeof id !== "string" && id != null)
     ) {
-      return data({ error: "Invalid script payload" }, { status: 400 });
+      return routeData({ error: "Invalid script payload" }, { status: 400 });
     }
 
     const scriptData: TablesInsert<"script"> = {
@@ -52,7 +52,7 @@ export const action = async ({ request }: { request: Request }) => {
 
     if (scriptError) {
       if (scriptError.code === "23505") {
-        return data(
+        return routeData(
           { error: "A script with this name already exists in the workspace" },
           { status: 400 }
         );
@@ -60,10 +60,10 @@ export const action = async ({ request }: { request: Request }) => {
       throw scriptError;
     }
 
-    return data({ script: updatedScript[0] });
+    return routeData({ script: updatedScript[0] });
 
   } catch (error) {
     logger.error("Error updating/creating script:", error);
-    return data({ error: (error as Error).message }, { status: 500 });
+    return routeData({ error: (error as Error).message }, { status: 500 });
   }
 };

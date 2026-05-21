@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, Link } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,7 +41,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         throw redirect("/admin?tab=workspaces");
     }
 
-    return data({ 
+    return routeData({ 
         workspace
     });
 };

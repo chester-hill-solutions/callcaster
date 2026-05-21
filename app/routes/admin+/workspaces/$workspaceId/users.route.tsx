@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, Link } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .select("*, user:user_id(*)")
         .eq("workspace_id", workspaceId);
 
-    return data({ 
+    return routeData({ 
         workspaceUsers: workspaceUsers || []
     });
 };

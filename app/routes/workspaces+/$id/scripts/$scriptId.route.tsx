@@ -1,5 +1,6 @@
-import { redirect, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData } from "react-router";
+
+
+import { data as routeData, redirect, LoaderFunctionArgs, ActionFunctionArgs, useLoaderData } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -37,7 +38,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .single();
 
   const mediaNames = await listMedia(supabaseClient, workspace_id as string );
-  return data({
+  return routeData({
     workspace: workspaceData,
     workspace_id,
     selected_id,
@@ -63,7 +64,7 @@ export const action = async ({ request, params }: ActionFunctionArgs  ) => {
     .single();
   if (error) {
     logger.error("Campaign Error", error);
-    return data({ success: false, error: error }, { headers });
+    return routeData({ success: false, error: error }, { headers });
   }
   const { data: campaignUpdate, error: updateError } = await supabaseClient
     .from("message_campaign")
@@ -77,9 +78,9 @@ export const action = async ({ request, params }: ActionFunctionArgs  ) => {
 
   if (updateError) {
     logger.error("Campaign update error", updateError);
-    return data({ success: false, error: updateError }, { headers });
+    return routeData({ success: false, error: updateError }, { headers });
   }
-  return data({ success: false, error: updateError }, { headers });
+  return routeData({ success: false, error: updateError }, { headers });
 };
 
 export default function ScriptEditor() {

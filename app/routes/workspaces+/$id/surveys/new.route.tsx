@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigate } from "react-router";
+
+
+import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
 import { useState } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
@@ -32,7 +33,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Unauthorized", { status: 403 });
   }
 
-  return data({
+  return routeData({
     workspaceId,
     user,
     userRole,

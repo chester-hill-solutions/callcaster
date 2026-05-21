@@ -1,6 +1,8 @@
-import {  } from "react-router";
-import { createClient } from '@supabase/supabase-js';
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import { createClient } from '@supabase/supabase-js';
+
 import type { Database, TablesInsert } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
@@ -26,7 +28,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const callSidRaw = params.CallSid ?? params.call_sid;
     if (!callSidRaw) {
-      return data({ error: "Missing CallSid" }, { status: 400 });
+      return routeData({ error: "Missing CallSid" }, { status: 400 });
     }
     const supabase = createClient<Database>(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const { data: existingCall } = await supabase.from("call").select("workspace").eq("sid", callSidRaw).single();
@@ -39,7 +41,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return data({ error: "Invalid Twilio signature" }, { status: 403 });
+      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
     const calledVia = params.CalledVia ?? params.called_via;
     const userId = calledVia ? calledVia.split(":")[1] : '';
@@ -83,7 +85,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { data, error } = await supabase.from('call').upsert([updateData], { onConflict: 'sid' }).select();
     if (error) {
         logger.error('Error updating call:', error);
-        return data({ success: false, error: 'Failed to update call' }, { status: 500 });
+        return routeData({ success: false, error: 'Failed to update call' }, { status: 500 });
     }
 
     // Resolve workspace and outreach attempt: use this call's row, or parent call (e.g. staffed dial child leg)
@@ -108,7 +110,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         .single();
     if (outreachAttemptId != null && fetchError) {
         logger.error('Error fetching current attempt:', fetchError);
-        return data({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
+        return routeData({ success: false, error: 'Failed to fetch current attempt' }, { status: 500 });
     }
     const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
     if (currentAttempt) {
@@ -132,7 +134,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
             if (updateError) {
                 logger.error('Error updating attempt:', updateError);
-                return data({ success: false, error: 'Failed to update attempt' }, { status: 500 });
+                return routeData({ success: false, error: 'Failed to update attempt' }, { status: 500 });
             }
         } else {
             logger.debug("Skipping outreach disposition transition", { currentDisposition, nextDisposition });
@@ -157,5 +159,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
         }
     }
-    return data({ success: true })
+    return routeData({ success: true })
 }

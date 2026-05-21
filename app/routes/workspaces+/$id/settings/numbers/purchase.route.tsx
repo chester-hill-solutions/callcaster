@@ -1,3 +1,5 @@
+import { data as routeData, Link, redirect, useFetcher, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -6,8 +8,6 @@ import { getUserRole } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { User } from "@/lib/types";
-import type { LoaderFunctionArgs } from "react-router";
-import { data, Link, redirect, useFetcher, useLoaderData } from "react-router";
 
 export type LoaderData = {
   workspaceId: string;
@@ -40,7 +40,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     throw new Response(error.message, { status: 500, headers });
   }
 
-  return data(
+  return routeData(
     {
       workspaceId,
       creditsBalance: workspace?.credits ?? 0,

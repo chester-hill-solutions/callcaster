@@ -1,5 +1,6 @@
-import { ActionFunctionArgs } from "react-router";
-import { Form, Link, useActionData, useOutletContext } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, Form, Link, useActionData, useOutletContext } from "react-router";
 import { CardAction } from "twilio/lib/rest/content/v1/content";
 import {
   Card,
@@ -19,7 +20,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const workspaceId = params.id;
 
   if (workspaceId == null) {
-    return data(
+    return routeData(
       {
         audienceData: null,
         campaignAudienceData: null,
@@ -45,7 +46,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return data({ error: "Form Action not recognized" }, { headers });
+  return routeData({ error: "Form Action not recognized" }, { headers });
 }
 
 export default function CampaignsNew() {

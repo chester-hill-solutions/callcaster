@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import { useRef, useCallback } from "react";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
@@ -32,8 +33,8 @@ export function useCallStatusPolling({
     const params = new URLSearchParams({ callSid, workspaceId });
     fetch(`/api/call-status-poll?${params}`)
       .then((res) => {
-        if (!res.ok) return res.json().then((data) => Promise.reject(data));
-        return res.json();
+        if (!res.ok) return res.routeData().then((data) => Promise.reject(data));
+        return res.routeData();
       })
       .then((data: { status?: string }) => {
         if (typeof data?.status === "string") {

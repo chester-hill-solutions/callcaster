@@ -1,4 +1,4 @@
-import { type ActionFunctionArgs } from "react-router";
+import { data as routeData, type ActionFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -33,7 +33,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return handleSubmitResponse(request, supabaseClient);
   }
 
-  return data({ error: "Method not allowed" }, { status: 405 });
+  return routeData({ error: "Method not allowed" }, { status: 405 });
 }
 
 async function handleSubmitResponse(
@@ -44,18 +44,18 @@ async function handleSubmitResponse(
     const formData = await request.formData();
     const responseDataRaw = formData.get("responseData") as string | null;
     if (!responseDataRaw) {
-      return data({ error: "Response data is required" }, { status: 400 });
+      return routeData({ error: "Response data is required" }, { status: 400 });
     }
     let responseData: SubmittedSurveyResponse;
     try {
       responseData = JSON.parse(responseDataRaw) as SubmittedSurveyResponse;
     } catch {
-      return data({ error: "Invalid response data format" }, { status: 400 });
+      return routeData({ error: "Invalid response data format" }, { status: 400 });
     }
     const surveyId = formData.get("surveyId") as string;
 
     if (!surveyId) {
-      return data({ error: "Survey ID and response data are required" }, { status: 400 });
+      return routeData({ error: "Survey ID and response data are required" }, { status: 400 });
     }
 
     // Get survey to verify it exists and is active
@@ -66,11 +66,11 @@ async function handleSubmitResponse(
       .single();
 
     if (surveyError || !survey) {
-      return data({ error: "Survey not found" }, { status: 404 });
+      return routeData({ error: "Survey not found" }, { status: 404 });
     }
 
     if (!survey.is_active) {
-      return data({ error: "Survey is not active" }, { status: 400 });
+      return routeData({ error: "Survey is not active" }, { status: 400 });
     }
 
     const nowIso = new Date().toISOString();
@@ -93,7 +93,7 @@ async function handleSubmitResponse(
     if (responseError) {
       if (!isUniqueViolation(responseError)) {
         logger.error("Error creating survey response:", responseError);
-        return data({ error: "Failed to submit response" }, { status: 500 });
+        return routeData({ error: "Failed to submit response" }, { status: 500 });
       }
       const { data: existing, error: existingError } = await supabaseClient
         .from("survey_response")
@@ -102,7 +102,7 @@ async function handleSubmitResponse(
         .single();
       if (existingError || !existing) {
         logger.error("Error fetching existing survey response:", existingError);
-        return data({ error: "Failed to submit response" }, { status: 500 });
+        return routeData({ error: "Failed to submit response" }, { status: 500 });
       }
       surveyResponse = existing;
       // Update completion/progress fields deterministically.
@@ -177,13 +177,13 @@ async function handleSubmitResponse(
       }
     }
 
-    return data({ 
+    return routeData({ 
       success: true, 
       response_id: surveyResponse?.id,
       result_id: responseData.result_id 
     });
   } catch (error) {
     logger.error("Error in handleSubmitResponse:", error);
-    return data({ error: "Internal server error" }, { status: 500 });
+    return routeData({ error: "Internal server error" }, { status: 500 });
   }
 } 

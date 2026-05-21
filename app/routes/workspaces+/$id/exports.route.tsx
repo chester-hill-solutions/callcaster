@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useRevalidator } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
@@ -53,12 +54,12 @@ interface LoaderData {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
-    return data({ error: "Unauthorized" }, { status: 401 });
+    return routeData({ error: "Unauthorized" }, { status: 401 });
   }
 
   const workspaceId = params["id"];
   if (!workspaceId) {
-    return data({ error: "Missing workspace ID" }, { status: 400 });
+    return routeData({ error: "Missing workspace ID" }, { status: 400 });
   }
 
   try {
@@ -122,7 +123,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       .filter((exp): exp is ExportItem => exp !== null)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    return json<LoaderData>({
+    return routeData<LoaderData>({
       exports: validExports.map((exp) => ({
         ...exp,
         createdAt: exp.createdAt.toISOString(),
@@ -132,7 +133,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   } catch (error) {
     logger.error("Error fetching exports:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    return data({ error: message }, { status: 500 });
+    return routeData({ error: message }, { status: 500 });
   }
 };
 

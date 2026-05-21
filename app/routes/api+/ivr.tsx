@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from '@/lib/database.server";
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from '@/lib/database.server';
 import { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { createErrorResponse } from "@/lib/errors.server";

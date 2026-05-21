@@ -1,5 +1,6 @@
-import { data } from "react-router";
-import { redirect } from "react-router";
+
+
+import { data as routeData, redirect } from "react-router";
 import { parseCSV } from "@/lib/utils";
 import { bulkCreateContacts } from "@/lib/database.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
@@ -123,7 +124,7 @@ export async function handleNewAudience({
   } catch (error) {
     logger.error("Error in handleNewAudience:", error);
     const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-    return data(
+    return routeData(
       {
         audienceData: null,
         error: errorMessage,
@@ -156,12 +157,12 @@ export async function handleNewCampaign({
 
   if (campaignError) {
     if (campaignError.code === '23505'){
-      return data(
+      return routeData(
         { campaignData: null, error: {message: "There is already a campaign with that name. Please use a unique campaign name."} },
         { headers },
       );  
     }
-    return data(
+    return routeData(
       { campaignData: null, error: campaignError },
       { headers },
     );
@@ -172,7 +173,7 @@ export async function handleNewCampaign({
                    newCampaignType === "robocall" ? "ivr_campaign" : null;
 
   if (!tableKey) {
-    return data(
+    return routeData(
       { campaignData: null, error: "Invalid campaign type" },
       { headers },
     );
@@ -183,7 +184,7 @@ export async function handleNewCampaign({
     .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
-    return data(
+    return routeData(
       { campaignData: campaignData, error: detailsError },
       { headers },
     );

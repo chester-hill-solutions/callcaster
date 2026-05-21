@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, useActionData, useLoaderData } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
 
   if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
-    return data({ error: "Unauthorized" }, { status: 403, headers });
+    return routeData({ error: "Unauthorized" }, { status: 403, headers });
   }
 
   const { data: workspace, error: workspaceError } = await supabaseClient
@@ -163,7 +164,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       (invite: PendingInvite | null): invite is PendingInvite => invite !== null,
     ) ?? [];
   
-  return data(
+  return routeData(
     {
       workspace: { id: workspace.id, name: workspace.name },
       userRole: normalizedUserRole,
@@ -181,7 +182,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (workspaceId == null) {
-    return data({ error: "No workspace_id found!" }, { headers });
+    return routeData({ error: "No workspace_id found!" }, { headers });
   }
 
   const { data: userData } = await supabaseClient
@@ -202,7 +203,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
 
   if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
-    return data({ error: "Unauthorized" }, { status: 403, headers });
+    return routeData({ error: "Unauthorized" }, { status: 403, headers });
   }
 
   const formData = await request.formData();
@@ -229,7 +230,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
-  return data(
+  return routeData(
     { data: null, error: "Error: Unrecognized action called" },
     { headers },
   );

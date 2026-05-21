@@ -1,6 +1,6 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
     const hasAccess = userRole?.role !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
-    return data(
+    return routeData(
       {
         phoneNumbers,
         workspaceId,
@@ -85,7 +85,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-  return data(
+  return routeData(
     {
       phoneNumbers,
       workspaceId,

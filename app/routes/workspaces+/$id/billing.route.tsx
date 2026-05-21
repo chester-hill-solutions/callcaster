@@ -1,5 +1,6 @@
-import { redirect, type LoaderFunctionArgs, type ActionFunctionArgs } from "react-router";
-import { useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
+
+
+import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
@@ -43,7 +44,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const sortedHistory = Array.isArray(history)
     ? [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     : [];
-  return data({
+  return routeData({
     credits: {
       balance: workspace?.credits ?? 0,
       history: sortedHistory,
@@ -60,7 +61,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const amount = Math.floor(Number(formData.get("amount")));
 
   if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
-    return data({
+    return routeData({
       error: `Choose at least ${formatCredits(MIN_CREDITS)} credits (${formatCurrency(MIN_PURCHASE_CAD)} minimum).`,
     }, { status: 400 });
   }
@@ -72,7 +73,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     .single();
 
   if (workspaceError) {
-    return data({ error: "We could not load billing for this workspace." }, { status: 400 });
+    return routeData({ error: "We could not load billing for this workspace." }, { status: 400 });
   }
 
   let stripeCustomerId = workspace?.stripe_id ?? null;
@@ -90,7 +91,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         .update({ stripe_id: stripeCustomerId })
         .eq("id", workspaceId);
     } catch {
-      return data(
+      return routeData(
         {
           error:
             "Billing is not ready for this workspace yet. Please try again in a moment or contact support.",
@@ -132,7 +133,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
     return redirect(session.url!);
   } catch {
-    return data(
+    return routeData(
       {
         error: "We could not open Stripe Checkout right now. Please try again.",
       },

@@ -1,6 +1,7 @@
-import { verifyAuth } from '@/lib/supabase.server';
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import { verifyAuth } from '@/lib/supabase.server';
+
 import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -24,10 +25,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const { data: publicUrlData } = await supabase.storage.from('audio').getPublicUrl(data.path);
         const { error: updateError } = await supabase.from('live_campaign').update({ voicedrop_audio: publicUrlData.publicUrl }).eq('campaign_id', live_campaign_id as number);
         if (updateError) throw updateError;
-        return data(publicUrlData.publicUrl, { status: 201 });
+        return routeData(publicUrlData.publicUrl, { status: 201 });
     }
     catch (error) {
         logger.error("Error uploading media:", error);
-        return data({ error }, { status: 500 });
+        return routeData({ error }, { status: 500 });
     }
 };

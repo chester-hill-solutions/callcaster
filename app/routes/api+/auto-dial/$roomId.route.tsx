@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server";
+import { createWorkspaceTwilioInstance } from '@/lib/database.server';
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { Call } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";

@@ -1,4 +1,4 @@
-import { type ActionFunctionArgs } from "react-router";
+import { data as routeData, type ActionFunctionArgs } from "react-router";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -11,7 +11,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return handleCompleteSurvey(request, supabaseClient);
   }
 
-  return data({ error: "Method not allowed" }, { status: 405 });
+  return routeData({ error: "Method not allowed" }, { status: 405 });
 }
 
 async function handleCompleteSurvey(
@@ -25,7 +25,7 @@ async function handleCompleteSurvey(
     const completed = formData.get("completed") as string;
 
     if (!resultId || !surveyId) {
-      return data({ error: "Missing required fields" }, { status: 400 });
+      return routeData({ error: "Missing required fields" }, { status: 400 });
     }
 
     // Get survey to verify it exists and is active
@@ -36,11 +36,11 @@ async function handleCompleteSurvey(
       .single();
 
     if (surveyError || !survey) {
-      return data({ error: "Survey not found" }, { status: 404 });
+      return routeData({ error: "Survey not found" }, { status: 404 });
     }
 
     if (!survey.is_active) {
-      return data({ error: "Survey is not active" }, { status: 400 });
+      return routeData({ error: "Survey is not active" }, { status: 400 });
     }
 
     // Update survey response to mark as completed
@@ -54,15 +54,15 @@ async function handleCompleteSurvey(
 
     if (updateError) {
       logger.error("Error completing survey:", updateError);
-      return data({ error: "Failed to complete survey" }, { status: 500 });
+      return routeData({ error: "Failed to complete survey" }, { status: 500 });
     }
 
-    return data({ 
+    return routeData({ 
       success: true, 
       result_id: resultId 
     });
   } catch (error) {
     logger.error("Error in handleCompleteSurvey:", error);
-    return data({ error: "Internal server error" }, { status: 500 });
+    return routeData({ error: "Internal server error" }, { status: 500 });
   }
 } 

@@ -1,8 +1,10 @@
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import {  } from "react-router";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server";
-import type { ActionFunctionArgs } from "react-router";
+
+import { createWorkspaceTwilioInstance } from '@/lib/database.server';
+
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -119,7 +121,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await Promise.all(updateOperations);
     } catch (error) {
         logger.error("IVR campaign error:", error);
-        return data({ success: false, error });
+        return routeData({ success: false, error });
     }
-    return data({ success: true });
+    return routeData({ success: true });
 };

@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from "react-router";
-import { useLoaderData, useFetcher, useNavigate } from "react-router";
+
+
+import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
 import { useState, useEffect, useCallback } from "react";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { Button } from "@/components/ui/button";
@@ -117,7 +118,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
-  return data({
+  return routeData({
     survey,
     resultId: existingResponse?.result_id || resultId,
     contact,

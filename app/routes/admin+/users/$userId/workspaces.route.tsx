@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, useActionData, Form, Link } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useActionData, Form, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .eq("email", targetUser.username)
         .eq("status", "pending");
 
-    return data({ 
+    return routeData({ 
         currentUser: userData,
         targetUser,
         allWorkspaces: allWorkspaces || [],
@@ -91,7 +92,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const userId = params.userId;
     
     if (!userId) {
-        return data({ error: "User ID is required" });
+        return routeData({ error: "User ID is required" });
     }
 
     const formData = await request.formData();
@@ -102,11 +103,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const role = formData.get("role") as string;
 
         if (!workspaceId) {
-            return data({ error: "Workspace is required" });
+            return routeData({ error: "Workspace is required" });
         }
 
         if (!role) {
-            return data({ error: "Role is required" });
+            return routeData({ error: "Role is required" });
         }
 
         // Check if user is already in the workspace
@@ -118,7 +119,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .single();
 
         if (existingMembership) {
-            return data({ error: "User is already a member of this workspace" });
+            return routeData({ error: "User is already a member of this workspace" });
         }
 
         // Add user to workspace
@@ -131,10 +132,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             });
 
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: "User added to workspace successfully" });
+        return routeData({ success: "User added to workspace successfully" });
     }
 
     if (action === "update_role") {
@@ -142,7 +143,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const role = formData.get("role") as "owner" | "member" | "caller" | "admin" | undefined;
 
         if (!workspaceId || !role) {
-            return data({ error: "Workspace and role are required" });
+            return routeData({ error: "Workspace and role are required" });
         }
 
         const { error } = await supabaseClient
@@ -152,17 +153,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq("workspace_id", workspaceId);
 
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: "User role updated successfully" });
+        return routeData({ success: "User role updated successfully" });
     }
 
     if (action === "remove_from_workspace") {
         const workspaceId = formData.get("workspaceId") as string;
 
         if (!workspaceId) {
-            return data({ error: "Workspace ID is required" });
+            return routeData({ error: "Workspace ID is required" });
         }
 
         const { error } = await supabaseClient
@@ -172,17 +173,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq("workspace_id", workspaceId);
 
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: "User removed from workspace successfully" });
+        return routeData({ success: "User removed from workspace successfully" });
     }
 
     if (action === "cancel_invite") {
         const inviteId = formData.get("inviteId") as string;
 
         if (!inviteId) {
-            return data({ error: "Invite ID is required" });
+            return routeData({ error: "Invite ID is required" });
         }
 
         const { error } = await supabaseClient
@@ -191,13 +192,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq("id", inviteId);
 
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: "Invitation cancelled successfully" });
+        return routeData({ success: "Invitation cancelled successfully" });
     }
 
-    return data({ error: "Invalid action" });
+    return routeData({ error: "Invalid action" });
 };
 
 export default function UserWorkspaces() {

@@ -1,5 +1,7 @@
-import { verifyAuth } from '@/lib/supabase.server";
-import {  } from "react-router";
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
+import { verifyAuth } from '@/lib/supabase.server';
+
 import { logger } from "@/lib/logger.server";
 
 function sanitizeFilename(filename: string) {
@@ -14,8 +16,6 @@ function sanitizeFilename(filename: string) {
     return `${name}.${ext}`;
 }
 
-import type { ActionFunctionArgs } from "react-router";
-
 export async function action({ request }: ActionFunctionArgs) {
 
     const { supabaseClient, headers } = await verifyAuth(request);
@@ -23,7 +23,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const formData = await request.formData();
     const workspaceId = formData.get('workspaceId')
     if (workspaceId == null) {
-        return data(
+        return routeData(
             { success: false, error: "Workspace does not exist" },
             { headers },
         );
@@ -45,7 +45,7 @@ export async function action({ request }: ActionFunctionArgs) {
             });
         if (uploadError && (uploadError as any).statusCode !== '409') {
             logger.error("Message media upload error:", uploadError);
-            return data({ success: false, error: uploadError }, { headers });
+            return routeData({ success: false, error: uploadError }, { headers });
         }
         if (campaignId) {
             const { data: campaign, error } = await supabaseClient
@@ -55,7 +55,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 .single();
             if (error) {
                 logger.error('Campaign Error', error);
-                return data({ success: false, error: error }, { headers });
+                return routeData({ success: false, error: error }, { headers });
             }
             const { data: campaignUpdate, error: updateError } = await supabaseClient
                 .from('message_campaign')
@@ -66,7 +66,7 @@ export async function action({ request }: ActionFunctionArgs) {
                 .select()
             if (updateError) {
                 logger.error("Error updating campaign with media:", updateError);
-                return data({ success: false, error: updateError }, { headers });
+                return routeData({ success: false, error: updateError }, { headers });
             }
 
             const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
@@ -75,10 +75,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
             if (signedUrlError) {
                 logger.error("Error signing uploaded message media:", signedUrlError);
-                return data({ success: false, error: signedUrlError }, { headers });
+                return routeData({ success: false, error: signedUrlError }, { headers });
             }
 
-            return data({
+            return routeData({
                 success: true,
                 error: null,
                 campaignUpdate,
@@ -87,8 +87,8 @@ export async function action({ request }: ActionFunctionArgs) {
             }, { headers });
         } else {
             const { data, error: imageError } = await supabaseClient.storage.from('messageMedia').createSignedUrl(`${workspaceId}/${safeFileName}`, 3600);
-            if (imageError) return data({ success: false, error: imageError }, { headers });
-            return data({ success: true, error: null, url: data.signedUrl }, { headers });
+            if (imageError) return routeData({ success: false, error: imageError }, { headers });
+            return routeData({ success: true, error: null, url: data.signedUrl }, { headers });
         }
     } else if (method === "DELETE") {
         const campaignIdRaw = formData.get("campaignId");
@@ -103,7 +103,7 @@ export async function action({ request }: ActionFunctionArgs) {
             .single();
         if (error) {
             logger.error("Campaign Error", error);
-            return data({ success: false, error: error }, { headers });
+            return routeData({ success: false, error: error }, { headers });
         }
 
         const { data: campaignUpdate, error: updateError } = await supabaseClient
@@ -117,9 +117,9 @@ export async function action({ request }: ActionFunctionArgs) {
             .select();
 
         if (updateError) {
-            return data({ success: false, error: updateError }, { headers });
+            return routeData({ success: false, error: updateError }, { headers });
         }
-        return data({ success: true, error: null, campaignUpdate, removedFileName: encodedMediaName }, { headers });
+        return routeData({ success: true, error: null, campaignUpdate, removedFileName: encodedMediaName }, { headers });
     }
-    return data({ success: false, error: 'Method not allowed' }, { status: 405 });
+    return routeData({ success: false, error: 'Method not allowed' }, { status: 405 });
 }

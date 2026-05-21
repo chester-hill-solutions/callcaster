@@ -1,4 +1,4 @@
-import { redirect } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { useLoaderData, useSubmit } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -200,7 +200,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     voicedrop_audio: campaignDetails.voicedrop_audio,
   };
 
-  return data({
+  return routeData({
     workspace_id,
     selected_id,
     data: {
@@ -225,7 +225,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
 
   if (!encodedMediaName) {
-    return data({ success: false, error: "File name is required" });
+    return routeData({ success: false, error: "File name is required" });
   }
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -238,7 +238,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (error) {
     logger.error("Campaign Error", error);
-    return data({ success: false, error: error }, { headers });
+    return routeData({ success: false, error: error }, { headers });
   }
 
   const { data: campaignUpdate, error: updateError } = await supabaseClient
@@ -252,9 +252,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .select();
 
   if (updateError) {
-    return data({ success: false, error: updateError }, { headers });
+    return routeData({ success: false, error: updateError }, { headers });
   }
-  return data({ success: true, data: campaignUpdate }, { headers });
+  return routeData({ success: true, data: campaignUpdate }, { headers });
 };
 
 export default function ScriptEditor() {

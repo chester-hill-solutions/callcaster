@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs } from "react-router";
-import { useFetcher, useLoaderData, useLocation, useOutletContext, useParams } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, useFetcher, useLoaderData, useLocation, useOutletContext, useParams } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -140,7 +141,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
-  return data(
+  return routeData(
     {
       messages,
       hasMore,

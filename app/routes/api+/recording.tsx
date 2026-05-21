@@ -1,6 +1,8 @@
-import {  } from "react-router";
-import { createClient } from "@supabase/supabase-js";
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
+import { createClient } from "@supabase/supabase-js";
+
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -12,5 +14,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     env.SUPABASE_SERVICE_KEY(),
   );
   logger.debug("Recording webhook received", { data });
-  return data(data);
+  return routeData(data);
 };

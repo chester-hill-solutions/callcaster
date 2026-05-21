@@ -1,6 +1,7 @@
-import Twilio from 'twilio';
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import Twilio from 'twilio';
+
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 
@@ -37,10 +38,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             from: `${fromNumber}`,
             to: `${toNumber}`
         });
-        return data({ success: true, message});
+        return routeData({ success: true, message});
     } catch (error){
         logger.error("Error sending message:", error);
-        return data({ success: false, message: error.message }, { status: 500 });
+        return routeData({ success: false, message: error.message }, { status: 500 });
     }
 }
 
@@ -48,5 +49,5 @@ export const loader = async ({request}: LoaderFunctionArgs) => {
     const url = new URL(request.url)
     const data = url.searchParams;
     logger.debug("Message loader data", data);
-    return data({success: true, data})
+    return routeData({success: true, data})
 }

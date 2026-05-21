@@ -6,7 +6,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 // Lib imports
-import { verifyAuth } from '@/lib/supabase.server";
+import { verifyAuth } from '@/lib/supabase.server';
 import {
   handleCall,
   handleConference,

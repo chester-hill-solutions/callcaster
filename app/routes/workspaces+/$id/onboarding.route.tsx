@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
@@ -176,7 +176,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     recentOutboundCount: 0,
   });
 
-  return json<LoaderData>(
+  return routeData<LoaderData>(
     {
       workspaceId,
       workspaceName: workspaceInfo?.name ?? "Workspace",
@@ -198,7 +198,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const workspaceId = params.id;
   if (!workspaceId) {
-    return json<ActionData>({ error: "Workspace ID is required." }, { status: 400 });
+    return routeData<ActionData>({ error: "Workspace ID is required." }, { status: 400 });
   }
 
   await requireWorkspaceAccess({
@@ -216,7 +216,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   )?.role;
 
   if (role !== "owner" && role !== "admin") {
-    return json<ActionData>(
+    return routeData<ActionData>(
       { error: "Only workspace admins can change onboarding state." },
       { status: 403 },
     );
@@ -251,7 +251,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         updates: nextState,
         actorUserId: user.id,
       });
-      return json<ActionData>({ success: "Onboarding channels updated." });
+      return routeData<ActionData>({ success: "Onboarding channels updated." });
     }
 
     if (actionName === "bootstrap_messaging_service") {
@@ -260,7 +260,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         workspaceId,
         actorUserId: user.id,
       });
-      return json<ActionData>({ success: "Messaging Service bootstrap completed." });
+      return routeData<ActionData>({ success: "Messaging Service bootstrap completed." });
     }
 
     if (actionName === "save_business_profile") {
@@ -314,7 +314,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         updates: nextState,
         actorUserId: user.id,
       });
-      return json<ActionData>({ success: "Business and compliance details saved." });
+      return routeData<ActionData>({ success: "Business and compliance details saved." });
     }
 
     if (actionName === "review_emergency_voice") {
@@ -339,7 +339,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         !address.postalCode.trim() ||
         !customerName
       ) {
-        return json<ActionData>(
+        return routeData<ActionData>(
           { error: "Save a complete emergency service address before running voice review." },
           { status: 400 },
         );
@@ -477,13 +477,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         });
 
         if (eligiblePhoneNumbers.length === 0) {
-          return json<ActionData>({
+          return routeData<ActionData>({
             success: "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
           });
         }
 
         const ineligibleCount = ineligibleCallerIds.length;
-        return json<ActionData>({
+        return routeData<ActionData>({
           success:
             ineligibleCount > 0
               ? `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are ready and ${ineligibleCount} still need review.`
@@ -513,7 +513,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           updates: failedState,
           actorUserId: user.id,
         });
-        return json<ActionData>(
+        return routeData<ActionData>(
           {
             error:
               error instanceof Error ? error.message : "Emergency address validation failed.",
@@ -530,19 +530,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         actorUserId: user.id,
       });
       if (nextState.reviewState.blockingIssues.length > 0) {
-        return json<ActionData>({
+        return routeData<ActionData>({
           error: "A2P submission is blocked until the required onboarding and Trust Hub prerequisites are completed.",
         });
       }
       if (nextState.a2p10dlc.rejectionReason || nextState.reviewState.lastError) {
-        return json<ActionData>({
+        return routeData<ActionData>({
           error:
             nextState.a2p10dlc.rejectionReason ??
             nextState.reviewState.lastError ??
             "A2P provisioning failed.",
         });
       }
-      return json<ActionData>({ success: "A2P brand and campaign were submitted for review." });
+      return routeData<ActionData>({ success: "A2P brand and campaign were submitted for review." });
     }
 
     if (actionName === "save_rcs") {
@@ -571,12 +571,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         notes: String(formData.get("rcsNotes") ?? ""),
         status: asWorkspaceOnboardingStatus(formData.get("rcsStatus")),
       });
-      return json<ActionData>({ success: "RCS onboarding state updated." });
+      return routeData<ActionData>({ success: "RCS onboarding state updated." });
     }
 
-    return json<ActionData>({ error: "Unknown onboarding action." }, { status: 400 });
+    return routeData<ActionData>({ error: "Unknown onboarding action." }, { status: 400 });
   } catch (error) {
-    return json<ActionData>(
+    return routeData<ActionData>(
       {
         error: error instanceof Error ? error.message : "Onboarding update failed.",
       },

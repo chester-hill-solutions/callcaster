@@ -1,4 +1,5 @@
-import { Form, Link, NavLink, useLoaderData, useNavigation } from "react-router";
+
+import { Form, Link, NavLink, useLoaderData, useNavigation, LoaderFunctionArgs } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -12,7 +13,6 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {

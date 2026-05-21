@@ -18,7 +18,8 @@ for (const file of walk(ROUTES)) {
   let src = fs.readFileSync(file, "utf8");
   const next = src
     .replace(/from ['"]\.\.\/lib\//g, "from '@/lib/")
-    .replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\//g, "from '@/lib/");
+    .replace(/from ['"]\.\.\/\.\.\/\.\.\/lib\//g, "from '@/lib/")
+    .replace(/from '@\/([^'"]+)";/g, "from '@/$1';");
   if (next !== src) {
     fs.writeFileSync(file, next);
     n++;

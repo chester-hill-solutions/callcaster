@@ -1,4 +1,4 @@
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { useActionData, useLoaderData, useNavigation, NavLink, useNavigate } from "react-router";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import type {
@@ -124,7 +124,7 @@ async function handleAuthenticatedUser(
   if (isNewUser) {
     const invites =
       ((await getInvitesByUserId(client, session.user.id)) as WorkspaceInviteRow[] | null) ?? [];
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "verified",
         invites,
@@ -136,7 +136,7 @@ async function handleAuthenticatedUser(
 
   const invites = await fetchInvitesWithWorkspace(client, session.user.id);
 
-  return json<LoaderData>(
+  return routeData<LoaderData>(
       {
         status: "existing_user",
         invites,
@@ -165,7 +165,7 @@ async function handleTokenVerification(
           verifyError.message.includes("Email link is invalid or has expired")) ||
         !verifyData.session
       ) {
-        return json<LoaderData>(
+        return routeData<LoaderData>(
           {
             status: "invalid_link",
             error:
@@ -197,7 +197,7 @@ async function handleTokenVerification(
         ((await getInvitesByUserId(client, sessionData.user.id)) as
           | WorkspaceInviteRow[]
           | null) ?? [];
-      return json<LoaderData>(
+      return routeData<LoaderData>(
       {
         status: "verified",
           email,
@@ -209,7 +209,7 @@ async function handleTokenVerification(
 
     const invites = await fetchInvitesWithWorkspace(client, sessionData.user.id);
 
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "existing_user",
         email,
@@ -221,7 +221,7 @@ async function handleTokenVerification(
     logger.error("Unhandled error during token verification", error);
     const message =
       error instanceof Error ? error.message : "An unexpected error occurred while verifying.";
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "error",
         error: message,
@@ -253,7 +253,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return handleTokenVerification(supabaseClient, token_hash, type as EmailOtpType, email, headers);
   }
 
-  return json<LoaderData>({ status: "not_signed_in" }, { headers });
+  return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -279,7 +279,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         typeof firstNameValue !== "string" ||
         typeof lastNameValue !== "string"
       ) {
-        return json<ActionData>(
+        return routeData<ActionData>(
           {
             status: "error",
             error: "Invalid form submission.",
@@ -306,7 +306,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (inviteError) throw inviteError;
 
-      return json<ActionData>(
+      return routeData<ActionData>(
         { status: "updated", invites: invites ?? [] },
         { headers },
       );
@@ -314,7 +314,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       logger.error("Error in updateUser:", error);
       const message =
         error instanceof Error ? error.message : "An unexpected error occurred";
-      return json<ActionData>(
+      return routeData<ActionData>(
         { status: "error", error: message },
         { headers, status: 500 },
       );
@@ -332,7 +332,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       .filter((value): value is string => Boolean(value));
 
     if (invitationIds.length === 0) {
-      return json<ActionData>(
+      return routeData<ActionData>(
         {
           status: "error",
           error: "No invitations were selected.",
@@ -349,7 +349,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const errors = result?.errors ?? [];
 
     if (errors.length > 0) {
-      return json<ActionData>(
+      return routeData<ActionData>(
         {
           status: "accept_failed",
           errors,
@@ -358,10 +358,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    return json<ActionData>({ status: "accepted" }, { headers: authContext.headers });
+    return routeData<ActionData>({ status: "accepted" }, { headers: authContext.headers });
   }
 
-  return json<ActionData>({ status: "error", error: "Invalid action type" }, { headers, status: 400 });
+  return routeData<ActionData>({ status: "error", error: "Invalid action type" }, { headers, status: 400 });
 };
 
 interface VerifiedNewUserProps {

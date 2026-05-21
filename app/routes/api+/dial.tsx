@@ -1,6 +1,6 @@
 import Twilio from 'twilio';
 import { createSupabaseServerClient, verifyAuth } from '@/lib/supabase.server';
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server";
+import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server';
 import type { ActionFunctionArgs } from "react-router";
 import type { TablesInsert, Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";

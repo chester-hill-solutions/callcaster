@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         .order("created_at", { ascending: false })
         .limit(10);
 
-    return data({ 
+    return routeData({ 
         user: userData, 
         workspaces, 
         users, 
@@ -97,13 +98,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .eq("id", workspaceId);
 
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
+        return routeData({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
     }
 
-    return data({ error: "Invalid action" });
+    return routeData({ error: "Invalid action" });
 };
 
 export default function Admin() {

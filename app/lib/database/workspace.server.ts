@@ -27,7 +27,7 @@ import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "../logger.server";
-import { data } from "react-router";
+import { data as routeData } from "react-router";
 import { createStripeContact } from "./stripe.server";
 import { AppError, ErrorCode } from "@/lib/errors.server";
 import {
@@ -1273,11 +1273,11 @@ export async function handleExistingUserSession(
     .select()
     .eq("user_id", serverSession.user.id);
   if (inviteError)
-    return data(
+    return routeData(
       { error: inviteError, newSession: null, invites: [] },
       { headers },
     );
-  return data({ newSession: serverSession, invites, error: null }, { headers });
+  return routeData({ newSession: serverSession, invites, error: null }, { headers });
 }
 
 export async function handleNewUserOTPVerification(
@@ -1287,7 +1287,7 @@ export async function handleNewUserOTPVerification(
   headers: Headers,
 ) {
   if (!token_hash) {
-    return data({ error: "Invalid invitation link" }, { headers });
+    return routeData({ error: "Invalid invitation link" }, { headers });
   }
 
   const { data, error } = await supabaseClient.auth.verifyOtp({
@@ -1300,25 +1300,25 @@ export async function handleNewUserOTPVerification(
       | "email_change",
   });
 
-  if (error) return data({ error }, { headers });
+  if (error) return routeData({ error }, { headers });
 
   const newSession = data.session;
 
   if (newSession) {
     const { error: sessionError } =
       await supabaseClient.auth.setSession(newSession);
-    if (sessionError) return data({ error: sessionError }, { headers });
+    if (sessionError) return routeData({ error: sessionError }, { headers });
 
     const { data: invites, error: inviteError } = await supabaseClient
       .from("workspace_invite")
       .select()
       .eq("user_id", newSession.user.id);
 
-    if (inviteError) return data({ error: inviteError }, { headers });
+    if (inviteError) return routeData({ error: inviteError }, { headers });
 
-    return data({ newSession, invites }, { headers });
+    return routeData({ newSession, invites }, { headers });
   } else {
-    return data({ error: "Failed to create session" }, { headers });
+    return routeData({ error: "Failed to create session" }, { headers });
   }
 }
 

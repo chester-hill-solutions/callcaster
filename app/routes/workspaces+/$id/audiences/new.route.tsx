@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, redirect } from "react-router";
-import { Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
@@ -16,7 +17,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const workspaceId = params.id;
 
   if (workspaceId == null) {
-    return data(
+    return routeData(
       {
         success: false,
         error: "Workspace not found",
@@ -31,7 +32,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
 
   if (!audienceName) {
-    return data(
+    return routeData(
       {
         success: false,
         error: "Audience name is required",
@@ -54,7 +55,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         .single();
 
       if (audienceError) {
-        return data(
+        return routeData(
           {
             success: false,
             error: audienceError.message,
@@ -69,7 +70,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return data({ success: false, error: "Form Action not recognized" }, { headers });
+  return routeData({ success: false, error: "Form Action not recognized" }, { headers });
 }
 
 export default function AudiencesNew() {

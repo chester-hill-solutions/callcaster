@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params["id"];
   if (workspaceId == null) {
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         scripts: null,
         error: "Workspace does not exist",
@@ -87,7 +88,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       .map((error) => error.message)
       .join(", ");
 
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         scripts: null,
         error: errorMessage,
@@ -97,7 +98,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   }
 
-  return json<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
+  return routeData<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -108,7 +109,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const idValue = data["id"];
   if (!idValue) {
-    return data({ error: "Script ID is required" }, { status: 400 });
+    return routeData({ error: "Script ID is required" }, { status: 400 });
   }
 
   const { data: script, error: scriptError } = await supabaseClient
@@ -119,11 +120,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (scriptError) {
     logger.error("Error fetching script:", scriptError);
-    return data({ error: "Error fetching script" }, { status: 500 });
+    return routeData({ error: "Error fetching script" }, { status: 500 });
   }
 
   if (!script) {
-    return data({ error: "Script not found" }, { status: 404 });
+    return routeData({ error: "Script not found" }, { status: 404 });
   }
 
   const scriptJson = JSON.stringify(script.steps, null, 2);
@@ -132,7 +133,7 @@ export async function action({ request }: ActionFunctionArgs) {
     ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
     : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
 
-  return data(
+  return routeData(
     {
       fileContent: scriptJson,
       fileName: fileName,

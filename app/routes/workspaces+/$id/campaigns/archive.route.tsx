@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, useOutletContext, Link } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { Campaign } from "@/lib/types";
@@ -32,7 +33,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     logger.error("Error fetching archived campaigns:", error);
   }
 
-  return data(
+  return routeData(
     { archivedCampaigns: archivedCampaigns || [] },
     { headers }
   );

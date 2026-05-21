@@ -1,4 +1,6 @@
-import {  } from "react-router";
+
+
+import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
@@ -38,7 +40,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const buffer = await audioFile.arrayBuffer();
     try {
         const transcriptionResult = await transcribeAudio(buffer); */
-        return data({ status: 'OK' });
+        return routeData({ status: 'OK' });
    /*  } catch (error) {
         console.error('Error transcribing audio:', error);
         return new Response("Failed to transcribe audio", { status: 500 });

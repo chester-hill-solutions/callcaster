@@ -1,5 +1,6 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { useLoaderData, useActionData, Form, Link } from "react-router";
+
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useActionData, Form, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         throw redirect("/admin?tab=users");
     }
 
-    return data({ 
+    return routeData({ 
         currentUser: userData,
         targetUser
     });
@@ -69,7 +70,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const userId = params.userId;
     
     if (!userId) {
-        return data({ error: "User ID is required" });
+        return routeData({ error: "User ID is required" });
     }
 
     const formData = await request.formData();
@@ -82,7 +83,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const accessLevel = formData.get("accessLevel") as string;
 
         if (!username) {
-            return data({ error: "Username is required" });
+            return routeData({ error: "Username is required" });
         }
 
         const { error } = await supabaseClient
@@ -96,13 +97,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq("id", userId);
             
         if (error) {
-            return data({ error: error.message });
+            return routeData({ error: error.message });
         }
 
-        return data({ success: "User updated successfully" });
+        return routeData({ success: "User updated successfully" });
     }
 
-    return data({ error: "Invalid action" });
+    return routeData({ error: "Invalid action" });
 };
 
 export default function EditUser() {

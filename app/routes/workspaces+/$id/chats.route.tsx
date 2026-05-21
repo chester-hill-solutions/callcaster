@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { NavLink, Outlet, useFetcher, useLoaderData, useLocation, useNavigate, useOutlet, useOutletContext, useParams, useSearchParams, useRouteError } from "react-router";
 import { MdAdd, MdChat } from "react-icons/md";
 import { Button } from "@/components/ui/button";
@@ -624,7 +624,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       typeof contactError.message === "string"
         ? contactError.message
         : "Failed to load contact";
-    return data(
+    return routeData(
       {
         campaigns: smsCampaigns,
         chats: [],
@@ -657,7 +657,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     },
   );
 
-  return data(
+  return routeData(
     {
       campaigns: smsCampaigns,
       workspaceNumbers: workspaceNumbers?.data ?? [],
@@ -703,7 +703,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     user: user as unknown as BaseUser,
   });
   if (!params.contact_number) return redirect(contact_number);
-  return data({ responseData });
+  return routeData({ responseData });
 }
 
 export default function ChatsList() {

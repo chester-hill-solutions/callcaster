@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 
@@ -19,16 +19,16 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const message = String(data.message ?? "").trim();
 
     if (!email) {
-      return data({ error: "Email is required" }, { status: 400 });
+      return routeData({ error: "Email is required" }, { status: 400 });
     }
     if (!EMAIL_REGEX.test(email)) {
-      return data({ error: "Invalid email format" }, { status: 400 });
+      return routeData({ error: "Invalid email format" }, { status: 400 });
     }
     if (name.length > MAX_NAME_LENGTH) {
-      return data({ error: "Name is too long" }, { status: 400 });
+      return routeData({ error: "Name is too long" }, { status: 400 });
     }
     if (message.length > MAX_MESSAGE_LENGTH) {
-      return data({ error: "Message is too long" }, { status: 400 });
+      return routeData({ error: "Message is too long" }, { status: 400 });
     }
 
     const result = await resend.emails.send({
@@ -40,9 +40,9 @@ export const action = async ({ request, params }: { request: Request, params: { 
       html: `<p>From: ${name}.</p><br/>${message}`,
     });
 
-    return data({ success: true, message: "Email sent", result });
+    return routeData({ success: true, message: "Email sent", result });
   } catch (error) {
     logger.error('Error processing contact form:', error);
-    return data({ error: 'Failed to process message' }, { status: 500 });
+    return routeData({ error: 'Failed to process message' }, { status: 500 });
   }
 };

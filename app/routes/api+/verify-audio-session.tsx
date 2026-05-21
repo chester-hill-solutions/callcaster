@@ -1,4 +1,4 @@
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import Twilio from "twilio";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
@@ -8,7 +8,7 @@ import { normalizePhoneNumber } from "@/lib/utils";
 export const loader = async ({ request }: { request: Request }) => {
     const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
     if (!user) {
-        return data({ error: "Unauthorized" }, { status: 401 });
+        return routeData({ error: "Unauthorized" }, { status: 401 });
     }
     const url = new URL(request.url);
     const workspace_id = url.searchParams.get('workspace_id') as string;
@@ -32,7 +32,7 @@ export const loader = async ({ request }: { request: Request }) => {
         .select()
         .single();
     if (verificationError) {
-        return data({ error: verificationError.message }, { status: 500 });
+        return routeData({ error: verificationError.message }, { status: 500 });
     }
 
     try {
@@ -44,7 +44,7 @@ export const loader = async ({ request }: { request: Request }) => {
             method: 'GET',
         });
 
-        return data({ 
+        return routeData({ 
             success: true, 
             verificationId: verificationData.id,
             callSid: call.sid,
@@ -59,7 +59,7 @@ export const loader = async ({ request }: { request: Request }) => {
             .delete()
             .eq('id', verificationData.id);
             
-        return data({ error: error.message }, { status: 500 });
+        return routeData({ error: error.message }, { status: 500 });
     }
 }
 

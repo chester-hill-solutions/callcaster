@@ -1,5 +1,7 @@
-import { redirect } from "react-router";
-import { Form, NavLink, useActionData } from "react-router";
+
+
+import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { AuthCard } from "@/components/shared/AuthCard";
@@ -7,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+
 import { logger } from "@/lib/logger.server";
 import { Text } from "@/components/ui/typography";
 
@@ -32,7 +34,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect("/workspaces", { headers });
   }
   logger.error("Sign-in error", error);
-  return data({ error: error.message });
+  return routeData({ error: error.message });
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -42,7 +44,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (user) {
     return redirect("/workspaces", { headers });
   }
-  return data({ user }, { headers });
+  return routeData({ user }, { headers });
 };
 
 export default function SignIn() {

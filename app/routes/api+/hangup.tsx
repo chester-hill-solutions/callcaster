@@ -1,5 +1,5 @@
-import {  } from "react-router";
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server";
+import { data as routeData } from "react-router";
+import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server';
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { isAssignedToUser } from "@/lib/queue-status";
@@ -13,7 +13,7 @@ export const action = async ({ request }: { request: Request }) => {
         typeof data.workspaceId === "string" ? data.workspaceId : null;
     const callSid = typeof data.callSid === "string" ? data.callSid : null;
     if (!workspaceId || !callSid) {
-        return data({ success: false, message: "Invalid hangup payload" }, { status: 400 });
+        return routeData({ success: false, message: "Invalid hangup payload" }, { status: 400 });
     }
     try {
         await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId });
@@ -74,10 +74,10 @@ export const action = async ({ request }: { request: Request }) => {
         if (realtime) {
             supabase.removeChannel(realtime);
         }
-        return data({ success: true });
+        return routeData({ success: true });
    
     } catch (error) {
         logger.error('Error hanging up call:', error);
-        return data({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
+        return routeData({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
     }
 };

@@ -1,4 +1,4 @@
-import { data, redirect } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
@@ -112,7 +112,7 @@ export function createErrorResponse(
 
   logger.error("Error response:", errorResponse, error);
 
-  return data(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
+  return routeData(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
 }
 
 /**

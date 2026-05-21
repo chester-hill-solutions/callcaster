@@ -1,5 +1,6 @@
-import { LoaderFunctionArgs } from "react-router";
-import { Link, NavLink, useLoaderData, useSearchParams } from "react-router";
+
+
+import { data as routeData, LoaderFunctionArgs, Link, NavLink, useLoaderData, useSearchParams } from "react-router";
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
@@ -73,7 +74,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     const workspaceId = params.id;
     if (!workspaceId) {
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace: null,
@@ -98,7 +99,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         workspaceId,
       )
     ) {
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace: null,
@@ -188,7 +189,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Check for workspace access
     if (!userRole) {
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace: null,
@@ -209,7 +210,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Check if workspace exists
     if (workspaceError || !workspace) {
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace: null,
@@ -232,7 +233,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const errors = [contactError, countError, flagsError].filter(Boolean);
     if (errors.length > 0) {
       logger.error("Database errors:", errors);
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace,
@@ -256,7 +257,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Validate page number
     if (page > totalPages && totalPages > 0) {
-      return data(
+      return routeData(
         {
           contacts: null,
           workspace,
@@ -275,7 +276,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       );
     }
 
-    return data(
+    return routeData(
       {
         contacts: contacts || [],
         workspace,
@@ -295,7 +296,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   } catch (error) {
     logger.error("Unexpected error in contacts loader:", error);
-    return data(
+    return routeData(
       {
         contacts: null,
         workspace: null,

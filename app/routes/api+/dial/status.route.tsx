@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { ActionFunction, ActionFunctionArgs } from "react-router";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server";
+import { data as routeData, ActionFunction, ActionFunctionArgs } from "react-router";
+import { createWorkspaceTwilioInstance } from '@/lib/database.server';
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { env } from "@/lib/env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
@@ -18,7 +18,7 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
   const callStatusValue = formData.get("CallStatus");
 
   if (!callSidValue || typeof callSidValue !== "string") {
-    return data({ success: false, error: "CallSid is required and must be a string" });
+    return routeData({ success: false, error: "CallSid is required and must be a string" });
   }
 
   const callSid = callSidValue;
@@ -33,7 +33,7 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
       .single();
     if (callError) throw callError;
     if (!dbCall) {
-      return data({ success: false, error: "Call not found" });
+      return routeData({ success: false, error: "Call not found" });
     }
 
     const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
@@ -42,7 +42,7 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
     if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return data({ error: "Invalid Twilio signature" }, { status: 403 });
+      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
     const twilio = await createWorkspaceTwilioInstance({
@@ -56,7 +56,7 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
       .single();
     if (campaignError) throw campaignError;
     if (!campaign) {
-      return data({ success: false, error: "Campaign not found" });
+      return routeData({ success: false, error: "Campaign not found" });
     }
 
     const { data: voicemailData, error: voicemailError } = campaign.voicemail_file
@@ -85,7 +85,7 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
           await call.update({
             twiml: `<Response><Pause length="5"/><Play>${voicemailData.signedUrl}</Play></Response>`,
           });
-          return data({ success: true });
+          return routeData({ success: true });
         } else {
           const { error: outreachError } = await supabase
             .from("outreach_attempt")
@@ -96,12 +96,12 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
           await call.update({
             twiml: `<Response><Hangup/></Response>`,
           });
-          return data({ success: true });
+          return routeData({ success: true });
         }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to handle voicemail";
-        return data({ success: false, error: errorMessage });
+        return routeData({ success: false, error: errorMessage });
       }
     } else {
       const { data: callData, error: callUpsertError } = await supabase
@@ -115,11 +115,11 @@ export const action: ActionFunction = async ({ request }: ActionFunctionArgs) =>
         .eq("id", dbCall.outreach_attempt_id)
         .select();
       if (attemptError) throw attemptError;
-      return data({ success: true, data: callData, attempt });
+      return routeData({ success: true, data: callData, attempt });
     }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "An unexpected error occurred";
-    return data({ success: false, error: errorMessage });
+    return routeData({ success: false, error: errorMessage });
   }
 };

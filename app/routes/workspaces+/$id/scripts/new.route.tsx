@@ -1,6 +1,5 @@
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
 import React, { useEffect, useState } from "react";
-import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
 
 import { MdAdd, MdClose } from "react-icons/md";
 import { toast } from "sonner";
@@ -17,7 +16,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const ref = search.get("ref") || null;
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return data(
+    return routeData(
       { workspace: null, error: "Workspace does not exist" },
       { headers },
     );
@@ -38,10 +37,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", workspaceId)
     .single();
   if (workspaceError) {
-    return data({ workspace: null, error: workspaceError }, { headers });
+    return routeData({ workspace: null, error: workspaceError }, { headers });
   }
 
-  return data(
+  return routeData(
     { workspace: workspaceData, error: null, ref: ref || null, campaignType },
     { headers },
   );
@@ -52,7 +51,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return data(
+    return routeData(
       { success: false, error: "Workspace does not exist" },
       { headers },
     );
@@ -65,7 +64,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const refValue = formData.get("ref");
 
   if (!nameValue || typeof nameValue !== "string") {
-    return data(
+    return routeData(
       { success: false, error: "Script name is required" },
       { headers },
     );
@@ -81,7 +80,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const stepsContent = await stepsFileValue.text();
       steps = JSON.parse(stepsContent) as Record<string, unknown>;
     } catch (error) {
-      return data(
+      return routeData(
         { success: false, error: "Invalid JSON file for steps" },
         { headers },
       );
@@ -102,7 +101,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   if (ref && data && data.length > 0) {
     const createdScript = data[0];
     if (!createdScript) {
-      return data(
+      return routeData(
         { success: false, error: "Failed to create script" },
         { headers },
       );
@@ -114,7 +113,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       .eq("campaign_id", Number(ref) || 0)
       .select();
     if (updateError) {
-      return data(
+      return routeData(
         { success: false, error: updateError },
         { headers },
       );
@@ -122,17 +121,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   if (error) {
-    return data({ success: false, error: error }, { headers });
+    return routeData({ success: false, error: error }, { headers });
   }
 
   if (!data || data.length === 0) {
-    return data(
+    return routeData(
       { success: false, error: "Failed to create script" },
       { headers },
     );
   }
 
-  return data({ data, success: true, error: null }, { headers });
+  return routeData({ data, success: true, error: null }, { headers });
 }
 
 export default function NewScript() {

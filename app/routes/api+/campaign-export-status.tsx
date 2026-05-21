@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs } from "react-router";
+import { data as routeData, LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
@@ -6,7 +6,7 @@ import { requireWorkspaceAccess } from "@/lib/database.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
-    return data({ error: "Unauthorized" }, { status: 401 });
+    return routeData({ error: "Unauthorized" }, { status: 401 });
   }
   
   try {
@@ -15,7 +15,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const workspaceId = url.searchParams.get("workspaceId");
     
     if (!exportId || !workspaceId) {
-      return data({ error: "Missing required parameters" }, { status: 400 });
+      return routeData({ error: "Missing required parameters" }, { status: 400 });
     }
 
     // Defense-in-depth: ensure the requesting user can access the workspace whose
@@ -29,7 +29,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     if (downloadError) {
       if (downloadError.message.includes("Object not found")) {
-        return data({ error: "Export not found" }, { status: 404 });
+        return routeData({ error: "Export not found" }, { status: 404 });
       }
       throw downloadError;
     }
@@ -38,10 +38,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const statusData = await statusFile.text();
     const status = JSON.parse(statusData);
     
-    return data(status);
+    return routeData(status);
   } catch (error) {
     logger.error("Status check error:", error);
-    return data({ 
+    return routeData({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500 });
   }

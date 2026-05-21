@@ -18,7 +18,7 @@ describe("startConferenceAndDial", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, conferenceName: "c1" })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: true })));
 
-    const mod = await import("../app/lib/startConferenceAndDial");
+    const mod = await import("../app/lib/services/hooks-api");
     await mod.startConferenceAndDial("u1", 1, "w1");
 
     expect(fetch).toHaveBeenNthCalledWith(
@@ -36,7 +36,7 @@ describe("startConferenceAndDial", () => {
 
   test("logs errors when either step fails", async () => {
     (fetch as any).mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: "nope" })));
-    const mod = await import("../app/lib/startConferenceAndDial");
+    const mod = await import("../app/lib/services/hooks-api");
     await mod.startConferenceAndDial("u1", 1, "w1");
     expect(console.error).toHaveBeenCalledWith("Failed to start conference:", "nope");
 
@@ -44,14 +44,14 @@ describe("startConferenceAndDial", () => {
     (fetch as any)
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, conferenceName: "c1" })))
       .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: "bad" })));
-    const mod2 = await import("../app/lib/startConferenceAndDial");
+    const mod2 = await import("../app/lib/services/hooks-api");
     await mod2.startConferenceAndDial("u1", 1, "w1");
     expect(console.error).toHaveBeenCalledWith("Failed to dial numbers:", "bad");
   });
 
   test("catches thrown errors", async () => {
     (fetch as any).mockRejectedValueOnce(new Error("network"));
-    const mod = await import("../app/lib/startConferenceAndDial");
+    const mod = await import("../app/lib/services/hooks-api");
     await mod.startConferenceAndDial("u1", 1, "w1");
     expect(console.error).toHaveBeenCalledWith(
       "Error during conference setup and dialing:",

@@ -1,5 +1,5 @@
 import { Resend } from "resend";
-import {  } from "react-router";
+import { data as routeData } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
@@ -20,12 +20,12 @@ export const action = async ({ request, params }: { request: Request, params: { 
       text: `An error occured which needs your attention\n\n: ${JSON.stringify({error, user: user})}`,
     });
     
-    return data( { success: true, message: "Error Report Sent"}, { status: 200, headers: {
+    return routeData( { success: true, message: "Error Report Sent"}, { status: 200, headers: {
       'Content-Type': 'application/json'
     } });
   } catch (error) {
     logger.error('Error processing error report:', error);
-    return data({ error: 'Failed to process error report' }, { status: 500, headers: {
+    return routeData({ error: 'Failed to process error report' }, { status: 500, headers: {
       'Content-Type': 'application/json'
     } });
   }

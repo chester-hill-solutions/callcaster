@@ -1,6 +1,8 @@
-import {  } from "react-router";
-import twilio from "twilio";
+
+import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
+import twilio from "twilio";
+
 import { verifyAuth } from "@/lib/supabase.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
@@ -9,7 +11,7 @@ import { logger } from "@/lib/logger.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient: supabase, user } = await verifyAuth(request);
   if (!user) {
-    return data({ error: "Unauthorized" }, { status: 401 });
+    return routeData({ error: "Unauthorized" }, { status: 401 });
   }
 
   const url = new URL(request.url);
@@ -17,7 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const clientIdentity = url.searchParams.get("client_identity") ?? "";
 
   if (!workspace || !clientIdentity) {
-    return data(
+    return routeData(
       { error: "workspace and client_identity are required" },
       { status: 400 }
     );
@@ -36,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     .single();
 
   if (error || !data) {
-    return data({ error: "Workspace not found" }, { status: 404 });
+    return routeData({ error: "Workspace not found" }, { status: 404 });
   }
 
   const twilioData = (data.twilio_data ?? {}) as Record<string, unknown>;
@@ -57,5 +59,5 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
   token.addGrant(voiceGrant);
   logger.debug("Generated handset Twilio token");
-  return data({ token: token.toJwt() });
+  return routeData({ token: token.toJwt() });
 };

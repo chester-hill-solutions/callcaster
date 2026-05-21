@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Await, Form, useActionData, useLoaderData } from "react-router";
 import { Suspense, useEffect } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -280,7 +280,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         throw redirect("/admin?tab=workspaces");
     }
 
-    return data({
+    return routeData({
         twilioData: loadTwilioData(supabaseClient, workspaceId),
     });
 };
@@ -304,7 +304,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
-        return data({ error: "Workspace ID is required" }, { status: 400 });
+        return routeData({ error: "Workspace ID is required" }, { status: 400 });
     }
 
     const formData = await request.formData();
@@ -316,10 +316,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 supabaseClient,
                 workspaceId,
             });
-            return data({ success: "Twilio sync completed for this workspace" });
+            return routeData({ success: "Twilio sync completed for this workspace" });
         } catch (error) {
             logger.error("Error syncing Twilio workspace snapshot:", error);
-            return data(
+            return routeData(
                 { error: error instanceof Error ? error.message : "Failed to sync Twilio workspace" },
                 { status: 500 },
             );
@@ -333,10 +333,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 workspaceId,
                 actorUserId: user.id,
             });
-            return data({ success: "Workspace messaging bootstrap completed" });
+            return routeData({ success: "Workspace messaging bootstrap completed" });
         } catch (error) {
             logger.error("Error bootstrapping workspace messaging:", error);
-            return data(
+            return routeData(
                 { error: error instanceof Error ? error.message : "Failed to bootstrap workspace messaging" },
                 { status: 500 },
             );
@@ -350,10 +350,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 workspaceId,
                 actorUserId: user.id,
             });
-            return data({ success: "Workspace A2P provisioning started" });
+            return routeData({ success: "Workspace A2P provisioning started" });
         } catch (error) {
             logger.error("Error provisioning workspace A2P:", error);
-            return data(
+            return routeData(
                 { error: error instanceof Error ? error.message : "Failed to provision workspace A2P" },
                 { status: 500 },
             );
@@ -429,10 +429,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                         ? (formData.get("rcsStatus") as "not_started" | "collecting_business" | "provisioning" | "submitting" | "in_review" | "approved" | "rejected" | "live")
                         : "in_review",
             });
-            return data({ success: "Workspace RCS state updated" });
+            return routeData({ success: "Workspace RCS state updated" });
         } catch (error) {
             logger.error("Error updating workspace RCS state:", error);
-            return data(
+            return routeData(
                 { error: error instanceof Error ? error.message : "Failed to update workspace RCS state" },
                 { status: 500 },
             );
@@ -440,7 +440,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (actionName !== "update_twilio_portal") {
-        return data({ error: "Invalid action" }, { status: 400 });
+        return routeData({ error: "Invalid action" }, { status: 400 });
     }
 
     try {
@@ -462,10 +462,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             },
         });
 
-        return data({ success: "Twilio portal settings updated" });
+        return routeData({ success: "Twilio portal settings updated" });
     } catch (error) {
         logger.error("Error updating Twilio portal settings:", error);
-        return data(
+        return routeData(
             { error: error instanceof Error ? error.message : "Failed to update Twilio portal settings" },
             { status: 500 },
         );
