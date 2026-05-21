@@ -1,16 +1,16 @@
 import { capitalize } from "@/lib/utils";
 
-import { Link, NavLink } from "@remix-run/react";
+import { Link, NavLink } from "react-router";
 import { FaTimes } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceInvite } from "@/lib/types";
-import { TypedResponse } from "@remix-run/node";
+import {  } from "react-router";
 
 type MobileMenuProps = {
   isSignedIn: boolean;
   user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   handleSignOut: () => Promise<
-    TypedResponse<{ success: string | null; error: string | null }>
+    { success: string | null; error: string | null }
   >;
   onClose: () => void;
 };

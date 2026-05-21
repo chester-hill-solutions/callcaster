@@ -40,7 +40,7 @@ interface QueueContentProps {
   supabase: SupabaseClient;
   selectedAudienceIds: number[];
   campaignId: string;
-  queueFetcher: ReturnType<typeof import("@remix-run/react").useFetcher>;
+  queueFetcher: ReturnType<typeof import("react-router").useFetcher>;
 }
 
 export function QueueContent({

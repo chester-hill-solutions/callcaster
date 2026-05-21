@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 let user: null | { id: string } = { id: "u1" };
 let downloadMode:
   | { kind: "ok"; statusJson: any }
@@ -84,39 +86,39 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 401 when no user", async () => {
     user = null;
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any);
+    } as any));
     expect(res.status).toBe(401);
   });
 
   test("returns 400 when params missing", async () => {
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any);
+    } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 400 when uploadId invalid", async () => {
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=not-a-number&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 500 when storage download errors", async () => {
     downloadMode = { kind: "error", message: "nope" };
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       file_name: "f.csv",
@@ -127,12 +129,12 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 when upload record query errors", async () => {
     uploadMode = { kind: "error", message: "db" };
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "db" });
   });
@@ -149,12 +151,12 @@ describe("api.audience-upload-status loader", () => {
         error_message: null,
       },
     };
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=2&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
@@ -171,24 +173,24 @@ describe("api.audience-upload-status loader", () => {
 
   test("returns 500 with Unknown error when thrown value is not Error", async () => {
     downloadMode = { kind: "throw", value: "boom" };
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Unknown error" });
   });
 
   test("returns 500 with error.message when thrown value is Error", async () => {
     downloadMode = { kind: "throw", value: new Error("boom") };
-    const mod = await import("../app/routes/api.audience-upload-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/audience-upload/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "boom" });
   });

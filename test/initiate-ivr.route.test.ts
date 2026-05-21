@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -23,7 +25,7 @@ vi.mock("../app/lib/utils", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-describe("app/routes/api.initiate-ivr.tsx", () => {
+describe("app/routes/api+/initiate-ivr/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
@@ -40,7 +42,7 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: { rpc: async () => ({ data: null, error: new Error("rpc") }) },
     });
-    const mod = await import("../app/routes/api.initiate-ivr");
+    const mod = await import("../app/routes/api+/initiate-ivr/route");
     await expect(mod.action({ request: new Request("http://x", { method: "POST" }) } as any)).rejects.toThrow("rpc");
   });
 
@@ -52,8 +54,8 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.fetch.mockResolvedValueOnce({
       json: async () => ({ creditsError: true }),
     } as any);
-    const mod = await import("../app/routes/api.initiate-ivr");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/initiate-ivr/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res).toEqual({ creditsError: true });
   });
 
@@ -65,8 +67,8 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     });
     mocks.fetch.mockRejectedValueOnce(new Error("net"));
 
-    const mod = await import("../app/routes/api.initiate-ivr");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/initiate-ivr/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res).toEqual(queue);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error initiating IVR call:", expect.any(Error));
   });

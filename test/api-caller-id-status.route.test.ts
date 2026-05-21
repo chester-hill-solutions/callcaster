@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const supabaseMocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -36,7 +38,7 @@ vi.mock("@/twilio.server", () => ({
     (twilioMocks.validateTwilioWebhookParams as any)(...args),
 }));
 
-describe("app/routes/api.caller-id.status.tsx", () => {
+describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   beforeEach(() => {
     supabaseMocks.createClient.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReset();
@@ -55,16 +57,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
         }),
       }),
     });
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id/status", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
     expect(await res.json()).toMatchObject({
       VerificationStatus: "pending",
       To: "+15555550100",
@@ -94,16 +96,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id/status", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
     expect(await res.json()).toEqual({ id: 1 });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -145,7 +147,7 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("VerificationStatus", "failed");
@@ -156,15 +158,15 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       });
     };
 
-    const r1 = await mod.action({ request: makeReq() } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
     expect(r1.status).toBe(500);
 
     mode = "empty";
-    const r2 = await mod.action({ request: makeReq() } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(500);
 
     mode = "ok";
-    const r3 = await mod.action({ request: makeReq() } as any);
+    const r3 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
     expect(r3.status).toBe(200);
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -192,16 +194,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
 
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id/status", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     const response = res as Response;
     expect(response.status).toBe(403);
@@ -219,16 +221,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id/status", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     const response = res as Response;
     expect(response.status).toBe(500);
@@ -243,16 +245,16 @@ describe("app/routes/api.caller-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api.caller-id.status");
+    const mod = await import("../app/routes/api+/call/routeer-id.status");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id/status", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     const response = res as Response;
     expect(response.status).toBe(403);

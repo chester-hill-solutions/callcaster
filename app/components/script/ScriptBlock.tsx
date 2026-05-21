@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { Block, BlockOption, IVRBlock, IVROption, Page } from "@/lib/types";
 import {
   Popover,

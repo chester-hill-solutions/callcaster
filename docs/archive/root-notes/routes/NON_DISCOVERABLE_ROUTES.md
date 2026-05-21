@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Non-Discoverable Routes
 
 This document lists all route files that exist in the codebase but are **NOT discoverable** through normal navigation flow starting from `_index.tsx`.

@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { Button } from "@/components/ui/button";
 

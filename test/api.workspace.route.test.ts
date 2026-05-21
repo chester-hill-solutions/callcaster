@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   verifyAuth: vi.fn(),
@@ -34,7 +36,7 @@ vi.mock("@/lib/errors.server", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-describe("app/routes/api.workspace.tsx", () => {
+describe("app/routes/api+/workspace/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -68,14 +70,14 @@ describe("app/routes/api.workspace.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValue({ workspace_id: "w1", update: {} });
 
-    const mod = await import("../app/routes/api.workspace");
-    const response = await mod.action({
+    const mod = await import("../app/routes/api+/workspace/route");
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(updateSpy).not.toHaveBeenCalled();
-    expect(response).toBeInstanceOf(Response);
-    await expect((response as Response).json()).resolves.toMatchObject({
+    expect(response.status).toEqual(expect.any(Number));
+    await expect(response.json()).resolves.toMatchObject({
       id: "w1",
       twilio_data: { authToken: "token" },
     });
@@ -122,7 +124,7 @@ describe("app/routes/api.workspace.tsx", () => {
       update: { onboardingStatus: "enabled" },
     });
 
-    const mod = await import("../app/routes/api.workspace");
+    const mod = await import("../app/routes/api+/workspace/route");
     await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any);

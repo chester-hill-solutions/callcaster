@@ -19,7 +19,7 @@ import {
   MdDialpad,
   MdRemove,
 } from "react-icons/md";
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { EditResponseModal } from "@/components/question/QuestionCard.ResponseTable.EditModal";
 const questionTypes = [
   { value: "synthetic", label: "Synthetic" },

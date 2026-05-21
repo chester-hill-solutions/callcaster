@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Component Reorganization Plan
 
 ## Overview

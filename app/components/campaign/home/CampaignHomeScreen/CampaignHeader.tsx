@@ -1,4 +1,4 @@
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { MdCampaign } from "react-icons/md";
 import { Badge } from "@/components/ui/badge";
 import { Enums } from "@/lib/database.types";

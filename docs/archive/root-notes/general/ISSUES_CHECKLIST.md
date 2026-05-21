@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Code Review Issues Checklist
 
 ## 🔴 CRITICAL - Fix Immediately

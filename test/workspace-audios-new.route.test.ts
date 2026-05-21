@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   class AudioUploadError extends Error {
     status: number;
@@ -54,7 +56,7 @@ function makeSupabase(opts?: { uploadError?: unknown }) {
   };
 }
 
-describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
+describe("app/routes/workspaces+/route+/route_.$id.audios_.new.tsx action", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.getSafeMediaBaseName.mockClear();
@@ -76,7 +78,7 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       extension: "mp3",
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routes/workspaces+/$id/audios/new/route");
     const formData = new FormData();
     formData.set("media-name", " Greeting ");
     formData.set(
@@ -84,13 +86,13 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       new File(["source-audio"], "greeting.m4a", { type: "audio/mp4" }),
     );
 
-    const response = await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any);
+    } as any));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -117,17 +119,17 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       headers: new Headers(),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routes/workspaces+/$id/audios/new/route");
     const formData = new FormData();
     formData.set("media-name", "Greeting");
 
-    const response = await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any);
+    } as any));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -148,7 +150,7 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       new mocks.AudioUploadError("Unsupported audio format.", 400),
     );
 
-    const mod = await import("../app/routes/workspaces_.$id.audios_.new");
+    const mod = await import("../app/routes/workspaces+/$id/audios/new/route");
     const formData = new FormData();
     formData.set("media-name", "Greeting");
     formData.set(
@@ -156,13 +158,13 @@ describe("app/routes/workspaces_.$id.audios_.new.tsx action", () => {
       new File(["bogus"], "bad.ogg", { type: "audio/ogg" }),
     );
 
-    const response = await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any);
+    } as any));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({

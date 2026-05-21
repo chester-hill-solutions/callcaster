@@ -1,21 +1,16 @@
-import type {
-  LinksFunction,
-  LoaderFunctionArgs,
-  TypedResponse,
-} from "@remix-run/node";
+import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import {
   Links,
-  LiveReload,
   Meta,
   Outlet,
   Params,
   Scripts,
   ScrollRestoration,
-  json,
+  data,
   redirect,
   useLoaderData,
   useNavigate,
-} from "@remix-run/react";
+} from "react-router";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
@@ -24,7 +19,7 @@ import { createSupabaseServerClient } from "@/lib/supabase.server";
 import Navbar from "@/components/layout/Navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
-import stylesheet from "@/tailwind.css";
+import stylesheet from "@/tailwind.css?url";
 import { Database } from "./lib/database.types";
 
 import { Session } from "@supabase/supabase-js";
@@ -83,7 +78,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: { session } } = await supabase.auth.getSession();
   const user = await supabase.auth.getUser();
   if (!user.data.user) {
-    return json({
+    return data({
       env,
       session,  
       workspaces: null,
@@ -107,7 +102,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const workspaces = workspaceData?.map((data) => data.workspace);
   
-  return json(
+  return data(
     {
       env,
       session,
@@ -136,14 +131,14 @@ export default function App() {
   const serverAccessToken = session?.access_token;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<TypedResponse<{ success: string | null; error: string | null }>> {
+  async function signOut(): Promise<{ success: string | null; error: string | null }> {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
-      return json({ success: null, error: signOutError.message });
+      return data({ success: null, error: signOutError.message });
     }
     navigate("/");
-    return json({ success: "Sign off successful", error: null });
+    return data({ success: "Sign off successful", error: null });
   }
 
   useEffect(() => {
@@ -189,7 +184,6 @@ export default function App() {
           <Toaster position="top-right" richColors visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />
-          <LiveReload />
         </ThemeProvider>
       </body>
     </html>

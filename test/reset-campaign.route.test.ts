@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -12,7 +14,7 @@ vi.mock("@/lib/supabase.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.reset_campaign.tsx", () => {
+describe("app/routes/api+/reset_campaign/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -22,18 +24,18 @@ describe("app/routes/api.reset_campaign.tsx", () => {
   test("returns error when campaign_id missing or not string", async () => {
     const supabaseClient = { rpc: vi.fn() };
     mocks.verifyAuth.mockResolvedValue({ supabaseClient, user: { id: "u1" } });
-    const mod = await import("../app/routes/api.reset_campaign");
+    const mod = await import("../app/routes/api+/reset_campaign/route");
 
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
-    } as any);
+    } as any));
     expect(r1).toEqual({ error: "Missing campaign_id" });
 
     const fd2 = new FormData();
     fd2.set("campaign_id", new File(["x"], "x.txt"));
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd2 }),
-    } as any);
+    } as any));
     expect(r2).toEqual({ error: "Missing campaign_id" });
   }, 30000);
 
@@ -42,10 +44,10 @@ describe("app/routes/api.reset_campaign.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "nope");
-    const mod = await import("../app/routes/api.reset_campaign");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/reset_campaign/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res).toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
@@ -54,7 +56,7 @@ describe("app/routes/api.reset_campaign.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { rpc }, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
-    const mod = await import("../app/routes/api.reset_campaign");
+    const mod = await import("../app/routes/api+/reset_campaign/route");
     await expect(
       mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
     ).rejects.toEqual({ message: "bad" });
@@ -66,10 +68,10 @@ describe("app/routes/api.reset_campaign.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: { rpc }, user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
-    const mod = await import("../app/routes/api.reset_campaign");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/reset_campaign/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res).toEqual({ success: true });
     expect(rpc).toHaveBeenCalledWith("reset_campaign", { campaign_id_prop: 10 });
   }, 30000);

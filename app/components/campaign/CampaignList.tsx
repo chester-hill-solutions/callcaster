@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { FaPlus } from "react-icons/fa";
 import { Card, CardHeader } from "@/components/ui/card";
 import { MemberRole } from "@/components/workspace/TeamMember";

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -20,7 +22,7 @@ vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
 }));
 
-describe("app/routes/api.contact-audience.tsx", () => {
+describe("app/routes/api+/contact-audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -35,10 +37,10 @@ describe("app/routes/api.contact-audience.tsx", () => {
       headers: new Headers({ "X-Test": "1" }),
     });
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "", audience_id: "" });
-    const mod = await import("../app/routes/api.contact-audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/contact-audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(400);
     expect(res.headers.get("X-Test")).toBe("1");
   });
@@ -50,10 +52,10 @@ describe("app/routes/api.contact-audience.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockResolvedValueOnce({ ok: true });
 
-    const mod = await import("../app/routes/api.contact-audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/contact-audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({ ok: true });
@@ -65,20 +67,20 @@ describe("app/routes/api.contact-audience.tsx", () => {
     mocks.parseActionRequest.mockResolvedValueOnce({ contact_id: "2", audience_id: "3" });
     mocks.removeContactFromAudience.mockRejectedValueOnce(new Error("nope"));
 
-    const mod = await import("../app/routes/api.contact-audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/contact-audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(mocks.createErrorResponse).toHaveBeenCalled();
   });
 
   test("non-DELETE returns json(undefined) with headers", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers: new Headers({ "X": "1" }) });
-    const mod = await import("../app/routes/api.contact-audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/contact-audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contact-audience", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("X")).toBe("1");
     await expect(res.text()).resolves.toBe("");

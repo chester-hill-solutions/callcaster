@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     validateTwilioWebhookParams: vi.fn(() => true),
@@ -133,7 +135,7 @@ function makeReq(params: Record<string, string>) {
   });
 }
 
-describe("app/routes/api.call-status.tsx", () => {
+describe("app/routes/api+/call/route-status.tsx", () => {
   let supabase: any;
 
   beforeEach(() => {
@@ -152,19 +154,19 @@ describe("app/routes/api.call-status.tsx", () => {
 
   test("rejects invalid Twilio signature", async () => {
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(403);
   });
 
   test("returns 500 when call upsert fails", async () => {
     supabase._set.upsertError(new Error("upsert"));
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -178,10 +180,10 @@ describe("app/routes/api.call-status.tsx", () => {
       expect(tok).toBe("ws-token");
       return true;
     });
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -195,10 +197,10 @@ describe("app/routes/api.call-status.tsx", () => {
     supabase._set.parentCall({ workspace: "w_parent", outreach_attempt_id: 77 });
     supabase._set.attemptFetchError(new Error("fetch"));
 
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "completed" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "Failed to fetch current attempt" });
   });
@@ -212,10 +214,10 @@ describe("app/routes/api.call-status.tsx", () => {
       parent_call_sid: null,
     });
 
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Duration: "61", CallDuration: "61" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(supabase._realtimeSend).not.toHaveBeenCalled();
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
@@ -228,10 +230,10 @@ describe("app/routes/api.call-status.tsx", () => {
 
   test("updates disposition when transition allowed; returns 500 on updateError", async () => {
     supabase._set.attemptUpdateError(new Error("upd"));
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "Failed to update attempt" });
   });
@@ -240,8 +242,8 @@ describe("app/routes/api.call-status.tsx", () => {
     supabase._set.currentAttempt({ disposition: "in-progress", contact_id: 1, workspace: null });
     supabase._set.upsertRow({ sid: "CA1", outreach_attempt_id: 10, workspace: undefined, parent_call_sid: null });
 
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         call_sid: "CA1",
         call_status: "completed",
@@ -249,7 +251,7 @@ describe("app/routes/api.call-status.tsx", () => {
         duration: "0",
         call_duration: "0",
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
@@ -260,10 +262,10 @@ describe("app/routes/api.call-status.tsx", () => {
       expect(tok).toBe("test");
       return true;
     });
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -274,16 +276,16 @@ describe("app/routes/api.call-status.tsx", () => {
       return true;
     });
 
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", CalledVia: "client:u1" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(supabase._realtimeChannel).toHaveBeenCalledWith("u1");
   });
 
   test("covers lowercase sid/status fallbacks and getString non-string via File", async () => {
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routes/api+/call/route-status");
 
     const fd = new FormData();
     fd.set("call_sid", "CA_FALLBACK");
@@ -294,13 +296,13 @@ describe("app/routes/api.call-status.tsx", () => {
     fd.set("CallDuration", "61");
     fd.set("called_via", "client:u2");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call-status", {
         method: "POST",
         headers: { "x-twilio-signature": "sig" },
         body: fd,
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -313,10 +315,10 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.currentAttempt({ disposition: "completed", contact_id: 1, workspace: null });
 
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy", CalledVia: "client:u3" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.debug).toHaveBeenCalledWith(
       "Skipping outreach disposition transition",
@@ -334,10 +336,10 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.parentCall({ workspace: null, outreach_attempt_id: null });
     supabase._set.currentAttempt(null);
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -350,10 +352,10 @@ describe("app/routes/api.call-status.tsx", () => {
     });
     supabase._set.parentCall(null);
     supabase._set.currentAttempt(null);
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA_CHILD", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -365,10 +367,10 @@ describe("app/routes/api.call-status.tsx", () => {
       workspace: "w1",
       parent_call_sid: null,
     });
-    const mod = await import("../app/routes/api.call-status");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/call/route-status");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "busy" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 });

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   syncWorkspaceTwilioSnapshot: vi.fn(),
@@ -48,7 +50,7 @@ function makeSupabase() {
   };
 }
 
-describe("app/routes/admin.tsx action", () => {
+describe("app/routes/admin+/route+/route.tsx action", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -63,14 +65,14 @@ describe("app/routes/admin.tsx action", () => {
     });
     mocks.syncWorkspaceTwilioSnapshot.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin");
+    const mod = await import("../app/routes/admin+/route");
     const formData = new FormData();
     formData.set("_action", "sync_workspace_twilio");
     formData.set("workspaceId", "w1");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: formData }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     expect(mocks.syncWorkspaceTwilioSnapshot).toHaveBeenCalledWith({
@@ -86,15 +88,15 @@ describe("app/routes/admin.tsx action", () => {
       user: { id: "u1" },
     });
 
-    const mod = await import("../app/routes/admin");
+    const mod = await import("../app/routes/admin+/route");
     const formData = new FormData();
     formData.set("_action", "toggle_workspace_status");
     formData.set("workspaceId", "w2");
     formData.set("currentStatus", "false");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: formData }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     expect(supabaseClient._spies.workspaceUpdateEq).toHaveBeenCalledWith("id", "w2");

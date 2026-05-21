@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useOutletContext } from "@remix-run/react";
+import { useOutletContext } from "react-router";
 import { formatDistanceToNow } from "date-fns";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import { Loader2 } from "lucide-react";

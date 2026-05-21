@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const twilioMocks = vi.hoisted(() => {
   return {
     dialNumber: vi.fn(),
@@ -118,7 +120,7 @@ function makeSupabase(options?: {
   return { from };
 }
 
-describe("app/routes/api.call.tsx", () => {
+describe("app/routes/api+/call/route.tsx", () => {
   beforeEach(() => {
     twilioMocks.dialNumber.mockReset();
     twilioMocks.say.mockReset();
@@ -130,15 +132,15 @@ describe("app/routes/api.call.tsx", () => {
   });
 
   test("action dials when To is phone-like", async () => {
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "+15555550100");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     await res.text();
@@ -156,15 +158,15 @@ describe("app/routes/api.call.tsx", () => {
   });
 
   test("action says invalid when To contains invalid chars", async () => {
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "not-a-phone");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     await res.text();
     expect(twilioMocks.say).toHaveBeenCalledWith(
@@ -177,17 +179,17 @@ describe("app/routes/api.call.tsx", () => {
     supabaseMocks.createClient.mockReturnValue(
       makeSupabase({ activeSession: false, handsetNumber: "+15551230000" }),
     );
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     await res.text();
     expect(twilioMocks.say).toHaveBeenCalledWith(
@@ -204,17 +206,17 @@ describe("app/routes/api.call.tsx", () => {
         handsetNumber: "+15559876543",
       }),
     );
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     await res.text();
@@ -240,17 +242,17 @@ describe("app/routes/api.call.tsx", () => {
         fallbackNumber: "bad",
       }),
     );
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     await res.text();
     expect(twilioMocks.say).toHaveBeenCalledWith(
@@ -260,16 +262,16 @@ describe("app/routes/api.call.tsx", () => {
   });
 
   test("falls back to default dial path when client_identity is missing", async () => {
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     await res.text();
     expect(twilioMocks.dial).toHaveBeenCalledWith(
@@ -278,14 +280,14 @@ describe("app/routes/api.call.tsx", () => {
   });
 
   test("says invalid when To is missing", async () => {
-    const mod = await import("../app/routes/api.call");
+    const mod = await import("../app/routes/api+/call/route");
     const fd = new FormData();
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     await res.text();
     expect(twilioMocks.say).toHaveBeenCalledWith(

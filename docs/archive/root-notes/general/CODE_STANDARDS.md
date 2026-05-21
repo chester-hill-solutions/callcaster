@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Code Standards
 
 This document outlines the coding standards, patterns, and conventions used in the NES Dashboard codebase. All code should follow these guidelines to maintain consistency and quality.

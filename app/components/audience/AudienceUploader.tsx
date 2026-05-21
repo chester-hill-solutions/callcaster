@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "@remix-run/react";
+import { useParams, useNavigate } from "react-router";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck } from "react-icons/md";
 import { Button } from "@/components/ui/button";
@@ -163,7 +163,7 @@ export default function AudienceUploader({
         const response = await fetch(
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspaceId}`
         );
-        const data = await response.json();
+        const data = await response.data();
 
         if (data.error) {
           setPollFailureCount((count) => count + 1);
@@ -290,7 +290,7 @@ export default function AudienceUploader({
         body: formData
       });
       
-      const data = await response.json();
+      const data = await response.data();
       
       if (data.error) {
         throw new Error(data.error);

@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Hooks Quality Improvement Checklist
 
 **Based on**: `HOOKS_QUALITY_EVALUATION.md`  

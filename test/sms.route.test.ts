@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 let currentSupabase: any = null;
 const defaultPortalConfig = {
   trafficClass: "unknown",
@@ -147,7 +149,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.sms.tsx", () => {
+describe("app/routes/api+/sms/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
@@ -172,8 +174,8 @@ describe("app/routes/api.sms.tsx", () => {
   test("returns auth error response", async () => {
     currentSupabase = makeSupabase({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "Unauthorized", status: 401 });
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
@@ -186,8 +188,8 @@ describe("app/routes/api.sms.tsx", () => {
       caller_id: "+15551234567",
       user_id: "u1",
     });
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
   });
@@ -238,8 +240,8 @@ describe("app/routes/api.sms.tsx", () => {
     }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("responses");
@@ -275,8 +277,8 @@ describe("app/routes/api.sms.tsx", () => {
     const create = vi.fn(async (args: any) => ({ sid: "SM2", body: args.body }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ mediaUrl: expect.anything() }));
@@ -300,8 +302,8 @@ describe("app/routes/api.sms.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]).toHaveProperty("3");
@@ -326,8 +328,8 @@ describe("app/routes/api.sms.tsx", () => {
     const create = vi.fn(async () => ({ sid: "should-not-send" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["12"]).toMatchObject({
@@ -355,8 +357,8 @@ describe("app/routes/api.sms.tsx", () => {
     const create = vi.fn(async () => ({ sid: "SM13", body: "Hi", to: "+15551234567" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledTimes(1);
   });
@@ -379,8 +381,8 @@ describe("app/routes/api.sms.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM4", body: "Hi" })) },
     });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["4"].success).toBe(false);
@@ -405,8 +407,8 @@ describe("app/routes/api.sms.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM5", body: "Hi" })) },
     });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["5"].success).toBe(false);
@@ -432,8 +434,8 @@ describe("app/routes/api.sms.tsx", () => {
     const create = vi.fn(async (args: any) => ({ sid: "SM6", body: args.body }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error shortening URL:", expect.anything());
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
@@ -456,8 +458,8 @@ describe("app/routes/api.sms.tsx", () => {
     const create = vi.fn(async (args: any) => ({ sid: "SM6b", body: args.body }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
   });
@@ -503,8 +505,8 @@ describe("app/routes/api.sms.tsx", () => {
       throw new Error(`Unexpected table: ${table}`);
     });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(inserted[0].sid).toBe("failed-+15551234567-123");
     (Date.now as any).mockRestore?.();
@@ -555,8 +557,8 @@ describe("app/routes/api.sms.tsx", () => {
     }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -613,8 +615,8 @@ describe("app/routes/api.sms.tsx", () => {
     }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ messagingServiceSid: "MG123" }),
@@ -642,8 +644,8 @@ describe("app/routes/api.sms.tsx", () => {
     });
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "caller_id is required for this campaign",
@@ -662,8 +664,8 @@ describe("app/routes/api.sms.tsx", () => {
     });
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain("Campaign fetch failed:");
@@ -686,8 +688,8 @@ describe("app/routes/api.sms.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM9", body: "Hi" })) },
     });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
@@ -708,16 +710,16 @@ describe("app/routes/api.sms.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM9b", body: "Hi" })) },
     });
 
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
   test("safeParseJson throws returns 500 with Unknown error handling", async () => {
     currentSupabase = makeSupabase({});
     mocks.safeParseJson.mockRejectedValueOnce("nope");
-    const mod = await import("../app/routes/api.sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/sms/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });

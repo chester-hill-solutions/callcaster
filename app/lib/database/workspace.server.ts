@@ -27,7 +27,7 @@ import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { logger } from "../logger.server";
-import { json } from "@remix-run/node";
+import { data } from "react-router";
 import { createStripeContact } from "./stripe.server";
 import { AppError, ErrorCode } from "@/lib/errors.server";
 import {
@@ -1273,11 +1273,11 @@ export async function handleExistingUserSession(
     .select()
     .eq("user_id", serverSession.user.id);
   if (inviteError)
-    return json(
+    return data(
       { error: inviteError, newSession: null, invites: [] },
       { headers },
     );
-  return json({ newSession: serverSession, invites, error: null }, { headers });
+  return data({ newSession: serverSession, invites, error: null }, { headers });
 }
 
 export async function handleNewUserOTPVerification(
@@ -1287,7 +1287,7 @@ export async function handleNewUserOTPVerification(
   headers: Headers,
 ) {
   if (!token_hash) {
-    return json({ error: "Invalid invitation link" }, { headers });
+    return data({ error: "Invalid invitation link" }, { headers });
   }
 
   const { data, error } = await supabaseClient.auth.verifyOtp({
@@ -1300,25 +1300,25 @@ export async function handleNewUserOTPVerification(
       | "email_change",
   });
 
-  if (error) return json({ error }, { headers });
+  if (error) return data({ error }, { headers });
 
   const newSession = data.session;
 
   if (newSession) {
     const { error: sessionError } =
       await supabaseClient.auth.setSession(newSession);
-    if (sessionError) return json({ error: sessionError }, { headers });
+    if (sessionError) return data({ error: sessionError }, { headers });
 
     const { data: invites, error: inviteError } = await supabaseClient
       .from("workspace_invite")
       .select()
       .eq("user_id", newSession.user.id);
 
-    if (inviteError) return json({ error: inviteError }, { headers });
+    if (inviteError) return data({ error: inviteError }, { headers });
 
-    return json({ newSession, invites }, { headers });
+    return data({ newSession, invites }, { headers });
   } else {
-    return json({ error: "Failed to create session" }, { headers });
+    return data({ error: "Failed to create session" }, { headers });
   }
 }
 

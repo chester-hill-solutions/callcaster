@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Critical Fixes Summary
 
 ## ✅ Completed Critical Issues

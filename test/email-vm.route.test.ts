@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -123,7 +125,7 @@ function makeReq(fields: Record<string, any>) {
   return new Request("http://localhost/api/email-vm", { method: "POST", body: fd });
 }
 
-describe("app/routes/api.email-vm.tsx", () => {
+describe("app/routes/api+/email-vm/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -154,8 +156,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm/route");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -164,7 +166,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         RecordingDuration: "12",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true });
     expect(mocks.sendEmail).toHaveBeenCalledWith(
@@ -197,8 +199,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm/route");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -206,7 +208,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         RecordingSid: "RE1",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
   });
@@ -233,8 +235,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm/route");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -243,7 +245,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         // omit RecordingDuration => duration undefined in webhook payload
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: [""] }),
@@ -256,7 +258,7 @@ describe("app/routes/api.email-vm.tsx", () => {
   });
 
   test("validates required fields and returns 500 on failures", async () => {
-    const mod = await import("../app/routes/api.email-vm");
+    const mod = await import("../app/routes/api+/email-vm/route");
     mocks.createClient.mockReturnValue(makeSupabase());
     mocks.fetch.mockResolvedValue({
       ok: true,
@@ -301,7 +303,7 @@ describe("app/routes/api.email-vm.tsx", () => {
   });
 
   test("covers supabase and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
-    const mod = await import("../app/routes/api.email-vm");
+    const mod = await import("../app/routes/api+/email-vm/route");
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ callError: { message: "call" } }),

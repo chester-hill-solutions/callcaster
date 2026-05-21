@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createSupabaseServerClient: vi.fn(),
@@ -98,7 +100,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.survey-answer.tsx", () => {
+describe("app/routes/api+/survey-answer/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createSupabaseServerClient.mockReset();
@@ -107,17 +109,17 @@ describe("app/routes/api.survey-answer.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-answer");
-    const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
+    const mod = await import("../app/routes/api+/survey-answer/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and invalid survey/contact IDs", async () => {
     mocks.createSupabaseServerClient.mockReturnValue({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
 
     const fd0 = new FormData();
-    const r0 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd0 }) } as any);
+    const r0 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd0 }) } as any));
     expect(r0.status).toBe(400);
 
     const fd1 = new FormData();
@@ -125,7 +127,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(400);
 
     const fd2 = new FormData();
@@ -134,12 +136,12 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
     fd2.set("contactId", "nope");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(400);
   });
 
   test("returns 404 when survey missing or inactive", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ surveyRow: null, surveyError: null }),
@@ -149,7 +151,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
@@ -160,12 +162,12 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(400);
   });
 
   test("unique-violation on survey_response insert fetches existing; update progress error only logs", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({
         insertSurveyResponseError: { code: "23505" },
@@ -179,13 +181,13 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd.set("questionId", "Q1");
     fd.set("resultId", "R1");
     fd.set("pageId", "p1");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error updating survey response:", { message: "upd" });
   });
 
   test("non-unique insert error returns 500; fetch-existing error returns 500", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ insertSurveyResponseError: { code: "X" } }),
@@ -195,7 +197,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(500);
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
@@ -206,7 +208,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(500);
   });
 
@@ -214,21 +216,21 @@ describe("app/routes/api.survey-answer.tsx", () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ insertSurveyResponseData: null, insertSurveyResponseError: null }),
     });
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
     const fd = new FormData();
     fd.set("surveyId", "1");
     fd.set("questionId", "Q1");
     fd.set("resultId", "R1");
     fd.set("pageId", "p1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to create survey response" });
   });
 
   test("returns 404 when question not found; answer insert unique violation updates; update error returns 500", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ questionRow: null, questionError: null }),
@@ -238,7 +240,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
@@ -249,7 +251,7 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(200);
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
@@ -260,12 +262,12 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd3.set("questionId", "Q1");
     fd3.set("resultId", "R1");
     fd3.set("pageId", "p1");
-    const r3 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd3 }) } as any);
+    const r3 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd3 }) } as any));
     expect(r3.status).toBe(500);
   });
 
   test("non-unique answer insert error returns 500; catch returns 500 internal", async () => {
-    const mod = await import("../app/routes/api.survey-answer");
+    const mod = await import("../app/routes/api+/survey-answer/route");
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ answerInsertError: { code: "X" } }),
     });
@@ -274,19 +276,19 @@ describe("app/routes/api.survey-answer.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(500);
 
     // force formData() throw deterministically
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: {
         method: "POST",
         formData: async () => {
           throw new Error("boom");
         },
       } as any,
-    } as any);
+    } as any));
     expect(r2.status).toBe(500);
   });
 });

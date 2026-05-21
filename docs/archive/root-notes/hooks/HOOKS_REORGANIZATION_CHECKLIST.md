@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Hooks Reorganization Checklist
 
 This checklist provides step-by-step tasks to reorganize hooks according to the **Option 1: By Domain/Feature** approach outlined in `HOOKS_ORGANIZATION_PLAN.md`.

@@ -1,6 +1,6 @@
 import { MdEdit, MdRemoveCircleOutline } from "react-icons/md";
 import { Button } from "./ui/button";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 import type { Contact } from "@/lib/types";
 import type { Json } from "@/lib/database.types";
 import { logger } from "@/lib/logger.client";

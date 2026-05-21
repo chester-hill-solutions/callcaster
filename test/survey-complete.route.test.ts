@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createSupabaseServerClient: vi.fn(),
@@ -40,7 +42,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.survey-complete.tsx", () => {
+describe("app/routes/api+/survey-complete/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createSupabaseServerClient.mockReset();
@@ -49,22 +51,22 @@ describe("app/routes/api.survey-complete.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
-    const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
+    const mod = await import("../app/routes/api+/survey-complete/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routes/api+/survey-complete/route");
     const fd = new FormData();
     fd.set("surveyId", "S1");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 404 when survey not found and 400 when inactive", async () => {
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routes/api+/survey-complete/route");
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ survey: null, surveyError: null }),
@@ -72,7 +74,7 @@ describe("app/routes/api.survey-complete.tsx", () => {
     const fd1 = new FormData();
     fd1.set("surveyId", "S1");
     fd1.set("resultId", "R1");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
     mocks.createSupabaseServerClient.mockReturnValueOnce({
@@ -81,12 +83,12 @@ describe("app/routes/api.survey-complete.tsx", () => {
     const fd2 = new FormData();
     fd2.set("surveyId", "S1");
     fd2.set("resultId", "R1");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(400);
   });
 
   test("updates completed_at when completed=true and when completed!=true", async () => {
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routes/api+/survey-complete/route");
     const supabase = makeSupabase({ survey: { id: 1, is_active: true } });
     mocks.createSupabaseServerClient.mockReturnValue({ supabaseClient: supabase });
 
@@ -94,14 +96,14 @@ describe("app/routes/api.survey-complete.tsx", () => {
     fd1.set("surveyId", "S1");
     fd1.set("resultId", "R1");
     fd1.set("completed", "true");
-    const r1 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(200);
 
     const fd2 = new FormData();
     fd2.set("surveyId", "S1");
     fd2.set("resultId", "R2");
     fd2.set("completed", "false");
-    const r2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(200);
   });
 
@@ -109,26 +111,26 @@ describe("app/routes/api.survey-complete.tsx", () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({
       supabaseClient: makeSupabase({ survey: { id: 1, is_active: true }, updateError: { message: "u" } }),
     });
-    const mod = await import("../app/routes/api.survey-complete");
+    const mod = await import("../app/routes/api+/survey-complete/route");
     const fd = new FormData();
     fd.set("surveyId", "S1");
     fd.set("resultId", "R1");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error completing survey:", { message: "u" });
   });
 
   test("returns 500 on unexpected error (formData throws) and logs", async () => {
     mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-complete");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-complete/route");
+    const res = await asRouteResponse(await mod.action({
       request: {
         method: "POST",
         formData: async () => {
           throw new Error("boom");
         },
       } as any,
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Internal server error" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in handleCompleteSurvey:", expect.anything());

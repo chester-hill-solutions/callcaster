@@ -1,4 +1,4 @@
-import { createCookieSessionStorage } from "@remix-run/node";
+import { createCookieSessionStorage } from "react-router";
 // Fallback lightweight theme session resolver to avoid dependency on remix-themes
 
 // You can default to 'development' if process.env.NODE_ENV is not set

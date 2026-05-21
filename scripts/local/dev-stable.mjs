@@ -10,10 +10,10 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const APP_PORT = process.env.PORT ?? "3000";
-const BUILD_PATH = path.resolve("build/index.js");
+const BUILD_PATH = path.resolve("build/server/index.js");
 const BUILD_DIR = path.dirname(BUILD_PATH);
 const CLIENT_BUILD_DIR = path.resolve("public/build");
-const REMIX_BIN = resolveLocalBin("remix");
+const REMIX_BIN = resolveLocalBin("react-router");
 const SERVER_ENTRY = path.resolve("server/index.js");
 const startupTimestamp = Date.now();
 
@@ -52,12 +52,12 @@ const DEV_ENV = {
   REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
 };
 
-const watchProcess = spawn(REMIX_BIN, ["watch"], {
+const watchProcess = spawn(REMIX_BIN, ["build", "--watch"], {
   env: DEV_ENV,
   stdio: ["inherit", "pipe", "pipe"],
 });
 
-pipeOutput("remix-watch", watchProcess);
+pipeOutput("remix-vite-watch", watchProcess);
 
 watchProcess.on("exit", (code, signal) => {
   if (isShuttingDown) {
@@ -65,7 +65,7 @@ watchProcess.on("exit", (code, signal) => {
   }
 
   console.error(
-    `[remix-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
+    `[remix-vite-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
   );
   shutdown(code ?? 1);
 });
@@ -244,7 +244,7 @@ async function shutdown(exitCode) {
   await Promise.all(
     processes.map(
       (childProcess) =>
-        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-watch"),
+        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-vite-watch"),
     ),
   );
 

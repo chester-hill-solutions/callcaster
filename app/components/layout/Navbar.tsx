@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { TypedResponse } from "@remix-run/node";
-import { Link, NavLink, Params, useLocation } from "@remix-run/react";
+import {  } from "react-router";
+import { Link, NavLink, Params, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import {
@@ -20,7 +20,7 @@ import { MobileMenu } from "./Navbar.MobileMenu";
 type NavbarProps = {
   className?: string;
   handleSignOut: () => Promise<
-    TypedResponse<{ success: string | null; error: string | null }>
+    { success: string | null; error: string | null }
   >;
   workspaces: WorkspaceData[] | null;
   isSignedIn: boolean;
@@ -58,7 +58,7 @@ const UserDropdownMenu = ({
 }: {
   user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
   handleSignOut: () => Promise<
-    TypedResponse<{ success: string | null; error: string | null }>
+    { success: string | null; error: string | null }
   >;
   workspaceId: string | undefined;
 }) =>

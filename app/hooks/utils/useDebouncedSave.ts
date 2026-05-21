@@ -1,4 +1,4 @@
-import { useFetcher } from '@remix-run/react';
+import { useFetcher } from 'react-router';
 import { useEffect, useRef, useCallback } from 'react';
 import { deepEqual } from '@/lib/utils';
 import type { QueueItem, OutreachAttempt, Campaign } from '@/lib/types';

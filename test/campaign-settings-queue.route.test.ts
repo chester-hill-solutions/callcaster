@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -62,12 +64,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routes/workspaces+/$id.campaigns.$selected_id.queue/route"
     );
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -96,12 +98,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routes/workspaces+/$id.campaigns.$selected_id.queue/route"
     );
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "77" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -135,12 +137,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routes/workspaces+/$id.campaigns.$selected_id.queue/route"
     );
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -198,7 +200,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routes/workspaces+/$id.campaigns.$selected_id.queue/route"
     );
 
     await mod.loader({
@@ -267,12 +269,12 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     });
 
     const mod = await import(
-      "../app/routes/workspaces_.$id.campaigns.$selected_id.queue"
+      "../app/routes/workspaces+/$id.campaigns.$selected_id.queue/route"
     );
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });

@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Template Tags for Message Campaigns
 
 This feature allows you to personalize your SMS messages by inserting contact-specific information using template tags.

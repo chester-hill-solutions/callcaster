@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const twilioMocks = vi.hoisted(() => {
   return {
     validationCreate: vi.fn(),
@@ -67,7 +69,7 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
-describe("app/routes/api.caller-id.tsx", () => {
+describe("app/routes/api+/call/routeer-id.tsx", () => {
   beforeEach(() => {
     twilioMocks.validationCreate.mockReset();
     twilioMocks.validationCreate.mockResolvedValue({ sid: "VR0" });
@@ -92,7 +94,7 @@ describe("app/routes/api.caller-id.tsx", () => {
   }
 
   test("returns 500 on workspace query error / missing data / missing twilio_data", async () => {
-    const mod = await import("../app/routes/api.caller-id");
+    const mod = await import("../app/routes/api+/call/routeer-id");
     const makeReq = (body: any) =>
       new Request("http://localhost/api/caller-id", {
         method: "POST",
@@ -112,13 +114,13 @@ describe("app/routes/api.caller-id.tsx", () => {
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({
+      const res = await asRouteResponse(await mod.action({
         request: makeReq({
           phoneNumber: "5555550100",
           workspace_id: "w1",
           friendlyName: "n",
         }),
-      } as any);
+      } as any));
       expect(res.status).toBe(500);
       await expect(res.json()).resolves.toMatchObject({
         error: "Supabase query error: q",
@@ -137,13 +139,13 @@ describe("app/routes/api.caller-id.tsx", () => {
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({
+      const res = await asRouteResponse(await mod.action({
         request: makeReq({
           phoneNumber: "5555550100",
           workspace_id: "w1",
           friendlyName: "n",
         }),
-      } as any);
+      } as any));
       expect(res.status).toBe(500);
       await expect(res.json()).resolves.toMatchObject({
         error: "No workspace data found",
@@ -162,13 +164,13 @@ describe("app/routes/api.caller-id.tsx", () => {
           throw new Error("unexpected");
         },
       });
-      const res = await mod.action({
+      const res = await asRouteResponse(await mod.action({
         request: makeReq({
           phoneNumber: "5555550100",
           workspace_id: "w1",
           friendlyName: "n",
         }),
-      } as any);
+      } as any));
       expect(res.status).toBe(500);
       await expect(res.json()).resolves.toMatchObject({
         error: "Workspace twilio_data not found",
@@ -177,7 +179,7 @@ describe("app/routes/api.caller-id.tsx", () => {
   }, 20000);
 
   test("returns 500 on invalid phone number length", async () => {
-    const mod = await import("../app/routes/api.caller-id");
+    const mod = await import("../app/routes/api+/call/routeer-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -188,7 +190,7 @@ describe("app/routes/api.caller-id.tsx", () => {
         throw new Error("unexpected");
       },
     });
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
         body: JSON.stringify({
@@ -198,7 +200,7 @@ describe("app/routes/api.caller-id.tsx", () => {
         }),
         headers: { "Content-Type": "application/json" },
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "Invalid phone number length",
@@ -206,7 +208,7 @@ describe("app/routes/api.caller-id.tsx", () => {
   });
 
   test("returns 500 when Twilio validation request rejects", async () => {
-    const mod = await import("../app/routes/api.caller-id");
+    const mod = await import("../app/routes/api+/call/routeer-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -228,7 +230,7 @@ describe("app/routes/api.caller-id.tsx", () => {
       },
     });
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
         body: JSON.stringify({
@@ -238,7 +240,7 @@ describe("app/routes/api.caller-id.tsx", () => {
         }),
         headers: { "Content-Type": "application/json" },
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     const body = await res.json();
@@ -248,7 +250,7 @@ describe("app/routes/api.caller-id.tsx", () => {
   });
 
   test("returns 500 on workspace_number upsert error", async () => {
-    const mod = await import("../app/routes/api.caller-id");
+    const mod = await import("../app/routes/api+/call/routeer-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -266,7 +268,7 @@ describe("app/routes/api.caller-id.tsx", () => {
       },
     });
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
         body: JSON.stringify({
@@ -276,7 +278,7 @@ describe("app/routes/api.caller-id.tsx", () => {
         }),
         headers: { "Content-Type": "application/json" },
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "Error inserting workspace number: ins",
@@ -284,7 +286,7 @@ describe("app/routes/api.caller-id.tsx", () => {
   });
 
   test("happy path returns validationRequest + numberRequest (covers + in middle normalization)", async () => {
-    const mod = await import("../app/routes/api.caller-id");
+    const mod = await import("../app/routes/api+/call/routeer-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -304,7 +306,7 @@ describe("app/routes/api.caller-id.tsx", () => {
       },
     });
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/caller-id", {
         method: "POST",
         body: JSON.stringify({
@@ -314,7 +316,7 @@ describe("app/routes/api.caller-id.tsx", () => {
         }),
         headers: { "Content-Type": "application/json" },
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     const body = await res.json();

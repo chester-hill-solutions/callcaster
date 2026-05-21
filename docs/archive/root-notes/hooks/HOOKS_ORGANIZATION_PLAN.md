@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Hooks Organization Plan
 
 This document outlines a plan to organize and structure hooks in the codebase for better maintainability, discoverability, and consistency.

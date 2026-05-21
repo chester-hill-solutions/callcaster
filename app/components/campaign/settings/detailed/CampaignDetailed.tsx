@@ -8,9 +8,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormField } from "@/components/ui/form-field";
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { MdAdd } from "react-icons/md";
-import { MessageSettings } from "@/components/settings/MessageSettings";
+import { MessageSettings } from "@/components/campaign/settings/MessageSettings";
 import { FileObject } from "@supabase/storage-js";
 import SelectVoicemail from "./CampaignDetailed.Voicemail";
 import SelectScript from "./CampaignDetailed.SelectScript";

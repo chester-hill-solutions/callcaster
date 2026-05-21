@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Hooks Quality, Durability, and Usefulness Evaluation
 
 **Date**: Generated after hooks reorganization  

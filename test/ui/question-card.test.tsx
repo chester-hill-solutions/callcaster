@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/components/settings/Settings.VoxTypeSelector", () => ({
+vi.mock("@/components/campaign/settings/VoxTypeSelector", () => ({
   VoxTypeSelector: (props: any) => mocks.VoxTypeSelector(props),
 }));
 

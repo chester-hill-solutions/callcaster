@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Build-Blocking Fixes
 
 ## ✅ Fixed (Critical)

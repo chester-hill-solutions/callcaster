@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -118,7 +120,7 @@ function makeSupabase(opts?: {
   return supabase;
 }
 
-describe("app/routes/api.inbound.tsx", () => {
+describe("app/routes/api+/inbound/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -134,7 +136,7 @@ describe("app/routes/api.inbound.tsx", () => {
   test("throws 400-like object when Called missing", async () => {
     const supabase = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     await expect(
       mod.action({
         request: new Request("http://x", {
@@ -149,7 +151,7 @@ describe("app/routes/api.inbound.tsx", () => {
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ number: null, numberError: null }),
     );
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     const fd = new FormData();
     fd.set("Called", "+1");
     await expect(
@@ -194,7 +196,7 @@ describe("app/routes/api.inbound.tsx", () => {
       }),
     );
 
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
@@ -225,7 +227,7 @@ describe("app/routes/api.inbound.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     let res = await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any);
@@ -307,7 +309,7 @@ describe("app/routes/api.inbound.tsx", () => {
     );
     const fd = new FormData();
     fd.set("Called", "+1");
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     await expect(
       mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
@@ -334,7 +336,7 @@ describe("app/routes/api.inbound.tsx", () => {
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
 
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
 
     // No workspace credentials => signature validation fails
     mocks.isPhoneNumber.mockReturnValue(false);
@@ -372,9 +374,9 @@ describe("app/routes/api.inbound.tsx", () => {
         },
       }),
     );
-    const response = await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await response.text()).toContain("say:");
 
     // callWebhook empty => does not send webhook
@@ -401,7 +403,7 @@ describe("app/routes/api.inbound.tsx", () => {
   });
 
   test("webhook notification failures are handled without blocking response", async () => {
-    const mod = await import("../app/routes/api.inbound");
+    const mod = await import("../app/routes/api+/inbound/route");
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
@@ -426,9 +428,9 @@ describe("app/routes/api.inbound.tsx", () => {
       }),
     );
 
-    const response = await mod.action({
+    const response = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(response.headers.get("Content-Type")).toBe("text/xml");
 
     await Promise.resolve();

@@ -1,170 +1,411 @@
-import { NumbersEmptyState } from "./NumbersPurchase.EmptyState";
+import { DataTable } from "@/components/workspace/tables/DataTable";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Fetcher, FetcherWithComponents, Link, NavLink, useFetcher } from "@remix-run/react";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Text } from "@/components/ui/typography";
+import {
+  hasCreditsForNumberRental,
+  NUMBER_RENTAL_MONTHLY_CREDITS,
+  numberRentalConfirmCopy,
+  numberRentalPriceLabel,
+} from "@/lib/number-rental";
+import type { NumberSearchMode } from "@/lib/numbers-search.server";
+import type { NumbersSearchResponse } from "@/lib/numbers-search.server";
+import type { AvailableNumber } from "@/routes/workspaces+/$id/settings/numbers.route";
+import { FetcherWithComponents, Link, NavLink, useFetcher } from "react-router";
+import type { ColumnDef } from "@tanstack/react-table";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
-import { AvailableNumber, FetcherData } from "@/routes/workspaces_.$id_.settings_.numbers";
+export type NumbersSearchFetcherData = NumbersSearchResponse | undefined;
 
-type PurchaseFetcherData = { newNumber?: string; creditsError?: boolean };
+type PurchaseFetcherData = {
+  newNumber?: { friendly_name?: string; phone_number?: string };
+  creditsError?: boolean;
+  error?: string;
+};
 
-export const NumberPurchase = ({ fetcher, workspaceId }: { fetcher: FetcherWithComponents<FetcherData>, workspaceId: string }) => {
+const SEARCH_MODE_LABELS: Record<NumberSearchMode, string> = {
+  areaCode: "Area code",
+  province: "Province",
+  city: "City",
+  postalCode: "Postal code",
+  contains: "Number pattern",
+};
+
+const SEARCH_PLACEHOLDERS: Record<NumberSearchMode, string> = {
+  areaCode: "e.g. 416",
+  province: "e.g. ON",
+  city: "e.g. Toronto",
+  postalCode: "e.g. M5H or M5H 2N2",
+  contains: "e.g. +416555",
+};
+
+const SEARCH_DESCRIPTIONS: Record<NumberSearchMode, string> = {
+  areaCode: "3-digit Canadian area code (NPA).",
+  province: "2-letter province or territory code.",
+  city: "City or locality name in Canada.",
+  postalCode: "Canadian postal code (FSA or full).",
+  contains:
+    "Match digits in the number (2–16 characters; Twilio pattern rules apply).",
+};
+
+function emptyMessageForMode(mode: NumberSearchMode, query: string): string {
+  switch (mode) {
+    case "areaCode":
+      return `No numbers found for area code ${query}.`;
+    case "province":
+      return `No numbers found in ${query.toUpperCase()}.`;
+    case "city":
+      return `No numbers found near ${query}.`;
+    case "postalCode":
+      return `No numbers found for postal code ${query}.`;
+    case "contains":
+      return `No numbers matched pattern "${query}".`;
+    default: {
+      const _exhaustive: never = mode;
+      return _exhaustive;
+    }
+  }
+}
+
+function capabilityBadges(capabilities: Record<string, boolean>) {
+  const entries = Object.entries(capabilities).filter(
+    ([key, enabled]) =>
+      enabled && ["voice", "sms", "mms", "fax"].includes(key),
+  );
+  if (entries.length === 0) {
+    return <Text variant="muted">—</Text>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {entries.map(([cap]) => (
+        <Badge key={cap} variant="secondary" className="text-xs uppercase">
+          {cap}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+export const NumberPurchase = ({
+  fetcher,
+  workspaceId,
+  creditsBalance,
+  billingLink = "../../billing",
+}: {
+  fetcher: FetcherWithComponents<NumbersSearchFetcherData>;
+  workspaceId: string;
+  creditsBalance: number;
+  billingLink?: string;
+}) => {
   const purchaseFetcher = useFetcher<PurchaseFetcherData>();
-  const complete = purchaseFetcher.state === "idle" && Boolean(purchaseFetcher.data?.newNumber);
-  const [openNumber, setOpenNumber] = useState<string | null>(null)
+  const [searchMode, setSearchMode] = useState<NumberSearchMode>("areaCode");
+  const [query, setQuery] = useState("");
+  const [filterVoice, setFilterVoice] = useState(false);
+  const [filterSms, setFilterSms] = useState(false);
+  const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(
+    null,
+  );
+  const [lastQuery, setLastQuery] = useState("");
 
-  const searchResults: AvailableNumber[] = Array.isArray(fetcher.data)
-    ? (fetcher.data as AvailableNumber[])
-    : [];
+  const canAfford = hasCreditsForNumberRental(creditsBalance);
+  const isSearching = fetcher.state !== "idle";
+  const searchData = fetcher.data;
+  const searchResults: AvailableNumber[] =
+    searchData?.ok === true ? searchData.numbers : [];
+  const searchError =
+    searchData?.ok === false ? searchData.error : undefined;
+  const hasSearched = searchData !== undefined;
 
-  const hasSearched = fetcher.data !== undefined;
+  const purchaseComplete =
+    purchaseFetcher.state === "idle" &&
+    Boolean(purchaseFetcher.data?.newNumber);
 
   useEffect(() => {
-    if (complete) {
-      setOpenNumber(null);
+    if (purchaseComplete) {
+      const purchased = purchaseFetcher.data?.newNumber;
+      toast.success(
+        `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`,
+      );
+      setSelectedNumber(null);
     }
-  }, [purchaseFetcher])
+  }, [purchaseComplete, purchaseFetcher.data?.newNumber]);
+
+  useEffect(() => {
+    if (purchaseFetcher.data?.error && purchaseFetcher.state === "idle") {
+      toast.error(purchaseFetcher.data.error);
+    }
+  }, [purchaseFetcher.data?.error, purchaseFetcher.state]);
+
+  const columns = useMemo<ColumnDef<AvailableNumber>[]>(
+    () => [
+      {
+        accessorKey: "friendlyName",
+        header: "Name",
+        cell: ({ row }) => (
+          <span className="text-sm">{row.original.friendlyName}</span>
+        ),
+      },
+      {
+        accessorKey: "phoneNumber",
+        header: "Number",
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">{row.original.phoneNumber}</span>
+        ),
+      },
+      {
+        id: "location",
+        header: "Location",
+        cell: ({ row }) => {
+          const parts = [
+            row.original.locality,
+            row.original.region,
+          ].filter(Boolean);
+          return (
+            <span className="text-sm text-muted-foreground">
+              {parts.length > 0 ? parts.join(", ") : "—"}
+            </span>
+          );
+        },
+      },
+      {
+        id: "capabilities",
+        header: "Capabilities",
+        cell: ({ row }) => capabilityBadges(row.original.capabilities),
+      },
+      {
+        id: "price",
+        header: "Price",
+        cell: () => (
+          <span className="text-sm whitespace-nowrap">
+            {numberRentalPriceLabel()}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        cell: ({ row }) => (
+          <Button
+            type="button"
+            size="sm"
+            disabled={purchaseFetcher.state !== "idle"}
+            onClick={() => setSelectedNumber(row.original)}
+          >
+            Purchase
+          </Button>
+        ),
+      },
+    ],
+    [purchaseFetcher.state],
+  );
+
   return (
-    <div>
-      <h3 className="text-center font-Zilla-Slab text-4xl font-bold">
-        Purchase a Number
-      </h3>
-      <div>
-        <div className="flex flex-col py-4">
-          <p className="self-start pb-2 font-sans text-lg font-bold uppercase tracking-tighter text-gray-600">
-            Number Lookup
-          </p>
-          <div className="flex flex-col gap-4 rounded-md border-2 border-gray-600 p-2">
-            <div className="flex flex-1 flex-col gap-2">
-              <fetcher.Form action="/api/numbers">
-                <input type="hidden" name="formName" value="caller-id" />
-                <div className="flex flex-col items-start">
-                  <label htmlFor="areaCode">Area Code</label>
-                  <div className="flex">
-                    <input id="areaCode" name="areaCode" className="w-full" />
-                    <Button type="submit">Search</Button>
-                  </div>
-                  <caption>
-                    3-digit Area Code of the locale you would like to search
-                  </caption>
-                </div>
-              </fetcher.Form>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Text variant="muted">
+          Search Canadian local numbers and rent one for your workspace.
+        </Text>
+        <Alert variant={canAfford ? "default" : "destructive"}>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              Balance: <strong>{creditsBalance}</strong> credits · Rent:{" "}
+              <strong>{NUMBER_RENTAL_MONTHLY_CREDITS}</strong> credits per
+              30-day period
+            </span>
+            {!canAfford ? (
+              <Button size="sm" variant="outline" asChild>
+                <Link to={billingLink} relative="path">
+                  Buy credits
+                </Link>
+              </Button>
+            ) : null}
+          </AlertDescription>
+        </Alert>
+      </div>
+
+      <fetcher.Form
+        action="/api/numbers"
+        method="get"
+        className="space-y-4 rounded-lg border border-border p-4"
+        onSubmit={() => setLastQuery(query.trim())}
+      >
+        <input type="hidden" name="searchMode" value={searchMode} />
+        {filterVoice ? (
+          <input type="hidden" name="voice" value="true" />
+        ) : null}
+        {filterSms ? <input type="hidden" name="sms" value="true" /> : null}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Search by" htmlFor="searchMode">
+            <Select
+              value={searchMode}
+              onValueChange={(v) => setSearchMode(v as NumberSearchMode)}
+            >
+              <SelectTrigger id="searchMode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(SEARCH_MODE_LABELS) as NumberSearchMode[]).map(
+                  (mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {SEARCH_MODE_LABELS[mode]}
+                    </SelectItem>
+                  ),
+                )}
+              </SelectContent>
+            </Select>
+          </FormField>
+
+          <FormField
+            label={SEARCH_MODE_LABELS[searchMode]}
+            htmlFor="query"
+            description={SEARCH_DESCRIPTIONS[searchMode]}
+            error={searchError}
+          >
+            <div className="flex gap-2">
+              <Input
+                id="query"
+                name="query"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={SEARCH_PLACEHOLDERS[searchMode]}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={isSearching}>
+                {isSearching ? "Searching…" : "Search"}
+              </Button>
             </div>
-            <div className="flex flex-1 flex-col">
-              <table className="w-full table-auto border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 font-Zilla-Slab dark:bg-gray-800">
-                    <th className="px-2 py-1 text-left text-sm">
-                      Friendly Name
-                    </th>
-                    <th className="px-2 py-1 text-left text-sm">
-                      Phone Number
-                    </th>
-                    <th className="px-2 py-1 text-left text-sm">Region</th>
-                    <th className="px-2 py-1 text-left text-sm">
-                      Capabilities
-                    </th>
-                    <th className="px-2 py-1 text-left text-sm">Price</th>
-                    <th className="px-2 py-1 text-left text-sm">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {hasSearched &&
-                    searchResults.map((number) => (
-                      <Dialog key={number.phoneNumber} open={openNumber === number.phoneNumber} onOpenChange={(open) => setOpenNumber((curr) => open ? curr : null)}>
-                        <tr className="border-b dark:border-gray-700">
-                          <td className="px-2 py-1 text-sm">
-                            {number.friendlyName}
-                          </td>
-                          <td className="px-2 py-1 text-sm">
-                            {number.phoneNumber}
-                          </td>
-                          <td className="px-2 py-1 text-sm">
-                            {number.region}
-                          </td>
-                          <td className="px-2 py-1">
-                            <ul className="text-xs">
-                              {Object.entries(number.capabilities).map(
-                                ([capability, enabled]) => (
-                                  <li key={capability}>
-                                    {capability}: {enabled ? "Yes" : "No"}
-                                  </li>
-                                ),
-                              )}
-                            </ul>
-                          </td>
-                          <td className="px-2 py-1 text-sm">1000 credits/month</td>
-                          <td className="px-2 py-1">
-                            <Button
-                              className="rounded bg-blue-500 px-2 py-1 text-xs font-bold text-white hover:bg-blue-600"
-                              type="submit"
-                              onClick={() => setOpenNumber(number.phoneNumber)}
-                              disabled={purchaseFetcher.state !== "idle"}
-                            >
-                              Purchase
-                            </Button>
-                            <DialogContent className="flex flex-col items-center bg-card">
-                              <purchaseFetcher.Form
-                                method="POST"
-                                action="/api/numbers"
-                              >
-                                <DialogHeader className="py-4">
-                                  <h2 className="mb-4 font-Zilla-Slab text-xl">
-                                    Confirm your purchase of{" "}
-                                    {number.friendlyName}
-                                  </h2>
-                                </DialogHeader>
-                                <div className="py-4">
-                                  <input
-                                    hidden
-                                    readOnly
-                                    name="phoneNumber"
-                                    value={number.phoneNumber}
-                                  />
-                                  <input
-                                    type="hidden"
-                                    name="workspace_id"
-                                    value={workspaceId}
-                                  />
-                                  <p>
-                                    The price of this number is 1000 credits per 30
-                                    days rental. This rental may be cancelled
-                                    at any time, billing cycles are monthly.
-                                  </p>
-                                </div>
-                                <p className="text-red-500">{purchaseFetcher.data?.creditsError ? "You do not have enough credits to purchase this number." : ""}</p>
-                                <DialogFooter className="mt-4">
-                                  <DialogClose asChild>
-                                    <Button variant={"outline"} type="reset">
-                                      Cancel
-                                    </Button>
-                                  </DialogClose>
-                                  {purchaseFetcher.data?.creditsError ? 
-                                  <Button asChild>
-                                    <NavLink to="../../billing" relative="path">Buy Credits</NavLink>
-                                  </Button> : 
-                                  <Button type="submit">Purchase</Button>}
-                                </DialogFooter>
-                              </purchaseFetcher.Form>
-                            </DialogContent>
-                          </td>
-                        </tr>
-                      </Dialog>
-                    ))}
-                  {!hasSearched && <NumbersEmptyState />}
-                  {hasSearched && searchResults.length === 0 && <tr><td colSpan={6} className="text-center text-lg py-4">No numbers found with this Area Code.</td></tr>}
-                </tbody>
-              </table>
-            </div>
+          </FormField>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="filterVoice"
+              checked={filterVoice}
+              onCheckedChange={(c) => setFilterVoice(c === true)}
+            />
+            <Label htmlFor="filterVoice" className="font-normal">
+              Voice enabled
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="filterSms"
+              checked={filterSms}
+              onCheckedChange={(c) => setFilterSms(c === true)}
+            />
+            <Label htmlFor="filterSms" className="font-normal">
+              SMS enabled
+            </Label>
           </div>
         </div>
-      </div>
+      </fetcher.Form>
+
+      <DataTable
+        columns={columns}
+        data={searchResults}
+        isLoading={isSearching}
+        emptyState={
+          hasSearched && !searchError ? (
+            <Text variant="muted" className="py-8 text-center">
+              {lastQuery
+                ? emptyMessageForMode(searchMode, lastQuery)
+                : "No results."}
+            </Text>
+          ) : (
+            <Text variant="muted" className="py-8 text-center">
+              Choose a search type and run a search for Canadian local numbers.
+            </Text>
+          )
+        }
+      />
+
+      <Dialog
+        open={selectedNumber !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedNumber(null);
+        }}
+      >
+        <DialogContent className="bg-card sm:max-w-md">
+          {selectedNumber ? (
+            <purchaseFetcher.Form method="POST" action="/api/numbers">
+              <DialogHeader>
+                <DialogTitle>Confirm purchase</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <Text>
+                  {selectedNumber.friendlyName} ({selectedNumber.phoneNumber})
+                </Text>
+                <Text variant="muted" className="text-sm">
+                  {numberRentalConfirmCopy()}
+                </Text>
+                <input
+                  type="hidden"
+                  name="phoneNumber"
+                  value={selectedNumber.phoneNumber}
+                  readOnly
+                />
+                <input
+                  type="hidden"
+                  name="workspace_id"
+                  value={workspaceId}
+                />
+                {purchaseFetcher.data?.creditsError ? (
+                  <Text className="text-sm text-destructive">
+                    You do not have enough credits to purchase this number.
+                  </Text>
+                ) : null}
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <DialogClose asChild>
+                  <Button variant="outline" type="button">
+                    Cancel
+                  </Button>
+                </DialogClose>
+                {purchaseFetcher.data?.creditsError ? (
+                  <Button asChild>
+                    <NavLink to={billingLink} relative="path">
+                      Buy credits
+                    </NavLink>
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    disabled={
+                      !canAfford || purchaseFetcher.state !== "idle"
+                    }
+                  >
+                    {purchaseFetcher.state !== "idle"
+                      ? "Purchasing…"
+                      : "Purchase"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </purchaseFetcher.Form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

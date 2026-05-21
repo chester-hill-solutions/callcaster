@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     send: vi.fn(),
@@ -22,7 +24,7 @@ vi.mock("resend", () => {
   return { Resend };
 });
 
-describe("app/routes/api.error-report.tsx", () => {
+describe("app/routes/api+/error-report/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.send.mockReset();
@@ -38,11 +40,11 @@ describe("app/routes/api.error-report.tsx", () => {
       user: { email: "", user_metadata: { email: "m@e.com" } },
     });
     mocks.send.mockResolvedValueOnce({ id: "em" });
-    const mod = await import("../app/routes/api.error-report");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/error-report/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("application/json");
     await expect(res.json()).resolves.toMatchObject({ success: true });
@@ -53,11 +55,11 @@ describe("app/routes/api.error-report.tsx", () => {
 
   test("returns 500 on error", async () => {
     mocks.safeParseJson.mockRejectedValueOnce(new Error("boom"));
-    const mod = await import("../app/routes/api.error-report");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/error-report/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to process error report" });
     expect(mocks.logger.error).toHaveBeenCalled();

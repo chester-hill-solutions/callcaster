@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -21,7 +23,7 @@ vi.mock("@/lib/queue.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.campaign_audience.tsx", () => {
+describe("app/routes/api+/campaign_audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -49,10 +51,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({
@@ -106,10 +108,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
@@ -150,10 +152,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
@@ -189,10 +191,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
@@ -225,10 +227,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "add boom" });
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -264,10 +266,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "contacts boom" });
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -323,10 +325,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("b=2");
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -360,10 +362,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
   }, 30000);
@@ -384,10 +386,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "del boom" });
   }, 30000);
@@ -423,10 +425,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "contacts del boom" });
   }, 30000);
@@ -475,10 +477,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "remove boom" });
   }, 30000);
@@ -486,10 +488,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
   test("returns 405 on unsupported method", async () => {
     const headers = new Headers();
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "PUT" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(405);
   }, 30000);
 
@@ -515,10 +517,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({
       error: "An unexpected error occurred",

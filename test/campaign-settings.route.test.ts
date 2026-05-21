@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -141,11 +143,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 0, fullCount: 0 });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
-    const res = await mod.action({
+    const mod = await import("../app/routes/workspaces+/$id.campaigns.$selected_id.settings/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -169,11 +171,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 2, fullCount: 2 });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
-    const res = await mod.action({
+    const mod = await import("../app/routes/workspaces+/$id.campaigns.$selected_id.settings/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, actionType: "status" });
@@ -191,11 +193,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       campaignData: JSON.stringify({ title: "Missing details" }),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
-    const res = await mod.action({
+    const mod = await import("../app/routes/workspaces+/$id.campaigns.$selected_id.settings/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -217,11 +219,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       campaignData: JSON.stringify({ title: "Copy me", type: "message" }),
     });
 
-    const mod = await import("../app/routes/workspaces_.$id.campaigns.$selected_id.settings");
-    const res = await mod.action({
+    const mod = await import("../app/routes/workspaces+/$id.campaigns.$selected_id.settings/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({

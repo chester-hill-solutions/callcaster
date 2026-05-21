@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Type Safety Improvements - Continuation
 
 This document outlines additional type safety improvements that can be made to continue enhancing the Callcaster application.

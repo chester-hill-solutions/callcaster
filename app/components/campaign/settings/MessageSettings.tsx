@@ -1,6 +1,6 @@
 import { MdAddAPhoto , MdTag } from "react-icons/md";
 import { useRef, useState, useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 
 // Helper function to generate survey links
@@ -269,14 +269,13 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
     };
 
     return (
-        <div className="flex flex-col items-center">
+        (<div className="flex flex-col items-center">
             <div className="my-1 flex flex-col gap-2 px-2">
                 <div className="m-4 flex flex-1 justify-end">
                     <div className="h-[40px]"></div>
                 </div>
             </div>
             <h3 className="font-Zilla-Slab text-2xl">Your Campaign Message.</h3>
-
             <div className="mx-auto flex max-w-sm flex-col gap-2 rounded-lg bg-green-100 p-4 shadow-md">
                 <div className="flex flex-col">
                         {renderMediaContent()}
@@ -479,7 +478,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                             const surveyMatches = displayText.match(/survey\([^)]+\)/g);
                                             if (surveyMatches) {
                                                 return (
-                                                    <div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
+                                                    (<div className="mt-3 p-2 bg-green-50 rounded border border-green-200">
                                                         <div className="text-xs font-semibold text-green-800 mb-1">Survey Links Preview:</div>
                                                         <div className="text-xs text-green-700 space-y-1">
                                                             {surveyMatches.map((match, index) => {
@@ -501,7 +500,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                                 );
                                                             })}
                                                         </div>
-                                                    </div>
+                                                    </div>)
                                                 );
                                             }
                                             return null;
@@ -512,6 +511,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                         )}
                     </div>
             </div>
-        </div>
-    )
+        </div>)
+    );
 }

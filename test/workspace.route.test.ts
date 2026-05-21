@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -44,7 +46,7 @@ function makeSupabaseUpdateSingle(result: { data: any; error: any }) {
   };
 }
 
-describe("app/routes/api.workspace.tsx", () => {
+describe("app/routes/api+/workspace/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
@@ -65,13 +67,13 @@ describe("app/routes/api.workspace.tsx", () => {
       }),
     );
 
-    const mod = await import("../app/routes/api.workspace");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/workspace/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: JSON.stringify({}),
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: "w1", twilio_data: {} });
@@ -87,13 +89,13 @@ describe("app/routes/api.workspace.tsx", () => {
       makeSupabaseUpdateSingle({ data: null, error: { message: "bad" } }),
     );
 
-    const mod = await import("../app/routes/api.workspace");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/workspace/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: JSON.stringify({}),
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     const body = await res.json();

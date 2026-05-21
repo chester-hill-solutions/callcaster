@@ -367,7 +367,18 @@ async function processNumber(args: {
   return "processed" as const;
 }
 
-export async function handleRequest(_request: Request): Promise<Response> {
+export async function handleRequest(request: Request): Promise<Response> {
+  const cronSecret = Deno.env.get("NUMBER_RENTAL_CRON_SECRET");
+  if (cronSecret) {
+    const provided = request.headers.get("x-cron-secret");
+    if (provided !== cronSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   try {
     const supabase = createSupabase();
     const now = utcDayStart(new Date());

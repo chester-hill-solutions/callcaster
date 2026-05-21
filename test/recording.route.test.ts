@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -17,7 +19,7 @@ vi.mock("@supabase/supabase-js", () => ({
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.recording.tsx", () => {
+describe("app/routes/api+/recording/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -31,11 +33,11 @@ describe("app/routes/api.recording.tsx", () => {
     const fd = new FormData();
     fd.set("RecordingSid", "RE1");
     fd.set("CallSid", "CA1");
-    const mod = await import("../app/routes/api.recording");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/recording/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ RecordingSid: "RE1", CallSid: "CA1" });
     expect(mocks.createClient).toHaveBeenCalledWith("http://supabase", "service");

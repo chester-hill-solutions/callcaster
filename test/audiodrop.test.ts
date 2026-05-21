@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+
+import { asRouteResponse } from "./helpers/route-result";
 import { logger } from "@/lib/logger.server";
 
 describe("api.audiodrop action", () => {
@@ -25,15 +27,15 @@ describe("api.audiodrop action", () => {
       },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
-    const mod = await import("../app/routes/api.audiodrop");
+    const mod = await import("../app/routes/api+/audiodrop/route");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(res).toEqual({ success: false, error: { call: expect.any(Error) } });
   });
 
@@ -65,15 +67,15 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
-    const mod = await import("../app/routes/api.audiodrop");
+    const mod = await import("../app/routes/api+/audiodrop/route");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(res).toEqual({ success: false, error: { campaign: expect.any(Error) } });
   });
 
@@ -106,15 +108,15 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
-    const mod = await import("../app/routes/api.audiodrop");
+    const mod = await import("../app/routes/api+/audiodrop/route");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(res).toEqual({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
   });
@@ -137,7 +139,7 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl }) },
     };
 
-    const mod = await import("../app/routes/api.audiodrop");
+    const mod = await import("../app/routes/api+/audiodrop/route");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
@@ -145,19 +147,19 @@ describe("api.audiodrop action", () => {
     const makeReq = () => new Request("http://localhost/api/audiodrop", { method: "POST", body: fd });
 
     createSignedUrl.mockResolvedValueOnce({ data: null, error: new Error("vm") });
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     // Current implementation checks `audio` before `voicemailError`.
     expect(r1).toEqual({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
 
     createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "" }, error: null });
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(r2).toEqual({ success: false, error: "No signed URL found" });
 
     // Covers `if (voicemailError) throw { voicemail: voicemailError }`
@@ -165,17 +167,17 @@ describe("api.audiodrop action", () => {
       data: { signedUrl: "https://s" },
       error: new Error("vm"),
     });
-    const r2b = await mod.action({
+    const r2b = await asRouteResponse(await mod.action({
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(r2b).toEqual({ success: false, error: { voicemail: expect.any(Error) } });
 
     createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "https://s" }, error: null });
-    const r3 = await mod.action({
+    const r3 = await asRouteResponse(await mod.action({
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
-    } as any);
+    } as any));
     expect(r3).toEqual({ success: true });
     expect(update).toHaveBeenCalledWith({ twiml: `<Response><Play>https://s</Play></Response>` });
   });
@@ -203,14 +205,14 @@ describe("api.audiodrop action", () => {
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
     vi.doMock("@/lib/database.server", () => ({ createWorkspaceTwilioInstance }));
 
-    const mod = await import("../app/routes/api.audiodrop");
+    const mod = await import("../app/routes/api+/audiodrop/route");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
     fd.set("campaignId", "1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res).toEqual({ success: true });
     expect(createWorkspaceTwilioInstance).toHaveBeenCalled();
   });

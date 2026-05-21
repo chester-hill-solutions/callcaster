@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     send: vi.fn(),
@@ -20,7 +22,7 @@ vi.mock("resend", () => {
   return { Resend };
 });
 
-describe("app/routes/api.contact-form.tsx", () => {
+describe("app/routes/api+/contact-form/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.send.mockReset();
@@ -28,7 +30,7 @@ describe("app/routes/api.contact-form.tsx", () => {
   });
 
   test("validates missing/invalid email and length limits", async () => {
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routes/api+/contact-form/route");
 
     const fd1 = new FormData();
     // omit email entirely to cover String(data.email ?? "") branch
@@ -55,7 +57,7 @@ describe("app/routes/api.contact-form.tsx", () => {
 
   test("sends email (signup vs normal subject) and returns success", async () => {
     mocks.send.mockResolvedValueOnce({ id: "em1" });
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routes/api+/contact-form/route");
 
     const fd = new FormData();
     fd.set("email", "a@b.com");
@@ -63,10 +65,10 @@ describe("app/routes/api.contact-form.tsx", () => {
     fd.set("message", "Hi");
     fd.set("signup", "1");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: { id: "1" },
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true, message: "Email sent" });
     expect(mocks.send).toHaveBeenCalledWith(
@@ -79,13 +81,13 @@ describe("app/routes/api.contact-form.tsx", () => {
 
   test("returns 500 on resend error", async () => {
     mocks.send.mockRejectedValueOnce(new Error("nope"));
-    const mod = await import("../app/routes/api.contact-form");
+    const mod = await import("../app/routes/api+/contact-form/route");
     const fd = new FormData();
     fd.set("email", "a@b.com");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: { id: "1" },
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Failed to process message" });
     expect(mocks.logger.error).toHaveBeenCalled();

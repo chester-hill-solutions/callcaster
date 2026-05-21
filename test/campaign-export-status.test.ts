@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -58,44 +60,44 @@ describe("api.campaign-export-status error handling", () => {
   });
 
   test("returns 400 when exportId/workspaceId missing", async () => {
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/campaign-export-status?exportId=e1"),
-    } as any);
+    } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 404 when status object not found", async () => {
     downloadBehavior = "not_found";
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
   });
 
   test("returns 401 when user is missing", async () => {
     userPresent = false;
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(401);
   });
 
   test("returns 200 with parsed JSON when download succeeds", async () => {
     statusJsonText = JSON.stringify({ status: "done", url: "x" });
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ status: "done", url: "x" });
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
@@ -103,46 +105,46 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 on non-not-found download error and on JSON parse error", async () => {
     downloadThrows = new Error("storage down");
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({ error: "storage down" });
 
     downloadThrows = null;
     statusJsonText = "{";
-    const res2 = await mod.loader({
+    const res2 = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res2.status).toBe(500);
     await expect(res2.json()).resolves.toMatchObject({ error: expect.any(String) });
   });
 
   test("returns 500 when download returns error that isn't Object not found", async () => {
     downloadBehavior = "other_error";
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Storage exploded" });
   });
 
   test("returns 500 with Unknown error when a non-Error is thrown", async () => {
     downloadThrows = "nope";
-    const mod = await import("../app/routes/api.campaign-export-status");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });

@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Discovered Routes - CallCaster Application
 
 This document lists all route files discovered by crawling the application starting from `_index.tsx`.

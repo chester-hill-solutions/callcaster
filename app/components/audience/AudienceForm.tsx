@@ -1,4 +1,4 @@
-import { Form } from "@remix-run/react";
+import { Form } from "react-router";
 import { Button } from "@/components/ui/button";
 import { FormEvent, useState } from "react";
 import { Database } from "@/lib/database.types";

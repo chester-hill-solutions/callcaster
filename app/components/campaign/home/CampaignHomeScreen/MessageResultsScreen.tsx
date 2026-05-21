@@ -3,7 +3,7 @@ import { TotalMessages } from "./ResultsScreen.TotalCalls";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
-import { NavLink, useNavigation, useParams } from "@remix-run/react";
+import { NavLink, useNavigation, useParams } from "react-router";
 
 interface MessageResultsScreenProps {
   results: DispositionResult[];

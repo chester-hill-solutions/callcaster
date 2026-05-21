@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { FetcherWithComponents } from "@remix-run/react";
+import { FetcherWithComponents } from "react-router";
 import { getNextContact } from "./getNextContact";
 import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
@@ -250,7 +250,7 @@ export const handleQueue = ({
     const res = await fetch(
       `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`,
     )
-      .then((res) => res.json())
+      .then((res) => res.data())
       .then((json) => updateQueue(json))
       .catch((error) => logger.error("Unable to fetch queue: ", error));
   };

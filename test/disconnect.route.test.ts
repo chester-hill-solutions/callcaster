@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -18,7 +20,7 @@ vi.mock("twilio", () => ({
   default: (...args: any[]) => mocks.twilioFactory(...args),
 }));
 
-describe("app/routes/api.disconnect.ts", () => {
+describe("app/routes/api+/disconnect/route.ts", () => {
   const origEnv = process.env;
 
   beforeEach(() => {
@@ -34,8 +36,8 @@ describe("app/routes/api.disconnect.ts", () => {
     delete process.env.TWILIO_SID;
     delete process.env.TWILIO_AUTH_TOKEN;
     mocks.safeParseJson.mockResolvedValueOnce({});
-    const mod = await import("../app/routes/api.disconnect");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/disconnect/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
@@ -43,8 +45,8 @@ describe("app/routes/api.disconnect.ts", () => {
     process.env.TWILIO_SID = "sid";
     process.env.TWILIO_AUTH_TOKEN = "tok";
     mocks.safeParseJson.mockResolvedValueOnce("nope"); // non-object body => getCallSid null branch
-    const mod = await import("../app/routes/api.disconnect");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/disconnect/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
   });
 
@@ -57,7 +59,7 @@ describe("app/routes/api.disconnect.ts", () => {
     });
     mocks.callUpdate.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/api.disconnect");
+    const mod = await import("../app/routes/api+/disconnect/route");
     let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -79,8 +81,8 @@ describe("app/routes/api.disconnect.ts", () => {
     process.env.TWILIO_SID = "sid";
     process.env.TWILIO_AUTH_TOKEN = "tok";
     mocks.safeParseJson.mockResolvedValueOnce({ call: { parameters: { CallSid: "" } } });
-    const mod = await import("../app/routes/api.disconnect");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/disconnect/route");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
   });
 });

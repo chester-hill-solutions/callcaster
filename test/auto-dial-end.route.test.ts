@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-describe("app/routes/api.auto-dial.end.tsx", () => {
+import { asRouteResponse } from "./helpers/route-result";
+
+describe("app/routes/api+/auto-dial/route.end.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
   test("returns 500 with message when conference listing throws", async () => {
-    const mod = await import("../app/routes/api.auto-dial.end");
+    const mod = await import("../app/routes/api+/auto-dial/route.end");
 
     const supabaseClient: any = {};
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
@@ -19,14 +21,14 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
             conferences: { list: async () => Promise.reject(new Error("list")) },
           }) as any,
       },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "list" });
   }, 60000);
 
   test("handles conference/call update errors and still returns success", async () => {
-    const mod = await import("../app/routes/api.auto-dial.end");
+    const mod = await import("../app/routes/api+/auto-dial/route.end");
 
     const outreachSingle = vi
       .fn()
@@ -66,7 +68,7 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
 
     const logger = { error: vi.fn(), debug: vi.fn() };
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         logger: logger as any,
@@ -81,7 +83,7 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
             calls: (_sid: string) => ({ update: callUpdate }),
           }) as any,
       },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -90,9 +92,9 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
   });
 
   test("returns success when there are no in-progress conferences", async () => {
-    const mod = await import("../app/routes/api.auto-dial.end");
+    const mod = await import("../app/routes/api+/auto-dial/route.end");
     const supabaseClient: any = {};
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
       deps: {
         verifyAuth: async () => ({ supabaseClient, user: { id: "u1" } } as any),
@@ -102,13 +104,13 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
             conferences: { list: async () => [] },
           }) as any,
       },
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 
   test("covers conf update error, call select error, empty call data, and missing outreach_attempt_id branches", async () => {
-    const mod = await import("../app/routes/api.auto-dial.end");
+    const mod = await import("../app/routes/api+/auto-dial/route.end");
 
     const logger = { error: vi.fn(), debug: vi.fn() };
 
@@ -231,10 +233,10 @@ describe("app/routes/api.auto-dial.end.tsx", () => {
     const logger = { error: vi.fn(), debug: vi.fn() };
     vi.doMock("@/lib/logger.server", () => ({ logger }));
 
-    const mod = await import("../app/routes/api.auto-dial.end");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error occurred" });
   });

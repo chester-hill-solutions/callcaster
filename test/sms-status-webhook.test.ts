@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -194,7 +196,7 @@ describe("api.sms.status webhook behavior", () => {
 
   test("rejects invalid Twilio signature", async () => {
     twilioValidateRequest.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api.sms.status");
+    const mod = await import("../app/routes/api+/sms/route.status");
     const fd = new FormData();
     fd.set("SmsSid", "SM_BAD");
     fd.set("SmsStatus", "delivered");
@@ -204,12 +206,12 @@ describe("api.sms.status webhook behavior", () => {
       body: fd,
     });
 
-    const res = await mod.action({ request: req } as any);
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(403);
   }, 15000);
 
   test("normalizes unknown SmsStatus to failed", async () => {
-    const mod = await import("../app/routes/api.sms.status");
+    const mod = await import("../app/routes/api+/sms/route.status");
     const fd = new FormData();
     fd.set("SmsSid", "SM123");
     fd.set("SmsStatus", "not-a-real-status");
@@ -219,7 +221,7 @@ describe("api.sms.status webhook behavior", () => {
       body: fd,
     });
 
-    const res = await mod.action({ request: req } as any);
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message.status).toBe("failed");
@@ -230,7 +232,7 @@ describe("api.sms.status webhook behavior", () => {
 
   test("does not overwrite terminal outreach disposition", async () => {
     // delivered -> failed should be skipped
-    const mod = await import("../app/routes/api.sms.status");
+    const mod = await import("../app/routes/api+/sms/route.status");
     const fd = new FormData();
     fd.set("SmsSid", "SM123");
     fd.set("SmsStatus", "failed");
@@ -240,13 +242,13 @@ describe("api.sms.status webhook behavior", () => {
       body: fd,
     });
 
-    const res = await mod.action({ request: req } as any);
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
   });
 
   test("bills only once for duplicate deliveries (same SmsSid)", async () => {
-    const mod = await import("../app/routes/api.sms.status");
+    const mod = await import("../app/routes/api+/sms/route.status");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("SmsSid", "SM_DUP");

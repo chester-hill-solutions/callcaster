@@ -20,25 +20,17 @@ type EnvConfig = {
   RESEND_API_KEY: string;
   OPENAI_API_KEY?: string;
   VERIFICATION_PHONE_NUMBER?: string;
+  TWILIO_VALIDATE_WEBHOOKS?: string;
 };
 
-const requiredEnvVars: (keyof EnvConfig)[] = [
-  'SUPABASE_URL',
-  'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_KEY',
-  'SUPABASE_PUBLISHABLE_KEY',
-  'TWILIO_SID',
-  'TWILIO_AUTH_TOKEN',
-  'TWILIO_APP_SID',
-  'TWILIO_PHONE_NUMBER',
-  'BASE_URL',
-  'STRIPE_SECRET_KEY',
-  'RESEND_API_KEY',
-];
+import { REQUIRED_ENV_KEYS, validateRequiredEnv } from "./required-env-keys";
+
+const requiredEnvVars: (keyof EnvConfig)[] = [...REQUIRED_ENV_KEYS];
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
   'OPENAI_API_KEY',
   'STRIPE_WEBHOOK_SECRET',
+  'TWILIO_VALIDATE_WEBHOOKS',
 ];
 
 /**
@@ -46,20 +38,7 @@ const optionalEnvVars: (keyof EnvConfig)[] = [
  * @throws Error if any required environment variable is missing
  */
 function validateEnv(): void {
-  const missing: string[] = [];
-
-  for (const key of requiredEnvVars) {
-    if (!process.env[key]) {
-      missing.push(key);
-    }
-  }
-
-  if (missing.length > 0) {
-    throw new Error(
-      `Missing required environment variables: ${missing.join(', ')}\n` +
-      'Please check your .env file or environment configuration.'
-    );
-  }
+  validateRequiredEnv(process.env);
 }
 
 /**
@@ -118,6 +97,8 @@ export const env = {
   RESEND_API_KEY: () => getEnv('RESEND_API_KEY'),
   OPENAI_API_KEY: () => getEnv('OPENAI_API_KEY'),
   VERIFICATION_PHONE_NUMBER: () => getEnv('VERIFICATION_PHONE_NUMBER'),
+  /** When `false` or `0`, Remix Twilio webhooks skip signature checks (local dev only). */
+  TWILIO_VALIDATE_WEBHOOKS: () => getEnv('TWILIO_VALIDATE_WEBHOOKS'),
 } as const;
 
 /**
@@ -126,4 +107,6 @@ export const env = {
 export function revalidateEnv(): void {
   validateEnv();
 }
+
+export { validateRequiredEnv, REQUIRED_ENV_KEYS };
 

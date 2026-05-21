@@ -1,4 +1,4 @@
-import { json, redirect } from "@remix-run/node";
+import { data, redirect } from "react-router";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "../database.types";
 import { getWorkspaceUsers } from "@/lib/database.server";
@@ -13,7 +13,7 @@ export async function handleAddUser(
   const username = formData.get("username") as string;
   const newUserRole = formData.get("new_user_workspace_role") as string;
   if (!username) {
-    return json({ user: null, error: "Must provide an email address" }, 400);
+    return data({ user: null, error: "Must provide an email address" }, 400);
   }
   const cleanedName = username.toLowerCase().trim();
   const { data: users } = await getWorkspaceUsers({
@@ -24,7 +24,7 @@ export async function handleAddUser(
     return user.username === cleanedName;
   });
   if (match?.length) {
-    return json({ user: null, error: "This user is already an agent in the workspace." }, 403);
+    return data({ user: null, error: "This user is already an agent in the workspace." }, 403);
   }
   const { data: user, error: inviteUserError } =
     await supabaseClient.functions.invoke("invite-user-by-email", {
@@ -35,9 +35,9 @@ export async function handleAddUser(
       },
     });
   if (inviteUserError) {
-    return json({ user: null, error: inviteUserError.message }, { headers });
+    return data({ user: null, error: inviteUserError.message }, { headers });
   }
-  return json({ data: user, error: null, success: true }, { headers });
+  return data({ data: user, error: null, success: true }, { headers });
 }
 export async function handleUpdateUser(
   formData: FormData,
@@ -55,7 +55,7 @@ export async function handleUpdateUser(
     .select()
     .single();
 
-  return json(
+  return data(
     { data: updatedUser, error: errorUpdatingUser?.message },
     { headers },
   );
@@ -76,7 +76,7 @@ export async function handleDeleteUser(
     .select()
     .single();
 
-  return json(
+  return data(
     { data: deletedUser, error: errorDeletingUser?.message },
     { headers },
   );
@@ -90,7 +90,7 @@ export async function handleDeleteSelf(
 ) {
   const userId = formData.get("user_id") as string;
   if (userId == null) {
-    return json({ error: `User ${userId} not found` }, { headers });
+    return data({ error: `User ${userId} not found` }, { headers });
   }
 
   const { data: deletedSelf, error: errorDeletingSelf } = await supabaseClient
@@ -126,7 +126,7 @@ export async function handleTransferWorkspace(
       .single();
 
   if (errorUpdatingNewOwner) {
-    return json({ error: errorUpdatingNewOwner.message }, { headers });
+    return data({ error: errorUpdatingNewOwner.message }, { headers });
   }
 
   const { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner } =
@@ -139,10 +139,10 @@ export async function handleTransferWorkspace(
       .single();
 
   if (errorUpdatingCurrentOwner) {
-    return json({ error: errorUpdatingCurrentOwner.message }, { headers });
+    return data({ error: errorUpdatingCurrentOwner.message }, { headers });
   }
 
-  return json(
+  return data(
     { data: updatedCurrentOwner, error: errorUpdatingCurrentOwner },
     { headers },
   );
@@ -229,10 +229,10 @@ export async function handleUpdateWebhook(
     .select();
   if (webhookError) {
     logger.error("Error updating webhook", webhookError);
-    return json({ data: null, error: webhookError.message }, { headers });
+    return data({ data: null, error: webhookError.message }, { headers });
   }
   
-  return json({ data: webhook, error: null }, { headers });
+  return data({ data: webhook, error: null }, { headers });
 }
 
 export async function testWebhook(
@@ -268,7 +268,7 @@ export async function testWebhook(
     let data;
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
+      data = await response.data();
     } else {
       data = await response.text();
     }

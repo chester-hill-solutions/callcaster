@@ -12,16 +12,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-import { Form } from "@remix-run/react";
+import { Form } from "react-router";
 import { MdCancel } from "react-icons/md";
 import { User } from "@/lib/types";
 
-export enum MemberRole {
-  Owner = "owner",
-  Admin = "admin",
-  Member = "member",
-  Caller = "caller",
-}
+export { MemberRole } from "@/lib/member-role";
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
   clsx(

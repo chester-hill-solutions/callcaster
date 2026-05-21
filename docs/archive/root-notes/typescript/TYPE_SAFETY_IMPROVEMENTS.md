@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Type Safety Improvements - Progress Update
 
 This document outlines the comprehensive type safety improvements made to the Callcaster application and the remaining work.

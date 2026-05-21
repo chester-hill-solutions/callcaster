@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -54,7 +56,7 @@ function makeSupabase(opts?: {
   return supabase;
 }
 
-describe("app/routes/api.ivr.tsx", () => {
+describe("app/routes/api+/ivr/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -72,7 +74,7 @@ describe("app/routes/api.ivr.tsx", () => {
   test("throws when required form data missing", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase());
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
-    const mod = await import("../app/routes/api.ivr");
+    const mod = await import("../app/routes/api+/ivr/route");
     const fd = new FormData();
     fd.set("to_number", "+1");
     await expect(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any)).rejects.toThrow(
@@ -85,7 +87,7 @@ describe("app/routes/api.ivr.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       calls: { create: async (_p: any) => ({ sid: "CA1" }) },
     });
-    const mod = await import("../app/routes/api.ivr");
+    const mod = await import("../app/routes/api+/ivr/route");
     const fd = new FormData();
     fd.set("to_number", "+1555");
     fd.set("campaign_id", "1");
@@ -94,9 +96,9 @@ describe("app/routes/api.ivr.tsx", () => {
     fd.set("caller_id", "+1666");
     fd.set("queue_id", "3");
     fd.set("user_id", "u1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, callSid: "CA1" });
   });
@@ -104,7 +106,7 @@ describe("app/routes/api.ivr.tsx", () => {
   test("returns 500 on errors (rpc/call insert/dequeue), with unknown error formatting", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ outreachError: new Error("rpc") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
-    const mod = await import("../app/routes/api.ivr");
+    const mod = await import("../app/routes/api+/ivr/route");
     const fd = new FormData();
     fd.set("to_number", "+1555");
     fd.set("campaign_id", "1");

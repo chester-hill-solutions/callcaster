@@ -11,10 +11,16 @@ export async function handleRequest(req: Request): Promise<Response> {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { data, error } = await supabase.rpc("get_campaign_queue", {
-      campaign_id_pro: campaign_id,
-    });
-    if (error || !data) throw error || "No queue found";
+    const { data: claimed, error: claimError } = await supabase.rpc(
+      "claim_campaign_queue_contacts",
+      {
+        campaign_id_pro: campaign_id,
+        claimed_by_user_id: owner || null,
+        claim_limit: 1,
+      },
+    );
+    if (claimError) throw claimError;
+    const data = claimed ?? [];
     if (!data.length) {
       console.log(`Queue is now empty. Marking completed.`)
       const { error: campaignUpdateError } = await supabase
@@ -40,21 +46,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       )
     }
     const contact = data[0];
-    if (campaign.type === "message") {  
+    if (campaign.type === "message") {
       console.log(`Sending message to contact`, contact, campaign);
     } else {
       console.log(`Calling contact`, contact, campaign);
-    }
-    const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
-      passed_contact_id: contact.contact_id,
-      group_on_household: campaign.group_household_queue,
-      dequeued_by_id: owner || null,
-      dequeued_reason_text: "Automated queue processing"
-    });
-
-    if (dequeueError) {
-      console.error(dequeueError);
-      throw dequeueError;
     }
 
     await new Promise(resolve => setTimeout(resolve, 200));

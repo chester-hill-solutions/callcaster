@@ -1,4 +1,4 @@
-import { useNavigation } from "@remix-run/react";
+import { useNavigation } from "react-router";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
 import { CampaignState } from "@/routes/workspaces_.$id.campaigns.$selected_id";

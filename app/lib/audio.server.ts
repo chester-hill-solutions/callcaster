@@ -1,17 +1,20 @@
 import path from "node:path";
 import { spawn } from "node:child_process";
+import {
+  AudioUploadError,
+  NORMALIZED_AUDIO_CONTENT_TYPE,
+  NORMALIZED_AUDIO_EXTENSION,
+  getSafeMediaBaseName,
+  isAllowedAudioExtension,
+} from "@/lib/audio-upload";
 
-const ALLOWED_AUDIO_EXTENSIONS = new Set([
-  ".aac",
-  ".flac",
-  ".m4a",
-  ".mp3",
-  ".mp4",
-  ".oga",
-  ".ogg",
-  ".wav",
-  ".webm",
-]);
+export {
+  AudioUploadError,
+  NORMALIZED_AUDIO_CONTENT_TYPE,
+  NORMALIZED_AUDIO_EXTENSION,
+  getAudioUploadAcceptValue,
+  getSafeMediaBaseName,
+} from "@/lib/audio-upload";
 
 const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "application/octet-stream",
@@ -32,62 +35,9 @@ const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "video/mp4",
 ]);
 
-export const NORMALIZED_AUDIO_CONTENT_TYPE = "audio/mpeg";
-export const NORMALIZED_AUDIO_EXTENSION = "mp3";
-
-export class AudioUploadError extends Error {
-  status: number;
-
-  constructor(message: string, status = 400) {
-    super(message);
-    this.name = "AudioUploadError";
-    this.status = status;
-  }
-}
-
 type NormalizeUploadedAudioDeps = Partial<{
   transcodeAudioBuffer: typeof transcodeAudioBuffer;
 }>;
-
-export function getAudioUploadAcceptValue() {
-  return [
-    ".aac",
-    ".flac",
-    ".m4a",
-    ".mp3",
-    ".ogg",
-    ".wav",
-    ".webm",
-    "audio/*",
-  ].join(",");
-}
-
-export function getSafeMediaBaseName(mediaName: string) {
-  const trimmed = mediaName.trim();
-  if (trimmed.length === 0) {
-    throw new AudioUploadError("Audio name is required.");
-  }
-
-  let baseName = trimmed;
-  while (true) {
-    const extensionMatch = baseName.match(/\.[^.]+$/);
-    const extension = extensionMatch?.[0]?.toLowerCase() ?? "";
-    if (extension.length === 0 || !ALLOWED_AUDIO_EXTENSIONS.has(extension)) {
-      break;
-    }
-
-    baseName = baseName.slice(0, -extension.length).trim();
-    if (baseName.length === 0) {
-      break;
-    }
-  }
-
-  if (baseName.length === 0) {
-    throw new AudioUploadError("Audio name is required.");
-  }
-
-  return baseName;
-}
 
 export function assertValidAudioUpload(file: File) {
   if (!(file instanceof File)) {
@@ -105,7 +55,7 @@ export function assertValidAudioUpload(file: File) {
     ALLOWED_AUDIO_MIME_TYPES.has(normalizedType) ||
     normalizedType.startsWith("audio/");
 
-  if (!ALLOWED_AUDIO_EXTENSIONS.has(extension) || !typeAllowed) {
+  if (!isAllowedAudioExtension(extension) || !typeAllowed) {
     throw new AudioUploadError(
       "Unsupported audio format. Please upload MP3, WAV, M4A, OGG, AAC, FLAC, or WebM audio.",
     );

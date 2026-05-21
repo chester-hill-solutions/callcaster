@@ -97,14 +97,14 @@ export {
 } from "./database/stripe.server";
 
 // Re-export utility functions that are still used
-import { json } from "@remix-run/node";
+import { data } from "react-router";
 import { logger } from "./logger.server";
 
 export const parseRequestData = async (request: Request) => {
   const contentType = request.headers.get("Content-Type") ?? "";
   if (!contentType) return;
   if (contentType.includes("application/json")) {
-    return await request.json();
+    return await request.data();
   } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
     const formData = await request.formData();
     return Object.fromEntries(formData);
@@ -138,10 +138,10 @@ export async function safeParseJson<T = Record<string, unknown>>(
   request: Request
 ): Promise<T> {
   try {
-    return (await request.json()) as T;
+    return (await request.data()) as T;
   } catch (e) {
     if (e instanceof SyntaxError) {
-      throw json({ error: "Invalid JSON" }, { status: 400 });
+      throw data({ error: "Invalid JSON" }, { status: 400 });
     }
     throw e;
   }
@@ -166,7 +166,7 @@ export const parseActionRequest = async (
 
 export const handleError = (error: Error, message: string, status = 500) => {
   logger.error(`${message}:`, error);
-  return json({ error: message }, { status });
+  return data({ error: message }, { status });
 };
 
 // Legacy functions that need to be kept for now

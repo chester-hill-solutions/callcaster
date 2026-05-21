@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const listMock = vi.fn();
 const twilioCtor = vi.fn(function (this: any) {
   return {
@@ -107,7 +109,7 @@ function makeSupabaseStub(opts: {
   return { from };
 }
 
-describe("app/routes/api.numbers.tsx", () => {
+describe("app/routes/api+/numbers/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     listMock.mockReset();
@@ -149,10 +151,10 @@ describe("app/routes/api.numbers.tsx", () => {
     const prevToken = process.env.TWILIO_AUTH_TOKEN;
     delete process.env.TWILIO_SID;
     delete process.env.TWILIO_AUTH_TOKEN;
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/numbers"),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual([{ phoneNumber: "+1" }]);
     expect(listMock).toHaveBeenCalledWith({ limit: 10 });
@@ -167,10 +169,10 @@ describe("app/routes/api.numbers.tsx", () => {
     const prevToken = process.env.TWILIO_AUTH_TOKEN;
     process.env.TWILIO_SID = "sid";
     process.env.TWILIO_AUTH_TOKEN = "token";
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/numbers?areaCode=415"),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual([{ phoneNumber: "+2" }]);
     expect(listMock).toHaveBeenCalledWith({ areaCode: 415, limit: 10 });
@@ -181,10 +183,10 @@ describe("app/routes/api.numbers.tsx", () => {
 
   test("loader returns 500 and logs on Twilio error", async () => {
     listMock.mockRejectedValueOnce(new Error("boom"));
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/numbers"),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: expect.anything() });
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -201,13 +203,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({
@@ -226,13 +228,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ creditsError: true });
@@ -262,13 +264,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({
@@ -312,13 +314,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1666");
     fd.set("workspace_id", "w2");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({ newNumber: { id: 10 } });
@@ -368,13 +370,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "w3");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(201);
     expect(attach).toHaveBeenCalledWith({ phoneNumberSid: "PN789" });
@@ -391,13 +393,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1777");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -417,13 +419,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1888");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
   });
@@ -444,13 +446,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -485,13 +487,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
   });
@@ -519,13 +521,13 @@ describe("app/routes/api.numbers.tsx", () => {
     const fd = new FormData();
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "w1");
-    const mod = await import("../app/routes/api.numbers");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/numbers/route");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
   });

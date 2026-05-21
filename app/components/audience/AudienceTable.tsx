@@ -2,7 +2,7 @@ import { useEffect, useState, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { Download, Search, X } from "lucide-react";
-import { useFetcher, useSearchParams } from "@remix-run/react";
+import { useFetcher, useSearchParams } from "react-router";
 import { useOptimisticCollection } from "@/hooks/utils/useOptimisticMutation";
 import TablePagination from "@/components/shared/TablePagination";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ export function AudienceTable({
       method: "PATCH",
       body: formData,
     });
-    const result = await response.json();
+    const result = await response.data();
 
     if (response.ok) {
       setAudienceInfo(result);

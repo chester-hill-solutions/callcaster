@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # TypeScript Type Errors - Comprehensive Checklist
 
 **Status**: ~390 errors remaining (down from ~410)  

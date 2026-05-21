@@ -9,6 +9,15 @@
 
 - Prefer [app/components/ui/](app/components/ui/) primitives; use `FormField` for form layout, `Section`/`AuthCard` for page structure, `DataTable`/`TablePagination` for tables, and `toast()` from sonner (single root Toaster). See [docs/design-system.md](docs/design-system.md).
 
+## Routes (React Router 7)
+
+- Route discovery: [app/routes.ts](app/routes.ts) uses `remix-flat-routes` hybrid folders (`workspaces+/`, `api+/`, …). Each route is a **single module** (`folder/route.tsx`); React Router 7 splits `loader` / `action` / UI automatically — no manual `route.server.tsx`.
+- Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
+
+## Public APIs (doc-first / Hey API)
+
+- Integrator-facing JSON APIs: OpenAPI in [app/lib/openapi.ts](app/lib/openapi.ts), served at `/api/docs/openapi`. Doc-first workflow and Hey API conventions: [.cursor/skills/hey-api-openapi/SKILL.md](.cursor/skills/hey-api-openapi/SKILL.md).
+
 ## Learned Workspace Facts
 
 - `archive/deprecated/twilio-serverless/**` contains deprecated Twilio Serverless code and can generally be ignored for current runtime and coverage work.

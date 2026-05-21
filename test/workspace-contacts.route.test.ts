@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -55,7 +57,7 @@ function buildWorkspaceQuery(result: unknown) {
   };
 }
 
-describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
+describe("app/routes/workspaces+/route+/route_.$id_.contacts.tsx", () => {
   const workspaceId = "11111111-1111-1111-1111-111111111111";
 
   beforeEach(() => {
@@ -100,13 +102,13 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/workspaces+/route+/route+/route+/route_.$id_.contacts");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=jo`,
       ),
       params: { id: workspaceId },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
 
@@ -151,7 +153,7 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
+    const mod = await import("../app/routes/workspaces+/route+/route+/route+/route_.$id_.contacts");
     await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=example.com`,
@@ -199,7 +201,7 @@ describe("app/routes/workspaces_.$id_.contacts.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/workspaces_.$id_.contacts");
+    const mod = await import("../app/routes/workspaces+/route+/route+/route+/route_.$id_.contacts");
     await mod.loader({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=1234`,

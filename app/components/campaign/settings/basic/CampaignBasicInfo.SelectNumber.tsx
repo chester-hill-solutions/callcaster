@@ -1,4 +1,4 @@
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -29,7 +29,7 @@ export default function SelectNumber({
   if (!phoneNumbers.length) {
     return (
       <Button variant="outline" asChild>
-        <NavLink to="../../../settings/numbers">Get a Number</NavLink>
+        <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
       </Button>
     );
   }

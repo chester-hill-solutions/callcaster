@@ -1,8 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import {
+  getTransactionDisplayDescription,
+  type TransactionType,
+} from "@/lib/transaction-history-display";
 
-export type TransactionType = "DEBIT" | "CREDIT";
+export type { TransactionType } from "@/lib/transaction-history-display";
+export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
 
 function isUniqueViolation(error: unknown): boolean {
   if (!error || typeof error !== "object") {
@@ -94,26 +99,3 @@ export async function insertTransactionHistoryIdempotent(args: {
   }
 }
 
-export function getTransactionDisplayDescription(args: {
-  type: TransactionType;
-  amount: number;
-  note?: string | null;
-}): string {
-  const rawNote = args.note ?? "";
-  const withoutMarker = rawNote
-    .replace(/\s*\[idempotency:[^\]]+\]\s*/g, " ")
-    .trim();
-  const withoutStripeSession = withoutMarker
-    .replace(/,?\s*stripe_session:[^\s,]+/g, "")
-    .trim();
-
-  if (withoutStripeSession) {
-    return withoutStripeSession;
-  }
-
-  if (args.type === "CREDIT") {
-    return `Added ${args.amount} credits`;
-  }
-
-  return `Used ${args.amount} credits`;
-}

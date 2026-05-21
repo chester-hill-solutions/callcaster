@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -114,7 +116,7 @@ describe("outreach disposition transitions", () => {
     supabaseStub = makeSupabaseStub({ currentDisposition: "completed" });
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routes/api+/call/route-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_TERM");
     fd.set("CallStatus", "ringing");
@@ -126,7 +128,7 @@ describe("outreach disposition transitions", () => {
       body: fd,
     });
 
-    const res = await mod.action({ request: req } as any);
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
   });

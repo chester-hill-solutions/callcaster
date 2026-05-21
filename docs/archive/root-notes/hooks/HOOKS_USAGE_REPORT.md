@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Hooks Usage Report
 
 This document tracks the usage of all hooks in the codebase, identifying which hooks are actively used in routes/components, which are only used internally by other hooks, and which are not referenced anywhere.

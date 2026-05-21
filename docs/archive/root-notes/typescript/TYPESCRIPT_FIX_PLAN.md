@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # TypeScript Fix Plan
 
 ## Current Status

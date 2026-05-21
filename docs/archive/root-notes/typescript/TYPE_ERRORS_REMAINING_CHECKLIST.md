@@ -1,3 +1,5 @@
+> **Historical only** — notes may not match the current codebase.
+
 # Type Errors Remaining Checklist
 
 **Status**: ~390 errors remaining (down from ~400)

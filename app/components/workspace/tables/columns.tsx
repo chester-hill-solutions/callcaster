@@ -4,7 +4,7 @@ import { formatDateToLocale, formatTableText } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { MdDownload, MdEdit, MdRemoveCircle } from "react-icons/md";
 import { Button } from "@/components/ui/button";
-import { NavLink, useFetcher, useSubmit } from "@remix-run/react";
+import { NavLink, useFetcher, useSubmit } from "react-router";
 import { useEffect } from "react";
 
 function AudienceDownloadCell({ audienceId }: { audienceId: string | number }) {

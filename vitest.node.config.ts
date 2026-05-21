@@ -18,7 +18,7 @@ export default mergeConfig(
         all: false,
         include: [
           "app/lib/**/*.{ts,tsx,js,jsx}",
-          "app/routes/api*.{ts,tsx,js,jsx}",
+          "app/routes/**/*.{ts,tsx,js,jsx}",
           "app/**/*.server.{ts,tsx,js,jsx}",
           "app/twilio.server.{ts,js}",
         ],
@@ -35,8 +35,6 @@ export default mergeConfig(
           "app/lib/csvDownload.ts",
           "app/lib/errors.client.ts",
           "app/lib/form-validation.ts",
-          "app/routes/archive/**",
-          "app/routes/old.*",
           "supabase/functions/**",
         ],
       },
