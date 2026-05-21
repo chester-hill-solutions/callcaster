@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => {
       TWILIO_SID: vi.fn(() => "sid"),
       TWILIO_AUTH_TOKEN: vi.fn(() => "token"),
     },
-    logger: { error: vi.fn(), debug: vi.fn() },
+    logger: { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
   };
 });
 

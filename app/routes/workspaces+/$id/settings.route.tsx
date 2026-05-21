@@ -37,7 +37,6 @@ import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
-import Workspace from "./$id";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";

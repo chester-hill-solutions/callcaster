@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     validateTwilioWebhookParams: vi.fn(() => true),
     insertTransactionHistoryIdempotent: vi.fn(async () => null),
-    logger: { error: vi.fn(), debug: vi.fn() },
+    logger: { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() },
     createClient: vi.fn(),
     supabase: null as any,
   };

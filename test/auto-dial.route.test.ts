@@ -496,7 +496,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
         requireWorkspaceAccess: async () => {
           throw new Error("forbidden");
         },
-        logger: { warn: vi.fn(), error: vi.fn() } as any,
+        logger: { warn: vi.fn(), error: vi.fn() , info: vi.fn(), debug: vi.fn()} as any,
         createSupabaseServerClient: () =>
           ({ supabaseClient: {}, headers: new Headers() }) as any,
         safeParseJson: async () => ({

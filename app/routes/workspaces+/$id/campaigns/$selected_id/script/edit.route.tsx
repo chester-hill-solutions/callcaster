@@ -13,7 +13,7 @@ import {
   getWorkspaceScripts,
   listMedia,
 } from "@/lib/database.server";
-import { MessageSettings } from "@/components/settings/MessageSettings";
+import { MessageSettings } from "@/components/MessageSettings";
 import {
   Dialog,
   DialogContent,

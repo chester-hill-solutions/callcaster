@@ -95,7 +95,7 @@ async function resolveInboundWorkspaceContext(
   args: { toRaw: string; messagingServiceSid: string },
 ): Promise<
   | { ok: true; ctx: InboundWorkspaceContext; attributionPath: string }
-  | { ok: false; response: ReturnType<typeof json> }
+  | { ok: false; response: ReturnType<typeof routeData> }
 > {
   const normalizedTo = normalizeInboundToNumber(args.toRaw);
   const rawTrimmed = args.toRaw.trim();

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     hashApiKeyForStorage: vi.fn((k: string) => `hash:${k}`),
     API_KEY_PREFIX_LENGTH: 8,
     randomBytes: vi.fn((len: number) => Buffer.alloc(len, 1)),

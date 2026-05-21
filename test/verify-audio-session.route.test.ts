@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: { BASE_URL: vi.fn(() => "http://base") },
     VoiceResponse,
     say,

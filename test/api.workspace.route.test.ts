@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
         status: 500,
       }),
   ),
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   env: {
     SUPABASE_URL: () => "https://sb.example",
     SUPABASE_SERVICE_KEY: () => "svc",

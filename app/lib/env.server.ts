@@ -25,7 +25,7 @@ type EnvConfig = {
 
 import { REQUIRED_ENV_KEYS, validateRequiredEnv } from "./required-env-keys";
 
-const requiredEnvVars: (keyof EnvConfig)[] = [...REQUIRED_ENV_KEYS];
+const requiredEnvVars = [...REQUIRED_ENV_KEYS] as (keyof EnvConfig)[];
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
   'OPENAI_API_KEY',

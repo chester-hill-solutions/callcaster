@@ -16,7 +16,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const baseUrl = env.BASE_URL();
     const client = new Twilio.Twilio(accountSid, authToken);
-    const {to: toNumber}: RobocallRequest = await request.data();
+    const {to: toNumber}: RobocallRequest = await request.json();
 
     if (!/^[+]?[\d()\-\s]+$/.test(toNumber)) {
         return new Response("Invalid phone number.", { status: 400 });

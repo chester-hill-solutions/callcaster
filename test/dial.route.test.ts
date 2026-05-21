@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: { BASE_URL: () => "https://base.example" },
   };
 });

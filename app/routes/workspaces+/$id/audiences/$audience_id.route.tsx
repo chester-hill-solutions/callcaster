@@ -1,6 +1,5 @@
 
 import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 import { useEffect, useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
@@ -39,7 +38,7 @@ type LoaderData = {
   } | null;
 };
 
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -178,7 +177,7 @@ export default function AudienceView() {
         const response = await fetch(
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspace_id}`
         );
-        const data = await response.data();
+        const data = await response.json();
 
         if (data.error || data.status === "completed" || data.status === "error") {
           setCurrentUploadId(null);

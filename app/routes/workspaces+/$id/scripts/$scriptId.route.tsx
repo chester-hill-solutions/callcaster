@@ -7,7 +7,6 @@ import CampaignSettingsScript from "@/components/campaign/settings/script/Campai
 import { deepEqual } from "@/lib/utils";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { getUserRole, listMedia } from "@/lib/database.server";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { Script, WorkspaceData } from "@/lib/types";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -47,7 +46,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     userRole,
   });
 };
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export const action = async ({ request, params }: ActionFunctionArgs  ) => {
   const campaignId = params.selected_id;
@@ -104,7 +103,7 @@ export default function ScriptEditor() {
         }),
         headers: { "Content-Type": "application/json" },
       });
-      const result = await response.data();
+      const result = await response.json();
 
       if (result.error) {
         throw new Error(result.error);

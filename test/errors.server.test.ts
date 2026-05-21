@@ -1,4 +1,5 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { asRouteResponse } from "./helpers/route-result";
 
 const loggerMock = vi.hoisted(() => ({ error: vi.fn() }));
 vi.mock("@/lib/logger.server", () => ({ logger: loggerMock }));
@@ -32,11 +33,13 @@ describe("errors.server", () => {
   test("createErrorResponse handles AppError and attaches headers", async () => {
     const mod = await import("../app/lib/errors.server");
     const headers = new Headers({ "X-Test": "1" });
-    const res = mod.createErrorResponse(
-      new mod.AppError("bad", 400, mod.ErrorCode.VALIDATION_ERROR, { field: "x" }),
-      "fallback",
-      500,
-      { headers },
+    const res = await asRouteResponse(
+      mod.createErrorResponse(
+        new mod.AppError("bad", 400, mod.ErrorCode.VALIDATION_ERROR, { field: "x" }),
+        "fallback",
+        500,
+        { headers },
+      ),
     );
     expect(res.status).toBe(400);
     expect(res.headers.get("X-Test")).toBe("1");
@@ -51,7 +54,9 @@ describe("errors.server", () => {
 
   test("createErrorResponse handles Error", async () => {
     const mod = await import("../app/lib/errors.server");
-    const res = mod.createErrorResponse(new Error("boom"), "fallback", 503);
+    const res = await asRouteResponse(
+      mod.createErrorResponse(new Error("boom"), "fallback", 503),
+    );
     expect(res.status).toBe(503);
     await expect(res.json()).resolves.toMatchObject({
       error: "boom",
@@ -60,7 +65,7 @@ describe("errors.server", () => {
     });
 
     // Covers defaultMessage/defaultStatusCode defaults + error.message falsy path
-    const res2 = mod.createErrorResponse(new Error(""));
+    const res2 = await asRouteResponse(mod.createErrorResponse(new Error("")));
     expect(res2.status).toBe(500);
     await expect(res2.json()).resolves.toMatchObject({
       error: "An error occurred",
@@ -70,13 +75,19 @@ describe("errors.server", () => {
 
   test("createErrorResponse handles {message} objects and unknowns", async () => {
     const mod = await import("../app/lib/errors.server");
-    const res1 = mod.createErrorResponse({ message: "m1" }, "fallback", 500);
+    const res1 = await asRouteResponse(
+      mod.createErrorResponse({ message: "m1" }, "fallback", 500),
+    );
     await expect(res1.json()).resolves.toMatchObject({ error: "m1" });
 
-    const res1b = mod.createErrorResponse({ message: "" } as any);
+    const res1b = await asRouteResponse(
+      mod.createErrorResponse({ message: "" } as any),
+    );
     await expect(res1b.json()).resolves.toMatchObject({ error: "An error occurred" });
 
-    const res2 = mod.createErrorResponse(123, "fallback", 500);
+    const res2 = await asRouteResponse(
+      mod.createErrorResponse(123, "fallback", 500),
+    );
     await expect(res2.json()).resolves.toMatchObject({ error: "fallback" });
   });
 

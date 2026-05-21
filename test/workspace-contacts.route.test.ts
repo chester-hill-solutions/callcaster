@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => {
     getUserRole: vi.fn(),
     logger: {
       error: vi.fn(),
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
     },
   };
 });

@@ -1,4 +1,5 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { asRouteResponse, normalizeRouteResult } from "./helpers/route-result";
 
 const loggerMocks = vi.hoisted(() => {
   return { error: vi.fn() };
@@ -123,12 +124,10 @@ describe("database.server helpers", () => {
     try {
       await mod.safeParseJson(bad);
       throw new Error("expected throw");
-    } catch (e: any) {
-      expect(e).toBeInstanceOf(Response);
-      expect((e as Response).status).toBe(400);
-      await expect((e as Response).json()).resolves.toEqual({
-        error: "Invalid JSON",
-      });
+    } catch (e: unknown) {
+      const normalized = await normalizeRouteResult(e);
+      expect(normalized.status).toBe(400);
+      expect(normalized.body).toEqual({ error: "Invalid JSON" });
     }
 
     const nonSyntaxReq = {
@@ -186,13 +185,13 @@ describe("database.server helpers", () => {
 
   test("handleError logs and returns json response", async () => {
     const mod = await import("../app/lib/database.server");
-    const res = mod.handleError(new Error("boom"), "nope", 418);
+    const res = await asRouteResponse(mod.handleError(new Error("boom"), "nope", 418));
     expect(res.status).toBe(418);
     await expect(res.json()).resolves.toEqual({ error: "nope" });
     expect(loggerMocks.error).toHaveBeenCalled();
 
     // Covers default status param = 500
-    const res2 = mod.handleError(new Error("boom"), "nope");
+    const res2 = await asRouteResponse(mod.handleError(new Error("boom"), "nope"));
     expect(res2.status).toBe(500);
   });
 

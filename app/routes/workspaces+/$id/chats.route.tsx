@@ -48,7 +48,7 @@ import type {
   WorkspaceNumber,
 } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
-import { sendMessage } from "./api.chat_sms";
+import { sendMessage } from "@/routes/api+/chat_sms";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import {
   getConversationParticipantPhones,

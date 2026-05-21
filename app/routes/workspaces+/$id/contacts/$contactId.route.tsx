@@ -1,6 +1,5 @@
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useSubmit } from "react-router";
 import { FaPlus } from "react-icons/fa";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 import { useState, useEffect, useCallback } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -13,7 +12,7 @@ import type { Audience, Contact, WorkspaceData, User } from "@/lib/types";
 import type { MemberRole } from "@/components/workspace/TeamMember";
 import { logger } from "@/lib/logger.server";
 
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export interface LoaderData {
   workspace: WorkspaceData;
@@ -48,7 +47,7 @@ export interface ContactScreenState {
 export const loader = async ({
   request,
   params,
-}: LoaderFunctionArgs): Promise<Response> => {
+}: LoaderFunctionArgs) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id) {
@@ -131,7 +130,7 @@ export const loader = async ({
 export const action = async ({
   request,
   params,
-}: ActionFunctionArgs): Promise<Response> => {
+}: ActionFunctionArgs) => {
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id || !selected_id) {

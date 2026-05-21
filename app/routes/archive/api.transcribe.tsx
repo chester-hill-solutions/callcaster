@@ -24,7 +24,7 @@ async function transcribeAudio(audioBuffer: ArrayBuffer) {
             response_format:"json"
         })
     });
-    return response.data();
+    return response.json();
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {

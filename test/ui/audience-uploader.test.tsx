@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => {
       cb: null as null | (() => Promise<void> | void),
       ms: null as any,
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     onUploadComplete: vi.fn(),
   };
 });

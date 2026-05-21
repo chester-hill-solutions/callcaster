@@ -101,7 +101,7 @@ export function AudienceTable({
       method: "PATCH",
       body: formData,
     });
-    const result = await response.data();
+    const result = await response.json();
 
     if (response.ok) {
       setAudienceInfo(result);

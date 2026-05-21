@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     send: vi.fn(),
     safeParseJson: vi.fn(),
     verifyAuth: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

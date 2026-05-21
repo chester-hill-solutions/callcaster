@@ -250,7 +250,7 @@ export const handleQueue = ({
     const res = await fetch(
       `/api/queues?campaign_id=${campaign.id}&workspace_id=${workspaceId}&limit=${length}`,
     )
-      .then((res) => res.data())
+      .then((res) => res.json())
       .then((json) => updateQueue(json))
       .catch((error) => logger.error("Unable to fetch queue: ", error));
   };

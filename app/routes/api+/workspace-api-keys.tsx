@@ -64,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
 
   if (request.method === "POST") {
-    const body = await request.data().catch(() => ({})) as {
+    const body = await request.json().catch(() => ({})) as {
       workspace_id?: string;
       name?: string;
     };
@@ -112,7 +112,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (request.method === "DELETE") {
-    const body = await request.data().catch(() => ({})) as {
+    const body = await request.json().catch(() => ({})) as {
       id?: string;
       workspace_id?: string;
     };

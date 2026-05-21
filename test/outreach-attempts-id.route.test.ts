@@ -37,9 +37,9 @@ describe("app/routes/api+/outreach_attempts/$id/route.js", () => {
       params: { id: "1" },
     } as any));
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: { message: "bad" } });
-    expect(from).toHaveBeenCalledWith("outreach_attempts");
+    expect(from).toHaveBeenCalledWith("outreach_attempt");
     expect(update).toHaveBeenCalledWith({ a: 1 });
     expect(eq).toHaveBeenCalledWith("id", "1");
   });

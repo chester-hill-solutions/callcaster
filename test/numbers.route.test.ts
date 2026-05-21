@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
       BASE_URL: vi.fn(() => "http://base"),
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

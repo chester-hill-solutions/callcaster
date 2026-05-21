@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+
 import { createClient } from '@supabase/supabase-js';
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";

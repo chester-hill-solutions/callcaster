@@ -20,7 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Heading } from "@/components/ui/typography";
-export { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 interface Workspace {
   id: string;

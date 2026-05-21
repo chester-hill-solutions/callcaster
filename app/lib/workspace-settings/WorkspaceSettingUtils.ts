@@ -268,7 +268,7 @@ export async function testWebhook(
     let data;
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
-      data = await response.data();
+      data = await response.json();
     } else {
       data = await response.text();
     }

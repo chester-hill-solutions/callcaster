@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
       BASE_URL: () => "https://base.example",
       TWILIO_AUTH_TOKEN: () => "fallback-token",
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

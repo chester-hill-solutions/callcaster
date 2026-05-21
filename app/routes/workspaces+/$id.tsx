@@ -15,7 +15,6 @@ import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
 import { Campaign, ContextType, User } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
@@ -243,4 +242,4 @@ export default function Workspace() {
   );
 }
 
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

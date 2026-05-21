@@ -12,7 +12,10 @@ export function formatZodError(error: ZodError): string {
   return message || "Validation failed";
 }
 
-export function validationErrorResponse(error: ZodError, status = 400): Response {
+export function validationErrorResponse(
+  error: ZodError,
+  status = 400,
+): ReturnType<typeof routeData> {
   return routeData({ error: formatZodError(error) }, { status });
 }
 

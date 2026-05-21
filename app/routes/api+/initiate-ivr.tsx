@@ -37,7 +37,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const res = await fetch(`${env.BASE_URL()}/api/ivr`, {
             body: formData,
             method: "POST",
-        }).then(e => e.data()).catch((e) => {
+        }).then(e => e.json()).catch((e) => {
             logger.error("Error initiating IVR call:", e);
             return null;
         })

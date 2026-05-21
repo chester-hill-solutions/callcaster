@@ -49,7 +49,7 @@ vi.mock("@/components/shared/TablePagination", () => ({
 }));
 
 vi.mock("@/lib/logger.client", () => ({
-  logger: { error: (...args: any[]) => mocks.loggerError(...args) },
+  logger: { error: (...args: any[]) => mocks.loggerError(...args) , info: vi.fn(), debug: vi.fn()},
 }));
 
 vi.mock("lucide-react", () => ({

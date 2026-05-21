@@ -6,6 +6,7 @@ import {
   parseSearchParams,
   validationErrorResponse,
 } from "../app/lib/api-parse.server";
+import { asRouteResponse, normalizeRouteResult } from "./helpers/route-result";
 
 describe("api-parse.server", () => {
   test("formatZodError includes path and message", () => {
@@ -22,7 +23,7 @@ describe("api-parse.server", () => {
     const result = schema.safeParse({ id: "nope" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      const res = validationErrorResponse(result.error);
+      const res = await asRouteResponse(validationErrorResponse(result.error));
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toMatchObject({
         error: expect.stringContaining("id:"),
@@ -47,9 +48,13 @@ describe("api-parse.server", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ count: "bad" }),
     });
-    await expect(parseJsonBody(request, schema)).rejects.toMatchObject({
-      status: 400,
-    });
+    await expect(parseJsonBody(request, schema)).rejects.toSatisfy(
+      async (thrown: unknown) => {
+        const { status } = await normalizeRouteResult(thrown);
+        expect(status).toBe(400);
+        return true;
+      },
+    );
   });
 
   test("parseSearchParams returns ok data or error", () => {

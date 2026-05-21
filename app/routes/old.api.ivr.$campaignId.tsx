@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   ensureWorkspaceTwilioBootstrap: vi.fn(),
   provisionWorkspaceA2P: vi.fn(),
   updateWorkspaceRcsOnboarding: vi.fn(),
-  logger: { error: vi.fn() },
+  logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
 }));
 
 vi.mock("@/lib/supabase.server", () => ({

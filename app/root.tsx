@@ -125,10 +125,10 @@ export default function App() {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
-      return routeData({ success: null, error: signOutError.message });
+      return { success: null, error: signOutError.message };
     }
     navigate("/");
-    return routeData({ success: "Sign off successful", error: null });
+    return { success: "Sign off successful", error: null };
   }
 
   useEffect(() => {

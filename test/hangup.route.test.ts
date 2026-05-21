@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     parseActionRequest: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

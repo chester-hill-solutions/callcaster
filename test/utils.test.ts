@@ -180,20 +180,26 @@ describe("app/lib/utils.ts", () => {
   });
 
   test("parseCSV logs and throws on parse error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.resetModules();
-    vi.doMock("csv-parse/sync", () => ({ parse: () => {
-      throw new Error("bad");
-    }}));
+    vi.doMock("csv-parse/sync", () => ({
+      parse: () => {
+        throw new Error("bad");
+      },
+    }));
     const mod = await import("../app/lib/utils");
     expect(() => mod.parseCSV("x")).toThrow("Failed to parse CSV file");
-    expect(logger.error).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   test("parseCSV logs and throws on internal mapping errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const mod = await import("../app/lib/utils");
     const csv = ["Email", ""].join("\n"); // empty value becomes null => parseEmail throws
     expect(() => mod.parseCSV(csv)).toThrow("Failed to parse CSV file");
-    expect(logger.error).toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
   });
 
   test("campaignTypeText maps known types and default", async () => {

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     sendEmail: vi.fn(),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(),
     env: {
       RESEND_API_KEY: () => "rk",

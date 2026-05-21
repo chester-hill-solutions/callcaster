@@ -15,14 +15,13 @@ import {
 } from "@/lib/callscreenActions";
 import { checkSchedule, getUserRole } from "@/lib/database.server";
 import { playTone } from "@/lib/utils";
-import { generateToken } from "./api.token";
+import { generateToken } from "@/routes/api+/token";
 
 // Component imports
 import { QueueList } from "@/components/call/CallScreen.QueueList";
 import { CallArea } from "@/components/call/CallScreen.CallArea";
 import { CallQuestionnaire } from "@/components/call/CallScreen.Questionnaire";
 import { Household } from "@/components/call/CallScreen.Household";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { CampaignHeader } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
@@ -61,7 +60,7 @@ import { Tables } from "@/lib/database.types";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { logger } from "@/lib/logger.client";
 
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 async function getCallScreenData(supabase: SupabaseClient, campaignId: string, workspaceId: string, userId: string) {
   const [

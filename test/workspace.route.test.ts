@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -32,16 +32,19 @@ vi.mock("@/lib/supabase.server", () => ({
   })),
 }));
 
-function makeSupabaseUpdateSingle(result: { data: any; error: any }) {
+function makeSupabaseWorkspaceClient(result: { data: any; error: any }) {
+  const terminal = {
+    eq: vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(async () => result),
+      })),
+      single: vi.fn(async () => result),
+    })),
+  };
   return {
     from: vi.fn(() => ({
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(async () => result),
-          })),
-        })),
-      })),
+      select: vi.fn(() => terminal),
+      update: vi.fn(() => terminal),
     })),
   };
 }
@@ -61,7 +64,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
   test("returns 200 with updated row", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w1" });
     mocks.createClient.mockReturnValueOnce(
-      makeSupabaseUpdateSingle({
+      makeSupabaseWorkspaceClient({
         data: { id: "w1", twilio_data: {} },
         error: null,
       }),
@@ -86,7 +89,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
   test("returns 500 and logs when update throws", async () => {
     mocks.safeParseJson.mockResolvedValueOnce({ workspace_id: "w2" });
     mocks.createClient.mockReturnValueOnce(
-      makeSupabaseUpdateSingle({ data: null, error: { message: "bad" } }),
+      makeSupabaseWorkspaceClient({ data: null, error: { message: "bad" } }),
     );
 
     const mod = await import("../app/routes/api+/workspace");

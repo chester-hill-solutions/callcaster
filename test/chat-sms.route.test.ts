@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
     env: { SUPABASE_URL: vi.fn(() => "http://supabase") },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

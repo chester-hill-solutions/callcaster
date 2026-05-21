@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(async () => ({ ok: true })),
   };
 });

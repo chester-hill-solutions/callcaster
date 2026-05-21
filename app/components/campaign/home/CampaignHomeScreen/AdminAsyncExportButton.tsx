@@ -31,7 +31,7 @@ export const AdminAsyncExportButton = ({ campaignId, workspaceId }: AdminAsyncEx
           const response = await fetch(
             `/api/campaign-export-status?exportId=${encodeURIComponent(exportId)}&workspaceId=${encodeURIComponent(workspaceIdStr)}`,
           );
-          const data = await response.routeData();
+          const data = await response.json();
           
           setExportStatus(data.status);
           if (data.progress) setProgress(data.progress);
@@ -100,7 +100,7 @@ export const AdminAsyncExportButton = ({ campaignId, workspaceId }: AdminAsyncEx
         body: formData,
       });
       
-      const data = await response.routeData();
+      const data = await response.json();
       
       if (response.ok) {
         setExportId(data.exportId);

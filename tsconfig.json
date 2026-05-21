@@ -12,7 +12,10 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "supabase/functions/**",
-    "archive/deprecated/twilio-serverless/**"
+    "archive/deprecated/twilio-serverless/**",
+    "app/routes/archive/**",
+    "app/routes/old*",
+    "app/routes/old.**"
   ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],

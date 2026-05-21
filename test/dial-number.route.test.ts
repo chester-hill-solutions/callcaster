@@ -4,7 +4,7 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
   return {
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: { BASE_URL: () => "https://base.example" },
     dialNumberThrows: false,
   };

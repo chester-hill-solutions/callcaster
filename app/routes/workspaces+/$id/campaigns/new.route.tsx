@@ -63,7 +63,12 @@ export default function CampaignsNew() {
     >
       {actionData?.error != null && (
         <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-          Error: {actionData.error.message}
+          Error:{" "}
+          {typeof actionData.error === "object" &&
+          actionData.error !== null &&
+          "message" in actionData.error
+            ? String(actionData.error.message)
+            : String(actionData.error)}
         </p>
       )}
       <Card bgColor="bg-brand-secondary dark:bg-zinc-900">

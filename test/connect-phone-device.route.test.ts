@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     createSupabaseServerClient: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     twilioCreate: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: {
       TWILIO_PHONE_NUMBER: () => "+15550000000",
       BASE_URL: () => "https://base.example",

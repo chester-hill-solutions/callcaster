@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

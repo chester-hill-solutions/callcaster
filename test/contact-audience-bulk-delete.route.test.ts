@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     removeContactsFromAudience: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

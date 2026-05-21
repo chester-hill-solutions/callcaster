@@ -1,4 +1,5 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
+import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
@@ -34,12 +35,14 @@ type LoaderData = {
   mediaNames: { id: number; name: string }[];
   users: User[];
   user: User;
+  creditsBalance: number;
 };
 
 export type AvailableNumber = {
   phoneNumber: string;
   friendlyName: string;
   region?: string;
+  locality?: string;
   capabilities: Record<string, boolean>;
 };
 
@@ -63,6 +66,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   });
   const { data: phoneNumbers, error: numbersError } =
     await getWorkspacePhoneNumbers({ supabaseClient, workspaceId });
+  const { data: workspace } = await supabaseClient
+    .from("workspace")
+    .select("credits")
+    .eq("id", workspaceId)
+    .single();
   const { data: mediaNames } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId);
@@ -80,6 +88,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         workspaceId,
         mediaNames,
         users,
+        creditsBalance: workspace?.credits ?? 0,
       },
       { headers },
     );
@@ -91,6 +100,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspaceId,
       user,
       users,
+      creditsBalance: workspace?.credits ?? 0,
     },
     { headers },
   );
@@ -177,7 +187,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       method: "POST",
     });
     const { validationRequest, numberRequest }: CallerIDResponse =
-      await res.data();
+      await res.json();
     return { validationRequest, numberRequest };
   } else if (formName === "remove-number") {
     const { formName: _ignoredFormName, ...removeNumberData } = data;
@@ -248,13 +258,14 @@ const WorkspaceSettings = () => {
     user,
     users,
     mediaNames,
+    creditsBalance,
   } = useLoaderData<LoaderData>();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
   const actionData = useActionData<CallerIDResponse>();
   const [isDialogOpen, setDialog] = useState<boolean>(
     !!actionData?.validationRequest,
   );
-  const fetcher = useFetcher<FetcherData>();
+  const fetcher = useFetcher<NumbersSearchFetcherData>();
   const updateFetcher = useFetcher();
 
   const { phoneNumbers, setPhoneNumbers } = useSupabaseRealtime({
@@ -376,6 +387,7 @@ const WorkspaceSettings = () => {
               <NumberPurchase
                 fetcher={fetcher}
                 workspaceId={workspaceId ?? ""}
+                creditsBalance={creditsBalance}
               />
             </Panel>
           </div>

@@ -54,11 +54,11 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
     });
 
     if (!response.ok) {
-      const errorData = await response.routeData().catch(() => ({ message: 'Network response was not ok' }));
+      const errorData = await response.json().catch(() => ({ message: 'Network response was not ok' }));
       throw new Error(errorData.message || 'Network response was not ok');
     }
 
-    return await response.routeData();
+    return await response.json();
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -106,7 +106,7 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
-    const data = await response.routeData();
+    const data = await response.json();
 
     if (data.creditsError) {
       return {

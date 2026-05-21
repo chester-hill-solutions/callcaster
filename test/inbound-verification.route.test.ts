@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
     },
-    logger: { debug: vi.fn(), error: vi.fn() },
+    logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     VoiceResponse,
     say,
     hangup,

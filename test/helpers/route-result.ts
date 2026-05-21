@@ -1,16 +1,38 @@
 /** Normalize RR7 loader/action return values in route unit tests. */
+function statusFromInit(init: number | { status?: number; headers?: Headers } | null | undefined): number {
+  if (typeof init === "number") return init;
+  if (init && typeof init === "object" && "status" in init) {
+    return init.status ?? 200;
+  }
+  return 200;
+}
+
+function headersFromInit(
+  init: number | { status?: number; headers?: Headers } | null | undefined,
+): Headers {
+  if (init && typeof init === "object" && "headers" in init && init.headers) {
+    return init.headers;
+  }
+  return new Headers();
+}
+
 export async function normalizeRouteResult(result: unknown): Promise<{
   status: number;
   body: unknown;
+  headers: Headers;
 }> {
   if (result instanceof Response) {
-    let body: unknown = null;
-    try {
-      body = await result.json();
-    } catch {
-      body = await result.text();
+    const text = await result.text();
+    const contentType = result.headers.get("Content-Type") ?? "";
+    let body: unknown = text;
+    if (contentType.includes("application/json")) {
+      try {
+        body = JSON.parse(text);
+      } catch {
+        body = text;
+      }
     }
-    return { status: result.status, body };
+    return { status: result.status, body, headers: result.headers };
   }
 
   if (
@@ -21,30 +43,30 @@ export async function normalizeRouteResult(result: unknown): Promise<{
   ) {
     const wrapped = result as {
       data: unknown;
-      init?: number | { status?: number } | null;
+      init?: number | { status?: number; headers?: Headers } | null;
     };
     const init = wrapped.init;
-    const status =
-      typeof init === "number"
-        ? init
-        : init && typeof init === "object" && "status" in init
-          ? (init.status ?? 200)
-          : 200;
-    return { status, body: wrapped.data };
+    return {
+      status: statusFromInit(init),
+      body: wrapped.data,
+      headers: headersFromInit(init),
+    };
   }
 
-  return { status: 200, body: result };
+  return { status: 200, body: result, headers: new Headers() };
 }
 
 /** Response-shaped wrapper so existing route tests can keep `res.status` / `res.json()`. */
 export async function asRouteResponse(result: unknown): Promise<{
   status: number;
+  headers: Headers;
   json: () => Promise<unknown>;
   text: () => Promise<string>;
 }> {
-  const { status, body } = await normalizeRouteResult(result);
+  const { status, body, headers } = await normalizeRouteResult(result);
   return {
     status,
+    headers,
     json: async () => body,
     text: async () =>
       typeof body === "string" ? body : JSON.stringify(body ?? ""),

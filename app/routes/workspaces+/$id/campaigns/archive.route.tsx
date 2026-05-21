@@ -7,7 +7,6 @@ import { Campaign } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, user, headers } = await verifyAuth(request);
@@ -132,5 +131,5 @@ export default function ArchivedCampaigns() {
   );
 }
 
-export { ErrorBoundary };
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 

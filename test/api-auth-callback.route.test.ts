@@ -11,6 +11,8 @@ vi.mock("@/lib/env.server", () => ({
 vi.mock("@/lib/logger.server", () => ({
   logger: {
     error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
   },
 }));
 

@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     navbarProps: null as any,
     navigate: vi.fn(),
     unsubscribe: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     envUtil: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "pk"),

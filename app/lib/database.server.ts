@@ -104,7 +104,7 @@ export const parseRequestData = async (request: Request) => {
   const contentType = request.headers.get("Content-Type") ?? "";
   if (!contentType) return;
   if (contentType.includes("application/json")) {
-    return await request.data();
+    return await request.json();
   } else if (contentType.startsWith("application/x-www-form-urlencoded")) {
     const formData = await request.formData();
     return Object.fromEntries(formData);
@@ -138,7 +138,7 @@ export async function safeParseJson<T = Record<string, unknown>>(
   request: Request
 ): Promise<T> {
   try {
-    return (await request.data()) as T;
+    return (await request.json()) as T;
   } catch (e) {
     if (e instanceof SyntaxError) {
       throw routeData({ error: "Invalid JSON" }, { status: 400 });

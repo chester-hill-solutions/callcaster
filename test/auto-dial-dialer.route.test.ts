@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     safeParseJson: vi.fn(),
-    logger: { debug: vi.fn(), error: vi.fn() },
+    logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",

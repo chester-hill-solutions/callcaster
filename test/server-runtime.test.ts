@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 
 async function startTestServer(acceptingTraffic = true) {
-  const readyState = { acceptingTraffic };
+  const readyState = { acceptingTraffic, buildReady: true };
   const app = createApp({
     build: {},
     readyState,
@@ -102,7 +102,13 @@ describe("server runtime", () => {
     const ready = await requestServer(server, "/readyz");
 
     expect(ready.statusCode).toBe(503);
-    expect(ready.body).toBe(JSON.stringify({ ok: false }));
+    expect(ready.body).toBe(
+      JSON.stringify({
+        ok: false,
+        buildReady: true,
+        acceptingTraffic: false,
+      }),
+    );
   });
 
   test("fails fast when required env vars are missing", () => {

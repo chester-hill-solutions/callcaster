@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

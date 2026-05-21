@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
         headers: { "Content-Type": "application/json" },
       });
     }),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

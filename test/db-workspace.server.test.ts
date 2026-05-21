@@ -467,12 +467,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r1 = await mod.addUserToWorkspace({
+    const r1 = await asRouteResponse(await mod.addUserToWorkspace({
       supabaseClient: supabaseErr,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
-    });
+    }));
     expect(r1.data).toBeNull();
     expect(r1.error).toBeTruthy();
     expect(logger.error).toHaveBeenCalled();
@@ -486,12 +486,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r2 = await mod.addUserToWorkspace({
+    const r2 = await asRouteResponse(await mod.addUserToWorkspace({
       supabaseClient: supabaseOk,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
-    });
+    }));
     expect(r2).toEqual({ data: { id: 1 }, error: null });
   });
 
@@ -607,11 +607,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r1 = await mod.handleExistingUserSession(
+    const r1 = await asRouteResponse(await mod.handleExistingUserSession(
       supabaseErr,
       serverSession,
       headers,
-    );
+    ));
     expect(r1.status).toBe(200);
     expect(await r1.json()).toMatchObject({ invites: [], newSession: null });
 
@@ -622,11 +622,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r2 = await mod.handleExistingUserSession(
+    const r2 = await asRouteResponse(await mod.handleExistingUserSession(
       supabaseOk,
       serverSession,
       headers,
-    );
+    ));
     expect(await r2.json()).toMatchObject({
       newSession: serverSession,
       error: null,
@@ -638,23 +638,23 @@ describe("app/lib/database/workspace.server.ts", () => {
     const headers = new Headers();
 
     const supabaseNoHash: any = { auth: {} };
-    const r0 = await mod.handleNewUserOTPVerification(
+    const r0 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseNoHash,
       "",
       "signup" as any,
       headers,
-    );
+    ));
     expect(await r0.json()).toEqual({ error: "Invalid invitation link" });
 
     const supabaseVerifyErr: any = {
       auth: { verifyOtp: async () => ({ data: null, error: new Error("x") }) },
     };
-    const r1 = await mod.handleNewUserOTPVerification(
+    const r1 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseVerifyErr,
       "th",
       "signup" as any,
       headers,
-    );
+    ));
     expect(((await r1.json()) as any).error).toBeTruthy();
 
     const supabaseNoSession: any = {
@@ -662,12 +662,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         verifyOtp: async () => ({ data: { session: null }, error: null }),
       },
     };
-    const r2 = await mod.handleNewUserOTPVerification(
+    const r2 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseNoSession,
       "th",
       "signup" as any,
       headers,
-    );
+    ));
     expect(await r2.json()).toEqual({ error: "Failed to create session" });
 
     const supabaseSessionErr: any = {
@@ -679,12 +679,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         setSession: async () => ({ error: new Error("set") }),
       },
     };
-    const r3 = await mod.handleNewUserOTPVerification(
+    const r3 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseSessionErr,
       "th",
       "signup" as any,
       headers,
-    );
+    ));
     expect(((await r3.json()) as any).error).toBeTruthy();
 
     const supabaseInviteErr: any = {
@@ -701,12 +701,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r4 = await mod.handleNewUserOTPVerification(
+    const r4 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseInviteErr,
       "th",
       "signup" as any,
       headers,
-    );
+    ));
     expect(((await r4.json()) as any).error).toBeTruthy();
 
     const supabaseOk: any = {
@@ -723,12 +723,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r5 = await mod.handleNewUserOTPVerification(
+    const r5 = await asRouteResponse(await mod.handleNewUserOTPVerification(
       supabaseOk,
       "th",
       "signup" as any,
       headers,
-    );
+    ));
     expect(await r5.json()).toMatchObject({ invites: [{ id: 1 }] });
   });
 
@@ -837,11 +837,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r2 = await mod.removeWorkspacePhoneNumber({
+    const r2 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseNoName,
       workspaceId: "w1",
       numberId: 1n as any,
-    });
+    }));
     expect(r2.error).toBeTruthy();
 
     const supabaseNumberErr: any = {
@@ -859,11 +859,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r3 = await mod.removeWorkspacePhoneNumber({
+    const r3 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseNumberErr,
       workspaceId: "w1",
       numberId: 1n as any,
-    });
+    }));
     expect(r3.error).toBeTruthy();
 
     const supabaseDeleteErr: any = {
@@ -887,11 +887,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r4 = await mod.removeWorkspacePhoneNumber({
+    const r4 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseDeleteErr,
       workspaceId: "w1",
       numberId: 1n as any,
-    });
+    }));
     expect(r4.error).toBeTruthy();
   });
 

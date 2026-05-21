@@ -25,7 +25,7 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
       intervalId = setInterval(async () => {
         try {
           const response = await fetch(`/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`);
-          const data = await response.routeData();
+          const data = await response.json();
           
           setExportStatus(data.status);
           if (data.progress) setProgress(data.progress);
@@ -85,7 +85,7 @@ export const AsyncExportButton = ({ campaignId, workspaceId }: AsyncExportButton
         body: formData,
       });
       
-      const data = await response.routeData();
+      const data = await response.json();
       
       if (response.ok) {
         setExportId(data.exportId);

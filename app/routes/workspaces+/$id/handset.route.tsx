@@ -126,7 +126,7 @@ export default function HandsetPage() {
     const url = `/api/handset-token?workspace=${encodeURIComponent(workspaceId)}&client_identity=${encodeURIComponent(clientIdentity)}`;
     fetch(url, { credentials: "include" })
       .then(async (r) => {
-        const data = await r.data();
+        const data = await r.json();
         if (!r.ok) {
           setTokenError(data.error ?? `Request failed (${r.status})`);
           return;

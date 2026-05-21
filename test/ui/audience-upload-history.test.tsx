@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
     outletContext: { supabase: null as any },
     realtimeOpts: null as any,
     formatDistanceToNow: vi.fn(() => "2 minutes ago"),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

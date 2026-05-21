@@ -117,7 +117,7 @@ export default function NewAudience() {
         <CardTitle>Add an Audience</CardTitle>
         {actionData?.error != null && (
           <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-            Error: {actionData.error.message}
+            Error: {String(actionData.error)}
           </p>
         )}
         <CardContent>

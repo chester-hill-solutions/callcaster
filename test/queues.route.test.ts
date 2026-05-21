@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     getSupabaseServerClientWithSession: vi.fn(),
     safeParseJson: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

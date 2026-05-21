@@ -26,7 +26,7 @@ const authToken = env.TWILIO_AUTH_TOKEN();
 const baseUrl = env.BASE_URL();
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const formData: MessageRequest = await request.data();
+    const formData: MessageRequest = await request.json();
     const toNumber = formatPhoneNumber(formData.to);
     logger.debug("Message toNumber", toNumber);
     const body = formData.messageBody
