@@ -1,6 +1,6 @@
 
 
-import { data as routeData, Links, Meta, Outlet, Params, Scripts, ScrollRestoration, redirect, useLoaderData, useNavigate } from "react-router";
+import { data as routeData, Links, Meta, Outlet, Params, Scripts, ScrollRestoration, redirect, useLoaderData, useNavigate, isRouteErrorResponse, useRouteError } from "react-router";
 import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
@@ -16,7 +16,6 @@ import { Database } from "./lib/database.types";
 import { Session } from "@supabase/supabase-js";
 import { env as envUtil } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 type LoaderData = {
   env: ENV;
@@ -181,4 +180,31 @@ export default function App() {
   );
 }
 
-export { ErrorBoundary };
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : "An unexpected error occurred";
+
+  return (
+    <html lang="en">
+      <body>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
+            <h3 className="text-lg font-medium text-gray-900">Something went wrong</h3>
+            <p className="mt-2 text-sm text-gray-500">{message}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </body>
+    </html>
+  );
+}
