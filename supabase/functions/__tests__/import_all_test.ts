@@ -25,7 +25,6 @@ const modules = [
   "../sms-handler/index.ts",
   "../sms-status/index.ts",
   "../twilio-open-sync/index.ts",
-  "../number-rental-billing/index.ts",
   "../update_audience_membership/index.ts",
   "../update_queue_by_campaign_audience/index.ts",
   "../workspace-twilio-sync/index.ts",

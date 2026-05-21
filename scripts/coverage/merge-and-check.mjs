@@ -253,6 +253,11 @@ function listSourceFiles() {
     if (rel.endsWith(".types.ts")) return true;
     if (rel.endsWith("-types.ts")) return true;
     if (rel === path.join("app", "env.ts")) return true;
+    if (
+      rel ===
+      path.join("supabase", "functions", "number-rental-billing", "index.ts")
+    )
+      return true;
     if (rel.endsWith("database.types.ts")) return true;
     if (rel.endsWith("supabase.types.ts")) return true;
     if (rel.endsWith("twilio.types.ts")) return true;
