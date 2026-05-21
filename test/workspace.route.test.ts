@@ -67,7 +67,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
       }),
     );
 
-    const mod = await import("../app/routes/api+/workspace/route");
+    const mod = await import("../app/routes/api+/workspace");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
@@ -89,7 +89,7 @@ describe("app/routes/api+/workspace/route.tsx", () => {
       makeSupabaseUpdateSingle({ data: null, error: { message: "bad" } }),
     );
 
-    const mod = await import("../app/routes/api+/workspace/route");
+    const mod = await import("../app/routes/api+/workspace");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",

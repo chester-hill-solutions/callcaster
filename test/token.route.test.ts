@@ -76,7 +76,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       supabaseClient: makeSupabaseRowLookup({ data: null, error: { message: "nope" } }),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/token?id=u1&workspace=w1"),
     } as any));
@@ -92,7 +92,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       }),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/token"),
     } as any));
@@ -108,7 +108,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       }),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/token?id=other-user&workspace=w1"),
     } as any));
@@ -134,7 +134,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       }),
       user: { id: "me" },
     });
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/token?id=me&workspace=w1"),
     } as any));
@@ -151,7 +151,7 @@ describe("app/routes/api+/token/route.tsx", () => {
       }),
       user: { id: "me" },
     });
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/token?workspace=w1&id=me"),
     } as any));
@@ -161,7 +161,7 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("generateToken returns jwt", async () => {
-    const mod = await import("../app/routes/api+/token/route");
+    const mod = await import("../app/routes/api+/token");
     const jwt = mod.generateToken({
       twilioAccountSid: "AC2",
       twilioApiKey: "K2",

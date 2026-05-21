@@ -1,5 +1,5 @@
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {

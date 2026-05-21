@@ -37,7 +37,7 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
 
   test("returns TwiML with campaign conference name", async () => {
     const mod = await import(
-      "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/route"
+      "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
     const res = await asRouteResponse(await mod.loader({
       params: { workspaceId: "w1", campaignId: "c1" },

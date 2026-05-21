@@ -115,7 +115,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
 
   test("method not allowed returns createErrorResponse", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.createErrorResponse).toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   test("POST validates body and unauthorized role", async () => {
     mocks.verifyAuth.mockResolvedValue({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce(null);
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
 
     const r0 = await asRouteResponse(await mod.action({ request: reqForm("POST", {}) } as any));
     expect(r0.status).toBe(400);
@@ -141,7 +141,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
 
   test("POST invalid surveyData JSON and missing workspaceId return 400", async () => {
     mocks.verifyAuth.mockResolvedValue({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
 
     const r0 = await asRouteResponse(await mod.action({
       request: reqForm("POST", { workspaceId: "w1", surveyData: "not-json" }),
@@ -159,7 +159,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       supabaseClient: makeSupabase({ user: { data: null, error: null } }),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -176,7 +176,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
 
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -232,7 +232,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -297,7 +297,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
 
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -335,7 +335,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   test("POST with no pages skips page/question creation", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -358,7 +358,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -386,7 +386,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
@@ -418,7 +418,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   });
 
   test("PATCH validates, 404s missing survey, unauthorized role, update error, and success", async () => {
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     let r0 = await mod.action({ request: reqForm("PATCH", {}) } as any);
@@ -486,7 +486,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
 
   test("PATCH catch logs and returns 500 when formData throws", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
     const res = await asRouteResponse(await mod.action({
       request: {
         method: "PATCH",
@@ -500,7 +500,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   });
 
   test("DELETE validates, unauthorized role, delete error, and success", async () => {
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     const r0 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", {}) } as any));
@@ -538,7 +538,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   });
 
   test("DELETE survey not found 404; catch logs and returns 500", async () => {
-    const mod = await import("../app/routes/api+/surveys/route");
+    const mod = await import("../app/routes/api+/surveys");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ surveyLookup: { data: null, error: null } }),

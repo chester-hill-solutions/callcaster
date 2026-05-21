@@ -1,4 +1,4 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import { SurveyFormData } from "@/lib/types";
@@ -11,7 +11,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     const { supabaseClient, user } = await verifyAuth(request);
     if (!user) {
-      return json({ error: "Unauthorized" }, { status: 401 });
+      return data({ error: "Unauthorized" }, { status: 401 });
     }
     
     if (request.method === "POST") {
@@ -36,18 +36,18 @@ async function handleCreateSurvey(
   const formData = await request.formData();
   const surveyDataRaw = formData.get("surveyData") as string | null;
   if (!surveyDataRaw) {
-    return json({ error: "Survey data is required" }, { status: 400 });
+    return data({ error: "Survey data is required" }, { status: 400 });
   }
   let surveyData: SurveyFormData;
   try {
     surveyData = JSON.parse(surveyDataRaw) as SurveyFormData;
   } catch {
-    return json({ error: "Invalid survey data format" }, { status: 400 });
+    return data({ error: "Invalid survey data format" }, { status: 400 });
   }
   const workspaceId = formData.get("workspaceId") as string;
 
   if (!workspaceId) {
-    return json({ error: "Workspace ID is required" }, { status: 400 });
+    return data({ error: "Workspace ID is required" }, { status: 400 });
   }
 
   // Check user role - convert Supabase Auth User to database User type
@@ -58,7 +58,7 @@ async function handleCreateSurvey(
     .single();
   
   if (dbUserError || !dbUser) {
-    return json({ error: "User not found" }, { status: 404 });
+    return data({ error: "User not found" }, { status: 404 });
   }
   
   const userRole = await getUserRole({ 
@@ -68,7 +68,7 @@ async function handleCreateSurvey(
   });
 
   if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-    return json({ error: "Unauthorized" }, { status: 403 });
+    return data({ error: "Unauthorized" }, { status: 403 });
   }
 
   // Create survey
@@ -147,7 +147,7 @@ async function handleCreateSurvey(
     }
   }
 
-  return json({ success: true, survey });
+  return data({ success: true, survey });
 }
 
 async function handleUpdateSurvey(
@@ -159,18 +159,18 @@ async function handleUpdateSurvey(
     const formData = await request.formData();
     const surveyDataRaw = formData.get("surveyData") as string | null;
     if (!surveyDataRaw) {
-      return json({ error: "Survey data is required" }, { status: 400 });
+      return data({ error: "Survey data is required" }, { status: 400 });
     }
     let surveyData: SurveyFormData;
     try {
       surveyData = JSON.parse(surveyDataRaw) as SurveyFormData;
     } catch {
-      return json({ error: "Invalid survey data format" }, { status: 400 });
+      return data({ error: "Invalid survey data format" }, { status: 400 });
     }
     const surveyId = formData.get("surveyId") as string;
 
     if (!surveyId) {
-      return json({ error: "Survey ID is required" }, { status: 400 });
+      return data({ error: "Survey ID is required" }, { status: 400 });
     }
 
     // Get survey to check workspace
@@ -181,7 +181,7 @@ async function handleUpdateSurvey(
       .single();
 
     if (fetchError || !existingSurvey) {
-      return json({ error: "Survey not found" }, { status: 404 });
+      return data({ error: "Survey not found" }, { status: 404 });
     }
 
     // Check user role
@@ -192,7 +192,7 @@ async function handleUpdateSurvey(
     });
 
     if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-      return json({ error: "Unauthorized" }, { status: 403 });
+      return data({ error: "Unauthorized" }, { status: 403 });
     }
 
     // Update survey
@@ -208,13 +208,13 @@ async function handleUpdateSurvey(
 
     if (surveyError) {
       logger.error("Error updating survey:", surveyError);
-      return json({ error: "Failed to update survey" }, { status: 500 });
+      return data({ error: "Failed to update survey" }, { status: 500 });
     }
 
-    return json({ success: true, survey });
+    return data({ success: true, survey });
   } catch (error) {
     logger.error("Error in handleUpdateSurvey:", error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    return data({ error: "Internal server error" }, { status: 500 });
   }
 }
 
@@ -228,7 +228,7 @@ async function handleDeleteSurvey(
     const surveyId = formData.get("surveyId") as string;
 
     if (!surveyId) {
-      return json({ error: "Survey ID is required" }, { status: 400 });
+      return data({ error: "Survey ID is required" }, { status: 400 });
     }
 
     // Get survey to check workspace
@@ -239,7 +239,7 @@ async function handleDeleteSurvey(
       .single();
 
     if (fetchError || !existingSurvey) {
-      return json({ error: "Survey not found" }, { status: 404 });
+      return data({ error: "Survey not found" }, { status: 404 });
     }
 
     // Check user role
@@ -250,7 +250,7 @@ async function handleDeleteSurvey(
     });
 
     if (!userRole || !["owner", "admin"].includes(userRole.role)) {
-      return json({ error: "Unauthorized" }, { status: 403 });
+      return data({ error: "Unauthorized" }, { status: 403 });
     }
 
     // Delete survey (cascade will handle related records)
@@ -261,12 +261,12 @@ async function handleDeleteSurvey(
 
     if (deleteError) {
       logger.error("Error deleting survey:", deleteError);
-      return json({ error: "Failed to delete survey" }, { status: 500 });
+      return data({ error: "Failed to delete survey" }, { status: 500 });
     }
 
-    return json({ success: true });
+    return data({ success: true });
   } catch (error) {
     logger.error("Error in handleDeleteSurvey:", error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    return data({ error: "Internal server error" }, { status: 500 });
   }
 } 

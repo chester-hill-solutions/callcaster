@@ -57,7 +57,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
         }),
       }),
     });
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -96,7 +96,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
@@ -147,7 +147,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("VerificationStatus", "failed");
@@ -194,7 +194,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
 
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
 
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -221,7 +221,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");
@@ -245,7 +245,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       }),
     });
 
-    const mod = await import("../app/routes/api+/call/routeer-id.status");
+    const mod = await import("../app/routes/api+/caller-id/status.route");
     const fd = new FormData();
     fd.set("VerificationStatus", "pending");
     fd.set("To", "+15555550100");

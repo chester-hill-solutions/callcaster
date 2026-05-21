@@ -1,13 +1,6 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import {
-  Form,
-  json,
-  useLoaderData,
-  useNavigate,
-  useOutletContext,
-  useRevalidator
-} from "@remix-run/react";
+import { Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 import { useEffect, useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
@@ -184,7 +177,7 @@ export default function AudienceView() {
         const response = await fetch(
           `/api/audience-upload-status?uploadId=${currentUploadId}&workspaceId=${workspace_id}`
         );
-        const data = await response.json();
+        const data = await response.data();
 
         if (data.error || data.status === "completed" || data.status === "error") {
           setCurrentUploadId(null);

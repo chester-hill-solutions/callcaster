@@ -1,7 +1,7 @@
 // Twilio not used in this endpoint
 import { createClient } from "@supabase/supabase-js";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";

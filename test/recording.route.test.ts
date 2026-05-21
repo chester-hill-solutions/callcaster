@@ -33,7 +33,7 @@ describe("app/routes/api+/recording/route.tsx", () => {
     const fd = new FormData();
     fd.set("RecordingSid", "RE1");
     fd.set("CallSid", "CA1");
-    const mod = await import("../app/routes/api+/recording/route");
+    const mod = await import("../app/routes/api+/recording");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: {},

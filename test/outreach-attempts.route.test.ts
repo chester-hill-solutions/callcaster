@@ -33,7 +33,7 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: 1, contact_id: 2, queue_id: 3 });
 
-    const mod = await import("../app/routes/api+/outreach-attempts/route");
+    const mod = await import("../app/routes/api+/outreach-attempts");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
     } as any));
@@ -59,7 +59,7 @@ describe("app/routes/api+/outreach-attempts/route.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: "10", contact_id: "20", queue_id: "30" });
 
-    const mod = await import("../app/routes/api+/outreach-attempts/route");
+    const mod = await import("../app/routes/api+/outreach-attempts");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
     } as any));

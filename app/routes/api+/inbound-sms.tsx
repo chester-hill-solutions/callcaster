@@ -1,4 +1,4 @@
-import { json, ActionFunctionArgs } from "@remix-run/node";
+import { ActionFunctionArgs } from "react-router";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
@@ -128,7 +128,7 @@ async function resolveInboundWorkspaceContext(
             : undefined,
         phone: candidate,
       });
-      return { ok: false, response: json({ error: "Number lookup failed" }, { status: 500 }) };
+      return { ok: false, response: data({ error: "Number lookup failed" }, { status: 500 }) };
     }
   }
 
@@ -138,7 +138,7 @@ async function resolveInboundWorkspaceContext(
       toRaw: args.toRaw,
       normalizedTo,
     });
-    return { ok: false, response: json({ error: "Number not found" }, { status: 404 }) };
+    return { ok: false, response: data({ error: "Number not found" }, { status: 404 }) };
   }
 
   const { data: workspaces, error: workspaceError } = await supabase
@@ -152,7 +152,7 @@ async function resolveInboundWorkspaceContext(
     logger.error("Inbound SMS workspace lookup by Messaging Service SID failed", workspaceError);
     return {
       ok: false,
-      response: json({ error: "Messaging service lookup failed" }, { status: 500 }),
+      response: data({ error: "Messaging service lookup failed" }, { status: 500 }),
     };
   }
 
@@ -165,7 +165,7 @@ async function resolveInboundWorkspaceContext(
         normalizedTo,
       },
     );
-    return { ok: false, response: json({ error: "Number not found" }, { status: 404 }) };
+    return { ok: false, response: data({ error: "Number not found" }, { status: 404 }) };
   }
 
   if (workspaces.length > 1) {
@@ -175,7 +175,7 @@ async function resolveInboundWorkspaceContext(
     });
     return {
       ok: false,
-      response: json(
+      response: data(
         { error: "Messaging service matches multiple workspaces" },
         { status: 409 },
       ),
@@ -242,7 +242,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       workspace: workspaceNumber.workspace,
       attributionPath: resolved.attributionPath,
     });
-    return json({ error: "Workspace Twilio credentials missing" }, 500);
+    return data({ error: "Workspace Twilio credentials missing" }, 500);
   }
 
   const media: string[] = [];
@@ -329,7 +329,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (messageError) {
     logger.error("Message insert error:", messageError);
-    return json({ messageError }, 400);
+    return data({ messageError }, 400);
   }
 
   const smsWebhook = workspaceNumber.webhook
@@ -356,5 +356,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  return json({ message }, 201);
+  return data({ message }, 201);
 };

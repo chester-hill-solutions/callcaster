@@ -1,12 +1,4 @@
-import {
-  Form,
-  json,
-  redirect,
-  useActionData,
-  useFetcher,
-  useNavigate,
-  useNavigation,
-} from "@remix-run/react";
+import { Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
@@ -16,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { Heading } from "@/components/ui/typography";
 
@@ -55,7 +47,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (serverSession && serverSession.session) {
     return redirect("/workspaces", { headers });
   }
-  return json({ serverSession }, { headers });
+  return data({ serverSession }, { headers });
 };
 
 // Removed unused legacy styles

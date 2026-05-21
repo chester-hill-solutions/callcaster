@@ -1,4 +1,4 @@
-import { redirect } from "@remix-run/node";
+import { redirect } from "react-router";
 
 export const loader = async () => redirect("/services");
 export const action = async () => redirect("/services");

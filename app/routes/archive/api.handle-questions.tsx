@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Twilio from 'twilio';
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 
 interface CallData {

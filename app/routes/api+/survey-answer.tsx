@@ -1,4 +1,4 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs } from "react-router";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -20,7 +20,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return handleSaveAnswer(request, supabaseClient);
   }
 
-  return json({ error: "Method not allowed" }, { status: 405 });
+  return data({ error: "Method not allowed" }, { status: 405 });
 }
 
 async function handleSaveAnswer(
@@ -38,13 +38,13 @@ async function handleSaveAnswer(
     const pageId = formData.get("pageId") as string;
 
     if (!surveyId || !questionId || !resultId || !pageId) {
-      return json({ error: "Missing required fields" }, { status: 400 });
+      return data({ error: "Missing required fields" }, { status: 400 });
     }
     
     // Get survey to verify it exists and is active
     const surveyIdNum = parseInt(surveyId, 10);
     if (isNaN(surveyIdNum)) {
-      return json({ error: "Invalid survey ID" }, { status: 400 });
+      return data({ error: "Invalid survey ID" }, { status: 400 });
     }
     
     const { data: survey, error: surveyError } = await supabaseClient
@@ -54,17 +54,17 @@ async function handleSaveAnswer(
       .single();
 
     if (surveyError || !survey) {
-      return json({ error: "Survey not found" }, { status: 404 });
+      return data({ error: "Survey not found" }, { status: 404 });
     }
 
     if (!survey.is_active) {
-      return json({ error: "Survey is not active" }, { status: 400 });
+      return data({ error: "Survey is not active" }, { status: 400 });
     }
 
     // Get-or-create survey response in an idempotent way (avoid select-then-insert races).
     const contactIdNum = contactId ? parseInt(contactId, 10) : null;
     if (contactIdNum !== null && Number.isNaN(contactIdNum)) {
-      return json({ error: "Invalid contact ID" }, { status: 400 });
+      return data({ error: "Invalid contact ID" }, { status: 400 });
     }
 
     const nowIso = new Date().toISOString();
@@ -85,7 +85,7 @@ async function handleSaveAnswer(
     if (insertError) {
       if (!isUniqueViolation(insertError)) {
         logger.error("Error creating survey response:", insertError);
-        return json({ error: "Failed to create survey response" }, { status: 500 });
+        return data({ error: "Failed to create survey response" }, { status: 500 });
       }
       // Duplicate result_id: fetch existing row.
       const { data: existingResponse, error: fetchExistingError } =
@@ -96,7 +96,7 @@ async function handleSaveAnswer(
           .single();
       if (fetchExistingError || !existingResponse) {
         logger.error("Error fetching existing survey response:", fetchExistingError);
-        return json({ error: "Failed to load survey response" }, { status: 500 });
+        return data({ error: "Failed to load survey response" }, { status: 500 });
       }
       surveyResponse = existingResponse;
     } else {
@@ -105,7 +105,7 @@ async function handleSaveAnswer(
 
     if (!surveyResponse) {
       logger.error("Missing survey response after insert/fetch");
-      return json({ error: "Failed to create survey response" }, { status: 500 });
+      return data({ error: "Failed to create survey response" }, { status: 500 });
     }
 
     // Always update progress fields deterministically.
@@ -129,7 +129,7 @@ async function handleSaveAnswer(
 
     if (questionError || !question) {
       logger.error("Question not found:", questionId);
-      return json({ error: "Question not found" }, { status: 404 });
+      return data({ error: "Question not found" }, { status: 404 });
     }
 
     // Insert-first, then update-on-duplicate to avoid race creating duplicate answers.
@@ -145,7 +145,7 @@ async function handleSaveAnswer(
     if (answerInsertError) {
       if (!isUniqueViolation(answerInsertError)) {
         logger.error("Error creating answer:", answerInsertError);
-        return json({ error: "Failed to save answer" }, { status: 500 });
+        return data({ error: "Failed to save answer" }, { status: 500 });
       }
       const { error: updateError } = await supabaseClient
         .from("response_answer")
@@ -157,17 +157,17 @@ async function handleSaveAnswer(
         .eq("question_id", question.id);
       if (updateError) {
         logger.error("Error updating answer:", updateError);
-        return json({ error: "Failed to update answer" }, { status: 500 });
+        return data({ error: "Failed to update answer" }, { status: 500 });
       }
     }
 
-    return json({ 
+    return data({ 
       success: true, 
       response_id: surveyResponse.id,
       result_id: resultId 
     });
   } catch (error) {
     logger.error("Error in handleSaveAnswer:", error);
-    return json({ error: "Internal server error" }, { status: 500 });
+    return data({ error: "Internal server error" }, { status: 500 });
   }
 } 

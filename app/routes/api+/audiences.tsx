@@ -1,4 +1,4 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { parseActionRequest , requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -57,7 +57,7 @@ export const action = async ({ request, deps }: { request: Request; deps?: Parti
         }
 
         if (!data.id) {
-            return json({ error: 'Missing id' }, { status: 400, headers });
+            return data({ error: 'Missing id' }, { status: 400, headers });
         }
 
         const { data: update, error } = await supabaseClient
@@ -72,11 +72,11 @@ export const action = async ({ request, deps }: { request: Request; deps?: Parti
         const raw = await d.parseActionRequest(request);
         const idStr = raw.id != null ? String(raw.id) : "";
         if (!idStr) {
-            return json({ error: 'Missing id' }, { status: 400, headers });
+            return data({ error: 'Missing id' }, { status: 400, headers });
         }
         const id = parseInt(idStr.toString(), 10);
         if (isNaN(id)) {
-            return json({ error: 'Invalid id' }, { status: 400, headers });
+            return data({ error: 'Invalid id' }, { status: 400, headers });
         }
 
         const { error } = await supabaseClient
@@ -89,7 +89,7 @@ export const action = async ({ request, deps }: { request: Request; deps?: Parti
         response = { success: true };
     }
     
-    return json(response, { headers });
+    return data(response, { headers });
 };
 
 export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
@@ -105,12 +105,12 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
 
     if (returnType === 'csv') {
         if (!audienceId) {
-          return json({ error: "Missing audienceId" }, { status: 400, headers });
+          return data({ error: "Missing audienceId" }, { status: 400, headers });
         }
 
         const id = parseInt(audienceId, 10);
         if (Number.isNaN(id)) {
-          return json({ error: "Invalid audienceId" }, { status: 400, headers });
+          return data({ error: "Invalid audienceId" }, { status: 400, headers });
         }
 
         // Defense-in-depth: verify the audience belongs to a workspace the user can access.
@@ -120,7 +120,7 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
           .eq("id", id)
           .single();
         if (audienceError || !audienceRow?.workspace) {
-          return json({ error: "Audience not found" }, { status: 404, headers });
+          return data({ error: "Audience not found" }, { status: 404, headers });
         }
         await d.requireWorkspaceAccess({
           supabaseClient,
@@ -220,5 +220,5 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
         throw error;
     }
 
-    return json({ data }, { headers });
+    return data({ data }, { headers });
 };

@@ -1,11 +1,4 @@
-import {
-  Form,
-  json,
-  Link,
-  NavLink,
-  useLoaderData,
-  useNavigation,
-} from "@remix-run/react";
+import { Form, Link, NavLink, useLoaderData, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -19,7 +12,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { LoaderFunctionArgs } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const {

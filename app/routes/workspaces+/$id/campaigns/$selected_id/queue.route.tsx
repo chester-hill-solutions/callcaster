@@ -1,5 +1,5 @@
-import { ActionFunctionArgs, defer, json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { parseActionRequest } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -144,7 +144,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         filters: { ...filters }
     };
 
-    return defer({
+    return data({
         selectedAudienceIds,
         queuePromise: queueResponse,
         campaignId: selected_id
@@ -188,7 +188,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             const { data: filteredRows, error: filteredRowsError } = await filteredIdsQuery;
 
             if (filteredRowsError) {
-                return json({ success: false, error: filteredRowsError.message });
+                return data({ success: false, error: filteredRowsError.message });
             }
 
             const filteredIds = ((filteredRows ?? []) as unknown as Array<{ id: number | string }>)
@@ -199,7 +199,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 .filter((id): id is number => Number.isFinite(id));
 
             if (filteredIds.length === 0) {
-                return json({ success: true });
+                return data({ success: true });
             }
 
             const { error } = await supabaseClient
@@ -208,7 +208,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 .in("id", filteredIds);
 
             if (error) {
-                return json({ success: false, error: error.message });
+                return data({ success: false, error: error.message });
             }
         } else {
             const updateIds = (Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))).map(
@@ -222,12 +222,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                     .in("id", updateIds);
 
                 if (error) {
-                    return json({ success: false, error: error.message });
+                    return data({ success: false, error: error.message });
                 }
             }
         }
 
-        return json({ success: true });
+        return data({ success: true });
     }
 
     if (intent === "add_from_audience") {
@@ -238,7 +238,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             .eq("audience_id", audienceId);
 
         if (error) {
-            return json({ success: false, error: error.message });
+            return data({ success: false, error: error.message });
         }
 
         const contactIds = contacts.map((contact) => contact.contact_id);
@@ -249,7 +249,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             { requeue: false }
         );
 
-        return json({ success: true });
+        return data({ success: true });
     }
 
     if (intent === "add_contacts") {
@@ -261,7 +261,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             { requeue: false }
         );
 
-        return json({ success: true });
+        return data({ success: true });
     }
 
     if (intent === "remove_contacts") {
@@ -275,7 +275,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 .eq("campaign_id", parseInt(selected_id));
 
             if (error) {
-                return json({ success: false, error: error.message });
+                return data({ success: false, error: error.message });
             }
         } else {
             const removeIds = (Array.isArray(ids) ? ids : JSON.parse(String(ids ?? "[]"))).map(
@@ -289,15 +289,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                     .in("id", removeIds);
 
                 if (error) {
-                    return json({ success: false, error: error.message });
+                    return data({ success: false, error: error.message });
                 }
             }
         }
 
-        return json({ success: true });
+        return data({ success: true });
     }
 
-    return json({ success: false, error: "Invalid intent" });
+    return data({ success: false, error: "Invalid intent" });
 };
 
 

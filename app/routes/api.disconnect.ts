@@ -1,4 +1,4 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs } from "react-router";
 import twilio from "twilio";
 import { safeParseJson } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
@@ -29,7 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (!TWILIO_SID || !TWILIO_AUTH_TOKEN) {
     logger.error("Missing Twilio credentials.");
-    return json(
+    return data(
       { error: "Twilio credentials are not configured." },
       { status: 500 },
     );
@@ -39,17 +39,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const callSid = getCallSid(body);
 
   if (!callSid) {
-    return json({ error: "Missing CallSid parameter." }, { status: 400 });
+    return data({ error: "Missing CallSid parameter." }, { status: 400 });
   }
 
   const client = twilio(TWILIO_SID, TWILIO_AUTH_TOKEN);
 
   try {
     await client.calls(callSid).update({ twiml: TWIML_PAUSE_RESPONSE });
-    return json({ success: true });
+    return data({ success: true });
   } catch (error) {
     logger.error("Failed to update call status", error);
-    return json(
+    return data(
       { error: "Failed to pause the call." },
       { status: 500 },
     );

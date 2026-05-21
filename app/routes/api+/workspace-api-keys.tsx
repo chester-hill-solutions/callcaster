@@ -1,5 +1,5 @@
-import { json } from "@remix-run/node";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import {  } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import {
   hashApiKeyForStorage,
@@ -26,7 +26,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const workspaceId = url.searchParams.get("workspace_id");
 
   if (!workspaceId) {
-    return json(
+    return data(
       { error: "workspace_id is required" },
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
@@ -46,13 +46,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (error) {
     logger.error("Error listing API keys:", error);
-    return json(
+    return data(
       { error: error.message },
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 
-  return json(
+  return data(
     { keys: keys ?? [] },
     { headers: { "Content-Type": "application/json" } }
   );
@@ -62,14 +62,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
 
   if (request.method === "POST") {
-    const body = await request.json().catch(() => ({})) as {
+    const body = await request.data().catch(() => ({})) as {
       workspace_id?: string;
       name?: string;
     };
     const { workspace_id, name } = body;
 
     if (!workspace_id || !name?.trim()) {
-      return json(
+      return data(
         { error: "workspace_id and name are required" },
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
@@ -97,27 +97,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
       logger.error("Error creating API key:", error);
-      return json(
+      return data(
         { error: error.message },
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return json(
+    return data(
       { key, id: row.id, name: row.name, key_prefix: row.key_prefix, created_at: row.created_at },
       { status: 201, headers: { "Content-Type": "application/json" } }
     );
   }
 
   if (request.method === "DELETE") {
-    const body = await request.json().catch(() => ({})) as {
+    const body = await request.data().catch(() => ({})) as {
       id?: string;
       workspace_id?: string;
     };
     const { id, workspace_id } = body;
 
     if (!id || !workspace_id) {
-      return json(
+      return data(
         { error: "id and workspace_id are required" },
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
@@ -137,19 +137,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
       logger.error("Error deleting API key:", error);
-      return json(
+      return data(
         { error: error.message },
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return json(
+    return data(
       { success: true },
       { headers: { "Content-Type": "application/json" } }
     );
   }
 
-  return json(
+  return data(
     { error: "Method not allowed" },
     { status: 405, headers: { "Content-Type": "application/json" } }
   );

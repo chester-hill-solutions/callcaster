@@ -155,7 +155,7 @@ function makeSupabase(accessLevel: string, workspaceTwilioSid: string | null = n
   };
 }
 
-describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", () => {
+describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.useRealTimers();
@@ -181,7 +181,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
       user: { id: "u1" },
     });
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "update_twilio_portal");
     await expect(
@@ -200,7 +200,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
     });
     mocks.updateWorkspaceTwilioPortalConfig.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "update_twilio_portal");
     formData.set("trafficClass", "toll_free");
@@ -247,7 +247,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
     });
     mocks.syncWorkspaceTwilioSnapshot.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "sync_twilio_workspace");
 
@@ -271,7 +271,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
     });
     mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "bootstrap_workspace_messaging");
 
@@ -296,7 +296,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
     });
     mocks.provisionWorkspaceA2P.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const provisionData = new FormData();
     provisionData.set("_action", "provision_workspace_a2p");
     const provisionRes = await asRouteResponse(await mod.action({
@@ -404,7 +404,7 @@ describe("app/routes/admin+/route+/route_.workspaces.$workspaceId.twilio.tsx", (
       },
     });
 
-    const mod = await import("../app/routes/admin+/route_.workspaces.$workspaceId.twilio");
+    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const data = await mod.loadTwilioData(supabaseClient as any, "w1");
 
     expect(usageList).toHaveBeenCalledWith();

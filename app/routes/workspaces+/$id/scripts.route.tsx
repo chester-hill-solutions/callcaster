@@ -1,5 +1,5 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, json } from "@remix-run/node";
-import { Form, Link, NavLink, useActionData, useLoaderData } from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
@@ -108,7 +108,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const idValue = data["id"];
   if (!idValue) {
-    return json({ error: "Script ID is required" }, { status: 400 });
+    return data({ error: "Script ID is required" }, { status: 400 });
   }
 
   const { data: script, error: scriptError } = await supabaseClient
@@ -119,11 +119,11 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (scriptError) {
     logger.error("Error fetching script:", scriptError);
-    return json({ error: "Error fetching script" }, { status: 500 });
+    return data({ error: "Error fetching script" }, { status: 500 });
   }
 
   if (!script) {
-    return json({ error: "Script not found" }, { status: 404 });
+    return data({ error: "Script not found" }, { status: 404 });
   }
 
   const scriptJson = JSON.stringify(script.steps, null, 2);
@@ -132,7 +132,7 @@ export async function action({ request }: ActionFunctionArgs) {
     ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
     : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
 
-  return json(
+  return data(
     {
       fileContent: scriptJson,
       fileName: fileName,

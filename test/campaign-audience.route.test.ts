@@ -51,7 +51,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -108,7 +108,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -152,7 +152,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -191,7 +191,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -227,7 +227,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -266,7 +266,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -325,7 +325,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
@@ -362,7 +362,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
@@ -386,7 +386,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
@@ -425,7 +425,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
@@ -477,7 +477,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       audience_id: 10,
       campaign_id: 20,
     });
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE" }),
     } as any));
@@ -488,7 +488,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
   test("returns 405 on unsupported method", async () => {
     const headers = new Headers();
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers });
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "PUT" }),
     } as any));
@@ -517,7 +517,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       campaign_id: 20,
     });
 
-    const mod = await import("../app/routes/api+/campaign_audience/route");
+    const mod = await import("../app/routes/api+/campaign_audience");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));

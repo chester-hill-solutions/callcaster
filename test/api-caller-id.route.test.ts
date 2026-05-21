@@ -94,7 +94,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   }
 
   test("returns 500 on workspace query error / missing data / missing twilio_data", async () => {
-    const mod = await import("../app/routes/api+/call/routeer-id");
+    const mod = await import("../app/routes/api+/caller-id");
     const makeReq = (body: any) =>
       new Request("http://localhost/api/caller-id", {
         method: "POST",
@@ -179,7 +179,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   }, 20000);
 
   test("returns 500 on invalid phone number length", async () => {
-    const mod = await import("../app/routes/api+/call/routeer-id");
+    const mod = await import("../app/routes/api+/caller-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -208,7 +208,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 when Twilio validation request rejects", async () => {
-    const mod = await import("../app/routes/api+/call/routeer-id");
+    const mod = await import("../app/routes/api+/caller-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -250,7 +250,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on workspace_number upsert error", async () => {
-    const mod = await import("../app/routes/api+/call/routeer-id");
+    const mod = await import("../app/routes/api+/caller-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,
@@ -286,7 +286,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("happy path returns validationRequest + numberRequest (covers + in middle normalization)", async () => {
-    const mod = await import("../app/routes/api+/call/routeer-id");
+    const mod = await import("../app/routes/api+/caller-id");
     const { workspaceChain } = setSupabaseWorkspaceSingle({
       data: { twilio_data: { sid: "AC", authToken: "at" } },
       error: null,

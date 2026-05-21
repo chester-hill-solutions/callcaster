@@ -50,7 +50,7 @@ function makeSupabase() {
   };
 }
 
-describe("app/routes/admin+/route+/route.tsx action", () => {
+describe("app/routes/admin+.tsx action", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();

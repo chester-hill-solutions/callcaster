@@ -165,7 +165,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce(new Response("no", { status: 403 }));
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
     } as any));
@@ -181,7 +181,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1" } });
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1" }),
     } as any));
@@ -198,7 +198,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     fd.set("SmsSid", "SM1");
     fd.set("SmsStatus", "sent");
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -224,7 +224,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
       params: { SmsSid: "SM1", SmsStatus: "delivered" },
     });
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
     } as any));
@@ -242,7 +242,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "sent" } });
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
     } as any));
@@ -259,7 +259,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "not-a-status" } });
     mocks.insertTransactionHistoryIdempotent.mockRejectedValueOnce(new Error("tx"));
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "not-a-status" }),
     } as any));
@@ -277,7 +277,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "delivered" } });
     mocks.shouldUpdateOutreachDisposition.mockReturnValueOnce(false);
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
     } as any));
@@ -294,7 +294,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase1);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "failed" } });
     mocks.shouldUpdateOutreachDisposition.mockReturnValueOnce(true);
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const r1 = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "failed" }),
     } as any));
@@ -331,7 +331,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "delivered" } });
     mocks.shouldUpdateOutreachDisposition.mockReturnValueOnce(true);
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
     } as any));
@@ -352,7 +352,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     });
     mocks.shouldUpdateOutreachDisposition.mockReturnValueOnce(true);
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "delivered" }),
     } as any));
@@ -371,7 +371,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "sent" } });
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
     } as any));
@@ -401,7 +401,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "sent" } });
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const r1 = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
     } as any));
@@ -430,7 +430,7 @@ describe("app/routes/api+/sms/route.status.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: { SmsSid: "SM1", SmsStatus: "sent" } });
 
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const res = await asRouteResponse(await mod.action({
       request: makeSmsStatusRequest({ SmsSid: "SM1", SmsStatus: "sent" }),
     } as any));

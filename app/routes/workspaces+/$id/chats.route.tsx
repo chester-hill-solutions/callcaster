@@ -1,22 +1,5 @@
-import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
-  json,
-  redirect,
-} from "@remix-run/node";
-import {
-  NavLink,
-  Outlet,
-  useFetcher,
-  useLoaderData,
-  useLocation,
-  useNavigate,
-  useOutlet,
-  useOutletContext,
-  useParams,
-  useSearchParams,
-  useRouteError,
-} from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { NavLink, Outlet, useFetcher, useLoaderData, useLocation, useNavigate, useOutlet, useOutletContext, useParams, useSearchParams, useRouteError } from "react-router";
 import { MdAdd, MdChat } from "react-icons/md";
 import { Button } from "@/components/ui/button";
 import {
@@ -641,7 +624,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       typeof contactError.message === "string"
         ? contactError.message
         : "Failed to load contact";
-    return json(
+    return data(
       {
         campaigns: smsCampaigns,
         chats: [],
@@ -674,7 +657,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     },
   );
 
-  return json(
+  return data(
     {
       campaigns: smsCampaigns,
       workspaceNumbers: workspaceNumbers?.data ?? [],
@@ -720,7 +703,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     user: user as unknown as BaseUser,
   });
   if (!params.contact_number) return redirect(contact_number);
-  return json({ responseData });
+  return data({ responseData });
 }
 
 export default function ChatsList() {

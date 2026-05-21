@@ -1,5 +1,5 @@
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData , Link } from "@remix-run/react";
+import { type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { getUserRole } from "@/lib/database.server";
@@ -39,7 +39,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Failed to load surveys", { status: 500 });
   }
 
-  return json({
+  return data({
     surveys: surveys || [],
     workspaceId,
     user,

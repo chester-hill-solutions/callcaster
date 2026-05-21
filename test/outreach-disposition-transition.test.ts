@@ -116,7 +116,7 @@ describe("outreach disposition transitions", () => {
     supabaseStub = makeSupabaseStub({ currentDisposition: "completed" });
     supabaseState.supabase = supabaseStub as any;
 
-    const mod = await import("../app/routes/api+/call/route-status");
+    const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_TERM");
     fd.set("CallStatus", "ringing");

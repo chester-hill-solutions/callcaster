@@ -1,5 +1,5 @@
-import { json, LoaderFunctionArgs } from "@remix-run/node";
-import { Link, useLoaderData, useNavigate } from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { Link, useLoaderData, useNavigate } from "react-router";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { audienceColumns } from "@/components/workspace/tables/columns";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return json(
+    return data(
       { workspace: null, error: "Workspace does not exist", userRole: null },
       { headers },
     );
@@ -32,13 +32,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("workspace", workspaceId);
 
   if (workspaceError) {
-    return json(
+    return data(
       { workspace: null, error: workspaceError.message, userRole },
       { headers },
     );
   }
 
-  return json(
+  return data(
     { audienceData, workspace: workspaceData, error: null, userRole },
     { headers },
   );

@@ -1,7 +1,7 @@
 import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from '../lib/supabase.server';
-import { normalizePhoneNumber } from '../lib/utils';
-import type { ActionFunctionArgs } from "@remix-run/node";
+import { verifyAuth } from '@/lib/supabase.server';
+import { normalizePhoneNumber } from '@/lib/utils';
+import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -34,7 +34,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const res = await fetch(`${env.BASE_URL()}/api/ivr`, {
             body: formData,
             method: "POST",
-        }).then(e => e.json()).catch((e) => {
+        }).then(e => e.data()).catch((e) => {
             logger.error("Error initiating IVR call:", e);
             return null;
         })

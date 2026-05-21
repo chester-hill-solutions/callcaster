@@ -1,6 +1,6 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
-import { parseCSV } from "../lib/csv";
+import { parseCSV } from '@/lib/csv";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
@@ -349,12 +349,12 @@ export const action = async ({
   const { supabaseClient, headers, user } = await d.verifyAuth(request);
   
   if (!user) {
-    return json({ error: "Unauthorized" }, { status: 401, headers });
+    return data({ error: "Unauthorized" }, { status: 401, headers });
   }
 
   // Only allow POST requests
   if (request.method !== "POST") {
-    return json({ error: "Method not allowed" }, { status: 405, headers });
+    return data({ error: "Method not allowed" }, { status: 405, headers });
   }
 
   const formData = await request.formData();
@@ -366,15 +366,15 @@ export const action = async ({
   const splitNameColumn = formData.get("split_name_column") as string;
   
   if (!workspaceId) {
-    return json({ error: "Workspace ID is required" }, { status: 400, headers });
+    return data({ error: "Workspace ID is required" }, { status: 400, headers });
   }
 
   if (!audienceIdStr && !audienceName) {
-    return json({ error: "Either Audience ID or Audience name is required" }, { status: 400, headers });
+    return data({ error: "Either Audience ID or Audience name is required" }, { status: 400, headers });
   }
 
   if (!contactsFile) {
-    return json({ error: "Contacts file is required" }, { status: 400, headers });
+    return data({ error: "Contacts file is required" }, { status: 400, headers });
   }
 
   try {
@@ -393,7 +393,7 @@ export const action = async ({
         .single();
         
       if (audienceCheckError || !existingAudience) {
-        return json({ error: "Audience not found or not accessible" }, { status: 404, headers });
+        return data({ error: "Audience not found or not accessible" }, { status: 404, headers });
       }
       
       finalAudienceId = audienceId;
@@ -418,7 +418,7 @@ export const action = async ({
         .single();
 
       if (audienceError) {
-        return json({ error: audienceError.message }, { status: 500, headers });
+        return data({ error: audienceError.message }, { status: 500, headers });
       }
 
       finalAudienceId = audienceData.id;
@@ -455,7 +455,7 @@ export const action = async ({
       .single();
 
     if (uploadError) {
-      return json({ error: uploadError.message }, { status: 500, headers });
+      return data({ error: uploadError.message }, { status: 500, headers });
     }
 
     const uploadId = uploadData.id;
@@ -475,7 +475,7 @@ export const action = async ({
     });
 
     // Return the audience ID and upload ID immediately
-    return json(
+    return data(
       { 
         success: true, 
         audience_id: finalAudienceId,
@@ -489,7 +489,7 @@ export const action = async ({
 
   } catch (error) {
     logger.error("Upload request error:", error);
-    return json({ 
+    return data({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });
   }

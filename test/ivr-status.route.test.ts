@@ -89,7 +89,7 @@ function makeSupabase(opts?: {
   return supabase;
 }
 
-describe("app/routes/api+/ivr/route.status.tsx", () => {
+describe("app/routes/api+/ivr/status.route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -107,7 +107,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
     const res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     expect(res.status).toBe(403);
   });
@@ -119,7 +119,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
 
     let res = await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }) } as any);
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -138,7 +138,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   test("machine voicemail branches: no page => hangup; synthetic => say; recorded => play; errors bubble to catch", async () => {
     const callUpdate = vi.fn(async (_p: any) => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: callUpdate }) });
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
 
     // no voicemail page
     let supabase = makeSupabase({
@@ -208,7 +208,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   });
 
   test("covers catch paths: call not found/workspace auth missing/update errors/outreach_attempt_id missing", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ callError: new Error("call") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
@@ -233,7 +233,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   });
 
   test("covers remaining voicemail recorded signedUrl error/missing, pagesObject undefined, dbCall null, timestamp fallback, and updateResult error throw", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
     const callUpdate = vi.fn(async (_p: any) => ({}));
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: callUpdate }) });
 
@@ -307,7 +307,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   });
 
   test("covers completed branch and updateCallStatus error branch", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
 
     // completed branch success
@@ -352,7 +352,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   });
 
   test("explicitly hits completed branch (spies call/outreach updates)", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
     const callUpdate = vi.fn(async () => ({ data: [], error: null }));
     const outreachUpdate = vi.fn(async () => ({ data: [], error: null }));
     const supabase: any = {
@@ -419,7 +419,7 @@ describe("app/routes/api+/ivr/route.status.tsx", () => {
   });
 
   test("covers switch default (non-terminal callStatus, non-machine)", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.status");
+    const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
         callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },

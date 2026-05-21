@@ -1,13 +1,6 @@
 import { Suspense } from "react";
-import { defer, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Await,
-  redirect,
-  useLoaderData,
-  Outlet,
-  useOutlet,
-  useOutletContext,
-} from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { Await, redirect, useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
@@ -81,7 +74,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       userId: user.id,
     });
 
-    return defer({
+    return data({
       userRole: userRole,
       workspaceData: workspacePromise,
       onboardingReadiness: readiness,

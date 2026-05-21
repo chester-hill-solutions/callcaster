@@ -27,7 +27,7 @@ describe("api.audiodrop action", () => {
       },
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
-    const mod = await import("../app/routes/api+/audiodrop/route");
+    const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
@@ -67,7 +67,7 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
-    const mod = await import("../app/routes/api+/audiodrop/route");
+    const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
@@ -108,7 +108,7 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
     };
 
-    const mod = await import("../app/routes/api+/audiodrop/route");
+    const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
@@ -139,7 +139,7 @@ describe("api.audiodrop action", () => {
       storage: { from: () => ({ createSignedUrl }) },
     };
 
-    const mod = await import("../app/routes/api+/audiodrop/route");
+    const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");
@@ -205,7 +205,7 @@ describe("api.audiodrop action", () => {
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
     vi.doMock("@/lib/database.server", () => ({ createWorkspaceTwilioInstance }));
 
-    const mod = await import("../app/routes/api+/audiodrop/route");
+    const mod = await import("../app/routes/api+/audiodrop");
     const fd = new FormData();
     fd.set("callId", "c1");
     fd.set("workspaceId", "w1");

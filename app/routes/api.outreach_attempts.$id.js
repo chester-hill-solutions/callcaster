@@ -1,4 +1,4 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { safeParseJson } from "../lib/database.server";
 import { createSupabaseServerClient } from "../lib/supabase.server";
 
@@ -8,6 +8,6 @@ export const action = async ({ request, params }) => {
     const { update } = await safeParseJson(request);
     const {id} = params;
     const { data, error } = await supabase.from('outreach_attempts').update(update).eq('id', id);
-    if (error) return json({ error })
-    return json(data,{headers})
+    if (error) return data({ error })
+    return data(data,{headers})
 }

@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { useLoaderData, Link } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .select("*, user:user_id(*)")
         .eq("workspace_id", workspaceId);
 
-    return json({ 
+    return data({ 
         workspaceUsers: workspaceUsers || []
     });
 };

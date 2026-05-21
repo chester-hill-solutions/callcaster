@@ -60,7 +60,7 @@ describe("api.campaign-export-status error handling", () => {
   });
 
   test("returns 400 when exportId/workspaceId missing", async () => {
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/campaign-export-status?exportId=e1"),
     } as any));
@@ -69,7 +69,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 404 when status object not found", async () => {
     downloadBehavior = "not_found";
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -81,7 +81,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 401 when user is missing", async () => {
     userPresent = false;
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -92,7 +92,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 200 with parsed JSON when download succeeds", async () => {
     statusJsonText = JSON.stringify({ status: "done", url: "x" });
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -105,7 +105,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 on non-not-found download error and on JSON parse error", async () => {
     downloadThrows = new Error("storage down");
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -127,7 +127,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 when download returns error that isn't Object not found", async () => {
     downloadBehavior = "other_error";
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
@@ -139,7 +139,7 @@ describe("api.campaign-export-status error handling", () => {
 
   test("returns 500 with Unknown error when a non-Error is thrown", async () => {
     downloadThrows = "nope";
-    const mod = await import("../app/routes/api+/campaign-export/route-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",

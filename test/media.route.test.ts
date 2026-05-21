@@ -42,7 +42,7 @@ describe("app/routes/api+/media/route.tsx", () => {
 
   test("uploads media and updates campaign, returning public url", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), user: { id: "u1" } });
-    const mod = await import("../app/routes/api+/media/route");
+    const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
     fd.set("live_campaign_id", "1");
@@ -54,7 +54,7 @@ describe("app/routes/api+/media/route.tsx", () => {
 
   test("returns 500 on upload/update error", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: new Error("up") }), user: { id: "u1" } });
-    const mod = await import("../app/routes/api+/media/route");
+    const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));

@@ -1,6 +1,6 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -12,5 +12,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     env.SUPABASE_SERVICE_KEY(),
   );
   logger.debug("Recording webhook received", { data });
-  return json(data);
+  return data(data);
 };

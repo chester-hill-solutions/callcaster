@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import {  } from "react-router";
+import { createWorkspaceTwilioInstance } from '@/lib/database.server";
+import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 
@@ -119,7 +119,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await Promise.all(updateOperations);
     } catch (error) {
         logger.error("IVR campaign error:", error);
-        return json({ success: false, error });
+        return data({ success: false, error });
     }
-    return json({ success: true });
+    return data({ success: true });
 };

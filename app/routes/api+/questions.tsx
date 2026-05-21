@@ -1,7 +1,7 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import type { Json } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 
@@ -31,7 +31,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (searchError && searchError.code !== 'PGRST116') {
         logger.error("Error searching for recent outreach:", searchError);
-        return json({ error: searchError }, { status: 500, headers });
+        return data({ error: searchError }, { status: 500, headers });
     }
 
     let outreachAttemptId: number | null = null;
@@ -49,7 +49,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (error) {
             logger.error("Error updating outreach attempt:", error);
-            return json({ error }, { status: 500, headers });
+            return data({ error }, { status: 500, headers });
         }
         outreachAttemptId = data[0]?.id ?? null;
     } else {
@@ -63,7 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         if (error) {
             logger.error("Error creating outreach attempt:", error);
-            return json({ error }, { status: 500, headers });
+            return data({ error }, { status: 500, headers });
         }
         outreachAttemptId = typeof data === 'number' ? data : Number(data);
     }
@@ -78,8 +78,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (updateError) {
         logger.error("Error updating outreach attempt:", updateError);
-        return json({ error: updateError }, { status: 500, headers });
+        return data({ error: updateError }, { status: 500, headers });
     }
 
-    return json(updatedOutreach[0], { headers });
+    return data(updatedOutreach[0], { headers });
 };

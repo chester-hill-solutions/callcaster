@@ -1,15 +1,16 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import {
   Form,
-  json,
   Link,
   NavLink,
+  Outlet,
   useActionData,
   useLoaderData,
+  useOutlet,
   useOutletContext,
-} from "@remix-run/react";
+} from "react-router";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,7 +84,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   workspace_users.forEach((user) => {
     users.push({role: user.role, id: user.user?.id, username: user.user?.username} as UserWithRole);
   });
-  return json(
+  return data(
       {
         workspace: rest,
         userRole,
@@ -103,7 +104,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (workspaceId == null) {
-    return json({ error: "No workspace_id found!" }, { headers });
+    return data({ error: "No workspace_id found!" }, { headers });
   }
 
   const formData = await request.formData();
@@ -149,7 +150,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
-  return json(
+  return data(
     { data: null, error: "Error: Unrecognized action called" },
     { headers },
   );
@@ -175,6 +176,7 @@ function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
 }
 
 export default function WorkspaceSettings() {
+  const outlet = useOutlet();
   const {
     hasAccess,
     userRole,
@@ -297,6 +299,10 @@ export default function WorkspaceSettings() {
       </div>
     </Form>
   );
+
+  if (outlet) {
+    return <Outlet />;
+  }
 
   return (
     <main className="mt-8 flex h-fit flex-col">

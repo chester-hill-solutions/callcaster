@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { createCampaign, requireWorkspaceAccess , safeParseJson } from "@/lib/database.server";
 import type { CampaignData, CampaignType } from "@/lib/database/campaign.server";

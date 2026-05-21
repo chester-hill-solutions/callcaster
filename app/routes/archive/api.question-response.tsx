@@ -1,6 +1,6 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { createClient } from '@supabase/supabase-js';
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 
 interface CallData {
@@ -25,7 +25,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (oldError) {
         logger.error('Error fetching call data:', oldError);
-        return json({ status: 'error', message: 'Failed to fetch call data' }, 500);
+        return data({ status: 'error', message: 'Failed to fetch call data' }, 500);
     }
 
     const responses = old.responses || {};
@@ -43,7 +43,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
         logger.error('Error updating call data:', error);
-        return json({ status: 'error', message: 'Failed to update call data' }, 500);
+        return data({ status: 'error', message: 'Failed to update call data' }, 500);
     }
 
     return new Response(`<Response><Redirect>/api/handle-questions</Redirect></Response>`.toString(), {

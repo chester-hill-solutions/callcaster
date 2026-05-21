@@ -5,7 +5,7 @@ import {
   getWorkspaceTwilioPortalConfig,
   requireWorkspaceAccess,
   safeParseJson,
-} from "../lib/database.server";
+} from '@/lib/database.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { env } from "@/lib/env.server";

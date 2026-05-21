@@ -1,11 +1,5 @@
-import { LoaderFunctionArgs, json } from "@remix-run/node";
-import {
-  useFetcher,
-  useLoaderData,
-  useLocation,
-  useOutletContext,
-  useParams,
-} from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { useFetcher, useLoaderData, useLocation, useOutletContext, useParams } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -146,7 +140,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
-  return json(
+  return data(
     {
       messages,
       hasMore,

@@ -140,7 +140,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -244,7 +244,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
 
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -323,7 +323,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -423,7 +423,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -466,7 +466,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     supabase.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -506,7 +506,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -535,7 +535,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -575,7 +575,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -633,7 +633,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -705,7 +705,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -730,7 +730,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -778,7 +778,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -816,7 +816,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
@@ -850,7 +850,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -890,7 +890,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -939,7 +939,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
@@ -980,7 +980,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api+/auto-dial/route.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");

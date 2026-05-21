@@ -1,11 +1,5 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Link,
-  NavLink,
-  json,
-  useLoaderData,
-  useSearchParams,
-} from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { Link, NavLink, useLoaderData, useSearchParams } from "react-router";
 import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
@@ -79,7 +73,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     const workspaceId = params.id;
     if (!workspaceId) {
-      return json(
+      return data(
         {
           contacts: null,
           workspace: null,
@@ -104,7 +98,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
         workspaceId,
       )
     ) {
-      return json(
+      return data(
         {
           contacts: null,
           workspace: null,
@@ -194,7 +188,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Check for workspace access
     if (!userRole) {
-      return json(
+      return data(
         {
           contacts: null,
           workspace: null,
@@ -215,7 +209,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Check if workspace exists
     if (workspaceError || !workspace) {
-      return json(
+      return data(
         {
           contacts: null,
           workspace: null,
@@ -238,7 +232,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     const errors = [contactError, countError, flagsError].filter(Boolean);
     if (errors.length > 0) {
       logger.error("Database errors:", errors);
-      return json(
+      return data(
         {
           contacts: null,
           workspace,
@@ -262,7 +256,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
     // Validate page number
     if (page > totalPages && totalPages > 0) {
-      return json(
+      return data(
         {
           contacts: null,
           workspace,
@@ -281,7 +275,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       );
     }
 
-    return json(
+    return data(
       {
         contacts: contacts || [],
         workspace,
@@ -301,7 +295,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     );
   } catch (error) {
     logger.error("Unexpected error in contacts loader:", error);
-    return json(
+    return data(
       {
         contacts: null,
         workspace: null,

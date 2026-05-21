@@ -95,7 +95,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: null,
     });
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost/api/call-status-poll") } as any));
     expect(res.status).toBe(401);
   }, 30000);
@@ -107,7 +107,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       headers: new Headers(),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({ request: new Request("http://localhost/api/call-status-poll?callSid=CA") } as any));
     expect(res.status).toBe(400);
   }, 30000);
@@ -123,7 +123,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     const svc = makeServiceSupabase({ callSingle: { data: null, error: null } });
     mocks.createClient.mockReturnValueOnce(svc);
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -144,7 +144,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(svc);
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
 
     const resMismatch = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
@@ -187,7 +187,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce(null);
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -212,7 +212,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -240,7 +240,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -267,7 +267,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -293,7 +293,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -318,7 +318,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
     });
     mocks.normalizeProviderStatus.mockReturnValueOnce("completed");
 
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));
@@ -339,7 +339,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       user: { id: "u1" },
     });
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce("nope");
-    const mod = await import("../app/routes/api+/call/route-status-poll");
+    const mod = await import("../app/routes/api+/call-status-poll");
     const r1 = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any));

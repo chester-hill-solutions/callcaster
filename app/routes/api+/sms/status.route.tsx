@@ -1,4 +1,4 @@
-import { ActionFunction, json } from "@remix-run/node";
+import { ActionFunction } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { validateTwilioWebhook } from "@/twilio.server";
@@ -66,7 +66,7 @@ export const action: ActionFunction = async ({ request }) => {
     const previewSid = previewPayload.SmsSid;
 
     if (!previewSid) {
-      return json({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+      return data({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
     }
 
     const preUpdateMessage = await loadMessageRowForSmsStatus({
@@ -89,11 +89,11 @@ export const action: ActionFunction = async ({ request }) => {
     const { SmsSid: sid, SmsStatus: status } = payload;
 
     if (!sid || !status) {
-      return json({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+      return data({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
     }
 
     if (isInboundMessageDirection(preUpdateMessage.direction)) {
-      return json({ message: preUpdateMessage, outreach: null });
+      return data({ message: preUpdateMessage, outreach: null });
     }
 
     // Validate status is a valid Twilio SMS status
@@ -122,7 +122,7 @@ export const action: ActionFunction = async ({ request }) => {
 
     if (messageError) {
       logger.error("Error updating message:", messageError);
-      return json({ error: "Failed to update message" }, { status: 500 });
+      return data({ error: "Failed to update message" }, { status: 500 });
     }
 
     // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
@@ -245,9 +245,9 @@ export const action: ActionFunction = async ({ request }) => {
         }
       }
     }
-    return json({ message: messageData, outreach: outreachData });
+    return data({ message: messageData, outreach: outreachData });
   } catch (error) {
     logger.error("Unexpected error:", error);
-    return json({ error: "An unexpected error occurred" }, { status: 500 });
+    return data({ error: "An unexpected error occurred" }, { status: 500 });
   }
 };

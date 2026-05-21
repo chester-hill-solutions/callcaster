@@ -1,7 +1,7 @@
-import { json, type ActionFunctionArgs } from "@remix-run/node";
+import { type ActionFunctionArgs } from "react-router";
 
-import { verifyAuth } from "../lib/supabase.server";
-import { createWorkspaceTwilioInstance, safeParseJson } from "../lib/database.server";
+import { verifyAuth } from '@/lib/supabase.server";
+import { createWorkspaceTwilioInstance, safeParseJson } from '@/lib/database.server";
 import type { Tables } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 
@@ -30,7 +30,7 @@ export const action = async ({
   const { supabaseClient, user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson(request);
   if (typeof workspace_id !== "string") {
-    return json({ error: "Missing workspaceId" }, { status: 400 });
+    return data({ error: "Missing workspaceId" }, { status: 400 });
   }
   const twilio = await d.createWorkspaceTwilioInstance({
     supabase: supabaseClient,
@@ -108,8 +108,8 @@ export const action = async ({
     const message =
       error instanceof Error ? error.message : "Unknown error occurred";
     d.logger.error("Error listing or updating conferences:", error);
-    return json({ error: message }, { status: 500 });
+    return data({ error: message }, { status: 500 });
   }
 
-  return json({ success: true });
+  return data({ success: true });
 };

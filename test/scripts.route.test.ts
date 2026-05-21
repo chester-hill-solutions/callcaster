@@ -39,7 +39,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       saveAsCopy: true,
     });
 
-    const mod = await import("../app/routes/api+/scripts/route");
+    const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 1, name: "N (Copy)" } });
@@ -60,7 +60,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       saveAsCopy: false,
     });
 
-    const mod = await import("../app/routes/api+/scripts/route");
+    const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ script: { id: 2, name: "N" } });
@@ -80,7 +80,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       saveAsCopy: false,
     });
 
-    const mod = await import("../app/routes/api+/scripts/route");
+    const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -101,7 +101,7 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       saveAsCopy: false,
     });
 
-    const mod = await import("../app/routes/api+/scripts/route");
+    const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "nope" });

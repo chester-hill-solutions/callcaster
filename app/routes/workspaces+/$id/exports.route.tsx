@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, json } from "@remix-run/node";
-import { useLoaderData, useRevalidator } from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
@@ -53,12 +53,12 @@ interface LoaderData {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
-    return json({ error: "Unauthorized" }, { status: 401 });
+    return data({ error: "Unauthorized" }, { status: 401 });
   }
 
   const workspaceId = params["id"];
   if (!workspaceId) {
-    return json({ error: "Missing workspace ID" }, { status: 400 });
+    return data({ error: "Missing workspace ID" }, { status: 400 });
   }
 
   try {
@@ -132,7 +132,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   } catch (error) {
     logger.error("Error fetching exports:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
-    return json({ error: message }, { status: 500 });
+    return data({ error: message }, { status: 500 });
   }
 };
 

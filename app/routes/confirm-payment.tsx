@@ -1,4 +1,4 @@
-import { redirect, type LoaderFunctionArgs } from "@remix-run/node";
+import { redirect, type LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import Stripe from "stripe";
 import { env } from "@/lib/env.server";

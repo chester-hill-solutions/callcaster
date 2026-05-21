@@ -1,4 +1,4 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
+import { ActionFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
@@ -869,14 +869,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     // Return the export ID immediately
-    return json({
+    return data({
       exportId,
       status: "started",
       statusUrl: `/api/campaign-export-status?exportId=${exportId}&workspaceId=${workspaceId}`
     });
   } catch (error) {
     logger.error("Export request error:", error);
-    return json({ 
+    return data({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500 });
   }

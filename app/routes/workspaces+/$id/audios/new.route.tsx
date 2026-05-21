@@ -1,12 +1,5 @@
-import { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Form,
-  Link,
-  json,
-  useActionData,
-  useNavigate,
-  useNavigation,
-} from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { Form, Link, useActionData, useNavigate, useNavigation } from "react-router";
 import { useEffect, useState } from "react";
 import { FaPlus } from "react-icons/fa";
 import { toast } from "sonner";
@@ -26,7 +19,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return json(
+    return data(
       { workspace: null, error: "Workspace does not exist" },
       { headers },
     );
@@ -38,10 +31,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .eq("id", workspaceId)
     .single();
   if (workspaceError) {
-    return json({ workspace: null, error: workspaceError }, { headers });
+    return data({ workspace: null, error: workspaceError }, { headers });
   }
 
-  return json({ workspace: workspaceData, error: null }, { headers });
+  return data({ workspace: workspaceData, error: null }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -49,7 +42,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const workspaceId = params.id;
   if (workspaceId == null) {
-    return json(
+    return data(
       { success: false, error: "Workspace does not exist" },
       { headers },
     );
@@ -80,16 +73,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
       );
 
     if (uploadError) {
-      return json({ success: false, error: uploadError }, { headers });
+      return data({ success: false, error: uploadError }, { headers });
     }
 
-    return json({ success: true, error: null }, { headers });
+    return data({ success: true, error: null }, { headers });
   } catch (error) {
     logger.error("Workspace audio upload failed", error);
     const message =
       error instanceof Error ? error.message : "Failed to upload audio.";
     const status = error instanceof AudioUploadError ? error.status : 500;
-    return json({ success: false, error: message }, { headers, status });
+    return data({ success: false, error: message }, { headers, status });
   }
 }
 

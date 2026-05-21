@@ -1,5 +1,5 @@
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { Link, useLoaderData, useSubmit, useNavigate } from "@remix-run/react";
+import { type LoaderFunctionArgs } from "react-router";
+import { Link, useLoaderData, useSubmit, useNavigate } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
@@ -66,7 +66,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     })) || []
   };
 
-  return json({
+  return data({
     survey,
     formData,
     workspaceId,

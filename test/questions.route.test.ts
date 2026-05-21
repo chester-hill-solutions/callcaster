@@ -76,7 +76,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -115,7 +115,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -154,7 +154,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -200,7 +200,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -239,7 +239,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -285,7 +285,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));
@@ -325,7 +325,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api+/questions/route");
+    const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
     } as any));

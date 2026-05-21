@@ -105,7 +105,7 @@ describe("confirm-payment route", () => {
       },
     });
 
-    const mod = await import("../app/routes/confirm-payment/route");
+    const mod = await import("../app/routes/confirm-payment");
     const request = new Request(
       "http://localhost/confirm-payment?session_id=sess_123",
     );
@@ -147,7 +147,7 @@ describe("confirm-payment route", () => {
       },
     };
 
-    const mod = await import("../app/routes/confirm-payment/route");
+    const mod = await import("../app/routes/confirm-payment");
     const response = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/confirm-payment?session_id=sess_123"),
     } as any));

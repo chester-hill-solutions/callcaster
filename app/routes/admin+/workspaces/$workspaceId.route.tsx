@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs, json, redirect } from "@remix-run/node";
-import { useLoaderData, Link, Outlet, useLocation } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData, Link, Outlet, useLocation } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -154,7 +154,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         return null;
     });
 
-    return json({ 
+    return data({ 
         user: userData, 
         workspace, 
         workspaceUsers: workspaceUsers || [],

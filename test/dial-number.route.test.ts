@@ -37,7 +37,7 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
   });
 
   test("returns xml with dial", async () => {
-    const mod = await import("../app/routes/api+/dial/route.$number");
+    const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");
     const res = await asRouteResponse(await mod.action({
@@ -50,7 +50,7 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
 
   test("logs and rethrows when twiml building throws", async () => {
     mocks.dialNumberThrows = true;
-    const mod = await import("../app/routes/api+/dial/route.$number");
+    const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");
     await expect(

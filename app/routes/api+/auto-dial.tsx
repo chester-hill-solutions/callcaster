@@ -1,10 +1,10 @@
 import Twilio from "twilio";
-import { createSupabaseServerClient } from "../lib/supabase.server";
+import { createSupabaseServerClient } from '@/lib/supabase.server";
 import {
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
   safeParseJson,
-} from "../lib/database.server";
+} from '@/lib/database.server";
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";

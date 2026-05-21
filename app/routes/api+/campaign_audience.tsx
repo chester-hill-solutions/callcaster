@@ -1,5 +1,5 @@
-import { json } from "@remix-run/node";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import {  } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
@@ -19,7 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const audienceId = Number(audience_id);
             const campaignId = Number(campaign_id);
             if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-                return json({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+                return data({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
             }
 
             // First check if this audience is already added to the campaign
@@ -35,7 +35,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             if (existing) {
-                return json({ message: "Audience already added to campaign" }, { headers });
+                return data({ message: "Audience already added to campaign" }, { headers });
             }
 
             // Add the audience to the campaign
@@ -74,7 +74,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 );
 
                 if (contactIds.length === 0) {
-                    return json({ success: true }, { headers });
+                    return data({ success: true }, { headers });
                 }
 
                 await enqueueContactsForCampaign(
@@ -85,7 +85,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 );
             }
 
-            return json({ success: true }, { headers });
+            return data({ success: true }, { headers });
         }
 
         if (method === "DELETE") {
@@ -96,7 +96,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             const audienceId = Number(audience_id);
             const campaignId = Number(campaign_id);
             if (!Number.isFinite(audienceId) || !Number.isFinite(campaignId)) {
-                return json({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
+                return data({ error: "Invalid audience_id or campaign_id" }, { status: 400, headers });
             }
 
             // Remove the audience from the campaign
@@ -154,13 +154,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 if (removeError) throw removeError;
             }
 
-            return json({ success: true }, { headers });
+            return data({ success: true }, { headers });
         }
 
-        return json({ error: "Method not allowed" }, { status: 405, headers });
+        return data({ error: "Method not allowed" }, { status: 405, headers });
     } catch (error: unknown) {
         logger.error("Error in campaign_audience action:", error);
-        return json(
+        return data(
             { error: error instanceof Error ? error.message : "An unexpected error occurred" },
             { status: 500, headers }
         );

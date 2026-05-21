@@ -1,7 +1,7 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
-import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from '../lib/database.server';
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from '@/lib/database.server';
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { logger } from "@/lib/logger.server";

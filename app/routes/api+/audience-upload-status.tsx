@@ -1,4 +1,4 @@
-import { LoaderFunctionArgs, json } from "@remix-run/node";
+import { LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 
@@ -6,7 +6,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { supabaseClient, headers, user } = await verifyAuth(request);
   
   if (!user) {
-    return json({ error: "Unauthorized" }, { status: 401, headers });
+    return data({ error: "Unauthorized" }, { status: 401, headers });
   }
 
   const url = new URL(request.url);
@@ -14,12 +14,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const workspaceId = url.searchParams.get("workspaceId");
 
   if (!uploadIdStr || !workspaceId) {
-    return json({ error: "Missing required parameters" }, { status: 400, headers });
+    return data({ error: "Missing required parameters" }, { status: 400, headers });
   }
 
   const uploadId = parseInt(uploadIdStr, 10);
   if (isNaN(uploadId)) {
-    return json({ error: "Invalid upload ID" }, { status: 400, headers });
+    return data({ error: "Invalid upload ID" }, { status: 400, headers });
   }
 
   try {
@@ -30,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       .single();
 
     if (uploadError) {
-      return json({ error: uploadError.message }, { status: 500, headers });
+      return data({ error: uploadError.message }, { status: 500, headers });
     }
 
     let statusFileData: Record<string, unknown> = {};
@@ -46,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
-    return json({
+    return data({
       ...statusFileData,
       uploadId: uploadData.id,
       audience_id: uploadData.audience_id,
@@ -68,7 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   } catch (error) {
     logger.error("Error fetching upload status:", error);
-    return json({ 
+    return data({ 
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500, headers });
   }

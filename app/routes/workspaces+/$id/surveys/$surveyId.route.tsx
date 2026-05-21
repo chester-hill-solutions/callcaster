@@ -1,5 +1,5 @@
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData , Link } from "@remix-run/react";
+import { type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import type { SurveyWithPages } from "@/lib/types";
@@ -122,7 +122,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     logger.error("Error fetching responses:", responsesError);
   }
 
-  return json({
+  return data({
     survey,
     recentResponses: recentResponses || [],
     workspaceId,

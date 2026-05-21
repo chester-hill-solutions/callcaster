@@ -1,5 +1,5 @@
-import { Form, useActionData } from "@remix-run/react";
-import { json } from "@remix-run/node";
+import { Form, useActionData } from "react-router";
+import {  } from "react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { AuthCard } from "@/components/shared/AuthCard";
@@ -7,23 +7,23 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const email = formData.get("email");
   if (typeof email !== "string" || !email) {
-    return json({ data: null, error: { message: "Email is required" } });
+    return data({ data: null, error: { message: "Email is required" } });
   }
   const { data, error } = await supabaseClient.auth.resetPasswordForEmail(
     email,
     { redirectTo: `${new URL(request.url).origin}/api/auth/callback` },
   );
   if (error) {
-    return json({ data: null, error: error.message }, { headers });
+    return data({ data: null, error: error.message }, { headers });
   }
-  return json({ data, error: null }, { headers });
+  return data({ data, error: null }, { headers });
 };
 
 type ActionData = {

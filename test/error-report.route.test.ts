@@ -40,7 +40,7 @@ describe("app/routes/api+/error-report/route.tsx", () => {
       user: { email: "", user_metadata: { email: "m@e.com" } },
     });
     mocks.send.mockResolvedValueOnce({ id: "em" });
-    const mod = await import("../app/routes/api+/error-report/route");
+    const mod = await import("../app/routes/api+/error-report");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },
@@ -55,7 +55,7 @@ describe("app/routes/api+/error-report/route.tsx", () => {
 
   test("returns 500 on error", async () => {
     mocks.safeParseJson.mockRejectedValueOnce(new Error("boom"));
-    const mod = await import("../app/routes/api+/error-report/route");
+    const mod = await import("../app/routes/api+/error-report");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "1" },

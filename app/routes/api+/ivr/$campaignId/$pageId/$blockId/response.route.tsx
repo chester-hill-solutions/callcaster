@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookParams } from "@/twilio.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";

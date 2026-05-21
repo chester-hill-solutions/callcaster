@@ -1,7 +1,7 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 
 interface OutreachAttemptRequest {
   campaign_id: number | string;
@@ -20,6 +20,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       wks_id: '',
       queue_id: Number(queue_id)
     });
-    if (error) return json({ error })
-    return json(data,{headers})
+    if (error) return data({ error })
+    return data(data,{headers})
 }

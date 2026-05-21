@@ -59,7 +59,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
@@ -77,7 +77,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue(undefined);
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
@@ -97,7 +97,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-call-in-session"),
     } as never));
@@ -115,7 +115,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=123"
@@ -145,7 +145,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"
@@ -173,7 +173,7 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api+/verify-call-in-session/route");
+    const mod = await import("../app/routes/api+/verify-call-in-session");
     const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"

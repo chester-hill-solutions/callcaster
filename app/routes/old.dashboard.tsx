@@ -1,14 +1,6 @@
-import {
-  useLoaderData,
-  redirect,
-  json,
-  useOutletContext,
-  useSubmit,
-  useNavigate,
-  useLocation,
-} from "@remix-run/react";
-import { createSupabaseServerClient } from "../lib/supabase.server";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, redirect, useOutletContext, useSubmit, useNavigate, useLocation } from "react-router";
+import { createSupabaseServerClient } from '@/lib/supabase.server";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 
 // Legacy route kept for backwards compatibility while the newer dashboard is the
 // actively maintained path. Avoid adding new product behavior here.
@@ -24,7 +16,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { data: campaigns, error: listsError } = await supabase
     .from("campaign")
     .select();
-  return json({ session: data.session, campaigns }, { headers });
+  return data({ session: data.session, campaigns }, { headers });
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {

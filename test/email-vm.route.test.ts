@@ -156,7 +156,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api+/email-vm/route");
+    const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
@@ -199,7 +199,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api+/email-vm/route");
+    const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
@@ -235,7 +235,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api+/email-vm/route");
+    const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
@@ -258,7 +258,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("validates required fields and returns 500 on failures", async () => {
-    const mod = await import("../app/routes/api+/email-vm/route");
+    const mod = await import("../app/routes/api+/email-vm");
     mocks.createClient.mockReturnValue(makeSupabase());
     mocks.fetch.mockResolvedValue({
       ok: true,
@@ -303,7 +303,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("covers supabase and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
-    const mod = await import("../app/routes/api+/email-vm/route");
+    const mod = await import("../app/routes/api+/email-vm");
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ callError: { message: "call" } }),

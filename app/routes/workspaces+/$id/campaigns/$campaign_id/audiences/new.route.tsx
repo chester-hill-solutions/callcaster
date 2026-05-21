@@ -1,11 +1,5 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Form,
-  Link,
-  json,
-  useActionData,
-  useLoaderData,
-} from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -21,7 +15,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const campaignId = params.campaign_id;
 
   if (workspaceId == null || campaignId == null) {
-    return json(
+    return data(
       {
         campaign: null,
         error:
@@ -39,10 +33,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
 
   if (campaignError) {
-    return json({ campaign: null, error: campaignError }, { headers });
+    return data({ campaign: null, error: campaignError }, { headers });
   }
 
-  return json({ campaign: campaignData, error: null }, { headers });
+  return data({ campaign: campaignData, error: null }, { headers });
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
@@ -52,7 +46,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const campaignId = params.campaign_id;
 
   if (!(workspaceId && campaignId)) {
-    return json(
+    return data(
       {
         audienceData: null,
         campaignAudienceData: null,
@@ -67,7 +61,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const contactsFile = formData.get("contacts") as File;
 
   if (!formData.get("audience-name")) {
-    return json(
+    return data(
       {
         success: false,
         error: "Audience name is required",
@@ -91,7 +85,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return json({ error: "Form Action not recognized" }, { headers });
+  return data({ error: "Form Action not recognized" }, { headers });
 }
 
 export default function NewAudience() {

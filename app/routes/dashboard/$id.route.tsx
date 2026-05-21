@@ -1,8 +1,8 @@
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import {  } from "react-router";
+import { useLoaderData } from "react-router";
 import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.client";
 
 interface LoaderData {
@@ -14,9 +14,9 @@ interface LoaderData {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id } = params;
   try {
-    return json({ success: true, message: "Call initiated", id });
+    return data({ success: true, message: "Call initiated", id });
   } catch (error) {
-    return json({
+    return data({
       success: false,
       message: "Failed to initiate call",
       error: error instanceof Error ? error.message : "Unknown error",

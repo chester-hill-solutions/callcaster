@@ -1,5 +1,5 @@
-import { json, redirect, LoaderFunctionArgs, ActionFunctionArgs  } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { redirect, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { useLoaderData } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -37,7 +37,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .single();
 
   const mediaNames = await listMedia(supabaseClient, workspace_id as string );
-  return json({
+  return data({
     workspace: workspaceData,
     workspace_id,
     selected_id,
@@ -63,7 +63,7 @@ export const action = async ({ request, params }: ActionFunctionArgs  ) => {
     .single();
   if (error) {
     logger.error("Campaign Error", error);
-    return json({ success: false, error: error }, { headers });
+    return data({ success: false, error: error }, { headers });
   }
   const { data: campaignUpdate, error: updateError } = await supabaseClient
     .from("message_campaign")
@@ -77,9 +77,9 @@ export const action = async ({ request, params }: ActionFunctionArgs  ) => {
 
   if (updateError) {
     logger.error("Campaign update error", updateError);
-    return json({ success: false, error: updateError }, { headers });
+    return data({ success: false, error: updateError }, { headers });
   }
-  return json({ success: false, error: updateError }, { headers });
+  return data({ success: false, error: updateError }, { headers });
 };
 
 export default function ScriptEditor() {
@@ -103,7 +103,7 @@ export default function ScriptEditor() {
         }),
         headers: { "Content-Type": "application/json" },
       });
-      const result = await response.json();
+      const result = await response.data();
 
       if (result.error) {
         throw new Error(result.error);

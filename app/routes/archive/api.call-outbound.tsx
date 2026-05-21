@@ -1,6 +1,6 @@
 import { xml } from 'remix-utils/responses';
 import twilio from 'twilio';
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 

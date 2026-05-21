@@ -91,7 +91,7 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   test("missing digits/to returns invalid request TwiML", async () => {
     const supabase = makeSupabase({});
     mocks.createClient.mockReturnValueOnce(supabase);
-    const mod = await import("../app/routes/api+/verify-pin-input/route");
+    const mod = await import("../app/routes/api+/verify-pin-input");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as any));
@@ -111,7 +111,7 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api+/verify-pin-input/route");
+    const mod = await import("../app/routes/api+/verify-pin-input");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -131,7 +131,7 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api+/verify-pin-input/route");
+    const mod = await import("../app/routes/api+/verify-pin-input");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
@@ -151,7 +151,7 @@ describe("app/routes/api+/verify-pin-input/route.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "654321");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api+/verify-pin-input/route");
+    const mod = await import("../app/routes/api+/verify-pin-input");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));

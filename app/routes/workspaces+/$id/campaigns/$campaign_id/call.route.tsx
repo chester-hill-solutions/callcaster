@@ -1,20 +1,12 @@
 // Core imports
-import {
-  useLoaderData,
-  useOutletContext,
-  redirect,
-  useNavigation,
-  useNavigate,
-  useFetcher,
-  useRevalidator,
-} from "@remix-run/react";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { useLoaderData, useOutletContext, redirect, useNavigation, useNavigate, useFetcher, useRevalidator } from "react-router";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 // Lib imports
-import { verifyAuth } from "../lib/supabase.server";
+import { verifyAuth } from '@/lib/supabase.server";
 import {
   handleCall,
   handleConference,

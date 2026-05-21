@@ -1,5 +1,5 @@
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, useSubmit } from "@remix-run/react";
+import { redirect } from "react-router";
+import { useLoaderData, useSubmit } from "react-router";
 import { useState, useEffect } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { LoaderFunctionArgs , ActionFunctionArgs } from "@remix-run/node";
+import type { LoaderFunctionArgs , ActionFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
 import { logger } from "@/lib/logger.server";
 import { logger as loggerClient } from "@/lib/logger.client";
@@ -200,7 +200,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     voicedrop_audio: campaignDetails.voicedrop_audio,
   };
 
-  return json({
+  return data({
     workspace_id,
     selected_id,
     data: {
@@ -225,7 +225,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
 
   if (!encodedMediaName) {
-    return json({ success: false, error: "File name is required" });
+    return data({ success: false, error: "File name is required" });
   }
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -238,7 +238,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   if (error) {
     logger.error("Campaign Error", error);
-    return json({ success: false, error: error }, { headers });
+    return data({ success: false, error: error }, { headers });
   }
 
   const { data: campaignUpdate, error: updateError } = await supabaseClient
@@ -252,9 +252,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     .select();
 
   if (updateError) {
-    return json({ success: false, error: updateError }, { headers });
+    return data({ success: false, error: updateError }, { headers });
   }
-  return json({ success: true, data: campaignUpdate }, { headers });
+  return data({ success: true, data: campaignUpdate }, { headers });
 };
 
 export default function ScriptEditor() {

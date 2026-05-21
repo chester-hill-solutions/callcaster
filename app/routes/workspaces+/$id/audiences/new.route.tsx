@@ -1,5 +1,5 @@
-import { ActionFunctionArgs, json, redirect } from "@remix-run/node";
-import { Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "@remix-run/react";
+import { ActionFunctionArgs, redirect } from "react-router";
+import { Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
@@ -16,7 +16,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const workspaceId = params.id;
 
   if (workspaceId == null) {
-    return json(
+    return data(
       {
         success: false,
         error: "Workspace not found",
@@ -31,7 +31,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
 
   if (!audienceName) {
-    return json(
+    return data(
       {
         success: false,
         error: "Audience name is required",
@@ -54,7 +54,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         .single();
 
       if (audienceError) {
-        return json(
+        return data(
           {
             success: false,
             error: audienceError.message,
@@ -69,7 +69,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return json({ success: false, error: "Form Action not recognized" }, { headers });
+  return data({ success: false, error: "Form Action not recognized" }, { headers });
 }
 
 export default function AudiencesNew() {

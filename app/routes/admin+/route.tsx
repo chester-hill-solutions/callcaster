@@ -1,5 +1,5 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect, json } from "@remix-run/node";
-import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,7 +74,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         .select("*, workspace(*)")
         .order("created_at", { ascending: false });
 
-    return json({ 
+    return data({ 
         user: userData, 
         workspaces, 
         users, 
@@ -120,10 +120,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .eq("id", workspaceId);
 
         if (error) {
-            return json({ error: error.message });
+            return data({ error: error.message });
         }
 
-        return json({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
+        return data({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
     }
 
     if (action === "sync_workspace_twilio") {
@@ -133,9 +133,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 supabaseClient,
                 workspaceId,
             });
-            return json({ success: "Workspace Twilio sync completed" });
+            return data({ success: "Workspace Twilio sync completed" });
         } catch (error) {
-            return json({
+            return data({
                 error: error instanceof Error ? error.message : "Failed to sync workspace Twilio data",
             });
         }
@@ -147,10 +147,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         if (error) {
-            return json({ error: error.message });
+            return data({ error: error.message });
         }
 
-        return json({ success: "Workspace Twilio sync started for all workspaces" });
+        return data({ success: "Workspace Twilio sync started for all workspaces" });
     }
     
     if (action === "toggle_user_status") {
@@ -164,13 +164,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             .eq("id", userId);
 
         if (error) {
-            return json({ error: error.message });
+            return data({ error: error.message });
         }
 
-        return json({ success: `User disabled successfully` });
+        return data({ success: `User disabled successfully` });
     }
 
-    return json({ error: "Invalid action" });
+    return data({ error: "Invalid action" });
 };
 
 export default function Admin() {

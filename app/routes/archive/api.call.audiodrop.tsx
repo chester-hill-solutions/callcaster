@@ -1,6 +1,6 @@
-import { json } from '@remix-run/node';
+import {  } from "react-router";
 import Twilio from 'twilio';
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 
 const accountSid = env.TWILIO_SID();
@@ -14,7 +14,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const baseUrl = env.BASE_URL();
 
     const client = new Twilio.Twilio(accountSid, authToken);
-    const {to: toNumber}: AudiodropRequest = await request.json();
+    const {to: toNumber}: AudiodropRequest = await request.data();
 /* 
     if (!/^[+]?[\d\(\)\-\s]+$/.test(toNumber)) {
         return new Response("Invalid phone number.", { status: 400 });
@@ -28,8 +28,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             machineDetection:'DetectMessageEnd',
             statusCallback:'/api/audiodrop-status'
         });
-        return json({ success: true, message: 'Robocall initiated', callSid: call.sid });
+        return data({ success: true, message: 'Robocall initiated', callSid: call.sid });
     } catch (error) {
-        return json({ success: false, message: error.message }, { status: 500 });
+        return data({ success: false, message: error.message }, { status: 500 });
     }
 };

@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
-describe("app/routes/api+/auto-dial/route.end.tsx", () => {
+describe("app/routes/api+/auto-dial/end.route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
   test("returns 500 with message when conference listing throws", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
 
     const supabaseClient: any = {};
     const res = await asRouteResponse(await mod.action({
@@ -28,7 +28,7 @@ describe("app/routes/api+/auto-dial/route.end.tsx", () => {
   }, 60000);
 
   test("handles conference/call update errors and still returns success", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
 
     const outreachSingle = vi
       .fn()
@@ -92,7 +92,7 @@ describe("app/routes/api+/auto-dial/route.end.tsx", () => {
   });
 
   test("returns success when there are no in-progress conferences", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
     const supabaseClient: any = {};
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
@@ -110,7 +110,7 @@ describe("app/routes/api+/auto-dial/route.end.tsx", () => {
   });
 
   test("covers conf update error, call select error, empty call data, and missing outreach_attempt_id branches", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
 
     const logger = { error: vi.fn(), debug: vi.fn() };
 
@@ -233,7 +233,7 @@ describe("app/routes/api+/auto-dial/route.end.tsx", () => {
     const logger = { error: vi.fn(), debug: vi.fn() };
     vi.doMock("@/lib/logger.server", () => ({ logger }));
 
-    const mod = await import("../app/routes/api+/auto-dial/route.end");
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
     } as any));

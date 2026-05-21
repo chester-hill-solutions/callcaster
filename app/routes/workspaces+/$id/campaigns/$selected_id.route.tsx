@@ -1,19 +1,5 @@
-import {
-  ActionFunctionArgs,
-  defer,
-  json,
-  LoaderFunctionArgs,
-  redirect,
-} from "@remix-run/node";
-import {
-  Await,
-  Outlet,
-  useActionData,
-  useLoaderData,
-  useLocation,
-  useOutletContext,
-  useRevalidator,
-} from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
 import { Suspense, useEffect, useRef } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger as loggerServer } from "@/lib/logger.server";
@@ -135,12 +121,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .csv();
     if (error || !data) {
       loggerServer.error("Error fetching campaign messages:", error);
-      return json(
+      return data(
         { error: error?.message || "Error fetching campaign messages" },
         { status: 500 },
       );
     }
-    return json({
+    return data({
       csvContent: data,
       filename: `outreach_results_${campaign_id}.csv`,
     });
@@ -155,17 +141,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       .csv();
     if (error || !data) {
       loggerServer.error("Error fetching campaign attempts:", error);
-      return json(
+      return data(
         { error: error?.message || "Error fetching campaign attempts" },
         { status: 500 },
       );
     }
-    return json({
+    return data({
       csvContent: data,
       filename: `outreach_results_${campaign_id}.csv`,
     });
   } else {
-    return json({ error: "Invalid campaign type" }, { status: 400 });
+    return data({ error: "Invalid campaign type" }, { status: 400 });
   }
 };
 
@@ -215,7 +201,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     expected_total: number;
   }[];
 
-  return defer({
+  return data({
     selected_id,
     hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(
       userRole?.role as MemberRole,

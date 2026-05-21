@@ -1,4 +1,4 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import { createErrorResponse } from "@/lib/errors.server";
@@ -19,13 +19,13 @@ export const action = async ({ request }: { request: Request }) => {
       const campaignDetails = parseJsonField<Parameters<typeof updateCampaign>[0]["campaignDetails"]>(data.campaignDetails);
       const { campaign, campaignDetails: updatedCampaignDetails } =
         await updateCampaign({ supabase: supabaseClient, campaignData, campaignDetails });
-      return json({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
+      return data({ campaign, campaignDetails: updatedCampaignDetails }, { headers });
     }
 
     if (request.method === "DELETE") {
       const campaignId = String(data.campaignId ?? "");
       await deleteCampaign({ supabase: supabaseClient, campaignId });
-      return json({ success: true }, { headers });
+      return data({ success: true }, { headers });
     }
 
     if (request.method === "POST") {
@@ -34,10 +34,10 @@ export const action = async ({ request }: { request: Request }) => {
         supabase: supabaseClient,
         campaignData,
       });
-      return json({ campaign, campaignDetails: createdCampaignDetails }, { headers });
+      return data({ campaign, campaignDetails: createdCampaignDetails }, { headers });
     }
 
-    return json({ error: "Method not allowed" }, { status: 405, headers });
+    return data({ error: "Method not allowed" }, { status: 405, headers });
   } catch (error) {
     return createErrorResponse(error, "Failed to process campaign request", 400, { headers });
   }

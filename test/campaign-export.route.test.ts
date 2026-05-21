@@ -319,7 +319,7 @@ describe("api.campaign-export", () => {
 
   test("returns 401 when user missing", async () => {
     authUser = null;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
@@ -331,7 +331,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({ request: reqForm("http://x", {}) } as any));
     expect(res.status).toBe(400);
   }, 60000);
@@ -342,7 +342,7 @@ describe("api.campaign-export", () => {
       campaignError: "not found",
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -354,7 +354,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w2", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -367,7 +367,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "nope", title: "T" },
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -379,7 +379,7 @@ describe("api.campaign-export", () => {
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const res = await asRouteResponse(await mod.action({
       request: {
@@ -453,7 +453,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -516,7 +516,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "81", workspaceId: "w1" }),
     } as any));
@@ -551,7 +551,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "5", workspaceId: "w1" }),
     } as any));
@@ -562,7 +562,7 @@ describe("api.campaign-export", () => {
 
   test("action covers blank campaign title branches for message and call", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const { supabaseClient: sbMsg } = makeSupabase({
       campaign: {
@@ -639,7 +639,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "8", workspaceId: "w1" }),
     } as any));
@@ -664,7 +664,7 @@ describe("api.campaign-export", () => {
       messages: [],
     });
     supabaseForAuth = supabaseClient;
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "9", workspaceId: "w1" }),
     } as any));
@@ -692,7 +692,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "4", workspaceId: "w1" }),
     } as any));
@@ -706,7 +706,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers internal campaign error and missing-campaign fallback", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const { supabaseClient } = makeSupabase({
       campaign: {
@@ -756,7 +756,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers campaign queue/contact/message errors and CSV upload error", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const baseCampaign = {
       workspace: "w1",
@@ -864,7 +864,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -909,7 +909,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "50", workspaceId: "w1" }),
     } as any));
@@ -919,7 +919,7 @@ describe("api.campaign-export", () => {
 
   test("message export uses default error strings when error.message is empty", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     // campaign_queue error -> uses "Error fetching campaign contacts"
     const { supabaseClient: sbQueueErr } = makeSupabase({
@@ -1094,7 +1094,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "2", workspaceId: "w1" }),
     } as any));
@@ -1118,7 +1118,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers campaign export error and missing-campaign fallback", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const { supabaseClient } = makeSupabase({
       campaign: {
@@ -1183,7 +1183,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "42", workspaceId: "w1" }),
     } as any));
@@ -1212,7 +1212,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "3", workspaceId: "w1" }),
     } as any));
@@ -1226,7 +1226,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers attempt chunk break, contacts/calls errors, status upload error, signed url error, and nested catch logging", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     const baseCampaign = {
       workspace: "w1",
@@ -1362,7 +1362,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "70", workspaceId: "w1" }),
     } as any));
@@ -1372,7 +1372,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers script?.steps fallbacks and default error strings, and Unknown error status on non-Error throws", async () => {
     vi.useFakeTimers();
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
 
     // script pages/blocks fallbacks via null script
     const { supabaseClient: sbNullScript } = makeSupabase({
@@ -1539,7 +1539,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "78", workspaceId: "w1" }),
     } as any));
@@ -1567,7 +1567,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
@@ -1604,7 +1604,7 @@ describe("api.campaign-export", () => {
     });
     supabaseForAuth = supabaseClient;
 
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const res = await asRouteResponse(await mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));

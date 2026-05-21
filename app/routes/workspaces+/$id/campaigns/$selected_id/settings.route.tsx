@@ -1,5 +1,5 @@
-import { defer, json, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "@remix-run/node";
-import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "@remix-run/react";
+import { LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
+import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
 import {
@@ -231,7 +231,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const campaignDetailsStr = data.campaignDetails != null ? String(data.campaignDetails) : "";
 
         if (!campaignDataStr || !campaignDetailsStr) {
-          return json(
+          return data(
             { error: "Campaign changes could not be saved", actionType: "save" as const },
             { status: 400 },
           );
@@ -276,7 +276,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           );
         }
 
-        return json({
+        return data({
           success: true,
           actionType: "save" as const,
           campaign: result.campaign,
@@ -284,7 +284,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         });
       } catch (error) {
         logger.error("Error saving campaign settings", error);
-        return json(
+        return data(
           {
             error: error instanceof Error ? error.message : "Campaign changes could not be saved",
             actionType: "save" as const,
@@ -316,7 +316,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
               campaignRecord.type,
             )
           ) {
-            return json(
+            return data(
               {
                 success: false,
                 error: "Campaign type must be selected before updating status",
@@ -348,7 +348,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
 
           if (readinessError) {
-            return json(
+            return data(
               { success: false, error: readinessError, actionType: "status" as const },
               { status: 400 },
             );
@@ -362,10 +362,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
           status,
           is_active === "true" ? true : is_active === "false" ? false : undefined
         );
-        return json({ success: true, actionType: "status" as const });
+        return data({ success: true, actionType: "status" as const });
       } catch (error) {
         logger.error("Error updating campaign status", error);
-        return json(
+        return data(
           {
             success: false,
             error: error instanceof Error ? error.message : "Campaign status could not be updated",
@@ -380,10 +380,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       try {
         const campaignData = data.campaignData != null ? String(data.campaignData) : "";
         await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
-        return json({ success: true, actionType: "duplicate" as const });
+        return data({ success: true, actionType: "duplicate" as const });
       } catch (error) {
         logger.error("Error duplicating campaign", error);
-        return json(
+        return data(
           {
             success: false,
             error: error instanceof Error ? error.message : "Campaign could not be duplicated",
@@ -395,7 +395,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     default:
-      return json({ success: false, error: "Invalid intent" }, { status: 400 });
+      return data({ success: false, error: "Invalid intent" }, { status: 400 });
   }
 }
 
@@ -469,7 +469,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  return defer({
+  return data({
     workspace_id,
     selected_id,
     campaignQueue: campaignWithAudience.campaign_queue as QueueItem[],

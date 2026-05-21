@@ -38,7 +38,7 @@ function makeSupabase() {
   return { channel, removeChannel, rpc, from };
 }
 
-describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
+describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   beforeEach(() => {
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -95,7 +95,7 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/dialer", { method: "POST" }),
     } as any));
@@ -136,7 +136,7 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     await res.json();
     expect(mocks.logger.error).toHaveBeenCalledWith("Cannot save call without sid");
@@ -161,7 +161,7 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
       ),
     });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true, message: "No queued contacts" });
     expect(confUpdate).toHaveBeenCalled();
@@ -194,7 +194,7 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     expect(res.headers.get("Content-Type")).toBe("application/json");
     await expect(res.json()).resolves.toEqual({ success: false, error: "dq" });
@@ -212,7 +212,7 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ conferences: { list: async () => [] } });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Unknown error" });
   });
@@ -232,13 +232,13 @@ describe("app/routes/api+/auto-dial/route.dialer.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ conferences: { list: async () => [] } });
 
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Invalid phone number length" });
   });
 
   test("helper exports cover remaining branches (normalization, rpc throws, and call persistence shaping)", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/route.dialer");
+    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
 
     // normalizePhoneNumber: + in middle triggers plus removal and minLength else-path
     expect(mod.normalizePhoneNumber("1+5555550100")).toBe("+15555550100");

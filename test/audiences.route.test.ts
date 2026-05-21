@@ -43,7 +43,7 @@ describe("api.audiences route", () => {
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({ name: "x" });
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const resMissing = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
@@ -85,7 +85,7 @@ describe("api.audiences route", () => {
         delete: () => ({ eq: async (...args: any[]) => (del(...args), { error: deleteError }) }),
       }),
     };
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const parseActionRequest = vi.fn();
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers() }));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
@@ -139,7 +139,7 @@ describe("api.audiences route", () => {
         throw new Error("unexpected");
       },
     };
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
@@ -199,7 +199,7 @@ describe("api.audiences route", () => {
         throw new Error("unexpected");
       },
     };
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
@@ -268,7 +268,7 @@ describe("api.audiences route", () => {
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
     vi.doMock("@/lib/database.server", () => ({ parseActionRequest, requireWorkspaceAccess }));
 
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
     } as any));
@@ -278,7 +278,7 @@ describe("api.audiences route", () => {
   test("loader JSON returns data and handles optional audienceId filter", async () => {
     const query = makeQuery({ data: [{ id: 1 }], error: null });
     const supabaseClient: any = { from: () => ({ select: () => query }) };
-    const mod = await import("../app/routes/api+/audiences/route");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);

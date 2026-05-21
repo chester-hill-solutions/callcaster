@@ -1,4 +1,4 @@
-import { json, ActionFunction } from '@remix-run/node';
+import { ActionFunction } from "react-router";
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { WorkspaceNumbers } from '@/lib/types';
 import { env } from '@/lib/env.server';
@@ -59,7 +59,7 @@ export const action: ActionFunction = async ({ request }) => {
     });
 
     if (!isValidTwilioRequest) {
-      return json({ error: 'Invalid Twilio signature' }, { status: 403 });
+      return data({ error: 'Invalid Twilio signature' }, { status: 403 });
     }
 
     if (parsedBody.VerificationStatus === 'success' || parsedBody.VerificationStatus === 'failed') {
@@ -89,12 +89,12 @@ export const action: ActionFunction = async ({ request }) => {
         throw new Error('No matching record found');
       }
 
-      return json(numberRequest[0]);
+      return data(numberRequest[0]);
     }
 
-    return json(parsedBody);
+    return data(parsedBody);
   } catch (error) {
     logger.error('Error processing request:', error);
-    return json({ error: 'An error occurred while processing the request' }, { status: 500 });
+    return data({ error: 'An error occurred while processing the request' }, { status: 500 });
   }
 };

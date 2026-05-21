@@ -18,6 +18,13 @@
 
 - Integrator-facing JSON APIs: OpenAPI in [app/lib/openapi.ts](app/lib/openapi.ts), served at `/api/docs/openapi`. Doc-first workflow and Hey API conventions: [.cursor/skills/hey-api-openapi/SKILL.md](.cursor/skills/hey-api-openapi/SKILL.md).
 
+## Route modules (hybrid `+` folders)
+
+- URL tree is verified with `npm run tools:routes:verify` against `scripts/baselines/route-tree.txt`.
+- Under `workspaces+/$id/` and similar nested paths, use `*.route.tsx` for segment modules (e.g. `settings.route.tsx`, `settings/numbers.route.tsx`), not plain `settings.tsx` / `settings/numbers.tsx` — `remix-flat-routes` will not register those.
+- Hybrid colocation alternative: `settings+/numbers.tsx` maps to `/settings/numbers`.
+- Repair/test import paths: `npm run tools:routes:repair` (includes `fix-route-test-module-paths.mjs`).
+
 ## Learned Workspace Facts
 
 - `archive/deprecated/twilio-serverless/**` contains deprecated Twilio Serverless code and can generally be ignored for current runtime and coverage work.

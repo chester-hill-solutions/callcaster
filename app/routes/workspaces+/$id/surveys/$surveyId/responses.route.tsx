@@ -1,5 +1,5 @@
-import { json, type LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useFetcher , Link } from "@remix-run/react";
+import { type LoaderFunctionArgs } from "react-router";
+import { useLoaderData, useFetcher, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { getUserRole } from "@/lib/database.server";
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
@@ -104,7 +104,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     responses?.filter((r) => r.completed_at)?.length || 0;
   const inProgressResponses = totalResponses - completedResponses;
 
-  return json({
+  return data({
     survey,
     responses: responses || [],
     workspaceId,

@@ -1,10 +1,5 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import {
-  Link,
-  useLoaderData,
-  useNavigate,
-  useFetcher,
-} from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { Link, useLoaderData, useNavigate, useFetcher } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import type { Database } from "@/lib/database.types";
@@ -131,7 +126,7 @@ export default function HandsetPage() {
     const url = `/api/handset-token?workspace=${encodeURIComponent(workspaceId)}&client_identity=${encodeURIComponent(clientIdentity)}`;
     fetch(url, { credentials: "include" })
       .then(async (r) => {
-        const data = await r.json();
+        const data = await r.data();
         if (!r.ok) {
           setTokenError(data.error ?? `Request failed (${r.status})`);
           return;

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
-import { ActionFunctionArgs, json } from "@remix-run/node";
+import { ActionFunctionArgs } from "react-router";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
@@ -149,9 +149,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       });
     }
 
-    return json({ success: true, message: "Voicemail processed and email sent", result });
+    return data({ success: true, message: "Voicemail processed and email sent", result });
   } catch (error) {
     logger.error('Error processing voicemail:', error);
-    return json({ error: 'Failed to process voicemail' }, { status: 500 });
+    return data({ error: 'Failed to process voicemail' }, { status: 500 });
   }
 };

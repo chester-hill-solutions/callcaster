@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
+import {  } from "react-router";
+import { createWorkspaceTwilioInstance } from '@/lib/database.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { validateTwilioWebhookParams } from "@/twilio.server";
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
@@ -144,7 +144,7 @@ export const action = async ({ request }: { request: Request }) => {
         const signature = request.headers.get("x-twilio-signature");
         const url = new URL(request.url).href;
         const isValid = validateTwilioWebhookParams(params, signature, url, authToken);
-        if (!isValid) return json({ error: "Invalid Twilio signature" }, { status: 403 });
+        if (!isValid) return data({ error: "Invalid Twilio signature" }, { status: 403 });
 
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
         
@@ -207,7 +207,7 @@ export const action = async ({ request }: { request: Request }) => {
         }
     } catch (error) {
         logger.error("Error processing IVR status:", error);
-        return json({ success: false, error });
+        return data({ success: false, error });
     }
-    return json({ success: true });
+    return data({ success: true });
 };

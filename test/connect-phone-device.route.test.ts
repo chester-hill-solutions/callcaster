@@ -50,7 +50,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
       campaignId: "c1",
     });
 
-    const mod = await import("../app/routes/api+/connect-phone-device/route");
+    const mod = await import("../app/routes/api+/connect-phone-device");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", {
         method: "POST",
@@ -75,7 +75,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.twilioCreate.mockResolvedValueOnce({ sid: "CA1" });
 
-    const mod = await import("../app/routes/api+/connect-phone-device/route");
+    const mod = await import("../app/routes/api+/connect-phone-device");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
     } as any));
@@ -111,7 +111,7 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.twilioCreate.mockRejectedValueOnce(new Error("twilio"));
 
-    const mod = await import("../app/routes/api+/connect-phone-device/route");
+    const mod = await import("../app/routes/api+/connect-phone-device");
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
     } as any));

@@ -168,7 +168,7 @@ describe("api.campaign-export CSV contract checks", () => {
   });
 
   test("produces BOM + CRLF CSV and neutralizes CSV injection", async () => {
-    const mod = await import("../app/routes/api+/campaign-export/route");
+    const mod = await import("../app/routes/api+/campaign-export");
     const fd = new FormData();
     fd.set("campaignId", "123");
     fd.set("workspaceId", "w1");

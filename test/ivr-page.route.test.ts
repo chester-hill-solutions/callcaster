@@ -81,7 +81,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
   test("returns 400 when required params missing", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: null }]));
-    const mod = await import("../app/routes/api+/ivr/route.$campaignId.$pageId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const res = await asRouteResponse(await mod.action({
       params: {},
       request: new Request("http://x", { method: "POST", body: new FormData() }),
@@ -93,7 +93,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
     const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }], "wstok"));
-    const mod = await import("../app/routes/api+/ivr/route.$campaignId.$pageId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     const res = await asRouteResponse(await mod.action({
@@ -104,7 +104,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   });
 
   test("redirects to first block; says error when page invalid; catch path for invalid script and retry failure", async () => {
-    const mod = await import("../app/routes/api+/ivr/route.$campaignId.$pageId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
 
     // success
     const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };

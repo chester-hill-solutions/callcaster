@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { json } from "@remix-run/node";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+import {  } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import type { Database, Tables } from "@/lib/database.types";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -19,7 +19,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
 
   if (!user) {
-    return json({ error: "Unauthorized" }, { status: 401, headers });
+    return data({ error: "Unauthorized" }, { status: 401, headers });
   }
 
   const url = new URL(request.url);
@@ -27,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const workspaceId = url.searchParams.get("workspaceId");
 
   if (!callSid || !workspaceId) {
-    return json(
+    return data(
       { error: "Missing callSid or workspaceId" },
       { status: 400, headers }
     );
@@ -46,11 +46,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   if (callError || !dbCall) {
     logger.debug("Call not found for poll", { callSid, error: callError?.message });
-    return json({ error: "Call not found" }, { status: 404, headers });
+    return data({ error: "Call not found" }, { status: 404, headers });
   }
 
   if (dbCall.workspace !== workspaceId) {
-    return json(
+    return data(
       { error: "Call does not belong to this workspace" },
       { status: 403, headers }
     );
@@ -73,7 +73,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const normalizedStatus = normalizeProviderStatus(rawStatus);
 
     if (normalizedStatus == null) {
-      return json(
+      return data(
         { status: rawStatus ?? undefined, error: "Unsupported status" },
         { status: 200, headers }
       );
@@ -101,7 +101,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
       if (updateCallError) {
         logger.error("Error updating call status from poll", updateCallError);
-        return json(
+        return data(
           { status: normalizedStatus, error: "Failed to sync call" },
           { status: 500, headers }
         );
@@ -122,7 +122,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       }
     }
 
-    return json({ status: normalizedStatus }, { headers });
+    return data({ status: normalizedStatus }, { headers });
   } catch (err) {
     logger.error("Error polling call status", err);
     return createErrorResponse(err, "Failed to fetch call status", 500, { headers });

@@ -1,7 +1,7 @@
-import { json } from "@remix-run/node";
+import {  } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
-import { getSupabaseServerClientWithSession } from "../lib/supabase.server";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+import { getSupabaseServerClientWithSession } from '@/lib/supabase.server";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { buildQueuedQueueUpdate } from "@/lib/queue-status";
 
@@ -22,13 +22,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const campaign_id = searchParams.get('campaign_id');
     const limit = searchParams.get('limit') ?? '10';
     if (parseInt(limit) === 0) {
-        return json([]);
+        return data([]);
     }
     const { data: newQueue } = await supabase.rpc('select_and_update_campaign_contacts', { p_campaign_id: Number(campaign_id), p_initial_limit: parseInt(limit) })
     
-    if (!newQueue || !newQueue.length) return json([]);
+    if (!newQueue || !newQueue.length) return data([]);
     const { data: queueItems } = await supabase.from('campaign_queue').select('*, contact(*)').in('id', newQueue.map((i: { queue_id: number }) => i.queue_id));
-    return json(queueItems);
+    return data(queueItems);
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -45,9 +45,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
         if (error) {
             logger.error('Error updating campaign queue:', error);
-            return json({ error: error.message }, { status: 500 });
+            return data({ error: error.message }, { status: 500 });
         }
-        return json(data);
+        return data(data);
     } 
 else if (request.method === 'DELETE') {
         const { campaignId }: ResetRequest = await safeParseJson(request);
@@ -60,10 +60,10 @@ else if (request.method === 'DELETE') {
 
         if (error) {
             logger.error('Error resetting campaign queue items:', error);
-            return json({ error: error.message }, { status: 500 });
+            return data({ error: error.message }, { status: 500 });
         }
-        return json({ message: 'Campaign queue items reset successfully', affected_rows: data.length });
+        return data({ message: 'Campaign queue items reset successfully', affected_rows: data.length });
     }
 
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return data({ error: 'Method not allowed' }, { status: 405 });
 };

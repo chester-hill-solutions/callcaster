@@ -1,5 +1,5 @@
-import { json, LoaderFunctionArgs, redirect } from "@remix-run/node";
-import { useLoaderData, useOutletContext , Link } from "@remix-run/react";
+import { LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData, useOutletContext, Link } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import { logger } from "@/lib/logger.server";
 import { Campaign } from "@/lib/types";
@@ -32,7 +32,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     logger.error("Error fetching archived campaigns:", error);
   }
 
-  return json(
+  return data(
     { archivedCampaigns: archivedCampaigns || [] },
     { headers }
   );

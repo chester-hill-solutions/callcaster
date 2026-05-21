@@ -162,7 +162,7 @@ describe("api.call-status billing + idempotency", () => {
 
   test("rejects invalid Twilio signature", async () => {
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api+/call/route-status");
+    const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BAD");
     fd.set("CallStatus", "completed");
@@ -181,7 +181,7 @@ describe("api.call-status billing + idempotency", () => {
   });
 
   test("bills one unit for 0s, two units for 60s, two units for 61s", async () => {
-    const mod = await import("../app/routes/api+/call/route-status");
+    const mod = await import("../app/routes/api+/call-status");
 
     const makeReq = (sid: string, duration: string) => {
       const fd = new FormData();
@@ -207,7 +207,7 @@ describe("api.call-status billing + idempotency", () => {
   });
 
   test("is idempotent across duplicate webhook deliveries (same CallSid)", async () => {
-    const mod = await import("../app/routes/api+/call/route-status");
+    const mod = await import("../app/routes/api+/call-status");
 
     const fd = new FormData();
     fd.set("CallSid", "CA_DUP");

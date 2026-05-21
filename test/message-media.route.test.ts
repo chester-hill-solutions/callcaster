@@ -64,7 +64,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
 
   test("requires workspaceId", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers({ "X": "1" }) });
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     const res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
@@ -72,7 +72,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("POST handles upload errors (non-409), 409 conflict continues", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
     fd.set("image", new File(["x"], "a.png"));
@@ -90,7 +90,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("POST with campaignId updates message_campaign, covering errors and success", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
     fd.set("image", new File(["x"], "a.png"));
@@ -111,7 +111,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("POST without campaignId returns signed URL or error", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
     fd.set("image", new File(["x"], "a.png"));
@@ -127,7 +127,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("DELETE updates message_campaign, covering errors and success", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
     fd.set("fileName", "x.png");
@@ -147,7 +147,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("covers filename non-string branches and message_media nullish fallbacks", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
 
     // POST: fileName as File => String(mediaNameRaw ?? '')
     const fd = new FormData();
@@ -175,7 +175,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
   });
 
   test("covers fileName missing => mediaNameRaw ?? '' fallback for POST and DELETE", async () => {
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
 
     const fd = new FormData();
     fd.set("workspaceId", "w1");
@@ -195,7 +195,7 @@ describe("app/routes/api+/message_media/route.tsx", () => {
 
   test("returns 405 for unsupported method", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers() });
-    const mod = await import("../app/routes/api+/message_media/route");
+    const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
     const res = await asRouteResponse(await mod.action({ request: req("PUT", fd) } as any));

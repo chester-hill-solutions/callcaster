@@ -1,5 +1,5 @@
-import { json } from "@remix-run/node";
-import type { ActionFunctionArgs } from "@remix-run/node";
+import {  } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { env } from "@/lib/env.server";
 
@@ -22,7 +22,7 @@ async function transcribeAudio(audioBuffer: ArrayBuffer) {
             response_format:"json"
         })
     });
-    return response.json();
+    return response.data();
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -38,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const buffer = await audioFile.arrayBuffer();
     try {
         const transcriptionResult = await transcribeAudio(buffer); */
-        return json({ status: 'OK' });
+        return data({ status: 'OK' });
    /*  } catch (error) {
         console.error('Error transcribing audio:', error);
         return new Response("Failed to transcribe audio", { status: 500 });

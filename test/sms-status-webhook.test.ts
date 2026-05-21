@@ -196,7 +196,7 @@ describe("api.sms.status webhook behavior", () => {
 
   test("rejects invalid Twilio signature", async () => {
     twilioValidateRequest.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const fd = new FormData();
     fd.set("SmsSid", "SM_BAD");
     fd.set("SmsStatus", "delivered");
@@ -211,7 +211,7 @@ describe("api.sms.status webhook behavior", () => {
   }, 15000);
 
   test("normalizes unknown SmsStatus to failed", async () => {
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const fd = new FormData();
     fd.set("SmsSid", "SM123");
     fd.set("SmsStatus", "not-a-real-status");
@@ -232,7 +232,7 @@ describe("api.sms.status webhook behavior", () => {
 
   test("does not overwrite terminal outreach disposition", async () => {
     // delivered -> failed should be skipped
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const fd = new FormData();
     fd.set("SmsSid", "SM123");
     fd.set("SmsStatus", "failed");
@@ -248,7 +248,7 @@ describe("api.sms.status webhook behavior", () => {
   });
 
   test("bills only once for duplicate deliveries (same SmsSid)", async () => {
-    const mod = await import("../app/routes/api+/sms/route.status");
+    const mod = await import("../app/routes/api+/sms/status.route");
     const makeReq = () => {
       const fd = new FormData();
       fd.set("SmsSid", "SM_DUP");

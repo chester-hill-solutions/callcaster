@@ -1,20 +1,7 @@
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import {
-  ActionFunctionArgs,
-  LoaderFunctionArgs,
-  redirect,
-  TypedResponse,
-} from "@remix-run/node";
-import {
-  Form,
-  json,
-  Link,
-  useActionData,
-  useFetcher,
-  useLoaderData,
-  useOutletContext,
-} from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect, TypedResponse } from "react-router";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,7 +74,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
     const hasAccess = userRole?.role !== MemberRole.Caller;
     if (!hasAccess) return redirect("..");
-    return json(
+    return data(
       {
         phoneNumbers,
         workspaceId,
@@ -98,7 +85,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-  return json(
+  return data(
     {
       phoneNumbers,
       workspaceId,
@@ -190,7 +177,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       method: "POST",
     });
     const { validationRequest, numberRequest }: CallerIDResponse =
-      await res.json();
+      await res.data();
     return { validationRequest, numberRequest };
   } else if (formName === "remove-number") {
     const { formName: _ignoredFormName, ...removeNumberData } = data;

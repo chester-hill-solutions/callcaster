@@ -1,12 +1,7 @@
 import { FaPlus } from "react-icons/fa";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import {
-  ActionFunctionArgs,
-  json,
-  LoaderFunctionArgs,
-  redirect,
-} from "@remix-run/node";
-import { useLoaderData, useOutletContext, useSubmit } from "@remix-run/react";
+import { ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
+import { useLoaderData, useOutletContext, useSubmit } from "react-router";
 import { useState, useEffect, useCallback } from "react";
 import { verifyAuth } from "@/lib/supabase.server";
 import { deepEqual } from "@/lib/utils";
@@ -119,7 +114,7 @@ export const loader = async ({
       throw audiencesError;
     }
 
-    return json({
+    return data({
       workspace: workspaceData,
       workspace_id,
       selected_id,
@@ -140,7 +135,7 @@ export const action = async ({
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id || !selected_id) {
-    return json({ error: "Missing required parameters" }, { status: 400 });
+    return data({ error: "Missing required parameters" }, { status: 400 });
   }
 
   try {
@@ -184,7 +179,7 @@ export const action = async ({
         throw createError;
       }
 
-      return json({ success: true, contact: newContact });
+      return data({ success: true, contact: newContact });
     } else {
       // Update existing contact
       const { data: updatedContact, error: updateError } = await supabaseClient
@@ -198,11 +193,11 @@ export const action = async ({
         throw updateError;
       }
 
-      return json({ success: true, contact: updatedContact });
+      return data({ success: true, contact: updatedContact });
     }
   } catch (error) {
     logger.error("Error in contact action:", error);
-    return json({ error: "Failed to save contact" }, { status: 500 });
+    return data({ error: "Failed to save contact" }, { status: 500 });
   }
 };
 

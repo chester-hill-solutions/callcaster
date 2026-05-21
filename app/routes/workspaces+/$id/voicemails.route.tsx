@@ -1,5 +1,5 @@
-import { LoaderFunctionArgs } from "@remix-run/node";
-import { redirect, useLoaderData, useOutletContext } from "@remix-run/react";
+import { LoaderFunctionArgs } from "react-router";
+import { redirect, useLoaderData, useOutletContext } from "react-router";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";

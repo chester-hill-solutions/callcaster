@@ -1,5 +1,5 @@
-import { ActionFunctionArgs, json } from "@remix-run/node";
-import { Form, Link, useActionData, useOutletContext } from "@remix-run/react";
+import { ActionFunctionArgs } from "react-router";
+import { Form, Link, useActionData, useOutletContext } from "react-router";
 import { CardAction } from "twilio/lib/rest/content/v1/content";
 import {
   Card,
@@ -19,7 +19,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const workspaceId = params.id;
 
   if (workspaceId == null) {
-    return json(
+    return data(
       {
         audienceData: null,
         campaignAudienceData: null,
@@ -45,7 +45,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       break;
   }
 
-  return json({ error: "Form Action not recognized" }, { headers });
+  return data({ error: "Form Action not recognized" }, { headers });
 }
 
 export default function CampaignsNew() {
