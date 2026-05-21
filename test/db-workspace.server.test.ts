@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { asRouteResponse } from "./helpers/route-result";
 
 describe("app/lib/database/workspace.server.ts", () => {
   beforeEach(() => {
@@ -467,12 +468,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r1 = await asRouteResponse(await mod.addUserToWorkspace({
+    const r1 = await mod.addUserToWorkspace({
       supabaseClient: supabaseErr,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
-    }));
+    });
     expect(r1.data).toBeNull();
     expect(r1.error).toBeTruthy();
     expect(logger.error).toHaveBeenCalled();
@@ -486,12 +487,12 @@ describe("app/lib/database/workspace.server.ts", () => {
         }),
       }),
     };
-    const r2 = await asRouteResponse(await mod.addUserToWorkspace({
+    const r2 = await mod.addUserToWorkspace({
       supabaseClient: supabaseOk,
       workspaceId: "w1",
       userId: "u1",
       role: "member",
-    }));
+    });
     expect(r2).toEqual({ data: { id: 1 }, error: null });
   });
 
@@ -837,11 +838,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r2 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
+    const r2 = await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseNoName,
       workspaceId: "w1",
       numberId: 1n as any,
-    }));
+    });
     expect(r2.error).toBeTruthy();
 
     const supabaseNumberErr: any = {
@@ -859,11 +860,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r3 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
+    const r3 = await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseNumberErr,
       workspaceId: "w1",
       numberId: 1n as any,
-    }));
+    });
     expect(r3.error).toBeTruthy();
 
     const supabaseDeleteErr: any = {
@@ -887,11 +888,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         return baseSupabase.from(table);
       },
     };
-    const r4 = await asRouteResponse(await mod.removeWorkspacePhoneNumber({
+    const r4 = await mod.removeWorkspacePhoneNumber({
       supabaseClient: supabaseDeleteErr,
       workspaceId: "w1",
       numberId: 1n as any,
-    }));
+    });
     expect(r4.error).toBeTruthy();
   });
 

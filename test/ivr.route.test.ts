@@ -115,18 +115,18 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     fd.set("caller_id", "+1666");
     fd.set("queue_id", "3");
     fd.set("user_id", "u1");
-    let res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    let res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("rpc");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ insertError: new Error("ins") }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
-    res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ dequeueError: "nope" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1" }) } });
-    res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
       error: "Error processing IVR request",

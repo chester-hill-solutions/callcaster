@@ -118,7 +118,7 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "u1");
 
     single.mockResolvedValueOnce({ data: null, error: new Error("del") });
-    const errObj = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers));
+    const errObj = await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers);
     expect(errObj).toEqual({ data: null, error: "del" });
     expect(logger.error).toHaveBeenCalled();
 
@@ -176,7 +176,7 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const err = await asRouteResponse(await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientErr, headers }));
+    const err = await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientErr, headers });
     expect(err).toEqual({ data: null, error: new Error("del ws") });
 
     const supabaseClientOk: any = {
@@ -207,7 +207,7 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const r1 = await asRouteResponse(await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientErr, formData: fd, headers }));
+    const r1 = await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientErr, formData: fd, headers });
     expect(r1.error).toBeTruthy();
 
     const supabaseClientOk: any = {
@@ -219,7 +219,7 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const r2 = await asRouteResponse(await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientOk, formData: fd, headers }));
+    const r2 = await mod.removeInvite({ workspaceId: "w1", supabaseClient: supabaseClientOk, formData: fd, headers });
     expect(r2).toEqual({ data: [{ ok: 1 }], error: null });
   });
 
@@ -261,11 +261,11 @@ describe("WorkspaceSettingUtils", () => {
       }),
     );
 
-    const r1 = await asRouteResponse(await mod.testWebhook(
+    const r1 = await mod.testWebhook(
       JSON.stringify({ a: 1 }),
       "https://example.com",
       JSON.stringify([["X", "1"]]),
-    ));
+    );
     expect(r1).toMatchObject({ data: { ok: 1 }, status: 201, statusText: "Created", error: null });
 
     fetchMock.mockResolvedValueOnce(
@@ -294,15 +294,15 @@ describe("WorkspaceSettingUtils", () => {
         statusText: "OK",
       }),
     );
-    const r2 = await asRouteResponse(await mod.testWebhook({ a: 1 }, "https://example.com", { X: "1" }));
+    const r2 = await mod.testWebhook({ a: 1 }, "https://example.com", { X: "1" });
     expect(r2).toMatchObject({ data: "ok", status: 200, error: null });
 
     fetchMock.mockRejectedValueOnce(new Error("nope"));
-    const r3 = await asRouteResponse(await mod.testWebhook({ a: 1 }, "https://example.com", {}));
+    const r3 = await mod.testWebhook({ a: 1 }, "https://example.com", {});
     expect(r3).toMatchObject({ data: null, status: 500, error: "nope" });
 
     fetchMock.mockRejectedValueOnce("boom");
-    const r4 = await asRouteResponse(await mod.testWebhook({ a: 1 }, "https://example.com", {}));
+    const r4 = await mod.testWebhook({ a: 1 }, "https://example.com", {});
     expect(r4).toMatchObject({ data: null, status: 500, error: "boom" });
   });
 
@@ -319,36 +319,36 @@ describe("WorkspaceSettingUtils", () => {
     };
 
     single.mockResolvedValueOnce({ data: null, error: new Error("none") });
-    const r0 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r0 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r0.success).toBe(false);
 
     single.mockResolvedValueOnce({ data: null, error: null });
-    const r0b = await asRouteResponse(await mod.sendWebhookNotification({
+    const r0b = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r0b).toEqual({ success: false, error: "No webhook configured" });
 
     single.mockResolvedValueOnce({
       data: { destination_url: "https://example.com", custom_headers: {}, events: [{ category: "x", type: "INSERT" }] },
       error: null,
     });
-    const r1 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r1 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r1).toEqual({ success: false, error: "Event type not enabled for this webhook" });
 
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
@@ -357,13 +357,13 @@ describe("WorkspaceSettingUtils", () => {
       error: null,
     });
     fetchMock.mockResolvedValueOnce(new Response("fail", { status: 500, statusText: "Nope" }));
-    const r2 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r2 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r2.success).toBe(false);
 
     single.mockResolvedValueOnce({
@@ -371,13 +371,13 @@ describe("WorkspaceSettingUtils", () => {
       error: null,
     });
     fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
-    const r2b = await asRouteResponse(await mod.sendWebhookNotification({
+    const r2b = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r2b).toEqual({ success: true, error: null });
 
     single.mockResolvedValueOnce({
@@ -385,34 +385,34 @@ describe("WorkspaceSettingUtils", () => {
       error: null,
     });
     fetchMock.mockResolvedValueOnce(new Response("ok", { status: 200, statusText: "OK" }));
-    const r3 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r3 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "UPDATE",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r3).toEqual({ success: true, error: null });
 
     single.mockRejectedValueOnce("boom");
-    const r4 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r4 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r4.success).toBe(false);
     expect(r4.error).toBe("boom");
 
     single.mockRejectedValueOnce(new Error("err2"));
-    const r5 = await asRouteResponse(await mod.sendWebhookNotification({
+    const r5 = await mod.sendWebhookNotification({
       eventCategory: "a",
       eventType: "INSERT",
       workspaceId: "w1",
       payload: { a: 1 },
       supabaseClient,
-    }));
+    });
     expect(r5).toEqual({ success: false, error: "err2" });
   });
 });

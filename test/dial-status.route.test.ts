@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
+      TWILIO_AUTH_TOKEN: () => "test",
     },
   };
 });
@@ -28,7 +29,7 @@ vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 function makeSupabase() {
   let callRow: any = { campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" };
   let callError: any = null;
-  let workspaceRow: any = { twilio_data: { authToken: "tok" } };
+  let workspaceRow: any = { twilio_data: { sid: "AC_test", authToken: "tok" } };
   let campaignRow: any = { voicemail_file: "vm.mp3" };
   let campaignError: any = null;
   let signedUrl: string | null = "https://signed";
@@ -155,27 +156,27 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human" }), // omit CallStatus => null
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "call" });
 
     const { supabase: sup2, twilio: tw2 } = makeSupabase();
     sup2._set.campaignError(new Error("camp"));
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "camp" });
 
     const { supabase: sup3, twilio: tw3 } = makeSupabase();
     sup3._set.voicemailError(new Error("vm"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "vm" });
   });
 
@@ -198,20 +199,24 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toMatchObject({ error: "Call not found" });
 
     const { supabase: sup2, twilio: tw2 } = makeSupabase();
     sup2._set.workspaceRow({});
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await mod.action({
+    mocks.validateTwilioWebhookParams.mockImplementationOnce((_p, _s, _u, tok) => {
+      expect(tok).toBe("test");
+      return true;
+    });
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed" }),
-    } as any);
-    expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toMatchObject({ error: "Workspace auth not found" });
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
   test("machine answer plays voicemail or hangs up; machine handler catch formats errors", async () => {
@@ -221,9 +226,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/dial/status.route");
 
     // voicemail present
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(supabase._callUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
@@ -234,9 +239,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.signedUrl(null);
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(sup2._callUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ twiml: "<Response><Hangup/></Response>" }),
@@ -247,9 +252,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup3._set.outreachUpdateError(new Error("upd"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "upd" });
 
     // handler catch: non-Error thrown -> "Failed to handle voicemail"
@@ -257,9 +262,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup4._set.outreachUpdateThrows("nope");
     mocks.createClient.mockReturnValueOnce(sup4);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw4 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Failed to handle voicemail" });
   });
 
@@ -269,9 +274,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
     const mod = await import("../app/routes/api+/dial/status.route");
 
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true, data: expect.any(Array), attempt: expect.any(Array) });
 
@@ -280,26 +285,26 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.callUpsertError(new Error("up"));
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "up" });
 
     const { supabase: sup3, twilio: tw3 } = makeSupabase();
     sup3._set.attemptUpdateError(new Error("att"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "att" });
 
     // throw non-Error from createWorkspaceTwilioInstance triggers outer catch "An unexpected error occurred"
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce("nope");
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "An unexpected error occurred" });
   });
 
@@ -311,9 +316,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     supabase._set.campaignRow(null);
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "human", CallStatus: "completed" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Campaign not found" });
 
     // voicemail_file falsy => ternary else branch and machine no-answer hangup path
@@ -321,9 +326,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup2._set.campaignRow({ voicemail_file: null });
     mocks.createClient.mockReturnValueOnce(sup2);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw2 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
     // voicemail present but outreach update returns error => hits `if (outreachError) throw outreachError`
@@ -331,9 +336,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup3._set.outreachUpdateError(new Error("outreach"));
     mocks.createClient.mockReturnValueOnce(sup3);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw3 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "outreach" });
 
     // no signedUrl branch: outreach update returns error => hits the other `if (outreachError) throw outreachError`
@@ -342,9 +347,9 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     sup4._set.outreachUpdateError(new Error("no-answer-update"));
     mocks.createClient.mockReturnValueOnce(sup4);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(tw4 as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "no-answer-update" });
   });
 });

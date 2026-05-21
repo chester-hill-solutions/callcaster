@@ -60,7 +60,7 @@ describe("app/routes/api+/disconnect/route.ts", () => {
     mocks.callUpdate.mockResolvedValueOnce({});
 
     const mod = await import("../app/routes/api.disconnect");
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    let res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
 
@@ -69,7 +69,7 @@ describe("app/routes/api+/disconnect/route.ts", () => {
       calls: (_sid: string) => ({ update: mocks.callUpdate }),
     });
     mocks.callUpdate.mockRejectedValueOnce(new Error("nope"));
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Failed to update call status",

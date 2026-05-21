@@ -82,7 +82,9 @@ function makeSupabase() {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: wsAuthToken ? { twilio_data: { authToken: wsAuthToken } } : {},
+                data: wsAuthToken
+                  ? { twilio_data: { sid: "AC_test", authToken: wsAuthToken } }
+                  : {},
                 error: null,
               }),
             }),

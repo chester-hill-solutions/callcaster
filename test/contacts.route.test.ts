@@ -76,16 +76,16 @@ describe("app/routes/api+/contacts/route.tsx", () => {
       audience_id: 2,
     });
     mocks.bulkCreateContacts.mockResolvedValueOnce({ created: 1 });
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ created: 1 });
 
     mocks.parseRequestData.mockResolvedValueOnce({ firstname: "a", audience_id: 2 });
     mocks.createContact.mockResolvedValueOnce({ id: 9 });
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/contacts", { method: "POST" }),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual({ id: 9 });
   });
 

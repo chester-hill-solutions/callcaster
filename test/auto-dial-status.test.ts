@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -44,17 +48,7 @@ vi.mock("../app/lib/database.server", async () => {
   };
 });
 
-type TransactionRow = {
-  id: number;
-  workspace: string;
-  type: "DEBIT" | "CREDIT";
-  amount: number;
-  note: string;
-  created_at: string;
-};
-
 function makeSupabaseStub(args?: { outreachDisposition?: string }) {
-  let nextId = 1;
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
   const campaignQueueEqCalls: Array<[string, unknown]> = [];
@@ -117,7 +111,12 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
               data:
                 workspaceAuthToken === null
                   ? ({} as any)
-                  : { twilio_data: { authToken: workspaceAuthToken ?? "twilio-token" } },
+                  : {
+                      twilio_data: {
+                        sid: "AC_test",
+                        authToken: workspaceAuthToken ?? "twilio-token",
+                      },
+                    },
               error: null,
             }),
           }),
@@ -167,45 +166,7 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     }
 
     if (table === "transaction_history") {
-      const q: { workspace?: string; type?: string; like?: string } = {};
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = (col: string, val: any) => {
-        if (col === "workspace") q.workspace = String(val);
-        if (col === "type") q.type = String(val);
-        return builder;
-      };
-      builder.like = (_col: string, pattern: string) => {
-        q.like = pattern.replace(/^%/, "").replace(/%$/, "");
-        return builder;
-      };
-      builder.order = () => builder;
-      builder.limit = async () => {
-        const matches = transactionRows.filter(
-          (r) =>
-            (!q.workspace || r.workspace === q.workspace) &&
-            (!q.type || r.type === q.type) &&
-            (!q.like || r.note.includes(q.like)),
-        );
-        return { data: matches.slice(0, 1), error: null };
-      };
-      builder.insert = (row: any) => ({
-        select: () => ({
-          single: async () => {
-            const created: TransactionRow = {
-              id: nextId++,
-              workspace: row.workspace,
-              type: row.type,
-              amount: row.amount,
-              note: row.note,
-              created_at: new Date().toISOString(),
-            };
-            transactionRows.push(created);
-            return { data: { id: created.id }, error: null };
-          },
-        }),
-      });
-      return builder;
+      return makeTransactionHistoryTableStub(transactionRows);
     }
 
     throw new Error(`unexpected table ${table}`);
@@ -286,8 +247,8 @@ describe("api.auto-dial.status", () => {
     expect(r2.status).toBe(200);
 
     expect(supabaseStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = supabaseStub._transactionRows.filter((r) =>
-      r.note.includes("[idempotency:call:CA_DUP]"),
+    const matching = supabaseStub._transactionRows.filter(
+      (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });

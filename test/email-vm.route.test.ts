@@ -267,29 +267,29 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     } as any);
 
     // RecordingUrl missing
-    let res = await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any);
+    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // CallSid missing
-    res = await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any);
+    res = await asRouteResponse(await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // AccountSid missing
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     // RecordingSid missing
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     // non-string RecordingUrl (File)
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: new File(["x"], "f.txt"),
         CallSid: "CA1",
@@ -297,7 +297,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         RecordingSid: "RE1",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -308,44 +308,44 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ callError: { message: "call" } }),
     );
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ numberError: { message: "num" } }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ workspace: null }));
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ workspace: { id: "w1", name: "W", twilio_data: null, webhook: [] } }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supOk = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supOk);
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supUploadErr = makeSupabase({ uploadError: { message: "up" } });
@@ -355,10 +355,10 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supSignedErr = makeSupabase({ signedUrlError: { message: "sig" } });
@@ -368,10 +368,10 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
   });
 });

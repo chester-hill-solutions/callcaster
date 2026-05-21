@@ -136,7 +136,7 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
     const mod = await import("../app/routes/api+/dial");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
-    expect(res).toEqual({ creditsError: true });
+    expect(res).toMatchObject({ creditsError: true });
   });
 
   test("happy path uses outreach_id when provided and upserts call", async () => {

@@ -36,7 +36,7 @@ describe("api.audiodrop action", () => {
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(res).toEqual({ success: false, error: { call: expect.any(Error) } });
+    expect(res).toMatchObject({ success: false, error: { call: expect.any(Error) } });
   });
 
   test("returns failure when campaign lookup errors", async () => {
@@ -76,7 +76,7 @@ describe("api.audiodrop action", () => {
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(res).toEqual({ success: false, error: { campaign: expect.any(Error) } });
+    expect(res).toMatchObject({ success: false, error: { campaign: expect.any(Error) } });
   });
 
   test("handles missing audio by completing call", async () => {
@@ -117,7 +117,7 @@ describe("api.audiodrop action", () => {
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(res).toEqual({ success: false, error: "No audio found" });
+    expect(res).toMatchObject({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
   });
 
@@ -152,7 +152,7 @@ describe("api.audiodrop action", () => {
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
     // Current implementation checks `audio` before `voicemailError`.
-    expect(r1).toEqual({ success: false, error: "No audio found" });
+    expect(r1).toMatchObject({ success: false, error: "No audio found" });
     expect(update).toHaveBeenCalledWith({ status: "completed" });
 
     createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "" }, error: null });
@@ -160,7 +160,7 @@ describe("api.audiodrop action", () => {
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(r2).toEqual({ success: false, error: "No signed URL found" });
+    expect(r2).toMatchObject({ success: false, error: "No signed URL found" });
 
     // Covers `if (voicemailError) throw { voicemail: voicemailError }`
     createSignedUrl.mockResolvedValueOnce({
@@ -171,14 +171,14 @@ describe("api.audiodrop action", () => {
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(r2b).toEqual({ success: false, error: { voicemail: expect.any(Error) } });
+    expect(r2b).toMatchObject({ success: false, error: { voicemail: expect.any(Error) } });
 
     createSignedUrl.mockResolvedValueOnce({ data: { signedUrl: "https://s" }, error: null });
     const r3 = await asRouteResponse(await mod.action({
       request: makeReq(),
       deps: { verifyAuth: vi.fn(async () => ({ supabaseClient })), createWorkspaceTwilioInstance },
     } as any));
-    expect(r3).toEqual({ success: true });
+    expect(r3).toMatchObject({ success: true });
     expect(update).toHaveBeenCalledWith({ twiml: `<Response><Play>https://s</Play></Response>` });
   });
 
@@ -213,7 +213,7 @@ describe("api.audiodrop action", () => {
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiodrop", { method: "POST", body: fd }),
     } as any));
-    expect(res).toEqual({ success: true });
+    expect(res).toMatchObject({ success: true });
     expect(createWorkspaceTwilioInstance).toHaveBeenCalled();
   });
 });

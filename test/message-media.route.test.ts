@@ -79,13 +79,13 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "a b@.png");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: { statusCode: "500" } }), headers: new Headers() });
-    let res = await mod.action({ request: req("POST", fd) } as any);
+    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalled();
 
     // 409 conflict: upload error ignored, then no campaignId => signed url
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: { statusCode: "409" } }), headers: new Headers() });
-    res = await mod.action({ request: req("POST", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
 
@@ -98,15 +98,15 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("campaignId", "1");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
-    let res = await mod.action({ request: req("POST", fd) } as any);
+    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
-    res = await mod.action({ request: req("POST", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: [] } }), headers: new Headers() });
-    res = await mod.action({ request: req("POST", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
@@ -118,11 +118,11 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("fileName", "x.png");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ signedUrlError: new Error("s") }), headers: new Headers() });
-    let res = await mod.action({ request: req("POST", fd) } as any);
+    let res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), headers: new Headers() });
-    res = await mod.action({ request: req("POST", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("POST", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
   });
 
@@ -134,15 +134,15 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     fd.set("campaignId", "1");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaignError: new Error("c") }), headers: new Headers() });
-    let res = await mod.action({ request: req("DELETE", fd) } as any);
+    let res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ updateError: new Error("u") }), headers: new Headers() });
-    res = await mod.action({ request: req("DELETE", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ campaign: { id: 1, message_media: ["x.png", "y.png"] } }), headers: new Headers() });
-    res = await mod.action({ request: req("DELETE", fd) } as any);
+    res = await asRouteResponse(await mod.action({ request: req("DELETE", fd) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 

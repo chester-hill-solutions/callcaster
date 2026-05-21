@@ -421,28 +421,28 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     const mod = await import("../app/routes/api+/surveys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    let r0 = await mod.action({ request: reqForm("PATCH", {}) } as any);
+    let r0 = await asRouteResponse(await mod.action({ request: reqForm("PATCH", {}) } as any));
     expect(r0.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    r0 = await mod.action({
+    r0 = await asRouteResponse(await mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: "not-json" }),
-    } as any);
+    } as any));
     expect(r0.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    r0 = await mod.action({
+    r0 = await asRouteResponse(await mod.action({
       request: reqForm("PATCH", { surveyData: JSON.stringify({ title: "X" }) }),
-    } as any);
+    } as any));
     expect(r0.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ surveyLookup: { data: null, error: null } }),
       user: { id: "u1" },
     });
-    r0 = await mod.action({
+    r0 = await asRouteResponse(await mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X", is_active: true }) }),
-    } as any);
+    } as any));
     expect(r0.status).toBe(404);
     mocks.getUserRole.mockReset();
 

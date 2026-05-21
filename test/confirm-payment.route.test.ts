@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
 
 vi.mock("@/lib/env.server", () => {
   const handler = { get: (_target: unknown, prop: string) => () => `test-${prop}` };
@@ -39,8 +43,7 @@ vi.mock("@/lib/supabase.server", () => ({
 }));
 
 function makeSupabaseStub() {
-  const rows: Array<{ id: number; workspace: string; type: string; amount: number; note: string }> = [];
-  let nextId = 1;
+  const rows: TransactionRow[] = [];
 
   return {
     rows,
@@ -48,42 +51,7 @@ function makeSupabaseStub() {
       if (table !== "transaction_history") {
         throw new Error(`unexpected table ${table}`);
       }
-
-      const query: { workspace?: string; type?: string; noteMarker?: string } = {};
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = (column: string, value: unknown) => {
-        if (column === "workspace") query.workspace = String(value);
-        if (column === "type") query.type = String(value);
-        return builder;
-      };
-      builder.like = (_column: string, pattern: string) => {
-        query.noteMarker = pattern.replace(/^%/, "").replace(/%$/, "");
-        return builder;
-      };
-      builder.order = () => builder;
-      builder.limit = async () => {
-        const matches = rows.filter((row) => {
-          if (query.workspace && row.workspace !== query.workspace) return false;
-          if (query.type && row.type !== query.type) return false;
-          if (query.noteMarker && !row.note.includes(query.noteMarker)) return false;
-          return true;
-        });
-        return {
-          data: matches.length ? [{ id: matches[matches.length - 1].id }] : [],
-          error: null,
-        };
-      };
-      builder.insert = (row: any) => ({
-        select: () => ({
-          single: async () => {
-            const inserted = { id: nextId++, ...row };
-            rows.push(inserted);
-            return { data: { id: inserted.id }, error: null };
-          },
-        }),
-      });
-      return builder;
+      return makeTransactionHistoryTableStub(rows);
     },
   };
 }

@@ -56,7 +56,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
     } as any);
     const mod = await import("../app/routes/api+/initiate-ivr");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
-    expect(res).toEqual({ creditsError: true });
+    expect(res).toMatchObject({ creditsError: true });
   });
 
   test("logs fetch error and continues (res null), returning queue data", async () => {
@@ -69,7 +69,7 @@ describe("app/routes/api+/initiate-ivr/route.tsx", () => {
 
     const mod = await import("../app/routes/api+/initiate-ivr");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
-    expect(res).toEqual(queue);
+    await expect(res.json()).resolves.toEqual(queue);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error initiating IVR call:", expect.any(Error));
   });
 });

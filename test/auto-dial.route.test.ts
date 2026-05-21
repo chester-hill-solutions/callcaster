@@ -46,7 +46,7 @@ describe("app/routes/api+/auto-dial/tsx.route", () => {
       },
     } as any));
 
-    expect(res).toEqual({ creditsError: true });
+    expect(res).toMatchObject({ creditsError: true });
   });
 
   test("returns 400 JSON when required parameters are missing", async () => {

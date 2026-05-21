@@ -64,7 +64,7 @@ function makeSupabase(opts: {
   const messageUpdate = opts.messageUpdate ?? { data: null, error: null };
   const workspaceLookup =
     opts.workspaceLookup ??
-    { data: { twilio_data: { authToken: "workspace-token" } }, error: null };
+    { data: { twilio_data: { sid: "AC_test", authToken: "workspace-token" } }, error: null };
   const attemptSelect = opts.attemptSelect ?? { data: null, error: null };
   const outreachUpdate = opts.outreachUpdate ?? { data: null, error: null };
   const webhookSelect = opts.webhookSelect ?? { data: [], error: null };

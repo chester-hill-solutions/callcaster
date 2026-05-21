@@ -1,7 +1,11 @@
-import { describe, expect, test, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+const twilioCreate = vi.hoisted(() => vi.fn().mockResolvedValue({ sid: "CA123" }));
 
 vi.mock("@/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: vi.fn(),
+  createWorkspaceTwilioInstance: vi.fn().mockResolvedValue({
+    calls: { create: twilioCreate },
+  }),
   requireWorkspaceAccess: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -16,30 +20,26 @@ vi.mock("@/lib/env.server", () => ({
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({
     rpc: vi.fn().mockResolvedValue({ data: 99, error: null }),
-    from: vi.fn(() => ({
-      update: vi.fn(() => ({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      })),
-    })),
+    from: vi.fn((table: string) => {
+      if (table === "call") {
+        return { insert: vi.fn().mockResolvedValue({ error: null }) };
+      }
+      if (table === "campaign_queue") {
+        return {
+          update: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    }),
   })),
 }));
-
-const twilioCreate = vi.fn().mockResolvedValue({ sid: "CA123" });
-
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
-  return {
-    ...actual,
-    createWorkspaceTwilioInstance: vi.fn().mockResolvedValue({
-      calls: { create: twilioCreate },
-    }),
-    requireWorkspaceAccess: vi.fn().mockResolvedValue(undefined),
-  };
-});
 
 describe("initiateIvrCall", () => {
   beforeEach(() => {
     twilioCreate.mockClear();
+    twilioCreate.mockResolvedValue({ sid: "CA123" });
   });
 
   test("returns call SID when Twilio and RPC succeed", async () => {

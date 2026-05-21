@@ -230,9 +230,9 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
     const mod = await import("../app/routes/api+/inbound");
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toContain("dial:+15550001111");
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
@@ -251,9 +251,9 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         voicemailList: [{ name: "vm.mp3", id: "vm.mp3" }],
       }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     const xml = await res.text();
     expect(xml).toContain("play:https://signed");
     expect(xml).toContain("record");
@@ -273,9 +273,9 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         voicemailListSpy: fallbackListSpy,
       }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await res.text()).toContain("leave us a message");
     expect(fallbackListSpy).toHaveBeenCalledWith("w1", {
       search: "vm.mp3",
@@ -289,9 +289,9 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ number: { ...baseNumber, inbound_action: "noop" } }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await res.text()).toContain("unable to answer");
   });
 
@@ -353,6 +353,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         },
       }),
     );
+    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
     await expect(
       mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),

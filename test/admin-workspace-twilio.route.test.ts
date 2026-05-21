@@ -142,7 +142,9 @@ function makeSupabase(accessLevel: string, workspaceTwilioSid: string | null = n
           select: () => ({
             eq: () => ({
               single: vi.fn(async () => ({
-                data: workspaceTwilioSid ? { twilio_data: { sid: workspaceTwilioSid } } : { twilio_data: null },
+                data: workspaceTwilioSid
+                  ? { twilio_data: { sid: workspaceTwilioSid, authToken: "test-token" } }
+                  : { twilio_data: null },
                 error: null,
               })),
             }),

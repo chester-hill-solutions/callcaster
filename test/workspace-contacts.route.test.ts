@@ -60,6 +60,16 @@ function buildWorkspaceQuery(result: unknown) {
   };
 }
 
+function buildCampaignQuery(result: unknown = { data: [], error: null }) {
+  return {
+    select: vi.fn(() => ({
+      eq: vi.fn(() => ({
+        order: vi.fn(async () => result),
+      })),
+    })),
+  };
+}
+
 describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
   const workspaceId = "11111111-1111-1111-1111-111111111111";
 
@@ -92,6 +102,10 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
             },
             error: null,
           });
+        }
+
+        if (table === "campaign") {
+          return buildCampaignQuery();
         }
 
         throw new Error(`Unexpected table: ${table}`);
@@ -145,6 +159,10 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
           });
         }
 
+        if (table === "campaign") {
+          return buildCampaignQuery();
+        }
+
         throw new Error(`Unexpected table: ${table}`);
       }),
     };
@@ -191,6 +209,10 @@ describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
             },
             error: null,
           });
+        }
+
+        if (table === "campaign") {
+          return buildCampaignQuery();
         }
 
         throw new Error(`Unexpected table: ${table}`);

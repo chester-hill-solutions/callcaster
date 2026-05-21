@@ -216,7 +216,7 @@ describe("app/routes/api+/inbound/route-sms.tsx", () => {
     const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [{ id: 9 }], insertedMessages, smsWebhook: true }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    let res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(insertedMessages[0]?.contact_id).toBe(9);
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
@@ -225,7 +225,7 @@ describe("app/routes/api+/inbound/route-sms.tsx", () => {
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: '"start"' }) });
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, uploadError: { message: "up" }, contacts: [{ id: 9 }] }));
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -248,12 +248,12 @@ describe("app/routes/api+/inbound/route-sms.tsx", () => {
 
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "stop", NumMedia: "0" }) });
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    let res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
 
     mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "start", NumMedia: "0" }) });
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });

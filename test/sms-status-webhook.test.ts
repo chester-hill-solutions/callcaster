@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -19,17 +23,7 @@ vi.mock("twilio", () => {
   };
 });
 
-type TransactionRow = {
-  id: number;
-  workspace: string;
-  type: "DEBIT" | "CREDIT";
-  amount: number;
-  note: string;
-  created_at: string;
-};
-
 function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
-  let nextId = 1;
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
   const messageUpdateCalls: any[] = [];
@@ -76,7 +70,7 @@ function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
         select: () => ({
           eq: () => ({
             single: async () => ({
-              data: { twilio_data: { authToken: "workspace-token" } },
+              data: { twilio_data: { sid: "AC_test", authToken: "workspace-token" } },
               error: null,
             }),
           }),
@@ -118,54 +112,7 @@ function makeSupabaseStub(args?: { currentOutreachDisposition?: string }) {
     }
 
     if (table === "transaction_history") {
-      const q: {
-        workspace?: string;
-        type?: string;
-        likeNoteSubstring?: string;
-      } = {};
-
-      const selectBuilder: any = {};
-      selectBuilder.select = () => selectBuilder;
-      selectBuilder.eq = (col: string, val: any) => {
-        if (col === "workspace") q.workspace = String(val);
-        if (col === "type") q.type = String(val);
-        return selectBuilder;
-      };
-      selectBuilder.like = (_col: string, pattern: string) => {
-        q.likeNoteSubstring = pattern.replace(/^%/, "").replace(/%$/, "");
-        return selectBuilder;
-      };
-      selectBuilder.order = () => selectBuilder;
-      selectBuilder.limit = async () => {
-        const filtered = transactionRows.filter((r) => {
-          if (q.workspace && r.workspace !== q.workspace) return false;
-          if (q.type && r.type !== q.type) return false;
-          if (q.likeNoteSubstring && !r.note.includes(q.likeNoteSubstring))
-            return false;
-          return true;
-        });
-        return { data: filtered.slice(0, 1), error: null };
-      };
-
-      return {
-        ...selectBuilder,
-        insert: (row: any) => ({
-          select: () => ({
-            single: async () => {
-              const created = {
-                id: nextId++,
-                workspace: row.workspace,
-                type: row.type,
-                amount: row.amount,
-                note: row.note,
-                created_at: new Date().toISOString(),
-              } satisfies TransactionRow;
-              transactionRows.push(created);
-              return { data: { id: created.id }, error: null };
-            },
-          }),
-        }),
-      };
+      return makeTransactionHistoryTableStub(transactionRows);
     }
 
     throw new Error(`unexpected table ${table}`);
@@ -264,7 +211,7 @@ describe("api.sms.status webhook behavior", () => {
     await mod.action({ request: makeReq() } as any);
 
     const matching = supabaseStub._transactionRows.filter((r) =>
-      r.note.includes("[idempotency:sms:SM_DUP]"),
+      r.idempotency_key === "sms:SM_DUP",
     );
     expect(matching.length).toBe(1);
   });
