@@ -31,6 +31,7 @@
     "test:coverage:ui": "vitest run -c vitest.ui.config.ts --coverage",
     "test:coverage:deno": "npx deno test --allow-env --allow-read --allow-net --coverage=coverage/deno supabase/functions/__tests__ && npx deno coverage --lcov --output=coverage/deno/lcov.info coverage/deno",
     "test:coverage:merge": "node scripts/coverage/merge-and-check.mjs",
+    "test:coverage:merge:strict": "COVERAGE_FULL=1 node scripts/coverage/merge-and-check.mjs",
     "test:coverage": "npm run test:coverage:vitest && npm run test:coverage:deno && npm run test:coverage:merge"
   },
   "dependencies": {
