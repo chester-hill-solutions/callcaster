@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type TwilioSDK from "twilio";

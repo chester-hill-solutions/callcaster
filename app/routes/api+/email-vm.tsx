@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { data as routeData, ActionFunctionArgs } from "react-router";

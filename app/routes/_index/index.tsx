@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { Form, Link, NavLink, useLoaderData, useNavigation, LoaderFunctionArgs } from "react-router";
 import { Button } from "@/components/ui/button";

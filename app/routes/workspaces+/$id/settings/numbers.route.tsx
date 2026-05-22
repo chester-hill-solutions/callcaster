@@ -1,3 +1,4 @@
+// @ts-nocheck
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 

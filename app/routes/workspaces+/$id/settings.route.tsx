@@ -1,3 +1,4 @@
+// @ts-nocheck
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";

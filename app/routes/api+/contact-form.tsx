@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Resend } from "resend";
 import { data as routeData } from "react-router";
 

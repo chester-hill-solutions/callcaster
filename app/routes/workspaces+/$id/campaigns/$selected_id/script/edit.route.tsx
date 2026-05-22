@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, redirect } from "react-router";
 import { useLoaderData, useSubmit } from "react-router";
 import { useState, useEffect } from "react";

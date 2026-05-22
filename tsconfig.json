@@ -22,6 +22,7 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
+    "module": "ES2022",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "target": "ES2022",

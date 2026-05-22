@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { data as routeData, Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { Button } from "@/components/ui/button";

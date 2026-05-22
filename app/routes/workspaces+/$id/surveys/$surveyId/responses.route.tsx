@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";

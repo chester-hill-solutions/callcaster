@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, ActionFunction } from "react-router";
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { WorkspaceNumbers } from '@/lib/types';

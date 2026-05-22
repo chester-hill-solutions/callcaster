@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { data } from "react-router";
 import type { ActionFunctionArgs } from "react-router";

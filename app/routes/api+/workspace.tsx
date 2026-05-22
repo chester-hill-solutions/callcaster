@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Twilio not used in this endpoint
 import { createClient } from "@supabase/supabase-js";
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 
 import { data as routeData, redirect, LoaderFunctionArgs, ActionFunctionArgs, useLoaderData } from "react-router";

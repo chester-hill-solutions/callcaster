@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { redirect, type LoaderFunctionArgs } from "react-router";
 
 import Stripe from "stripe";

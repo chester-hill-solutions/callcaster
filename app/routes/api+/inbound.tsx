@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";

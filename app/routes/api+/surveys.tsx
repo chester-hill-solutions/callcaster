@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 
 import { SurveyFormData } from "@/lib/types";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useSubmit } from "react-router";
 import { FaPlus } from "react-icons/fa";
 

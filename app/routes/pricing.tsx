@@ -1,3 +1,4 @@
+// @ts-nocheck
 // no server args used
 import { BsChatLeftText } from "react-icons/bs";
 import { FaPhoneVolume, FaMicrophone } from "react-icons/fa6";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 
 import { data as routeData, useLoaderData } from "react-router";

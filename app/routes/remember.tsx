@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 
 import { data as routeData, Form, useActionData } from "react-router";

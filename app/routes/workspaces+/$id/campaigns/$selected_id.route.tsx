@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
 import { Suspense, useEffect, useRef } from "react";

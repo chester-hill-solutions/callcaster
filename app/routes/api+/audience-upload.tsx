@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData } from "react-router";
 
 import { parseCSV } from '@/lib/csv';

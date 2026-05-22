@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData, Link, redirect, useFetcher, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";

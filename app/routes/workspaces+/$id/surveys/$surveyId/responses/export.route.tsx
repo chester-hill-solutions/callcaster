@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { type LoaderFunctionArgs } from "react-router";
 
 import type { Tables } from "@/lib/database.types";

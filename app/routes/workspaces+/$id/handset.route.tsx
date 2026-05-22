@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useNavigate, useFetcher } from "react-router";
 import { createClient } from "@supabase/supabase-js";

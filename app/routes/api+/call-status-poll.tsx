@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";

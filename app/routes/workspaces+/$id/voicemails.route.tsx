@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 
 import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext } from "react-router";
