@@ -16,12 +16,17 @@ import { Twilio } from "twilio";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 
-const supabase = createClient(
-  env.SUPABASE_URL(),
-  env.SUPABASE_SERVICE_KEY(),
-);
+let cachedSupabase: ReturnType<typeof createClient> | null = null;
+const getSupabase = async () => {
+  if (cachedSupabase) return cachedSupabase;
+  const { env } = await import("@/lib/env.server");
+  cachedSupabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  return cachedSupabase;
+};
 
 const updateCall = async (sid: string, update: Partial<Tables<"call">>) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
   try {
     const { data, error } = await supabase
       .from("call")
@@ -51,6 +56,8 @@ export const updateOutreachAttempt = async (
   id: string,
   update: Partial<OutreachAttempt>,
 ) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
   try {
     if (update.disposition) {
       const { data: current, error: currentError } = await supabase
@@ -94,6 +101,8 @@ const updateCampaignQueue = async (
   campaignId: number,
   update: Partial<Tables<"campaign_queue">>,
 ) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
   try {
     const { data, error } = await supabase
       .from("campaign_queue")
@@ -110,6 +119,8 @@ const updateCampaignQueue = async (
 };
 
 const triggerAutoDialer = async (callData: Tables<"call">) => {
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
   try {
     const response = await fetch(
       `${env.BASE_URL()}/api/auto-dial/dialer`,
@@ -141,6 +152,8 @@ const handleCallStatus = async (
   status: Tables<"call">["status"],
   duration: number
 ) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
     const timestamp = requireValue(parsedBody.Timestamp, "Timestamp");
@@ -190,6 +203,9 @@ const onePerSixty = (duration: number) => {
   return Math.floor(duration / 60) + 1;
 }
 const updateTransaction = async (call: Tables<"call">, duration: number) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
+  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
   if (!call.workspace) {
     logger.error("Skipping transaction update because call workspace is missing", {
       callSid: call.sid,
@@ -213,6 +229,8 @@ const handleParticipantLeave = async (
   twilio: Twilio,
   realtime: RealtimeChannel,
 ) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
 
   try {
     const callSid = requireValue(parsedBody.CallSid, "CallSid");
@@ -263,6 +281,8 @@ const handleParticipantJoin = async (
   dbCall: Tables<"call">,
   realtime: RealtimeChannel,
 ) => {
+  const supabase = await getSupabase();
+  const { logger } = await import("@/lib/logger.server");
   try {
     if (!dbCall.conference_id) {
       await updateCall(requireValue(parsedBody.CallSid, "CallSid"), {
@@ -299,7 +319,8 @@ const handleParticipantJoin = async (
   }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const supabase = await getSupabase();
   const { logger } = await import("@/lib/logger.server");
   const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { env } = await import("@/lib/env.server");

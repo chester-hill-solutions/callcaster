@@ -68,23 +68,31 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   return null;
 };
 
-const handleOptions = (twiml: Twilio.twiml.VoiceResponse, block: { options?: Array<{ value: string; next?: string }> }, campaignId: string, pageId: string, blockId: string, script: Script) => {
+const handleOptions = (
+  twiml: Twilio.twiml.VoiceResponse,
+  block: { options?: Array<{ value: string; next?: string }> },
+  campaignId: string,
+  pageId: string,
+  blockId: string,
+  script: Script,
+  baseUrl: string,
+) => {
   if (block.options && block.options.length > 0) {
     twiml.gather({
-      action: `${env.BASE_URL()}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
+      action: `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
       input: ["dtmf", "speech"],
       speechTimeout: "auto",
       speechModel: "phone_call",
       timeout: 5,
     });
     twiml.redirect(
-      `${env.BASE_URL()}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
+      `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
     );
   } else {
     const nextLocation = findNextBlock(script, pageId, blockId);
     if (nextLocation) {
       twiml.redirect(
-        `${env.BASE_URL()}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
+        `${baseUrl}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
       );
     } else {
       twiml.hangup();
@@ -101,13 +109,16 @@ const handleBlock = async (
   blockId: string,
   script: Script,
   workspace: string,
+  baseUrl: string,
 ) => {
   await handleAudio(supabase, twiml, block, workspace);
-  handleOptions(twiml, block, campaignId, pageId, blockId, script);
+  handleOptions(twiml, block, campaignId, pageId, blockId, script, baseUrl);
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ params, request }: ActionFunctionArgs) => {
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
+  const baseUrl = env.BASE_URL();
 
   const supabase = createClient(
     env.SUPABASE_URL(),
@@ -140,6 +151,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {  cons
         blockId,
         script,
         workspace,
+        baseUrl,
       );
     } else {
       twiml.say("There was an error in the IVR flow. Goodbye.");

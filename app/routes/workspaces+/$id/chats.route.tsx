@@ -44,7 +44,6 @@ import type {
   WorkspaceNumber,
 } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
-import { sendMessage } from "@/routes/api+/chat_sms";
 import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
 import {
   getConversationParticipantPhones,
@@ -687,8 +686,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+export async function action({ request, params }: ActionFunctionArgs) {
+  const { verifyAuth } = await import("@/lib/supabase.server");
   const { getWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { sendMessage } = await import("@/routes/api+/chat_sms.send.server");
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

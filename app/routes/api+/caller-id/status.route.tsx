@@ -26,6 +26,10 @@ interface Capabilities {
 }
 
 export const action: ActionFunction = async ({ request }) => {
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+
   const formData = await request.formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 

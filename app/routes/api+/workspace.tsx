@@ -52,6 +52,7 @@ const updateWorkspace = async ({
   workspace_id,
   update,
 }: UpdateWorkspaceParams) => {
+  const { env } = await import("@/lib/env.server");
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const { data: workspace, error: workspaceError } = await supabase
     .from("workspace")

@@ -88,6 +88,7 @@ function buildTwilioMessageCreateParams({
   defaultMessageIntent,
   resolvedMessagingServiceSid,
   from,
+  statusCallback,
 }: {
   body: string;
   to: string;
@@ -96,6 +97,7 @@ function buildTwilioMessageCreateParams({
   defaultMessageIntent: TwilioMessageIntent | null;
   resolvedMessagingServiceSid: string | null;
   from: string;
+  statusCallback: string;
 }) {
   const resolvedMessageIntent = messageIntent ?? defaultMessageIntent;
   const effectiveFrom = from.trim();
@@ -106,7 +108,7 @@ function buildTwilioMessageCreateParams({
   return {
     body,
     to,
-    statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+    statusCallback,
     ...(media?.length && { mediaUrl: media }),
     ...(resolvedMessagingServiceSid
       ? { messagingServiceSid: resolvedMessagingServiceSid }
@@ -131,7 +133,11 @@ const sendMessage = async ({
   messagingServiceSidFromRequest,
   campaignSmsRow,
 }: SendMessageParams) => {
-  
+  const { processUrls } = await import("@/lib/sms.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
   const twilio = await createWorkspaceTwilioInstance({
     supabase,
     workspace_id: workspace,
@@ -158,6 +164,7 @@ const sendMessage = async ({
           defaultMessageIntent: portalConfig.defaultMessageIntent,
           resolvedMessagingServiceSid,
           from,
+          statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
         }),
       )
       .catch(e => ({ error: e })),
@@ -220,6 +227,7 @@ const sendMessage = async ({
 };
 
 const updateOutreach = async ({ supabase, id, status }: { supabase: SupabaseClient, id: string, status: string }) => {
+  const { logger } = await import("@/lib/logger.server");
   const { data, error } = await supabase
     .from("outreach_attempt")
     .update({ disposition: status })
@@ -246,6 +254,7 @@ const createOutreachAttempt = async ({
   workspace: string;
   user_id: string;
 }) => {
+  const { logger } = await import("@/lib/logger.server");
   const { data: outreachAttempt, error: outreachError } = await supabase.rpc(
     "create_outreach_attempt",
     {

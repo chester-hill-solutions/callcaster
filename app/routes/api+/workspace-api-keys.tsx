@@ -11,10 +11,13 @@ import { randomBytes } from "crypto";
 const KEY_SECRET_LENGTH = 32;
 const KEY_PREFIX = "cc_live_";
 
-function generateApiKey(): { key: string; keyPrefix: string; keyHash: string } {
+function generateApiKey(
+  hashApiKeyForStorage: (key: string) => string,
+  apiKeyPrefixLength: number,
+): { key: string; keyPrefix: string; keyHash: string } {
   const secret = randomBytes(KEY_SECRET_LENGTH).toString("base64url");
   const key = `${KEY_PREFIX}${secret}`;
-  const keyPrefix = key.slice(0, API_KEY_PREFIX_LENGTH);
+  const keyPrefix = key.slice(0, apiKeyPrefixLength);
   const keyHash = hashApiKeyForStorage(key);
   return { key, keyPrefix, keyHash };
 }
@@ -88,7 +91,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { logg
       workspaceId: workspace_id,
     });
 
-    const { key, keyPrefix, keyHash } = generateApiKey();
+    const { key, keyPrefix, keyHash } = generateApiKey(
+      hashApiKeyForStorage,
+      API_KEY_PREFIX_LENGTH,
+    );
 
     const { data: row, error } = await supabaseClient
       .from("workspace_api_key")

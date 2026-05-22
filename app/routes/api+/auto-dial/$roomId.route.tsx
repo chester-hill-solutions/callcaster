@@ -8,15 +8,23 @@ import { Database, Tables } from "@/lib/database.types";
 
 
 
-const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+let cachedSupabase: ReturnType<typeof createClient> | null = null;
+const getSupabase = async () => {
+  if (cachedSupabase) return cachedSupabase;
+  const { env } = await import("@/lib/env.server");
+  cachedSupabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  return cachedSupabase;
+};
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
+  const supabase = await getSupabase();
     const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
     if (error) throw new Error(`Error fetching call data: ${error.message}`);
     return data;
 };
 
 const fetchWorkspaceAuthToken = async (workspaceId: string) => {
+  const supabase = await getSupabase();
     const { data, error } = await supabase
         .from("workspace")
         .select("twilio_data")
@@ -29,12 +37,14 @@ const fetchWorkspaceAuthToken = async (workspaceId: string) => {
 };
 
 const fetchCampaignData = async (campaignId: string) => {
+  const supabase = await getSupabase();
     const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', campaignId).single();
     if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
     return data;
 };
 
 const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) => {
+  const supabase = await getSupabase();
     if (!voicemailFile) return null;
     const { data, error } = await supabase.storage.from('workspaceAudio').createSignedUrl(`${workspace}/${voicemailFile}`, 3600);
     if (error) throw new Error(`Error fetching voicemail file: ${error.message}`);
@@ -42,6 +52,7 @@ const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) =
 };
 
 const dequeueContact = async (contactId: string, groupOnHousehold: boolean, userId: string) => {
+  const supabase = await getSupabase();
     if (groupOnHousehold) {
         const { data, error } = await supabase.rpc('dequeue_contact', {
             passed_contact_id: contactId,
@@ -64,12 +75,14 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
 };
 
 const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"outreach_attempt">>) => {
+  const supabase = await getSupabase();
     const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', attemptId).select();
     if (error) throw new Error(`Error updating outreach attempt: ${error.message}`);
     return data;
 };
 
 const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string) => {
+  const { env } = await import("@/lib/env.server");
     await fetch(`${env.BASE_URL()}/api/auto-dial/dialer`, {
         method: 'POST',
         headers: { "Content-Type": 'application/json' },
@@ -90,6 +103,7 @@ const handleMachineAnswer = async (
     signedUrl: string,
     outreachStatus: OutreachStatusItem[]
 ) => {
+  const supabase = await getSupabase();
     const twiml = new Twilio.twiml.VoiceResponse();
     const firstOutreachStatus = outreachStatus[0];
     if (!firstOutreachStatus) {
@@ -115,6 +129,7 @@ const handleMachineAnswer = async (
 };
 
 const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceName: string, called: string) => {
+  const supabase = await getSupabase();
     const twiml = new Twilio.twiml.VoiceResponse();
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
@@ -132,10 +147,12 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
 };
 
 const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
+  const supabase = await getSupabase();
     return await addToConference(dbCall.conference_id?.toString() ?? '', dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
 };
 
 async function addToConference(conferenceId: string, campaignId: string, workspaceId: string) {
+  const { env } = await import("@/lib/env.server");
     const twiml = new Twilio.twiml.VoiceResponse();
     const dial = twiml.dial();
     dial.conference({
@@ -151,6 +168,7 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
 }
 
 const checkUserDevices = async (contactId: string, conferenceName: string, called: string, callerId: string) => {
+  const supabase = await getSupabase();
     const { data, error } = await supabase
         .from('user')
         .select('verified_audio_numbers')
@@ -164,7 +182,9 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
     return false;
 }
 
-export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
+  const supabase = await getSupabase();
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");

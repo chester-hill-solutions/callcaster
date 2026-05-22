@@ -85,7 +85,13 @@ const findNextStep = (currentBlock: { id: string; options?: Array<{ value: strin
     : 'hangup';
 };
 
-const handleNextStep = (twiml: Twilio.twiml.VoiceResponse, nextStep: string, campaignId: string, pageId: string) => {
+const handleNextStep = (
+  twiml: Twilio.twiml.VoiceResponse,
+  nextStep: string,
+  campaignId: string,
+  pageId: string,
+  baseUrl: string,
+) => {
   if (nextStep === "hangup") {
     twiml.hangup();
   } else if (nextStep.includes(":")) {
@@ -95,22 +101,24 @@ const handleNextStep = (twiml: Twilio.twiml.VoiceResponse, nextStep: string, cam
       return;
     }
     twiml.redirect(
-      `${env.BASE_URL()}/api/ivr/${campaignId}/${nextPageId}/${nextBlockId}/`
+      `${baseUrl}/api/ivr/${campaignId}/${nextPageId}/${nextBlockId}/`
     );
   } else if (nextStep.startsWith("page_")) {
     twiml.redirect(
-      `${env.BASE_URL()}/api/ivr/${campaignId}/${nextStep}/`
+      `${baseUrl}/api/ivr/${campaignId}/${nextStep}/`
     );
   } else {
     twiml.redirect(
-      `${env.BASE_URL()}/api/ivr/${campaignId}/${pageId}/${nextStep}/`
+      `${baseUrl}/api/ivr/${campaignId}/${pageId}/${nextStep}/`
     );
   }
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { logger } = await import("@/lib/logger.server");
   const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { env } = await import("@/lib/env.server");
+  const baseUrl = env.BASE_URL();
 
   const supabase = createClient(
     env.SUPABASE_URL(),
@@ -205,7 +213,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {  cons
       .eq("id", call.outreach_attempt_id);
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
-    handleNextStep(twiml, nextStep, campaignId, pageId);
+    handleNextStep(twiml, nextStep, campaignId, pageId, baseUrl);
   } catch (e) {
     const errorMessage =
       e instanceof Error ? e.message : "An error occurred. Please try again later.";
