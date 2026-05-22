@@ -36,6 +36,9 @@ async function handleCreateSurvey(
   supabaseClient: SupabaseClient<Database>,
   user: { id: string }
 ) {
+  const { logger } = await import("@/lib/logger.server");
+  const { getUserRole } = await import("@/lib/database.server");
+  const { handleDatabaseError } = await import("@/lib/errors.server");
   const formData = await request.formData();
   const surveyDataRaw = formData.get("surveyData") as string | null;
   if (!surveyDataRaw) {
@@ -158,6 +161,8 @@ async function handleUpdateSurvey(
   supabaseClient: SupabaseClient<Database>,
   user: { id: string }
 ) {
+  const { logger } = await import("@/lib/logger.server");
+  const { getUserRole } = await import("@/lib/database.server");
   try {
     const formData = await request.formData();
     const surveyDataRaw = formData.get("surveyData") as string | null;
@@ -226,6 +231,8 @@ async function handleDeleteSurvey(
   supabaseClient: SupabaseClient<Database>,
   user: { id: string }
 ) {
+  const { logger } = await import("@/lib/logger.server");
+  const { getUserRole } = await import("@/lib/database.server");
   try {
     const formData = await request.formData();
     const surveyId = formData.get("surveyId") as string;

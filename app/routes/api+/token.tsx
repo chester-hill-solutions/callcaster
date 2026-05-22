@@ -62,7 +62,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logg
   return routeData({ token: token.toJwt() });
 };
 
-export const generateToken = ({ twilioAccountSid, twilioApiKey, twilioApiSecret, identity }: GenerateTokenParams) => {
+export const generateToken = async ({ twilioAccountSid, twilioApiKey, twilioApiSecret, identity }: GenerateTokenParams) => {
+  const { env } = await import("@/lib/env.server");
   const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
     outgoingApplicationSid: env.TWILIO_APP_SID(),
     incomingAllow: true,

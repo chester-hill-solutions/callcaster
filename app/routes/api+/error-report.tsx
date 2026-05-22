@@ -5,12 +5,11 @@ import { data as routeData } from "react-router";
 
 
 
-const resend = new Resend(env.RESEND_API_KEY());
-
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {  const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
   const { verifyAuth } = await import("@/lib/supabase.server");
   const { safeParseJson } = await import("@/lib/database.server");
+  const resend = new Resend(env.RESEND_API_KEY());
 
   try {
     const error = await safeParseJson<unknown>(request);

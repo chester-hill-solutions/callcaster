@@ -53,6 +53,7 @@ export async function createTwilioCall(
   user_id: string,
   selected_device: string,
 ) {
+  const { env } = await import("@/lib/env.server");
   return await client.calls.create({
     to: toNumber,
     from: fromNumber,
@@ -67,6 +68,7 @@ export async function saveCallToDatabase(
   supabase: SupabaseClient<Database>,
   callData: Partial<Call>
 ) {
+  const { logger } = await import("@/lib/logger.server");
   if (!callData.sid) {
     logger.error("Cannot save call without sid");
     return;

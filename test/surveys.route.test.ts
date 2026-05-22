@@ -26,10 +26,14 @@ vi.mock("@/lib/supabase.server", () => ({
 vi.mock("@/lib/database.server", () => ({
   getUserRole: (...args: any[]) => mocks.getUserRole(...args),
 }));
-vi.mock("@/lib/errors.server", () => ({
-  handleDatabaseError: (...args: any[]) => mocks.handleDatabaseError(...args),
-  createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
-}));
+vi.mock("@/lib/errors.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/errors.server")>();
+  return {
+    ...actual,
+    handleDatabaseError: (...args: any[]) => mocks.handleDatabaseError(...args),
+    createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
+  };
+});
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 function sbSingle(result: { data: any; error: any }) {

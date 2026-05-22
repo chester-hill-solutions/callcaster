@@ -406,8 +406,10 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
-    const data = await mod.loadTwilioData(supabaseClient as any, "w1");
+    const { loadTwilioData } = await import(
+      "../app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server",
+    );
+    const data = await loadTwilioData(supabaseClient as any, "w1");
 
     expect(usageList).toHaveBeenCalledWith();
     expect(data.twilioUsage).toEqual([

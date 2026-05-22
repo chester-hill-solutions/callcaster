@@ -59,6 +59,7 @@ export const processAudienceUpload = async (
   splitNameColumn: string | null,
   deps: { parseCSV: typeof parseCSV } = { parseCSV },
 ) => {
+  const { logger } = await import("@/lib/logger.server");
   // Initialize status data at the top level so it's available in catch block
   const statusData = {
     status: "processing",

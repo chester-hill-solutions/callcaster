@@ -20,6 +20,7 @@ async function handleCompleteSurvey(
   request: Request,
   supabaseClient: SupabaseClient<Database>
 ) {
+  const { logger } = await import("@/lib/logger.server");
   try {
     const formData = await request.formData();
     const resultId = formData.get("resultId") as string;

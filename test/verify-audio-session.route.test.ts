@@ -24,9 +24,13 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
-}));
+vi.mock("@/lib/supabase.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase.server")>();
+  return {
+    ...actual,
+    verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  };
+});
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),

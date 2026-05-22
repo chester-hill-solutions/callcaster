@@ -34,6 +34,7 @@ async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
   supabase: ReturnType<typeof createClient<Database>>;
   workspaceId: string;
 }): Promise<string> {
+  const { env } = await import("@/lib/env.server");
   const { data: workspaceRecord, error: workspaceLookupError } = await args.supabase
     .from("workspace")
     .select("twilio_data")
@@ -49,6 +50,17 @@ async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
 }
 
 export const action: ActionFunction = async ({ request }) => {
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhook } = await import("@/twilio.server");
+  const { sendWebhookNotification } = await import(
+    "@/lib/workspace-settings/WorkspaceSettingUtils.server"
+  );
+  const { insertTransactionHistoryIdempotent } = await import(
+    "@/lib/transaction-history.server"
+  );
+  const { cancelQueuedMessagesForCampaign } = await import("@/lib/database.server");
+
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

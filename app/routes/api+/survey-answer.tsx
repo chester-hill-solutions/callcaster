@@ -29,6 +29,7 @@ async function handleSaveAnswer(
   request: Request,
   supabaseClient: SupabaseClient<Database>
 ) {
+  const { logger } = await import("@/lib/logger.server");
   try {
     type SurveyResponseRow = Database["public"]["Tables"]["survey_response"]["Row"];
     const formData = await request.formData();

@@ -164,7 +164,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "see https://example.com",
       to: "+15551234567",
@@ -216,7 +216,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "https://example.com",
       to: "+15551234567",
@@ -236,7 +236,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     await expect(
       mod.sendMessage({
         body: "hi",
@@ -259,7 +259,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     await expect(
       mod.sendMessage({
         body: "hi",
@@ -316,7 +316,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })),
       },
     });
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "https://example.com",
       to: "+15551234567",
@@ -337,7 +337,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })) },
     });
-    const mod = await import("../app/routes/api+/chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "hi",
       to: "+15551234567",

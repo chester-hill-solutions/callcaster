@@ -10,12 +10,11 @@ import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
-const resend = new Resend(env.RESEND_API_KEY());
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+  const resend = new Resend(env.RESEND_API_KEY());
 
   try {
     const formData = await request.formData();

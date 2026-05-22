@@ -14,6 +14,8 @@ async function findMatchingContactIds(
   workspaceId: string,
   phoneNumber: string,
 ): Promise<number[]> {
+  const { logger } = await import("@/lib/logger.server");
+  const { findPotentialContacts } = await import("@/lib/database.server");
   const { data: contacts, error } = await findPotentialContacts(
     supabase,
     phoneNumber,
@@ -97,6 +99,7 @@ async function resolveInboundWorkspaceContext(
   | { ok: true; ctx: InboundWorkspaceContext; attributionPath: string }
   | { ok: false; response: ReturnType<typeof routeData> }
 > {
+  const { logger } = await import("@/lib/logger.server");
   const normalizedTo = normalizeInboundToNumber(args.toRaw);
   const rawTrimmed = args.toRaw.trim();
 
@@ -203,7 +206,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { vali
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
-  const { findPotentialContacts } = await import("@/lib/database.server");
 
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),

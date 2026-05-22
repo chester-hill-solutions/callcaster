@@ -40,9 +40,17 @@ function dispatchInboundCallWebhookNotification(args: {
     start_time: string | null;
   };
   supabaseClient: ReturnType<typeof createClient<Database>>;
+  sendWebhookNotification: (input: {
+    eventCategory: string;
+    eventType: string;
+    workspaceId: string;
+    payload: Record<string, unknown>;
+    supabaseClient: ReturnType<typeof createClient<Database>>;
+  }) => Promise<unknown>;
+  logger: { warn: (...args: unknown[]) => void };
 }) {
   void Promise.resolve(
-    sendWebhookNotification({
+    args.sendWebhookNotification({
       eventCategory: "inbound_call",
       eventType: "INSERT",
       workspaceId: args.workspaceId,
@@ -57,7 +65,7 @@ function dispatchInboundCallWebhookNotification(args: {
       supabaseClient: args.supabaseClient,
     }),
   ).catch((error: unknown) => {
-    logger.warn("Failed to send inbound call webhook notification", {
+    args.logger.warn("Failed to send inbound call webhook notification", {
       workspaceId: args.workspaceId,
       callSid: args.call.sid,
       error: error instanceof Error ? error.message : String(error),
@@ -267,6 +275,8 @@ export const action = async ({ request }: LoaderFunctionArgs) => {  const { vali
         start_time: call.start_time,
       },
       supabaseClient: supabase,
+      sendWebhookNotification,
+      logger,
     });
   }
 

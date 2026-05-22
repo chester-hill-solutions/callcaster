@@ -8,6 +8,10 @@ import { data as routeData, ActionFunction, ActionFunctionArgs } from "react-rou
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
+  const { env } = await import("@/lib/env.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

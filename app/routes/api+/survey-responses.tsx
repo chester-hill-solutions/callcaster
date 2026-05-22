@@ -42,6 +42,7 @@ async function handleSubmitResponse(
   request: Request,
   supabaseClient: SupabaseClient<Database>
 ) {
+  const { logger } = await import("@/lib/logger.server");
   try {
     const formData = await request.formData();
     const responseDataRaw = formData.get("responseData") as string | null;
