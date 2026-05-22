@@ -8,22 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  createWorkspaceTwilioInstance,
-  getUserRole,
-  getWorkspaceInfo,
-  getWorkspacePhoneNumbers,
-  requireWorkspaceAccess,
-  updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import {
-  buildOnboardingStepsForState,
-  deriveWorkspaceMessagingReadiness,
-  getWorkspaceMessagingOnboardingState,
-  mergeWorkspaceMessagingOnboardingState,
-  updateWorkspaceMessagingOnboardingState,
-} from "@/lib/messaging-onboarding.server";
+
+
+
 import {
   TWILIO_RCS_DOCS_URL,
   TWILIO_RCS_PROVIDER,
@@ -32,8 +19,8 @@ import {
   hydrateWorkspaceRcsOnboardingState,
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
-import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+
+
 import type { Tables } from "@/lib/database.types";
 import type {
   User,
@@ -135,7 +122,12 @@ function hasVoiceCapability(capabilities: unknown) {
   return isRecord(capabilities) && (capabilities.voice === true || capabilities.voice === "true");
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { provisionWorkspaceA2P } = await import("@/lib/twilio-a2p.server");
+  const { ensureWorkspaceTwilioBootstrap } = await import("@/lib/twilio-bootstrap.server");
+  const { buildOnboardingStepsForState, deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, getUserRole, getWorkspaceInfo, getWorkspacePhoneNumbers, requireWorkspaceAccess, updateWorkspacePhoneNumber } = await import("@/lib/database.server");
+
   const { supabaseClient, user, headers } = await verifyAuth(request);
   if (!user) {
     throw redirect("/signin", { headers });
@@ -193,7 +185,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   );
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { provisionWorkspaceA2P } = await import("@/lib/twilio-a2p.server");
+  const { ensureWorkspaceTwilioBootstrap } = await import("@/lib/twilio-bootstrap.server");
+  const { buildOnboardingStepsForState, deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, getUserRole, getWorkspaceInfo, getWorkspacePhoneNumbers, requireWorkspaceAccess, updateWorkspacePhoneNumber } = await import("@/lib/database.server");
+
   const { supabaseClient, user, headers } = await verifyAuth(request);
   if (!user) {
     throw redirect("/signin", { headers });

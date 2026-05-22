@@ -1,9 +1,11 @@
 import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from '@/lib/database.server';
-import { verifyAuth } from '@/lib/supabase.server';
+
+
 import { Contact } from "@/lib/types";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const method = request.method;
 
@@ -36,7 +38,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const url = new URL(request.url);
   const searchQuery = url.searchParams.get("q")?.toLowerCase() || "";

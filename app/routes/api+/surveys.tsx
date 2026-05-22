@@ -1,13 +1,15 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+
 import { SurveyFormData } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
-import { createErrorResponse, AppError, ErrorCode, handleDatabaseError } from "@/lib/errors.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+
+export async function action({ request }: ActionFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { createErrorResponse, AppError, ErrorCode, handleDatabaseError } = await import("@/lib/errors.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   try {
     const { supabaseClient, user } = await verifyAuth(request);
     if (!user) {

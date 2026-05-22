@@ -1,7 +1,7 @@
 
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request)
 
     if (!user) {
@@ -68,7 +69,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -108,9 +110,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Admin() {
-    const { user, workspaces, users, workspaceUsers, recentCampaigns, stats } = useLoaderData<typeof loader>();
+    const { user, workspaces, users, workspaceUsers, recentCampaigns, stats } = useLoaderData();
     const [searchParams, setSearchParams] = useSearchParams();
-    const actionData = useActionData<typeof action>();
+    const actionData = useActionData();
     const currentTab = searchParams.get("tab") || "workspaces";
     
     // Update the URL when tab changes

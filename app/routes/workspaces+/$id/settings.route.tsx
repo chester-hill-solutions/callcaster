@@ -13,23 +13,8 @@ import {
 } from "react-router";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  getUserRole,
-  getWorkspacePhoneNumbers,
-  getWorkspaceUsers,
-} from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import {
-  handleAddUser,
-  handleDeleteSelf,
-  handleDeleteUser,
-  handleDeleteWorkspace,
-  handleTransferWorkspace,
-  handleUpdateUser,
-  handleUpdateWebhook,
-  removeInvite,
-  testWebhook,
-} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+
+
 
 import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";
@@ -63,7 +48,10 @@ type WorkspaceNumbers = {
   };
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -98,7 +86,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     );
   }
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
+
   const workspaceId = params.id;
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
@@ -190,7 +181,7 @@ export default function WorkspaceSettings() {
   const { workspace: outletWorkspace } = useOutletContext<{
     workspace: WorkspaceData;
   }>();
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const canManageWebhook =
     hasAccess &&
     outletWorkspace != null &&

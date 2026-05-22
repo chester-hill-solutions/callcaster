@@ -5,12 +5,14 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
-import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
+
 import { MdAdd, MdClose } from "react-icons/md";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { handleNewAudience } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -41,7 +43,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return routeData({ campaign: campaignData, error: null }, { headers });
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { handleNewAudience } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -91,8 +95,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function NewAudience() {
-  const { campaign, error } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const { campaign, error } = useLoaderData();
+  const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

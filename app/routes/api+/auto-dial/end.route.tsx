@@ -1,9 +1,7 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 
-import { verifyAuth } from '@/lib/supabase.server';
-import { createWorkspaceTwilioInstance, safeParseJson } from '@/lib/database.server';
+
 import type { Tables } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 type AutoDialEndDeps = Partial<{
   verifyAuth: typeof verifyAuth;
@@ -25,7 +23,10 @@ const resolveDeps = (deps?: AutoDialEndDeps) => {
 export const action = async ({
   request,
   deps,
-}: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {
+}: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, safeParseJson } = await import("@/lib/database.server");
+
   const d = resolveDeps(deps);
   const { supabaseClient, user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson(request);

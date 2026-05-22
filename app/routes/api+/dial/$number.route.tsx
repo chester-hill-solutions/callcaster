@@ -1,9 +1,10 @@
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+
     const twiml = new Twilio.twiml.VoiceResponse();
     const formData = await request.formData();
     const number = params.number;

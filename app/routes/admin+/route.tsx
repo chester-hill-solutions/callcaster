@@ -1,6 +1,6 @@
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,16 +20,18 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
+
 import {
     filterWorkspaceAdminRows,
     sortWorkspaceAdminRows,
     type WorkspaceAdminRow,
     type WorkspaceSortKey,
 } from "@/lib/admin-workspaces";
-import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { deriveWorkspaceAdminRows } = await import("@/lib/admin-workspaces.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { syncWorkspaceTwilioSnapshot } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request)
 
     if (!user) {
@@ -99,7 +101,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { deriveWorkspaceAdminRows } = await import("@/lib/admin-workspaces.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { syncWorkspaceTwilioSnapshot } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -183,9 +188,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Admin() {
-    const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData<typeof loader>();
+    const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData();
     const [searchParams, setSearchParams] = useSearchParams();
-    const actionData = useActionData<typeof action>();
+    const actionData = useActionData();
     const currentTab = searchParams.get("tab") || "workspaces";
 
     // Pagination state for workspaces

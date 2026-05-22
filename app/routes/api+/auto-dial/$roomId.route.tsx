@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server';
+
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { Call } from "@/lib/types";
 import { Database, Tables } from "@/lib/database.types";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookParams } from "@/twilio.server";
+
+
+
 const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
@@ -163,7 +163,11 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
     return false;
 }
 
-export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
+export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const conferenceName = params.roomId;
     const realtime = supabase.realtime.channel(conferenceName)
     const formData = await request.formData();

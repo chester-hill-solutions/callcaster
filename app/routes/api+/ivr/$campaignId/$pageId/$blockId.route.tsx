@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
@@ -105,7 +105,9 @@ const handleBlock = async (
   handleOptions(twiml, block, campaignId, pageId, blockId, script);
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
+export const action = async ({ params, request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

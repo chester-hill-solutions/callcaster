@@ -2,10 +2,10 @@ import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, us
 import { FaPlus } from "react-icons/fa";
 
 import { useState, useEffect, useCallback } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+
 import ContactDetails from "@/components/contact/ContactDetails";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import type { Audience, Contact, WorkspaceData, User } from "@/lib/types";
@@ -47,7 +47,9 @@ export interface ContactScreenState {
 export const loader = async ({
   request,
   params,
-}: LoaderFunctionArgs) => {
+}: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id) {
@@ -130,7 +132,9 @@ export const loader = async ({
 export const action = async ({
   request,
   params,
-}: ActionFunctionArgs) => {
+}: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { id: workspace_id, contactId: selected_id } = params;
 
   if (!workspace_id || !selected_id) {

@@ -6,10 +6,8 @@ import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
-import { createWorkspaceTwilioInstance } from '@/lib/database.server';
 
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
 
 interface CampaignData {
   voicemail_file?: string;
@@ -68,7 +66,10 @@ const handleVoicemail = async (twilio: any, callSid: string, dbCall: CallData, s
     }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
 

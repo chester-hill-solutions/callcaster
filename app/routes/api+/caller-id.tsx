@@ -3,12 +3,11 @@ import type { ActionFunctionArgs } from "react-router";
 import Twilio from "twilio";
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 
-import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
+
+
 import { normalizePhoneNumber } from "@/lib/utils";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
@@ -27,7 +26,12 @@ interface RequestBody {
   friendlyName: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { env } = await import("@/lib/env.server");
+  const { requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
   const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   try {
     const supabase: SupabaseClient = createClient(

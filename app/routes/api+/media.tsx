@@ -1,10 +1,10 @@
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import { verifyAuth } from '@/lib/supabase.server';
 
-import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const live_campaign_id_raw = formData.get('live_campaign_id');

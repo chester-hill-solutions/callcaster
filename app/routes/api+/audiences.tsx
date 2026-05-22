@@ -1,8 +1,8 @@
 import { data as routeData } from "react-router";
-import { parseActionRequest , requireWorkspaceAccess } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { SupabaseClient } from "@supabase/supabase-js";
-import { logger } from "@/lib/logger.server";
+
 import type { Database } from "@/lib/database.types";
 import { csvResponse, toCsvString } from "@/lib/csv";
 import type { CsvCell } from "@/lib/csv";
@@ -36,7 +36,10 @@ const resolveDeps = (deps?: Partial<AudiencesDeps>) => {
   } as AudiencesDeps;
 };
 
-export const action = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
+export const action = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     const d = resolveDeps(deps);
     const { supabaseClient, headers }: SupabaseResponse =
         await d.verifyAuth(request);
@@ -92,7 +95,10 @@ export const action = async ({ request, deps }: { request: Request; deps?: Parti
     return routeData(response, { headers });
 };
 
-export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
+export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     const d = resolveDeps(deps);
     const { supabaseClient, headers, user } = await d.verifyAuth(request);
     const url = new URL(request.url);

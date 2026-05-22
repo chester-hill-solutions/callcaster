@@ -1,10 +1,11 @@
 import { xml } from 'remix-utils/responses';
 import twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
   const baseUrl = env.BASE_URL();
 
   const formData = await request.formData();

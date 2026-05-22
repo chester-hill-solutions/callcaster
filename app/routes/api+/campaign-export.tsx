@@ -1,9 +1,8 @@
 import { data as routeData, ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+
 import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM, escapeCsvCell, type CsvCell } from "@/lib/csv";
 // Generate a unique ID without using uuid package
 const generateUniqueId = () => {
@@ -809,7 +808,10 @@ const processCallCampaignExport = async (
 const escapeExportCell = (value: unknown): string =>
   escapeCsvCell(value as CsvCell, { protectFromInjection: true });
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
     return new Response("Unauthorized", { status: 401 });

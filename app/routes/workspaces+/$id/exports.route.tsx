@@ -1,11 +1,11 @@
 
 
 import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card } from "@/components/ui/card";
 import { Download, RefreshCw } from "lucide-react";
 import { useEffect } from "react";
-import { logger } from "@/lib/logger.server";
+
 import {
   Table,
   TableBody,
@@ -51,7 +51,9 @@ interface LoaderData {
   exports: SerializedExportItem[];
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });

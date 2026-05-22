@@ -1,9 +1,11 @@
 import { data as routeData, ActionFunction } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { logger } from "@/lib/logger.server";
+
+
 
 export const action: ActionFunction = async ({ request }) => {
+  const { safeParseJson } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
   const {event, destination_url, custom_headers} = await safeParseJson<{ event: string; destination_url: string; custom_headers: string }>(request)
     const eventData = JSON.parse(event)
     const customHeaders = JSON.parse(custom_headers)

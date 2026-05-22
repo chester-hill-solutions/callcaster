@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance, safeParseJson } from '@/lib/database.server';
+
 import type TwilioSDK from "twilio";
-import { env } from '@/lib/env.server';
-import { logger } from '@/lib/logger.server';
+
+
 import type { Database } from '@/lib/database.types';
 import type { Call } from '@/lib/types';
 import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
@@ -116,7 +116,10 @@ export async function completeAllConferences(client: TwilioClient, user_id: stri
   );
 }
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance, safeParseJson } = await import("@/lib/database.server");
+
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

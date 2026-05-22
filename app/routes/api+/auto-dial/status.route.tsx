@@ -2,16 +2,16 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 
-import { createWorkspaceTwilioInstance } from '@/lib/database.server';
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
 
-import { env } from "@/lib/env.server";
-import { validateTwilioWebhookParams } from "@/twilio.server";
-import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+
+
+
+
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 
@@ -298,7 +298,12 @@ const handleParticipantJoin = async (
   }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
 
   let realtime;
   try {

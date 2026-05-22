@@ -4,12 +4,12 @@ import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, 
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
-import { getUserRole } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { formatDateToLocale } from "@/lib/utils";
 import { useEffect } from "react";
 import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
-import { logger } from "@/lib/logger.server";
+
 import type { Json , Database } from "@/lib/database.types";
 import type { User } from "@/lib/types";
 
@@ -55,7 +55,10 @@ type LoaderData =
 
 // ActionData inferred from action's return via typeof action
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params["id"];
@@ -101,7 +104,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return routeData<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
@@ -150,8 +155,8 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function WorkspaceScripts() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const loaderData = useLoaderData<LoaderData>();
+  const actionData = useActionData();
 
   // Narrow the type of loaderData
   const { error } = loaderData;

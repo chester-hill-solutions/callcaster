@@ -6,16 +6,18 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
 import { toast } from "sonner";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { useEffect } from "react";
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient } = await verifyAuth(request);
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) return redirect("/remember");
   return routeData({});
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = await verifyAuth(request);
 
   const formData = await request.formData();
@@ -39,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ResetPassword() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
 
   useEffect(() => {
     if (actionData?.success != null) {

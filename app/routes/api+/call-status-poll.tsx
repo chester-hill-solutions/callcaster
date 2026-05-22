@@ -3,17 +3,22 @@ import type { LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 
 import type { Database, Tables } from "@/lib/database.types";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
+
+
+
+
+
 import {
   normalizeProviderStatus,
   type CallStatusEnum,
 } from "@/lib/call-status";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { env } = await import("@/lib/env.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient: userSupabase, headers, user } = await verifyAuth(
     request,
     "/signin"

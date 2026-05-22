@@ -1,9 +1,11 @@
 import { data as routeData, ActionFunctionArgs } from "react-router";
-import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+
+
+export async function action({ request }: ActionFunctionArgs) {  const { parseActionRequest, removeContactsFromAudience } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (!user) {

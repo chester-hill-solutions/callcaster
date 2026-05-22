@@ -3,8 +3,7 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { createClient } from '@supabase/supabase-js';
 
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
 
 interface CallData {
   id: string;
@@ -12,7 +11,9 @@ interface CallData {
   current_question: number;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const formData = await request.formData();
     const url = new URL(request.url);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());

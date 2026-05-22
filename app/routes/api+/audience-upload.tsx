@@ -1,9 +1,8 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { parseCSV } from '@/lib/csv';
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 interface StorageBucket {
   id: string;
@@ -344,7 +343,9 @@ export const action = async ({
 }: {
   request: Request;
   deps?: AudienceUploadDeps;
-}) => {
+}) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const d = resolveDeps(deps);
   const { supabaseClient, headers, user } = await d.verifyAuth(request);
   

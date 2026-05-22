@@ -2,15 +2,10 @@ import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } f
 import { NavLink, Outlet, useFetcher, useLoaderData, useLocation, useNavigate, useOutlet, useOutletContext, useParams, useSearchParams, useRouteError } from "react-router";
 import { MdAdd, MdChat } from "react-icons/md";
 import { Button } from "@/components/ui/button";
-import {
-  fetchCampaignsByType,
-  fetchContactData,
-  fetchConversationSummary,
-  getUserRole,
-} from "@/lib/database.server";
-import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+
+
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -548,7 +543,10 @@ function useImageHandling(workspace_id: string) {
   };
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const { id: workspaceId } = params;
   const url = new URL(request.url);
@@ -682,7 +680,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params["id"];

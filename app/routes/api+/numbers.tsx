@@ -1,25 +1,26 @@
 import Twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
-import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from '@/lib/database.server';
+
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import {
-  buildOnboardingStepsForState,
-  getWorkspaceMessagingOnboardingState,
-  mergeWorkspaceMessagingOnboardingState,
-  updateWorkspaceMessagingOnboardingState,
-} from "@/lib/messaging-onboarding.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
+
+
+
 
 interface FormData {
   phoneNumber: string;
   workspace_id: string;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     await verifyAuth(request);
     const twilio = new Twilio.Twilio(process.env['TWILIO_SID'] ?? '', process.env['TWILIO_AUTH_TOKEN'] ?? '');
     const url = new URL(request.url);
@@ -46,7 +47,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     const { supabaseClient: userSupabase, user } = await verifyAuth(request);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();

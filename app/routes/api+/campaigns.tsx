@@ -1,14 +1,16 @@
 import { data as routeData } from "react-router";
-import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { createErrorResponse } from "@/lib/errors.server";
+
+
 
 function parseJsonField<T>(value: unknown): T {
   if (typeof value === "string") return JSON.parse(value) as T;
   return value as T;
 }
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } = await import("@/lib/database.server");
+
   const { supabaseClient, headers } = await verifyAuth(request);
 
   try {

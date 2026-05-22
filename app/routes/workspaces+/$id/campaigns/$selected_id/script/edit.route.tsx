@@ -1,18 +1,12 @@
 import { data as routeData, redirect } from "react-router";
 import { useLoaderData, useSubmit } from "react-router";
 import { useState, useEffect } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SaveBar } from "@/components/shared/SaveBar";
-import {
-  getMedia,
-  getSignedUrls,
-  getUserRole,
-  getWorkspaceScripts,
-  listMedia,
-} from "@/lib/database.server";
+
 import { MessageSettings } from "@/components/MessageSettings";
 import {
   Dialog,
@@ -24,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import type { LoaderFunctionArgs , ActionFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
-import { logger } from "@/lib/logger.server";
+
 import { logger as loggerClient } from "@/lib/logger.client";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { isObject } from "@/lib/type-utils";
@@ -90,7 +84,10 @@ function getScriptRecordingFileNames(script: Script | undefined): string[] {
     });
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } = await import("@/lib/database.server");
+
   const { id: workspace_id, selected_id } = params;
   
   if (!workspace_id || !selected_id) {
@@ -214,7 +211,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   } satisfies LoaderData);
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } = await import("@/lib/database.server");
+
   const campaignId = params.selected_id;
   if (!campaignId) {
     throw new Response("Campaign ID is required", { status: 400 });
@@ -259,7 +259,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
 export default function ScriptEditor() {
   const { workspace_id, selected_id, mediaNames = [], scripts = [], data } =
-    useLoaderData<typeof loader>();
+    useLoaderData<LoaderData>();
   const [initData, setInitData] = useState<PageData>(data);
   const submit = useSubmit();
   const [pageData, setPageData] = useState<PageData>(data);

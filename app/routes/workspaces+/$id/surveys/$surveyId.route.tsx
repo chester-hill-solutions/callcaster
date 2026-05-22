@@ -1,14 +1,13 @@
 
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+
 import type { SurveyWithPages } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { logger } from "@/lib/logger.server";
+
 import { 
   Calendar, 
   Users, 
@@ -67,7 +66,10 @@ interface Survey {
   survey_page?: SurveyPage[];
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 
@@ -133,7 +135,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function SurveyDetailPage() {
-  const { survey, recentResponses, workspaceId, userRole } = useLoaderData<typeof loader>();
+  const { survey, recentResponses, workspaceId, userRole } = useLoaderData();
 
   const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
 

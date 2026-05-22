@@ -1,13 +1,7 @@
 import Twilio from "twilio";
-import { createSupabaseServerClient } from '@/lib/supabase.server';
-import {
-  createWorkspaceTwilioInstance,
-  requireWorkspaceAccess,
-  safeParseJson,
-} from '@/lib/database.server';
+
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
 
 type AutoDialDeps = Partial<{
   createSupabaseServerClient: typeof createSupabaseServerClient;
@@ -75,7 +69,11 @@ export const action = async ({
 }: {
   request: Request;
   deps?: AutoDialDeps;
-}) => {
+}) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
   const d = resolveDeps(deps);
   const { supabaseClient: supabase } = d.createSupabaseServerClient(request);
   const {

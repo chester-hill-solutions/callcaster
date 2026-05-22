@@ -1,16 +1,11 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import {
-  createWorkspaceTwilioInstance,
-  getWorkspaceTwilioPortalConfig,
-  requireWorkspaceAccess,
-  safeParseJson,
-} from '@/lib/database.server';
+
 import { Database } from '@/lib/database.types';
-import { verifyApiKeyOrSession } from '@/lib/api-auth.server';
+
 import { normalizePhoneNumber, processTemplateTags } from '@/lib/utils';
-import { logger } from '@/lib/logger.server';
-import { env } from '@/lib/env.server';
-import { processUrls } from '@/lib/sms.server';
+
+
+
 import { resolveTwilioSmsMessagingServiceSid } from '@/lib/sms-send-resolve';
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from '@/lib/types';
 
@@ -200,7 +195,12 @@ export const sendMessage = async ({
     }
 };
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { processUrls } = await import("@/lib/sms.server");
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyApiKeyOrSession } = await import("@/lib/api-auth.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
     const authResult = await verifyApiKeyOrSession(request);
 
     if ("error" in authResult) {

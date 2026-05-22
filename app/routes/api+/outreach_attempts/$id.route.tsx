@@ -1,8 +1,10 @@
-import { safeParseJson } from "@/lib/database.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+
+
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+  const { safeParseJson } = await import("@/lib/database.server");
+
   const { supabaseClient: supabase, headers } =
     createSupabaseServerClient(request);
   const { update } = await safeParseJson<{ update: Record<string, unknown> }>(request);

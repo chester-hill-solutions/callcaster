@@ -12,9 +12,9 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+
   const {
     supabaseClient: supabase,
   } = createSupabaseServerClient(request);

@@ -4,12 +4,15 @@ import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext } from "r
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
-import { getUserRole } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { Workspace } from "@/lib/types";
 import type { FileObject } from "@supabase/storage-js";
-import { logger } from "@/lib/logger.server";
-export async function loader({ request, params }: LoaderFunctionArgs) {
+
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params["id"];
@@ -61,7 +64,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function WorkspaceVoicemailsPage() {
   const { audioMedia, error} =
-    useLoaderData<typeof loader>();
+    useLoaderData();
   const {workspace } = useOutletContext<{workspace: Workspace}>();
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
   const voicemails = audioMedia?.filter(

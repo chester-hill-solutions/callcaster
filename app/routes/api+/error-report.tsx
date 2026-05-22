@@ -1,13 +1,16 @@
 import { Resend } from "resend";
 import { data as routeData } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
+
+
 
 const resend = new Resend(env.RESEND_API_KEY());
 
-export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
+export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { safeParseJson } = await import("@/lib/database.server");
+
   try {
     const error = await safeParseJson<unknown>(request);
     const {supabaseClient, user} = await verifyAuth(request);

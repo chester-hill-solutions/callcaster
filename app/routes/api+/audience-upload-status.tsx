@@ -1,8 +1,9 @@
 import { data as routeData, LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   
   if (!user) {

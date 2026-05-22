@@ -1,10 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { env } from "@/lib/env.server";
-import { validateTwilioWebhookParams } from "@/twilio.server";
+
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const MAX_RETRIES = 5;
@@ -33,7 +33,10 @@ const getCallWithRetry = async (supabase: SupabaseClient<Database>, callSid: str
   return data;
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
+export const action = async ({ params, request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { env } = await import("@/lib/env.server");
+
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };

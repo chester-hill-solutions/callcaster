@@ -6,16 +6,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { capitalize } from "@/lib/utils";
 import type { Database, Tables } from "@/lib/database.types";
-import {
-  handleAddUser,
-  handleDeleteSelf,
-  handleDeleteUser,
-  handleUpdateUser,
-  removeInvite,
-} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -74,7 +67,9 @@ const memberRoles = new Set(Object.values(MemberRole));
 const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.workspaceId;
@@ -177,7 +172,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   );
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const workspaceId = params.workspaceId;
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
@@ -262,7 +259,7 @@ export default function WorkspaceUsers() {
     pendingInvites,
   } = useLoaderData<LoaderData>();
   
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const workspaceOwner = users.find(
     (member) => member.role === MemberRole.Owner,
   );

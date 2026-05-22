@@ -5,9 +5,9 @@ import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { createNewWorkspace } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import { toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -39,7 +39,10 @@ interface LoaderData {
   error: string | null;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createNewWorkspace } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   if (!user) {
@@ -63,7 +66,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { workspaces: workspaces, userId: userId, error: null };
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createNewWorkspace } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const formData = await request.formData();
@@ -180,7 +186,7 @@ const NewWorkspaceDialog = ({
 
 export default function Workspaces() {
   const { workspaces, userId, error } = useLoaderData<LoaderData>();
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const { state } = useNavigation();
   const [searchParams] = useSearchParams();
   const isBusy = state !== "idle";

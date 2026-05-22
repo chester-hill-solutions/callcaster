@@ -1,11 +1,10 @@
 // Twilio not used in this endpoint
 import { createClient } from "@supabase/supabase-js";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+
 import type { ActionFunctionArgs } from "react-router";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
+
 
 // unused types removed
 
@@ -80,7 +79,12 @@ const updateWorkspace = async ({
   return data;
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const { workspace_id, update }: WorkspaceRequest =
     await safeParseJson(request);

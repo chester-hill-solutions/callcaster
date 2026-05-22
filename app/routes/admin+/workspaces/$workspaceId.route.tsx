@@ -1,15 +1,15 @@
 
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, useLocation } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { logger } from "@/lib/logger.server";
+
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
 
@@ -48,7 +48,10 @@ interface TwilioUsageRecord {
     endDate?: Date;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -168,7 +171,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function WorkspaceDetails() {
-    const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData<typeof loader>();
+    const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData();
     const location = useLocation();
     
     // Determine active tab from URL

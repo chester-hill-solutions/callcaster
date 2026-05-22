@@ -1,12 +1,14 @@
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import type { Database } from "@/lib/database.types";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+
   const formData = await request.formData();
   const toNumber = (formData.get("To") as string) ?? "";
   const workspaceId = formData.get("workspace_id") as string | null;

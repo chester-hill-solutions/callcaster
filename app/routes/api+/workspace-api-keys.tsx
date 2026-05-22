@@ -2,13 +2,9 @@
 
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import {
-  hashApiKeyForStorage,
-  API_KEY_PREFIX_LENGTH,
-} from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import { randomBytes } from "crypto";
 
 const KEY_SECRET_LENGTH = 32;
@@ -22,7 +18,11 @@ function generateApiKey(): { key: string; keyPrefix: string; keyHash: string } {
   return { key, keyPrefix, keyHash };
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { hashApiKeyForStorage, API_KEY_PREFIX_LENGTH } = await import("@/lib/api-auth.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const url = new URL(request.url);
   const workspaceId = url.searchParams.get("workspace_id");
@@ -60,7 +60,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   );
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { hashApiKeyForStorage, API_KEY_PREFIX_LENGTH } = await import("@/lib/api-auth.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
 
   if (request.method === "POST") {

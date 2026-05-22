@@ -1,8 +1,7 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -26,7 +25,9 @@ type SubmittedSurveyResponse = {
   answers?: SubmittedSurveyAnswer[];
 };
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient } = await verifyAuth(request);
   
   if (request.method === "POST") {

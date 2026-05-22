@@ -1,11 +1,9 @@
 
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
 
 import type { Json } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 interface RequestData {
   update?: Json;
@@ -16,7 +14,10 @@ interface RequestData {
   queue_id: number;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
     const { supabaseClient, headers, user } = await verifyAuth(request);
     const { update, contact_id, campaign_id, workspace, disposition, queue_id }: RequestData = await safeParseJson(request);
     await requireWorkspaceAccess({ supabaseClient, user, workspaceId: workspace });

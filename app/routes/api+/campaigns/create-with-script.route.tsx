@@ -1,9 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
-import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
-import { createCampaign, requireWorkspaceAccess , safeParseJson } from "@/lib/database.server";
+
 import type { CampaignData, CampaignType } from "@/lib/database/campaign.server";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { logger } from "@/lib/logger.server";
+
+
 import type { Json } from "@/lib/database.types";
 
 const SCRIPT_TYPES_FOR_CAMPAIGN: Record<CampaignType, string> = {
@@ -53,7 +52,11 @@ function jsonResponse(
   });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+  const { verifyApiKeyOrSession } = await import("@/lib/api-auth.server");
+  const { createCampaign, requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }

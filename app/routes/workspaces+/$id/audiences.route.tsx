@@ -4,11 +4,13 @@ import { data as routeData, LoaderFunctionArgs, Link, useLoaderData, useNavigate
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { audienceColumns } from "@/components/workspace/tables/columns";
 import { Button } from "@/components/ui/button";
-import { getUserRole } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { User } from "@/lib/types";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -46,7 +48,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function WorkspaceAudiencesPage() {
-  const loaderData = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData();
   const audienceData = "audienceData" in loaderData ? loaderData.audienceData : [];
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const error = "error" in loaderData ? loaderData.error : null;

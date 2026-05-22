@@ -5,13 +5,14 @@ import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -74,7 +75,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function AudiencesNew() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const params = useParams();
   const workspaceId = params.id;
   const submit = useSubmit();

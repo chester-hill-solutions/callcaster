@@ -3,8 +3,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
 
 interface CampaignData {
   ivr_campaign: Array<{
@@ -48,7 +47,9 @@ const updateResult = async (supabase: any, outreach_attempt_id: string, result: 
     if (error) throw error;
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     
     const formData = await request.formData();

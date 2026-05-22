@@ -1,9 +1,8 @@
 import { redirect, type LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import Stripe from "stripe";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+
+
 
 function buildBillingRedirect(
   workspaceId: string,
@@ -18,7 +17,11 @@ function buildBillingRedirect(
   return redirect(`/workspaces/${workspaceId}/billing?${searchParams.toString()}`);
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session_id");
 

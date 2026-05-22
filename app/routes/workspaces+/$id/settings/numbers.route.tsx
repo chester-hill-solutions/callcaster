@@ -5,16 +5,8 @@ import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } f
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  getUserRole,
-  requireWorkspaceAccess,
-  getWorkspacePhoneNumbers,
-  getWorkspaceUsers,
-  removeWorkspacePhoneNumber,
-  updateCallerId,
-  updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
 import { toast } from "sonner";
 import {
@@ -54,7 +46,9 @@ export type ActionData = {
   };
   error?: string;
 };
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, requireWorkspaceAccess, getWorkspacePhoneNumbers, getWorkspaceUsers, removeWorkspacePhoneNumber, updateCallerId, updateWorkspacePhoneNumber } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!user || !workspaceId) {
@@ -146,7 +140,9 @@ interface FormData {
   [key: string]: unknown;
 }
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, requireWorkspaceAccess, getWorkspacePhoneNumbers, getWorkspaceUsers, removeWorkspacePhoneNumber, updateCallerId, updateWorkspacePhoneNumber } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const data = Object.fromEntries(await request.formData()) as Record<

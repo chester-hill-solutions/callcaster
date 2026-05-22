@@ -3,7 +3,6 @@ import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import Twilio from 'twilio';
 
-import { env } from "@/lib/env.server";
 
 const accountSid = env.TWILIO_SID();
 const authToken = env.TWILIO_AUTH_TOKEN();
@@ -12,7 +11,8 @@ interface RobocallRequest {
   to: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+
 
     const baseUrl = env.BASE_URL();
     const client = new Twilio.Twilio(accountSid, authToken);

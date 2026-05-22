@@ -8,12 +8,13 @@ import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 
-import { logger } from "@/lib/logger.server";
+
 import { Text } from "@/components/ui/typography";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const requestUrl = new URL(request.url);
   const next = requestUrl.searchParams.get('next');
@@ -37,7 +38,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return routeData({ error: error.message });
 };
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const {supabaseClient, headers} = createSupabaseServerClient(request);
   const { data: { user } } = await supabaseClient.auth.getUser();
 
@@ -48,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function SignIn() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
 
   useEffect(() => {
     if (actionData?.error != null) {

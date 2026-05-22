@@ -1,9 +1,10 @@
 import { data as routeData, LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });

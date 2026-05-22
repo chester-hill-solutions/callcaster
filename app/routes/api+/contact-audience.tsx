@@ -1,9 +1,11 @@
 import { data as routeData } from "react-router";
-import { parseActionRequest, removeContactFromAudience } from '@/lib/database.server';
-import { verifyAuth } from '@/lib/supabase.server';
-import { createErrorResponse } from "@/lib/errors.server";
 
-export const action = async ({ request }: { request: Request }) => {
+
+
+export const action = async ({ request }: { request: Request }) => {  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { parseActionRequest, removeContactFromAudience } = await import("@/lib/database.server");
+
     const { supabaseClient, headers } =
         await verifyAuth(request);
 

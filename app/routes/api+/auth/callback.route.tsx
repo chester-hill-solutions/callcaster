@@ -2,8 +2,7 @@ import { redirect, type LoaderFunctionArgs } from "react-router";
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
 
 function getSafeRedirectPath(next: string | null): string {
   if (!next || !next.startsWith("/")) {
@@ -13,7 +12,9 @@ function getSafeRedirectPath(next: string | null): string {
   return next.startsWith("//") ? "/" : next;
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+
   const requestUrl = new URL(request.url);
   const token_hash = requestUrl.searchParams.get("token_hash");
   const type = requestUrl.searchParams.get("type") as EmailOtpType | null;

@@ -2,7 +2,7 @@
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
 import { useState, useEffect, useCallback } from "react";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +38,8 @@ function safeString(value: string | string[]): string {
   return Array.isArray(value) ? JSON.stringify(value) : value;
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+
   const { surveyId } = params;
   const url = new URL(request.url);
   const contactId = url.searchParams.get('contact');
@@ -128,7 +129,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function SurveyPage() {
-  const { survey, resultId, contact, existingResponse, existingAnswers } = useLoaderData<typeof loader>();
+  const { survey, resultId, contact, existingResponse, existingAnswers } = useLoaderData();
   const answerFetcher = useFetcher();
   const completeFetcher = useFetcher();
   

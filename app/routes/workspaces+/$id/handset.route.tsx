@@ -1,14 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useNavigate, useFetcher } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env.server";
+
 import type { Database } from "@/lib/database.types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
-import {
-  requireWorkspaceAccess,
-  getHandsetNumberForWorkspace,
-} from "@/lib/database.server";
+
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import { Button } from "@/components/ui/button";
@@ -27,7 +23,10 @@ import {
 
 const SESSION_EXPIRY_MINUTES = 60;
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { env } = await import("@/lib/env.server");
+  const { requireWorkspaceAccess, getHandsetNumberForWorkspace } = await import("@/lib/database.server");
+
   if (request.method !== "POST") return null;
   const formData = await request.formData();
   if (formData.get("intent") !== "end_session") return null;
@@ -57,7 +56,10 @@ type LoaderData = {
   workspaceId: string;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { env } = await import("@/lib/env.server");
+  const { requireWorkspaceAccess, getHandsetNumberForWorkspace } = await import("@/lib/database.server");
+
   const { supabaseClient: supabase, user } = await verifyAuth(request);
   if (!user) {
     throw new Response("Unauthorized", { status: 401 });

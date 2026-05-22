@@ -4,7 +4,7 @@ import { Suspense, useEffect } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { FileText, Image, Loader2, MessageSquare, Phone, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,27 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Database } from "@/lib/database.types";
-import {
-    createWorkspaceTwilioInstance,
-    getWorkspaceTwilioPortalSnapshot,
-    syncWorkspaceTwilioSnapshot,
-    updateWorkspaceTwilioPortalConfig,
-} from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+
+
 import { groupTwilioUsageData } from "@/lib/twilio-usage";
-import {
-    buildOnboardingStepsForState,
-    DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-    deriveWorkspaceMessagingReadiness,
-} from "@/lib/messaging-onboarding.server";
-import {
-  TWILIO_RCS_DOCS_URL,
-  TWILIO_RCS_PROVIDER,
-  TWILIO_RCS_SENDERS_URL,
-  updateWorkspaceRcsOnboarding,
-} from "@/lib/rcs-onboarding.server";
-import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+
+
+
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import {
     TWILIO_MESSAGE_INTENT_VALUES,
@@ -259,7 +245,14 @@ export async function loadTwilioData(
     };
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { provisionWorkspaceA2P } = await import("@/lib/twilio-a2p.server");
+  const { ensureWorkspaceTwilioBootstrap } = await import("@/lib/twilio-bootstrap.server");
+  const { TWILIO_RCS_DOCS_URL, TWILIO_RCS_PROVIDER, TWILIO_RCS_SENDERS_URL, updateWorkspaceRcsOnboarding } = await import("@/lib/rcs-onboarding.server");
+  const { buildOnboardingStepsForState, DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE, deriveWorkspaceMessagingReadiness } = await import("@/lib/messaging-onboarding.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot, syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -286,7 +279,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { provisionWorkspaceA2P } = await import("@/lib/twilio-a2p.server");
+  const { ensureWorkspaceTwilioBootstrap } = await import("@/lib/twilio-bootstrap.server");
+  const { TWILIO_RCS_DOCS_URL, TWILIO_RCS_PROVIDER, TWILIO_RCS_SENDERS_URL, updateWorkspaceRcsOnboarding } = await import("@/lib/rcs-onboarding.server");
+  const { buildOnboardingStepsForState, DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE, deriveWorkspaceMessagingReadiness } = await import("@/lib/messaging-onboarding.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot, syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -1362,8 +1362,8 @@ function PortalContent({ data }: { data: TwilioPageData }) {
 }
 
 export default function WorkspaceTwilio() {
-    const { twilioData } = useLoaderData<typeof loader>();
-    const actionData = useActionData<typeof action>();
+    const { twilioData } = useLoaderData();
+    const actionData = useActionData();
 
     useEffect(() => {
         if (actionData && "success" in actionData) {

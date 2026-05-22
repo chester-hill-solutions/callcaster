@@ -1,18 +1,11 @@
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
 import { Suspense, useEffect, useRef } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger as loggerServer } from "@/lib/logger.server";
+
+
 import { logger as loggerClient } from "@/lib/logger.client";
 
-import {
-  fetchBasicResults,
-  fetchCampaignData,
-  fetchCampaignDetails,
-  fetchQueueCounts,
-  getUserRole,
-  getWorkspaceUsers,
-} from "@/lib/database.server";
+
 import { MemberRole } from "@/components/workspace/TeamMember";
 import {
   ResultsDisplay,
@@ -90,7 +83,10 @@ const getTable = (
         : null;
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger: loggerServer } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } = await import("@/lib/database.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const rpcClient = supabaseClient as SupabaseClient<any>;
   if (!user) {
@@ -155,7 +151,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger: loggerServer } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } = await import("@/lib/database.server");
+
   const { id: workspace_id, selected_id } = params;
   if (!workspace_id || !selected_id) {
     return redirect(`/workspaces/${workspace_id}/campaigns`);
@@ -220,7 +219,7 @@ export default function CampaignScreen() {
     results,
     selected_id,
     queueCounts,
-  } = useLoaderData<typeof loader>();
+  } = useLoaderData();
   const { audiences, campaigns, phoneNumbers, workspace, supabase } =
     useOutletContext<{
       audiences: Audience[];

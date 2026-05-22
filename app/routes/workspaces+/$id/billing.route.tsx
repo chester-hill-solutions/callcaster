@@ -4,10 +4,10 @@ import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFuncti
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import Stripe from "stripe";
-import { env } from "@/lib/env.server";
-import { createStripeContact } from "@/lib/database/stripe.server";
+
+
 import {
   getTransactionDisplayDescription,
   type TransactionType,
@@ -32,7 +32,10 @@ function formatUnitPrice() {
   return "$0.003 CAD";
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
+  const { env } = await import("@/lib/env.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -52,7 +55,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   });
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
+  const { env } = await import("@/lib/env.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
@@ -143,13 +149,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function Credits() {
-  const { credits } = useLoaderData<typeof loader>();
+  const { credits } = useLoaderData();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(1667);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
 
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");

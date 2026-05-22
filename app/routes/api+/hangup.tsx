@@ -1,10 +1,13 @@
 import { data as routeData } from "react-router";
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server';
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import { isAssignedToUser } from "@/lib/queue-status";
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     const {supabaseClient:supabase, user} = await verifyAuth(request);
     const data = await parseActionRequest(request);
     const conferenceId =

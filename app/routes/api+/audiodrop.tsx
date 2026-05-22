@@ -1,6 +1,5 @@
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+
+
 
 type AudiodropDeps = Partial<{
   verifyAuth: typeof verifyAuth;
@@ -13,7 +12,10 @@ export const action = async ({
 }: {
   request: Request;
   deps?: AudiodropDeps;
-}) => {
+}) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
   const d = deps as { verifyAuth: typeof verifyAuth; createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance };
 
   const formData = await request.formData();

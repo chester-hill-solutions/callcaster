@@ -1,12 +1,10 @@
 import Twilio from 'twilio';
-import { createSupabaseServerClient, verifyAuth } from '@/lib/supabase.server';
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from '@/lib/database.server';
+
 import type { ActionFunctionArgs } from "react-router";
 import type { TablesInsert, Database } from "@/lib/database.types";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
 import { normalizePhoneNumber } from "@/lib/utils";
-import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 
 interface DialRequest {
   to_number: string;
@@ -20,7 +18,12 @@ interface DialRequest {
   selected_device?: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { getWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase } = createSupabaseServerClient(request);
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {

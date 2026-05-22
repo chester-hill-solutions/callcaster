@@ -1,22 +1,12 @@
 import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
-import {
-  fetchCampaignAudience,
-  fetchQueueCounts,
-  getWorkspacePhoneNumbers,
-  getWorkspaceTwilioPortalConfigFromTwilioData,
-  getWorkspaceTwilioSyncSnapshotFromTwilioData,
-  getSignedUrls,
-  getCampaignTableKey,
-  parseActionRequest,
-  updateCampaign,
-} from "@/lib/database.server";
-import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
+
+
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { logger } from "@/lib/logger.server";
+
 import {
   Audience,
   Campaign,
@@ -214,7 +204,10 @@ async function handleCampaignDuplicate(
   return { success: true };
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { getWorkspaceMessagingOnboardingFromTwilioData } = await import("@/lib/messaging-onboarding.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
@@ -399,7 +392,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { getWorkspaceMessagingOnboardingFromTwilioData } = await import("@/lib/messaging-onboarding.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { fetchCampaignAudience, fetchQueueCounts, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, getSignedUrls, getCampaignTableKey, parseActionRequest, updateCampaign } = await import("@/lib/database.server");
+
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);
 
@@ -514,7 +511,7 @@ export default function CampaignSettingsRoute() {
     surveys,
     outboundEstimateInputs,
     smsSendContext,
-  } = useLoaderData<typeof loader>();
+  } = useLoaderData();
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();

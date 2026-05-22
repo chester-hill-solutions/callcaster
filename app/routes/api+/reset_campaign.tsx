@@ -1,8 +1,9 @@
 import { ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
     const formData = await request.formData();
     const campaign_id = formData.get("campaign_id");

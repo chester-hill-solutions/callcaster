@@ -1,14 +1,16 @@
 
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+
+
 import { Campaign } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user, headers } = await verifyAuth(request);
   
   if (!user) {
@@ -52,7 +54,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 export default function ArchivedCampaigns() {
-  const { archivedCampaigns } = useLoaderData<typeof loader>();
+  const { archivedCampaigns } = useLoaderData();
   const { workspace } = useOutletContext<{ workspace: { id: string } }>();
 
   return (

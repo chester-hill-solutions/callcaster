@@ -1,7 +1,7 @@
 
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useActionData, Form, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -50,7 +51,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -107,8 +109,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function EditUser() {
-    const { currentUser, targetUser } = useLoaderData<typeof loader>();
-    const actionData = useActionData<typeof action>();
+    const { currentUser, targetUser } = useLoaderData();
+    const actionData = useActionData();
 
     useEffect(() => {
         if (actionData && 'success' in actionData) {

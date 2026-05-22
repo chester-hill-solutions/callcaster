@@ -1,7 +1,7 @@
 
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useActionData, Form, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -72,7 +73,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -202,8 +204,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function UserWorkspaces() {
-    const { currentUser, targetUser, allWorkspaces, userWorkspaces, pendingInvites } = useLoaderData<typeof loader>();
-    const actionData = useActionData<typeof action>();
+    const { currentUser, targetUser, allWorkspaces, userWorkspaces, pendingInvites } = useLoaderData();
+    const actionData = useActionData();
 
     // Filter out workspaces the user is already a member of
     const availableWorkspaces = allWorkspaces.filter(

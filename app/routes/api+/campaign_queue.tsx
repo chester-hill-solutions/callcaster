@@ -1,7 +1,7 @@
 import { data as routeData, ActionFunctionArgs, redirect } from "react-router";
-import { parseRequestData } from "@/lib/database.server";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
+
 import { CampaignQueue } from "@/lib/types";
 import { filteredSearch } from "@/routes/workspaces+/$id/campaigns/$selected_id/queue.route";
 import { safeNumber } from "@/lib/type-utils";
@@ -22,7 +22,10 @@ interface ContactMapping {
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+  const { parseRequestData } = await import("@/lib/database.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
     if (!user) throw redirect("/signin");
     const data = await parseRequestData(request);

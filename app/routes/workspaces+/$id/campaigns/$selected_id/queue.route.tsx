@@ -2,8 +2,8 @@
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
-import { parseActionRequest } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
 import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
@@ -17,7 +17,6 @@ import {
     QUEUE_STATUS_QUEUED,
     type QueueStatusFilter,
 } from "@/lib/queue-status";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -79,7 +78,10 @@ export const filteredSearch = (query: string, filters: { name: string, phone: st
     return searchQuery;
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { parseActionRequest } = await import("@/lib/database.server");
+
     const { selected_id } = params;
     const url = new URL(request.url);
     const searchParams = url.searchParams;
@@ -152,7 +154,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     });
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { enqueueContactsForCampaign } = await import("@/lib/queue.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { parseActionRequest } = await import("@/lib/database.server");
+
     const { selected_id } = params;
     const { supabaseClient, user } = await verifyAuth(request);
 
@@ -473,7 +478,7 @@ export default function Queue() {
         audiences: NonNullable<Audience>[],
         supabase: SupabaseClient
     }>();
-    const { queuePromise, campaignId, selectedAudienceIds } = useLoaderData<typeof loader>();
+    const { queuePromise, campaignId, selectedAudienceIds } = useLoaderData<LoaderData>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
     const [selectedAudience, setSelectedAudience] = useState<number | null>(null);

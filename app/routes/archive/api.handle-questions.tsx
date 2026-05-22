@@ -1,8 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
 
 interface CallData {
   current_question: number;
@@ -10,7 +9,9 @@ interface CallData {
   previous_status?: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const twiml = new Twilio.twiml.VoiceResponse();
 
     try {

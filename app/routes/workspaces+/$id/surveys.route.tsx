@@ -1,16 +1,18 @@
 
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
-import { getUserRole } from "@/lib/database.server";
+
+
 import { Survey, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Calendar, Users, CheckCircle, XCircle } from "lucide-react";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
@@ -49,7 +51,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function SurveysPage() {
-  const { surveys, workspaceId } = useLoaderData<typeof loader>();
+  const { surveys, workspaceId } = useLoaderData();
 
   return (
     <div className="container mx-auto py-6">

@@ -1,8 +1,7 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -13,7 +12,9 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+
   const { supabaseClient } = createSupabaseServerClient(request);
   
   if (request.method === "POST") {

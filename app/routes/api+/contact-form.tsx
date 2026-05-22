@@ -1,7 +1,6 @@
 import { Resend } from "resend";
 import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
 
 const resend = new Resend(env.RESEND_API_KEY());
 
@@ -9,7 +8,9 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_NAME_LENGTH = 200;
 
-export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
+export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData) as Record<string, unknown>;

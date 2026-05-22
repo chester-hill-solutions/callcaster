@@ -6,14 +6,14 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 
 // Lib imports
-import { verifyAuth } from '@/lib/supabase.server';
+
 import {
   handleCall,
   handleConference,
   handleContact,
   handleQueue,
 } from "@/lib/callscreenActions";
-import { checkSchedule, getUserRole } from "@/lib/database.server";
+
 import { playTone } from "@/lib/utils";
 import { generateToken } from "@/routes/api+/token";
 
@@ -177,7 +177,9 @@ function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
   return attempts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { checkSchedule, getUserRole } = await import("@/lib/database.server");
+
   const { campaign_id: id, id: workspaceId } = params;
   const {
     supabaseClient: supabase,
@@ -231,7 +233,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { checkSchedule, getUserRole } = await import("@/lib/database.server");
+
   const { campaign_id } = params;
 
   const { supabaseClient, headers, user } = await verifyAuth(request);

@@ -5,12 +5,15 @@ import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
-import { getUserRole } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import { User } from "@/lib/types";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -107,7 +110,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function WorkspaceAudiosPage() {
   const { audioMedia, workspace, error, userRole } =
-    useLoaderData<typeof loader>();
+    useLoaderData();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
   const workspaceAudios = audioMedia?.filter((media) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));

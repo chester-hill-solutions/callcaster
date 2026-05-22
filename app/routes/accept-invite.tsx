@@ -8,21 +8,13 @@ import type {
   Session,
 } from "@supabase/supabase-js";
 import { EmailOtpType } from "@supabase/supabase-js";
-import {
-  createSupabaseServerClient,
-  verifyAuth,
-} from "@/lib/supabase.server";
-import {
-  acceptWorkspaceInvitations,
-  getInvitesByUserId,
-} from "@/lib/database.server";
+
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
 type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];
@@ -116,6 +108,7 @@ async function handleAuthenticatedUser(
   session: Session,
   headers: Headers,
 ) {
+  const { getInvitesByUserId } = await import("@/lib/database.server");
   const email = session.user.email ?? "";
   const isNewUser =
     session.user.user_metadata.first_name === "New" &&
@@ -153,6 +146,8 @@ async function handleTokenVerification(
   email: string,
   headers: Headers,
 ) {
+  const { getInvitesByUserId } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
   try {
     const { data: verifyData, error: verifyError } = await client.auth.verifyOtp({
       token_hash,
@@ -231,7 +226,9 @@ async function handleTokenVerification(
   }
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const {
     data: { session },
@@ -256,7 +253,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+  const { acceptWorkspaceInvitations, getInvitesByUserId } = await import("@/lib/database.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const actionType = formData.get("actionType");
@@ -404,8 +404,8 @@ function NotSignedIn() {
 }
 
 export default function AcceptInvite() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const loaderData = useLoaderData<LoaderData>();
+  const actionData = useActionData<ActionData>();
   const navigate = useNavigate();
   const { state } = useNavigation();
   const verifiedEmail =

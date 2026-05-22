@@ -9,10 +9,11 @@ import {
   WorkspaceNumbers,
   Campaign,
 } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { headers, user } = await verifyAuth(request);
   if (!user) {
     return redirect("/signin", { headers });

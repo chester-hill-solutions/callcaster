@@ -8,11 +8,10 @@ import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getUserRole } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
+
 import { User } from "@/lib/types";
 import { formatDateToLocale } from "@/lib/utils";
-import { logger } from "@/lib/logger.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -60,7 +59,10 @@ function buildContactSearchFilter(rawSearchQuery: string): string {
   return filters.join(",");
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   try {
     const { supabaseClient, headers, user } = await verifyAuth(request);
     const url = new URL(request.url);
@@ -318,7 +320,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function WorkspaceContacts() {
   const { contacts, error, userRole, workspace, flags, pagination, campaigns } =
-    useLoaderData<typeof loader>();
+    useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("q") ?? "";
 

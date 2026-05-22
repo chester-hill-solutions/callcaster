@@ -1,12 +1,14 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { env } from "@/lib/env.server";
+
+
 import { normalizePhoneNumber } from "@/lib/utils";
 import { isValidPhoneNumber } from "@/lib/utils/phone";
 
 const SESSION_EXPIRY_MINUTES = 10;
 
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request }: { request: Request }) => {  const { env } = await import("@/lib/env.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });

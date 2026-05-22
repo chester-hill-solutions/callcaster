@@ -1,17 +1,11 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import {
-  createWorkspaceTwilioInstance,
-  getCampaignQueueById,
-  getWorkspaceTwilioPortalConfig,
-  requireWorkspaceAccess,
-  safeParseJson,
-} from '@/lib/database.server';
-import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+
+
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
-import { processUrls } from "@/lib/sms.server";
+
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import {
   messageCampaignRequiresCallerId,
@@ -268,7 +262,12 @@ const createOutreachAttempt = async ({
   return outreachAttempt;
 };
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { processUrls } = await import("@/lib/sms.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { verifyApiKeyOrSession } = await import("@/lib/api-auth.server");
+  const { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
   const authResult = await verifyApiKeyOrSession(request);
   if ("error" in authResult) {
     return new Response(JSON.stringify({ error: authResult.error }), {

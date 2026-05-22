@@ -4,9 +4,9 @@ import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
-import { getUserRole } from "@/lib/database.server";
+
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import type { User } from "@/lib/types";
 
 export type LoaderData = {
@@ -14,7 +14,9 @@ export type LoaderData = {
   creditsBalance: number;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole } = await import("@/lib/database.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const workspaceId = params.id;
   if (!user || !workspaceId) {

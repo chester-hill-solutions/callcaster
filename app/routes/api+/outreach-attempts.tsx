@@ -1,8 +1,7 @@
 
 import { data as routeData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
+
 
 interface OutreachAttemptRequest {
   campaign_id: number | string;
@@ -10,7 +9,9 @@ interface OutreachAttemptRequest {
   queue_id: number | string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { safeParseJson } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
     const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest = await safeParseJson(request);
 

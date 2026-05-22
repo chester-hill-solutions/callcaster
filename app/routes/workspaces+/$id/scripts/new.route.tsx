@@ -4,12 +4,13 @@ import React, { useEffect, useState } from "react";
 import { MdAdd, MdClose } from "react-icons/md";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { CardContent } from "@/components/ui/card";
 import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
 import type { Json } from "@/lib/database.types";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const url = new URL(request.url);
   const search = new URLSearchParams(url.search);
@@ -46,7 +47,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   );
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -135,8 +137,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function NewScript() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const loaderData = useLoaderData();
+  const actionData = useActionData();
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const error = "error" in loaderData ? loaderData.error : null;
   const ref = "ref" in loaderData ? loaderData.ref : null;

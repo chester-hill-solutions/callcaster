@@ -1,10 +1,9 @@
 
 import { data as routeData } from "react-router";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { getSupabaseServerClientWithSession } from '@/lib/supabase.server';
 
-import { logger } from "@/lib/logger.server";
+
+
 import { buildQueuedQueueUpdate } from "@/lib/queue-status";
 
 interface DequeueRequest {
@@ -17,7 +16,10 @@ interface ResetRequest {
   campaignId: string;
 }
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { getSupabaseServerClientWithSession } = await import("@/lib/supabase.server");
+  const { safeParseJson } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
     const url = new URL(request.url);
     const searchParams = url.searchParams;
@@ -33,7 +35,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     return routeData(queueItems);
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { getSupabaseServerClientWithSession } = await import("@/lib/supabase.server");
+  const { safeParseJson } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
     const user = serverSession?.user;
 

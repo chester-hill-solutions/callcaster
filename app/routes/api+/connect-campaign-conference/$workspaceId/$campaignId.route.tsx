@@ -1,8 +1,8 @@
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
 import type { LoaderFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
 
-export const loader = async ({ params }: LoaderFunctionArgs) => {
+export const loader = async ({ params }: LoaderFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+
     const twiml = new VoiceResponse();
     
     twiml.say('Welcome to the campaign. You will be connected to calls through your phone.');

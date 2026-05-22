@@ -1,12 +1,11 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { data as routeData } from "react-router";
-import { createWorkspaceTwilioInstance } from '@/lib/database.server';
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { validateTwilioWebhookParams } from "@/twilio.server";
+
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
 
 export interface CallEvent {
     Called: string;
@@ -122,7 +121,11 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
     ]);
 };
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;

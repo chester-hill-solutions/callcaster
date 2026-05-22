@@ -9,12 +9,13 @@ import {
   CardTitle,
 } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Flags } from "@/lib/types";
 
-import { handleNewCampaign } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
 
-export async function action({ request, params }: ActionFunctionArgs) {
+export async function action({ request, params }: ActionFunctionArgs) {  const { handleNewCampaign } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -55,7 +56,7 @@ export default function CampaignsNew() {
   const isMessageEnabled = true //flags?.sms?.campaign === true;
   const isRobocallEnabled = true //flags?.ivr?.campaign === true;
 
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   return (
     <section
       id="form"

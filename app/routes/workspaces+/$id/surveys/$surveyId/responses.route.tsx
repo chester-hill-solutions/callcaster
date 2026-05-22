@@ -1,9 +1,8 @@
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { logger } from "@/lib/logger.server";
+
 import {
   Card,
   CardContent,
@@ -27,7 +26,10 @@ import { useEffect, useState } from "react";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/database.types";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 
@@ -150,7 +152,7 @@ type SurveyResponseWithContact = Tables<"survey_response"> & {
 
 export default function SurveyResponsesPage() {
   const { survey, responses, workspaceId, stats } =
-    useLoaderData<typeof loader>();
+    useLoaderData();
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
   const exportFetcher = useFetcher();
 

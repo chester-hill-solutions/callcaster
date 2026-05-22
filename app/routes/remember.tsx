@@ -8,9 +8,9 @@ import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const email = formData.get("email");

@@ -2,11 +2,11 @@
 
 import { data as routeData, redirect, LoaderFunctionArgs, ActionFunctionArgs, useLoaderData } from "react-router";
 import { useState, useEffect } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { deepEqual } from "@/lib/utils";
 import { SaveBar } from "@/components/shared/SaveBar";
-import { getUserRole, listMedia } from "@/lib/database.server";
+
 import { Script, WorkspaceData } from "@/lib/types";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -16,7 +16,9 @@ import {
   normalizeScriptPageDataForComparison,
 } from "@/lib/script-change";
   
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, listMedia } = await import("@/lib/database.server");
+
   const { id: workspace_id, scriptId: selected_id } = params;
   const { supabaseClient, headers, user } = await verifyAuth(request);
   if (!user) {
@@ -48,7 +50,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
-export const action = async ({ request, params }: ActionFunctionArgs  ) => {
+export const action = async ({ request, params }: ActionFunctionArgs  ) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, listMedia } = await import("@/lib/database.server");
+
   const campaignId = params.selected_id;
   const formData = await request.formData();
   const mediaName = formData.get("fileName") as string;
@@ -90,7 +94,7 @@ export default function ScriptEditor() {
     mediaNames,
     userRole,
     workspace,
-  } = useLoaderData<typeof loader>();
+  } = useLoaderData();
   const [isChanged, setChanged] = useState(false);
   const [script, setScript] = useState(initScript);
 

@@ -2,8 +2,7 @@
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
 import { useState } from "react";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+
 import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save } from "lucide-react";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;
 
@@ -41,7 +42,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function NewSurveyPage() {
-  const { workspaceId } = useLoaderData<typeof loader>();
+  const { workspaceId } = useLoaderData();
   const submit = useSubmit();
   const navigate = useNavigate();
   

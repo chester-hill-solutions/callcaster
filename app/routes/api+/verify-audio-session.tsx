@@ -1,11 +1,15 @@
 import { data as routeData } from "react-router";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+
 import Twilio from "twilio";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
+
+
 import { normalizePhoneNumber } from "@/lib/utils";
-export const loader = async ({ request }: { request: Request }) => {
+export const loader = async ({ request }: { request: Request }) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
     if (!user) {
         return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -64,7 +68,11 @@ export const loader = async ({ request }: { request: Request }) => {
 }
 
 // Handle the TwiML response for the verification call
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request }: { request: Request }) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const twiml = new Twilio.twiml.VoiceResponse();
     
     twiml.say('Welcome to the phone verification system.');

@@ -1,11 +1,12 @@
 import { type LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+
 import type { Tables } from "@/lib/database.types";
 import type { ResponseAnswer, Contact } from "@/lib/types";
 import { csvResponse, toCsvString } from "@/lib/csv";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;
 

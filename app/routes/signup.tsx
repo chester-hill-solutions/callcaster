@@ -11,7 +11,7 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+
 import { Heading } from "@/components/ui/typography";
 
 type ActionData =
@@ -30,7 +30,8 @@ type ActionData =
   | { error: string; emailError?: null; passwordError?: null; data?: undefined }
   | { data: unknown; error: null; emailError?: null; passwordError?: null };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { headers } = createSupabaseServerClient(request);
 
   return routeData<ActionData>(
@@ -42,7 +43,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   );
 };
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = await verifyAuth(request);
   const { data: serverSession } = await supabaseClient.auth.getSession();
 

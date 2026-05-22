@@ -1,13 +1,14 @@
 
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+
     const { supabaseClient, user } = await verifyAuth(request);
 
     if (!user) {
@@ -47,7 +48,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export default function WorkspaceCampaigns() {
-    const { workspace } = useLoaderData<typeof loader>();
+    const { workspace } = useLoaderData();
 
     return (
         <Card>

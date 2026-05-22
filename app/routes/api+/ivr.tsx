@@ -1,13 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from '@/lib/database.server';
-import { ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
-import { verifyAuth } from "@/lib/supabase.server";
 
-export const action = async ({ request }:ActionFunctionArgs) => {
+import { ActionFunctionArgs } from "react-router";
+
+
+
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+
+export const action = async ({ request }:ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { createErrorResponse } = await import("@/lib/errors.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance, requireWorkspaceAccess } = await import("@/lib/database.server");
+
   const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const formData = await request.formData();

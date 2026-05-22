@@ -1,10 +1,10 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { env } from "@/lib/env.server";
-import { validateTwilioWebhookParams } from "@/twilio.server";
+
+
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
+
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
@@ -107,7 +107,10 @@ const handleNextStep = (twiml: Twilio.twiml.VoiceResponse, nextStep: string, cam
   }
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { env } = await import("@/lib/env.server");
+
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY()

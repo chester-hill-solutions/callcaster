@@ -7,7 +7,7 @@ import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
@@ -40,7 +40,8 @@ type LoaderData = {
 
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers, user } = await verifyAuth(request);
 
   const url = new URL(request.url);
@@ -156,7 +157,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 
 export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
-    useLoaderData<typeof loader>();
+    useLoaderData<LoaderData>();
   const navigate = useNavigate();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
   const [activeTab, setActiveTab] = useState("contacts");

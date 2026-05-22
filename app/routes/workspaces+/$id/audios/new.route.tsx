@@ -6,16 +6,10 @@ import { FaPlus } from "react-icons/fa";
 import { toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
-import {
-  AudioUploadError,
-  getAudioUploadAcceptValue,
-  getSafeMediaBaseName,
-  normalizeUploadedAudio,
-} from "@/lib/audio.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import { logger } from "@/lib/logger.server";
+import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
+  const { verifyAuth } = await import("@/lib/supabase.server");
   const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -39,6 +33,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { logger } = await import("@/lib/logger.server");
+  const {
+    AudioUploadError,
+    getSafeMediaBaseName,
+    normalizeUploadedAudio,
+  } = await import("@/lib/audio.server");
   const { supabaseClient, headers } = await verifyAuth(request);
 
   const workspaceId = params.id;
@@ -88,7 +89,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function Media() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
   const navigate = useNavigate();
   const {state} = useNavigation();

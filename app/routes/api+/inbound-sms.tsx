@@ -1,11 +1,10 @@
 import { data as routeData, ActionFunctionArgs } from "react-router";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { findPotentialContacts } from "@/lib/database.server";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhook } from "@/twilio.server";
+
+
+
+
 import { normalizePhoneNumber } from "@/lib/utils";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
@@ -199,7 +198,12 @@ async function resolveInboundWorkspaceContext(
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { validateTwilioWebhook } = await import("@/twilio.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { findPotentialContacts } = await import("@/lib/database.server");
+
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

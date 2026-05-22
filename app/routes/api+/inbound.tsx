@@ -2,15 +2,14 @@ import { LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import type {
   TwilioInboundCallWebhook,
   WebhookEvent,
 } from "@/lib/twilio.types";
 import type { Database } from "@/lib/database.types";
-import { validateTwilioWebhookParams } from "@/twilio.server";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -65,7 +64,11 @@ function dispatchInboundCallWebhookNotification(args: {
   });
 }
 
-export const action = async ({ request }: LoaderFunctionArgs) => {
+export const action = async ({ request }: LoaderFunctionArgs) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+
   const twiml = new Twilio.twiml.VoiceResponse();
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),

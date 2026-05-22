@@ -1,17 +1,21 @@
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { data as routeData, ActionFunctionArgs } from "react-router";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+
 import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 const resend = new Resend(env.RESEND_API_KEY());
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
   try {
     const formData = await request.formData();
     const recordingUrl = formData.get("RecordingUrl");

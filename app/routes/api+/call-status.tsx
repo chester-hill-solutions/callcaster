@@ -4,10 +4,10 @@ import type { ActionFunctionArgs } from "react-router";
 import { createClient } from '@supabase/supabase-js';
 
 import type { Database, TablesInsert } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
-import { validateTwilioWebhookParams } from "@/twilio.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+
+
+
+
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
@@ -23,7 +23,11 @@ function convertKeysToUnderCase(obj: Record<string, unknown>): Record<string, un
     return newObj;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const formData = await request.formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const callSidRaw = params.CallSid ?? params.call_sid;

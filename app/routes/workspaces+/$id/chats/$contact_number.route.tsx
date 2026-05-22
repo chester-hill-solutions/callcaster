@@ -1,7 +1,7 @@
 
 
 import { data as routeData, LoaderFunctionArgs, useFetcher, useLoaderData, useLocation, useOutletContext, useParams } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
@@ -9,7 +9,7 @@ import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.client";
-import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { useInfiniteScroll } from "@/hooks";
 
@@ -83,7 +83,9 @@ async function fetchMessagePage({
   return { messages: withMedia, hasMore };
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export async function loader({ request, params }: LoaderFunctionArgs) {  const { getWorkspaceMessagingOnboardingState } = await import("@/lib/messaging-onboarding.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+
   const { id, contact_number } = params;
   const { supabaseClient, headers } = await verifyAuth(request);
   const url = new URL(request.url);

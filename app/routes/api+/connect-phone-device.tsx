@@ -1,11 +1,15 @@
 import { data as routeData } from "react-router";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { twilio } from "@/twilio.server";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
 
-export const action = async ({ request }: { request: Request }) => {
+
+
+
+
+export const action = async ({ request }: { request: Request }) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+  const { twilio } = await import("@/twilio.server");
+  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+  const { requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
+
     const { supabaseClient: supabase, headers } = await createSupabaseServerClient(request);
     const { data, error } = await supabase.auth.getUser();
     const user = data.user;
