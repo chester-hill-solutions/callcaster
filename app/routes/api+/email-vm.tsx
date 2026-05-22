@@ -3,7 +3,7 @@ import { Resend } from "resend";
 import { data as routeData, ActionFunctionArgs } from "react-router";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type { Database } from "@/lib/database.types";

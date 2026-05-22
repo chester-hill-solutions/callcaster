@@ -7,6 +7,7 @@ export default remixRoutesOptionAdapter((defineRoutes) => {
     ignoredRouteFiles: [
       "**/.*",
       "**/*.test.{js,jsx,ts,tsx}",
+      "**/old.*",
     ],
     nestedDirectoryChar: "+",
   });

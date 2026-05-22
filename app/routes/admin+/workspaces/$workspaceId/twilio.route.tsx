@@ -45,6 +45,7 @@ import {
     TWILIO_THROUGHPUT_PRODUCT_VALUES,
     TWILIO_TRAFFIC_CLASS_VALUES,
     type WorkspaceTwilioOpsConfig,
+    type WorkspaceTwilioPortalSnapshot,
     type WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
 
@@ -81,7 +82,7 @@ interface TwilioPageData {
         startDate?: string;
         endDate?: string;
     }>;
-    portalSnapshot: Awaited<ReturnType<typeof getWorkspaceTwilioPortalSnapshot>>;
+    portalSnapshot: WorkspaceTwilioPortalSnapshot;
 }
 
 function parseOptionalString(value: FormDataEntryValue | null): string | null {
@@ -146,7 +147,7 @@ export async function loadTwilioData(
     const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
         supabaseClient,
         workspaceId,
-    }).catch((error): Awaited<ReturnType<typeof getWorkspaceTwilioPortalSnapshot>> => {
+    }).catch((error): WorkspaceTwilioPortalSnapshot => {
         logger.error("Error fetching Twilio portal snapshot:", error);
         const onboarding = {
             ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,

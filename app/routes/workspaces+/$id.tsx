@@ -1,96 +1,16 @@
 import { Suspense } from "react";
-import { data as routeData, LoaderFunctionArgs } from "react-router";
-import { Await, redirect, useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
+import { Await, useLoaderData, Outlet, useOutlet, useOutletContext } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
-import {
-  getUserRole,
-  getWorkspaceInfoWithDetails,
-  getWorkspacePhoneNumbers,
-  type WorkspaceInfoWithDetails,
-} from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
-import { Campaign, ContextType, User } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
 import {
-  deriveWorkspaceMessagingReadiness,
-  getWorkspaceMessagingOnboardingState,
-} from "@/lib/messaging-onboarding.server";
-
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
-
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    throw new Error("No workspace found");
-  }
-
-  const userRole = (
-    await getUserRole({
-      supabaseClient: supabaseClient as SupabaseClient,
-      user: user as unknown as User,
-      workspaceId: workspaceId as string,
-    })
-  )?.role;
-  try {
-    const pathname = new URL(request.url).pathname;
-    const [onboarding, phoneNumbersResult] = await Promise.all([
-      getWorkspaceMessagingOnboardingState({
-        supabaseClient,
-        workspaceId: workspaceId as string,
-      }),
-      getWorkspacePhoneNumbers({
-        supabaseClient,
-        workspaceId: workspaceId as string,
-      }),
-    ]);
-    const readiness = deriveWorkspaceMessagingReadiness({
-      onboarding,
-      workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
-        type: number?.type ?? null,
-        phone_number: number?.phone_number ?? null,
-        capabilities: number?.capabilities ?? null,
-      })),
-      recentOutboundCount: 0,
-    });
-    if (
-      pathname === `/workspaces/${workspaceId}` &&
-      (userRole === "owner" || userRole === "admin") &&
-      readiness.shouldRedirectToOnboarding
-    ) {
-      throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
-    }
-
-    const workspacePromise = getWorkspaceInfoWithDetails({
-      supabaseClient,
-      workspaceId,
-      userId: user.id,
-    });
-
-    return routeData({
-      userRole: userRole,
-      workspaceData: workspacePromise,
-      onboardingReadiness: readiness,
-      headers,
-    });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "PGRST116"
-    ) {
-      throw redirect("/workspaces", { headers });
-    }
-    throw error;
-  }
-};
+  Campaign,
+  ContextType,
+  type WorkspaceMessagingReadiness,
+} from "@/lib/types";
+import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
 function WorkspaceResolvedView({
   resolvedData,
@@ -103,7 +23,7 @@ function WorkspaceResolvedView({
   userRole: string | null | undefined;
   outlet: ReturnType<typeof useOutlet>;
   context: ContextType;
-  onboardingReadiness: ReturnType<typeof deriveWorkspaceMessagingReadiness>;
+  onboardingReadiness: WorkspaceMessagingReadiness;
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -212,7 +132,7 @@ function WorkspaceResolvedView({
 
 export default function Workspace() {
   const { workspaceData, userRole, onboardingReadiness } =
-    useLoaderData<typeof loader>();
+    useLoaderData<typeof import("./$id.server").loader>();
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
 

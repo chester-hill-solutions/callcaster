@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Flags } from "@/lib/types";
 
-import { handleNewCampaign } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils";
+import { handleNewCampaign } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const { supabaseClient, headers, user } = await verifyAuth(request);

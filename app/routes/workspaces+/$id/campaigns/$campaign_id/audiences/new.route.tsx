@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { verifyAuth } from "@/lib/supabase.server";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
-import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils";
+import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
 import { MdAdd, MdClose } from "react-icons/md";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {

@@ -15,7 +15,7 @@ import {
   handleDeleteUser,
   handleUpdateUser,
   removeInvite,
-} from "@/lib/workspace-settings/WorkspaceSettingUtils";
+} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 

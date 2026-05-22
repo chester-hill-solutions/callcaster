@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("@/twilio.server", () => ({ validateTwilioWebhook: (...a: any[]) => mocks.validateTwilioWebhook(...a) }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...a: any[]) => mocks.sendWebhookNotification(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));

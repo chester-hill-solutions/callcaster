@@ -2,7 +2,7 @@ import { LoaderFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import type {

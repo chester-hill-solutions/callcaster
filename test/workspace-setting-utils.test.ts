@@ -17,7 +17,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleAddUser validates username and detects existing user", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const fdMissing = new FormData();
@@ -33,7 +33,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleAddUser returns error on invite invoke error, and success otherwise", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     getWorkspaceUsers.mockResolvedValueOnce({ data: [] });
 
@@ -54,7 +54,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleUpdateUser and handleDeleteUser return json with error message when present", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
     const supabaseClient: any = {
@@ -94,7 +94,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleDeleteSelf returns json when missing userId; returns object error on delete error; redirects on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const fdMissing = new FormData();
@@ -129,7 +129,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleTransferWorkspace handles errors for each update and returns json on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
     const supabaseClient: any = {
@@ -164,7 +164,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleDeleteWorkspace returns error object on failure and redirects on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const supabaseClientErr: any = {
@@ -193,7 +193,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("removeInvite returns error object or success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("userId", "u1");
@@ -224,7 +224,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleUpdateWebhook upserts and returns json (error or success)", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const select = vi.fn();
     const supabaseClient: any = {
@@ -250,7 +250,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("testWebhook handles json vs text responses and catches errors", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValueOnce(
@@ -307,7 +307,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("sendWebhookNotification handles missing webhook, disabled events, delivery failure, success, and catch", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
     const single = vi.fn();
     const supabaseClient: any = {

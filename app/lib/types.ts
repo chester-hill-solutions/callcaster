@@ -223,6 +223,17 @@ export interface WorkspaceTwilioSyncSnapshot {
   lastSyncError: string | null;
 }
 
+export interface WorkspaceTwilioPortalSnapshot {
+  config: WorkspaceTwilioOpsConfig;
+  onboarding: WorkspaceMessagingOnboardingState;
+  readiness: WorkspaceMessagingReadiness;
+  detectedTrafficClass: TwilioTrafficClass;
+  metrics: WorkspaceTwilioPortalMetrics;
+  recommendations: WorkspaceTwilioPortalRecommendation[];
+  supportRequestSummary: string;
+  syncSnapshot: WorkspaceTwilioSyncSnapshot;
+}
+
 export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "a2p10dlc",
   "rcs",

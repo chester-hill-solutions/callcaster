@@ -1,7 +1,7 @@
 import { data as routeData, ActionFunctionArgs } from "react-router";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
-import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { findPotentialContacts } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";

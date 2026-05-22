@@ -1,13 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, safeParseJson } from '@/lib/database.server';
-import Twilio from "twilio";
+import type TwilioSDK from "twilio";
 import { env } from '@/lib/env.server';
 import { logger } from '@/lib/logger.server';
 import type { Database } from '@/lib/database.types';
 import type { Call } from '@/lib/types';
 import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
 
-type TwilioClient = Awaited<ReturnType<typeof createWorkspaceTwilioInstance>>;
+type TwilioClient = TwilioSDK.Twilio;
 
 export const normalizePhoneNumber = sharedNormalizePhoneNumber;
 

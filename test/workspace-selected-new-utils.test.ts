@@ -24,7 +24,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewAudience success with no campaign and no contacts", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers({ "x": "y" });
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
@@ -55,7 +55,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   }, 60000);
 
   test("handleNewAudience inserts contacts and enqueues when campaignId provided", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
@@ -96,7 +96,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewAudience does not enqueue when insert list is empty", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
@@ -136,7 +136,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewAudience returns json 500 when campaign link insert errors", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
@@ -176,7 +176,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewAudience returns json 500 when creation errors (including non-Error throws)", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
@@ -232,7 +232,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewCampaign covers duplicate-name, generic error, invalid type, details error, and success redirect", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
 
     const fd = new FormData();
@@ -284,7 +284,7 @@ describe("WorkspaceSelectedNewUtils", () => {
   });
 
   test("handleNewCampaign selects correct details table for message and robocall", async () => {
-    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils");
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
 
     const insertSingle = vi.fn();

@@ -7,12 +7,12 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 
-function resolveAppServerModules(): Plugin {
+function resolveAppModuleSuffix(suffix: ".server" | ".client"): Plugin {
   return {
-    name: "resolve-app-server-modules",
+    name: `resolve-app-${suffix.slice(1)}-modules`,
     enforce: "pre",
     resolveId(source) {
-      if (!source.startsWith("@/") || !source.includes(".server")) {
+      if (!source.startsWith("@/") || !source.includes(suffix)) {
         return null;
       }
       if (/\.(ts|tsx|js|jsx)$/.test(source)) {
@@ -31,7 +31,12 @@ function resolveAppServerModules(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [resolveAppServerModules(), reactRouter(), tsconfigPaths()],
+  plugins: [
+    resolveAppModuleSuffix(".server"),
+    resolveAppModuleSuffix(".client"),
+    reactRouter(),
+    tsconfigPaths(),
+  ],
   server: {
     port: Number(process.env.PORT ?? 3000),
   },

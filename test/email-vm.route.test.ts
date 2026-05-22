@@ -23,7 +23,7 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...args: any[]) => mocks.sendWebhookNotification(...args),
 }));
 

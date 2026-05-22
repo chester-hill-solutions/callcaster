@@ -20,10 +20,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
 import {
-    deriveWorkspaceAdminRows,
     filterWorkspaceAdminRows,
     sortWorkspaceAdminRows,
+    type WorkspaceAdminRow,
     type WorkspaceSortKey,
 } from "@/lib/admin-workspaces";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
@@ -74,12 +75,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         .select("*, workspace(*)")
         .order("created_at", { ascending: false });
 
+    const workspaceRows = deriveWorkspaceAdminRows({
+        workspaces: workspaces || [],
+        users: users || [],
+        workspaceUsers: workspaceUsers || [],
+        workspaceNumbers: workspaceNumbers || [],
+    });
+
     return routeData({ 
         user: userData, 
         workspaces, 
         users, 
         workspaceUsers,
         workspaceNumbers,
+        workspaceRows,
         campaigns: allCampaigns || [],
         stats: {
             totalWorkspaces: workspaces?.length || 0,
@@ -174,7 +183,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Admin() {
-    const { user, workspaces, users, workspaceUsers, workspaceNumbers, campaigns, stats } = useLoaderData<typeof loader>();
+    const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData<typeof loader>();
     const [searchParams, setSearchParams] = useSearchParams();
     const actionData = useActionData<typeof action>();
     const currentTab = searchParams.get("tab") || "workspaces";
@@ -312,13 +321,6 @@ export default function Admin() {
     
     // Get unique access levels for filters
     const accessLevels = Array.from(new Set(users?.map(u => u.access_level).filter(Boolean))) || [];
-
-    const workspaceRows = useMemo(() => deriveWorkspaceAdminRows({
-        workspaces: workspaces || [],
-        users: users || [],
-        workspaceUsers: workspaceUsers || [],
-        workspaceNumbers: workspaceNumbers || [],
-    }), [users, workspaceNumbers, workspaceUsers, workspaces]);
 
     const filteredWorkspaceRows = useMemo(() => filterWorkspaceAdminRows(workspaceRows, {
         search: workspaceFilter.search,

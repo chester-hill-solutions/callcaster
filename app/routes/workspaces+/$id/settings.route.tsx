@@ -29,7 +29,7 @@ import {
   handleUpdateWebhook,
   removeInvite,
   testWebhook,
-} from "@/lib/workspace-settings/WorkspaceSettingUtils";
+} from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 
 import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";

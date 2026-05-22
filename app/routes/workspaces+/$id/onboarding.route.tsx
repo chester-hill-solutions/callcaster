@@ -34,9 +34,12 @@ import {
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import type { Tables } from "@/lib/database.types";
 import type {
   User,
   WorkspaceMessagingBusinessProfile,
+  WorkspaceMessagingOnboardingState,
+  WorkspaceMessagingReadiness,
   WorkspaceOnboardingChannel,
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
@@ -45,9 +48,9 @@ type LoaderData = {
   workspaceId: string;
   workspaceName: string;
   userRole: string | null | undefined;
-  onboarding: Awaited<ReturnType<typeof getWorkspaceMessagingOnboardingState>>;
-  readiness: ReturnType<typeof deriveWorkspaceMessagingReadiness>;
-  phoneNumbers: Awaited<ReturnType<typeof getWorkspacePhoneNumbers>>["data"];
+  onboarding: WorkspaceMessagingOnboardingState;
+  readiness: WorkspaceMessagingReadiness;
+  phoneNumbers: Tables<"workspace_number">[] | null;
   rcsBlockingIssues: string[];
 };
 

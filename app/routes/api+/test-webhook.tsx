@@ -1,6 +1,6 @@
 import { data as routeData, ActionFunction } from "react-router";
 import { safeParseJson } from "@/lib/database.server";
-import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils";
+import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { logger } from "@/lib/logger.server";
 
 export const action: ActionFunction = async ({ request }) => {

@@ -26,7 +26,7 @@ vi.mock("@/lib/utils", () => ({
   isPhoneNumber: (...a: any[]) => mocks.isPhoneNumber(...a),
   isEmail: (...a: any[]) => mocks.isEmail(...a),
 }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...a: any[]) => mocks.sendWebhookNotification(...a),
 }));
 vi.mock("@/twilio.server", () => ({
