@@ -5,19 +5,20 @@ import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 
 
 type AutoDialDeps = Partial<{
-  createSupabaseServerClient: typeof createSupabaseServerClient;
-  safeParseJson: typeof safeParseJson;
-  createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance;
-  requireWorkspaceAccess: typeof requireWorkspaceAccess;
-  getAuthenticatedUser: (
-    supabase: ReturnType<typeof createSupabaseServerClient>["supabaseClient"],
-  ) => Promise<{ id: string } | null>;
-  env: typeof env;
-  logger: typeof logger;
+  createSupabaseServerClient: (request: Request) => { supabaseClient: unknown };
+  safeParseJson: <T>(request: Request) => Promise<T>;
+  createWorkspaceTwilioInstance: (args: {
+    supabase: unknown;
+    workspace_id: string;
+  }) => Promise<unknown>;
+  requireWorkspaceAccess: (args: unknown) => Promise<void>;
+  getAuthenticatedUser: (supabase: unknown) => Promise<{ id: string } | null>;
+  env: { BASE_URL: () => string };
+  logger: { error: (...args: unknown[]) => void };
 }>;
 
 async function defaultGetAuthenticatedUser(
-  supabase: ReturnType<typeof createSupabaseServerClient>["supabaseClient"],
+  supabase: unknown,
 ): Promise<{ id: string } | null> {
   const authClient = (
     supabase as { auth?: { getUser?: () => Promise<unknown> } }
@@ -39,22 +40,6 @@ async function defaultGetAuthenticatedUser(
   return { id: userId };
 }
 
-const resolveDeps = (deps?: AutoDialDeps) => {
-  return {
-    createSupabaseServerClient:
-      deps?.createSupabaseServerClient ?? createSupabaseServerClient,
-    safeParseJson: deps?.safeParseJson ?? safeParseJson,
-    createWorkspaceTwilioInstance:
-      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
-    requireWorkspaceAccess:
-      deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
-    getAuthenticatedUser:
-      deps?.getAuthenticatedUser ?? defaultGetAuthenticatedUser,
-    env: deps?.env ?? env,
-    logger: deps?.logger ?? logger,
-  } as Required<AutoDialDeps>;
-};
-
 function buildPendingCallSid(): string {
   const randomSuffix =
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -75,7 +60,19 @@ export const action = async ({
   const { createSupabaseServerClient } = await import("@/lib/supabase.server");
   const { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } = await import("@/lib/database.server");
 
-  const d = resolveDeps(deps);
+  const d = {
+    createSupabaseServerClient:
+      deps?.createSupabaseServerClient ?? createSupabaseServerClient,
+    safeParseJson: deps?.safeParseJson ?? safeParseJson,
+    createWorkspaceTwilioInstance:
+      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
+    requireWorkspaceAccess:
+      deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
+    getAuthenticatedUser:
+      deps?.getAuthenticatedUser ?? defaultGetAuthenticatedUser,
+    env: deps?.env ?? env,
+    logger: deps?.logger ?? logger,
+  };
   const { supabaseClient: supabase } = d.createSupabaseServerClient(request);
   const {
     user_id: _userIdFromBody,

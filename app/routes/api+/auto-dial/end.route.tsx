@@ -5,21 +5,14 @@ import { data as routeData, type ActionFunctionArgs } from "react-router";
 import type { Tables } from "@/lib/database.types";
 
 type AutoDialEndDeps = Partial<{
-  verifyAuth: typeof verifyAuth;
-  safeParseJson: typeof safeParseJson;
-  createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance;
-  logger: typeof logger;
+  verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown; user: unknown }>;
+  safeParseJson: (request: Request) => Promise<unknown>;
+  createWorkspaceTwilioInstance: (args: {
+    supabase: unknown;
+    workspace_id: string;
+  }) => Promise<unknown>;
+  logger: { error: (...args: unknown[]) => void };
 }>;
-
-const resolveDeps = (deps?: AutoDialEndDeps) => {
-  return {
-    verifyAuth: deps?.verifyAuth ?? verifyAuth,
-    safeParseJson: deps?.safeParseJson ?? safeParseJson,
-    createWorkspaceTwilioInstance:
-      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
-    logger: deps?.logger ?? logger,
-  } as Required<AutoDialEndDeps>;
-};
 
 export const action = async ({
   request,
@@ -28,7 +21,13 @@ export const action = async ({
   const { verifyAuth } = await import("@/lib/supabase.server");
   const { createWorkspaceTwilioInstance, safeParseJson } = await import("@/lib/database.server");
 
-  const d = resolveDeps(deps);
+  const d = {
+    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    safeParseJson: deps?.safeParseJson ?? safeParseJson,
+    createWorkspaceTwilioInstance:
+      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
+    logger: deps?.logger ?? logger,
+  };
   const { supabaseClient, user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson(request);
   if (typeof workspace_id !== "string") {

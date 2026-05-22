@@ -155,6 +155,7 @@ const processMessageCampaignExport = async (
   exportId: string,
   campaignName: string
 ) => {
+  const { logger } = await import("@/lib/logger.server");
   // Initialize status
   const statusData = {
     status: "processing",
@@ -467,6 +468,7 @@ const processCallCampaignExport = async (
   exportId: string,
   campaignName: string
 ) => {
+  const { logger } = await import("@/lib/logger.server");
   // Initialize status
   const statusData = {
     status: "processing",

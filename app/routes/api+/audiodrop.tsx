@@ -3,13 +3,16 @@
 
 
 type AudiodropDeps = Partial<{
-  verifyAuth: typeof verifyAuth;
-  createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance;
+  verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown }>;
+  createWorkspaceTwilioInstance: (args: {
+    supabase: unknown;
+    workspace_id: string;
+  }) => Promise<unknown>;
 }>;
 
 export const action = async ({
   request,
-  deps = { verifyAuth, createWorkspaceTwilioInstance },
+  deps,
 }: {
   request: Request;
   deps?: AudiodropDeps;
@@ -17,7 +20,11 @@ export const action = async ({
   const { verifyAuth } = await import("@/lib/supabase.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
 
-  const d = deps as { verifyAuth: typeof verifyAuth; createWorkspaceTwilioInstance: typeof createWorkspaceTwilioInstance };
+  const d = {
+    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    createWorkspaceTwilioInstance:
+      deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
+  };
 
   const formData = await request.formData();
   const callId = formData.get("callId");

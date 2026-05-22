@@ -26,22 +26,18 @@ interface AudienceData {
 type AudiencesDeps = {
   verifyAuth: (request: Request) => Promise<{ supabaseClient: SupabaseResponse["supabaseClient"]; headers: Headers; user?: any }>;
   parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
-  requireWorkspaceAccess: typeof requireWorkspaceAccess;
-};
-
-const resolveDeps = (deps?: Partial<AudiencesDeps>) => {
-  return {
-    verifyAuth: deps?.verifyAuth ?? verifyAuth,
-    parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
-    requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
-  } as AudiencesDeps;
+  requireWorkspaceAccess: (args: unknown) => Promise<void>;
 };
 
 export const action = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {  const { logger } = await import("@/lib/logger.server");
   const { verifyAuth } = await import("@/lib/supabase.server");
   const { parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
 
-    const d = resolveDeps(deps);
+    const d = {
+      verifyAuth: deps?.verifyAuth ?? verifyAuth,
+      parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
+      requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
+    };
     const { supabaseClient, headers }: SupabaseResponse =
         await d.verifyAuth(request);
 
@@ -100,7 +96,11 @@ export const loader = async ({ request, deps }: { request: Request; deps?: Parti
   const { verifyAuth } = await import("@/lib/supabase.server");
   const { parseActionRequest, requireWorkspaceAccess } = await import("@/lib/database.server");
 
-    const d = resolveDeps(deps);
+    const d = {
+      verifyAuth: deps?.verifyAuth ?? verifyAuth,
+      parseActionRequest: deps?.parseActionRequest ?? parseActionRequest,
+      requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
+    };
     const { supabaseClient, headers, user } = await d.verifyAuth(request);
     const url = new URL(request.url);
     const audienceId = url.searchParams.get('audienceId');

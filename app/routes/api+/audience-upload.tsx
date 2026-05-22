@@ -327,16 +327,9 @@ export const processAudienceUpload = async (
 };
 
 type AudienceUploadDeps = Partial<{
-  verifyAuth: typeof verifyAuth;
+  verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown; headers: Headers; user: unknown }>;
   processAudienceUpload: typeof processAudienceUpload;
 }>;
-
-const resolveDeps = (deps?: AudienceUploadDeps) => {
-  return {
-    verifyAuth: deps?.verifyAuth ?? verifyAuth,
-    processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
-  } as Required<AudienceUploadDeps>;
-};
 
 export const action = async ({
   request,
@@ -347,7 +340,10 @@ export const action = async ({
 }) => {  const { logger } = await import("@/lib/logger.server");
   const { verifyAuth } = await import("@/lib/supabase.server");
 
-  const d = resolveDeps(deps);
+  const d = {
+    verifyAuth: deps?.verifyAuth ?? verifyAuth,
+    processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
+  };
   const { supabaseClient, headers, user } = await d.verifyAuth(request);
   
   if (!user) {
