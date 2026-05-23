@@ -10,10 +10,7 @@ import type { Database, TablesInsert } from "@/lib/database.types";
 
 
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -28,7 +25,6 @@ function convertKeysToUnderCase(obj: Record<string, unknown>): Record<string, un
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
 
@@ -39,17 +35,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { inse
       return routeData({ error: "Missing CallSid" }, { status: 400 });
     }
     const supabase = createClient<Database>(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
-    const { data: existingCall } = await supabase.from("call").select("workspace").eq("sid", callSidRaw).single();
-    let creds = null;
-    if (existingCall?.workspace) {
-      const { data: ws } = await supabase.from("workspace").select("twilio_data").eq("id", existingCall.workspace).single();
-      creds = readTwilioWorkspaceCredentials(ws?.twilio_data);
-    }
-    const authToken = resolveTwilioWebhookAuthToken(creds);
-    const signature = request.headers.get("x-twilio-signature");
-    const url = new URL(request.url).href;
-    if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
+    const validation = await validateTwilioWebhookForCallSid({
+      request,
+      supabase,
+      callSid: callSidRaw,
+      params,
+    });
+    if (!validation.ok) {
+      return validation.response;
     }
     const calledVia = params.CalledVia ?? params.called_via;
     const userId = calledVia ? calledVia.split(":")[1] : '';

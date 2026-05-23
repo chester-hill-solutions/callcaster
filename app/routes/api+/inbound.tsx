@@ -1,10 +1,8 @@
 // @ts-nocheck
-import { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
-
-
 
 import type {
   TwilioInboundCallWebhook,
@@ -12,9 +10,9 @@ import type {
 } from "@/lib/twilio.types";
 import type { Database } from "@/lib/database.types";
 import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
+  loadWorkspaceTwilioData,
+  validateWorkspaceTwilioWebhook,
+} from "@/lib/twilio-webhook.server";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -77,8 +75,7 @@ function dispatchInboundCallWebhookNotification(args: {
   });
 }
 
-export const action = async ({ request }: LoaderFunctionArgs) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
-  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
 
@@ -125,67 +122,42 @@ export const action = async ({ request }: LoaderFunctionArgs) => {  const { vali
     | null
     | undefined;
 
-  // Fallback: when join returns workspace as UUID string, twilio_data is missing; fetch from workspace table
   const workspaceIdFromNumber =
     number.workspace && typeof number.workspace === "object" && "id" in number.workspace
       ? (number.workspace as { id: string }).id
       : typeof number.workspace === "string"
         ? number.workspace
         : null;
-  if (
-    workspaceIdFromNumber &&
-    (!twilioData ||
-      (typeof twilioData?.authToken !== "string" && typeof twilioData?.auth_token !== "string"))
-  ) {
-    const { data: workspaceRow } = await supabase
-      .from("workspace")
-      .select("twilio_data")
-      .eq("id", workspaceIdFromNumber)
-      .single();
-    const fetched = (workspaceRow?.twilio_data ?? null) as Record<string, unknown> | null;
-    if (fetched && (typeof fetched.authToken === "string" || typeof fetched.auth_token === "string")) {
-      twilioData = fetched;
-      logger.info("api.inbound fetched workspace twilio_data (join did not include it)", {
-        workspaceId: workspaceIdFromNumber,
-      });
-    }
-  }
 
-  const inboundCreds = readTwilioWorkspaceCredentials(twilioData);
-  const authToken = resolveTwilioWebhookAuthToken(inboundCreds);
-  const authTokenSource = inboundCreds
-    ? "workspace.twilio_data"
-    : authToken
-      ? "env.TWILIO_AUTH_TOKEN"
-      : "missing";
-  const signature = request.headers.get("x-twilio-signature");
-  const requestUrl = new URL(request.url).href;
+  twilioData = (await loadWorkspaceTwilioData(
+    supabase,
+    workspaceIdFromNumber,
+    twilioData,
+    logger,
+  )) as Record<string, unknown> | null | undefined;
+
+  const params = data as Record<string, string>;
+  const validation = validateWorkspaceTwilioWebhook({
+    request,
+    params,
+    twilioData,
+  });
+  const authTokenSource = validation.ok ? "validated" : "missing";
 
   logger.info("api.inbound webhook received", {
     Called: data.Called,
     CallSid: data.CallSid,
     workspaceId: workspaceIdFromNumber,
     authTokenSource,
-    hasSignature: Boolean(signature),
-    requestUrl,
+    hasSignature: Boolean(request.headers.get("x-twilio-signature")),
+    requestUrl: new URL(request.url).href,
   });
 
-  if (
-    !authToken ||
-    !validateTwilioWebhookParams(
-      data as Record<string, string>,
-      signature,
-      requestUrl,
-      authToken,
-    )
-  ) {
+  if (!validation.ok) {
     logger.warn("api.inbound Twilio signature validation failed", {
       Called: data.Called,
       CallSid: data.CallSid,
       workspaceId: workspaceIdFromNumber,
-      authTokenSource,
-      hasSignature: Boolean(signature),
-      requestUrl,
     });
     throw { status: 403, statusText: "Invalid Twilio signature" };
   }
@@ -362,7 +334,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {  const { vali
       transcribe: true,
       timeout: 10,
       playBeep: true,
-      recordingStatusCallback: "/api/email-vm",
+      recordingStatusCallback: `${env.BASE_URL()}/api/email-vm`,
     });
     return new Response(twiml.toString(), {
       headers: {

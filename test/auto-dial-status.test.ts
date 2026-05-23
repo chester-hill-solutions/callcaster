@@ -22,6 +22,11 @@ vi.mock("@/lib/logger.server", () => ({
 
 const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
+  validateTwilioWebhookForCallSid: vi.fn(),
+}));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
+    twilioValidation.validateTwilioWebhookForCallSid(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: twilioValidation.validateTwilioWebhookParams,
@@ -197,6 +202,14 @@ describe("api.auto-dial.status", () => {
     supabaseState.supabase = supabaseStub as any;
     twilioValidation.validateTwilioWebhookParams.mockReset();
     twilioValidation.validateTwilioWebhookParams.mockReturnValue(true);
+    twilioValidation.validateTwilioWebhookForCallSid.mockReset();
+    twilioValidation.validateTwilioWebhookForCallSid.mockImplementation(
+      async (args: { params?: Record<string, string> }) => ({
+        ok: true,
+        params: args.params ?? {},
+        authToken: "tok",
+      }),
+    );
     twilioClientMock.conferences.list.mockReset();
     twilioClientMock.conferences.list.mockResolvedValue([]);
     loggerMocks.error.mockReset();
@@ -205,7 +218,12 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioValidation.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    twilioValidation.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");

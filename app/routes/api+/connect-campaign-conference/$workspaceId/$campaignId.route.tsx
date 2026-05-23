@@ -12,8 +12,6 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {  const { env }
     // Connect to the campaign conference
     const dial = twiml.dial();
     dial.conference({
-        statusCallback: `${env.BASE_URL()}/api/conference-events`,
-        statusCallbackEvent: ['join', 'leave', 'end', 'start'],
         endConferenceOnExit: true,
         waitUrl: 'http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical',
         startConferenceOnEnter: true,

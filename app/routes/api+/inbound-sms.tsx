@@ -11,6 +11,7 @@ import {
   readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
 } from "@/lib/twilio-workspace-credentials";
+import { validateWorkspaceTwilioWebhook } from "@/lib/twilio-webhook.server";
 
 async function findMatchingContactIds(
   supabase: SupabaseClient<Database>,
@@ -205,8 +206,7 @@ async function resolveInboundWorkspaceContext(
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
-  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
 
@@ -239,22 +239,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { vali
   const inboundTwilioCreds = readTwilioWorkspaceCredentials(
     workspaceNumber.twilio_data,
   );
-  const authToken = resolveTwilioWebhookAuthToken(inboundTwilioCreds);
-  if (!authToken) {
-    logger.error("Workspace missing Twilio credentials for inbound SMS", {
-      workspace: workspaceNumber.workspace,
-      attributionPath: resolved.attributionPath,
-    });
-    return routeData({ error: "Workspace Twilio credentials missing" }, 500);
+  const validation = validateWorkspaceTwilioWebhook({
+    request,
+    params,
+    twilioData: workspaceNumber.twilio_data,
+  });
+  if (!validation.ok) {
+    if (validation.response.status === 500) {
+      logger.error("Workspace missing Twilio credentials for inbound SMS", {
+        workspace: workspaceNumber.workspace,
+        attributionPath: resolved.attributionPath,
+      });
+    }
+    return validation.response;
   }
-
-  const signature = request.headers.get("x-twilio-signature");
-  const requestUrl = new URL(request.url).href;
-  if (
-    !validateTwilioWebhookParams(params, signature, requestUrl, authToken)
-  ) {
-    return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
-  }
+  const authToken = validation.authToken;
 
   const data = params as Record<string, unknown>;
   const fromNumber = parseTrimmedString(data.From);
@@ -266,14 +265,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { vali
   const numSegments =
     Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
 
+  const credsForRest =
+    inboundTwilioCreds ??
+    (authToken && process.env.NODE_ENV !== "production"
+      ? { sid: env.TWILIO_SID(), authToken }
+      : null);
+
   const media: string[] = [];
   const now = new Date();
   const nowIso = now.toISOString();
+  if (numMedia > 0 && !credsForRest) {
+    logger.warn("Skipping inbound SMS MMS fetch: no Twilio REST credentials", {
+      workspace: workspaceNumber.workspace,
+      messageSid,
+    });
+  }
   for (let i = 0; i < numMedia; i++) {
+    if (!credsForRest) {
+      continue;
+    }
     try {
       const mediaResponse = await fetch(data[`MediaUrl${i}`] as string, {
         headers: {
-          Authorization: `Basic ${Buffer.from(`${inboundTwilioCreds.sid}:${inboundTwilioCreds.authToken}`).toString("base64")}`,
+          Authorization: `Basic ${Buffer.from(`${credsForRest.sid}:${credsForRest.authToken}`).toString("base64")}`,
         },
       });
 

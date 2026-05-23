@@ -1,5 +1,8 @@
-import { describe, expect, test } from "vitest";
-import { readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge } from "../supabase/functions/_shared/twilio-workspace-credentials.ts";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import {
+  readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge,
+  resolveTwilioWebhookAuthToken as resolveTwilioWebhookAuthTokenEdge,
+} from "../supabase/functions/_shared/twilio-workspace-credentials.ts";
 import {
   readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsApp,
   resolveTwilioWebhookAuthToken,
@@ -57,7 +60,7 @@ describe("readTwilioWorkspaceCredentials", () => {
   });
 });
 
-describe("resolveTwilioWebhookAuthToken", () => {
+describe("resolveTwilioWebhookAuthToken (app)", () => {
   const originalNodeEnv = process.env.NODE_ENV;
 
   afterEach(() => {
@@ -76,7 +79,32 @@ describe("resolveTwilioWebhookAuthToken", () => {
   });
 
   test("falls back to main token outside production when creds missing", () => {
+    vi.stubEnv("TWILIO_AUTH_TOKEN", "main-tok");
     process.env.NODE_ENV = "test";
-    expect(resolveTwilioWebhookAuthToken(null)).toBeTruthy();
+    expect(resolveTwilioWebhookAuthToken(null)).toBe("main-tok");
+  });
+});
+
+describe("resolveTwilioWebhookAuthToken (Edge)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test("returns workspace token when creds present", () => {
+    expect(
+      resolveTwilioWebhookAuthTokenEdge({ sid: "AC01", authToken: "workspace-tok" }),
+    ).toBe("workspace-tok");
+  });
+
+  test("returns null in production when creds missing", () => {
+    vi.stubEnv("ENVIRONMENT", "production");
+    vi.stubEnv("DENO_DEPLOYMENT_ID", "deploy-1");
+    expect(resolveTwilioWebhookAuthTokenEdge(null)).toBeNull();
+  });
+
+  test("falls back to TWILIO_AUTH_TOKEN outside production when creds missing", () => {
+    vi.stubEnv("ENVIRONMENT", "development");
+    vi.stubEnv("TWILIO_AUTH_TOKEN", "main-tok");
+    expect(resolveTwilioWebhookAuthTokenEdge(null)).toBe("main-tok");
   });
 });

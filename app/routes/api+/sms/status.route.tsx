@@ -11,55 +11,11 @@ import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } fro
 
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
-
-async function loadMessageRowForSmsStatus(args: {
-  supabase: ReturnType<typeof createClient<Database>>;
-  sid: string;
-}): Promise<Tables<"message"> | null> {
-  const { data, error } = await args.supabase
-    .from("message")
-    .select("*")
-    .eq("sid", args.sid)
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data as Tables<"message">;
-}
-
-async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
-  supabase: ReturnType<typeof createClient<Database>>;
-  workspaceId: string;
-}): Promise<string> {
-  const { env } = await import("@/lib/env.server");
-  const { data: workspaceRecord, error: workspaceLookupError } = await args.supabase
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", args.workspaceId)
-    .single();
-
-  if (workspaceLookupError) {
-    throw new Error("Failed to load workspace Twilio credentials");
-  }
-
-  const creds = readTwilioWorkspaceCredentials(workspaceRecord?.twilio_data);
-  const token = resolveTwilioWebhookAuthToken(creds);
-  if (!token) {
-    throw new Error("Workspace Twilio credentials required for SMS status webhook");
-  }
-  return token;
-}
+import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
 
 export const action: ActionFunction = async ({ request }) => {
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
-  const { validateTwilioWebhook } = await import("@/twilio.server");
   const { sendWebhookNotification } = await import(
     "@/lib/workspace-settings/WorkspaceSettingUtils.server"
   );
@@ -72,13 +28,14 @@ export const action: ActionFunction = async ({ request }) => {
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
+  // Main-account REST client for legacy SMS status side effects only; webhook auth uses workspace token.
   const twilio = new Twilio.Twilio(
     env.TWILIO_SID(),
     env.TWILIO_AUTH_TOKEN(),
   );
 
   try {
-    const previewFormData = await request.clone().formData();
+    const previewFormData = await request.formData();
     const previewPayload = Object.fromEntries(
       previewFormData.entries(),
     ) as Partial<TwilioSmsStatusWebhook>;
@@ -88,27 +45,31 @@ export const action: ActionFunction = async ({ request }) => {
       return routeData({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
     }
 
-    const preUpdateMessage = await loadMessageRowForSmsStatus({
+    const validation = await validateTwilioWebhookForMessageSid({
+      request,
       supabase,
-      sid: previewSid,
+      smsSid: previewSid,
+      params: previewPayload as Record<string, string>,
     });
-
-    if (!preUpdateMessage?.workspace) {
-      throw new Error("Failed to find message workspace for SMS status webhook");
+    if (!validation.ok) {
+      return validation.response;
     }
 
-    const authToken = await getWorkspaceTwilioAuthTokenForWorkspace({
-      supabase,
-      workspaceId: preUpdateMessage.workspace,
-    });
-
-    const validation = await validateTwilioWebhook(request, authToken);
-    if (validation instanceof Response) return validation;
     const payload = validation.params as Partial<TwilioSmsStatusWebhook>;
     const { SmsSid: sid, SmsStatus: status } = payload;
 
     if (!sid || !status) {
       return routeData({ error: "Missing required fields: SmsSid or SmsStatus" }, { status: 400 });
+    }
+
+    const { data: preUpdateMessage, error: messageLookupError } = await supabase
+      .from("message")
+      .select("*")
+      .eq("sid", sid)
+      .single();
+
+    if (messageLookupError || !preUpdateMessage) {
+      throw new Error("Failed to find message workspace for SMS status webhook");
     }
 
     if (isInboundMessageDirection(preUpdateMessage.direction)) {

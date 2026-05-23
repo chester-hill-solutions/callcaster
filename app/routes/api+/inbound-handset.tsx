@@ -1,28 +1,51 @@
-// @ts-nocheck
 import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
-
 import type { Database } from "@/lib/database.types";
+import {
+  resolveTwilioDataForPhoneNumber,
+  validateWorkspaceTwilioWebhook,
+} from "@/lib/twilio-webhook.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
 
   const twiml = new Twilio.twiml.VoiceResponse();
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY()
+    env.SUPABASE_SERVICE_KEY(),
   );
 
   const formData = await request.formData();
-  const called = formData.get("Called") as string | null;
+  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const called = params.Called?.trim() ?? "";
   if (!called) {
     twiml.say("Invalid request. Missing caller information.");
     twiml.hangup();
     return new Response(twiml.toString(), {
       headers: { "Content-Type": "text/xml" },
     });
+  }
+
+  const resolved = await resolveTwilioDataForPhoneNumber(supabase, called, logger);
+  if (!resolved) {
+    logger.debug("Inbound handset: number not found", { called });
+    twiml.say("This number is not configured for handset.");
+    twiml.hangup();
+    return new Response(twiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const validation = validateWorkspaceTwilioWebhook({
+    request,
+    params,
+    twilioData: resolved.twilioData,
+  });
+  if (!validation.ok) {
+    return validation.response;
   }
 
   const { data: numberRow, error: numberError } = await supabase
@@ -45,7 +68,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { logg
   }
 
   const workspaceId = String(numberRow.workspace);
-
   const now = new Date().toISOString();
   const { data: session, error: sessionError } = await supabase
     .from("handset_session")

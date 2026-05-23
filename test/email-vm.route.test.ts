@@ -26,6 +26,10 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...args: any[]) => mocks.sendWebhookNotification(...args),
 }));
+vi.mock("@/twilio.server", () => ({
+  validateTwilioWebhookParams: vi.fn(() => true),
+  shouldValidateTwilioWebhooks: () => true,
+}));
 
 vi.mock("resend", () => {
   class Resend {
@@ -76,6 +80,14 @@ function makeSupabase(overrides?: {
     from: (table: string) => {
       if (table === "call") {
         return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: callRow,
+                error: overrides?.callError ?? null,
+              }),
+            }),
+          }),
           update: () => ({
             eq: () => ({
               select: () => ({
@@ -134,6 +146,26 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.logger.error.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
+  });
+
+  test("returns 403 when Twilio signature validation fails", async () => {
+    const { validateTwilioWebhookParams } = await import("@/twilio.server");
+    vi.mocked(validateTwilioWebhookParams).mockReturnValueOnce(false);
+    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeReq({
+          RecordingUrl: "https://tw/rec",
+          CallSid: "CA1",
+          AccountSid: "AC1",
+          RecordingSid: "RE1",
+        }),
+        params: {},
+      } as any),
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 
   test("success path sends email and (optionally) webhook", async () => {

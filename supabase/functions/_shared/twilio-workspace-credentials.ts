@@ -26,3 +26,26 @@ export function readTwilioWorkspaceCredentials(
   if (!sid || !authToken) return null;
   return { sid, authToken };
 }
+
+/** Auth token for Twilio webhook signature validation (Edge). */
+export function resolveTwilioWebhookAuthToken(
+  creds: TwilioWorkspaceCredentials | null,
+): string | null {
+  if (creds?.authToken) {
+    return creds.authToken;
+  }
+  const readEnv = (key: string): string | undefined => {
+    if (typeof Deno !== "undefined") {
+      return Deno.env.get(key);
+    }
+    return process.env[key];
+  };
+  const environment = readEnv("ENVIRONMENT") ?? "";
+  const isProduction =
+    environment === "production" || Boolean(readEnv("DENO_DEPLOYMENT_ID"));
+  if (!isProduction) {
+    const token = readEnv("TWILIO_AUTH_TOKEN");
+    return token?.trim() ? token.trim() : null;
+  }
+  return null;
+}

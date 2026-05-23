@@ -1,11 +1,10 @@
-// @ts-nocheck
-import { data as routeData, ActionFunction } from "react-router";
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { WorkspaceNumbers } from '@/lib/types';
+import { data as routeData, type ActionFunction } from "react-router";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-
-
-import { readTwilioWorkspaceCredentials } from '@/lib/twilio-workspace-credentials';
+import {
+  rejectMissingTwilioSignatureHeader,
+  validateTwilioWebhookForPhoneCandidates,
+} from "@/lib/twilio-webhook.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -28,62 +27,63 @@ interface Capabilities {
 export const action: ActionFunction = async ({ request }) => {
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+
+  const missingHeader = rejectMissingTwilioSignatureHeader(request);
+  if (missingHeader) {
+    return missingHeader;
+  }
 
   const formData = await request.formData();
   const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
   const supabase: SupabaseClient = createClient(
     env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY()
+    env.SUPABASE_SERVICE_KEY(),
   );
 
   try {
     const { data: candidateNumbers, error: candidateError } = await supabase
-      .from('workspace_number')
-      .select('workspace(twilio_data)')
-      .eq('phone_number', parsedBody.To);
+      .from("workspace_number")
+      .select("workspace(twilio_data)")
+      .eq("phone_number", parsedBody.To);
 
     if (candidateError) {
       throw new Error(`Database error: ${candidateError.message}`);
     }
 
-    const isValidTwilioRequest = (candidateNumbers ?? []).some((row) => {
-      const twilioData = (row as { workspace?: { twilio_data?: unknown } }).workspace
-        ?.twilio_data;
-      const creds = readTwilioWorkspaceCredentials(twilioData);
-      return (
-        creds != null &&
-        validateTwilioWebhookParams(
-          parsedBody,
-          request.headers.get('x-twilio-signature'),
-          request.url,
-          creds.authToken,
-        )
-      );
+    const isValidTwilioRequest = validateTwilioWebhookForPhoneCandidates({
+      request,
+      params: parsedBody,
+      candidates: (candidateNumbers ?? []).map((row) => ({
+        twilioData: (row as { workspace?: { twilio_data?: unknown } }).workspace
+          ?.twilio_data,
+      })),
     });
 
     if (!isValidTwilioRequest) {
-      return routeData({ error: 'Invalid Twilio signature' }, { status: 403 });
+      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
-    if (parsedBody.VerificationStatus === 'success' || parsedBody.VerificationStatus === 'failed') {
+    if (
+      parsedBody.VerificationStatus === "success" ||
+      parsedBody.VerificationStatus === "failed"
+    ) {
       const capabilities: Capabilities = {
         fax: false,
-        mms: parsedBody.VerificationStatus === 'success',
-        sms: parsedBody.VerificationStatus === 'success',
-        voice: parsedBody.VerificationStatus === 'success',
+        mms: parsedBody.VerificationStatus === "success",
+        sms: parsedBody.VerificationStatus === "success",
+        voice: parsedBody.VerificationStatus === "success",
         verification_status: parsedBody.VerificationStatus,
-        emergency_address_status: 'not_started',
+        emergency_address_status: "not_started",
         emergency_address_sid: null,
         emergency_eligible: false,
-        emergency_compliance_status: 'not_started',
+        emergency_compliance_status: "not_started",
       };
 
       const { data: numberRequest, error: numberError } = await supabase
-        .from('workspace_number')
+        .from("workspace_number")
         .update({ capabilities })
-        .eq('phone_number', parsedBody.To)
+        .eq("phone_number", parsedBody.To)
         .select();
 
       if (numberError) {
@@ -91,7 +91,7 @@ export const action: ActionFunction = async ({ request }) => {
       }
 
       if (!numberRequest || numberRequest.length === 0) {
-        throw new Error('No matching record found');
+        throw new Error("No matching record found");
       }
 
       return routeData(numberRequest[0]);
@@ -99,7 +99,10 @@ export const action: ActionFunction = async ({ request }) => {
 
     return routeData(parsedBody);
   } catch (error) {
-    logger.error('Error processing request:', error);
-    return routeData({ error: 'An error occurred while processing the request' }, { status: 500 });
+    logger.error("Error processing request:", error);
+    return routeData(
+      { error: "An error occurred while processing the request" },
+      { status: 500 },
+    );
   }
 };

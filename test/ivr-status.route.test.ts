@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
+    validateTwilioWebhookForCallSid: vi.fn(),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -19,6 +20,10 @@ const mocks = vi.hoisted(() => {
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
+}));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...a: unknown[]) =>
+    mocks.validateTwilioWebhookForCallSid(...a),
 }));
 vi.mock("@/twilio.server", () => ({ validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -104,11 +109,24 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockImplementation(async (args: {
+      params?: Record<string, string>;
+    }) => ({
+      ok: true,
+      params: args.params ?? { CallSid: "CA1" },
+      authToken: "tok",
+    }));
     mocks.logger.error.mockReset();
   });
 
   test("returns 403 on invalid signature", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const supabase = makeSupabase({
       callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: {} } } } } },
       workspaceAuthToken: "tok",

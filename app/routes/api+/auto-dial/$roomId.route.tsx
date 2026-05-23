@@ -23,23 +23,6 @@ const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>
     return data;
 };
 
-const fetchWorkspaceAuthToken = async (workspaceId: string) => {
-  const { readTwilioWorkspaceCredentials, resolveTwilioWebhookAuthToken } =
-    await import("@/lib/twilio-workspace-credentials");
-  const supabase = await getSupabase();
-    const { data, error } = await supabase
-        .from("workspace")
-        .select("twilio_data")
-        .eq("id", workspaceId)
-        .single();
-    if (error) throw new Error(`Error fetching workspace auth token: ${error.message}`);
-    const authToken = resolveTwilioWebhookAuthToken(
-      readTwilioWorkspaceCredentials(data?.twilio_data),
-    );
-    if (!authToken) throw new Error("Workspace Twilio auth token not found");
-    return authToken;
-};
-
 const fetchCampaignData = async (campaignId: string) => {
   const supabase = await getSupabase();
     const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', campaignId).single();
@@ -188,10 +171,10 @@ const checkUserDevices = async (contactId: string, conferenceName: string, calle
 
 export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
   const supabase = await getSupabase();
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
 
     const conferenceName = params.roomId;
     const realtime = supabase.realtime.channel(conferenceName)
@@ -205,20 +188,19 @@ export const action = async ({ request, params }: { request: Request, params: { 
     let response: Response;
     
     try {
-        const dbCall = await fetchCallData(callSid);
-        const authToken = await fetchWorkspaceAuthToken(dbCall.workspace?.toString() ?? "");
-        const isValidTwilioRequest = validateTwilioWebhookParams(
-            parsedBody,
-            request.headers.get("x-twilio-signature"),
-            request.url,
-            authToken
-        );
-        if (!isValidTwilioRequest) {
+        const validation = await validateTwilioWebhookForCallSid({
+            request,
+            supabase,
+            callSid,
+            params: parsedBody,
+        });
+        if (!validation.ok) {
             return new Response(`<Response><Hangup/></Response>`, {
                 status: 403,
                 headers: { 'Content-Type': 'text/xml' }
             });
         }
+        const dbCall = await fetchCallData(callSid);
         const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
 
         if (await checkUserDevices(dbCall.contact_id?.toString() ?? '', conferenceName, called, campaign.caller_id?.toString() ?? '')) {

@@ -29,6 +29,16 @@ vi.mock("../app/lib/env.server", () => ({
 
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
 
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: vi.fn(async (args: {
+    params?: Record<string, string>;
+  }) => ({
+    ok: true,
+    params: args.params ?? {},
+    authToken: "tok",
+  })),
+}));
+
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: vi.fn(() => true),
 }));

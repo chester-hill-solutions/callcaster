@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
+    validateTwilioWebhookForCallSid: vi.fn(),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -20,6 +21,10 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
+}));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
+    mocks.validateTwilioWebhookForCallSid(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: (...args: any[]) => mocks.validateTwilioWebhookParams(...args),
@@ -138,6 +143,14 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockImplementation(
+      async (args: { params?: Record<string, string> }) => ({
+        ok: true,
+        params: args.params ?? {},
+        authToken: "tok",
+      }),
+    );
   });
 
   test("validates CallSid", async () => {
@@ -181,7 +194,12 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
   });
 
   test("returns 403 on invalid signature", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const { supabase, twilio } = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);

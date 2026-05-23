@@ -4,10 +4,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 
 
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
@@ -325,7 +322,6 @@ const handleParticipantJoin = async (
 export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = await getSupabase();
   const { logger } = await import("@/lib/logger.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { env } = await import("@/lib/env.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
 
@@ -336,6 +332,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
     const parsedBody = params;
 
+    if (!parsedBody.CallSid) {
+      throw new Error("Missing CallSid");
+    }
+
+    const validation = await validateTwilioWebhookForCallSid({
+      request,
+      supabase,
+      callSid: parsedBody.CallSid,
+      params,
+    });
+    if (!validation.ok) {
+      return validation.response;
+    }
+
     const { data: dbCall, error: callError } = await supabase
       .from("call")
       .select()
@@ -343,15 +353,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       .single();
     if (callError) {
       throw new Error("Failed to fetch call data: " + callError.message);
-    }
-
-    const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
-    const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-    const authToken = resolveTwilioWebhookAuthToken(creds);
-    const signature = request.headers.get("x-twilio-signature");
-    const url = new URL(request.url).href;
-    if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
 
     const twilio = await createWorkspaceTwilioInstance({

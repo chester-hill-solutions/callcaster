@@ -16,7 +16,7 @@ import {
   shouldUpdateOutreachDisposition,
 } from "../_shared/sms-status-logic.ts";
 import { insertTransactionHistoryIdempotent } from "../_shared/ivr-status-logic.ts";
-import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import { readTwilioWorkspaceCredentials, resolveTwilioWebhookAuthToken } from "../_shared/twilio-workspace-credentials.ts";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
@@ -77,7 +77,8 @@ export async function handleRequest(req: Request): Promise<Response> {
       .single();
 
     const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-    if (workspaceError || !creds) {
+    const authToken = resolveTwilioWebhookAuthToken(creds);
+    if (workspaceError || !authToken) {
       throw new Error(`Failed to get workspace data: ${workspaceError?.message || 'No auth token found'}`);
     }
 
@@ -85,7 +86,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     const twilioSignature = req.headers.get('x-twilio-signature');
     const url = getFunctionUrl("sms-status");
     const isValidRequest = Twilio.validateRequest(
-      creds.authToken,
+      authToken,
       twilioSignature || '',
       url,
       Object.fromEntries(formData)

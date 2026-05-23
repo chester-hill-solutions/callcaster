@@ -3,12 +3,10 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { data as routeData } from "react-router";
 
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
+import type { ActionFunctionArgs } from "react-router";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
-import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
+import { Call, Campaign, IVRCampaign, OutreachAttempt, Script, type Block } from "@/lib/types";
 
 
 export interface CallEvent {
@@ -64,8 +62,6 @@ const updateCallStatus = async (supabase: SupabaseClient, callSid: string, statu
         .eq('sid', callSid);
     if (error) throw error;
 };
-
-import type { Block } from "@/lib/types";
 
 interface ScriptSteps {
     pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
@@ -125,9 +121,8 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
     ]);
 };
 
-export const action = async ({ request }: { request: Request }) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
 
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
@@ -137,6 +132,16 @@ export const action = async ({ request }: { request: Request }) => {  const { lo
     const callSid = parsedBody.CallSid;
 
     try {
+        const validation = await validateTwilioWebhookForCallSid({
+            request,
+            supabase,
+            callSid,
+            params,
+        });
+        if (!validation.ok) {
+            return validation.response;
+        }
+
         const { data: dbCall, error: callError } = await supabase
             .from('call')
             .select('outreach_attempt_id, workspace, campaign(*, ivr_campaign(*, script(*)))')
@@ -144,16 +149,6 @@ export const action = async ({ request }: { request: Request }) => {  const { lo
             .single();
         if (callError) throw callError;
         if (!dbCall) throw new Error("Call not found");
-
-        const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
-        const creds = readTwilioWorkspaceCredentials(workspace.data?.twilio_data);
-        const authToken = resolveTwilioWebhookAuthToken(creds);
-        const signature = request.headers.get("x-twilio-signature");
-        const url = new URL(request.url).href;
-        const isValid =
-          Boolean(authToken) &&
-          validateTwilioWebhookParams(params, signature, url, authToken);
-        if (!isValid) return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
 
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});
         
