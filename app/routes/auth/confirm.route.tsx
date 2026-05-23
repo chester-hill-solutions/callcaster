@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { redirect, type LoaderFunctionArgs } from "react-router"
 import { createServerClient, parse, serialize } from '@supabase/ssr'
 

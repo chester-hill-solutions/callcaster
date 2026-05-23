@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./archive.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, Link } from "react-router";
 
@@ -9,37 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, user, headers } = await verifyAuth(request);
-  
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    return redirect("/workspaces", { headers });
-  }
-
-  // Fetch archived campaigns
-  const { data: archivedCampaigns, error } = await supabaseClient
-    .from("campaign")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .eq("status", "archived")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    logger.error("Error fetching archived campaigns:", error);
-  }
-
-  return routeData(
-    { archivedCampaigns: archivedCampaigns || [] },
-    { headers }
-  );
-};
+;
 
 const StatusBadge = ({ status }: { status: string }) => {
   const badgeStyles: Record<string, string> = {
@@ -135,4 +104,3 @@ export default function ArchivedCampaigns() {
 }
 
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
-

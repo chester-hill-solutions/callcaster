@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { action } from "./new.action.server";
 
 import { data as routeData, ActionFunctionArgs, Form, Link, useActionData, useOutletContext } from "react-router";
 import { CardAction } from "twilio/lib/rest/content/v1/content";
@@ -12,44 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 
 import { Flags } from "@/lib/types";
-
-
-export async function action({ request, params }: ActionFunctionArgs) {  const { handleNewCampaign } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-
-  if (workspaceId == null) {
-    return routeData(
-      {
-        audienceData: null,
-        campaignAudienceData: null,
-        error: "Workspace not found",
-      },
-      { headers },
-    );
-  }
-
-  const formData = await request.formData();
-  const formAction = formData.get("formAction") as string;
-
-  switch (formAction) {
-    case "newCampaign": {
-      return handleNewCampaign({
-        supabaseClient,
-        formData,
-        workspaceId,
-        headers,
-      });
-    }
-    default:
-      break;
-  }
-
-  return routeData({ error: "Form Action not recognized" }, { headers });
-}
 
 export default function CampaignsNew() {
   const { flags }:{flags:Flags} = useOutletContext();

@@ -8,6 +8,9 @@ export default remixRoutesOptionAdapter((defineRoutes) => {
       "**/.*",
       "**/*.test.{js,jsx,ts,tsx}",
       "**/old.*",
+      "**/*.loader.server.ts",
+      "**/*.action.server.ts",
+      "**/*.types.ts",
     ],
     nestedDirectoryChar: "+",
   });

@@ -1,4 +1,6 @@
-// @ts-nocheck
+export { loader } from "./route.loader.server";
+export { action } from "./route.action.server";
+
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { useLoaderData, Link, Outlet, NavLink, useSearchParams, useActionData, Form } from "react-router";
 
@@ -29,164 +31,9 @@ import {
     type WorkspaceSortKey,
 } from "@/lib/admin-workspaces";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { deriveWorkspaceAdminRows } = await import("@/lib/admin-workspaces.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { syncWorkspaceTwilioSnapshot } = await import("@/lib/database.server");
+;
 
-    const { supabaseClient, user } = await verifyAuth(request)
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const { data: workspaces } = await supabaseClient
-        .from("workspace")
-        .select("*, campaign(*)")
-
-    if (!workspaces) {
-        throw redirect("/signin");
-    }
-
-    // Get all users
-    const { data: users } = await supabaseClient
-        .from("user")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-    // Get workspace users relationship
-    const { data: workspaceUsers } = await supabaseClient
-        .from("workspace_users")
-        .select("*");
-
-    const { data: workspaceNumbers } = await supabaseClient
-        .from("workspace_number")
-        .select("*");
-
-    // Get all campaigns (not just recent ones)
-    const { data: allCampaigns } = await supabaseClient
-        .from("campaign")
-        .select("*, workspace(*)")
-        .order("created_at", { ascending: false });
-
-    const workspaceRows = deriveWorkspaceAdminRows({
-        workspaces: workspaces || [],
-        users: users || [],
-        workspaceUsers: workspaceUsers || [],
-        workspaceNumbers: workspaceNumbers || [],
-    });
-
-    return routeData({ 
-        user: userData, 
-        workspaces, 
-        users, 
-        workspaceUsers,
-        workspaceNumbers,
-        workspaceRows,
-        campaigns: allCampaigns || [],
-        stats: {
-            totalWorkspaces: workspaces?.length || 0,
-            totalUsers: users?.length || 0,
-            totalCampaigns: workspaces?.reduce((acc, workspace) => acc + (workspace.campaign?.length || 0), 0) || 0,
-            activeWorkspaces: workspaces?.filter(w => !w.disabled).length || 0
-        }
-    });
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {  const { deriveWorkspaceAdminRows } = await import("@/lib/admin-workspaces.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { syncWorkspaceTwilioSnapshot } = await import("@/lib/database.server");
-
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const formData = await request.formData();
-    const action = formData.get("_action") as string;
-
-    if (action === "toggle_workspace_status") {
-        const workspaceId = formData.get("workspaceId") as string;
-        const currentStatus = formData.get("currentStatus") === "true";
-        
-        const { error } = await supabaseClient
-            .from("workspace")
-            .update({ disabled: !currentStatus })
-            .eq("id", workspaceId);
-
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
-    }
-
-    if (action === "sync_workspace_twilio") {
-        const workspaceId = formData.get("workspaceId") as string;
-        try {
-            await syncWorkspaceTwilioSnapshot({
-                supabaseClient,
-                workspaceId,
-            });
-            return routeData({ success: "Workspace Twilio sync completed" });
-        } catch (error) {
-            return routeData({
-                error: error instanceof Error ? error.message : "Failed to sync workspace Twilio data",
-            });
-        }
-    }
-
-    if (action === "sync_all_workspaces_twilio") {
-        const { error } = await supabaseClient.functions.invoke("workspace-twilio-sync", {
-            body: {},
-        });
-
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: "Workspace Twilio sync started for all workspaces" });
-    }
-    
-    if (action === "toggle_user_status") {
-        const userId = formData.get("userId") as string;
-        
-        // For now, we'll just disable users by setting access_level to 'disabled'
-        // This assumes the system will check for this value elsewhere
-        const { error } = await supabaseClient
-            .from("user")
-            .update({ access_level: 'disabled' })
-            .eq("id", userId);
-
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: `User disabled successfully` });
-    }
-
-    return routeData({ error: "Invalid action" });
-};
+;
 
 export default function Admin() {
     const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData();
@@ -1335,4 +1182,4 @@ export default function Admin() {
             <Outlet />
         </div>
     );
-} 
+}

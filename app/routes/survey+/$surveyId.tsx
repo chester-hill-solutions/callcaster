@@ -1,6 +1,4 @@
-// @ts-nocheck
-
-
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
 import { useState, useEffect, useCallback } from "react";
 
@@ -39,7 +37,7 @@ function safeString(value: string | string[]): string {
   return Array.isArray(value) ? JSON.stringify(value) : value;
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+export async function loader({ request, params }: LoaderFunctionArgs) {
 
   const { surveyId } = params;
   const url = new URL(request.url);

@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./campaigns.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
@@ -8,45 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
-
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const workspaceId = params.workspaceId;
-    
-    if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    // Get workspace details with campaigns
-    const { data: workspace } = await supabaseClient
-        .from("workspace")
-        .select("*, campaign(*)")
-        .eq("id", workspaceId)
-        .single();
-
-    if (!workspace) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    return routeData({ 
-        workspace
-    });
-};
+;
 
 export default function WorkspaceCampaigns() {
     const { workspace } = useLoaderData();
@@ -110,4 +71,4 @@ export default function WorkspaceCampaigns() {
             </CardContent>
         </Card>
     );
-} 
+}

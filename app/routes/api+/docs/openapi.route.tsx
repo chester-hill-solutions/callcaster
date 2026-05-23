@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { LoaderFunctionArgs } from "react-router";
 import { openApiSpec } from "@/lib/openapi";
 

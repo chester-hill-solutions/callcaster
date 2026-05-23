@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { Form, Link, NavLink, useLoaderData, useNavigation, LoaderFunctionArgs } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +13,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const {
     supabaseClient: supabase,

@@ -1,0 +1,31 @@
+import { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
+import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
+
+export const action = async ({ request }: ActionFunctionArgs) => {
+
+
+    const { supabaseClient, user } = await verifyAuth(request);
+    const formData = await request.formData();
+    const campaign_id = formData.get("campaign_id");
+    
+    if (!campaign_id || typeof campaign_id !== 'string') {
+        return { error: 'Missing campaign_id' };
+    }
+    
+    const campaignIdNum = parseInt(campaign_id, 10);
+    if (isNaN(campaignIdNum)) {
+        return { error: 'Invalid campaign_id' };
+    }
+
+    const rpcClient = supabaseClient as unknown as {
+        rpc: (
+            fn: string,
+            args?: Record<string, unknown>,
+        ) => Promise<{ error: unknown }>;
+    };
+    const { error } = await rpcClient.rpc("reset_campaign", { campaign_id_prop: campaignIdNum });
+    if (error) { logger.error("Error resetting campaign:", error); throw error; }
+    return { success: true }
+}

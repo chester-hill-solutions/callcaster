@@ -1,0 +1,59 @@
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useNavigate, useNavigation } from "react-router";
+import { FaPlus } from "react-icons/fa";
+import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
+import { AudioUploadError, getSafeMediaBaseName, normalizeUploadedAudio } from "@/lib/audio.server";
+import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
+
+export async function action({ request, params }: ActionFunctionArgs) {
+
+
+  const { supabaseClient, headers } = await verifyAuth(request);
+
+  const workspaceId = params.id;
+  if (workspaceId == null) {
+    return routeData(
+      { success: false, error: "Workspace does not exist" },
+      { headers },
+    );
+  }
+  const formData = await request.formData();
+  const mediaName = formData.get("media-name") as string;
+  const mediaToUpload = formData.get("media");
+
+  logger.debug("Media To Upload:", mediaToUpload);
+
+  try {
+    if (!(mediaToUpload instanceof File)) {
+      throw new AudioUploadError("Please choose an audio file to upload.");
+    }
+
+    const safeMediaName = getSafeMediaBaseName(mediaName);
+    const normalizedAudio = await normalizeUploadedAudio(mediaToUpload);
+    const { error: uploadError } = await supabaseClient.storage
+      .from("workspaceAudio")
+      .upload(
+        `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`,
+        normalizedAudio.buffer,
+        {
+          cacheControl: "60",
+          upsert: false,
+          contentType: normalizedAudio.contentType,
+        },
+      );
+
+    if (uploadError) {
+      return routeData({ success: false, error: uploadError }, { headers });
+    }
+
+    return routeData({ success: true, error: null }, { headers });
+  } catch (error) {
+    logger.error("Workspace audio upload failed", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to upload audio.";
+    const status = error instanceof AudioUploadError ? error.status : 500;
+    return routeData({ success: false, error: message }, { headers, status });
+  }
+}

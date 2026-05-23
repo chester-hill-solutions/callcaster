@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./users.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
@@ -8,40 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
-
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const workspaceId = params.workspaceId;
-    
-    if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    // Get workspace users
-    const { data: workspaceUsers } = await supabaseClient
-        .from("workspace_users")
-        .select("*, user:user_id(*)")
-        .eq("workspace_id", workspaceId);
-
-    return routeData({ 
-        workspaceUsers: workspaceUsers || []
-    });
-};
+;
 
 export default function WorkspaceUsers() {
     const { workspaceUsers } = useLoaderData();
@@ -95,4 +61,4 @@ export default function WorkspaceUsers() {
             </CardContent>
         </Card>
     );
-} 
+}

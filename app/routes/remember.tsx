@@ -1,6 +1,4 @@
-// @ts-nocheck
-
-
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData, Form, useActionData } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
 import { useEffect } from "react";
@@ -10,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
