@@ -55,7 +55,7 @@ export async function loadWorkspaceTwilioData(
   supabase: SupabaseClient<Database>,
   workspaceId: string | null,
   joinedTwilioData: unknown,
-  logger?: { info: (...args: unknown[]) => void },
+  logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<unknown> {
   if (!workspaceId) {
     return joinedTwilioData;
@@ -227,7 +227,7 @@ export async function validateTwilioWebhookForMessageSid(args: {
 export async function resolveTwilioDataForPhoneNumber(
   supabase: SupabaseClient<Database>,
   phoneNumber: string,
-  logger?: { info: (...args: unknown[]) => void },
+  logger?: { info: (message: string, ...args: unknown[]) => void },
 ): Promise<{ workspaceId: string; twilioData: unknown } | null> {
   const { data: numberRow, error } = await supabase
     .from("workspace_number")
