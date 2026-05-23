@@ -3,7 +3,10 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 import { data as routeData } from "react-router";
 
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script} from "@/lib/types";
 
@@ -144,10 +147,12 @@ export const action = async ({ request }: { request: Request }) => {  const { lo
 
         const workspace = await supabase.from("workspace").select("twilio_data").eq("id", dbCall.workspace).single();
         const creds = readTwilioWorkspaceCredentials(workspace.data?.twilio_data);
-        const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
+        const authToken = resolveTwilioWebhookAuthToken(creds);
         const signature = request.headers.get("x-twilio-signature");
         const url = new URL(request.url).href;
-        const isValid = validateTwilioWebhookParams(params, signature, url, authToken);
+        const isValid =
+          Boolean(authToken) &&
+          validateTwilioWebhookParams(params, signature, url, authToken);
         if (!isValid) return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
 
         const twilio = await createWorkspaceTwilioInstance({supabase, workspace_id: dbCall.workspace as string});

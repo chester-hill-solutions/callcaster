@@ -6,7 +6,10 @@ import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200; 
@@ -52,10 +55,10 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {  cons
     const callData = await getCallWithRetry(supabase, callSid);
     const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", callData.workspace).single();
     const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-    const authToken = creds?.authToken ?? env.TWILIO_AUTH_TOKEN();
+    const authToken = resolveTwilioWebhookAuthToken(creds);
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
-    if (!validateTwilioWebhookParams(paramsObj, signature, url, authToken)) {
+    if (!authToken || !validateTwilioWebhookParams(paramsObj, signature, url, authToken)) {
       return new Response("Invalid Twilio signature", { status: 403 });
     }
     const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as unknown as IvrScriptSteps | null | undefined;

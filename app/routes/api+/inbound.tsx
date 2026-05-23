@@ -11,6 +11,10 @@ import type {
   WebhookEvent,
 } from "@/lib/twilio.types";
 import type { Database } from "@/lib/database.types";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -147,25 +151,13 @@ export const action = async ({ request }: LoaderFunctionArgs) => {  const { vali
     }
   }
 
-  const authTokenSource =
-    typeof twilioData?.authToken === "string"
-      ? "workspace.twilio_data.authToken"
-      : typeof twilioData?.auth_token === "string"
-        ? "workspace.twilio_data.auth_token"
-        : "env.TWILIO_AUTH_TOKEN";
-  if (authTokenSource === "env.TWILIO_AUTH_TOKEN" && twilioData) {
-    logger.debug("api.inbound using env fallback; twilio_data keys", {
-      twilioDataKeys: Object.keys(twilioData),
-      hasAuthToken: "authToken" in twilioData,
-      hasAuth_token: "auth_token" in twilioData,
-    });
-  }
-  const authToken =
-    typeof twilioData?.authToken === "string"
-      ? twilioData.authToken
-      : typeof twilioData?.auth_token === "string"
-        ? twilioData.auth_token
-        : env.TWILIO_AUTH_TOKEN(); // fallback for local dev when workspace twilio_data missing
+  const inboundCreds = readTwilioWorkspaceCredentials(twilioData);
+  const authToken = resolveTwilioWebhookAuthToken(inboundCreds);
+  const authTokenSource = inboundCreds
+    ? "workspace.twilio_data"
+    : authToken
+      ? "env.TWILIO_AUTH_TOKEN"
+      : "missing";
   const signature = request.headers.get("x-twilio-signature");
   const requestUrl = new URL(request.url).href;
 
@@ -179,6 +171,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {  const { vali
   });
 
   if (
+    !authToken ||
     !validateTwilioWebhookParams(
       data as Record<string, string>,
       signature,

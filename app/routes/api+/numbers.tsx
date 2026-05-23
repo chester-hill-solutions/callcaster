@@ -23,7 +23,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {  const { veri
   const { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } = await import("@/lib/database.server");
 
     await verifyAuth(request);
-    const twilio = new Twilio.Twilio(process.env['TWILIO_SID'] ?? '', process.env['TWILIO_AUTH_TOKEN'] ?? '');
+    const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
     const url = new URL(request.url);
     const params = url.searchParams;
     const areaCode = params.get('areaCode')

@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
       SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
       BASE_URL: vi.fn(() => "http://base"),
+      TWILIO_SID: vi.fn(() => process.env.TWILIO_SID ?? "sid"),
+      TWILIO_AUTH_TOKEN: vi.fn(() => process.env.TWILIO_AUTH_TOKEN ?? "token"),
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
@@ -147,10 +149,8 @@ describe("app/routes/api+/numbers/route.tsx", () => {
 
   test("loader lists local numbers with default params", async () => {
     listMock.mockResolvedValueOnce([{ phoneNumber: "+1" }]);
-    const prevSid = process.env.TWILIO_SID;
-    const prevToken = process.env.TWILIO_AUTH_TOKEN;
-    delete process.env.TWILIO_SID;
-    delete process.env.TWILIO_AUTH_TOKEN;
+    mocks.env.TWILIO_SID.mockReturnValueOnce("");
+    mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/numbers"),
@@ -159,16 +159,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     await expect(res.json()).resolves.toEqual([{ phoneNumber: "+1" }]);
     expect(listMock).toHaveBeenCalledWith({ limit: 10 });
     expect(twilioCtor).toHaveBeenCalledWith("", "");
-    process.env.TWILIO_SID = prevSid;
-    process.env.TWILIO_AUTH_TOKEN = prevToken;
   });
 
   test("loader uses areaCode when provided", async () => {
     listMock.mockResolvedValueOnce([{ phoneNumber: "+2" }]);
-    const prevSid = process.env.TWILIO_SID;
-    const prevToken = process.env.TWILIO_AUTH_TOKEN;
-    process.env.TWILIO_SID = "sid";
-    process.env.TWILIO_AUTH_TOKEN = "token";
+    mocks.env.TWILIO_SID.mockReturnValueOnce("sid");
+    mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
     const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/numbers?areaCode=415"),
@@ -177,8 +173,6 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     await expect(res.json()).resolves.toEqual([{ phoneNumber: "+2" }]);
     expect(listMock).toHaveBeenCalledWith({ areaCode: 415, limit: 10 });
     expect(twilioCtor).toHaveBeenCalledWith("sid", "token");
-    process.env.TWILIO_SID = prevSid;
-    process.env.TWILIO_AUTH_TOKEN = prevToken;
   });
 
   test("loader returns 500 and logs on Twilio error", async () => {

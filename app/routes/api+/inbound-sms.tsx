@@ -7,7 +7,10 @@ import type { Database } from "@/lib/database.types";
 
 
 import { normalizePhoneNumber } from "@/lib/utils";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 async function findMatchingContactIds(
   supabase: SupabaseClient<Database>,
@@ -202,7 +205,7 @@ async function resolveInboundWorkspaceContext(
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { validateTwilioWebhook } = await import("@/twilio.server");
+export const action = async ({ request }: ActionFunctionArgs) => {  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
@@ -211,19 +214,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { vali
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),
   );
-  const validation = await validateTwilioWebhook(request, env.TWILIO_AUTH_TOKEN());
-  if (validation instanceof Response) return validation;
-  const data = validation.params as Record<string, unknown>;
-  const toNumber = parseTrimmedString(data.To);
-  const fromNumber = parseTrimmedString(data.From);
-  const messageSid = parseTrimmedString(data.MessageSid);
-  const accountSid = parseTrimmedString(data.AccountSid);
-  const body = typeof data.Body === "string" ? data.Body : "";
-  const status = parseTrimmedString(data.Status);
-  const messagingServiceSid = parseTrimmedString(data.MessagingServiceSid);
-  const numMedia = Number.parseInt(typeof data.NumMedia === "string" ? data.NumMedia : "0", 10) || 0;
-  const numSegments =
-    Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
+
+  const formData = await request.formData();
+  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const toNumber = parseTrimmedString(params.To);
+  const messagingServiceSid = parseTrimmedString(params.MessagingServiceSid);
 
   const resolved = await resolveInboundWorkspaceContext(supabase, {
     toRaw: toNumber,
@@ -244,13 +239,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { vali
   const inboundTwilioCreds = readTwilioWorkspaceCredentials(
     workspaceNumber.twilio_data,
   );
-  if (!inboundTwilioCreds) {
+  const authToken = resolveTwilioWebhookAuthToken(inboundTwilioCreds);
+  if (!authToken) {
     logger.error("Workspace missing Twilio credentials for inbound SMS", {
       workspace: workspaceNumber.workspace,
       attributionPath: resolved.attributionPath,
     });
     return routeData({ error: "Workspace Twilio credentials missing" }, 500);
   }
+
+  const signature = request.headers.get("x-twilio-signature");
+  const requestUrl = new URL(request.url).href;
+  if (
+    !validateTwilioWebhookParams(params, signature, requestUrl, authToken)
+  ) {
+    return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
+  }
+
+  const data = params as Record<string, unknown>;
+  const fromNumber = parseTrimmedString(data.From);
+  const messageSid = parseTrimmedString(data.MessageSid);
+  const accountSid = parseTrimmedString(data.AccountSid);
+  const body = typeof data.Body === "string" ? data.Body : "";
+  const status = parseTrimmedString(data.Status);
+  const numMedia = Number.parseInt(typeof data.NumMedia === "string" ? data.NumMedia : "0", 10) || 0;
+  const numSegments =
+    Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
 
   const media: string[] = [];
   const now = new Date();

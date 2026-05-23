@@ -11,7 +11,10 @@ import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } fro
 
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 async function loadMessageRowForSmsStatus(args: {
   supabase: ReturnType<typeof createClient<Database>>;
@@ -46,7 +49,11 @@ async function getWorkspaceTwilioAuthTokenForWorkspace(args: {
   }
 
   const creds = readTwilioWorkspaceCredentials(workspaceRecord?.twilio_data);
-  return creds?.authToken || env.TWILIO_AUTH_TOKEN();
+  const token = resolveTwilioWebhookAuthToken(creds);
+  if (!token) {
+    throw new Error("Workspace Twilio credentials required for SMS status webhook");
+  }
+  return token;
 }
 
 export const action: ActionFunction = async ({ request }) => {

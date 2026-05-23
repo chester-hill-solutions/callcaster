@@ -36,41 +36,7 @@ import {
     type WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
 
-interface TwilioPageData {
-    twilioAccountInfo: {
-        sid: string;
-        friendlyName: string;
-        status: string;
-        type: string;
-        dateCreated: string;
-    } | null;
-    twilioNumbers: Array<{
-        sid: string;
-        phoneNumber: string;
-        friendlyName: string;
-        capabilities: {
-            voice: boolean;
-            sms: boolean;
-            mms: boolean;
-            fax: boolean;
-        };
-        voiceReceiveMode?: string;
-        smsApplicationSid?: string;
-        voiceApplicationSid?: string;
-        addressRequirements?: string;
-        status?: string;
-    }>;
-    twilioUsage: Array<{
-        category: string;
-        description: string;
-        usage: string;
-        usageUnit: string;
-        price: string;
-        startDate?: string;
-        endDate?: string;
-    }>;
-    portalSnapshot: WorkspaceTwilioPortalSnapshot;
-}
+import type { TwilioPageData } from "./loadTwilioData.server";
 
 function parseOptionalString(value: FormDataEntryValue | null): string | null {
     return typeof value === "string" && value.trim() ? value.trim() : null;

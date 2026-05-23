@@ -128,7 +128,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -227,7 +227,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -312,7 +312,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -409,7 +409,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -618,7 +618,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -694,7 +694,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),

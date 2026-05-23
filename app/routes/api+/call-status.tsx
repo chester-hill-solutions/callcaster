@@ -10,7 +10,10 @@ import type { Database, TablesInsert } from "@/lib/database.types";
 
 
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -37,15 +40,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {  const { inse
     }
     const supabase = createClient<Database>(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const { data: existingCall } = await supabase.from("call").select("workspace").eq("sid", callSidRaw).single();
-    let authToken = env.TWILIO_AUTH_TOKEN();
+    let creds = null;
     if (existingCall?.workspace) {
       const { data: ws } = await supabase.from("workspace").select("twilio_data").eq("id", existingCall.workspace).single();
-      const creds = readTwilioWorkspaceCredentials(ws?.twilio_data);
-      if (creds?.authToken) authToken = creds.authToken;
+      creds = readTwilioWorkspaceCredentials(ws?.twilio_data);
     }
+    const authToken = resolveTwilioWebhookAuthToken(creds);
     const signature = request.headers.get("x-twilio-signature");
     const url = new URL(request.url).href;
-    if (!validateTwilioWebhookParams(params, signature, url, authToken)) {
+    if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
       return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
     }
     const calledVia = params.CalledVia ?? params.called_via;

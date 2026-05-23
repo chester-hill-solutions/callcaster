@@ -24,6 +24,8 @@ const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>
 };
 
 const fetchWorkspaceAuthToken = async (workspaceId: string) => {
+  const { readTwilioWorkspaceCredentials, resolveTwilioWebhookAuthToken } =
+    await import("@/lib/twilio-workspace-credentials");
   const supabase = await getSupabase();
     const { data, error } = await supabase
         .from("workspace")
@@ -31,7 +33,9 @@ const fetchWorkspaceAuthToken = async (workspaceId: string) => {
         .eq("id", workspaceId)
         .single();
     if (error) throw new Error(`Error fetching workspace auth token: ${error.message}`);
-    const authToken = (data?.twilio_data as { authToken?: string } | null)?.authToken;
+    const authToken = resolveTwilioWebhookAuthToken(
+      readTwilioWorkspaceCredentials(data?.twilio_data),
+    );
     if (!authToken) throw new Error("Workspace Twilio auth token not found");
     return authToken;
 };

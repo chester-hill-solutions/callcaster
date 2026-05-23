@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge } from "../supabase/functions/_shared/twilio-workspace-credentials.ts";
-import { readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsApp } from "../app/lib/twilio-workspace-credentials.ts";
+import {
+  readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsApp,
+  resolveTwilioWebhookAuthToken,
+} from "../app/lib/twilio-workspace-credentials.ts";
 
 const readTwilioWorkspaceCredentials = readTwilioWorkspaceCredentialsEdge;
 
@@ -51,5 +54,29 @@ describe("readTwilioWorkspaceCredentials", () => {
   test("missing pieces", () => {
     expect(readTwilioWorkspaceCredentials({ sid: "AC" })).toBeNull();
     expect(readTwilioWorkspaceCredentials({ authToken: "x" })).toBeNull();
+  });
+});
+
+describe("resolveTwilioWebhookAuthToken", () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+
+  afterEach(() => {
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+
+  test("returns workspace token when creds present", () => {
+    expect(
+      resolveTwilioWebhookAuthToken({ sid: "AC01", authToken: "workspace-tok" }),
+    ).toBe("workspace-tok");
+  });
+
+  test("returns null in production when creds missing", () => {
+    process.env.NODE_ENV = "production";
+    expect(resolveTwilioWebhookAuthToken(null)).toBeNull();
+  });
+
+  test("falls back to main token outside production when creds missing", () => {
+    process.env.NODE_ENV = "test";
+    expect(resolveTwilioWebhookAuthToken(null)).toBeTruthy();
   });
 });
