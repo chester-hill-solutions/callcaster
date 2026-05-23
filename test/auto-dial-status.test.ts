@@ -476,7 +476,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt works without disposition (covers else path)", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const mod = await import("../app/routes/api+/auto-dial/status.action.server");
     const res = await mod.updateOutreachAttempt("oa1", {
       answered_at: new Date().toISOString(),
     } as any);
@@ -487,7 +487,7 @@ describe("api.auto-dial.status", () => {
   test("updateOutreachAttempt catch formats non-Error as Unknown error", async () => {
     supabaseStub = makeSupabaseStub({ outreachUpdateThrows: "nope" } as any);
     supabaseState.supabase = supabaseStub as any;
-    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const mod = await import("../app/routes/api+/auto-dial/status.action.server");
     const res = (await mod.updateOutreachAttempt("oa1", {
       answered_at: new Date().toISOString(),
     } as any)) as any;

@@ -20,6 +20,7 @@ const twilioMocks = vi.hoisted(() => {
 vi.mock("@/twilio.server", () => {
   return {
     validateTwilioWebhookParams: twilioMocks.validateTwilioWebhookParams,
+    shouldValidateTwilioWebhooks: () => true,
   };
 });
 
@@ -91,6 +92,9 @@ let supabaseStub: ReturnType<typeof makeSupabaseStub>;
 const supabaseState = vi.hoisted(() => {
   return { supabase: null as any };
 });
+vi.mock("@/lib/supabase.server", () => ({
+  getServiceSupabase: () => supabaseState.supabase,
+}));
 vi.mock("@supabase/supabase-js", () => {
   return {
     createClient: () => supabaseState.supabase,
@@ -99,6 +103,7 @@ vi.mock("@supabase/supabase-js", () => {
 
 describe("api.call-status billing + idempotency", () => {
   beforeEach(() => {
+    vi.resetModules();
     supabaseStub = makeSupabaseStub();
     supabaseState.supabase = supabaseStub as any;
     twilioMocks.validateTwilioWebhookParams.mockReset();

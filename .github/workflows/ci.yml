@@ -20,6 +20,19 @@ jobs:
       - run: npm run test:node
       - run: npm run test:ui
 
+  bundle-guard:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:client-bundle
+
   coverage:
     runs-on: ubuntu-latest
     continue-on-error: true

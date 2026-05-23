@@ -1,0 +1,80 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+import type { Database } from "@/lib/database.types";
+import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { env } from "@/lib/env.server";
+import type { User } from "@supabase/supabase-js";
+
+export const SESSION_EXPIRY_MINUTES = 60;
+
+export type HandsetLoaderData = {
+  handsetNumber: string | null;
+  clientIdentity: string;
+  workspaceId: string;
+};
+
+export async function getHandsetLoaderData({
+  supabaseClient,
+  user,
+  workspaceId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  user: User;
+  workspaceId: string;
+}): Promise<HandsetLoaderData> {
+  const { data: handsetData } = await getHandsetNumberForWorkspace({
+    supabaseClient,
+    workspaceId,
+  });
+
+  if (!handsetData?.phone_number) {
+    return {
+      handsetNumber: null,
+      clientIdentity: "",
+      workspaceId,
+    };
+  }
+
+  const clientIdentity = `handset-${crypto.randomUUID()}`;
+  const expiresAt = new Date(
+    Date.now() + SESSION_EXPIRY_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  const { error } = await supabaseClient.from("handset_session").insert({
+    user_id: user.id,
+    workspace_id: workspaceId,
+    client_identity: clientIdentity,
+    status: "active",
+    expires_at: expiresAt,
+  });
+
+  if (error) {
+    throw new Response("Failed to create handset session", { status: 500 });
+  }
+
+  return {
+    handsetNumber: handsetData.phone_number,
+    clientIdentity,
+    workspaceId,
+  };
+}
+
+export async function endHandsetSession({
+  workspaceId,
+  userId,
+}: {
+  workspaceId: string;
+  userId: string;
+}): Promise<void> {
+  const serviceSupabase = createClient<Database>(
+    env.SUPABASE_URL(),
+    env.SUPABASE_SERVICE_KEY(),
+  );
+
+  await serviceSupabase
+    .from("handset_session")
+    .update({ status: "ended" })
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .eq("status", "active");
+}
