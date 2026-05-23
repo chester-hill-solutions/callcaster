@@ -1,10 +1,6 @@
 import { data as routeData, type ActionFunction } from "react-router";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import {
-  rejectMissingTwilioSignatureHeader,
-  validateTwilioWebhookForPhoneCandidates,
-} from "@/lib/twilio-webhook.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -25,6 +21,10 @@ interface Capabilities {
 }
 
 export const action: ActionFunction = async ({ request }) => {
+  const {
+    rejectMissingTwilioSignatureHeader,
+    validateTwilioWebhookForPhoneCandidates,
+  } = await import("@/lib/twilio-webhook.server");
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
 

@@ -3,12 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
 import type { Database } from "@/lib/database.types";
-import {
-  resolveTwilioDataForPhoneNumber,
-  validateWorkspaceTwilioWebhook,
-} from "@/lib/twilio-webhook.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForPhoneNumber } = await import("@/lib/twilio-webhook.server");
+
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
 
@@ -21,28 +19,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
   const called = params.Called?.trim() ?? "";
-  if (!called) {
-    twiml.say("Invalid request. Missing caller information.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
 
-  const resolved = await resolveTwilioDataForPhoneNumber(supabase, called, logger);
-  if (!resolved) {
-    logger.debug("Inbound handset: number not found", { called });
-    twiml.say("This number is not configured for handset.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" },
-    });
-  }
-
-  const validation = validateWorkspaceTwilioWebhook({
+  const validation = await validateTwilioWebhookForPhoneNumber({
     request,
+    supabase,
+    phoneNumber: called,
     params,
-    twilioData: resolved.twilioData,
+    logger,
   });
   if (!validation.ok) {
     return validation.response;

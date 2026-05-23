@@ -2,27 +2,25 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
-
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
-
 const MAX_RETRIES = 5;
-const RETRY_DELAY = 200; 
+const RETRY_DELAY = 200;
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** IVR script steps shape from DB (script.steps is Json) */
 type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
 
-const getCallWithRetry = async (supabase: SupabaseClient<Database>, callSid: string, retries = 0) => {
+const getCallWithRetry = async (
+  supabase: SupabaseClient<Database>,
+  callSid: string,
+  retries = 0,
+) => {
   const { data, error } = await supabase
     .from("call")
-    .select('*, campaign(*, ivr_campaign(*, script(*)))')
+    .select("*, campaign(*, ivr_campaign(*, script(*)))")
     .eq("sid", callSid)
     .single();
 
@@ -37,8 +35,9 @@ const getCallWithRetry = async (supabase: SupabaseClient<Database>, callSid: str
   return data;
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+export const action = async ({ params, request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
 
   const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
@@ -51,17 +50,23 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {  cons
   if (!callSid || !campaignId || !pageId) {
     return new Response("Missing required parameters", { status: 400 });
   }
+
+  const validation = await validateTwilioWebhookForCallSid({
+    request,
+    supabase,
+    callSid,
+    params: paramsObj,
+  });
+  if (!validation.ok) {
+    return validation.response;
+  }
+
   try {
     const callData = await getCallWithRetry(supabase, callSid);
-    const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", callData.workspace).single();
-    const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-    const authToken = resolveTwilioWebhookAuthToken(creds);
-    const signature = request.headers.get("x-twilio-signature");
-    const url = new URL(request.url).href;
-    if (!authToken || !validateTwilioWebhookParams(paramsObj, signature, url, authToken)) {
-      return new Response("Invalid Twilio signature", { status: 403 });
-    }
-    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as unknown as IvrScriptSteps | null | undefined;
+    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as
+      | IvrScriptSteps
+      | null
+      | undefined;
     if (!script || !script.pages) {
       throw new Error("Invalid script structure");
     }

@@ -9,10 +9,6 @@ import type {
   WebhookEvent,
 } from "@/lib/twilio.types";
 import type { Database } from "@/lib/database.types";
-import {
-  loadWorkspaceTwilioData,
-  validateWorkspaceTwilioWebhook,
-} from "@/lib/twilio-webhook.server";
 
 interface WorkspaceNumberData {
   handset_enabled: boolean | null;
@@ -75,7 +71,9 @@ function dispatchInboundCallWebhookNotification(args: {
   });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { loadWorkspaceTwilioData, validateWorkspaceTwilioWebhook } = await import("@/lib/twilio-webhook.server");
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
 

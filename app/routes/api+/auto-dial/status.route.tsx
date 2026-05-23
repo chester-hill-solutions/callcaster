@@ -4,7 +4,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { createClient, RealtimeChannel } from "@supabase/supabase-js";
 
 
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+
 import { Tables } from "@/lib/database.types";
 import { OutreachAttempt } from "@/lib/types";
 import { Twilio } from "twilio";
@@ -320,6 +320,8 @@ const handleParticipantJoin = async (
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+
   const supabase = await getSupabase();
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");

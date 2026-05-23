@@ -16,6 +16,7 @@
     "tools:routes:rename": "node scripts/rename-route-modules.mjs",
     "tools:routes:imports": "node scripts/rewrite-route-imports.mjs && node scripts/normalize-route-test-imports.mjs",
     "tools:routes:repair": "node scripts/repair-consolidated-routes.mjs && node scripts/fix-route-lib-imports.mjs && node scripts/repair-route-exports.mjs && node scripts/fix-route-remix-imports.mjs && node scripts/fix-route-tests-rr7.mjs && node scripts/fix-route-test-module-paths.mjs",
+    "tools:routes:dynamic-imports": "node scripts/route-dynamic-server-imports.mjs && node scripts/fix-route-module-scope-server-refs.mjs",
     "tools:routes:legacy-delete": "node scripts/delete-legacy-routes.mjs",
     "tools:routes:sync-config": "node scripts/sync-config-after-route-cleanup.mjs",
     "tools:components:move-settings": "node scripts/move-component-settings.mjs",

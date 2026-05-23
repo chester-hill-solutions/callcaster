@@ -3,9 +3,10 @@ import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
 

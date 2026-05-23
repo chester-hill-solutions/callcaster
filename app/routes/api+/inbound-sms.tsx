@@ -11,7 +11,6 @@ import {
   readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
 } from "@/lib/twilio-workspace-credentials";
-import { validateWorkspaceTwilioWebhook } from "@/lib/twilio-webhook.server";
 
 async function findMatchingContactIds(
   supabase: SupabaseClient<Database>,
@@ -206,9 +205,17 @@ async function resolveInboundWorkspaceContext(
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { rejectMissingTwilioSignatureHeader, validateWorkspaceTwilioWebhook } =
+    await import("@/lib/twilio-webhook.server");
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+
+  const missingHeader = rejectMissingTwilioSignatureHeader(request);
+  if (missingHeader) {
+    return missingHeader;
+  }
 
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),

@@ -11,9 +11,9 @@ import type { TwilioSmsStatusWebhook, TwilioSmsStatus, OutreachDisposition } fro
 
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { isInboundMessageDirection } from "@/lib/chat-conversation-sort";
-import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
 
 export const action: ActionFunction = async ({ request }) => {
+  const { validateTwilioWebhookForMessageSid } = await import("@/lib/twilio-webhook.server");
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
   const { sendWebhookNotification } = await import(

@@ -7,16 +7,9 @@ import {
   resolveTwilioWebhookAuthToken,
 } from "@/lib/twilio-workspace-credentials";
 import {
+  shouldValidateTwilioWebhooks,
   validateTwilioWebhookParams,
 } from "@/twilio.server";
-
-function shouldValidateTwilioWebhooks(): boolean {
-  const value = process.env.TWILIO_VALIDATE_WEBHOOKS;
-  if (value === undefined || value === "") {
-    return true;
-  }
-  return value !== "false" && value !== "0";
-}
 
 export type TwilioWebhookValidationResult =
   | { ok: true; params: Record<string, string>; authToken: string }
@@ -222,6 +215,60 @@ export async function validateTwilioWebhookForMessageSid(args: {
   }
 
   return { ok: true, params, authToken };
+}
+
+export type TwilioWebhookPhoneValidationResult =
+  | {
+      ok: true;
+      params: Record<string, string>;
+      authToken: string;
+      workspaceId: string;
+      twilioData: unknown;
+    }
+  | { ok: false; response: Response };
+
+export async function validateTwilioWebhookForPhoneNumber(args: {
+  request: Request;
+  supabase: SupabaseClient<Database>;
+  phoneNumber: string;
+  params: Record<string, string>;
+  logger?: { info: (message: string, ...args: unknown[]) => void };
+}): Promise<TwilioWebhookPhoneValidationResult> {
+  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
+  if (missingHeader) {
+    return { ok: false, response: missingHeader };
+  }
+
+  const phoneNumber = args.phoneNumber.trim();
+  if (!phoneNumber) {
+    return { ok: false, response: twilioWebhookForbidden("Missing phone number") };
+  }
+
+  const resolved = await resolveTwilioDataForPhoneNumber(
+    args.supabase,
+    phoneNumber,
+    args.logger,
+  );
+  if (!resolved) {
+    return { ok: false, response: twilioWebhookForbidden() };
+  }
+
+  const validation = validateWorkspaceTwilioWebhook({
+    request: args.request,
+    params: args.params,
+    twilioData: resolved.twilioData,
+  });
+  if (!validation.ok) {
+    return validation;
+  }
+
+  return {
+    ok: true,
+    params: validation.params,
+    authToken: validation.authToken,
+    workspaceId: resolved.workspaceId,
+    twilioData: resolved.twilioData,
+  };
 }
 
 export async function resolveTwilioDataForPhoneNumber(

@@ -6,11 +6,6 @@ import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
-import {
-  readTwilioWorkspaceCredentials,
-  resolveTwilioWebhookAuthToken,
-} from "@/lib/twilio-workspace-credentials";
-
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase
     .from("campaign")
@@ -118,8 +113,8 @@ const handleNextStep = (
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
   const { logger } = await import("@/lib/logger.server");
-  const { validateTwilioWebhookParams } = await import("@/twilio.server");
   const { env } = await import("@/lib/env.server");
   const baseUrl = env.BASE_URL();
 
@@ -155,21 +150,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     return new Response("Missing CallSid parameter", { status: 400 });
   }
 
+  const validation = await validateTwilioWebhookForCallSid({
+    request,
+    supabase,
+    callSid,
+    params: formParams,
+  });
+  if (!validation.ok) {
+    return validation.response;
+  }
+
   try {
     const [{ data: call }, campaignData] = await Promise.all([
       supabase.from("call").select("*").eq("sid", callSid).single(),
       getCampaignData(supabase, campaignId),
     ]);
-    const twilioDataJson = call?.workspace
-      ? (await supabase.from("workspace").select("twilio_data").eq("id", call.workspace).single()).data?.twilio_data
-      : null;
-    const creds = readTwilioWorkspaceCredentials(twilioDataJson);
-    const authToken = resolveTwilioWebhookAuthToken(creds);
-    const signature = request.headers.get("x-twilio-signature");
-    const url = new URL(request.url).href;
-    if (!authToken || !validateTwilioWebhookParams(formParams, signature, url, authToken)) {
-      return new Response("Invalid Twilio signature", { status: 403 });
-    }
 
     if (!call) {
       throw new Error("Call not found");

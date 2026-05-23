@@ -4,7 +4,6 @@ import Twilio from "twilio";
 import { data as routeData } from "react-router";
 
 import type { ActionFunctionArgs } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
 import { Call, Campaign, IVRCampaign, OutreachAttempt, Script, type Block } from "@/lib/types";
 
@@ -121,7 +120,9 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
     ]);
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+  const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
 

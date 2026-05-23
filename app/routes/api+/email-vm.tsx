@@ -5,9 +5,10 @@ import { data as routeData, type ActionFunctionArgs } from "react-router";
 import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { validateWorkspaceTwilioWebhook } from "@/lib/twilio-webhook.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+
   const { logger } = await import("@/lib/logger.server");
   const { env } = await import("@/lib/env.server");
   const { sendWebhookNotification } = await import(
@@ -35,6 +36,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       env.SUPABASE_URL(),
       env.SUPABASE_SERVICE_KEY(),
     );
+
+    const validation = await validateTwilioWebhookForCallSid({
+      request,
+      supabase,
+      callSid,
+      params,
+    });
+    if (!validation.ok) {
+      return validation.response;
+    }
 
     const { data: callRow, error: callLookupError } = await supabase
       .from("call")
@@ -72,15 +83,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     if (!number.workspace) {
       throw new Error("Workspace not found");
-    }
-
-    const validation = validateWorkspaceTwilioWebhook({
-      request,
-      params,
-      twilioData: number.workspace.twilio_data,
-    });
-    if (!validation.ok) {
-      return validation.response;
     }
 
     const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);

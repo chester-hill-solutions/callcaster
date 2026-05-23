@@ -3,10 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
 
 import type { Database } from "@/lib/database.types";
-import {
-  resolveTwilioDataForPhoneNumber,
-  validateWorkspaceTwilioWebhook,
-} from "@/lib/twilio-webhook.server";
 
 /**
  * Twilio calls this when the handset <Dial> ends (timeout, hang up, etc.).
@@ -14,6 +10,8 @@ import {
  * otherwise just hang up so the caller is not sent to a voicemail-style message.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForPhoneNumber } = await import("@/lib/twilio-webhook.server");
+
   const { env } = await import("@/lib/env.server");
 
   if (request.method !== "POST") {
@@ -30,18 +28,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const called = (params.Called ?? params.To ?? "").trim();
   const dialCallStatus = String(params.DialCallStatus ?? "").toLowerCase();
 
-  if (called) {
-    const resolved = await resolveTwilioDataForPhoneNumber(supabase, called);
-    if (resolved) {
-      const validation = validateWorkspaceTwilioWebhook({
-        request,
-        params,
-        twilioData: resolved.twilioData,
-      });
-      if (!validation.ok) {
-        return validation.response;
-      }
-    }
+  const validation = await validateTwilioWebhookForPhoneNumber({
+    request,
+    supabase,
+    phoneNumber: called,
+    params,
+  });
+  if (!validation.ok) {
+    return validation.response;
   }
 
   const twiml = new Twilio.twiml.VoiceResponse();

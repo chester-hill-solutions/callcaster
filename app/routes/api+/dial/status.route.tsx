@@ -5,9 +5,9 @@ import { data as routeData, ActionFunction, ActionFunctionArgs } from "react-rou
 
 
 
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
   const { env } = await import("@/lib/env.server");
   const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
 

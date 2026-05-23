@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 
 /** When false, skips X-Twilio-Signature checks (local dev only). Defaults to true. */
 export function shouldValidateTwilioWebhooks(): boolean {
-  const value = process.env.TWILIO_VALIDATE_WEBHOOKS;
+  const value = env.TWILIO_VALIDATE_WEBHOOKS();
   if (value === undefined || value === "") {
     return true;
   }

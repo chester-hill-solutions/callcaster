@@ -10,7 +10,6 @@ import type { Database, TablesInsert } from "@/lib/database.types";
 
 
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 
 function toUnderCase(str: string): string {
     return str.replace(/(?!^)([A-Z])/g, '_$1').toLowerCase();
@@ -24,7 +23,9 @@ function convertKeysToUnderCase(obj: Record<string, unknown>): Record<string, un
     return newObj;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+  const { insertTransactionHistoryIdempotent } = await import("@/lib/transaction-history.server");
   const { env } = await import("@/lib/env.server");
   const { logger } = await import("@/lib/logger.server");
 
