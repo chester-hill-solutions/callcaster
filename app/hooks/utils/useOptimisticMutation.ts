@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import type { Fetcher } from "@remix-run/react";
+import type { Fetcher } from "react-router";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
 

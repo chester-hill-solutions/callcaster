@@ -1,6 +1,15 @@
 import Twilio from "twilio";
-import { json } from "@remix-run/node";
 import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+
+/** When false, skips X-Twilio-Signature checks (local dev only). Defaults to true. */
+export function shouldValidateTwilioWebhooks(): boolean {
+  const value = process.env.TWILIO_VALIDATE_WEBHOOKS;
+  if (value === undefined || value === "") {
+    return true;
+  }
+  return value !== "false" && value !== "0";
+}
 
 /**
  * Validates that a request came from Twilio using the X-Twilio-Signature header.
@@ -15,19 +24,34 @@ export async function validateTwilioWebhook(
   request: Request,
   authToken: string
 ): Promise<{ params: Record<string, string> } | Response> {
-  const signature = request.headers.get("x-twilio-signature");
-  if (!signature) {
-    return json({ error: "Missing Twilio signature" }, { status: 403 });
-  }
-
-  const url = new URL(request.url).href;
   const formData = await request.formData();
   const params = Object.fromEntries(formData.entries()) as Record<string, string>;
 
-  const isValid = Twilio.validateRequest(authToken, signature, url, params);
-  if (!isValid) {
-    return json({ error: "Invalid Twilio signature" }, { status: 403 });
+  if (!shouldValidateTwilioWebhooks()) {
+    logger.debug("validateTwilioWebhook skipped", {
+      url: new URL(request.url).href,
+      paramKeys: Object.keys(params),
+    });
+    return { params };
   }
+
+  const signature = request.headers.get("x-twilio-signature");
+  if (!signature) {
+    return new Response(JSON.stringify({ error: "Missing Twilio signature" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const url = new URL(request.url).href;
+  const valid = Twilio.validateRequest(authToken, signature, url, params);
+  if (!valid) {
+    return new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   return { params };
 }
 
@@ -41,7 +65,18 @@ export function validateTwilioWebhookParams(
   url: string,
   authToken: string
 ): boolean {
-  if (!signature) return false;
+  if (!shouldValidateTwilioWebhooks()) {
+    logger.debug("validateTwilioWebhookParams skipped", {
+      url,
+      paramKeys: Object.keys(params),
+    });
+    return true;
+  }
+
+  if (!signature) {
+    return false;
+  }
+
   return Twilio.validateRequest(authToken, signature, url, params);
 }
 

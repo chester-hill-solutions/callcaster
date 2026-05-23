@@ -1,12 +1,20 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tables } from "@/lib/database.types";
-import type { getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
 
 type WorkspaceRecord = (Tables<"workspace"> & { campaign?: unknown[] }) | null;
 type WorkspaceUserRecord = (Tables<"workspace_users"> & { user?: Tables<"user"> | null })[] | null | undefined;
 type WorkspaceNumberRecord = Tables<"workspace_number">[] | null | undefined;
-type WorkspaceTwilioSnapshot = Awaited<ReturnType<typeof getWorkspaceTwilioPortalSnapshot>> | null | undefined;
+type WorkspaceTwilioSyncSnapshot = {
+  lastSyncStatus?: string;
+  accountStatus?: string;
+  lastSyncedAt?: string;
+  numberTypes?: string[];
+  lastSyncError?: string;
+};
+type WorkspaceTwilioSnapshot = {
+  syncSnapshot?: WorkspaceTwilioSyncSnapshot;
+} | null | undefined;
 
 export default function WorkspaceOverview({
     workspace,

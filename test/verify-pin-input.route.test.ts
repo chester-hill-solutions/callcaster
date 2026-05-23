@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   const say = vi.fn();
   const hangup = vi.fn();
@@ -72,7 +74,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.verify-pin-input.tsx", () => {
+describe("app/routes/api+/verify-pin-input/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -89,10 +91,10 @@ describe("app/routes/api.verify-pin-input.tsx", () => {
   test("missing digits/to returns invalid request TwiML", async () => {
     const supabase = makeSupabase({});
     mocks.createClient.mockReturnValueOnce(supabase);
-    const mod = await import("../app/routes/api.verify-pin-input");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/verify-pin-input");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toBe("<Response />");
     expect(mocks.say).toHaveBeenCalledWith(
@@ -109,10 +111,10 @@ describe("app/routes/api.verify-pin-input.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api.verify-pin-input");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/verify-pin-input");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await res.text()).toBe("<Response />");
     expect(mocks.say).toHaveBeenCalledWith(
       "Invalid or expired verification code. Please try again."
@@ -129,10 +131,10 @@ describe("app/routes/api.verify-pin-input.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "123456");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api.verify-pin-input");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/verify-pin-input");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await res.text()).toBe("<Response />");
     expect(mocks.say).toHaveBeenCalledWith(
       "An error occurred while verifying your number. Please try again later."
@@ -149,10 +151,10 @@ describe("app/routes/api.verify-pin-input.tsx", () => {
     const fd = new FormData();
     fd.set("Digits", "654321");
     fd.set("To", "+15551234567");
-    const mod = await import("../app/routes/api.verify-pin-input");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/verify-pin-input");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(await res.text()).toBe("<Response />");
     expect((supabase as any)._spies.delEq).toHaveBeenCalledWith("id", 2);
     expect(mocks.say).toHaveBeenCalledWith(

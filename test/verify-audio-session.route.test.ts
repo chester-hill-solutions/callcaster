@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   const say = vi.fn();
   const pause = vi.fn();
@@ -12,7 +14,7 @@ const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: { BASE_URL: vi.fn(() => "http://base") },
     VoiceResponse,
     say,
@@ -22,9 +24,13 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
-}));
+vi.mock("@/lib/supabase.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/supabase.server")>();
+  return {
+    ...actual,
+    verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+  };
+});
 vi.mock("@/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
@@ -59,7 +65,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.verify-audio-session.tsx", () => {
+describe("app/routes/api+/verify-audio-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -80,10 +86,10 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       headers: new Headers(),
       user: null,
     });
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
-    } as any);
+    } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
@@ -96,7 +102,7 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: vi.fn() } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
+    const mod = await import("../app/routes/api+/verify-audio-session");
     await expect(
       mod.loader({
         request: new Request(
@@ -116,10 +122,10 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       user: { id: "u1" },
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: vi.fn() } });
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "ins" });
   });
@@ -133,10 +139,10 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     const create = vi.fn(async () => ({ sid: "CA1" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({
@@ -165,12 +171,12 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
     const create = vi.fn(async () => ({ sid: "CA2" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create } });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=1%2B5551234567&fromNumber=5551234567"
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ callSid: "CA2", pin: "222222" });
   });
@@ -188,12 +194,12 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       calls: { create: vi.fn(async () => ({ sid: "CA3" })) },
     });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=%2B15551234567&fromNumber=%2B15551234567"
       ),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -216,10 +222,10 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-audio-session?workspace_id=w1&phoneNumber=15551234567&fromNumber=15551234567"),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "twilio" });
@@ -231,8 +237,8 @@ describe("app/routes/api.verify-audio-session.tsx", () => {
   });
 
   test("action returns TwiML xml", async () => {
-    const mod = await import("../app/routes/api.verify-audio-session");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/verify-audio-session");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toBe("<Response />");
     expect(mocks.gather).toHaveBeenCalledWith(

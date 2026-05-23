@@ -23,15 +23,16 @@ You can import hooks using either explicit file paths or directory imports (via 
 
 ```typescript
 // Explicit file path
-import { useCallState } from '@/hooks/call/useCallState';
+import { useCallState } from "@/hooks/call/useCallState";
 
 // Directory import (via index.ts)
-import { useCallState, useTwilioDevice } from '@/hooks/call';
+import { useCallState, useTwilioDevice } from "@/hooks/call";
 ```
 
 ### Hook Categories
 
 #### Call Hooks (`call/`)
+
 - `useCallState` - Manages call state machine and transitions
 - `useTwilioDevice` - Main Twilio device integration (coordinates useTwilioConnection and useCallHandling)
 - `useTwilioConnection` - Twilio device registration and connection management
@@ -41,6 +42,7 @@ import { useCallState, useTwilioDevice } from '@/hooks/call';
 - `useSupabaseRoom` - Supabase room management for calls
 
 #### Realtime Hooks (`realtime/`)
+
 - `useSupabaseRealtime` - Main realtime data synchronization
 - `useSupabaseRealtimeSubscription` - Reusable subscription hook
 - `useRealtimeData` - Workspace contacts realtime updates
@@ -48,18 +50,22 @@ import { useCallState, useTwilioDevice } from '@/hooks/call';
 - `useConversationSummaryRealTime` - Conversation summary updates
 
 #### Queue Hooks (`queue/`)
+
 - `useQueue` - Queue management
 - `useAttempts` - Outreach attempt tracking
 - `useCalls` - Call tracking
 
 #### Campaign Hooks (`campaign/`)
+
 - `useCampaignSettings` - Campaign settings management
 - `useScriptState` - Script state management
 
 #### Contact Hooks (`contact/`)
+
 - `useContactSearch` - Contact search functionality
 
 #### Utility Hooks (`utils/`)
+
 - `useDebounce` - Debounce values
 - `useDebouncedSave` - Debounced save functionality
 - `useInterval` - Interval management
@@ -68,11 +74,13 @@ import { useCallState, useTwilioDevice } from '@/hooks/call';
 **Note**: `useCsvDownload` was refactored to a utility function (`lib/csvDownload.ts`) and is no longer a hook.
 
 #### Phone Hooks (`phone/`)
+
 - `usePhoneNumbers` - Phone number management
 
 ## Dependencies
 
 Some hooks have internal dependencies:
+
 - `useSupabaseRealtime` depends on `useQueue`, `useAttempts`, `useCalls`, and `usePhoneNumbers`
 - `useTwilioDevice` depends on `useTwilioConnection`, `useCallHandling`, and `useCallDuration`
 - `useDebouncedSave` depends on `useDebounce`
@@ -87,5 +95,4 @@ Some hooks have internal dependencies:
 
 ## Migration Notes
 
-This directory was reorganized from a flat structure to domain-based organization. All imports have been updated to use the new paths. See `HOOKS_REORGANIZATION_CHECKLIST.md` for migration details.
-
+This directory was reorganized from a flat structure to domain-based organization. All imports have been updated to use the new paths. See `docs/archive/root-notes/hooks/HOOKS_REORGANIZATION_CHECKLIST.md` for migration details.

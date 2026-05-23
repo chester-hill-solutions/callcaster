@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate, useNavigation } from "@remix-run/react";
+import { Form, NavLink, useFetcher, useNavigate, useNavigation } from "react-router";
 import { QueueItem } from "@/lib/types";
 
 interface CampaignDialogsProps {

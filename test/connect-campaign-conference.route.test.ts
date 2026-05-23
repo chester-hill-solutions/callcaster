@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Avoid env validation noise
 vi.mock("@/lib/env.server", () => ({
   env: { BASE_URL: () => "https://base.example" },
@@ -28,18 +30,18 @@ vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
   return { default: VoiceResponse };
 });
 
-describe("app/routes/api.connect-campaign-conference.$workspaceId.$campaignId.tsx", () => {
+describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
   });
 
   test("returns TwiML with campaign conference name", async () => {
     const mod = await import(
-      "../app/routes/api.connect-campaign-conference.$workspaceId.$campaignId"
+      "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       params: { workspaceId: "w1", campaignId: "c1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const body = await res.text();
     expect(body).toContain("conf:campaign-w1-c1");

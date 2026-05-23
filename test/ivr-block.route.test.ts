@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -8,7 +10,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -72,7 +74,7 @@ function makeSupabase(opts?: {
   return supabase;
 }
 
-describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
+describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -81,8 +83,8 @@ describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("returns 400 when required params missing", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase());
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId.$blockId");
-    const res = await mod.action({ params: {}, request: new Request("http://x") } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(await mod.action({ params: {}, request: new Request("http://x") } as any));
     expect(res.status).toBe(400);
   });
 
@@ -95,11 +97,11 @@ describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
     };
     const campaignData = { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId.$blockId");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: new Request("http://x"),
-    } as any);
+    } as any));
     const xml = await res.text();
     expect(xml).toContain("play:https://signed");
     expect(xml).toContain("gather:https://base.example/api/ivr/1/page_1/b1/response");
@@ -116,7 +118,7 @@ describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
       },
     };
     const campaignData = { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] };
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId.$blockId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     let res = await mod.action({
@@ -149,7 +151,7 @@ describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("catch logs and says generic error on invalid script or signed url error", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", ivr_campaign: [{ script: { steps: null } }] } }));
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId.$blockId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: new Request("http://x"),
@@ -171,11 +173,11 @@ describe("app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("covers getCampaignData error branch", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignError: new Error("db") }));
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId.$blockId");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: new Request("http://x"),
-    } as any);
+    } as any));
     expect(await res.text()).toContain("An error occurred. Please try again later.");
   });
 });

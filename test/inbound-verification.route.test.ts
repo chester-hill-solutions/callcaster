@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   const say = vi.fn();
   const hangup = vi.fn();
@@ -13,7 +15,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
     },
-    logger: { debug: vi.fn(), error: vi.fn() },
+    logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     VoiceResponse,
     say,
     hangup,
@@ -88,7 +90,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.inbound-verification.tsx", () => {
+describe("app/routes/api+/inbound/route-verification.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -104,13 +106,13 @@ describe("app/routes/api.inbound-verification.tsx", () => {
       makeSupabase({ session: { data: null, error: null } })
     );
     const formData = new FormData();
-    const mod = await import("../app/routes/api.inbound-verification");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
       }),
-    } as never);
+    } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(mocks.say).toHaveBeenCalledWith(
       "Invalid request. Missing caller information."
@@ -124,13 +126,13 @@ describe("app/routes/api.inbound-verification.tsx", () => {
     mocks.createClient.mockReturnValue(supabase);
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
       }),
-    } as never);
+    } as never));
     expect(mocks.say).toHaveBeenCalledWith(
       expect.stringContaining("No active verification session")
     );
@@ -158,13 +160,13 @@ describe("app/routes/api.inbound-verification.tsx", () => {
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
       }),
-    } as never);
+    } as never));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(mocks.say).toHaveBeenCalledWith(
@@ -191,13 +193,13 @@ describe("app/routes/api.inbound-verification.tsx", () => {
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
-    const mod = await import("../app/routes/api.inbound-verification");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
       }),
-    } as never);
+    } as never));
 
     expect(mocks.say).toHaveBeenCalledWith(
       "This number is already verified."

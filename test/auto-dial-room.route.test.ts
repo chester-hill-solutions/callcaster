@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(async () => ({ ok: true })),
   };
 });
@@ -26,6 +28,16 @@ vi.mock("../app/lib/env.server", () => ({
 }));
 
 vi.mock("../app/lib/logger.server", () => ({ logger: mocks.logger }));
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: vi.fn(async (args: {
+    params?: Record<string, string>;
+  }) => ({
+    ok: true,
+    params: args.params ?? {},
+    authToken: "tok",
+  })),
+}));
 
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: vi.fn(() => true),
@@ -65,7 +77,7 @@ function makeSupabase(overrides: Partial<any>) {
   return supabase;
 }
 
-describe("app/routes/api.auto-dial.$roomId.tsx", () => {
+describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
   beforeEach(() => {
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -126,7 +138,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -138,16 +150,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
 
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(mocks.fetch).toHaveBeenCalledWith(
@@ -225,7 +237,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -242,16 +254,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
 
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(updateCallTwiml).toHaveBeenCalledWith(
@@ -310,7 +322,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -321,16 +333,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
 
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -407,7 +419,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -421,16 +433,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(updateCallTwiml).toHaveBeenCalled();
@@ -464,16 +476,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     supabase.rpc.mockResolvedValueOnce({ data: null, error: new Error("dq") });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -504,16 +516,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -533,16 +545,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -573,16 +585,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     // intentionally omit Called
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
 
@@ -616,7 +628,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -631,16 +643,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     supabase.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(mocks.fetch).toHaveBeenCalledWith(
       "https://base.example/api/auto-dial/dialer",
@@ -692,7 +704,7 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
           select: () => ({
             eq: () => ({
               single: async () => ({
-                data: { twilio_data: { authToken: "auth" } },
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
                 error: null,
               }),
             }),
@@ -703,16 +715,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(outreachSelect).toHaveBeenCalled();
@@ -728,16 +740,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(mocks.logger.error).toHaveBeenCalled();
     expect(await res.text()).toContain("<Hangup/>");
   });
@@ -776,16 +788,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
 
@@ -814,16 +826,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "+1777");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
   });
 
@@ -848,16 +860,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -888,16 +900,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -937,16 +949,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "machine_start");
     fd.set("CallStatus", "ringing");
     fd.set("Called", "+1888");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(await res.text()).toContain("<Hangup/>");
   });
 
@@ -978,16 +990,16 @@ describe("app/routes/api.auto-dial.$roomId.tsx", () => {
     });
     mocks.createClient.mockReturnValueOnce(supabase);
 
-    const mod = await import("../app/routes/api.auto-dial.$roomId");
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
     fd.set("AnsweredBy", "");
     fd.set("CallStatus", "in-progress");
     fd.set("Called", "client:u1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/auto-dial/u1", { method: "POST", body: fd }),
       params: { roomId: "u1" },
-    } as any);
+    } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     // Only called from machine paths / answered-at branch; should not be invoked here.
     expect(outreachSelect).not.toHaveBeenCalledWith(expect.anything());

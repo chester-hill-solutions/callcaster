@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "@remix-run/react";
+import { useParams, useNavigate } from "react-router";
 import { parse } from "csv-parse/sync";
 import { MdAdd, MdClose, MdCheck } from "react-icons/md";
 import { Button } from "@/components/ui/button";

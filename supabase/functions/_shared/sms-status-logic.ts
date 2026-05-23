@@ -37,7 +37,7 @@ export function pickRawTwilioSmsStatus(payload: {
 }
 
 export function normalizeTwilioSmsStatus(raw: string): TwilioSmsStatus {
-  const s = String(raw || "").trim();
+  const s = String(raw || "").trim().toLowerCase();
   return (VALID_SMS_STATUSES.has(s as TwilioSmsStatus)
     ? (s as TwilioSmsStatus)
     : "failed") as TwilioSmsStatus;

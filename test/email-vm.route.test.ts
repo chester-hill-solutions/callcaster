@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
     sendEmail: vi.fn(),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(),
     env: {
       RESEND_API_KEY: () => "rk",
@@ -21,8 +23,12 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...args: any[]) => mocks.sendWebhookNotification(...args),
+}));
+vi.mock("@/twilio.server", () => ({
+  validateTwilioWebhookParams: vi.fn(() => true),
+  shouldValidateTwilioWebhooks: () => true,
 }));
 
 vi.mock("resend", () => {
@@ -74,6 +80,14 @@ function makeSupabase(overrides?: {
     from: (table: string) => {
       if (table === "call") {
         return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: callRow,
+                error: overrides?.callError ?? null,
+              }),
+            }),
+          }),
           update: () => ({
             eq: () => ({
               select: () => ({
@@ -123,7 +137,7 @@ function makeReq(fields: Record<string, any>) {
   return new Request("http://localhost/api/email-vm", { method: "POST", body: fd });
 }
 
-describe("app/routes/api.email-vm.tsx", () => {
+describe("app/routes/api+/email-vm/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -132,6 +146,26 @@ describe("app/routes/api.email-vm.tsx", () => {
     mocks.logger.error.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
+  });
+
+  test("returns 403 when Twilio signature validation fails", async () => {
+    const { validateTwilioWebhookParams } = await import("@/twilio.server");
+    vi.mocked(validateTwilioWebhookParams).mockReturnValueOnce(false);
+    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeReq({
+          RecordingUrl: "https://tw/rec",
+          CallSid: "CA1",
+          AccountSid: "AC1",
+          RecordingSid: "RE1",
+        }),
+        params: {},
+      } as any),
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 
   test("success path sends email and (optionally) webhook", async () => {
@@ -154,8 +188,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -164,7 +198,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         RecordingDuration: "12",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true });
     expect(mocks.sendEmail).toHaveBeenCalledWith(
@@ -197,8 +231,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -206,7 +240,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         RecordingSid: "RE1",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
   });
@@ -233,8 +267,8 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
-    const mod = await import("../app/routes/api.email-vm");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -243,7 +277,7 @@ describe("app/routes/api.email-vm.tsx", () => {
         // omit RecordingDuration => duration undefined in webhook payload
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: [""] }),
@@ -256,7 +290,7 @@ describe("app/routes/api.email-vm.tsx", () => {
   });
 
   test("validates required fields and returns 500 on failures", async () => {
-    const mod = await import("../app/routes/api.email-vm");
+    const mod = await import("../app/routes/api+/email-vm");
     mocks.createClient.mockReturnValue(makeSupabase());
     mocks.fetch.mockResolvedValue({
       ok: true,
@@ -265,29 +299,29 @@ describe("app/routes/api.email-vm.tsx", () => {
     } as any);
 
     // RecordingUrl missing
-    let res = await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any);
+    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // CallSid missing
-    res = await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any);
+    res = await asRouteResponse(await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
     expect(res.status).toBe(500);
 
     // AccountSid missing
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     // RecordingSid missing
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     // non-string RecordingUrl (File)
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({
         RecordingUrl: new File(["x"], "f.txt"),
         CallSid: "CA1",
@@ -295,55 +329,55 @@ describe("app/routes/api.email-vm.tsx", () => {
         RecordingSid: "RE1",
       }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("covers supabase and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
-    const mod = await import("../app/routes/api.email-vm");
+    const mod = await import("../app/routes/api+/email-vm");
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ callError: { message: "call" } }),
     );
-    let res = await mod.action({
+    let res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ numberError: { message: "num" } }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ workspace: null }));
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ workspace: { id: "w1", name: "W", twilio_data: null, webhook: [] } }),
     );
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supOk = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supOk);
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supUploadErr = makeSupabase({ uploadError: { message: "up" } });
@@ -353,10 +387,10 @@ describe("app/routes/api.email-vm.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
 
     const supSignedErr = makeSupabase({ signedUrlError: { message: "sig" } });
@@ -366,10 +400,10 @@ describe("app/routes/api.email-vm.tsx", () => {
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await mod.action({
+    res = await asRouteResponse(await mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
   });
 });

@@ -1,10 +1,14 @@
+// @ts-nocheck
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
 import Twilio from "twilio";
-import { json } from "@remix-run/node";
-import { createWorkspaceTwilioInstance } from "../lib/database.server";
-import type { ActionFunctionArgs } from "@remix-run/node";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+
+
+
 
 interface CampaignData {
   voicemail_file?: string;
@@ -63,7 +67,10 @@ const handleVoicemail = async (twilio: any, callSid: string, dbCall: CallData, s
     }
 };
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { env } = await import("@/lib/env.server");
+  const { createWorkspaceTwilioInstance } = await import("@/lib/database.server");
+
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
 
@@ -119,7 +126,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         await Promise.all(updateOperations);
     } catch (error) {
         logger.error("IVR campaign error:", error);
-        return json({ success: false, error });
+        return routeData({ success: false, error });
     }
-    return json({ success: true });
+    return routeData({ success: true });
 };

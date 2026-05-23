@@ -1,5 +1,11 @@
 import { describe, expect, test, vi, beforeEach } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -17,17 +23,7 @@ vi.mock("@/twilio.server", () => {
   };
 });
 
-type TransactionRow = {
-  id: number;
-  workspace: string;
-  type: "DEBIT" | "CREDIT";
-  amount: number;
-  note: string;
-  created_at: string;
-};
-
 function makeSupabaseStub() {
-  let nextId = 1;
   const transactionRows: TransactionRow[] = [];
 
   const realtime = {
@@ -63,7 +59,7 @@ function makeSupabaseStub() {
         select: () => ({
           eq: () => ({
             single: async () => ({
-              data: { twilio_data: { authToken: "twilio-token" } },
+              data: { twilio_data: { sid: "AC_test", authToken: "twilio-token" } },
               error: null,
             }),
           }),
@@ -81,56 +77,7 @@ function makeSupabaseStub() {
     }
 
     if (table === "transaction_history") {
-      const q: {
-        workspace?: string;
-        type?: string;
-        likeNoteSubstring?: string;
-      } = {};
-
-      const selectBuilder: any = {};
-      selectBuilder.select = () => selectBuilder;
-      selectBuilder.eq = (col: string, val: any) => {
-        if (col === "workspace") q.workspace = String(val);
-        if (col === "type") q.type = String(val);
-        return selectBuilder;
-      };
-      selectBuilder.like = (_col: string, pattern: string) => {
-        // pattern looks like `%[idempotency:call:CA123]%`
-        q.likeNoteSubstring = pattern.replace(/^%/, "").replace(/%$/, "");
-        return selectBuilder;
-      };
-      selectBuilder.order = () => selectBuilder;
-      selectBuilder.limit = async () => {
-        const filtered = transactionRows.filter((r) => {
-          if (q.workspace && r.workspace !== q.workspace) return false;
-          if (q.type && r.type !== q.type) return false;
-          if (q.likeNoteSubstring && !r.note.includes(q.likeNoteSubstring))
-            return false;
-          return true;
-        });
-        const latest = filtered.length ? [filtered[filtered.length - 1]] : [];
-        return { data: latest, error: null };
-      };
-
-      return {
-        ...selectBuilder,
-        insert: (row: any) => ({
-          select: () => ({
-            single: async () => {
-              const created = {
-                id: nextId++,
-                workspace: row.workspace,
-                type: row.type,
-                amount: row.amount,
-                note: row.note,
-                created_at: new Date().toISOString(),
-              } satisfies TransactionRow;
-              transactionRows.push(created);
-              return { data: { id: created.id }, error: null };
-            },
-          }),
-        }),
-      };
+      return makeTransactionHistoryTableStub(transactionRows);
     }
 
     throw new Error(`unexpected table ${table}`);
@@ -160,26 +107,26 @@ describe("api.call-status billing + idempotency", () => {
 
   test("rejects invalid Twilio signature", async () => {
     twilioMocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routes/api+/call-status");
     const fd = new FormData();
     fd.set("CallSid", "CA_BAD");
     fd.set("CallStatus", "completed");
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "61");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/call-status", {
         method: "POST",
         headers: { "x-twilio-signature": "bad" },
         body: fd,
       }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(403);
   });
 
   test("bills one unit for 0s, two units for 60s, two units for 61s", async () => {
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routes/api+/call-status");
 
     const makeReq = (sid: string, duration: string) => {
       const fd = new FormData();
@@ -205,7 +152,7 @@ describe("api.call-status billing + idempotency", () => {
   });
 
   test("is idempotent across duplicate webhook deliveries (same CallSid)", async () => {
-    const mod = await import("../app/routes/api.call-status");
+    const mod = await import("../app/routes/api+/call-status");
 
     const fd = new FormData();
     fd.set("CallSid", "CA_DUP");
@@ -223,8 +170,8 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: req.clone() } as any);
     await mod.action({ request: req.clone() } as any);
 
-    const matching = supabaseStub._transactionRows.filter((r) =>
-      r.note.includes("[idempotency:call:CA_DUP]"),
+    const matching = supabaseStub._transactionRows.filter(
+      (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });

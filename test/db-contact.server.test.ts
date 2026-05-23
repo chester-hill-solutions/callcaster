@@ -1,33 +1,55 @@
 import { describe, expect, test, vi } from "vitest";
 
 describe("app/lib/database/contact.server.ts", () => {
-  test("findPotentialContacts builds an .or() query and returns result", async () => {
+  test("findPotentialContacts prioritizes exact indexed lookup and narrows fallback", async () => {
     const mod = await import("../app/lib/database/contact.server");
 
+    const inArgs: { value?: string[] } = {};
     const orArg: { value?: string } = {};
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      in: (_column: string, values: string[]) => {
+        inArgs.value = values;
+        return chain;
+      },
       or: (s: string) => {
         orArg.value = s;
         return chain;
       },
       not: () => chain,
-      neq: async () => ({ data: [{ id: 1 }], error: null }),
+      neq: async () => ({ data: [], error: null }),
     };
 
-    const supabase: any = { from: vi.fn(() => chain) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: new Error("rpc unavailable"),
+      })),
+      from: vi.fn(() => chain),
+    };
     const res = await mod.findPotentialContacts(
       supabase,
       "(555) 555-0100",
       "w1",
     );
 
+    expect(supabase.rpc).toHaveBeenCalledWith("find_contact_by_phone", {
+      p_workspace_id: "w1",
+      p_phone_number: "(555) 555-0100",
+    });
     expect(supabase.from).toHaveBeenCalledWith("contact");
-    expect(orArg.value).toContain("phone.eq.5555550100");
-    expect(orArg.value).toContain("phone.eq.+15555550100");
-    expect(orArg.value).toContain("phone.ilike.%5555550100");
-    expect(res).toEqual({ data: [{ id: 1 }], error: null });
+    expect(inArgs.value).toEqual(
+      expect.arrayContaining([
+        "5555550100",
+        "+15555550100",
+        "(555) 555-0100",
+        "555.555.0100",
+      ]),
+    );
+    expect(orArg.value).toContain("phone.ilike.5555550100%");
+    expect(orArg.value).not.toContain("%5555550100");
+    expect(res).toEqual({ data: [], error: null });
   });
 
   test("fetchContactData: by number only promotes a unique match to contact", async () => {
@@ -36,11 +58,18 @@ describe("app/lib/database/contact.server.ts", () => {
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       or: () => chain,
       not: () => chain,
       neq: async () => ({ data: [{ id: 1 }], error: null }),
     };
-    const supabase: any = { from: vi.fn(() => chain) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: new Error("rpc unavailable"),
+      })),
+      from: vi.fn(() => chain),
+    };
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.contact).toEqual({ id: 1 });
@@ -54,11 +83,18 @@ describe("app/lib/database/contact.server.ts", () => {
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       or: () => chain,
       not: () => chain,
       neq: async () => ({ data: null, error: null }),
     };
-    const supabase: any = { from: vi.fn(() => chain) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: new Error("rpc unavailable"),
+      })),
+      from: vi.fn(() => chain),
+    };
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.potentialContacts).toEqual([]);
@@ -70,11 +106,21 @@ describe("app/lib/database/contact.server.ts", () => {
     const chain: any = {
       select: () => chain,
       eq: () => chain,
+      in: () => chain,
       or: () => chain,
       not: () => chain,
-      neq: async () => ({ data: [{ id: 1 }, { id: 2 }, { id: 2 }], error: null }),
+      neq: async () => ({
+        data: [{ id: 1 }, { id: 2 }, { id: 2 }],
+        error: null,
+      }),
     };
-    const supabase: any = { from: vi.fn(() => chain) };
+    const supabase: any = {
+      rpc: vi.fn(async () => ({
+        data: null,
+        error: new Error("rpc unavailable"),
+      })),
+      from: vi.fn(() => chain),
+    };
 
     const res = await mod.fetchContactData(supabase, "w1", "", "5555550100");
     expect(res.contact).toBeNull();
@@ -116,16 +162,19 @@ describe("app/lib/database/contact.server.ts", () => {
           expect("x" in data).toBe(false);
           return {
             eq: () => ({
-              select: async () => ({ data: [{ id: data.id, ok: 1 }], error: null }),
+              select: async () => ({
+                data: [{ id: data.id, ok: 1 }],
+                error: null,
+              }),
             }),
           };
         },
       }),
     };
 
-    await expect(mod.updateContact(supabase, { x: undefined } as any)).rejects.toThrow(
-      "Contact ID is required",
-    );
+    await expect(
+      mod.updateContact(supabase, { x: undefined } as any),
+    ).rejects.toThrow("Contact ID is required");
 
     const updated = await mod.updateContact(supabase, {
       id: 1,
@@ -143,9 +192,9 @@ describe("app/lib/database/contact.server.ts", () => {
         }),
       }),
     };
-    await expect(mod.updateContact(supabaseErr, { id: 1 } as any)).rejects.toThrow(
-      "bad",
-    );
+    await expect(
+      mod.updateContact(supabaseErr, { id: 1 } as any),
+    ).rejects.toThrow("bad");
 
     const supabaseEmpty: any = {
       from: () => ({
@@ -156,9 +205,9 @@ describe("app/lib/database/contact.server.ts", () => {
         }),
       }),
     };
-    await expect(mod.updateContact(supabaseEmpty, { id: 1 } as any)).rejects.toThrow(
-      "Contact not found",
-    );
+    await expect(
+      mod.updateContact(supabaseEmpty, { id: 1 } as any),
+    ).rejects.toThrow("Contact not found");
   });
 
   test("createContact: inserts contact and optionally links audience", async () => {
@@ -225,6 +274,11 @@ describe("app/lib/database/contact.server.ts", () => {
                       error: null,
                     },
             }),
+            delete: () => ({
+              eq: () => ({
+                in: async () => ({ error: null }),
+              }),
+            }),
           };
         }
         if (table === "contact_audience") {
@@ -262,4 +316,3 @@ describe("app/lib/database/contact.server.ts", () => {
     ).rejects.toThrow("link");
   });
 });
-

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createSupabaseServerClient: vi.fn(),
@@ -8,7 +10,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: { BASE_URL: () => "https://base.example" },
   };
 });
@@ -79,7 +81,7 @@ function makeSupabaseStub(credits: number) {
   return { supabase, upsert, rpc };
 }
 
-describe("app/routes/api.dial.tsx", () => {
+describe("app/routes/api+/dial/tsx.route", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createSupabaseServerClient.mockReset();
@@ -112,7 +114,7 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.verifyAuth.mockResolvedValueOnce({ user: null });
 
-    const mod = await import("../app/routes/api.dial");
+    const mod = await import("../app/routes/api+/dial");
     await expect(
       mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
     ).rejects.toMatchObject({ status: 401 });
@@ -132,9 +134,9 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
-    expect(res).toEqual({ creditsError: true });
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect(res).toMatchObject({ creditsError: true });
   });
 
   test("happy path uses outreach_id when provided and upserts call", async () => {
@@ -155,8 +157,8 @@ describe("app/routes/api.dial.tsx", () => {
     const callsCreate = vi.fn(async () => ({ sid: "CA1", from: "+1555" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: callsCreate } });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
     expect(rpc).not.toHaveBeenCalled(); // outreach_id provided
     expect(upsert).toHaveBeenCalled();
@@ -183,8 +185,8 @@ describe("app/routes/api.dial.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
     expect(rpc).toHaveBeenCalledWith("create_outreach_attempt", expect.any(Object));
   });
@@ -203,7 +205,7 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
     await expect(
-      (await import("../app/routes/api.dial")).action({
+      (await import("../app/routes/api+/dial")).action({
         request: new Request("http://localhost/api/dial", { method: "POST" }),
       } as any),
     ).rejects.toThrow("Invalid phone number length");
@@ -226,8 +228,8 @@ describe("app/routes/api.dial.tsx", () => {
       calls: { create: async () => Promise.reject(new Error("tw")) },
     });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     const xml = await (res as Response).text();
     expect(xml).toContain("There was an error placing your call");
     expect(mocks.logger.error).toHaveBeenCalledWith("Error placing call:", expect.any(Error));
@@ -255,7 +257,7 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
 
-    const mod = await import("../app/routes/api.dial");
+    const mod = await import("../app/routes/api+/dial");
     await expect(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any)).rejects.toThrow("db");
   });
 
@@ -275,8 +277,8 @@ describe("app/routes/api.dial.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     expect(await (res as Response).text()).toContain("There was an error placing your call");
   });
 
@@ -317,7 +319,7 @@ describe("app/routes/api.dial.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ user: { id: "u1" } });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
-    const mod = await import("../app/routes/api.dial");
+    const mod = await import("../app/routes/api+/dial");
     await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error saving the call to the database:",
@@ -370,7 +372,7 @@ describe("app/routes/api.dial.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.dial");
+    const mod = await import("../app/routes/api+/dial");
     await expect(
       mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any),
     ).rejects.toMatchObject({ status: 400 });
@@ -422,8 +424,8 @@ describe("app/routes/api.dial.tsx", () => {
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
 
-    const mod = await import("../app/routes/api.dial");
-    const res = await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
 
     expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
   });

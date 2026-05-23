@@ -51,8 +51,7 @@ export const LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN =
  * `status` is not reliable on its own because Twilio/webhook updates can overwrite it,
  * while `dequeued_at` remains the durable marker that queue work is finished.
  */
-export const COMPLETED_QUEUE_COUNT_FILTER =
-  `status.eq.${QUEUE_STATUS_DEQUEUED},dequeued_at.not.is.null`;
+export const COMPLETED_QUEUE_COUNT_FILTER = `status.eq.${QUEUE_STATUS_DEQUEUED},dequeued_at.not.is.null`;
 
 function toQueueStateLike(
   value: QueueStateLike | string | null | undefined,
@@ -89,7 +88,7 @@ export function getAssignedUserId(
     return queue.assigned_to_user_id;
   }
 
-  return isUserAssignment(queue.status) ? (queue.status ?? null) : null;
+  return isUserAssignment(queue.status) && queue.status != null ? queue.status : null;
 }
 
 export function getProviderStatus(
@@ -120,13 +119,10 @@ export function isQueued(
 ): boolean {
   const queue = toQueueStateLike(value);
   if (queue.queue_state) {
-    return (
-      queue.queue_state === QUEUE_STATUS_QUEUED &&
-      !Boolean(queue.dequeued_at)
-    );
+    return queue.queue_state === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
   }
 
-  return queue.status === QUEUE_STATUS_QUEUED && !Boolean(queue.dequeued_at);
+  return queue.status === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
 }
 
 /**
@@ -249,14 +245,18 @@ export function applyQueueStatusFilter(
   }
 
   return query
-    .not("status", "in", `("${QUEUE_STATUS_QUEUED}","${QUEUE_STATUS_DEQUEUED}")`)
+    .not(
+      "status",
+      "in",
+      `("${QUEUE_STATUS_QUEUED}","${QUEUE_STATUS_DEQUEUED}")`,
+    )
     .not("status", "like", LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN)
     .is("dequeued_at", null);
 }
 
-export function buildQueuedQueueUpdate(
-  options?: { includeNormalizedFields?: boolean },
-): Database["public"]["Tables"]["campaign_queue"]["Update"] {
+export function buildQueuedQueueUpdate(options?: {
+  includeNormalizedFields?: boolean;
+}): Database["public"]["Tables"]["campaign_queue"]["Update"] {
   const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
     status: QUEUE_STATUS_QUEUED,
     dequeued_at: null,

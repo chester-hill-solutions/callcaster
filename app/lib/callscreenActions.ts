@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import { FetcherWithComponents } from "@remix-run/react";
+import { FetcherWithComponents } from "react-router";
 import { getNextContact } from "./getNextContact";
 import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";

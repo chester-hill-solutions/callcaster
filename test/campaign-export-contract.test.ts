@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
@@ -166,7 +168,7 @@ describe("api.campaign-export CSV contract checks", () => {
   });
 
   test("produces BOM + CRLF CSV and neutralizes CSV injection", async () => {
-    const mod = await import("../app/routes/api.campaign-export");
+    const mod = await import("../app/routes/api+/campaign-export");
     const fd = new FormData();
     fd.set("campaignId", "123");
     fd.set("workspaceId", "w1");
@@ -175,7 +177,7 @@ describe("api.campaign-export CSV contract checks", () => {
       body: fd,
     });
 
-    const res = await mod.action({ request: req } as any);
+    const res = await asRouteResponse(await mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
 

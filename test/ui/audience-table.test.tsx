@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   return { submit, setSearchParams, saveSnapshot, loggerError };
 });
 
-vi.mock("@remix-run/react", () => ({
+vi.mock("react-router", () => ({
   useFetcher: () => ({ submit: mocks.submit }),
   useSearchParams: () => [new URLSearchParams("page=2&pageSize=10"), mocks.setSearchParams],
 }));
@@ -49,7 +49,7 @@ vi.mock("@/components/shared/TablePagination", () => ({
 }));
 
 vi.mock("@/lib/logger.client", () => ({
-  logger: { error: (...args: any[]) => mocks.loggerError(...args) },
+  logger: { error: (...args: any[]) => mocks.loggerError(...args) , info: vi.fn(), debug: vi.fn()},
 }));
 
 vi.mock("lucide-react", () => ({

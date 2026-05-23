@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -18,11 +20,11 @@ vi.mock("@/lib/database.server", () => ({
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
 }));
-vi.mock("../app/routes/workspaces_.$id.campaigns.$selected_id.queue", () => ({
+vi.mock("../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route", () => ({
   filteredSearch: (...args: any[]) => mocks.filteredSearch(...args),
 }));
 
-describe("app/routes/api.campaign_queue.tsx", () => {
+describe("app/routes/api+/campaign_queue/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -33,7 +35,7 @@ describe("app/routes/api.campaign_queue.tsx", () => {
 
   test("redirects to /signin when user missing", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: null });
-    const mod = await import("../app/routes/api.campaign_queue");
+    const mod = await import("../app/routes/api+/campaign_queue");
     await expect(
       mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     ).rejects.toBeInstanceOf(Response);
@@ -44,8 +46,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, 10, [1, 2], {
@@ -65,8 +67,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1, 2], campaign_id: 10 });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }] });
   });
@@ -86,8 +88,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: [1], campaign_id: 10 });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "bad" });
   });
@@ -109,8 +111,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
       error: null,
     });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 5 }] });
   });
@@ -123,8 +125,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: null });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ data: [] });
   });
@@ -146,8 +148,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
       error: null,
     });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "del bad" });
   });
@@ -158,8 +160,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.parseRequestData.mockResolvedValueOnce({ ids: null, campaign_id: 10, filters: { q: "x" } });
     mocks.filteredSearch.mockResolvedValueOnce({ data: null, error: { message: "lookup bad" } });
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "lookup bad" });
   });
@@ -168,8 +170,8 @@ describe("app/routes/api.campaign_queue.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({});
 
-    const mod = await import("../app/routes/api.campaign_queue");
-    const res = await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_queue");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(res.status).toBe(405);
   });
 });

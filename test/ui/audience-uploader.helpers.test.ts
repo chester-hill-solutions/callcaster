@@ -3,7 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   return {
     parse: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 

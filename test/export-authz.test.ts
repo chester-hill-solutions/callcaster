@@ -1,5 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 // Mocks must be declared before importing the modules under test.
 const requireWorkspaceAccess = vi.fn(async () => undefined);
 
@@ -86,11 +88,11 @@ vi.mock("@/lib/supabase.server", () => {
 describe("export endpoints authz", () => {
   test("campaign-export-status enforces workspace access", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.campaign-export-status");
+    const mod = await import("../app/routes/api+/campaign-export-status");
     const request = new Request(
       "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
     );
-    const res = await mod.loader({ request } as any);
+    const res = await asRouteResponse(await mod.loader({ request } as any));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
     expect(requireWorkspaceAccess).toHaveBeenCalledWith(
@@ -100,11 +102,11 @@ describe("export endpoints authz", () => {
 
   test("api.audiences CSV export enforces workspace access via audience workspace", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routes/api+/audiences");
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123",
     );
-    const res = await mod.loader({ request } as any);
+    const res = await asRouteResponse(await mod.loader({ request } as any));
     // loader returns a Response for CSV downloads
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalled();
@@ -112,7 +114,7 @@ describe("export endpoints authz", () => {
 
   test("api.campaign-export enforces workspace access for requested workspaceId", async () => {
     requireWorkspaceAccess.mockClear();
-    const mod = await import("../app/routes/api.campaign-export");
+    const mod = await import("../app/routes/api+/campaign-export");
     const fd = new FormData();
     fd.set("campaignId", "123");
     fd.set("workspaceId", "w1");
@@ -120,7 +122,7 @@ describe("export endpoints authz", () => {
       method: "POST",
       body: fd,
     });
-    const res = await mod.action({ request } as any);
+    const res = await asRouteResponse(await mod.action({ request } as any));
     // our mock supabase returns campaign not found -> 404, but authz must still run
     expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);

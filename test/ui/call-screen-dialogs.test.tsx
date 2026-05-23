@@ -37,7 +37,7 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogTitle: ({ children }: any) => <div>{children}</div>,
 }));
 
-vi.mock("@remix-run/react", () => ({
+vi.mock("react-router", () => ({
   Form: ({ children, ...props }: any) => <form {...props}>{children}</form>,
   NavLink: ({ to, children }: any) => <a href={String(to)}>{children}</a>,
   useFetcher: () => ({ submit: (...args: any[]) => mocks.fetcherSubmit(...args) }),

@@ -1,6 +1,6 @@
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { Database } from "./database.types";
-import { redirect } from "@remix-run/node";
+import { redirect } from "react-router";
 import { env } from "./env.server";
 
 export const createSupabaseServerClient = (request: Request) => {

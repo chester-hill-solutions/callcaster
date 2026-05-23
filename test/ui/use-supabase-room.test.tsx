@@ -6,6 +6,7 @@ vi.mock("@/lib/logger.client", () => ({
     debug: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
+    info: vi.fn(),
   },
 }));
 

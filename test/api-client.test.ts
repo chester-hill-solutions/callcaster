@@ -12,7 +12,10 @@ describe("ApiClient", () => {
       new Response(JSON.stringify({ hello: "world" }), { status: 200 }),
     );
 
-    const client = new ApiClient({ baseUrl: "http://localhost", headers: { A: "b" } });
+    const client = new ApiClient({
+      baseUrl: "http://localhost",
+      headers: { A: "b" },
+    });
     const res = await client.request("/x", { headers: { C: "d" } });
 
     expect(res).toEqual({ success: true, data: { hello: "world" } });
@@ -44,13 +47,92 @@ describe("ApiClient", () => {
   test("request uses HTTP status message when error payload has no error field", async () => {
     const { ApiClient } = await import("../app/lib/api-client");
 
-    (fetch as any).mockResolvedValueOnce(new Response(JSON.stringify({}), { status: 500 }));
+    (fetch as any).mockResolvedValueOnce(
+      new Response(JSON.stringify({}), { status: 500 }),
+    );
     const client = new ApiClient({ baseUrl: "http://localhost" });
     const res = await client.request("/no-error-field");
     expect(res).toMatchObject({
       success: false,
       error: { code: "HTTP_500", message: "HTTP 500" },
     });
+  });
+
+  test("request wraps non-object error payloads in response details", async () => {
+    const { ApiClient } = await import("../app/lib/api-client");
+
+    (fetch as any).mockResolvedValueOnce(
+      new Response("service unavailable", {
+        status: 503,
+        headers: { "content-type": "text/plain" },
+      }),
+    );
+    const client = new ApiClient({ baseUrl: "http://localhost" });
+    const res = await client.request("/text-error");
+
+    expect(res).toMatchObject({
+      success: false,
+      error: {
+        code: "HTTP_503",
+        message: "HTTP 503",
+        details: { response: "service unavailable" },
+      },
+    });
+  });
+
+  test("request handles missing content-type headers via JSON shape detection", async () => {
+    const { ApiClient } = await import("../app/lib/api-client");
+
+    (fetch as any).mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      headers: { get: () => null },
+      text: async () => '{"ok":true}',
+    });
+
+    const client = new ApiClient({ baseUrl: "http://localhost" });
+    const res = await client.request("/missing-header");
+    expect(res).toEqual({ success: true, data: { ok: true } });
+  });
+
+  test("request handles 204 responses as null payload", async () => {
+    const { ApiClient } = await import("../app/lib/api-client");
+
+    (fetch as any).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new ApiClient({ baseUrl: "http://localhost" });
+    const res = await client.request("/no-content");
+
+    expect(res).toEqual({ success: true, data: null });
+  });
+
+  test("request returns plain text payload for non-json responses", async () => {
+    const { ApiClient } = await import("../app/lib/api-client");
+
+    (fetch as any).mockResolvedValueOnce(
+      new Response("plain", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      }),
+    );
+    const client = new ApiClient({ baseUrl: "http://localhost" });
+    const res = await client.request<string>("/plain");
+
+    expect(res).toEqual({ success: true, data: "plain" });
+  });
+
+  test("request treats empty 200 response bodies as null", async () => {
+    const { ApiClient } = await import("../app/lib/api-client");
+
+    (fetch as any).mockResolvedValueOnce(
+      new Response("", {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const client = new ApiClient({ baseUrl: "http://localhost" });
+    const res = await client.request("/empty");
+    expect(res).toEqual({ success: true, data: null });
   });
 
   test("request omits JSON content-type for FormData bodies", async () => {
@@ -99,7 +181,9 @@ describe("ApiClient", () => {
     const mod = await import("../app/lib/api-client");
     const { ApiClient } = mod;
 
-    (fetch as any).mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    (fetch as any).mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
     const client = new ApiClient({ baseUrl: "http://localhost" });
 
     await client.get("/g");
@@ -124,36 +208,57 @@ describe("ApiClient", () => {
     const res = await mod.submitForm(fd, "/submit");
     expect(res).toMatchObject({ success: true, data: { ok: true } });
 
-    expect(mod.handleApiError({ success: true, data: { ok: 1 } })).toEqual({ ok: 1 });
+    expect(mod.handleApiError({ success: true, data: { ok: 1 } })).toEqual({
+      ok: 1,
+    });
 
     expect(() =>
-      mod.handleApiError({ success: true, error: { message: "nope", code: "X" } }),
+      mod.handleApiError({
+        success: true,
+        error: { message: "nope", code: "X" },
+      }),
     ).toThrow("nope");
 
-    expect(() => mod.handleApiError({ success: false, error: { message: "nope", code: "X" } }))
-      .toThrow("nope");
+    expect(() =>
+      mod.handleApiError({
+        success: false,
+        error: { message: "nope", code: "X" },
+      }),
+    ).toThrow("nope");
 
-    expect(() => mod.handleApiError({ success: false })).toThrow("API request failed");
+    expect(() => mod.handleApiError({ success: false })).toThrow(
+      "API request failed",
+    );
 
-    expect(mod.validateApiResponse({ a: 1 }, (d): d is { a: number } => {
-      return typeof (d as any)?.a === "number";
-    })).toEqual({ a: 1 });
+    expect(
+      mod.validateApiResponse({ a: 1 }, (d): d is { a: number } => {
+        return typeof (d as any)?.a === "number";
+      }),
+    ).toEqual({ a: 1 });
 
-    expect(() => mod.validateApiResponse({ a: "no" }, (d): d is { a: number } => {
-      return typeof (d as any)?.a === "number";
-    })).toThrow("Invalid API response format");
+    expect(() =>
+      mod.validateApiResponse({ a: "no" }, (d): d is { a: number } => {
+        return typeof (d as any)?.a === "number";
+      }),
+    ).toThrow("Invalid API response format");
   });
 
   test("default apiClient uses window.location.origin when window exists", async () => {
     vi.resetModules();
     vi.stubGlobal("fetch", vi.fn());
-    vi.stubGlobal("window", { location: { origin: "http://example.com" } } as any);
+    vi.stubGlobal("window", {
+      location: { origin: "http://example.com" },
+    } as any);
 
-    (fetch as any).mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    (fetch as any).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
     const mod = await import("../app/lib/api-client");
     await mod.apiClient.get("/ping");
 
-    expect(fetch).toHaveBeenCalledWith("http://example.com/ping", expect.any(Object));
+    expect(fetch).toHaveBeenCalledWith(
+      "http://example.com/ping",
+      expect.any(Object),
+    );
   });
 });
-

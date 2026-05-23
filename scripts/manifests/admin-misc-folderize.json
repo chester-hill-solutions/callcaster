@@ -1,0 +1,33 @@
+{
+  "batches": [
+    [
+      "admin",
+      "admin.fixed",
+      "admin_.users.$userId.edit",
+      "admin_.users.$userId.workspaces",
+      "admin_.workspaces.$workspaceId",
+      "admin_.workspaces.$workspaceId.campaigns",
+      "admin_.workspaces.$workspaceId.twilio",
+      "admin_.workspaces.$workspaceId.users",
+      "admin_.workspaces.$workspaceId_.invite"
+    ],
+    [
+      "_index",
+      "accept-invite",
+      "auth.confirm",
+      "confirm-payment",
+      "dashboard.$id",
+      "other-services",
+      "pricing",
+      "remember",
+      "reset",
+      "reset-password",
+      "services",
+      "signin"
+    ],
+    [
+      "signup",
+      "survey.$surveyId"
+    ]
+  ]
+}

@@ -158,11 +158,10 @@
     --brand-silver: 30 2% 62%;
     --brand-gold: 45 100% 48%;
 
-    --background: white;
+    --background: 0 0% 100%;
 
     --foreground: 240 10% 3.9%;
-    /* --card: 0 0% 100%; */
-    --card: 220, 5%, 90%;
+    --card: 220 5% 90%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
     --primary: var(--brand-primary);
@@ -215,11 +214,11 @@ input:not([type="hidden"]),
 select,
 textarea {
   border: 2px solid hsl(var(--border));
-  background-color: white;
-  color: rgb(17 24 39);
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
   padding: 4px 8px;
 }
 
 textarea::placeholder {
-  color: rgb(107 114 128);
+  color: hsl(var(--muted-foreground));
 }

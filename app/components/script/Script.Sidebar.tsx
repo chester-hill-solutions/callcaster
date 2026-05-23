@@ -1,103 +1,54 @@
-import React from 'react';
-import { FaPlus } from 'react-icons/fa';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Flow, Script } from '@/lib/types';
+import React from "react";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Flow } from "@/lib/types";
 
 type SidebarProps = {
   scriptData: Flow;
   currentPage: string | null;
   setCurrentPage: (pageId: string) => void;
-  openBlock: string | null;
-  setOpenBlock: (blockId: string | null) => void;
   addPage: () => void;
-  addBlock: () => void;
-  scripts: Script[];
-  handleScriptChange: (value: string) => void;
 };
 
 export default function Sidebar({
   scriptData,
   currentPage,
   setCurrentPage,
-  openBlock,
-  setOpenBlock,
   addPage,
-  addBlock,
-  scripts,
-  handleScriptChange,
 }: SidebarProps) {
+  const hasSections = Object.keys(scriptData.pages || {}).length > 0;
+
   return (
     <div className="w-1/4 border-r pr-4" style={{ width: "25%" }}>
-      <div className="flex h-full flex-col justify-between">
-        <div>
-          <div className="mb-1 w-full text-center">Sections</div>
-          <Button className="mb-4 w-full" onClick={addPage}>
-            Add Section <FaPlus size="16px" className="ml-2 inline" />
+      <div className="flex h-full flex-col">
+        <div className="mb-1 w-full text-center font-semibold">Sections</div>
+        <p className="mb-3 text-center text-xs text-muted-foreground">
+          {!hasSections
+            ? "Start here: add your first section."
+            : "Choose a section, then add blocks in the editor."}
+        </p>
+        <Button
+          className="mb-4 w-full"
+          onClick={addPage}
+          variant={hasSections ? "outline" : "default"}
+        >
+          Add Section <Plus className="ml-2 h-4 w-4" />
+        </Button>
+        {Object.values(scriptData.pages || {}).map((page) => (
+          <Button
+            key={page.id}
+            className="mb-2 w-full justify-start"
+            variant={currentPage === page.id ? "default" : "outline"}
+            onClick={() => setCurrentPage(page.id)}
+          >
+            {page.title}
           </Button>
-          {Object.values(scriptData.pages || {}).map((page) => (
-            <Button
-              key={page.id}
-              className={`mb-2 w-full justify-start ${
-                currentPage === page.id
-                  ? "bg-primary text-white"
-                  : "border-2 border-zinc-800 bg-transparent text-black"
-              }`}
-              onClick={() => setCurrentPage(page.id)}
-            >
-              {page.title}
-            </Button>
-          ))}
-          <hr className="my-4" />
-          <div className="mb-1 w-full text-center">Question Blocks</div>
-          <Button className="mb-4 w-full" onClick={addBlock} disabled={!currentPage}>
-            Add Block <FaPlus size="16px" className="ml-2 inline" />
-          </Button>
-          {currentPage &&
-            scriptData.pages[currentPage]?.blocks?.map((blockId: string) => (
-              <Button
-                key={blockId}
-                className={`mb-2 w-full justify-start ${
-                  openBlock === blockId
-                    ? "bg-primary text-white"
-                    : "border-2 border-zinc-800 bg-transparent text-black"
-                }`}
-                onClick={() => setOpenBlock(blockId)}
-              >
-                {scriptData.blocks[blockId]?.title ||
-                  blockId}
-              </Button>
-            ))}
-        </div>
-        <div>
-          {scripts.length > 0 && (
-            <div className="flex flex-col">
-              <div className="flex">
-                <h3 className="font-Zilla-Slab text-lg">Your Scripts</h3>
-              </div>
-              <div className="flex">
-                <Select onValueChange={handleScriptChange}>
-                  <SelectTrigger className="bg-white dark:bg-transparent">
-                    <SelectValue
-                      className="text-brand-primary"
-                      placeholder="Select a script"
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {scripts.map((script) => (
-                      <SelectItem key={script.id} value={String(script.id)}>
-                        {script.name} - {script.type}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value={`create-new-${scripts.length + 1}`}>
-                      Create New
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-        </div>
+        ))}
+        {!hasSections && (
+          <p className="text-center text-sm text-muted-foreground">
+            No sections yet.
+          </p>
+        )}
       </div>
     </div>
   );

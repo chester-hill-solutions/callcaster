@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 const baseUrl = getFunctionsBaseUrl();
 
 interface RequestBody {
@@ -86,9 +87,10 @@ export async function handleRequest(req: Request): Promise<Response> {
     const outreach_attempt_id = await createOutreachAttempt(supabase, body);
     if (!outreach_attempt_id) throw new Error("Outreach creation failed");
     const twilio_data = await getTwilioData(supabase, body.workspace_id);
-    if (!twilio_data) throw new Error("Twilio data retrieval failed");
+    const creds = readTwilioWorkspaceCredentials(twilio_data);
+    if (!twilio_data || !creds) throw new Error("Twilio data retrieval failed");
     try {
-      const twilio = new Twilio(twilio_data.sid, twilio_data.authToken);
+      const twilio = new Twilio(creds.sid, creds.authToken);
       const call = await twilio.calls.create({
         to: body.to_number,
         from: body.caller_id,

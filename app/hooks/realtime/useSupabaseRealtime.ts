@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { SupabaseClient, RealtimePostgresChangesPayload , User as SupabaseUser } from "@supabase/supabase-js";
 import { useQueue } from "@/hooks/queue/useQueue";
 import { useAttempts } from "@/hooks/queue/useAttempts";
@@ -44,7 +44,8 @@ interface UseSupabaseRealtimeProps {
  * @param params.supabase - Supabase client instance
  * @param params.schema - Database schema (defaults to "public")
  * @param params.table - Table name(s) to subscribe to (string or array of strings)
- * @param params.filter - Optional filter string for the subscription
+ * @param params.filter - Optional filter string applied to each table listener
+ * @param params.channelTopic - Realtime channel name (default `db-changes`). Use a unique topic when mounting multiple subscriptions.
  * @param params.onChange - Callback function called when changes occur
  * 
  * @example
@@ -64,12 +65,14 @@ export const useSupabaseRealtimeSubscription = ({
   schema = "public",
   table,
   filter,
+  channelTopic = "db-changes",
   onChange,
 }: {
   supabase: SupabaseClient<Database>;
   schema?: string;
   table: string | string[];
   filter?: string;
+  channelTopic?: string;
   onChange: (payload: RealtimeChangePayload) => void;
 }) => {
   // Memoize onChange callback to prevent unnecessary re-subscriptions
@@ -79,25 +82,35 @@ export const useSupabaseRealtimeSubscription = ({
     onChangeRef.current = onChange;
   }, [onChange]);
 
+  const tableSignature = Array.isArray(table)
+    ? [...table].sort().join("\0")
+    : table;
+
+  const tablesForSubscription = useMemo(
+    () => (Array.isArray(table) ? [...table] : [table]),
+    [tableSignature],
+  );
+
   useEffect(() => {
-    const channel = supabase
-      .channel("db-changes")
-      .on(
+    const channel = supabase.channel(channelTopic);
+    for (const t of tablesForSubscription) {
+      channel.on(
         'postgres_changes' as any,
         {
           event: '*',
           schema,
-          table,
+          table: t,
           ...(filter ? { filter } : {}),
         } as any,
         (payload: RealtimeChangePayload) => onChangeRef.current(payload)
-      )
-      .subscribe();
+      );
+    }
+    void channel.subscribe();
 
     return () => {
       void channel.unsubscribe();
     };
-  }, [supabase, schema, table, filter]); // Removed onChange from dependencies
+  }, [supabase, schema, tablesForSubscription, filter, channelTopic]);
 };
 
 /**
@@ -294,28 +307,32 @@ export const useSupabaseRealtime = ({
               .select("*, contact(*)")
               .eq("id", queueItem.id)
               .maybeSingle()
-              .then(({ data, error }) => {
-                if (error) {
-                  logger.error("Failed to hydrate queue item from realtime payload", error);
-                  return;
-                }
+              .then(
+                ({ data, error }) => {
+                  if (error) {
+                    logger.error("Failed to hydrate queue item from realtime payload", error);
+                    return;
+                  }
 
-                if (data?.contact) {
-                  updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
-                  return;
-                }
+                  if (data?.contact) {
+                    updateQueue({ new: data as Tables<"campaign_queue"> & { contact: Contact } });
+                    return;
+                  }
 
-                const existingContact =
-                  queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
-                if (existingContact) {
-                  updateQueue({
-                    new: {
-                      ...queueItem,
-                      contact: existingContact,
-                    } as Tables<"campaign_queue"> & { contact: Contact },
-                  });
-                }
-              });
+                  const existingContact =
+                    queueRef.current.find((item) => item.id === queueItem.id)?.contact ?? null;
+                  if (existingContact) {
+                    updateQueue({
+                      new: {
+                        ...queueItem,
+                        contact: existingContact,
+                      } as Tables<"campaign_queue"> & { contact: Contact },
+                    });
+                  }
+                },
+                (err: unknown) =>
+                  logger.error("Failed to hydrate queue item from realtime payload", err)
+              );
           }
           break;
         case "workspace_number":

@@ -11,10 +11,16 @@ export async function handleRequest(req: Request): Promise<Response> {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
-    const { data, error } = await supabase.rpc("get_campaign_queue", {
-      campaign_id_pro: campaign_id,
-    });
-    if (error || !data) throw error || "No queue found";
+    const { data: claimed, error: claimError } = await supabase.rpc(
+      "claim_campaign_queue_contacts",
+      {
+        campaign_id_pro: campaign_id,
+        claimed_by_user_id: owner || null,
+        claim_limit: 1,
+      },
+    );
+    if (claimError) throw claimError;
+    const data = claimed ?? [];
     if (!data.length) {
       console.log(`Queue is now empty. Marking completed.`)
       const { error: campaignUpdateError } = await supabase
@@ -29,7 +35,7 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
     const { data: campaign, error: campaignError } = await supabase
       .from("campaign")
-      .select('is_active, group_household_queue, type')
+      .select("is_active, group_household_queue, type, sms_send_mode, sms_messaging_service_sid, caller_id")
       .eq("id", campaign_id)
       .single();
     if (campaignError) throw campaignError;
@@ -40,21 +46,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       )
     }
     const contact = data[0];
-    if (campaign.type === "message") {  
+    if (campaign.type === "message") {
       console.log(`Sending message to contact`, contact, campaign);
     } else {
       console.log(`Calling contact`, contact, campaign);
-    }
-    const { error: dequeueError } = await supabase.rpc('dequeue_contact', {
-      passed_contact_id: contact.contact_id,
-      group_on_household: campaign.group_household_queue,
-      dequeued_by_id: owner || null,
-      dequeued_reason_text: "Automated queue processing"
-    });
-
-    if (dequeueError) {
-      console.error(dequeueError);
-      throw dequeueError;
     }
 
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -105,13 +100,15 @@ export async function handleRequest(req: Request): Promise<Response> {
             campaign_id: campaign_id,
             workspace_id: contact.workspace,
             contact_id: contact.contact_id,
-            caller_id: contact.caller_id,
+            caller_id: contact.caller_id || campaign.caller_id,
             queue_id: contact.id,
             user_id: owner,
             index: 0,
             total: data.length,
             isLastContact: 0 === data.length - 1,
-            type: campaign.type
+            type: campaign.type,
+            sms_send_mode: campaign.sms_send_mode,
+            sms_messaging_service_sid: campaign.sms_messaging_service_sid,
           })
         }
       );

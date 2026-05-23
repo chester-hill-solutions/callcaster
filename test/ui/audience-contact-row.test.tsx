@@ -1,10 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { AudienceContactRow } from "@/components/AudienceContactRow";
 
 const mocks = vi.hoisted(() => {
-  return { logger: { error: vi.fn() } };
+  return { logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()} };
 });
 
 vi.mock("@/lib/logger.client", () => ({ logger: mocks.logger }));

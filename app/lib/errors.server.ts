@@ -1,4 +1,4 @@
-import { json, redirect } from "@remix-run/node";
+import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { PostgrestError } from "@supabase/supabase-js";
 
@@ -80,7 +80,7 @@ export function createErrorResponse(
   defaultMessage: string = "An error occurred",
   defaultStatusCode: number = 500,
   options?: { headers?: Headers }
-): Response {
+): ReturnType<typeof routeData> {
   let errorResponse: ErrorResponse;
 
   if (error instanceof AppError) {
@@ -112,7 +112,7 @@ export function createErrorResponse(
 
   logger.error("Error response:", errorResponse, error);
 
-  return json(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
+  return routeData(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
 }
 
 /**

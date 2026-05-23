@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 /**
  * Hooks API Service Layer
  * Centralized API calls specifically for React hooks

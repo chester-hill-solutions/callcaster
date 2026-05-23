@@ -1,7 +1,10 @@
-import { Tooltip, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { TooltipContent } from "@radix-ui/react-tooltip";
-import { Campaign } from "@/lib/types";
 
 export default function ActivateButtons({
   joinDisabled,
@@ -15,7 +18,7 @@ export default function ActivateButtons({
   handleScheduleButton: () => void;
 }) {
   return (
-    <div className="flex items-end">
+    <div className="flex items-end gap-1">
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>

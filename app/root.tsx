@@ -1,35 +1,21 @@
-import type {
-  LinksFunction,
-  LoaderFunctionArgs,
-  TypedResponse,
-} from "@remix-run/node";
-import {
-  Links,
-  LiveReload,
-  Meta,
-  Outlet,
-  Params,
-  Scripts,
-  ScrollRestoration,
-  json,
-  redirect,
-  useLoaderData,
-  useNavigate,
-} from "@remix-run/react";
+
+
+import { data as routeData, Links, Meta, Outlet, Params, Scripts, ScrollRestoration, redirect, useLoaderData, useNavigate, isRouteErrorResponse, useRouteError } from "react-router";
+import type { LinksFunction, LoaderFunctionArgs } from "react-router";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 
 import Navbar from "@/components/layout/Navbar";
+import { ThemeProvider } from "@/components/shared/theme-provider";
 import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
-import stylesheet from "@/tailwind.css";
+import stylesheet from "@/tailwind.css?url";
 import { Database } from "./lib/database.types";
 
 import { Session } from "@supabase/supabase-js";
 import { env as envUtil } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 
 type LoaderData = {
   env: ENV;
@@ -82,7 +68,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: { session } } = await supabase.auth.getSession();
   const user = await supabase.auth.getUser();
   if (!user.data.user) {
-    return json({
+    return routeData({
       env,
       session,  
       workspaces: null,
@@ -106,7 +92,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const workspaces = workspaceData?.map((data) => data.workspace);
   
-  return json(
+  return routeData(
     {
       env,
       session,
@@ -135,14 +121,14 @@ export default function App() {
   const serverAccessToken = session?.access_token;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<TypedResponse<{ success: string | null; error: string | null }>> {
+  async function signOut(): Promise<{ success: string | null; error: string | null }> {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
-      return json({ success: null, error: signOutError.message });
+      return { success: null, error: signOutError.message };
     }
     navigate("/");
-    return json({ success: "Sign off successful", error: null });
+    return { success: "Sign off successful", error: null };
   }
 
   useEffect(() => {
@@ -163,26 +149,62 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        {/* <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} /> */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
+          }}
+        />
         <Links />
       </head>
-      <body className={`min-h-screen bg-background`}>
-        <Navbar
-          className="bg-brand-secondary"
-          handleSignOut={signOut}
-          workspaces={workspaces}
-          isSignedIn={serverAccessToken != null}
-          user={user ?? null}
-          params={params}
-        />
-        <Outlet context={{ env, supabase }} />
-        <Toaster position="top-right" richColors visibleToasts={3} />
-        <ScrollRestoration />
-        <Scripts />
-        <LiveReload />
+      <body className="min-h-screen bg-background">
+        <ThemeProvider
+          defaultTheme="light"
+          storageKey="callcaster-theme"
+          attribute="class"
+        >
+          <Navbar
+            className="bg-brand-secondary"
+            handleSignOut={signOut}
+            workspaces={workspaces}
+            isSignedIn={serverAccessToken != null}
+            user={user ?? null}
+            params={params}
+          />
+          <Outlet context={{ env, supabase }} />
+          <Toaster position="top-right" richColors visibleToasts={3} />
+          <ScrollRestoration />
+          <Scripts />
+        </ThemeProvider>
       </body>
     </html>
   );
 }
 
-export { ErrorBoundary };
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : "An unexpected error occurred";
+
+  return (
+    <html lang="en">
+      <body>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
+            <h3 className="text-lg font-medium text-gray-900">Something went wrong</h3>
+            <p className="mt-2 text-sm text-gray-500">{message}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </body>
+    </html>
+  );
+}

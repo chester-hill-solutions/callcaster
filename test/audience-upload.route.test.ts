@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const logger = vi.hoisted(() => ({
   error: vi.fn(),
   warn: vi.fn(),
@@ -9,7 +11,7 @@ const logger = vi.hoisted(() => ({
 
 vi.mock("@/lib/logger.server", () => ({ logger }));
 
-describe("app/routes/api.audience-upload.tsx", () => {
+describe("app/routes/api+/audience-upload/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     logger.error.mockReset();
@@ -22,7 +24,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     new Request("http://localhost/api/audience-upload", { method, body: fd });
 
   test("exports: isOtherDataArray + generateUniqueId", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
     expect(mod.isOtherDataArray([{ key: "a", value: 1 }])).toBe(true);
     expect(mod.isOtherDataArray([{ key: "a" } as any])).toBe(false);
     expect(mod.isOtherDataArray("no" as any)).toBe(false);
@@ -34,7 +36,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: unauthorized, method not allowed, and validation errors", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       supabaseClient: {} as any,
@@ -42,10 +44,10 @@ describe("app/routes/api.audience-upload.tsx", () => {
       user: null,
     }));
 
-    const res401 = await mod.action({
+    const res401 = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audience-upload", { method: "POST" }),
       deps: { verifyAuth },
-    } as any);
+    } as any));
     expect(res401.status).toBe(401);
 
     const verifyAuthUser = vi.fn(async () => ({
@@ -54,36 +56,36 @@ describe("app/routes/api.audience-upload.tsx", () => {
       user: { id: "u1" },
     }));
 
-    const res405 = await mod.action({
+    const res405 = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audience-upload", { method: "GET" }),
       deps: { verifyAuth: verifyAuthUser },
-    } as any);
+    } as any));
     expect(res405.status).toBe(405);
 
     const fd = new FormData();
-    const res400a = await mod.action({
+    const res400a = await asRouteResponse(await mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
-    } as any);
+    } as any));
     expect(res400a.status).toBe(400);
 
     fd.set("workspace_id", "w1");
-    const res400b = await mod.action({
+    const res400b = await asRouteResponse(await mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
-    } as any);
+    } as any));
     expect(res400b.status).toBe(400);
 
     fd.set("audience_name", "A");
-    const res400c = await mod.action({
+    const res400c = await asRouteResponse(await mod.action({
       request: makeReq(fd),
       deps: { verifyAuth: verifyAuthUser },
-    } as any);
+    } as any));
     expect(res400c.status).toBe(400);
   }, 30000);
 
   test("action: audienceId path validates audience, creates upload record, and starts background processing", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const processAudienceUpload = vi.fn(async () => {});
     const supabaseClient: any = {
@@ -128,10 +130,10 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd.set("header_mapping", JSON.stringify({ Name: "name" }));
     fd.set("split_name_column", "Name");
 
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeReq(fd),
       deps: { verifyAuth, processAudienceUpload },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -141,7 +143,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("action: audienceId path returns 404 when audience missing", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const supabaseClient: any = {
       from: (table: string) => {
@@ -169,12 +171,12 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any);
+    const res = await asRouteResponse(await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(404);
   }, 30000);
 
   test("action: create-audience path handles audience insert/upload insert errors and catches invalid JSON", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       headers: new Headers(),
@@ -199,7 +201,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd1.set("workspace_id", "w1");
     fd1.set("audience_name", "A");
     fd1.set("contacts", new File(["x"], "c.csv"));
-    const r1 = await mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any);
+    const r1 = await asRouteResponse(await mod.action({ request: makeReq(fd1), deps: { verifyAuth } } as any));
     expect(r1.status).toBe(500);
 
     const supabaseUploadErr: any = {
@@ -235,7 +237,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd2.set("workspace_id", "w1");
     fd2.set("audience_name", "A");
     fd2.set("contacts", new File(["x"], "c.csv"));
-    const r2 = await mod.action({ request: makeReq(fd2), deps: { verifyAuth: verifyAuth2 } } as any);
+    const r2 = await asRouteResponse(await mod.action({ request: makeReq(fd2), deps: { verifyAuth: verifyAuth2 } } as any));
     expect(r2.status).toBe(500);
 
     const fdBadJson = new FormData();
@@ -243,13 +245,13 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fdBadJson.set("audience_name", "A");
     fdBadJson.set("contacts", new File(["x"], "c.csv"));
     fdBadJson.set("header_mapping", "{");
-    const r3 = await mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth: verifyAuth2 } } as any);
+    const r3 = await asRouteResponse(await mod.action({ request: makeReq(fdBadJson), deps: { verifyAuth: verifyAuth2 } } as any));
     expect(r3.status).toBe(500);
   }, 30000);
 
   test("action: create-audience success message and background .catch logging", async () => {
     vi.resetModules();
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const processAudienceUpload = vi.fn(async () => {
       throw new Error("bg");
@@ -288,10 +290,10 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd.set("audience_name", "A");
     fd.set("contacts", new File(["x"], "c.csv"));
     // omit header_mapping and split_name_column to hit default {} / null branches
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeReq(fd),
       deps: { verifyAuth, processAudienceUpload },
-    } as any);
+    } as any));
     const body = await res.json();
     expect(body.message).toContain("Audience created");
 
@@ -320,18 +322,18 @@ describe("app/routes/api.audience-upload.tsx", () => {
     }));
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
 
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
     const fd = new FormData();
     fd.set("workspace_id", "w1");
     fd.set("audience_name", "A");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await mod.action({ request: makeReq(fd) } as any);
+    const res = await asRouteResponse(await mod.action({ request: makeReq(fd) } as any));
     expect(res.status).toBe(200);
     expect(verifyAuth).toHaveBeenCalled();
   }, 30000);
 
   test("action: catch branch returns Unknown error for non-Error throw", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const verifyAuth = vi.fn(async () => ({
       supabaseClient: {
@@ -346,13 +348,13 @@ describe("app/routes/api.audience-upload.tsx", () => {
     fd.set("workspace_id", "w1");
     fd.set("audience_id", "1");
     fd.set("contacts", new File(["x"], "c.csv"));
-    const res = await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any);
+    const res = await asRouteResponse(await mod.action({ request: makeReq(fd), deps: { verifyAuth } } as any));
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Unknown error" });
   }, 30000);
 
   test("processAudienceUpload: happy path maps contacts, writes progress, and completes", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const uploads: any[] = [];
     const updates: any[] = [];
@@ -434,7 +436,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload: header mismatch and insert errors go through catch and write error status", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const uploads: any[] = [];
     const supabaseClient: any = {
@@ -493,7 +495,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload covers bucket/status/link errors and default deps branch", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     // bucketError
     await mod.processAudienceUpload(
@@ -693,7 +695,7 @@ describe("app/routes/api.audience-upload.tsx", () => {
   }, 30000);
 
   test("processAudienceUpload covers remaining else-branches (splitNameColumn missing header, undefined values, and i!==0)", async () => {
-    const mod = await import("../app/routes/api.audience-upload");
+    const mod = await import("../app/routes/api+/audience-upload");
 
     const supabaseClient: any = {
       storage: {

@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6"
 import Twilio from "npm:twilio@^5.3.0";
 import { validateRequest } from "npm:twilio@^5.3.0/lib/webhooks/webhooks.js";
 import { getFunctionsBaseUrl, getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -109,7 +110,11 @@ const getWorkspace = async (supabase: SupabaseClient, workspace_id: string): Pro
     .eq('id', workspace_id)
     .single();
   if (error) throw error;
-  return data;
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  return { id: data.id, twilio_data: creds };
 };
 
 const getCallWithScript = async (supabase: SupabaseClient, callSid: string) => {

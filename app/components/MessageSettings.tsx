@@ -1,1 +1,1 @@
-export { MessageSettings } from "@/components/settings/MessageSettings";
+export { MessageSettings } from "@/components/campaign/settings/MessageSettings";

@@ -15,18 +15,22 @@ const DispositionBar = ({
   dispositionCount,
   totalOfAllResults,
   averageCallDuration,
-}: DispositionResult & { dispositionCount: number, totalOfAllResults: number, averageCallDuration: string }) => (
+}: DispositionResult & { dispositionCount: number, totalOfAllResults: number, averageCallDuration: string }) => {
+  const percent =
+    totalOfAllResults > 0 ? (dispositionCount / totalOfAllResults) * 100 : 0;
+
+  return (
   <div key={disposition} className="mb-6">
     <div className="mb-1 flex items-center justify-between">
       <span className="text-sm font-medium capitalize">{disposition}</span>
       <span className="text-sm font-medium">
-        {dispositionCount} ({((dispositionCount / totalOfAllResults) * 100).toFixed(1)}%)
+        {dispositionCount} ({percent.toFixed(1)}%)
       </span>
     </div>
     <div className="h-2.5 w-full rounded-full bg-gray-200">
       <div
         className={`h-2.5 rounded-full ${dispositionColors[disposition] || "bg-gray-500"}`}
-        style={{ width: `${(dispositionCount / totalOfAllResults) * 100}%` }}
+        style={{ width: `${percent}%` }}
       ></div>
     </div>
     {(disposition === "completed" || disposition === "voicemail") && (
@@ -39,7 +43,8 @@ const DispositionBar = ({
       </div>
     )}
   </div>
-);
+  );
+};
 
 export const DispositionBreakdown = ({
   results,
@@ -53,17 +58,14 @@ export const DispositionBreakdown = ({
   return(
   <div className="mb-8">
     <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
-    {results?.map(
-      (result) =>
-        result.disposition && result.disposition != "idle" && result.disposition != "No Disposition" && (
-          <DispositionBar
-            key={result.disposition}
-            {...result}
-            dispositionCount={totalsByDisposition?.[`${result.disposition}`] || 0}
-            totalOfAllResults={totalOfAllResults}
-            averageCallDuration={result?.average_call_duration || "00:00:00"}
-          />
-        ),
-    )}
+    {results?.map((result) => (
+      <DispositionBar
+        key={result.disposition}
+        {...result}
+        dispositionCount={totalsByDisposition?.[result.disposition] || 0}
+        totalOfAllResults={totalOfAllResults}
+        averageCallDuration={result?.average_call_duration || "00:00:00"}
+      />
+    ))}
   </div>
 )};

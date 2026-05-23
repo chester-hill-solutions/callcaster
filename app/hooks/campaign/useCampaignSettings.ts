@@ -1,4 +1,4 @@
-import { NavigateFunction , Fetcher, SubmitFunction } from "@remix-run/react";
+import { NavigateFunction, Fetcher, SubmitFunction } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Audience, CampaignAudience, Schedule, Script } from "@/lib/types";

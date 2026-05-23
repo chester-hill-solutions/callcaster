@@ -1,6 +1,6 @@
 # Local Development
 
-This app runs as a Remix server on `http://localhost:3000` and uses local Supabase for database/auth/storage services. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
+This app runs as a React Router v7 app with a custom Express server on `http://localhost:3000` and uses local Supabase for database/auth/storage services. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
 
 ## Prerequisites
 
@@ -135,6 +135,14 @@ Twilio webhook validation uses the exact incoming request URL. If your Localtunn
 Relevant runtime wiring:
 - incoming numbers point to `${BASE_URL}/api/inbound`, `${BASE_URL}/api/inbound-sms`, and `${BASE_URL}/api/caller-id/status`
 - browser/device calls rely on `TWILIO_APP_SID`, which should point at `${BASE_URL}/api/call`
+
+## Build, Typegen, And Production Server
+
+- `npm run build` runs `react-router build` (client + server bundles under `build/`).
+- `npm run typecheck` runs `react-router typegen` then `tsc`.
+- `npm start` runs the custom Express server (`server/index.js`) against `build/server/index.js`.
+- Railway-style probes: `GET /healthz` (liveness), `GET /readyz` (readiness; 503 until the RR build is loaded or during graceful shutdown).
+- Optional: `PROCESS_FATAL_ON_REJECTION=1` exits the process on unhandled promise rejections (default logs only).
 
 ## Suggested Daily Workflow
 

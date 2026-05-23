@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("@remix-run/react", () => ({
+vi.mock("react-router", () => ({
   Form: (props: any) => <form {...props} />,
 }));
 

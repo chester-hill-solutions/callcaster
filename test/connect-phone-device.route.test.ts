@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
     createSupabaseServerClient: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     twilioCreate: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     env: {
       TWILIO_PHONE_NUMBER: () => "+15550000000",
       BASE_URL: () => "https://base.example",
@@ -27,7 +29,7 @@ vi.mock("@/twilio.server", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-describe("app/routes/api.connect-phone-device.tsx", () => {
+describe("app/routes/api+/connect-phone-device/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
@@ -48,13 +50,13 @@ describe("app/routes/api.connect-phone-device.tsx", () => {
       campaignId: "c1",
     });
 
-    const mod = await import("../app/routes/api.connect-phone-device");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/connect-phone-device");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", {
         method: "POST",
         body: JSON.stringify({}),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
@@ -73,10 +75,10 @@ describe("app/routes/api.connect-phone-device.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.twilioCreate.mockResolvedValueOnce({ sid: "CA1" });
 
-    const mod = await import("../app/routes/api.connect-phone-device");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/connect-phone-device");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
@@ -109,10 +111,10 @@ describe("app/routes/api.connect-phone-device.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.twilioCreate.mockRejectedValueOnce(new Error("twilio"));
 
-    const mod = await import("../app/routes/api.connect-phone-device");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/connect-phone-device");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "twilio" });
     expect(mocks.logger.error).toHaveBeenCalledWith(

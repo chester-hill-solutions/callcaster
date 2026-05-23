@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyApiKeyOrSession: vi.fn(),
@@ -9,7 +11,7 @@ const mocks = vi.hoisted(() => {
     safeParseJson: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
     env: { SUPABASE_URL: vi.fn(() => "http://supabase") },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -90,7 +92,7 @@ function makeSupabaseStub(opts: {
   return { from, _spies: { messageInsert, webhookFilter, contactSingle } };
 }
 
-describe("app/routes/api.chat_sms.tsx", () => {
+describe("app/routes/api+/chat_sms/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
@@ -162,7 +164,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "see https://example.com",
       to: "+15551234567",
@@ -214,7 +216,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
       },
     });
 
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "https://example.com",
       to: "+15551234567",
@@ -234,7 +236,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     await expect(
       mod.sendMessage({
         body: "hi",
@@ -257,7 +259,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     await expect(
       mod.sendMessage({
         body: "hi",
@@ -314,7 +316,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
         create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })),
       },
     });
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "https://example.com",
       to: "+15551234567",
@@ -335,7 +337,7 @@ describe("app/routes/api.chat_sms.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })) },
     });
-    const mod = await import("../app/routes/api.chat_sms");
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
       body: "hi",
       to: "+15551234567",
@@ -351,8 +353,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
 
   test("action returns auth error response", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "no", status: 401 });
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "no" });
   });
@@ -367,8 +369,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
       body: "hi",
       media: "[]",
     });
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
   });
 
@@ -386,8 +388,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: " " })) },
     });
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
   });
 
@@ -403,8 +405,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
       media: "[]",
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(404);
     expect(mocks.logger.error).toHaveBeenCalledWith("Invalid phone number:", expect.anything());
   });
@@ -430,8 +432,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: "Hello {{firstname}}" })) },
     });
 
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
   });
@@ -457,8 +459,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
     });
     mocks.processTemplateTags.mockReturnValueOnce("Hello A");
 
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({ data: [{ id: 1 }], message: expect.anything() });
     expect(mocks.processTemplateTags).toHaveBeenCalled();
@@ -519,8 +521,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
       messages: { create },
     });
 
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -545,8 +547,8 @@ describe("app/routes/api.chat_sms.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
     mocks.createWorkspaceTwilioInstance.mockRejectedValueOnce(new Error("twilio"));
 
-    const mod = await import("../app/routes/api.chat_sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in chat_sms action:", expect.anything());
   });

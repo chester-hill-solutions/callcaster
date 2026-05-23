@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   const say = vi.fn();
   const pause = vi.fn();
@@ -21,7 +23,7 @@ vi.mock("twilio", () => ({
   },
 }));
 
-describe("app/routes/api.verify-audio-pin.$pin.tsx", () => {
+describe("app/routes/api+/verify-audio-pin/$pin/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.say.mockReset();
@@ -36,8 +38,8 @@ describe("app/routes/api.verify-audio-pin.$pin.tsx", () => {
     const prev = process.env.BASE_URL;
     process.env.BASE_URL = "http://base";
 
-    const mod = await import("../app/routes/api.verify-audio-pin.$pin");
-    const res = await mod.loader();
+    const mod = await import("../app/routes/api+/verify-audio-pin/$pin.route");
+    const res = await asRouteResponse(await mod.loader());
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toBe("<Response />");

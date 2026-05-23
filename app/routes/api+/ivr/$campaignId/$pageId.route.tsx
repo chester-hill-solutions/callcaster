@@ -1,0 +1,85 @@
+// @ts-nocheck
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import Twilio from "twilio";
+
+
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
+
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
+
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 200; 
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** IVR script steps shape from DB (script.steps is Json) */
+type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
+
+const getCallWithRetry = async (supabase: SupabaseClient<Database>, callSid: string, retries = 0) => {
+  const { data, error } = await supabase
+    .from("call")
+    .select('*, campaign(*, ivr_campaign(*, script(*)))')
+    .eq("sid", callSid)
+    .single();
+
+  if (error || !data) {
+    if (retries < MAX_RETRIES) {
+      await sleep(RETRY_DELAY);
+      return getCallWithRetry(supabase, callSid, retries + 1);
+    }
+    throw new Error("Failed to retrieve call after multiple attempts");
+  }
+
+  return data;
+};
+
+export const action = async ({ params, request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { validateTwilioWebhookParams } = await import("@/twilio.server");
+  const { env } = await import("@/lib/env.server");
+
+  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+  const twiml = new Twilio.twiml.VoiceResponse();
+  const { pageId, campaignId } = params as { pageId: string; campaignId: string };
+  const formData = await request.formData();
+  const paramsObj = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const callSid = paramsObj.CallSid ?? null;
+
+  if (!callSid || !campaignId || !pageId) {
+    return new Response("Missing required parameters", { status: 400 });
+  }
+  try {
+    const callData = await getCallWithRetry(supabase, callSid);
+    const { data: workspace } = await supabase.from("workspace").select("twilio_data").eq("id", callData.workspace).single();
+    const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+    const authToken = resolveTwilioWebhookAuthToken(creds);
+    const signature = request.headers.get("x-twilio-signature");
+    const url = new URL(request.url).href;
+    if (!authToken || !validateTwilioWebhookParams(paramsObj, signature, url, authToken)) {
+      return new Response("Invalid Twilio signature", { status: 403 });
+    }
+    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as unknown as IvrScriptSteps | null | undefined;
+    if (!script || !script.pages) {
+      throw new Error("Invalid script structure");
+    }
+    const currentPage = script.pages[pageId];
+    if (currentPage && currentPage.blocks.length > 0) {
+      const firstBlockId = currentPage.blocks[0];
+      twiml.redirect(`/api/ivr/${campaignId}/${pageId}/${firstBlockId}`);
+    } else {
+      twiml.say("There was an error in the IVR flow. Goodbye.");
+      twiml.hangup();
+    }
+  } catch (e) {
+    logger.error("Error processing IVR page:", e);
+    twiml.say("An error occurred. Please try again later.");
+    twiml.hangup();
+  }
+
+  return new Response(twiml.toString(), {
+    headers: { "Content-Type": "application/xml" },
+  });
+};

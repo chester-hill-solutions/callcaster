@@ -1,23 +1,29 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
-    validateTwilioWebhook: vi.fn(),
+    validateTwilioWebhookParams: vi.fn(() => true),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
+      TWILIO_SID: () => "AC_MAIN",
     },
     fetch: vi.fn(),
   };
 });
 
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
-vi.mock("@/twilio.server", () => ({ validateTwilioWebhook: (...a: any[]) => mocks.validateTwilioWebhook(...a) }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/twilio.server", () => ({
+  validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a),
+  shouldValidateTwilioWebhooks: () => true,
+}));
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...a: any[]) => mocks.sendWebhookNotification(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
@@ -25,6 +31,9 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 function makeSupabase(opts?: {
   number?: any;
+  workspaceNumberError?: any;
+  workspaceMsMatches?: any[];
+  workspaceMsError?: any;
   messageError?: any;
   contactError?: any;
   contacts?: any[];
@@ -34,6 +43,10 @@ function makeSupabase(opts?: {
   insertedMessages?: Record<string, unknown>[];
 }) {
   const supabase: any = {
+    rpc: async () => ({
+      data: [],
+      error: { message: "stub rpc for tests", code: "stub" },
+    }),
     storage: {
       from: () => ({
         upload: async (_name: string, _b: any, _opts: any) => ({
@@ -47,10 +60,20 @@ function makeSupabase(opts?: {
         return {
           select: () => ({
             eq: () => ({
-              single: async () => ({
+              maybeSingle: async () => ({
                 data: opts?.number ?? null,
-                error: null,
+                error: opts?.workspaceNumberError ?? null,
               }),
+            }),
+          }),
+        };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            or: async () => ({
+              data: opts?.workspaceMsMatches ?? [],
+              error: opts?.workspaceMsError ?? null,
             }),
           }),
         };
@@ -60,6 +83,7 @@ function makeSupabase(opts?: {
           select: () => contactQuery,
           eq: () => contactQuery,
           or: () => contactQuery,
+          in: () => contactQuery,
           not: () => contactQuery,
           neq: async () => ({
             data: opts?.contacts ?? [],
@@ -106,61 +130,165 @@ function makeParams(overrides?: Partial<Record<string, unknown>>) {
   };
 }
 
-describe("app/routes/api.inbound-sms.tsx", () => {
+function makeInboundSmsRequest(overrides?: Partial<Record<string, unknown>>) {
+  const body = new FormData();
+  for (const [key, value] of Object.entries(makeParams(overrides))) {
+    body.append(key, String(value));
+  }
+  return new Request("http://x/inbound-sms", { method: "POST", body });
+}
+
+describe("app/routes/api+/inbound-sms", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhook.mockReset();
+    mocks.validateTwilioWebhookParams.mockReset();
+    mocks.validateTwilioWebhookParams.mockReturnValue(true);
     mocks.sendWebhookNotification.mockReset();
     mocks.logger.error.mockReset();
+    mocks.logger.info.mockReset();
+    mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
   });
 
-  test("returns validation Response directly", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce(new Response("no", { status: 403 }));
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+  test("returns 403 when Twilio signature validation fails", async () => {
+    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    const number = {
+      workspace: "w1",
+      twilio_data: { sid: "sid", authToken: "workspace-tok" },
+      webhook: [],
+    };
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeInboundSmsRequest(),
+      } as any),
+    );
     expect(res.status).toBe(403);
+    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
+      expect.objectContaining({ To: "+1555" }),
+      null,
+      expect.any(String),
+      "workspace-tok",
+    );
   });
 
   test("returns 404 when number not found", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams() });
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number: null }));
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(404);
   });
 
+  test("resolves workspace by MessagingServiceSid when To number is unknown", async () => {
+    const insertedMessages: Record<string, unknown>[] = [];
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        number: null,
+        workspaceMsMatches: [
+          {
+            id: "w-ms",
+            twilio_data: { sid: "sid", authToken: "tok" },
+            webhook: [],
+          },
+        ],
+        insertedMessages,
+      }),
+    );
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeInboundSmsRequest({
+          To: "+19998887777",
+          MessagingServiceSid: "MG1234567890abcdef",
+          NumMedia: "0",
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(201);
+    expect(insertedMessages[0]).toMatchObject({
+      workspace: "w-ms",
+      messaging_service_sid: "MG1234567890abcdef",
+      direction: "inbound",
+    });
+  });
+
+  test("returns 409 when MessagingServiceSid matches multiple workspaces", async () => {
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        number: null,
+        workspaceMsMatches: [
+          { id: "w1", twilio_data: { sid: "AC1", authToken: "tok1" }, webhook: [] },
+          { id: "w2", twilio_data: { sid: "AC2", authToken: "tok2" }, webhook: [] },
+        ],
+      }),
+    );
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: makeInboundSmsRequest({
+          To: "+19998887777",
+          MessagingServiceSid: "MGdup",
+          NumMedia: "0",
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(409);
+  });
+
+  test("uses env Twilio creds for MMS when workspace twilio_data is missing in dev", async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "test";
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["x"]),
+    } as any);
+    const number = { workspace: "w1", twilio_data: null, webhook: [] };
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(
+      await mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
+    );
+    process.env.NODE_ENV = originalNodeEnv;
+    expect(res.status).toBe(201);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "https://m/0",
+      expect.objectContaining({
+        headers: {
+          Authorization: `Basic ${Buffer.from("AC_MAIN:tok").toString("base64")}`,
+        },
+      }),
+    );
+  });
+
   test("processes media (handles fetch/upload failures), inserts message, opt-out stop/start, and sends webhook", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "stop" }) });
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
     const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [{ id: 9 }], insertedMessages, smsWebhook: true }));
-    const mod = await import("../app/routes/api.inbound-sms");
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(insertedMessages[0]?.contact_id).toBe(9);
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
 
     // start branch with quoted start + upload error path
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: '"start"' }) });
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, uploadError: { message: "up" }, contacts: [{ id: 9 }] }));
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("covers media_urls branch, contact lookup error logging, and no-webhook path", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "hello", NumMedia: "1" }) });
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "other" }] }] };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contactError: new Error("c") }));
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalledWith("Contact lookup error:", expect.any(Error));
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
@@ -168,27 +296,24 @@ describe("app/routes/api.inbound-sms.tsx", () => {
 
   test("covers stop/start contact empty (no update) + contactError logging branches", async () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
-    const mod = await import("../app/routes/api.inbound-sms");
+    const mod = await import("../app/routes/api+/inbound-sms");
 
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "stop", NumMedia: "0" }) });
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    let res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
 
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "start", NumMedia: "0" }) });
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("covers webhook payload media_urls when media present", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ Body: "hello", NumMedia: "1" }) });
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -198,7 +323,6 @@ describe("app/routes/api.inbound-sms.tsx", () => {
   });
 
   test("does not stamp contact_id when phone lookup is ambiguous", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams({ NumMedia: "0" }) });
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
     const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(
@@ -208,20 +332,19 @@ describe("app/routes/api.inbound-sms.tsx", () => {
         insertedMessages,
       }),
     );
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
 
     expect(res.status).toBe(201);
     expect(insertedMessages[0]).not.toHaveProperty("contact_id");
   });
 
   test("message insert error returns 400", async () => {
-    mocks.validateTwilioWebhook.mockResolvedValueOnce({ params: makeParams() });
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     mocks.createClient.mockReturnValueOnce(makeSupabase({ number, messageError: new Error("msg") }));
-    const mod = await import("../app/routes/api.inbound-sms");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(400);
   });
 });

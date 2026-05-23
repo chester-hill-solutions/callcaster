@@ -12,7 +12,7 @@ type ServiceMod = {
 };
 
 const services: Array<{ name: string; path: string }> = [
-  { name: "api", path: "@/lib/services/api" },
+  { name: "api", path: "@/lib/services/hooks-api" },
   { name: "hooks-api", path: "@/lib/services/hooks-api" },
 ];
 

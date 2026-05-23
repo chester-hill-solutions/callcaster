@@ -1,0 +1,466 @@
+// @ts-nocheck
+import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
+
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import {
+  Form,
+  Link,
+  NavLink,
+  Outlet,
+  useActionData,
+  useLoaderData,
+  useOutlet,
+  useOutletContext,
+} from "react-router";
+import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+
+
+
+import { toast } from "sonner";
+import { capitalize } from "@/lib/utils";
+import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
+import { Card } from "@/components/shared/CustomCard";
+import WebhookEditor from "@/components/workspace/WebhookEditor";
+import ApiKeysSection from "@/components/workspace/ApiKeysSection";
+import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Heading } from "@/components/ui/typography";
+
+type UserWithRole = Partial<User> & { role: string };
+
+type LoaderData = {
+  workspace: WorkspaceData;
+  userRole: MemberRole;
+  users: UserWithRole[];
+  activeUserId: string;
+  phoneNumbers: WorkspaceNumbers[];
+  pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
+  webhook: WorkspaceWebhook;
+  hasAccess: boolean;
+}   
+
+type WorkspaceNumbers = {
+  id: string;
+  phone_number: string;
+  capabilities: {
+    verification_status: 'success' | 'failed' | 'pending';
+  };
+};
+
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
+
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+
+  const workspaceId = params.id;
+  if (!workspaceId) throw new Error("No workspace id found!");
+  const userId = user?.id;
+  const {data: workspace, error: workspaceError} = await supabaseClient
+    .from("workspace")
+    .select("name, id, workspace_users(role, user(username, id)), workspace_number(*), audience(*), workspace_invite(*, user(username, id, first_name, last_name)), webhook(*)")
+    .eq("id", workspaceId)
+    .single();
+    
+  if (workspaceError) throw workspaceError;
+  const userRole = workspace.workspace_users.find((user) => user.user?.id === userId)?.role;
+  const users = [] as UserWithRole[];
+  const hasAccess = userRole !== MemberRole.Caller; 
+  const {workspace_users, workspace_number, audience, workspace_invite, webhook, ...rest} = workspace;
+  workspace_users.forEach((user) => {
+    users.push({role: user.role, id: user.user?.id, username: user.user?.username} as UserWithRole);
+  });
+  return routeData(
+      {
+        workspace: rest,
+        userRole,
+        users,
+        activeUserId: userId,
+        phoneNumbers: workspace_number,
+        pendingInvites: workspace_invite,
+        webhook: webhook[0] as WorkspaceWebhook,
+        hasAccess,
+      },
+      { headers },
+    );
+  }
+
+export const action = async ({ request, params }: ActionFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
+  const { verifyAuth } = await import("@/lib/supabase.server");
+  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
+
+  const workspaceId = params.id;
+  const { supabaseClient, headers, user } = await verifyAuth(request);
+
+  if (workspaceId == null) {
+    return routeData({ error: "No workspace_id found!" }, { headers });
+  }
+
+  const formData = await request.formData();
+  const formName = formData.get("formName");
+
+  switch (formName) {
+    case "addUser": {
+      return handleAddUser(formData, workspaceId, supabaseClient, headers);
+    }
+    case "updateUser": {
+      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
+    }
+    case "deleteUser": {
+      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
+    }
+    case "deleteSelf": {
+      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
+    }
+    case "transferWorkspaceOwnership": {
+      return handleTransferWorkspace(
+        formData,
+        workspaceId,
+        supabaseClient,
+        headers,
+      );
+    }
+    case "deleteWorkspace": {
+      return handleDeleteWorkspace({ workspaceId, supabaseClient, headers });
+    }
+    case "cancelInvite": {
+      return removeInvite({ workspaceId, supabaseClient, formData, headers });
+    }
+    case "updateWebhook": {
+      return handleUpdateWebhook(
+        formData,
+        workspaceId,
+        supabaseClient,
+        headers,
+      );
+    }
+    default: {
+      break;
+    }
+  }
+
+  return routeData(
+    { data: null, error: "Error: Unrecognized action called" },
+    { headers },
+  );
+};
+
+function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
+  const memberRoleArray = Object.values(MemberRole);
+
+  const aRole = a.role as MemberRole;
+  const bRole = b.role as MemberRole;
+
+  if (
+    memberRoleArray.indexOf(aRole) <
+    memberRoleArray.indexOf(bRole)
+  )
+    return -1;
+  if (
+    memberRoleArray.indexOf(aRole) >
+    memberRoleArray.indexOf(bRole)
+  )
+    return 1;
+  return 0;
+}
+
+export default function WorkspaceSettings() {
+  const outlet = useOutlet();
+  const {
+    hasAccess,
+    userRole,
+    users,
+    activeUserId,
+    phoneNumbers,
+    pendingInvites,
+    webhook,
+    workspace,
+  } = useLoaderData<LoaderData>();
+  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
+  const { workspace: outletWorkspace } = useOutletContext<{
+    workspace: WorkspaceData;
+  }>();
+  const actionData = useActionData();
+  const canManageWebhook =
+    hasAccess &&
+    outletWorkspace != null &&
+    "id" in outletWorkspace &&
+    typeof outletWorkspace.id === "string";
+  const webhookWorkspaceId = canManageWebhook ? String(outletWorkspace.id) : "";
+  const webhookUserId = String(activeUserId);
+  const workspaceOwner = users?.find(
+    (user) => user?.role === "owner"
+  ) as UserWithRole | undefined;
+  users?.sort((a, b) => compareMembersByRole(a, b));
+  const formRef = useRef<HTMLFormElement | null>(null);
+  useEffect(() => {
+    if (actionData && actionData?.error) {
+      toast.error(JSON.stringify(actionData.error));
+    }
+    if (actionData && (('data' in actionData && actionData.data) || ('success' in actionData && actionData.success))) {
+      toast.success("Action completed succesfully!");
+      formRef?.current?.reset();
+    }
+  }, [actionData]);
+
+  const addUserTabs = (
+    <Form method="POST" className="flex w-full flex-col gap-2" ref={formRef}>
+      {actionData?.error && (
+        <p className="text-center text-2xl font-bold text-brand-primary">
+          {actionData.error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <input type="hidden" name="formName" value="addUser" />
+        <FormField htmlFor="username" label="Email" className="w-full">
+          <Input
+            type="text"
+            name="username"
+            id="username"
+            className="bg-transparent"
+          />
+        </FormField>
+        <FormField
+          htmlFor="new_user_workspace_role"
+          label="Role"
+          className="w-full"
+        >
+          <select
+            className="rounded-md border-2 border-border px-2 py-2 bg-background text-foreground"
+            name="new_user_workspace_role"
+            id="new_user_workspace_role"
+            defaultValue={MemberRole.Caller}
+            required
+          >
+            {Object.values(MemberRole).map((role) => {
+              if (role.valueOf() === "owner") {
+                return <></>;
+              }
+              if (
+                role.valueOf() === "admin" &&
+                userRole === MemberRole.Member
+              ) {
+                return <></>;
+              }
+
+              return (
+                <option
+                  key={role.valueOf()}
+                  value={role.valueOf()}
+                  className=""
+                >
+                  {capitalize(role.valueOf())}
+                </option>
+              );
+            })}
+          </select>
+        </FormField>
+      </div>
+      <Button
+        type="submit"
+        className="h-full w-full font-Zilla-Slab text-xl font-semibold"
+      >
+        Invite
+      </Button>
+    </Form>
+  );
+
+  const callerSelfDeleteForm = (
+    <Form method="POST" className="w-full">
+      <input type="hidden" name="formName" value="deleteSelf" />
+      <input type="hidden" name="user_id" value={activeUserId} />
+      <div className="flex w-full gap-2">
+        <Button
+          className="h-full w-full font-Zilla-Slab text-2xl font-semibold"
+          variant="destructive"
+        >
+          Quit This Workspace
+        </Button>
+        <Button
+          asChild
+          variant="outline"
+          className="h-full w-1/3 border border-border bg-primary font-Zilla-Slab text-2xl font-semibold text-primary-foreground"
+        >
+          <Link to=".." relative="path">
+            Back
+          </Link>
+        </Button>
+      </div>
+    </Form>
+  );
+
+  if (outlet) {
+    return <Outlet />;
+  }
+
+  return (
+    <main className="mt-8 flex h-fit flex-col">
+      <div className="flex justify-center">
+        <Heading className="mb-4" branded>
+          Workspace Settings
+        </Heading>
+      </div>
+      <div className="flex flex-wrap items-stretch gap-4">
+        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex justify-between">
+          <div className="flex-1">
+            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+              Manage Team Members
+            </h3>
+            <div className="flex flex-col py-4">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
+                Owner
+              </p>
+              {workspaceOwner && <TeamMember
+                member={workspaceOwner}
+                userRole={userRole}
+                memberIsUser={workspaceOwner?.id === activeUserId}
+                workspaceOwner={workspaceOwner!}
+              />}
+            </div>
+            <div className="flex flex-col py-4">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
+                Members
+              </p>
+              <ul className=" flex w-full flex-col items-center gap-2">
+                {users?.map((member) => {
+                  if (!member || !member.role) {
+                    return <></>;
+                  }
+                  if (member.role === "owner") {
+                    return <></>;
+                  }
+                  return (
+                    <li key={member.id} className="w-full">
+                      <TeamMember
+                        member={member}
+                        userRole={userRole}
+                        memberIsUser={member.id === activeUserId}
+                        workspaceOwner={workspaceOwner!}
+                      />
+                    </li>
+                  );
+                })}
+                {pendingInvites?.map((invite) => {
+                  if (!invite) {
+                    return <></>;
+                  }
+                  const inviteWithUser = invite as WorkspaceInvite & {user?: Partial<User>};
+                  return (
+                    <li key={invite.id} className="w-full">
+                      <TeamMember
+                        member={{
+                          ...(inviteWithUser.user || {}),
+                          role: "invited",
+                        } as UserWithRole}
+                        userRole={userRole}
+                        memberIsUser={false}
+                        workspaceOwner={workspaceOwner!}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          <div className="flex flex-col pt-4">
+            <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
+              {hasAccess && "Invite User"}
+            </p>
+            {hasAccess ? addUserTabs : callerSelfDeleteForm}
+          </div>
+        </Card>
+        <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
+          <div className="flex-1">
+            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+              Manage Phone Numbers
+            </h3>
+            <div className="flex flex-col py-4">
+              <p className="self-start font-sans text-lg font-bold uppercase tracking-tighter text-muted-foreground">
+                Phone Numbers
+              </p>
+              <ul className="flex w-full flex-col items-center gap-2">
+                {phoneNumbers?.map((number) => {
+                  if (!number) {
+                    return <></>;
+                  } 
+                  return (
+                    <li key={number.id} className="w-full">
+                      <div className="flex w-full items-center justify-between border-b border-border bg-transparent p-2 text-xl shadow-sm">
+                        <p className="font-semibold">{number.phone_number}</p>
+                        <div>
+                          {number.capabilities?.verification_status ===
+                          "success" ? (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase">
+                                {number.capabilities?.verification_status}
+                              </p>
+                              <MdCheckCircle fill="#008800" size={24} />
+                            </div>
+                          ) : number.capabilities?.verification_status ===
+                            "failed" ? (
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase">
+                                {number.capabilities?.verification_status}
+                              </p>
+                              <MdError fill="#880000" size={24} />
+                            </div>
+                          ) : number.capabilities?.verification_status ===
+                            "pending" ? (
+                            <div className="i gap-2tems-center flex">
+                              <p className="text-xs uppercase">
+                                {number.capabilities?.verification_status}
+                              </p>
+                              <MdCached size={24} />
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+          {hasAccess && (
+            <div className="">
+              <Button
+                asChild
+                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
+              >
+                <NavLink to={"./numbers"} relative="path">
+                  Manage Numbers
+                </NavLink>
+              </Button>
+            </div>
+          )}
+        </Card>
+        {hasAccess && (
+          <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
+        )}
+        {hasAccess && <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
+          <div className="flex-1">
+            <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+              Manage Webhook
+            </h3>
+            <div className="flex flex-col py-4">
+              {canManageWebhook ? (
+                <WebhookEditor initialWebhook={webhook ? {
+                  id: String(webhook.id || ''),
+                  destination_url: webhook.destination_url || '',
+                  events: Array.isArray(webhook.event) ? webhook.event.map((e: string) => ({ category: 'inbound_call' as const, type: e as 'INSERT' | 'UPDATE' })) : [],
+                  custom_headers: typeof webhook.custom_headers === 'object' && webhook.custom_headers !== null ? webhook.custom_headers as Record<string, string> : undefined,
+                } : undefined} userId={webhookUserId} workspaceId={webhookWorkspaceId} />
+              ) : (
+                <p className="text-center text-muted-foreground">
+                  You don't have permission to manage webhooks.
+                </p>
+              )}
+            </div>
+          </div>
+        </Card>}
+      </div>
+    </main>
+  );
+}

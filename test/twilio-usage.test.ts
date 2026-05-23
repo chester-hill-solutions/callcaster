@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { getTwilioUsageDateRange, groupTwilioUsageData } from "../app/lib/twilio-usage";
+import {
+  getTwilioUsageDateRange,
+  groupTwilioUsageData,
+} from "../app/lib/twilio-usage";
 
 describe("app/lib/twilio-usage.ts", () => {
   test("suppresses parent usage categories when detailed child categories exist", () => {
@@ -219,9 +222,90 @@ describe("app/lib/twilio-usage.ts", () => {
   });
 
   test("builds a stable UTC date range for the last 30 days", () => {
-    expect(getTwilioUsageDateRange(new Date("2026-03-06T12:00:00.000Z"))).toEqual({
+    expect(
+      getTwilioUsageDateRange(new Date("2026-03-06T12:00:00.000Z")),
+    ).toEqual({
       startDate: "2026-02-04",
       endDate: "2026-03-06",
     });
+  });
+
+  test("covers additional category mappings and skips zero-value details", () => {
+    const { groupedUsage, totalPrice } = groupTwilioUsageData([
+      {
+        category: "failed-message-processing-fee",
+        description: "Failed sends",
+        usage: "3",
+        usageUnit: "messages",
+        price: "0.09",
+      },
+      {
+        category: "mms-inbound-longcode",
+        description: "Inbound MMS",
+        usage: "2",
+        usageUnit: "messages",
+        price: "0.02",
+      },
+      {
+        category: "calls-outbound-api",
+        description: "Outbound voice",
+        usage: "5",
+        usageUnit: "minutes",
+        price: "0.25",
+      },
+      {
+        category: "channels-other",
+        description: "Channels misc",
+        usage: "4",
+        usageUnit: "messages",
+        price: "0.40",
+      },
+      {
+        category: "unknown-category",
+        description: "Unknown",
+        usage: "7",
+        usageUnit: "units",
+        price: "0.70",
+      },
+      {
+        category: "unknown-non-numeric",
+        description: "No numeric usage",
+        usage: "not-a-number",
+        usageUnit: "units",
+        price: "0",
+      },
+      {
+        category: "totalprice",
+        description: "Total",
+        usage: "0",
+        usageUnit: "usd",
+        price: "0",
+      },
+      {
+        category: "sms",
+        description: "Filtered zero row",
+        usage: "0",
+        usageUnit: "messages",
+        price: "0",
+      },
+    ]);
+
+    expect(groupedUsage["Failed Messages"]?.price).toBe(0.09);
+    expect(groupedUsage.MMS?.price).toBe(0.02);
+    expect(groupedUsage.Voice?.price).toBe(0.25);
+    expect(groupedUsage.Channels?.price).toBe(0.4);
+    expect(groupedUsage.Other?.price).toBe(0.7);
+    expect(
+      groupedUsage.Other?.details.some(
+        (detail) => detail.description === "No numeric usage",
+      ),
+    ).toBe(false);
+    expect(totalPrice).toBe(1.46);
+  });
+
+  test("returns ISO-like dates when using default date argument", () => {
+    const range = getTwilioUsageDateRange();
+    expect(range.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(range.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

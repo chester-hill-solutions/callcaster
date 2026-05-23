@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
@@ -11,12 +13,12 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
-vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils", () => ({
+vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   testWebhook: (...args: any[]) => mocks.testWebhook(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.test-webhook.tsx", () => {
+describe("app/routes/api+/test-webhook/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
@@ -30,8 +32,8 @@ describe("app/routes/api.test-webhook.tsx", () => {
       destination_url: 123,
       custom_headers: JSON.stringify([]),
     });
-    const mod = await import("../app/routes/api.test-webhook");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/test-webhook");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid input" });
     expect(mocks.logger.warn).toHaveBeenCalledWith("Invalid input for webhook test");
@@ -44,8 +46,8 @@ describe("app/routes/api.test-webhook.tsx", () => {
       custom_headers: JSON.stringify([["X-Test", "1"]]),
     });
     mocks.testWebhook.mockResolvedValueOnce({ ok: true });
-    const mod = await import("../app/routes/api.test-webhook");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/test-webhook");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
     expect(mocks.testWebhook).toHaveBeenCalledWith({ category: "outbound_sms" }, "http://hook", { "X-Test": "1" });

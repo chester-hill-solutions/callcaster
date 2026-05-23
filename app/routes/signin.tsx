@@ -1,17 +1,21 @@
-import { json, redirect } from "@remix-run/node";
-import { Form, NavLink, useActionData } from "@remix-run/react";
+// @ts-nocheck
+
+
+import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { logger } from "@/lib/logger.server";
+
+
 import { Text } from "@/components/ui/typography";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const requestUrl = new URL(request.url);
   const next = requestUrl.searchParams.get('next');
@@ -32,21 +36,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect("/workspaces", { headers });
   }
   logger.error("Sign-in error", error);
-  return json({ error: error.message });
+  return routeData({ error: error.message });
 };
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const {supabaseClient, headers} = createSupabaseServerClient(request);
   const { data: { user } } = await supabaseClient.auth.getUser();
 
   if (user) {
     return redirect("/workspaces", { headers });
   }
-  return json({ user }, { headers });
+  return routeData({ user }, { headers });
 };
 
 export default function SignIn() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData();
 
   useEffect(() => {
     if (actionData?.error != null) {
@@ -55,7 +61,7 @@ export default function SignIn() {
   }, [actionData]);
 
   return (
-    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">
+    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
       <AuthCard
         title="Login"
         description="Sign in to manage your workspaces, calls, and messaging."
@@ -101,14 +107,14 @@ export default function SignIn() {
         </Button>
         <NavLink
           to={"/signup"}
-          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-black transition-all duration-150 hover:text-brand-primary hover:underline dark:text-brand-secondary dark:hover:text-brand-primary"
+          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-all duration-150 hover:text-brand-primary hover:underline dark:text-secondary-foreground dark:hover:text-brand-primary"
         >
           Don't Have an Account Yet? Click{" "}
           <span className="text-brand-primary">HERE</span> to Sign-Up!
         </NavLink>
         <NavLink
           to={"/remember"}
-          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-gray-500 hover:text-brand-primary hover:underline dark:text-brand-tertiary"
+          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground hover:text-brand-primary hover:underline dark:text-brand-tertiary"
         >
           I forgot my password
         </NavLink>

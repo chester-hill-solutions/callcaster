@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     safeParseJson: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -44,7 +46,7 @@ function makeUpdateBuilder(selectResult: { data: any; error: any }, updateSpy?: 
   };
 }
 
-describe("app/routes/api.questions.tsx", () => {
+describe("app/routes/api+/questions/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -74,10 +76,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
@@ -113,10 +115,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("b=2");
@@ -152,10 +154,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: rpcError });
@@ -198,10 +200,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: 1, disposition: "completed" });
@@ -237,10 +239,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: updateError });
@@ -283,10 +285,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: null, disposition: "completed" });
@@ -323,10 +325,10 @@ describe("app/routes/api.questions.tsx", () => {
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
 
-    const mod = await import("../app/routes/api.questions");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/questions", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: updateError });

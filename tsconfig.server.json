@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["server/**/*.ts", "app/lib/required-env-keys.ts"],
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "server-dist",
+    "rootDir": ".",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "declaration": false,
+    "sourceMap": true
+  }
+}

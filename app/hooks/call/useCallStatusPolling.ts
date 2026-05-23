@@ -1,3 +1,4 @@
+import { data as routeData } from "react-router";
 import { useRef, useCallback } from "react";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";

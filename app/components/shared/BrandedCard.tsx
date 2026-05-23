@@ -18,7 +18,7 @@ export const BrandedCard = React.forwardRef<HTMLDivElement, BrandedCardProps>(
     <UiCard
       ref={ref}
       className={cn(
-        "relative rounded-lg border-border/80 bg-white shadow-md dark:border-white dark:bg-zinc-900 dark:shadow-none",
+        "relative rounded-lg border-border/80 bg-card shadow-md dark:shadow-none",
         bgColor,
         bgColorClassName,
         className,

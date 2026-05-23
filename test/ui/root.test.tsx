@@ -1,5 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { asRouteResponse } from "../helpers/route-result";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -7,7 +8,7 @@ const mocks = vi.hoisted(() => {
     navbarProps: null as any,
     navigate: vi.fn(),
     unsubscribe: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     envUtil: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "pk"),
@@ -18,7 +19,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/tailwind.css", () => ({ default: "/tailwind.css" }));
+vi.mock("@/tailwind.css?url", () => ({ default: "/tailwind.css" }));
 
 vi.mock("@/components/layout/Navbar", () => ({
   default: (props: any) => {
@@ -42,31 +43,19 @@ vi.mock("@supabase/ssr", () => ({
   createBrowserClient: (...args: any[]) => mocks.createBrowserClient(...args),
 }));
 
-vi.mock("@remix-run/react", () => {
-  const json = (data: any, init?: any) => {
-    const headers = new Headers(init?.headers ?? {});
-    if (!headers.has("Content-Type")) {
-      headers.set("Content-Type", "application/json");
-    }
-    return new Response(JSON.stringify(data), {
-      status: init?.status ?? 200,
-      headers,
-    });
-  };
-  const redirect = (to: string) =>
-    new Response(null, { status: 302, headers: { Location: to } });
-
+vi.mock("react-router", async () => {
+  const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
+    ...actual,
     Links: () => null,
-    LiveReload: () => null,
     Meta: () => null,
     Outlet: () => null,
     Scripts: () => null,
     ScrollRestoration: () => null,
     useLoaderData: () => mocks.loaderData,
     useNavigate: () => mocks.navigate,
-    json,
-    redirect,
+    useRouteError: () => null,
+    isRouteErrorResponse: () => false,
   };
 });
 
@@ -87,17 +76,19 @@ describe("root.tsx", () => {
   test("links includes stylesheet", async () => {
     const mod = await import("../../app/root");
     expect(mod.links()).toEqual(
-      expect.arrayContaining([{ rel: "stylesheet", href: "/tailwind.css" }])
+      expect.arrayContaining([
+        expect.objectContaining({ rel: "stylesheet", href: expect.stringContaining("tailwind") }),
+      ]),
     );
   });
 
   test("loader redirects when q decodes to contactId:surveyId", async () => {
     const mod = await import("../../app/root");
     const q = btoa("10:20");
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(`http://x/?q=${encodeURIComponent(q)}`),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/survey/20?contact=10");
   });
@@ -116,10 +107,10 @@ describe("root.tsx", () => {
 
     const mod = await import("../../app/root");
     const q = btoa("10:");
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(`http://x/?q=${encodeURIComponent(q)}`),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -136,10 +127,10 @@ describe("root.tsx", () => {
     });
 
     const mod = await import("../../app/root");
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/?q=not-base64"),
       params: { id: "x" },
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -188,10 +179,10 @@ describe("root.tsx", () => {
     });
 
     const mod = await import("../../app/root");
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/"),
       params: {},
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.error).not.toHaveBeenCalledWith(
       "Error loading workspaces or user data",
@@ -236,10 +227,10 @@ describe("root.tsx", () => {
     });
 
     const mod = await import("../../app/root");
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/"),
       params: {},
-    } as any);
+    } as any));
     const body = await res.json();
     expect(body.workspaces).toEqual([{ id: "w1", name: "W" }]);
     expect(mocks.logger.error).toHaveBeenCalledWith(
@@ -273,7 +264,7 @@ describe("root.tsx", () => {
     expect(mocks.navbarProps.isSignedIn).toBe(true);
 
     const r = await mocks.navbarProps.handleSignOut();
-    await expect(r.json()).resolves.toEqual({ success: null, error: "bad" });
+    expect(r).toEqual({ success: null, error: "bad" });
     expect(mocks.navigate).toHaveBeenCalledWith("/reset");
 
     unmount();
@@ -304,7 +295,7 @@ describe("root.tsx", () => {
     consoleError.mockRestore();
 
     const r = await mocks.navbarProps.handleSignOut();
-    await expect(r.json()).resolves.toEqual({ success: "Sign off successful", error: null });
+    expect(r).toEqual({ success: "Sign off successful", error: null });
     expect(mocks.navigate).toHaveBeenCalledWith("/");
   });
 });

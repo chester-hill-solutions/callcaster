@@ -1,47 +1,82 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-const mocks = vi.hoisted(() => {
-  return {
-    createClient: vi.fn(),
-    env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
-    },
-    logger: { debug: vi.fn() },
-  };
-});
+import { asRouteResponse } from "./helpers/route-result";
+
+const mocks = vi.hoisted(() => ({
+  createClient: vi.fn(),
+  validateTwilioWebhookForCallSid: vi.fn(),
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+  env: {
+    SUPABASE_URL: () => "https://sb.example",
+    SUPABASE_SERVICE_KEY: () => "svc",
+  },
+}));
 
 vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: any[]) => mocks.createClient(...args),
+  createClient: (...args: unknown[]) => mocks.createClient(...args),
+}));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
+    mocks.validateTwilioWebhookForCallSid(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.recording.tsx", () => {
+describe("app/routes/api+/recording", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.env.SUPABASE_URL.mockClear();
-    mocks.env.SUPABASE_SERVICE_KEY.mockClear();
-    mocks.logger.debug.mockReset();
-  });
-
-  test("returns json of form data and logs debug", async () => {
-    mocks.createClient.mockReturnValueOnce({});
-    const fd = new FormData();
-    fd.set("RecordingSid", "RE1");
-    fd.set("CallSid", "CA1");
-    const mod = await import("../app/routes/api.recording");
-    const res = await mod.action({
-      request: new Request("http://x", { method: "POST", body: fd }),
-      params: {},
-    } as any);
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ RecordingSid: "RE1", CallSid: "CA1" });
-    expect(mocks.createClient).toHaveBeenCalledWith("http://supabase", "service");
-    expect(mocks.logger.debug).toHaveBeenCalledWith("Recording webhook received", {
-      data: { RecordingSid: "RE1", CallSid: "CA1" },
+    mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
+      ok: true,
+      params: { CallSid: "CA1", RecordingUrl: "https://rec" },
+      authToken: "tok",
     });
   });
-});
 
+  test("returns 400 when CallSid missing", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test("returns 403 when validation fails", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("returns payload on happy path", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("RecordingUrl", "https://rec");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ CallSid: "CA1" });
+  });
+});

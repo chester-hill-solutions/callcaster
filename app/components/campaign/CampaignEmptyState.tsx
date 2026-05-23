@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "@remix-run/react";
+import { NavLink, useLocation } from "react-router";
 import BgImage from "@/components/shared/TransparentBGImage";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -29,7 +29,7 @@ const CampaignEmptyState = ({hasAccess = false, type}:{hasAccess:boolean; type: 
               </NavLink>
             </Button>:
             <Button asChild>
-            <NavLink to={isCampaignsRoute ? "../settings/numbers" : "./settings/numbers"}>
+            <NavLink to={isCampaignsRoute ? "../settings/numbers/purchase" : "./settings/numbers/purchase"}>
               Get a Number
               </NavLink>
             </Button>

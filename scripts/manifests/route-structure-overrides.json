@@ -1,0 +1,13 @@
+{
+  "workspaces_.$id_.settings_.numbers": "workspaces+/$id/settings/numbers",
+  "workspaces_.$id_.settings_.numbers.purchase": "workspaces+/$id/settings/numbers/purchase",
+  "workspaces_.$id_.contacts": "workspaces+/$id/contacts",
+  "workspaces_.$id_.handset": "workspaces+/$id/handset",
+  "workspaces_.$id_.campaigns.$campaign_id.call": "workspaces+/$id/campaigns/$campaign_id/call",
+  "workspaces_.$id": "workspaces+/$id",
+  "workspaces_.$id.settings": "workspaces+/$id/settings",
+  "admin_.workspaces.$workspaceId": "admin+/workspaces/$workspaceId",
+  "admin_.workspaces.$workspaceId_.invite": "admin+/workspaces/$workspaceId/invite",
+  "admin_.users.$userId.edit": "admin+/users/$userId/edit",
+  "admin_.users.$userId.workspaces": "admin+/users/$userId/workspaces"
+}

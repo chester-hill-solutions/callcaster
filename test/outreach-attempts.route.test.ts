@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -14,7 +16,7 @@ vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 
-describe("app/routes/api.outreach-attempts.tsx", () => {
+describe("app/routes/api+/outreach-attempts/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -31,10 +33,10 @@ describe("app/routes/api.outreach-attempts.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: 1, contact_id: 2, queue_id: 3 });
 
-    const mod = await import("../app/routes/api.outreach-attempts");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/outreach-attempts");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ error: { message: "nope" } });
@@ -57,10 +59,10 @@ describe("app/routes/api.outreach-attempts.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaign_id: "10", contact_id: "20", queue_id: "30" });
 
-    const mod = await import("../app/routes/api.outreach-attempts");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/outreach-attempts");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/outreach-attempts", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("b=2");

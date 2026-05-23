@@ -2,7 +2,7 @@ import { TotalCalls } from "./ResultsScreen.TotalCalls";
 import { AsyncExportButton } from "./AsyncExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
-import { useParams } from "@remix-run/react";
+import { useParams } from "react-router";
 
 type CampaignResult = {
   disposition: string;

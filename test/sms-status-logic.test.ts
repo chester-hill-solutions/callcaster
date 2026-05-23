@@ -20,6 +20,8 @@ describe("sms-status shared logic", () => {
 
   test("normalizeTwilioSmsStatus maps unknown to failed", () => {
     expect(normalizeTwilioSmsStatus("delivered")).toBe("delivered");
+    expect(normalizeTwilioSmsStatus("DELIVERED")).toBe("delivered");
+    expect(normalizeTwilioSmsStatus("Sent")).toBe("sent");
     expect(normalizeTwilioSmsStatus("not-a-status")).toBe("failed");
   });
 

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -31,7 +33,7 @@ function makeSupabase(opts?: { uploadError?: any; updateError?: any }) {
   };
 }
 
-describe("app/routes/api.media.tsx", () => {
+describe("app/routes/api+/media/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -40,22 +42,22 @@ describe("app/routes/api.media.tsx", () => {
 
   test("uploads media and updates campaign, returning public url", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase(), user: { id: "u1" } });
-    const mod = await import("../app/routes/api.media");
+    const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
     fd.set("live_campaign_id", "1");
     fd.set("campaign_name", "Camp");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toBe("https://public");
   });
 
   test("returns 500 on upload/update error", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({ uploadError: new Error("up") }), user: { id: "u1" } });
-    const mod = await import("../app/routes/api.media");
+    const mod = await import("../app/routes/api+/media");
     const fd = new FormData();
     fd.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
-    const res = await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any);
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
 
@@ -63,7 +65,7 @@ describe("app/routes/api.media.tsx", () => {
     const fd2 = new FormData();
     fd2.set("file", new File(["x"], "a.mp3", { type: "audio/mpeg" }));
     fd2.set("live_campaign_id", "1");
-    const res2 = await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any);
+    const res2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(res2.status).toBe(500);
   });
 });

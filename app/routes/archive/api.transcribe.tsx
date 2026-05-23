@@ -1,7 +1,9 @@
-import { json } from "@remix-run/node";
-import type { ActionFunctionArgs } from "@remix-run/node";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+// @ts-nocheck
+
+
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
+
 
 async function transcribeAudio(audioBuffer: ArrayBuffer) {
     const openAiUrl = 'https://api.openai.com/v1/audio/transcriptions';
@@ -25,7 +27,9 @@ async function transcribeAudio(audioBuffer: ArrayBuffer) {
     return response.json();
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const baseUrl = env.BASE_URL();
     const formData = await request.formData();
     const text = formData.get('TranscriptionText');
@@ -38,7 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const buffer = await audioFile.arrayBuffer();
     try {
         const transcriptionResult = await transcribeAudio(buffer); */
-        return json({ status: 'OK' });
+        return routeData({ status: 'OK' });
    /*  } catch (error) {
         console.error('Error transcribing audio:', error);
         return new Response("Failed to transcribe audio", { status: 500 });

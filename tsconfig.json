@@ -1,8 +1,9 @@
 {
   "include": [
-    "remix.env.d.ts",
+    "app/env.ts",
     "app/**/*.ts",
-    "app/**/*.tsx"
+    "app/**/*.tsx",
+    ".react-router/types/**/*"
   ],
   "exclude": [
     "node_modules",
@@ -11,15 +12,17 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "supabase/functions/**",
+    "archive/deprecated/twilio-serverless/**",
     "app/routes/archive/**",
-    "app/routes/old.*",
-    "twilio-serverless/**"
+    "app/routes/old*",
+    "app/routes/old.**"
   ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "isolatedModules": true,
     "esModuleInterop": true,
     "jsx": "react-jsx",
+    "module": "ES2022",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "target": "ES2022",
@@ -28,6 +31,8 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
+    "rootDirs": [".", "./.react-router/types"],
+    "types": ["@react-router/node", "vite/client"],
     "paths": {
       "@/*": ["./app/*"]
     },

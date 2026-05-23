@@ -97,7 +97,7 @@ export {
 } from "./database/stripe.server";
 
 // Re-export utility functions that are still used
-import { json } from "@remix-run/node";
+import { data as routeData } from "react-router";
 import { logger } from "./logger.server";
 
 export const parseRequestData = async (request: Request) => {
@@ -141,7 +141,7 @@ export async function safeParseJson<T = Record<string, unknown>>(
     return (await request.json()) as T;
   } catch (e) {
     if (e instanceof SyntaxError) {
-      throw json({ error: "Invalid JSON" }, { status: 400 });
+      throw routeData({ error: "Invalid JSON" }, { status: 400 });
     }
     throw e;
   }
@@ -166,13 +166,14 @@ export const parseActionRequest = async (
 
 export const handleError = (error: Error, message: string, status = 500) => {
   logger.error(`${message}:`, error);
-  return json({ error: message }, { status });
+  return routeData({ error: message }, { status });
 };
 
 // Legacy functions that need to be kept for now
 import Twilio from "twilio";
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "./database.types";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 // Marked for deprecation
 export async function endConferenceByUser({
@@ -192,10 +193,11 @@ export async function endConferenceByUser({
   if (error || !data) {
     throw error || new Error("No workspace found");
   }
-  const twilio = new Twilio.Twilio(
-    data.twilio_data.sid,
-    data.twilio_data.authToken,
-  );
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Workspace missing Twilio credentials");
+  }
+  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
   if (!user_id) {
     throw new Error("User ID is required");
   }

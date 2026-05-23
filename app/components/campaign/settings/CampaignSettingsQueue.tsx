@@ -1,4 +1,4 @@
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Tables } from "@/lib/database.types";
 

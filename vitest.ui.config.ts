@@ -23,9 +23,7 @@ export default mergeConfig(
           // Covered via the Node suite to avoid cross-transform LCOV mismatches.
           "app/lib/type-utils.ts",
           "app/lib/type-safety-utils.ts",
-          "app/routes/api*.{ts,tsx,js,jsx}",
-          "app/routes/archive/**",
-          "app/routes/old.*",
+          "app/routes/**/*.{ts,tsx,js,jsx}",
           "supabase/functions/**",
           "twilio-serverless/**",
         ],
@@ -33,4 +31,3 @@ export default mergeConfig(
     },
   }),
 );
-

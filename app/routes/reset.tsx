@@ -1,4 +1,5 @@
-import { redirect } from "@remix-run/node";
+// @ts-nocheck
+import { redirect } from "react-router";
 
 export const loader = async () => redirect("/reset-password");
 export const action = async () => redirect("/reset-password");

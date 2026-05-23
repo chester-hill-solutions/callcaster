@@ -87,6 +87,7 @@ interface CampaignBasicInfoProps {
   readinessIssues: string[];
   scheduleDisabled: string | boolean;
   isBusy: boolean;
+  callerIdOptional?: boolean;
 }
 
 // Main Component
@@ -102,6 +103,7 @@ export const CampaignBasicInfo = ({
   readinessIssues,
   scheduleDisabled,
   isBusy,
+  callerIdOptional = false,
 }: CampaignBasicInfoProps) => {
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
@@ -166,10 +168,17 @@ export const CampaignBasicInfo = ({
             }
           />
 
+          {campaignData.type === "message" && callerIdOptional ? (
+            <p className="-mt-1 text-xs text-muted-foreground">
+              Outbound number is optional when sending via Messaging Service (Twilio uses the
+              service&apos;s sender pool).
+            </p>
+          ) : null}
           <SelectNumber
             campaignData={{ caller_id: campaignData.caller_id ?? undefined }}
             handleInputChange={(name, value) => handleInputChange(name, value)}
             phoneNumbers={phoneNumbers}
+            callerIdOptional={callerIdOptional}
           />
 
           <SelectDates

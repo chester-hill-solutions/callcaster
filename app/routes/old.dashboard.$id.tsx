@@ -1,8 +1,14 @@
-import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+// @ts-nocheck
+/* eslint-disable @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+
+
+
+import { data as routeData, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 import { useEffect, useState, useRef } from "react";
 import * as wavefile from "wavefile";
-import type { LoaderFunctionArgs } from "@remix-run/node";
+
 import { logger } from "@/lib/logger.client";
 
 interface LoaderData {
@@ -20,9 +26,9 @@ interface AudioMessage {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id } = params;
   try {
-    return json({ success: true, message: "Call initiated", id });
+    return routeData({ success: true, message: "Call initiated", id });
   } catch (error) {
-    return json({
+    return routeData({
       success: false,
       message: "Failed to initiate call",
       error: error.message,

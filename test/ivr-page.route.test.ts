@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -9,7 +11,7 @@ const mocks = vi.hoisted(() => {
       SUPABASE_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
     },
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -68,7 +70,7 @@ function makeSupabase(sequence: Array<{ data: any; error: any }>, workspaceAuthT
   };
 }
 
-describe("app/routes/api.ivr.$campaignId.$pageId.tsx", () => {
+describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
@@ -79,11 +81,11 @@ describe("app/routes/api.ivr.$campaignId.$pageId.tsx", () => {
 
   test("returns 400 when required params missing", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: null }]));
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const res = await asRouteResponse(await mod.action({
       params: {},
       request: new Request("http://x", { method: "POST", body: new FormData() }),
-    } as any);
+    } as any));
     expect(res.status).toBe(400);
   });
 
@@ -91,18 +93,18 @@ describe("app/routes/api.ivr.$campaignId.$pageId.tsx", () => {
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
     const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
     mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }], "wstok"));
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
-    } as any);
+    } as any));
     expect(res.status).toBe(403);
   });
 
   test("redirects to first block; says error when page invalid; catch path for invalid script and retry failure", async () => {
-    const mod = await import("../app/routes/api.ivr.$campaignId.$pageId");
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
 
     // success
     const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };

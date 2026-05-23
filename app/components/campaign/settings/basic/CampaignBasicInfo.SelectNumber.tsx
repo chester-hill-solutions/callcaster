@@ -1,4 +1,4 @@
-import { NavLink } from "@remix-run/react";
+import { NavLink } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,35 +10,51 @@ import {
 import { WorkspaceNumbers } from "@/lib/types";
 
 interface SelectNumberProps {
-  handleInputChange: (name: string, value: string) => void;
+  handleInputChange: (name: string, value: string | null) => void;
   campaignData: {
     caller_id?: string;
   };
   phoneNumbers: WorkspaceNumbers[];
+  callerIdOptional?: boolean;
 }
+
+const NONE_VALUE = "__none__";
 
 export default function SelectNumber({
   handleInputChange,
   campaignData,
   phoneNumbers,
+  callerIdOptional = false,
 }: SelectNumberProps) {
   if (!phoneNumbers.length) {
     return (
       <Button variant="outline" asChild>
-        <NavLink to="../../../settings/numbers">Get a Number</NavLink>
+        <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
       </Button>
     );
   }
 
+  const selectValue =
+    campaignData.caller_id && campaignData.caller_id.length > 0
+      ? campaignData.caller_id
+      : callerIdOptional
+        ? NONE_VALUE
+        : undefined;
+
   return (
     <Select
-      value={campaignData.caller_id}
-      onValueChange={(value) => handleInputChange("caller_id", value)}
+      value={selectValue}
+      onValueChange={(value) =>
+        handleInputChange("caller_id", value === NONE_VALUE ? null : value)
+      }
     >
       <SelectTrigger id="caller_id">
         <SelectValue placeholder="Select a number" />
       </SelectTrigger>
       <SelectContent>
+        {callerIdOptional ? (
+          <SelectItem value={NONE_VALUE}>None (Messaging Service only)</SelectItem>
+        ) : null}
         {phoneNumbers.map((number) => number?.phone_number && (
           <SelectItem 
             key={number.phone_number} 

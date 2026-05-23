@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+
+import { asRouteResponse } from "./helpers/route-result";
 import { logger } from "@/lib/logger.server";
 
 const loggerMock = vi.hoisted(() => ({
@@ -41,37 +43,37 @@ describe("api.audiences route", () => {
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({ name: "x" });
-    const mod = await import("../app/routes/api.audiences");
-    const resMissing = await mod.action({
+    const mod = await import("../app/routes/api+/audiences");
+    const resMissing = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resMissing.status).toBe(400);
 
     // Covers `value ?? ""` branch for null id
     parseActionRequest.mockResolvedValueOnce({ id: null, name: "x" });
-    const resNullId = await mod.action({
+    const resNullId = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resNullId.status).toBe(400);
 
     parseActionRequest.mockResolvedValueOnce({ id: "1", name: "New", extra: { skip: true } });
     select.mockResolvedValueOnce({ data: [{ id: 1, name: "New" }], error: null });
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(await res.json()).toEqual([{ id: 1, name: "New" }]);
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ id: 1, name: "New" }));
 
     // Covers `update || null` branch
     parseActionRequest.mockResolvedValueOnce({ id: "3", name: "Maybe" });
     select.mockResolvedValueOnce({ data: null, error: null });
-    const resNull = await mod.action({
+    const resNull = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(await resNull.json()).toBeNull();
   }, 30000);
 
@@ -83,30 +85,30 @@ describe("api.audiences route", () => {
         delete: () => ({ eq: async (...args: any[]) => (del(...args), { error: deleteError }) }),
       }),
     };
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routes/api+/audiences");
     const parseActionRequest = vi.fn();
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers() }));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
     parseActionRequest.mockResolvedValueOnce({});
-    const resMissing = await mod.action({
+    const resMissing = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resMissing.status).toBe(400);
 
     parseActionRequest.mockResolvedValueOnce({ id: "nope" });
-    const resInvalid = await mod.action({
+    const resInvalid = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resInvalid.status).toBe(400);
 
     parseActionRequest.mockResolvedValueOnce({ id: "2" });
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(await res.json()).toEqual({ success: true });
     expect(logger.error).toHaveBeenCalled();
 
@@ -114,10 +116,10 @@ describe("api.audiences route", () => {
     const before = (logger.error as any).mock.calls.length;
     deleteError = null;
     parseActionRequest.mockResolvedValueOnce({ id: "3" });
-    const resOk = await mod.action({
+    const resOk = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "DELETE" }),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(await resOk.json()).toEqual({ success: true });
     expect((logger.error as any).mock.calls.length).toBe(before);
   }, 30000);
@@ -137,39 +139,39 @@ describe("api.audiences route", () => {
         throw new Error("unexpected");
       },
     };
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
-    const resMissing = await mod.loader({
+    const resMissing = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resMissing.status).toBe(400);
 
-    const resInvalid = await mod.loader({
+    const resInvalid = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=nope"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(resInvalid.status).toBe(400);
 
     audienceSingle.mockResolvedValueOnce({ data: null, error: null });
-    const res404 = await mod.loader({
+    const res404 = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(res404.status).toBe(404);
 
     audienceSingle.mockResolvedValueOnce({ data: { workspace: "w1" }, error: null });
     contactAudienceQuery.or.mockClear();
     contactAudienceQuery.order.mockClear();
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://localhost/api/audiences?returnType=csv&audienceId=1&q=joe&sortKey=firstname&sortDirection=desc",
       ),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalled();
     expect(contactAudienceQuery.or).toHaveBeenCalled();
@@ -197,15 +199,15 @@ describe("api.audiences route", () => {
         throw new Error("unexpected");
       },
     };
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
 
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     const text = await res.text();
     expect(text).toContain("X");
 
@@ -218,14 +220,14 @@ describe("api.audiences route", () => {
         throw new Error("unexpected");
       },
     };
-    const resEmpty = await mod.loader({
+    const resEmpty = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences?returnType=csv&audienceId=1&sortKey=__bad__"),
       deps: {
         verifyAuth: vi.fn(async () => ({ supabaseClient: supabaseClientEmpty, headers: new Headers(), user: { id: "u1" } })),
         parseActionRequest,
         requireWorkspaceAccess,
       },
-    } as any);
+    } as any));
     expect(resEmpty.status).toBe(200);
     expect(emptyQuery.order).not.toHaveBeenCalled();
     expect(await resEmpty.text()).toContain("\r\n");
@@ -266,24 +268,24 @@ describe("api.audiences route", () => {
     vi.doMock("@/lib/supabase.server", () => ({ verifyAuth }));
     vi.doMock("@/lib/database.server", () => ({ parseActionRequest, requireWorkspaceAccess }));
 
-    const mod = await import("../app/routes/api.audiences");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/audiences");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/audiences", { method: "PATCH" }),
-    } as any);
+    } as any));
     expect(await res.json()).toEqual([{ id: 1 }]);
   }, 30000);
 
   test("loader JSON returns data and handles optional audienceId filter", async () => {
     const query = makeQuery({ data: [{ id: 1 }], error: null });
     const supabaseClient: any = { from: () => ({ select: () => query }) };
-    const mod = await import("../app/routes/api.audiences");
+    const mod = await import("../app/routes/api+/audiences");
     const verifyAuth = vi.fn(async () => ({ supabaseClient, headers: new Headers(), user: { id: "u1" } }));
     const parseActionRequest = vi.fn(async () => ({}));
     const requireWorkspaceAccess = vi.fn(async () => undefined);
-    const res = await mod.loader({
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/audiences"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
-    } as any);
+    } as any));
     expect(await res.json()).toEqual({ data: [{ id: 1 }] });
 
     await mod.loader({

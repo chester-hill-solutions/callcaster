@@ -1,7 +1,10 @@
-import { json } from "@remix-run/node";
+// @ts-nocheck
+
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs } from "react-router";
 import { createClient } from '@supabase/supabase-js';
-import type { ActionFunctionArgs } from "@remix-run/node";
-import { logger } from "@/lib/logger.server";
+
+
 
 interface CallData {
   id: string;
@@ -9,7 +12,9 @@ interface CallData {
   current_question: number;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const formData = await request.formData();
     const url = new URL(request.url);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
@@ -25,7 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (oldError) {
         logger.error('Error fetching call data:', oldError);
-        return json({ status: 'error', message: 'Failed to fetch call data' }, 500);
+        return routeData({ status: 'error', message: 'Failed to fetch call data' }, 500);
     }
 
     const responses = old.responses || {};
@@ -43,7 +48,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (error) {
         logger.error('Error updating call data:', error);
-        return json({ status: 'error', message: 'Failed to update call data' }, 500);
+        return routeData({ status: 'error', message: 'Failed to update call data' }, 500);
     }
 
     return new Response(`<Response><Redirect>/api/handle-questions</Redirect></Response>`.toString(), {

@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
     verifyAuth: vi.fn(),
     normalizePhoneNumber: vi.fn((p: string) => `+${p}`),
-    logger: { debug: vi.fn(), error: vi.fn() },
+    logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: { BASE_URL: () => "https://base.example" },
     fetch: vi.fn(),
   };
@@ -23,7 +25,7 @@ vi.mock("../app/lib/utils", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 
-describe("app/routes/api.initiate-ivr.tsx", () => {
+describe("app/routes/api+/initiate-ivr/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
@@ -40,7 +42,7 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: { rpc: async () => ({ data: null, error: new Error("rpc") }) },
     });
-    const mod = await import("../app/routes/api.initiate-ivr");
+    const mod = await import("../app/routes/api+/initiate-ivr");
     await expect(mod.action({ request: new Request("http://x", { method: "POST" }) } as any)).rejects.toThrow("rpc");
   });
 
@@ -52,9 +54,9 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     mocks.fetch.mockResolvedValueOnce({
       json: async () => ({ creditsError: true }),
     } as any);
-    const mod = await import("../app/routes/api.initiate-ivr");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
-    expect(res).toEqual({ creditsError: true });
+    const mod = await import("../app/routes/api+/initiate-ivr");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res).toMatchObject({ creditsError: true });
   });
 
   test("logs fetch error and continues (res null), returning queue data", async () => {
@@ -65,9 +67,9 @@ describe("app/routes/api.initiate-ivr.tsx", () => {
     });
     mocks.fetch.mockRejectedValueOnce(new Error("net"));
 
-    const mod = await import("../app/routes/api.initiate-ivr");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
-    expect(res).toEqual(queue);
+    const mod = await import("../app/routes/api+/initiate-ivr");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    await expect(res.json()).resolves.toEqual(queue);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error initiating IVR call:", expect.any(Error));
   });
 });

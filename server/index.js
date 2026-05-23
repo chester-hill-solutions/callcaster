@@ -7,37 +7,25 @@ import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createRequestHandler } from "@remix-run/express";
+import { createRequestHandler } from "@react-router/express";
+import { validateRequiredEnv } from "../app/lib/required-env-keys.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
-const BUILD_PATH = path.resolve(ROOT_DIR, "build/index.js");
+const BUILD_PATH = path.resolve(ROOT_DIR, "build/server/index.js");
 const PUBLIC_DIR = path.resolve(ROOT_DIR, "public");
 const PUBLIC_BUILD_DIR = path.resolve(PUBLIC_DIR, "build");
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const SHUTDOWN_GRACE_PERIOD_MS = 10_000;
-const REQUIRED_ENV_KEYS = [
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_KEY",
-  "SUPABASE_PUBLISHABLE_KEY",
-  "TWILIO_SID",
-  "TWILIO_AUTH_TOKEN",
-  "TWILIO_APP_SID",
-  "TWILIO_PHONE_NUMBER",
-  "BASE_URL",
-  "STRIPE_SECRET_KEY",
-  "RESEND_API_KEY",
-];
+const PROBE_PATHS = new Set(["/healthz", "/readyz"]);
+const FATAL_ON_REJECTION =
+  process.env.PROCESS_FATAL_ON_REJECTION === "1" ||
+  process.env.PROCESS_FATAL_ON_REJECTION === "true";
 
 export function validateEnvironment(env = process.env) {
-  const missing = REQUIRED_ENV_KEYS.filter((key) => !env[key]);
-
-  if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
-  }
+  validateRequiredEnv(env);
 }
 
 export async function loadBuild(buildPath = BUILD_PATH) {
@@ -46,8 +34,13 @@ export async function loadBuild(buildPath = BUILD_PATH) {
 
 function log(level, message, details) {
   const timestamp = new Date().toISOString();
-  const payload = details ? ` ${JSON.stringify(details)}` : "";
-  const line = `[${timestamp}] [${level.toUpperCase()}] ${message}${payload}`;
+  const entry = {
+    timestamp,
+    level,
+    message,
+    ...(details && typeof details === "object" ? details : { detail: details }),
+  };
+  const line = JSON.stringify(entry);
 
   if (level === "error") {
     console.error(line);
@@ -62,6 +55,15 @@ function log(level, message, details) {
   console.log(line);
 }
 
+function securityHeaders() {
+  return (_request, response, next) => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.setHeader("X-Frame-Options", "SAMEORIGIN");
+    next();
+  };
+}
+
 function buildRequestLogger() {
   return (request, response, next) => {
     const startedAt = process.hrtime.bigint();
@@ -71,6 +73,11 @@ function buildRequestLogger() {
     response.setHeader("x-request-id", requestId);
 
     response.on("finish", () => {
+      const pathname = request.path ?? request.url;
+      if (PROBE_PATHS.has(pathname)) {
+        return;
+      }
+
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
       log("info", "request completed", {
@@ -89,13 +96,14 @@ function buildRequestLogger() {
 export function createApp({
   build,
   mode = process.env.NODE_ENV ?? "production",
-  readyState = { acceptingTraffic: true },
+  readyState = { acceptingTraffic: true, buildReady: false },
   remixHandler,
 } = {}) {
   const app = express();
 
   app.disable("x-powered-by");
   app.set("trust proxy", true);
+  app.use(securityHeaders());
   app.use(compression());
   app.use(buildRequestLogger());
   app.use(
@@ -116,8 +124,12 @@ export function createApp({
   });
 
   app.get("/readyz", (_request, response) => {
-    if (!readyState.acceptingTraffic) {
-      response.status(503).json({ ok: false });
+    if (!readyState.buildReady || !readyState.acceptingTraffic) {
+      response.status(503).json({
+        ok: false,
+        buildReady: Boolean(readyState.buildReady),
+        acceptingTraffic: Boolean(readyState.acceptingTraffic),
+      });
       return;
     }
 
@@ -158,8 +170,10 @@ export async function startServer({
 } = {}) {
   validateEnvironment(env);
 
+  const readyState = { acceptingTraffic: true, buildReady: false };
   const build = await loadBuild(buildPath);
-  const readyState = { acceptingTraffic: true };
+  readyState.buildReady = true;
+
   const app = createApp({ build, mode: env.NODE_ENV ?? "production", readyState });
   const server = createHttpServer(app);
   const sockets = new Set();
@@ -231,7 +245,9 @@ export async function startServer({
     log("error", "unhandled rejection", {
       message: reason instanceof Error ? reason.message : String(reason),
     });
-    void shutdown("unhandledRejection", 1);
+    if (FATAL_ON_REJECTION) {
+      void shutdown("unhandledRejection", 1);
+    }
   });
 
   return { app, server, shutdown, readyState };

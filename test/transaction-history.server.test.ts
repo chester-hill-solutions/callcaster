@@ -22,4 +22,23 @@ describe("transaction-history display helpers", () => {
       }),
     ).toBe("Used 10 credits");
   });
+
+  test("falls back to credit default when note is omitted", () => {
+    expect(
+      getTransactionDisplayDescription({
+        type: "CREDIT",
+        amount: 5,
+      }),
+    ).toBe("Added 5 credits");
+  });
+
+  test("returns cleaned user note when only idempotency marker is present", () => {
+    expect(
+      getTransactionDisplayDescription({
+        type: "DEBIT",
+        amount: 1,
+        note: "Manual adjustment [idempotency:abc123]",
+      }),
+    ).toBe("Manual adjustment");
+  });
 });

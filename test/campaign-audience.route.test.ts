@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     safeParseJson: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -16,11 +18,12 @@ vi.mock("@/lib/database.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/queue.server", () => ({
-  enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
+  enqueueContactsForCampaign: (...args: any[]) =>
+    mocks.enqueueContactsForCampaign(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.campaign_audience.tsx", () => {
+describe("app/routes/api+/campaign_audience/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -43,13 +46,20 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
-    await expect(res.json()).resolves.toEqual({ message: "Audience already added to campaign" });
+    await expect(res.json()).resolves.toEqual({
+      message: "Audience already added to campaign",
+    });
   }, 30000);
 
   test("POST inserts link and enqueues when contacts found", async () => {
@@ -62,7 +72,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
           select: () => ({
             eq: () => ({
               eq: () => ({
-                single: async () => ({ data: null, error: { code: "PGRST116" } }),
+                single: async () => ({
+                  data: null,
+                  error: { code: "PGRST116" },
+                }),
               }),
             }),
           }),
@@ -74,7 +87,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         // contact_audience select
         .mockReturnValueOnce({
           select: () => ({
-            eq: async () => ({ data: [{ contact_id: 1 }, { contact_id: 2 }], error: null }),
+            eq: async () => ({
+              data: [{ contact_id: 1 }, { contact_id: 2 }],
+              error: null,
+            }),
           }),
         })
         // existing campaign_queue rows
@@ -87,13 +103,23 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, 20, [1, 2], { requeue: false });
+    expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
+      supabaseClient,
+      20,
+      [1, 2],
+      { requeue: false },
+    );
   }, 30000);
 
   test("POST skips enqueue when no contacts found", async () => {
@@ -105,7 +131,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
           select: () => ({
             eq: () => ({
               eq: () => ({
-                single: async () => ({ data: null, error: { code: "PGRST116" } }),
+                single: async () => ({
+                  data: null,
+                  error: { code: "PGRST116" },
+                }),
               }),
             }),
           }),
@@ -118,10 +147,54 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
+  }, 30000);
+
+  test("POST treats null contact lookup data as empty list", async () => {
+    const headers = new Headers();
+    const supabaseClient = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce({
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                single: async () => ({
+                  data: null,
+                  error: { code: "PGRST116" },
+                }),
+              }),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({ insert: async () => ({ error: null }) })
+        .mockReturnValueOnce({
+          select: () => ({
+            eq: async () => ({ data: null, error: null }),
+          }),
+        }),
+    };
+    mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
+
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
@@ -136,7 +209,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
           select: () => ({
             eq: () => ({
               eq: () => ({
-                single: async () => ({ data: null, error: { code: "PGRST116" } }),
+                single: async () => ({
+                  data: null,
+                  error: { code: "PGRST116" },
+                }),
               }),
             }),
           }),
@@ -146,10 +222,15 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "add boom" });
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -164,7 +245,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
           select: () => ({
             eq: () => ({
               eq: () => ({
-                single: async () => ({ data: null, error: { code: "PGRST116" } }),
+                single: async () => ({
+                  data: null,
+                  error: { code: "PGRST116" },
+                }),
               }),
             }),
           }),
@@ -177,10 +261,15 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "contacts boom" });
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -231,10 +320,15 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "DELETE" }),
+    } as any));
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("b=2");
     await expect(res.json()).resolves.toEqual({ success: true });
@@ -264,9 +358,14 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "DELETE" }),
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
   }, 30000);
@@ -283,9 +382,14 @@ describe("app/routes/api.campaign_audience.tsx", () => {
       }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "DELETE" }),
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "del boom" });
   }, 30000);
@@ -309,14 +413,22 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         })
         .mockReturnValueOnce({
           select: () => ({
-            eq: async () => ({ data: null, error: new Error("contacts del boom") }),
+            eq: async () => ({
+              data: null,
+              error: new Error("contacts del boom"),
+            }),
           }),
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "DELETE" }),
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "contacts del boom" });
   }, 30000);
@@ -361,9 +473,14 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "DELETE" }) } as any);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "DELETE" }),
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "remove boom" });
   }, 30000);
@@ -371,8 +488,10 @@ describe("app/routes/api.campaign_audience.tsx", () => {
   test("returns 405 on unsupported method", async () => {
     const headers = new Headers();
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: {}, headers });
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "PUT" }),
+    } as any));
     expect(res.status).toBe(405);
   }, 30000);
 
@@ -383,20 +502,29 @@ describe("app/routes/api.campaign_audience.tsx", () => {
         select: () => ({
           eq: () => ({
             eq: () => ({
-              single: async () => ({ data: null, error: { code: "X", message: "boom" } }),
+              single: async () => ({
+                data: null,
+                error: { code: "X", message: "boom" },
+              }),
             }),
           }),
         }),
       }),
     };
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient, headers });
-    mocks.safeParseJson.mockResolvedValueOnce({ audience_id: 10, campaign_id: 20 });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      audience_id: 10,
+      campaign_id: 20,
+    });
 
-    const mod = await import("../app/routes/api.campaign_audience");
-    const res = await mod.action({ request: new Request("http://x", { method: "POST" }) } as any);
+    const mod = await import("../app/routes/api+/campaign_audience");
+    const res = await asRouteResponse(await mod.action({
+      request: new Request("http://x", { method: "POST" }),
+    } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "An unexpected error occurred" });
+    await expect(res.json()).resolves.toEqual({
+      error: "An unexpected error occurred",
+    });
     expect(mocks.logger.error).toHaveBeenCalled();
   }, 30000);
 });
-

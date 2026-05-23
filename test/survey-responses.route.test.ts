@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -89,7 +91,7 @@ function makeReq(form: Record<string, string>) {
   return new Request("http://x", { method: "POST", body: fd });
 }
 
-describe("app/routes/api.survey-responses.tsx", () => {
+describe("app/routes/api+/survey-responses/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -98,60 +100,60 @@ describe("app/routes/api.survey-responses.tsx", () => {
 
   test("returns 405 for non-POST", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({ request: new Request("http://x", { method: "GET" }) } as any);
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields and bad JSON", async () => {
     mocks.verifyAuth.mockResolvedValue({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routes/api+/survey-responses");
 
-    const r0 = await mod.action({ request: makeReq({ surveyId: "S1" }) } as any);
+    const r0 = await asRouteResponse(await mod.action({ request: makeReq({ surveyId: "S1" }) } as any));
     expect(r0.status).toBe(400);
 
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "", responseData: JSON.stringify({}) }),
-    } as any);
+    } as any));
     expect(r1.status).toBe(400);
 
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: "not-json" }),
-    } as any);
+    } as any));
     expect(r2.status).toBe(400);
   });
 
   test("returns 404 when survey missing and 400 when inactive", async () => {
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routes/api+/survey-responses");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ survey: { data: null, error: null } }),
     });
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
-    } as any);
+    } as any));
     expect(r1.status).toBe(404);
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ survey: { data: { id: 1, is_active: false }, error: null } }),
     });
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
-    } as any);
+    } as any));
     expect(r2.status).toBe(400);
   });
 
   test("non-unique insert error 500; unique violation fetch existing error 500", async () => {
-    const mod = await import("../app/routes/api.survey-responses");
+    const mod = await import("../app/routes/api+/survey-responses");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({
         insertResponse: { data: null, error: { code: "X", message: "bad" } },
       }),
     });
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
-    } as any);
+    } as any));
     expect(r1.status).toBe(500);
 
     mocks.verifyAuth.mockResolvedValueOnce({
@@ -160,9 +162,9 @@ describe("app/routes/api.survey-responses.tsx", () => {
         existingResponse: { data: null, error: { message: "no" } },
       }),
     });
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: makeReq({ surveyId: "S1", responseData: JSON.stringify({ result_id: "R1" }) }),
-    } as any);
+    } as any));
     expect(r2.status).toBe(500);
   });
 
@@ -173,8 +175,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         existingResponse: { data: { id: 11 }, error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -184,7 +186,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true, response_id: 11, result_id: "R1" });
   });
@@ -196,8 +198,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         existingResponse: { data: { id: 12 }, error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -206,7 +208,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -218,8 +220,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -228,7 +230,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [{ question_id: "Q1", answer_value: "x" }],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -268,8 +270,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
     });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: supabase });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -281,7 +283,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           ],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -292,8 +294,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: null },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -301,7 +303,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [{ question_id: "Q1", answer_value: "x" }],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
   });
 
@@ -312,8 +314,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: { code: "X" } },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -321,7 +323,7 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [{ question_id: "Q1", answer_value: ["a"] }],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.error).toHaveBeenCalledWith("Failed to insert response_answer:", expect.anything());
   });
@@ -333,8 +335,8 @@ describe("app/routes/api.survey-responses.tsx", () => {
         answerInsert: { error: "boom" },
       }),
     });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: makeReq({
         surveyId: "S1",
         responseData: JSON.stringify({
@@ -342,22 +344,22 @@ describe("app/routes/api.survey-responses.tsx", () => {
           answers: [{ question_id: "Q1", answer_value: "x" }],
         }),
       }),
-    } as any);
+    } as any));
     expect(res.status).toBe(200);
     expect(mocks.logger.error).toHaveBeenCalledWith("Failed to insert response_answer:", expect.anything());
   });
 
   test("returns 500 on unexpected error (formData throws)", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api.survey-responses");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/survey-responses");
+    const res = await asRouteResponse(await mod.action({
       request: {
         method: "POST",
         formData: async () => {
           throw new Error("boom");
         },
       } as any,
-    } as any);
+    } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Internal server error" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in handleSubmitResponse:", expect.anything());

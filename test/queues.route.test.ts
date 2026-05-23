@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     getSupabaseServerClientWithSession: vi.fn(),
     safeParseJson: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
@@ -16,7 +18,7 @@ vi.mock("@/lib/database.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-describe("app/routes/api.queues.tsx", () => {
+describe("app/routes/api+/queues/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.getSupabaseServerClientWithSession.mockReset();
@@ -26,20 +28,20 @@ describe("app/routes/api.queues.tsx", () => {
 
   test("loader returns [] when limit is 0", async () => {
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: {} });
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=0"),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual([]);
   });
 
   test("loader uses default limit when missing", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc } });
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=7"),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual([]);
     expect(rpc).toHaveBeenCalledWith("select_and_update_campaign_contacts", {
       p_campaign_id: 7,
@@ -50,10 +52,10 @@ describe("app/routes/api.queues.tsx", () => {
   test("loader returns [] when rpc returns empty", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: [] });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc } });
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=1&limit=10"),
-    } as any);
+    } as any));
     await expect(res.json()).resolves.toEqual([]);
   });
 
@@ -64,10 +66,10 @@ describe("app/routes/api.queues.tsx", () => {
     const from = vi.fn().mockReturnValueOnce({ select });
     mocks.getSupabaseServerClientWithSession.mockResolvedValueOnce({ supabaseClient: { rpc, from } });
 
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://localhost/api/queues?campaign_id=99&limit=2"),
-    } as any);
+    } as any));
 
     await expect(res.json()).resolves.toEqual([{ id: 1 }, { id: 2 }]);
     expect(rpc).toHaveBeenCalledWith("select_and_update_campaign_contacts", {
@@ -87,10 +89,10 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "rpc fail" });
@@ -111,10 +113,10 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "POST" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
@@ -131,10 +133,10 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "update fail" });
@@ -152,10 +154,10 @@ describe("app/routes/api.queues.tsx", () => {
     });
     mocks.safeParseJson.mockResolvedValueOnce({ campaignId: "5", userId: "u1" });
 
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "DELETE" }),
-    } as any);
+    } as any));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -175,10 +177,10 @@ describe("app/routes/api.queues.tsx", () => {
       supabaseClient: {},
       serverSession: { user: { id: "u1" } },
     });
-    const mod = await import("../app/routes/api.queues");
-    const res = await mod.action({
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/queues", { method: "PUT" }),
-    } as any);
+    } as any));
     expect(res.status).toBe(405);
   });
 });

@@ -1,62 +1,76 @@
 import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
 
+const params = {
+  user_id: "u1",
+  caller_id: "c1",
+  workspace_id: "w1",
+  campaign_id: "camp1",
+  selected_device: "device1",
+};
+
 describe("startConferenceAndDial", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.resetModules();
   });
 
-  test("happy path: starts conference then dials", async () => {
-    (fetch as any)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, conferenceName: "c1" })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true })));
-
-    const mod = await import("../app/lib/startConferenceAndDial");
-    await mod.startConferenceAndDial("u1", 1, "w1");
-
-    expect(fetch).toHaveBeenNthCalledWith(
-      1,
-      "/api/power-dial",
-      expect.objectContaining({ method: "POST" }),
+  test("happy path: posts to auto-dial and returns conference data", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ success: true, conferenceName: "c1" }),
+        { status: 200 },
+      ),
     );
-    expect(fetch).toHaveBeenNthCalledWith(
-      2,
-      "/api/power-dial/dialer",
-      expect.objectContaining({ method: "POST" }),
+
+    const mod = await import("../app/lib/services/hooks-api");
+    await expect(mod.startConferenceAndDial(params)).resolves.toEqual({
+      success: true,
+      conferenceName: "c1",
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/auto-dial",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }),
     );
-    expect(console.log).toHaveBeenCalled();
   });
 
-  test("logs errors when either step fails", async () => {
-    (fetch as any).mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: "nope" })));
-    const mod = await import("../app/lib/startConferenceAndDial");
-    await mod.startConferenceAndDial("u1", 1, "w1");
-    expect(console.error).toHaveBeenCalledWith("Failed to start conference:", "nope");
+  test("returns creditsError payload without throwing", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response(JSON.stringify({ creditsError: true }), { status: 200 }),
+    );
+
+    const mod = await import("../app/lib/services/hooks-api");
+    await expect(mod.startConferenceAndDial(params)).resolves.toMatchObject({
+      success: false,
+      creditsError: true,
+    });
+  });
+
+  test("throws when required params are missing", async () => {
+    const mod = await import("../app/lib/services/hooks-api");
+    await expect(
+      mod.startConferenceAndDial({ ...params, user_id: "" }),
+    ).rejects.toThrow(/Missing required parameters/);
+  });
+
+  test("throws on network and HTTP errors", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("network"));
+    const mod = await import("../app/lib/services/hooks-api");
+    await expect(mod.startConferenceAndDial(params)).rejects.toThrow("network");
 
     vi.resetModules();
-    (fetch as any)
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, conferenceName: "c1" })))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: "bad" })));
-    const mod2 = await import("../app/lib/startConferenceAndDial");
-    await mod2.startConferenceAndDial("u1", 1, "w1");
-    expect(console.error).toHaveBeenCalledWith("Failed to dial numbers:", "bad");
-  });
-
-  test("catches thrown errors", async () => {
-    (fetch as any).mockRejectedValueOnce(new Error("network"));
-    const mod = await import("../app/lib/startConferenceAndDial");
-    await mod.startConferenceAndDial("u1", 1, "w1");
-    expect(console.error).toHaveBeenCalledWith(
-      "Error during conference setup and dialing:",
-      expect.any(Error),
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      new Response("bad", { status: 500 }),
     );
+    const mod2 = await import("../app/lib/services/hooks-api");
+    await expect(mod2.startConferenceAndDial(params)).rejects.toThrow(/HTTP error/);
   });
 });
-

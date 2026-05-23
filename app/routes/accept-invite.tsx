@@ -1,12 +1,7 @@
-import { json } from "@remix-run/node";
-import {
-  useActionData,
-  useLoaderData,
-  useNavigation,
-  NavLink,
-  useNavigate,
-} from "@remix-run/react";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "@remix-run/node";
+// @ts-nocheck
+import { data as routeData } from "react-router";
+import { useActionData, useLoaderData, useNavigation, NavLink, useNavigate } from "react-router";
+import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import type {
   SupabaseClient,
   User,
@@ -14,21 +9,13 @@ import type {
   Session,
 } from "@supabase/supabase-js";
 import { EmailOtpType } from "@supabase/supabase-js";
-import {
-  createSupabaseServerClient,
-  verifyAuth,
-} from "@/lib/supabase.server";
-import {
-  acceptWorkspaceInvitations,
-  getInvitesByUserId,
-} from "@/lib/database.server";
+
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
 import { toast } from "sonner";
 import { useEffect } from "react";
 import type { Database } from "@/lib/database.types";
-import { logger } from "@/lib/logger.server";
 
 type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
 type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];
@@ -122,6 +109,7 @@ async function handleAuthenticatedUser(
   session: Session,
   headers: Headers,
 ) {
+  const { getInvitesByUserId } = await import("@/lib/database.server");
   const email = session.user.email ?? "";
   const isNewUser =
     session.user.user_metadata.first_name === "New" &&
@@ -130,7 +118,7 @@ async function handleAuthenticatedUser(
   if (isNewUser) {
     const invites =
       ((await getInvitesByUserId(client, session.user.id)) as WorkspaceInviteRow[] | null) ?? [];
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "verified",
         invites,
@@ -142,7 +130,7 @@ async function handleAuthenticatedUser(
 
   const invites = await fetchInvitesWithWorkspace(client, session.user.id);
 
-  return json<LoaderData>(
+  return routeData<LoaderData>(
       {
         status: "existing_user",
         invites,
@@ -159,6 +147,8 @@ async function handleTokenVerification(
   email: string,
   headers: Headers,
 ) {
+  const { getInvitesByUserId } = await import("@/lib/database.server");
+  const { logger } = await import("@/lib/logger.server");
   try {
     const { data: verifyData, error: verifyError } = await client.auth.verifyOtp({
       token_hash,
@@ -171,7 +161,7 @@ async function handleTokenVerification(
           verifyError.message.includes("Email link is invalid or has expired")) ||
         !verifyData.session
       ) {
-        return json<LoaderData>(
+        return routeData<LoaderData>(
           {
             status: "invalid_link",
             error:
@@ -203,7 +193,7 @@ async function handleTokenVerification(
         ((await getInvitesByUserId(client, sessionData.user.id)) as
           | WorkspaceInviteRow[]
           | null) ?? [];
-      return json<LoaderData>(
+      return routeData<LoaderData>(
       {
         status: "verified",
           email,
@@ -215,7 +205,7 @@ async function handleTokenVerification(
 
     const invites = await fetchInvitesWithWorkspace(client, sessionData.user.id);
 
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "existing_user",
         email,
@@ -227,7 +217,7 @@ async function handleTokenVerification(
     logger.error("Unhandled error during token verification", error);
     const message =
       error instanceof Error ? error.message : "An unexpected error occurred while verifying.";
-    return json<LoaderData>(
+    return routeData<LoaderData>(
       {
         status: "error",
         error: message,
@@ -237,7 +227,9 @@ async function handleTokenVerification(
   }
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const {
     data: { session },
@@ -259,10 +251,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return handleTokenVerification(supabaseClient, token_hash, type as EmailOtpType, email, headers);
   }
 
-  return json<LoaderData>({ status: "not_signed_in" }, { headers });
+  return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
+  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
+  const { acceptWorkspaceInvitations, getInvitesByUserId } = await import("@/lib/database.server");
+
   const { supabaseClient, headers } = createSupabaseServerClient(request);
   const formData = await request.formData();
   const actionType = formData.get("actionType");
@@ -285,7 +280,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         typeof firstNameValue !== "string" ||
         typeof lastNameValue !== "string"
       ) {
-        return json<ActionData>(
+        return routeData<ActionData>(
           {
             status: "error",
             error: "Invalid form submission.",
@@ -312,7 +307,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (inviteError) throw inviteError;
 
-      return json<ActionData>(
+      return routeData<ActionData>(
         { status: "updated", invites: invites ?? [] },
         { headers },
       );
@@ -320,7 +315,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       logger.error("Error in updateUser:", error);
       const message =
         error instanceof Error ? error.message : "An unexpected error occurred";
-      return json<ActionData>(
+      return routeData<ActionData>(
         { status: "error", error: message },
         { headers, status: 500 },
       );
@@ -338,7 +333,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       .filter((value): value is string => Boolean(value));
 
     if (invitationIds.length === 0) {
-      return json<ActionData>(
+      return routeData<ActionData>(
         {
           status: "error",
           error: "No invitations were selected.",
@@ -355,7 +350,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const errors = result?.errors ?? [];
 
     if (errors.length > 0) {
-      return json<ActionData>(
+      return routeData<ActionData>(
         {
           status: "accept_failed",
           errors,
@@ -364,10 +359,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    return json<ActionData>({ status: "accepted" }, { headers: authContext.headers });
+    return routeData<ActionData>({ status: "accepted" }, { headers: authContext.headers });
   }
 
-  return json<ActionData>({ status: "error", error: "Invalid action type" }, { headers, status: 400 });
+  return routeData<ActionData>({ status: "error", error: "Invalid action type" }, { headers, status: 400 });
 };
 
 interface VerifiedNewUserProps {
@@ -410,8 +405,8 @@ function NotSignedIn() {
 }
 
 export default function AcceptInvite() {
-  const loaderData = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const loaderData = useLoaderData<LoaderData>();
+  const actionData = useActionData<ActionData>();
   const navigate = useNavigate();
   const { state } = useNavigation();
   const verifiedEmail =

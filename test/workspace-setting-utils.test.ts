@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { asRouteResponse } from "./helpers/route-result";
 import { logger } from "@/lib/logger.server";
 
 const getWorkspaceUsers = vi.fn(async () => ({ data: [] as Array<{ username: string }> }));
@@ -16,23 +17,23 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleAddUser validates username and detects existing user", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await mod.handleAddUser(fdMissing, "w1", {} as any, headers);
+    const resMissing = await asRouteResponse(await mod.handleAddUser(fdMissing, "w1", {} as any, headers));
     expect(resMissing.status).toBe(400);
 
     getWorkspaceUsers.mockResolvedValueOnce({ data: [{ username: "a@b.com" }] });
     const fd = new FormData();
     fd.set("username", "A@B.COM ");
     fd.set("new_user_workspace_role", "caller");
-    const resDup = await mod.handleAddUser(fd, "w1", {} as any, headers);
+    const resDup = await asRouteResponse(await mod.handleAddUser(fd, "w1", {} as any, headers));
     expect(resDup.status).toBe(403);
   });
 
   test("handleAddUser returns error on invite invoke error, and success otherwise", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     getWorkspaceUsers.mockResolvedValueOnce({ data: [] });
 
@@ -44,16 +45,16 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("new_user_workspace_role", "member");
 
     invoke.mockResolvedValueOnce({ data: null, error: new Error("invite failed") });
-    const resErr = await mod.handleAddUser(fd, "w1", supabaseClient, headers);
+    const resErr = await asRouteResponse(await mod.handleAddUser(fd, "w1", supabaseClient, headers));
     expect(await resErr.json()).toMatchObject({ user: null, error: "invite failed" });
 
     invoke.mockResolvedValueOnce({ data: { ok: 1 }, error: null });
-    const resOk = await mod.handleAddUser(fd, "w1", supabaseClient, headers);
+    const resOk = await asRouteResponse(await mod.handleAddUser(fd, "w1", supabaseClient, headers));
     expect(await resOk.json()).toEqual({ data: { ok: 1 }, error: null, success: true });
   });
 
   test("handleUpdateUser and handleDeleteUser return json with error message when present", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
     const supabaseClient: any = {
@@ -80,24 +81,24 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("updated_workspace_role", "admin");
 
     single.mockResolvedValueOnce({ data: { id: "u1" }, error: null });
-    const resUpdateOk = await mod.handleUpdateUser(fd, "w1", supabaseClient, headers);
+    const resUpdateOk = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", supabaseClient, headers));
     expect(await resUpdateOk.json()).toEqual({ data: { id: "u1" }, error: undefined });
 
     single.mockResolvedValueOnce({ data: null, error: new Error("nope") });
-    const resUpdateErr = await mod.handleUpdateUser(fd, "w1", supabaseClient, headers);
+    const resUpdateErr = await asRouteResponse(await mod.handleUpdateUser(fd, "w1", supabaseClient, headers));
     expect(await resUpdateErr.json()).toEqual({ data: null, error: "nope" });
 
     single.mockResolvedValueOnce({ data: { id: "u1" }, error: null });
-    const resDeleteOk = await mod.handleDeleteUser(fd, "w1", supabaseClient, headers);
+    const resDeleteOk = await asRouteResponse(await mod.handleDeleteUser(fd, "w1", supabaseClient, headers));
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: undefined });
   });
 
   test("handleDeleteSelf returns json when missing userId; returns object error on delete error; redirects on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await mod.handleDeleteSelf(fdMissing, "w1", {} as any, headers);
+    const resMissing = await asRouteResponse(await mod.handleDeleteSelf(fdMissing, "w1", {} as any, headers));
     expect(resMissing.status).toBe(200);
 
     const single = vi.fn();
@@ -122,13 +123,13 @@ describe("WorkspaceSettingUtils", () => {
     expect(logger.error).toHaveBeenCalled();
 
     single.mockResolvedValueOnce({ data: { ok: 1 }, error: null });
-    const res = await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers);
+    const res = await asRouteResponse(await mod.handleDeleteSelf(fd, "w1", supabaseClient, headers));
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/workspaces");
   });
 
   test("handleTransferWorkspace handles errors for each update and returns json on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const single = vi.fn();
     const supabaseClient: any = {
@@ -148,22 +149,22 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("user_id", "new");
 
     single.mockResolvedValueOnce({ data: null, error: new Error("new owner failed") });
-    const res1 = await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers);
+    const res1 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
     expect(await res1.json()).toEqual({ error: "new owner failed" });
 
     single.mockResolvedValueOnce({ data: { id: "new" }, error: null });
     single.mockResolvedValueOnce({ data: null, error: new Error("current failed") });
-    const res2 = await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers);
+    const res2 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
     expect(await res2.json()).toEqual({ error: "current failed" });
 
     single.mockResolvedValueOnce({ data: { id: "new" }, error: null });
     single.mockResolvedValueOnce({ data: { id: "owner" }, error: null });
-    const res3 = await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers);
+    const res3 = await asRouteResponse(await mod.handleTransferWorkspace(fd, "w1", supabaseClient, headers));
     expect(await res3.json()).toEqual({ data: { id: "owner" }, error: null });
   });
 
   test("handleDeleteWorkspace returns error object on failure and redirects on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const supabaseClientErr: any = {
@@ -187,12 +188,12 @@ describe("WorkspaceSettingUtils", () => {
         }),
       }),
     };
-    const res = await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientOk, headers });
+    const res = await asRouteResponse(await mod.handleDeleteWorkspace({ workspaceId: "w1", supabaseClient: supabaseClientOk, headers }));
     expect(res.status).toBe(302);
   });
 
   test("removeInvite returns error object or success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const fd = new FormData();
     fd.set("userId", "u1");
@@ -223,7 +224,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("handleUpdateWebhook upserts and returns json (error or success)", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const select = vi.fn();
     const supabaseClient: any = {
@@ -240,16 +241,16 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("events", JSON.stringify([{ category: "a", type: "INSERT" }]));
 
     select.mockResolvedValueOnce({ data: null, error: new Error("bad") });
-    const resErr = await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers);
+    const resErr = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers));
     expect(await resErr.json()).toEqual({ data: null, error: "bad" });
 
     select.mockResolvedValueOnce({ data: [{ id: 1 }], error: null });
-    const resOk = await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers);
+    const resOk = await asRouteResponse(await mod.handleUpdateWebhook(fd, "w1", supabaseClient, headers));
     expect(await resOk.json()).toEqual({ data: [{ id: 1 }], error: null });
   });
 
   test("testWebhook handles json vs text responses and catches errors", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
     fetchMock.mockResolvedValueOnce(
@@ -306,7 +307,7 @@ describe("WorkspaceSettingUtils", () => {
   });
 
   test("sendWebhookNotification handles missing webhook, disabled events, delivery failure, success, and catch", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils");
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
 
     const single = vi.fn();
     const supabaseClient: any = {

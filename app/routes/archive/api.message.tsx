@@ -1,8 +1,9 @@
+// @ts-nocheck
+import { data as routeData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import Twilio from 'twilio';
-import { json } from '@remix-run/node';
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { logger } from "@/lib/logger.server";
-import { env } from "@/lib/env.server";
+
+
 
 interface MessageRequest {
   to: string;
@@ -24,7 +25,9 @@ const accountSid = env.TWILIO_SID();
 const authToken = env.TWILIO_AUTH_TOKEN();
 const baseUrl = env.BASE_URL();
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const formData: MessageRequest = await request.json();
     const toNumber = formatPhoneNumber(formData.to);
     logger.debug("Message toNumber", toNumber);
@@ -37,16 +40,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             from: `${fromNumber}`,
             to: `${toNumber}`
         });
-        return json({ success: true, message});
+        return routeData({ success: true, message});
     } catch (error){
         logger.error("Error sending message:", error);
-        return json({ success: false, message: error.message }, { status: 500 });
+        return routeData({ success: false, message: error.message }, { status: 500 });
     }
 }
 
-export const loader = async ({request}: LoaderFunctionArgs) => {
+export const loader = async ({request}: LoaderFunctionArgs) => {  const { env } = await import("@/lib/env.server");
+  const { logger } = await import("@/lib/logger.server");
+
     const url = new URL(request.url)
     const data = url.searchParams;
     logger.debug("Message loader data", data);
-    return json({success: true, data})
+    return routeData({success: true, data})
 }

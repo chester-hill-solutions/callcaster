@@ -9,6 +9,7 @@ import {
   getCallWithRetry,
   insertTransactionHistoryIdempotent,
 } from "../_shared/ivr-status-logic.ts";
+import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 
 interface TwilioEventData {
   CallSid?: string;
@@ -54,7 +55,12 @@ const getWorkspaceData = async (supabase: SupabaseClient, workspace_id: string):
     throw new Error("Failed to retrieve workspace data");
   }
 
-  return data;
+  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  if (!creds) {
+    throw new Error("Failed to retrieve workspace Twilio credentials");
+  }
+
+  return { id: data.id, twilio_data: creds };
 };
 
 const updateCallStatus = async (

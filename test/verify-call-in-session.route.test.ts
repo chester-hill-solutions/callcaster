@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
   env: {
@@ -42,7 +44,7 @@ function makeSupabase(opts: { insertResult?: { data: unknown; error: unknown } }
   };
 }
 
-describe("app/routes/api.verify-call-in-session.tsx", () => {
+describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -57,12 +59,12 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
       ),
-    } as never);
+    } as never));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
@@ -75,12 +77,12 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue(undefined);
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
       ),
-    } as never);
+    } as never));
     expect(res.status).toBe(503);
     await expect(res.json()).resolves.toEqual({
       error: "Call-in verification is not configured",
@@ -95,10 +97,10 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/verify-call-in-session"),
-    } as never);
+    } as never));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "Valid phone number is required",
@@ -113,12 +115,12 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=123"
       ),
-    } as never);
+    } as never));
     expect(res.status).toBe(400);
   });
 
@@ -143,12 +145,12 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"
       ),
-    } as never);
+    } as never));
 
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -171,12 +173,12 @@ describe("app/routes/api.verify-call-in-session.tsx", () => {
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
-    const mod = await import("../app/routes/api.verify-call-in-session");
-    const res = await mod.loader({
+    const mod = await import("../app/routes/api+/verify-call-in-session");
+    const res = await asRouteResponse(await mod.loader({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"
       ),
-    } as never);
+    } as never));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "db error" });

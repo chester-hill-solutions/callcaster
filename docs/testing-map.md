@@ -11,9 +11,10 @@ This document is a high-signal index of **critical, high-risk behaviors** in thi
   - **Supabase Edge Functions (Deno)**: `npm run test:coverage:deno` → `coverage/deno/lcov.info`
 - **Merge + enforce**: `npm run test:coverage:merge` (script: `scripts/coverage/merge-and-check.mjs`)
   - Merges LCOV inputs and fails if any expected runtime file is not at **100%**.
-  - **Deprecated**: `twilio-serverless/**` is explicitly ignored (per decision: deprecated).
+  - **Deprecated**: `archive/deprecated/twilio-serverless/**` is explicitly ignored (per decision: deprecated).
 
 Notes:
+
 - **Client-only utilities** are covered in the UI suite. Node coverage excludes:
   - `app/lib/**/*.client.*`
   - `app/lib/callscreenActions.ts`
@@ -144,5 +145,3 @@ Top remaining blockers (smallest surface area first):
   - `_shared/*` modules and many function entrypoints currently show very low line coverage; the next step is to **unit-test the shared logic** and refactor entrypoints to **export pure handlers** guarded by `import.meta.main`, so tests can invoke handlers directly without starting servers.
 - **UI (JSDOM) breadth**:
   - We need a systematic approach: focus on **small, deterministic components/hooks first**, then expand with targeted smoke renders for “wiring” components.
-
-

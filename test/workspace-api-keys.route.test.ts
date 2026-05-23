@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { asRouteResponse } from "./helpers/route-result";
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    logger: { error: vi.fn() },
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     hashApiKeyForStorage: vi.fn((k: string) => `hash:${k}`),
     API_KEY_PREFIX_LENGTH: 8,
     randomBytes: vi.fn((len: number) => Buffer.alloc(len, 1)),
@@ -57,7 +59,7 @@ function makeSupabase(opts: {
   };
 }
 
-describe("app/routes/api.workspace-api-keys.tsx", () => {
+describe("app/routes/api+/workspace/route-api-keys.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyAuth.mockReset();
@@ -72,23 +74,23 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       supabaseClient: makeSupabase({}),
       user: { id: "u1" },
     });
-    const mod = await import("../app/routes/api.workspace-api-keys");
-    const res = await mod.loader({ request: new Request("http://x/api/workspace-api-keys") } as any);
+    const mod = await import("../app/routes/api+/workspace-api-keys");
+    const res = await asRouteResponse(await mod.loader({ request: new Request("http://x/api/workspace-api-keys") } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id is required" });
   });
 
   test("loader 500s when select errors; success returns keys ?? []", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routes/api+/workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({
       supabaseClient: makeSupabase({ list: { data: null, error: { message: "bad" } } }),
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r1 = await mod.loader({
+    const r1 = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/workspace-api-keys?workspace_id=w1"),
-    } as any);
+    } as any));
     expect(r1.status).toBe(500);
     await expect(r1.json()).resolves.toEqual({ error: "bad" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error listing API keys:", expect.anything());
@@ -98,25 +100,25 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r2 = await mod.loader({
+    const r2 = await asRouteResponse(await mod.loader({
       request: new Request("http://x/api/workspace-api-keys?workspace_id=w1"),
-    } as any);
+    } as any));
     expect(r2.status).toBe(200);
     await expect(r2.json()).resolves.toEqual({ keys: [] });
   });
 
   test("action POST validates body (including json catch) and creates key; errors 500", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routes/api+/workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
     const badJson = new Request("http://x", { method: "POST", body: "nope", headers: { "Content-Type": "application/json" } });
-    const r0 = await mod.action({ request: badJson } as any);
+    const r0 = await asRouteResponse(await mod.action({ request: badJson } as any));
     expect(r0.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "w1", name: "  " }) }),
-    } as any);
+    } as any));
     expect(r1.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({
@@ -126,9 +128,9 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "w1", name: " Name " }) }),
-    } as any);
+    } as any));
     expect(r2.status).toBe(201);
     const b2 = await r2.json();
     expect(b2.key).toMatch(/^cc_live_/);
@@ -141,20 +143,20 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r3 = await mod.action({
+    const r3 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: JSON.stringify({ workspace_id: "w1", name: "Name" }) }),
-    } as any);
+    } as any));
     expect(r3.status).toBe(500);
     await expect(r3.json()).resolves.toEqual({ error: "ins" });
   });
 
   test("action DELETE validates body and deletes; errors 500; other method 405", async () => {
-    const mod = await import("../app/routes/api.workspace-api-keys");
+    const mod = await import("../app/routes/api+/workspace-api-keys");
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const r0 = await mod.action({
+    const r0 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({}) }),
-    } as any);
+    } as any));
     expect(r0.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
@@ -163,7 +165,7 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       body: "nope",
       headers: { "Content-Type": "application/json" },
     });
-    const r0b = await mod.action({ request: badJson } as any);
+    const r0b = await asRouteResponse(await mod.action({ request: badJson } as any));
     expect(r0b.status).toBe(400);
 
     mocks.verifyAuth.mockResolvedValueOnce({
@@ -171,9 +173,9 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r1 = await mod.action({
+    const r1 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({ id: "k1", workspace_id: "w1" }) }),
-    } as any);
+    } as any));
     expect(r1.status).toBe(500);
     await expect(r1.json()).resolves.toEqual({ error: "del" });
 
@@ -182,14 +184,14 @@ describe("app/routes/api.workspace-api-keys.tsx", () => {
       user: { id: "u1" },
     });
     mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
-    const r2 = await mod.action({
+    const r2 = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "DELETE", body: JSON.stringify({ id: "k1", workspace_id: "w1" }) }),
-    } as any);
+    } as any));
     expect(r2.status).toBe(200);
     await expect(r2.json()).resolves.toEqual({ success: true });
 
     mocks.verifyAuth.mockResolvedValueOnce({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const r3 = await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any);
+    const r3 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(r3.status).toBe(405);
   });
 });
