@@ -1,14 +1,11 @@
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useNavigate, useNavigation } from "react-router";
-import { FaPlus } from "react-icons/fa";
-import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { AudioUploadError, getSafeMediaBaseName, normalizeUploadedAudio } from "@/lib/audio.server";
+import { data as routeData } from "react-router";
+import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
 
   const { supabaseClient, headers } = await verifyAuth(request);
 

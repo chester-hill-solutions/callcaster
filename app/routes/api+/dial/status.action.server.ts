@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
-import { data as routeData, ActionFunction, ActionFunctionArgs } from "react-router";
-
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient(

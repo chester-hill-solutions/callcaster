@@ -1,11 +1,10 @@
-import { redirect, type LoaderFunctionArgs } from "react-router";
 import { createServerClient, parse, serialize } from "@supabase/ssr";
-import { type EmailOtpType } from "@supabase/supabase-js";
 import { Database } from "@/lib/database.types";
-import { redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
+import { type EmailOtpType } from "@supabase/supabase-js";
+import type { LoaderFunctionArgs } from "react-router";
 
 function getSafeRedirectPath(next: string | null): string {
   if (!next || !next.startsWith("/")) {
@@ -16,7 +15,6 @@ function getSafeRedirectPath(next: string | null): string {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-
 
   const requestUrl = new URL(request.url);
   const token_hash = requestUrl.searchParams.get("token_hash");

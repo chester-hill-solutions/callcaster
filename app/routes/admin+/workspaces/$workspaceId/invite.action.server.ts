@@ -1,10 +1,17 @@
-import type { Database, Tables } from "@/lib/database.types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
 import { capitalize } from "@/lib/utils";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
 import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { MemberRole } from "@/lib/member-role";
+import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database, Tables } from "@/lib/database.types";
+
+type MemberUser = Pick<
+  Tables<"user">,
+  "id" | "username" | "first_name" | "last_name"
+> & {
+  role: MemberRole;
+};
 
 function compareMembersByRole(a: MemberUser, b: MemberUser) {
   const memberRoleArray = Object.values(MemberRole);
@@ -23,7 +30,6 @@ function compareMembersByRole(a: MemberUser, b: MemberUser) {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
 
   const workspaceId = params.workspaceId;
   const { supabaseClient, headers, user } = await verifyAuth(request);

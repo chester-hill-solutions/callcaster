@@ -1,21 +1,21 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { getInvitesByUserId } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
 import type {
   EmailOtpType,
   Session,
   SupabaseClient,
   VerifyTokenHashParams,
 } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import { getInvitesByUserId } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import type {
   ExistingUserInvite,
   LoaderData,
   RawInviteWithWorkspace,
   WorkspaceInviteRow,
 } from "./accept-invite.types";
+import type { Database } from "@/lib/database.types";
+import type { LoaderFunctionArgs } from "react-router";
 
 async function fetchInvitesWithWorkspace(
   client: SupabaseClient<Database>,

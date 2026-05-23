@@ -1,13 +1,12 @@
-import type { ActionFunctionArgs } from "react-router";
-import type { TablesInsert, Database } from "@/lib/database.types";
-import Twilio from 'twilio';
-import { normalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber } from "@/lib/utils";
+import Twilio from 'twilio';
+import type { ActionFunctionArgs } from "react-router";
+import type { TablesInsert, Database } from "@/lib/database.types";
 
 interface DialRequest {
   to_number: string;
@@ -22,10 +21,6 @@ interface DialRequest {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
-
-
 
     const { supabaseClient: supabase } = createSupabaseServerClient(request);
     const raw = await parseActionRequest(request) as Partial<DialRequest>;

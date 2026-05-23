@@ -1,10 +1,7 @@
 import {
-  data as routeData,
-  type LoaderFunctionArgs,
-  redirect,
-} from "react-router";
-
-import type { Tables } from "@/lib/database.types";
+  deriveWorkspaceMessagingReadiness,
+  getWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
 import {
   getUserRole,
   getWorkspaceInfo,
@@ -12,19 +9,18 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database.server";
 import {
-  deriveWorkspaceMessagingReadiness,
-  getWorkspaceMessagingOnboardingState,
-} from "@/lib/messaging-onboarding.server";
-import {
   getWorkspaceRcsBlockingIssues,
   hydrateWorkspaceRcsOnboardingState,
 } from "@/lib/rcs-onboarding.server";
+import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import type {
   User,
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
+import type { LoaderFunctionArgs } from "react-router";
+import type { Tables } from "@/lib/database.types";
 
 export type OnboardingLoaderData = {
   workspaceId: string;

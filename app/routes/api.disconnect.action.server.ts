@@ -1,9 +1,8 @@
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-import twilio from "twilio";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { safeParseJson } from "@/lib/database.server";
+import twilio from "twilio";
+import type { ActionFunctionArgs } from "react-router";
 
 type DisconnectRequestBody = {
   call?: {
@@ -25,7 +24,6 @@ const getCallSid = (body: unknown): string | null => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
 
   const { TWILIO_SID, TWILIO_AUTH_TOKEN } = process.env;
 

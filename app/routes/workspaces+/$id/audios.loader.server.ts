@@ -1,14 +1,11 @@
-import { data as routeData, LoaderFunctionArgs, Link, useLoaderData } from "react-router";
-import { User } from "@/lib/types";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { User } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

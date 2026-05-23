@@ -1,18 +1,15 @@
-import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
-import Stripe from "stripe";
 import {
   getTransactionDisplayDescription,
   type TransactionType,
 } from "@/lib/transaction-history.server";
-import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { createStripeContact } from "@/lib/database/stripe.server";
+import { data as routeData, redirect } from "react-router";
 import { env } from "@/lib/env.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import Stripe from "stripe";
+import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
-
 
   const { supabaseClient } = await verifyAuth(request);
   const workspaceId = params.id;

@@ -1,10 +1,17 @@
-import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { env } from "@/lib/env.server";
 import { createErrorResponse } from "@/lib/errors.server";
+import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+
+interface WorkspaceUpdate {
+  name?: string;
+  description?: string;
+  settings?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 interface UpdateWorkspaceParams {
   workspace_id: string;
@@ -14,6 +21,10 @@ interface UpdateWorkspaceParams {
 interface WorkspaceRequest {
   workspace_id: string;
   update?: WorkspaceUpdate;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function sanitizeWorkspaceUpdate(update: unknown): WorkspaceUpdate {
@@ -65,10 +76,6 @@ const updateWorkspace = async ({
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const { workspace_id, update }: WorkspaceRequest =

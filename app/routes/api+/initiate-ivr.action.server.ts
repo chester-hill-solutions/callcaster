@@ -1,10 +1,9 @@
-import type { ActionFunctionArgs } from "react-router";
-import { data } from "react-router";
-import { normalizePhoneNumber } from '@/lib/utils';
-import { safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber } from '@/lib/utils';
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 interface InitiateIVRRequest {
   campaign_id: number;
@@ -13,9 +12,6 @@ interface InitiateIVRRequest {
 }
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
-
-
 
     const { campaign_id, user_id, workspace_id }: InitiateIVRRequest = await safeParseJson(request);
     const { supabaseClient: supabase } = await verifyAuth(request);

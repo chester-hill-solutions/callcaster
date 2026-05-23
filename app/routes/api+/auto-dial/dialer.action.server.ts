@@ -1,12 +1,11 @@
-import type TwilioSDK from "twilio";
-import type { Database } from '@/lib/database.types';
-import type { Call } from '@/lib/types';
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
 import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber as sharedNormalizePhoneNumber } from "@/lib/utils";
+import type { Call } from '@/lib/types';
+import type { Database } from '@/lib/database.types';
+import type TwilioSDK from "twilio";
 
 type TwilioClient = TwilioSDK.Twilio;
 
@@ -118,8 +117,6 @@ export async function completeAllConferences(client: TwilioClient, user_id: stri
 }
 
 export const action = async ({ request }: { request: Request }) => {
-
-
 
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),

@@ -66,7 +66,14 @@ interface FormData {
   [key: string]: unknown;
 }
 
-;
+type LoaderData = {
+  phoneNumbers: WorkspaceNumbers;
+  workspaceId: string;
+  mediaNames: { id: number; name: string }[];
+  users: User[];
+  user: User;
+  creditsBalance: number;
+};
 
 const WorkspaceSettings = () => {
   const {

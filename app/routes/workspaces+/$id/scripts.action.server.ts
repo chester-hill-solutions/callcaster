@@ -1,16 +1,13 @@
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
-import type { Json , Database } from "@/lib/database.types";
-import type { User } from "@/lib/types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
-import { MdDownload, MdEdit } from "react-icons/md";
-import { formatDateToLocale } from "@/lib/utils";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
+import { formatDateToLocale } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Json , Database } from "@/lib/database.types";
+import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@/lib/types";
 
 export async function action({ request }: ActionFunctionArgs) {
-
 
   const { supabaseClient, headers } = await verifyAuth(request);
 

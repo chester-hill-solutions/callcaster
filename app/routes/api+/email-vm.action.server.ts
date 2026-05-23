@@ -1,14 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-
-import type { Database } from "@/lib/database.types";
+import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
+import { Resend } from "resend";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { Workspace, WorkspaceNumber, WorkspaceWebhook } from "@/lib/types";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const resend = new Resend(env.RESEND_API_KEY());

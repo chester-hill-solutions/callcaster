@@ -1,13 +1,12 @@
-import Twilio from "twilio";
-
-import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { Call } from "@/lib/types";
-import { Database, Tables } from "@/lib/database.types";
+import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { Database, Tables } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 import { getServiceSupabase } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import Twilio from "twilio";
 
 const getSupabase = () => getServiceSupabase();
 

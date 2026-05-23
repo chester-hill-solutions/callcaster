@@ -1,22 +1,3 @@
-import type { Database, Tables } from "@/lib/database.types";
-import type {
-  User,
-  Contact,
-  Workspace,
-  BaseUser,
-  WorkspaceNumber,
-} from "@/lib/types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { NavLink, Outlet, useFetcher, useLoaderData, useLocation, useNavigate, useOutlet, useOutletContext, useParams, useSearchParams, useRouteError } from "react-router";
-import { MdAdd, MdChat } from "react-icons/md";
-import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
-import { useInfiniteScroll } from "@/hooks";
-import { X } from "lucide-react";
-import {
-  RealtimePostgresChangesPayload,
-  SupabaseClient,
-} from "@supabase/supabase-js";
 import {
   getConversationParticipantPhones,
   getChatSortOption,
@@ -25,15 +6,28 @@ import {
   sortConversationSummaries,
   type ConversationSummary,
 } from "@/lib/chat-conversation-sort";
+import {
+  RealtimePostgresChangesPayload,
+  SupabaseClient,
+} from "@supabase/supabase-js";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
+import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { verifyAuth } from "@/lib/supabase.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { sendMessage } from "@/routes/api+/chat_sms.send.server";
+import { useInfiniteScroll } from "@/hooks";
+import { verifyAuth } from "@/lib/supabase.server";
+import type {
+  User,
+  Contact,
+  Workspace,
+  BaseUser,
+  WorkspaceNumber,
+} from "@/lib/types";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database, Tables } from "@/lib/database.types";
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

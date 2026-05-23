@@ -1,12 +1,11 @@
-import { data as routeData, type ActionFunction } from "react-router";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 import {
   rejectMissingTwilioSignatureHeader,
   validateTwilioWebhookForPhoneCandidates,
 } from "@/lib/twilio-webhook.server";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { data as routeData } from "react-router";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
 
 interface FormData {
   VerificationStatus: string;

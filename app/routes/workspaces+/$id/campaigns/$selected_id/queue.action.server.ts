@@ -1,101 +1,19 @@
-import type { AppError } from "@/lib/errors.server";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
-import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
 import {
     applyQueueStatusFilter,
     COMPLETED_QUEUE_COUNT_FILTER,
     QUEUE_STATUS_QUEUED,
     type QueueStatusFilter,
 } from "@/lib/queue-status";
+import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { parseActionRequest } from "@/lib/database.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { parseActionRequest } from "@/lib/database.server";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
-
-function useQueueActions(campaignId: string, unfilteredCount: number) {
-    const fetcher = useFetcher();
-    const [params, setParams] = useSearchParams();
-
-    const handleFilterChange = (key: string, value: string) => {
-        setParams((prev) => {
-            const newParams = new URLSearchParams(prev);
-            if (value) {
-                newParams.set(key, value);
-            } else {
-                newParams.delete(key);
-            }
-            return newParams;
-        });
-    };
-
-    const clearFilter = () => {
-        setParams((prev) => {
-            const newParams = new URLSearchParams(prev);
-            ['name', 'phone', 'disposition', 'queueStatus', 'audiences', 'email', 'address'].forEach(key => {
-                newParams.delete(key);
-            });
-            return newParams;
-        });
-    };
-
-    const handleStatusChange = (ids: string[], newStatus: string, isAllSelected: boolean) => {
-        const filters = Object.fromEntries(params.entries());
-        fetcher.submit(
-            {
-                intent: "update_status",
-                ids: isAllSelected ? 'all' : ids,
-                status: newStatus,
-                isAllSelected,
-                filters: JSON.stringify(filters),
-            },
-            { method: "POST", encType: "application/json" }
-        );
-    };
-
-    const handleAddFromAudience = (audienceId: number) => {
-        fetcher.submit(
-            { audience_id: audienceId, campaign_id: Number(campaignId) },
-            { action: "/api/campaign_audience", method: "POST", encType: "application/json" }
-        );
-    };
-
-    const handleAddContactToQueue = (contacts: Contact[]) => {
-        fetcher.submit(
-            {
-                ids: contacts.map(c => c.id),
-                campaign_id: Number(campaignId),
-                startOrder: unfilteredCount
-            },
-            { action: "/api/campaign_queue", method: "POST", encType: "application/json" }
-        );
-    };
-
-    const handleRemoveContactsFromQueue = (ids: string[] | 'all') => {
-        const filters = Object.fromEntries(params.entries());
-        fetcher.submit(
-            ids === 'all'
-                ? { campaign_id: Number(campaignId), filters }
-                : { ids, campaign_id: Number(campaignId) },
-            { method: "DELETE", encType: "application/json", action: "/api/campaign_queue" }
-        );
-    };
-
-    return {
-        handleFilterChange,
-        clearFilter,
-        handleStatusChange,
-        handleAddFromAudience,
-        handleAddContactToQueue,
-        handleRemoveContactsFromQueue,
-        queueFetcher: fetcher,
-    };
-}
+import type { ActionFunctionArgs } from "react-router";
+import type { AppError } from "@/lib/errors.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
-
 
     const { selected_id } = params;
     const { supabaseClient, user } = await verifyAuth(request);

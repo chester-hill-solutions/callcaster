@@ -1,14 +1,10 @@
+import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { data as routeData } from "react-router";
 import { isAssignedToUser } from "@/lib/queue-status";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request }: { request: Request }) => {
-
-
 
     const {supabaseClient:supabase, user} = await verifyAuth(request);
     const data = await parseActionRequest(request);

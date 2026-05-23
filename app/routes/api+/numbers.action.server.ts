@@ -1,22 +1,15 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import Twilio from 'twilio';
+import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { createClient } from '@supabase/supabase-js';
-import type { ActionFunctionArgs } from "react-router";
+import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { verifyAuth } from "@/lib/supabase.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import Twilio from 'twilio';
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
-
-
-
-
 
     const { supabaseClient: userSupabase, user } = await verifyAuth(request);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());

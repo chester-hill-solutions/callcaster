@@ -1,13 +1,10 @@
-import { data as routeData, ActionFunctionArgs } from "react-router";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { parseActionRequest, removeContactsFromAudience } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request }: ActionFunctionArgs) {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

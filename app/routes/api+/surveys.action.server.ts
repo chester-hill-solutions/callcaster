@@ -1,20 +1,18 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { SurveyFormData } from "@/lib/types";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { getUserRole } from "@/lib/database.server";
 import { AppError, ErrorCode, createErrorResponse, handleDatabaseError } from "@/lib/errors.server";
+import { data as routeData } from "react-router";
+import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { SurveyFormData } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function handleCreateSurvey(
   request: Request,
   supabaseClient: SupabaseClient<Database>,
   user: { id: string }
 ) {
-
 
   const formData = await request.formData();
   const surveyDataRaw = formData.get("surveyData") as string | null;
@@ -257,9 +255,6 @@ async function handleDeleteSurvey(
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-
-
-
 
   try {
     const { supabaseClient, user } = await verifyAuth(request);

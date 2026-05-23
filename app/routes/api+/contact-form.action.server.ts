@@ -1,9 +1,7 @@
-import { Resend } from "resend";
 import { data as routeData } from "react-router";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { Resend } from "resend";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

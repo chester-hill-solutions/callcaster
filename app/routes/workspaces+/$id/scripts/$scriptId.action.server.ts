@@ -1,7 +1,7 @@
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-
+import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const campaignId = params.selected_id;

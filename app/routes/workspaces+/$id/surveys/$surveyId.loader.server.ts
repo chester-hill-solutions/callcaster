@@ -1,5 +1,3 @@
-import type { SurveyWithPages } from "@/lib/types";
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 import { 
   Calendar, 
   Users, 
@@ -12,10 +10,11 @@ import {
   MessageSquare
 } from "lucide-react";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
+import type { SurveyWithPages } from "@/lib/types";
 
 interface SurveyPage {
   id: number;
@@ -63,8 +62,6 @@ interface Survey {
 }
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;

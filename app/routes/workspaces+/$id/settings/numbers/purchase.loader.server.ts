@@ -1,15 +1,12 @@
-import type { LoaderFunctionArgs } from "react-router";
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import type { User } from "@/lib/types";
-import { data as routeData, Link, redirect, useFetcher, useLoaderData } from "react-router";
-import { MemberRole } from "@/lib/member-role";
 import { data as routeData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
+import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
+import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
+import type { User } from "@/lib/types";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const workspaceId = params.id;

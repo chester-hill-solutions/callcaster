@@ -17,7 +17,39 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-;
+interface ExportItem {
+  id: string;
+  createdAt: Date;
+  downloadUrl?: string;
+  campaignId: string;
+  campaignName: string;
+  expiresAt: Date;
+  isExpired: boolean;
+  status: string;
+  progress: number;
+  stage?: string;
+  processed?: number;
+  total?: number;
+}
+
+interface SerializedExportItem {
+  id: string;
+  createdAt: string;
+  downloadUrl?: string;
+  campaignId: string;
+  campaignName: string;
+  expiresAt: string;
+  isExpired: boolean;
+  status: string;
+  progress: number;
+  stage?: string;
+  processed?: number;
+  total?: number;
+}
+
+interface LoaderData {
+  exports: SerializedExportItem[];
+}
 
 export default function WorkspaceExports() {
   const { exports: serializedExports = [] } = useLoaderData<LoaderData>();

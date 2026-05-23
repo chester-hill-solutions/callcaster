@@ -1,11 +1,10 @@
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-
-import type { Database } from "@/lib/database.types";
+import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const formData = await request.formData();

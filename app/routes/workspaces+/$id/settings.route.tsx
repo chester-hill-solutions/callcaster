@@ -30,7 +30,26 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Heading } from "@/components/ui/typography";
 
-;
+type UserWithRole = Partial<User> & { role: string };
+
+type LoaderData = {
+  workspace: WorkspaceData;
+  userRole: MemberRole;
+  users: UserWithRole[];
+  activeUserId: string;
+  phoneNumbers: WorkspaceNumbers[];
+  pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
+  webhook: WorkspaceWebhook;
+  hasAccess: boolean;
+}   
+
+type WorkspaceNumbers = {
+  id: string;
+  phone_number: string;
+  capabilities: {
+    verification_status: 'success' | 'failed' | 'pending';
+  };
+};
 
 function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
   const memberRoleArray = Object.values(MemberRole);

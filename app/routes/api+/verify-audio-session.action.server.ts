@@ -1,16 +1,11 @@
-import { data as routeData } from "react-router";
-import Twilio from "twilio";
-import { normalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+import { normalizePhoneNumber } from "@/lib/utils";
+import Twilio from "twilio";
 
 export const action = async ({ request }: { request: Request }) => {
-
-
-
 
     const twiml = new Twilio.twiml.VoiceResponse();
     

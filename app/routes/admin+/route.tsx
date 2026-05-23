@@ -30,15 +30,41 @@ import {
     type WorkspaceAdminRow,
     type WorkspaceSortKey,
 } from "@/lib/admin-workspaces";
+import type { Tables } from "@/lib/database.types";
 
-;
+type WorkspaceWithCampaigns = Tables<"workspace"> & {
+  campaign?: Tables<"campaign">[] | null;
+};
 
-;
+type CampaignWithWorkspace = Tables<"campaign"> & {
+  workspace?: Tables<"workspace"> | null;
+};
+
+type LoaderData = {
+  user: Tables<"user">;
+  workspaces: WorkspaceWithCampaigns[] | null;
+  users: Tables<"user">[] | null;
+  workspaceUsers: Tables<"workspace_users">[] | null;
+  workspaceNumbers: Tables<"workspace_number">[] | null;
+  workspaceRows: WorkspaceAdminRow[];
+  campaigns: CampaignWithWorkspace[];
+  stats: {
+    totalWorkspaces: number;
+    totalUsers: number;
+    totalCampaigns: number;
+    activeWorkspaces: number;
+  };
+};
+
+type ActionData = {
+  success?: string;
+  error?: string;
+};
 
 export default function Admin() {
-    const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData();
+    const { user, workspaces, users, workspaceUsers, workspaceNumbers, workspaceRows, campaigns, stats } = useLoaderData<LoaderData>();
     const [searchParams, setSearchParams] = useSearchParams();
-    const actionData = useActionData();
+    const actionData = useActionData<ActionData>();
     const currentTab = searchParams.get("tab") || "workspaces";
 
     // Pagination state for workspaces

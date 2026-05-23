@@ -1,7 +1,7 @@
-import type { ActionFunctionArgs } from "react-router";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 function sanitizeFilename(filename: string) {
     const decodedFilename = decodeURIComponent(filename);
@@ -16,8 +16,6 @@ function sanitizeFilename(filename: string) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-
-
 
     const { supabaseClient, headers } = await verifyAuth(request);
     const method = request.method;

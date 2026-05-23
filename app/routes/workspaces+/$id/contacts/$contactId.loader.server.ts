@@ -1,15 +1,11 @@
-import {
-  data as routeData,
-  redirect,
-  type LoaderFunctionArgs,
-} from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-import { logger } from "@/lib/logger.server";
+import { data as routeData, redirect } from "react-router";
 import { getUserRole } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
+import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { Audience, Contact, User, WorkspaceData } from "@/lib/types";
-import type { MemberRole } from "@/components/workspace/TeamMember";
+import type { LoaderFunctionArgs } from "react-router";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ContactIdLoaderData = {
   workspace: WorkspaceData;

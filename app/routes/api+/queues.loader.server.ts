@@ -1,11 +1,9 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
 import { buildQueuedQueueUpdate } from "@/lib/queue-status";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
 import { getSupabaseServerClientWithSession } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { safeParseJson } from "@/lib/database.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface DequeueRequest {
   contact_id: number;
@@ -18,8 +16,6 @@ interface ResetRequest {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
 
     const { supabaseClient: supabase } = await getSupabaseServerClientWithSession(request);
     const url = new URL(request.url);

@@ -35,9 +35,56 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
-;
+export type CampaignState = {
+  campaign_id: string;
+  workspace: string;
+  title: string;
+  status: string;
+  type:
+    | "message"
+    | "robocall"
+    | "live_call"
+    | "simple_ivr"
+    | "complex_ivr"
+    | "email";
+  dial_type: "call" | "predictive" | null;
+  group_household_queue: boolean;
+  start_date: string;
+  end_date: string;
+  caller_id: string | null;
+  voicemail_file: string | null;
+  script_id: number | null;
+  audiences: NonNullable<Audience>[];
+  body_text: string | null;
+  message_media: string[] | null;
+  voicedrop_audio: string | null;
+  schedule: Schedule | null;
+  is_active: boolean;
+  details: LiveCampaign | MessageCampaign | IVRCampaign;
+};
 
-;
+type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
+
+/** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
+const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
+  "campaign_queue",
+  "outreach_attempt",
+  "call",
+  "message",
+] as const;
+
+const getTable = (
+  campaignType: string | null | undefined,
+): CampaignTable | null => {
+  return campaignType === "live_call"
+    ? "live_campaign"
+    : campaignType === "message"
+      ? "message_campaign"
+      : campaignType &&
+          ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
+        ? "ivr_campaign"
+        : null;
+};
 
 export default function CampaignScreen() {
   const {

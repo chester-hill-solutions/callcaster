@@ -1,10 +1,8 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
-import { MdArrowForward, MdCheck } from "react-icons/md";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export async function action({ request, params }: ActionFunctionArgs) {
 

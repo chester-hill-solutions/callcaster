@@ -1,14 +1,13 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import Twilio from 'twilio';
+import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { createClient } from '@supabase/supabase-js';
-import type { LoaderFunctionArgs } from "react-router";
+import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
-import { createErrorResponse } from "@/lib/errors.server";
-import { logger } from "@/lib/logger.server";
-import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { verifyAuth } from "@/lib/supabase.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { logger } from "@/lib/logger.server";
+import { verifyAuth } from "@/lib/supabase.server";
+import Twilio from 'twilio';
+import type { LoaderFunctionArgs } from "react-router";
 
 interface FormData {
   phoneNumber: string;
@@ -16,12 +15,6 @@ interface FormData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
-
-
-
-
 
     await verifyAuth(request);
     const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());

@@ -1,15 +1,12 @@
-import {
-  data as routeData,
-  type LoaderFunctionArgs,
-} from "react-router";
-
 import { buildContactSearchFilter } from "@/lib/contacts/search.server";
-import type { Database } from "@/lib/database.types";
+import { data as routeData } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { User } from "@/lib/types";
 import { MemberRole } from "@/lib/member-role";
+import { verifyAuth } from "@/lib/supabase.server";
+import type { Database } from "@/lib/database.types";
+import type { LoaderFunctionArgs } from "react-router";
+import type { User } from "@/lib/types";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;

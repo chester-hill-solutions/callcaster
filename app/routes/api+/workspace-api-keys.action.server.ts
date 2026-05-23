@@ -1,17 +1,12 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
-import { randomBytes } from "crypto";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { API_KEY_PREFIX_LENGTH, hashApiKeyForStorage } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { randomBytes } from "crypto";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
 

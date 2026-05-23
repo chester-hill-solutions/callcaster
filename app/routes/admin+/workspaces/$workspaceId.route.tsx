@@ -13,7 +13,40 @@ import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentia
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
 
-;
+interface TwilioPhoneNumber {
+    sid: string;
+    phoneNumber: string;
+    friendlyName: string;
+    capabilities: {
+        voice: boolean;
+        sms: boolean;
+        mms: boolean;
+        fax: boolean;
+    };
+    voiceReceiveMode?: string;
+    smsApplicationSid?: string;
+    voiceApplicationSid?: string;
+    addressRequirements?: string;
+    status?: string;
+}
+
+interface TwilioAccount {
+    sid: string;
+    friendlyName: string;
+    status: string;
+    type: string;
+    dateCreated: Date;
+}
+
+interface TwilioUsageRecord {
+    category: string;
+    description: string;
+    usage: string;
+    usageUnit: string;
+    price: string;
+    startDate?: Date;
+    endDate?: Date;
+}
 
 export default function WorkspaceDetails() {
     const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData();

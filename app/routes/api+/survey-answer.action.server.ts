@@ -1,10 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { logger } from "@/lib/logger.server";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { data as routeData } from "react-router";
+import { logger } from "@/lib/logger.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -165,7 +164,6 @@ async function handleSaveAnswer(
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-
 
   const { supabaseClient } = createSupabaseServerClient(request);
   

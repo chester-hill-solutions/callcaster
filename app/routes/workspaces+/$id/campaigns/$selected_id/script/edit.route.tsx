@@ -26,9 +26,66 @@ import { logger as loggerClient } from "@/lib/logger.client";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { isObject } from "@/lib/type-utils";
 
-;
+type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
 
-;
+type BaseCampaignDetails = {
+  campaign_id: number | null;
+  created_at: string;
+  id: number;
+  script_id: number | null;
+  workspace: string;
+  script?: Script;
+  mediaLinks?: Array<string | { [key: string]: string }>;
+  message_media?: string[];
+  disposition_options?: Record<string, unknown>;
+  questions?: Record<string, unknown>;
+  voicedrop_audio?: string | null;
+};
+
+type LoaderData = {
+  workspace_id: string;
+  selected_id: string;
+  data: {
+    id: number;
+    type: CampaignType;
+    campaignDetails: BaseCampaignDetails;
+  };
+  mediaNames: string[];
+  userRole: string;
+  scripts: Script[];
+};
+
+type PageData = LoaderData['data'];
+
+function getScriptRecordingFileNames(script: Script | undefined): string[] {
+  if (!script?.steps || !isObject(script.steps) || Array.isArray(script.steps)) {
+    return [];
+  }
+
+  const rawSteps = script.steps as Record<string, unknown>;
+  if (!isObject(rawSteps.blocks)) {
+    return [];
+  }
+
+  return Object.values(rawSteps.blocks)
+    .flatMap((block) => {
+      if (!isObject(block)) {
+        return [];
+      }
+
+      const speechType = block.speechType;
+      const audioFile = block.audioFile;
+      if (
+        speechType === "recorded" &&
+        typeof audioFile === "string" &&
+        audioFile.length > 0
+      ) {
+        return [audioFile];
+      }
+
+      return [];
+    });
+}
 
 export default function ScriptEditor() {
   const { workspace_id, selected_id, mediaNames = [], scripts = [], data } =

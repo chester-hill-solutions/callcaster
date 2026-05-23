@@ -14,6 +14,48 @@ import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
 import type { Json , Database } from "@/lib/database.types";
 import type { User } from "@/lib/types";
 
+type ScriptSteps = {
+  pages?: Record<string, unknown>;
+  blocks?: Record<string, unknown>;
+};
+
+type Script = {
+  id: number;
+  name: string;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string | null;
+  updated_by: string | null;
+  workspace: string | null;
+  type: string | null;
+  steps: Json;
+};
+
+type ScriptWithParsedSteps = Omit<Script, 'steps'> & {
+  steps: ScriptSteps | null;
+};
+
+type Workspace = {
+  id: string;
+  name: string;
+};
+
+type LoaderData =
+  | {
+      scripts: null;
+      error: string;
+      userRole: Database["public"]["Enums"]["workspace_role"] | null;
+      workspace?: undefined;
+    }
+  | {
+      scripts: Script[] | null;
+      workspace: Workspace | null;
+      error: null;
+      userRole: Database["public"]["Enums"]["workspace_role"];
+    };
+
+// ActionData inferred from action's return via typeof action
+
 export default function WorkspaceScripts() {
   const loaderData = useLoaderData<LoaderData>();
   const actionData = useActionData();

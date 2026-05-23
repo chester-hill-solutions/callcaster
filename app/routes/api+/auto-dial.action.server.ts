@@ -1,10 +1,9 @@
-import Twilio from "twilio";
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
-import type { ActionFunctionArgs } from "react-router";
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import Twilio from "twilio";
 
 type AutoDialDeps = Partial<{
   createSupabaseServerClient: (request: Request) => { supabaseClient: unknown };
@@ -58,9 +57,6 @@ export const action = async ({
   request: Request;
   deps?: AutoDialDeps;
 }) => {
-
-
-
 
   const d = {
     createSupabaseServerClient:

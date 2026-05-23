@@ -1,11 +1,11 @@
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
 import { acceptWorkspaceInvitations } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
+import { data as routeData } from "react-router";
+import { logger } from "@/lib/logger.server";
 import type { ActionData } from "./accept-invite.types";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabaseClient, headers } = createSupabaseServerClient(request);

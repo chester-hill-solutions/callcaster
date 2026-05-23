@@ -1,16 +1,12 @@
-import type { ActionFunctionArgs } from "react-router";
 import { data as routeData } from "react-router";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
-import { data as routeData } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { logger } from "@/lib/logger.server";
+import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
-
 
     const { supabaseClient, headers } = await verifyAuth(request);
     const method = request.method;

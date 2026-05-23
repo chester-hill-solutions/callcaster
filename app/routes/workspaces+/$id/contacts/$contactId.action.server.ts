@@ -1,12 +1,8 @@
-import {
-  data as routeData,
-  redirect,
-  type ActionFunctionArgs,
-} from "react-router";
-
+import { data as routeData, redirect } from "react-router";
 import { getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export type ContactFormData = {
   id?: number;

@@ -1,15 +1,11 @@
-import { Resend } from "resend";
 import { data as routeData } from "react-router";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { Resend } from "resend";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
 
 export const action = async ({ request, params }: { request: Request, params: { id: string } }) => {
-
-
 
   const resend = new Resend(env.RESEND_API_KEY());
 

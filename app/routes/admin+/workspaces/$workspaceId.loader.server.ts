@@ -1,11 +1,9 @@
-import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link, Outlet, useLocation } from "react-router";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
-import { data as routeData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface TwilioPhoneNumber {
     sid: string;
@@ -43,8 +41,6 @@ interface TwilioUsageRecord {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
-
 
     const { supabaseClient, user } = await verifyAuth(request);
 

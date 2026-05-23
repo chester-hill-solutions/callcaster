@@ -1,18 +1,16 @@
+import { createClient } from "@supabase/supabase-js";
+import { env } from "@/lib/env.server";
+import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
+import { logger } from "@/lib/logger.server";
+import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
-import Twilio from 'twilio';
-import { createClient } from "@supabase/supabase-js";
-import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 
 function isAValidPhoneNumber(number: string): boolean {
   return /^[\d+\-() ]+$/.test(number);
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
 
   const formData = await request.formData();
   const toNumber = (formData.get("To") as string) ?? "";

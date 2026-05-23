@@ -1,7 +1,6 @@
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
+import { data as routeData } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 
 function parseJsonField<T>(value: unknown): T {
@@ -10,8 +9,6 @@ function parseJsonField<T>(value: unknown): T {
 }
 
 export const action = async ({ request }: { request: Request }) => {
-
-
 
   const { supabaseClient, headers } = await verifyAuth(request);
 

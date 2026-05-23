@@ -1,15 +1,11 @@
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
 import { buildQueuedQueueUpdate } from "@/lib/queue-status";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
 import { getSupabaseServerClientWithSession } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { safeParseJson } from "@/lib/database.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
 
     const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
     const user = serverSession?.user;

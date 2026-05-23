@@ -1,21 +1,16 @@
-import type { TwilioMessageIntent } from "@/lib/types";
+import { env } from "@/lib/env.server";
+import { getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
 import { sendMessage } from "./chat_sms.send.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
-import { getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+import type { TwilioMessageIntent } from "@/lib/types";
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 export const action = async ({ request }: { request: Request }) => {
-
-
-
-
 
   const authResult = await verifyApiKeyOrSession(request);
 

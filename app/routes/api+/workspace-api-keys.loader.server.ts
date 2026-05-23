@@ -1,12 +1,10 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
-import { randomBytes } from "crypto";
-import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { API_KEY_PREFIX_LENGTH, hashApiKeyForStorage } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { randomBytes } from "crypto";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 const KEY_SECRET_LENGTH = 32;
 
@@ -24,9 +22,6 @@ function generateApiKey(
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const url = new URL(request.url);

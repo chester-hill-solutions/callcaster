@@ -1,6 +1,6 @@
+import { env } from "@/lib/env.server";
 import type { LoaderFunctionArgs } from "react-router";
 import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
-import { env } from "@/lib/env.server";
 
 export const loader = async ({ params }: LoaderFunctionArgs) => {
 

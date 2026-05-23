@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Text } from "@/components/ui/typography";
 import { numberRentalPriceLabel } from "@/lib/number-rental";
-import type { AvailableNumber } from "@/routes/workspaces+/$id/settings/numbers.route";
+import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import type { ColumnDef } from "@tanstack/react-table";
 
 function capabilityBadges(capabilities: Record<string, boolean>) {

@@ -1,11 +1,9 @@
-import Twilio from "twilio";
 import { createClient } from "@supabase/supabase-js";
-import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import Twilio from "twilio";
 
 export const action = async ({ request }: { request: Request }) => {
-
 
     const supabase = createClient(
         env.SUPABASE_URL(),

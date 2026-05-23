@@ -1,11 +1,11 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import Twilio from "twilio";
-
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import Twilio from "twilio";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;

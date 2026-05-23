@@ -1,12 +1,10 @@
-import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
+import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
 import { Contact } from "@/lib/types";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
-import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const url = new URL(request.url);

@@ -1,10 +1,9 @@
-import type { Tables } from "@/lib/database.types";
-import { data as routeData, type ActionFunctionArgs } from "react-router";
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
+import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Tables } from "@/lib/database.types";
 
 type AutoDialEndDeps = Partial<{
   verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown; user: unknown }>;
@@ -20,8 +19,6 @@ export const action = async ({
   request,
   deps,
 }: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {
-
-
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? verifyAuth,
@@ -57,7 +54,6 @@ export const action = async ({
       throw error;
     }
   };
-
 
   try {
     const conferences = await twilio.conferences.list({

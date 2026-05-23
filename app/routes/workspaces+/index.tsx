@@ -24,9 +24,22 @@ import {
 } from "@/components/ui/dialog";
 import { Heading } from "@/components/ui/typography";
 
-;
+interface Workspace {
+  id: string;
+  name: string;
+}
 
-;
+interface WorkspaceUser {
+  last_accessed: string;
+  role: string;
+  workspace: Workspace;
+}
+
+interface LoaderData {
+  workspaces: WorkspaceUser[] | null;
+  userId: string;
+  error: string | null;
+}
 
 const WorkspaceCard = React.memo(
   ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {

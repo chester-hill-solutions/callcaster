@@ -1,55 +1,13 @@
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { User, WorkspaceNumbers } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { data as routeData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers, removeWorkspacePhoneNumber, requireWorkspaceAccess, updateCallerId, updateWorkspacePhoneNumber } from "@/lib/database.server";
+import { MemberRole } from "@/lib/member-role";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { User, WorkspaceNumbers } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
-
-type ValidationRequest = {
-  accountSid: string;
-  callSid: string;
-  friendlyName: string;
-  phoneNumber: string;
-  validationCode: string;
-};
-
-type NumberCapabilities = {
-  fax: boolean;
-  mms: boolean;
-  sms: boolean;
-  voice: boolean;
-  verification_status: boolean;
-};
-
-type NumberRequest = Array<{
-  id: bigint;
-  created_at: string;
-  workspace: string;
-  friendly_name: string;
-  phone_number: string;
-  capabilities: NumberCapabilities;
-}>;
-
-type CallerIDResponse = {
-  validationRequest: ValidationRequest;
-  numberRequest: NumberRequest;
-  error?: string;
-};
-
-interface FormData {
-  formName: string;
-  numberId?: string;
-  incomingActivity?: string;
-  incomingVoiceMessage?: string;
-  callerId?: string;
-  [key: string]: unknown;
-}
+import type { LoaderFunctionArgs } from "react-router";
+import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
   const workspaceId = params.id;

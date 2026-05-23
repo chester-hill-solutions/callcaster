@@ -6,25 +6,22 @@ import {
   hasCreditsForNumberRental,
   NUMBER_RENTAL_MONTHLY_CREDITS,
 } from "@/lib/number-rental";
-import type { NumbersSearchResponse } from "@/lib/numbers-search.server";
-import type { AvailableNumber } from "@/routes/workspaces+/$id/settings/numbers.route";
+import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import { Link, useFetcher, type FetcherWithComponents } from "react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
-import { emptyMessageForMode } from "./NumberPurchase.constants";
+import {
+  emptyMessageForMode,
+  type NumbersSearchFetcherData,
+  type PurchaseFetcherData,
+} from "./NumberPurchase.constants";
 import { NumberPurchaseSearchForm } from "./NumberPurchase.SearchForm";
 import type { NumberSearchMode } from "@/lib/numbers-search.server";
 
-export type NumbersSearchFetcherData = NumbersSearchResponse | undefined;
-
-export type PurchaseFetcherData = {
-  newNumber?: { friendly_name?: string; phone_number?: string };
-  creditsError?: boolean;
-  error?: string;
-};
+export type { NumbersSearchFetcherData, PurchaseFetcherData };
 
 export const NumberPurchase = ({
   fetcher,

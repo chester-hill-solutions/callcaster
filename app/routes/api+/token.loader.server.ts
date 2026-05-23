@@ -1,11 +1,10 @@
-import type { LoaderFunctionArgs } from "react-router";
 import { data as routeData } from "react-router";
-import twilio from "twilio";
-import { data as routeData } from "react-router";
-import { requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
 import { getSupabaseServerClientWithSession } from "@/lib/supabase.server";
+import { logger } from "@/lib/logger.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
+import twilio from "twilio";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface GenerateTokenParams {
   twilioAccountSid: string;
@@ -30,9 +29,6 @@ export const generateToken = async ({ twilioAccountSid, twilioApiKey, twilioApiS
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
-
 
   const { supabaseClient: supabase, user } = await getSupabaseServerClientWithSession(request);
   const url = new URL(request.url);

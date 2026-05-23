@@ -1,15 +1,12 @@
 import { data as routeData } from "react-router";
-import { normalizePhoneNumber } from "@/lib/utils";
-import { isValidPhoneNumber } from "@/lib/utils/phone";
-import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
+import { isValidPhoneNumber } from "@/lib/utils/phone";
+import { normalizePhoneNumber } from "@/lib/utils";
 import { verifyAuth } from "@/lib/supabase.server";
 
 const SESSION_EXPIRY_MINUTES = 10;
 
 export const loader = async ({ request }: { request: Request }) => {
-
 
   const { supabaseClient: supabase, headers, user } = await verifyAuth(request);
   if (!user) {

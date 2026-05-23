@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Text } from "@/components/ui/typography";
 import { numberRentalConfirmCopy } from "@/lib/number-rental";
-import type { AvailableNumber } from "@/routes/workspaces+/$id/settings/numbers.route";
+import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import { NavLink, type FetcherWithComponents } from "react-router";
 
 import type { PurchaseFetcherData } from "./NumberPurchase";

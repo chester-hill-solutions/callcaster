@@ -238,14 +238,14 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
   });
 
   test("helper exports cover remaining branches (normalization, rpc throws, and call persistence shaping)", async () => {
-    const mod = await import("../app/routes/api+/auto-dial/dialer.route");
+    const helpers = await import("../app/routes/api+/auto-dial/dialer.action.server");
 
     // normalizePhoneNumber: + in middle triggers plus removal and minLength else-path
-    expect(mod.normalizePhoneNumber("1+5555550100")).toBe("+15555550100");
+    expect(helpers.normalizePhoneNumber("1+5555550100")).toBe("+15555550100");
 
     // getNextContact: throws when rpc returns error
     await expect(
-      mod.getNextContact(
+      helpers.getNextContact(
         {
           rpc: async () => ({ data: [], error: new Error("q") }),
         } as any,
@@ -256,7 +256,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
     // createOutreachAttempt: throws when rpc returns error
     await expect(
-      mod.createOutreachAttempt(
+      helpers.createOutreachAttempt(
         {
           rpc: async () => ({ data: null, error: new Error("oa") }),
         } as any,
@@ -269,7 +269,7 @@ describe("app/routes/api+/auto-dial/dialer.route.tsx", () => {
 
     // saveCallToDatabase: shapes optional fields and logs on upsert error
     const upsertSelect = vi.fn(async () => ({ error: new Error("ins") }));
-    await mod.saveCallToDatabase(
+    await helpers.saveCallToDatabase(
       {
         from: () => ({ upsert: () => ({ select: upsertSelect }) }),
       } as any,

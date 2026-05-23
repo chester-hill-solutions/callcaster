@@ -84,16 +84,13 @@ function rebuildRoute(routeFile) {
   if (loader) reexports.push(`export { loader } from "./${base}.loader.server";`);
   if (action) reexports.push(`export { action } from "./${base}.action.server";`);
 
-  const importEnd = findImportEnd(cleaned);
-  const firstExportAt = Math.min(loader?.start ?? Infinity, action?.start ?? Infinity);
-  const imports = cleaned.slice(0, importEnd).trim();
-  let tail = cleaned;
-  if (loader) tail = tail.replace(loader.full, "");
-  if (action) tail = tail.replace(action.full, "");
-  if (firstExportAt > importEnd) {
-    tail = tail.replace(cleaned.slice(importEnd, firstExportAt), "");
-  }
-  tail = tail.slice(importEnd).trim();
+  let ui = cleaned;
+  if (loader) ui = ui.replace(loader.full, "");
+  if (action) ui = ui.replace(action.full, "");
+
+  const importEnd = findImportEnd(ui);
+  const imports = ui.slice(0, importEnd).trim();
+  const tail = ui.slice(importEnd).trim();
 
   const content = `${reexports.join("\n")}\n\n${imports}\n\n${tail}\n`;
   fs.writeFileSync(routeFile, content);

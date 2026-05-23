@@ -1,17 +1,16 @@
-import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import {
   messageCampaignRequiresCallerId,
   resolveTwilioSmsMessagingServiceSid,
 } from "@/lib/sms-send-resolve";
-import type { ActionFunctionArgs } from "react-router";
-import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { processUrls } from "@/lib/sms.server";
+import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 interface CampaignData {
   body_text: string;
@@ -133,9 +132,6 @@ const sendMessage = async ({
   messagingServiceSidFromRequest,
   campaignSmsRow,
 }: SendMessageParams) => {
-
-
-
 
   const twilio = await createWorkspaceTwilioInstance({
     supabase,
@@ -270,10 +266,6 @@ const createOutreachAttempt = async ({
 };
 
 export const action = async ({ request }: { request: Request }) => {
-
-
-
-
 
   const authResult = await verifyApiKeyOrSession(request);
   if ("error" in authResult) {

@@ -18,7 +18,7 @@ import {
   SEARCH_MODE_LABELS,
   SEARCH_PLACEHOLDERS,
 } from "./NumberPurchase.constants";
-import type { NumbersSearchFetcherData } from "./NumberPurchase";
+import type { NumbersSearchFetcherData } from "./NumberPurchase.constants";
 
 type NumberPurchaseSearchFormProps = {
   fetcher: FetcherWithComponents<NumbersSearchFetcherData>;

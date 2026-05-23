@@ -1,9 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
-import { Database } from "@/lib/database.types";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { Database } from "@/lib/database.types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 
@@ -21,7 +21,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   const audience_id = params.audience_id;
 
   if (!audience_id) {
-    return routeData<LoaderData>(
+    return routeData<AudienceDetailLoaderData>(
       {
         contacts: null,
         workspace_id,
@@ -70,7 +70,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .single();
 
   if (contactError) {
-    return routeData<LoaderData>({
+    return routeData<AudienceDetailLoaderData>({
       contacts: null,
       workspace_id,
       audience: null,
@@ -89,7 +89,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }, { headers });
   }
 
-  return routeData<LoaderData>(
+  return routeData<AudienceDetailLoaderData>(
     {
       contacts: contacts?.map(contact => ({ contact })) || null,
       workspace_id,

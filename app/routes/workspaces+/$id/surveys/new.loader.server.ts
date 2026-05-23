@@ -1,13 +1,10 @@
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
-import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
-import { Plus, Trash2, Save } from "lucide-react";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
+import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const workspaceId = params.id;

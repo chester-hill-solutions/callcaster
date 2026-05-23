@@ -14,9 +14,11 @@ import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { AudienceDetailLoaderData } from "./$audience_id.types";
+
 export default function AudienceView() {
   const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
-    useLoaderData<LoaderData>();
+    useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
   const [activeTab, setActiveTab] = useState("contacts");

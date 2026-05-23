@@ -1,9 +1,7 @@
-import { data as routeData, LoaderFunctionArgs, useLoaderData, useRevalidator } from "react-router";
-import { Download, RefreshCw } from "lucide-react";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface ExportItem {
   id: string;
@@ -40,7 +38,6 @@ interface LoaderData {
 }
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {

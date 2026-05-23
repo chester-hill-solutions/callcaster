@@ -1,19 +1,14 @@
-import type { LoaderFunctionArgs , ActionFunctionArgs } from "react-router";
-import type { Script } from "@/lib/types";
-import { data as routeData, redirect } from "react-router";
-import { useLoaderData, useSubmit } from "react-router";
-import { deepEqual } from "@/lib/utils";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
-import { isObject } from "@/lib/type-utils";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
+import { deepEqual } from "@/lib/utils";
 import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
+import { isObject } from "@/lib/type-utils";
 import { logger } from "@/lib/logger.server";
+import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { Script } from "@/lib/types";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
-
 
   const campaignId = params.selected_id;
   if (!campaignId) {

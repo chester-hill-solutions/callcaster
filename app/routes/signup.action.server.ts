@@ -1,11 +1,7 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { data as routeData, Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
-import { FaGithub } from "react-icons/fa";
-import { FcGoogle } from "react-icons/fc";
+import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
 import { data as routeData, redirect } from "react-router";
 import type { ActionFunctionArgs } from "react-router";
-import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
-
+import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
 

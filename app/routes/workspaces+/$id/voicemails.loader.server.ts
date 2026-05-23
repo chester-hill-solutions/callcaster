@@ -1,15 +1,12 @@
-import type { FileObject } from "@supabase/storage-js";
-import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext } from "react-router";
-import { Workspace } from "@/lib/types";
-import { redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import { Workspace } from "@/lib/types";
+import type { FileObject } from "@supabase/storage-js";
+import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

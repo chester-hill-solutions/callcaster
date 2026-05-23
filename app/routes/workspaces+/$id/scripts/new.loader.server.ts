@@ -1,9 +1,7 @@
-import type { Json } from "@/lib/database.types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
-import { MdAdd, MdClose } from "react-icons/md";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { Json } from "@/lib/database.types";
+import type { LoaderFunctionArgs } from "react-router";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 

@@ -1,6 +1,3 @@
-import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
-import type { Tables } from "@/lib/database.types";
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
 import {
   Calendar,
   Users,
@@ -12,36 +9,14 @@ import {
   Clock,
 } from "lucide-react";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
-
-type SurveyPageWithQuestions = {
-  survey_question?: Array<{
-    id: number;
-    question_id: string;
-    question_text: string;
-    question_type: string;
-  }>;
-};
-
-type SurveyWithPages = Tables<"survey"> & {
-  survey_page?: SurveyPageWithQuestions[];
-};
-
-type ResponseAnswerWithQuestion = ResponseAnswer & {
-  survey_question?: {
-    question_id: string;
-    question_text: string;
-    question_type: string;
-    question_option?: Array<{ option_label: string }>;
-  };
-};
+import type { LoaderFunctionArgs } from "react-router";
+import type { Tables } from "@/lib/database.types";
+import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const { id: workspaceId, surveyId } = params;

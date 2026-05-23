@@ -20,6 +20,52 @@ import {
   MessageSquare
 } from "lucide-react";
 
+// Type-safe interfaces for survey data
+interface SurveyPage {
+  id: number;
+  page_id: string;
+  title: string;
+  page_order: number;
+  survey_question?: SurveyQuestion[];
+}
+
+interface SurveyQuestion {
+  id: number;
+  question_id: string;
+  question_text: string;
+  question_type: string;
+  is_required: boolean;
+  question_order: number;
+  question_option?: SurveyQuestionOption[];
+}
+
+interface SurveyQuestionOption {
+  id: number;
+  option_value: string;
+  option_label: string;
+  option_order: number;
+}
+
+interface SurveyResponse {
+  id: number;
+  created_at: string;
+  completed_at?: string;
+  last_page_completed?: number;
+  contact?: {
+    firstname?: string;
+    surname?: string;
+    phone?: string;
+  };
+}
+
+interface Survey {
+  survey_id: string;
+  title: string;
+  is_active: boolean;
+  created_at: string;
+  survey_page?: SurveyPage[];
+}
+
 export default function SurveyDetailPage() {
   const { survey, recentResponses, workspaceId, userRole } = useLoaderData();
 

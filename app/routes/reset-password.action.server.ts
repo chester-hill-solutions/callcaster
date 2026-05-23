@@ -1,7 +1,6 @@
-import { data as routeData, Form, useActionData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export async function action({ request }: ActionFunctionArgs) {
 

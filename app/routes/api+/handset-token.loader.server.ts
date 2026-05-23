@@ -1,16 +1,12 @@
-import type { LoaderFunctionArgs } from "react-router";
 import { data as routeData } from "react-router";
-import twilio from "twilio";
-import { data as routeData } from "react-router";
-import { requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import twilio from "twilio";
+import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
-
 
   const { supabaseClient: supabase, user } = await verifyAuth(request);
   if (!user) {

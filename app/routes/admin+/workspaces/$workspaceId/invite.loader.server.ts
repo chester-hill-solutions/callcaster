@@ -1,10 +1,10 @@
-import type { Database, Tables } from "@/lib/database.types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
 import { capitalize } from "@/lib/utils";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
 import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { MemberRole } from "@/lib/member-role";
+import { verifyAuth } from "@/lib/supabase.server";
+import type { Database, Tables } from "@/lib/database.types";
+import type { LoaderFunctionArgs } from "react-router";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -59,7 +59,6 @@ const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

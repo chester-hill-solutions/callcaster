@@ -1,16 +1,11 @@
+import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
+import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { twilio } from "@/twilio.server";
 
 export const action = async ({ request }: { request: Request }) => {
-
-
-
-
 
     const { supabaseClient: supabase, headers } = await createSupabaseServerClient(request);
     const { data, error } = await supabase.auth.getUser();

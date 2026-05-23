@@ -204,7 +204,7 @@ export async function validateTwilioWebhookForCallSid(args: {
     .eq("id", existingCall.workspace)
     .single();
 
-  const authToken = resolveTwilioWebhookAuthToken(workspace?.twilio_data);
+  const authToken = resolveWorkspaceWebhookAuthToken(workspace?.twilio_data);
   const signature = args.request.headers.get("x-twilio-signature");
   const url = resolveTwilioWebhookRequestUrl(args.request);
 
@@ -246,7 +246,7 @@ export async function validateTwilioWebhookForMessageSid(args: {
     .eq("id", messageRow.workspace)
     .single();
 
-  const authToken = resolveTwilioWebhookAuthToken(workspace?.twilio_data);
+  const authToken = resolveWorkspaceWebhookAuthToken(workspace?.twilio_data);
   const signature = args.request.headers.get("x-twilio-signature");
   const url = resolveTwilioWebhookRequestUrl(args.request);
 

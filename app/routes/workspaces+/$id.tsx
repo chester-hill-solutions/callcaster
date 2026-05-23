@@ -21,13 +21,14 @@ import {
   ContextType,
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
+import type { WorkspaceMessagingReadiness } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
-
-import type { User } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-;
+type LoaderData = {
+  userRole: string | null | undefined;
+  workspaceData: Promise<WorkspaceInfoWithDetails>;
+  onboardingReadiness: WorkspaceMessagingReadiness;
+};
 
 function WorkspaceResolvedView({
   resolvedData,

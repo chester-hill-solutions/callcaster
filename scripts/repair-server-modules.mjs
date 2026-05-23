@@ -5,10 +5,11 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 
 const ROOT = process.cwd();
+const GIT_REF = process.argv.find((a) => a.startsWith("--ref="))?.slice(6) ?? "523129c^";
 
 function gitShow(rel) {
   try {
-    return execSync(`git show 'HEAD:${rel.replace(/'/g, "'\\''")}'`, {
+    return execSync(`git show '${GIT_REF}:${rel.replace(/'/g, "'\\''")}'`, {
       cwd: ROOT,
       encoding: "utf8",
       shell: "/bin/bash",
@@ -123,7 +124,8 @@ function extractImports(source) {
 function isServerOnlyChunk(chunk) {
   if (!chunk.trim()) return false;
   if (/export default|export \{ RouteErrorBoundary/.test(chunk)) return false;
-  if (/<\/[A-Za-z]|<[A-Za-z][^>]*\s|return\s*\(\s*</.test(chunk)) return false;
+  if (/<\/[A-Za-z][^>]*>/.test(chunk)) return false;
+  if (/return\s*\(\s*<[A-Z]/.test(chunk)) return false;
   if (/@\/components\/|@\/hooks\/|logger\.client|from ["']react["']|from ["']sonner["']/.test(chunk))
     return false;
   return /^(async )?function |^export (async )?function |^type |^interface |^const \w+ =|^export const \w+ =/m.test(
@@ -277,4 +279,4 @@ for (const routeFile of routes) {
   regenerate(routeFile, source);
   n++;
 }
-console.log(`Regenerated server modules for ${n} routes`);
+console.log(`Regenerated server modules for ${n} routes (ref ${GIT_REF})`);

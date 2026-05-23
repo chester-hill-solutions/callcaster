@@ -1,26 +1,15 @@
-import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
-import type { User } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  Await,
-  useLoaderData,
-  Outlet,
-  useOutlet,
-  useOutletContext,
-  data as routeData,
-  redirect,
-  type LoaderFunctionArgs,
-} from "react-router";
 import {
   Campaign,
   ContextType,
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
-import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
 import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
 type LoaderData = {
   userRole: string | null | undefined;
@@ -29,8 +18,6 @@ type LoaderData = {
 };
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
   if (!user) {

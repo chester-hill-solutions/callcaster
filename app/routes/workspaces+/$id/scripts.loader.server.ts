@@ -1,14 +1,12 @@
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
-import type { Json , Database } from "@/lib/database.types";
-import type { User } from "@/lib/types";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
-import { MdDownload, MdEdit } from "react-icons/md";
-import { formatDateToLocale } from "@/lib/utils";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { formatDateToLocale } from "@/lib/utils";
 import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { Json , Database } from "@/lib/database.types";
+import type { LoaderFunctionArgs } from "react-router";
+import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
+import type { User } from "@/lib/types";
 
 type Script = {
   id: number;
@@ -44,8 +42,6 @@ type LoaderData =
 // ActionData inferred from action's return via typeof action
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

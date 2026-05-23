@@ -11,9 +11,62 @@ import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 import { capitalize } from "@/lib/utils";
 import type { Database, Tables } from "@/lib/database.types";
 
-;
+type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
-;
+type MemberUser = Pick<
+  Tables<"user">,
+  "id" | "username" | "first_name" | "last_name"
+> & {
+  role: MemberRole;
+};
+
+type PendingInvite = Tables<"workspace_invite"> & {
+  user: Pick<
+    Tables<"user">,
+    "id" | "username" | "first_name" | "last_name"
+  > | null;
+};
+
+type WorkspaceMemberRecord = {
+  role: WorkspaceRole;
+  user: Pick<
+    Tables<"user">,
+    "id" | "username" | "first_name" | "last_name"
+  > | null;
+};
+
+type WorkspaceMemberWithUser = WorkspaceMemberRecord & {
+  user: Pick<
+    Tables<"user">,
+    "id" | "username" | "first_name" | "last_name"
+  >;
+};
+
+type WorkspaceWithMembers = Pick<Tables<"workspace">, "id" | "name"> & {
+  workspace_users: Array<WorkspaceMemberRecord | null> | null;
+  workspace_invite: Array<PendingInvite | null> | null;
+};
+
+type LoaderData = {
+  workspace: Pick<Tables<"workspace">, "id" | "name">;
+  userRole: MemberRole | null;
+  users: MemberUser[];
+  activeUserId: string;
+  pendingInvites: PendingInvite[];
+  hasAccess: boolean;
+};
+
+type DisplayUser = Pick<
+  Tables<"user">,
+  "id" | "username" | "first_name" | "last_name"
+> & {
+  role: MemberRole | "invited";
+};
+
+const memberRoles = new Set(Object.values(MemberRole));
+
+const isMemberRole = (role: string | null | undefined): role is MemberRole =>
+  !!role && memberRoles.has(role as MemberRole);
 
 function compareMembersByRole(a: MemberUser, b: MemberUser) {
   const memberRoleArray = Object.values(MemberRole);

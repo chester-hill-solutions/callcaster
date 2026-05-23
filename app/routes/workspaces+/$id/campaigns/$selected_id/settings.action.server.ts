@@ -1,7 +1,3 @@
-import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
-import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
-import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import { SupabaseClient } from "@supabase/supabase-js";
 import {
   Audience,
   Campaign,
@@ -16,19 +12,126 @@ import {
   Survey,
   TwilioAccountData,
 } from "@/lib/types";
-import { deepEqual } from "@/lib/utils";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
+import { deepEqual } from "@/lib/utils";
 import { fetchQueueCounts, getCampaignTableKey, parseActionRequest, updateCampaign } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
+import { logger } from "@/lib/logger.server";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import type { ActionFunctionArgs } from "react-router";
+
+type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
+
+type CampaignWithAudiences = Campaign & {
+  audiences?: Audience[];
+  schedule?: Schedule;
+};
+
+type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
+  script?: Script;
+  mediaLinks?: string[];
+};
+
+function normalizeSchedule(schedule: unknown) {
+  if (!schedule) return null;
+
+  if (typeof schedule === "string") {
+    try {
+      return JSON.parse(schedule);
+    } catch {
+      return null;
+    }
+  }
+
+  return schedule;
+}
+
+async function updateCampaignStatus(
+  supabaseClient: SupabaseClient,
+  selected_id: string,
+  workspaceId: string,
+  status: string,
+  is_active?: boolean,
+) {
+  const update: { status: string; is_active?: boolean } = { status };
+
+  if (is_active !== undefined) {
+    update.is_active = is_active;
+  } else {
+    if (status === "running") update.is_active = true;
+    if (status === "paused") update.is_active = false;
+  }
+
+  logger.debug("Server update object:", update);
+  const { error } = await supabaseClient
+    .from("campaign")
+    .update({ ...update })
+    .eq("id", Number(selected_id))
+    .eq("workspace", workspaceId);
+
+  if (error) throw error;
+  return { success: true };
+}
+
+async function handleCampaignDuplicate(
+  supabaseClient: SupabaseClient,
+  selected_id: string,
+  workspace_id: string,
+  campaignData: string,
+) {
+  const parsedData = JSON.parse(campaignData);
+
+  const { data: campaign, error } = await supabaseClient
+    .from("campaign")
+    .insert({ ...parsedData, workspace: workspace_id })
+    .select("id")
+    .single();
+
+  if (error || !campaign) throw error || new Error("Failed to create campaign");
+
+  const { data: originalQueue } = await supabaseClient
+    .from("campaign_queue")
+    .select("contact_id")
+    .eq("campaign_id", selected_id);
+
+  if (originalQueue?.length) {
+    const newQueueItems = originalQueue.map((item) => ({
+      campaign_id: campaign.id,
+      contact_id: item.contact_id,
+      workspace: workspace_id,
+    }));
+
+    const { error: queueError } = await supabaseClient
+      .from("campaign_queue")
+      .insert(newQueueItems);
+
+    if (queueError) throw queueError;
+  }
+
+  await supabaseClient
+    .from(
+      parsedData.type === "live_call"
+        ? "live_campaign"
+        : parsedData.type === "message"
+          ? "message_campaign"
+          : "ivr_campaign",
+    )
+    .insert({
+      campaign_id: campaign.id,
+      workspace: workspace_id,
+      script_id: parsedData.script_id,
+      body_text: parsedData.body_text,
+      message_media: parsedData.message_media,
+      voicedrop_audio: parsedData.voicedrop_audio,
+    });
+
+  return { success: true };
+}
 
 export async function action({ request, params }: ActionFunctionArgs) {
-
-
-
 
   const { id: workspace_id, selected_id } = params;
   const { supabaseClient, user } = await verifyAuth(request);

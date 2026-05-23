@@ -1,14 +1,10 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
-import { FaPlus } from "react-icons/fa";
-import { redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { createNewWorkspace } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

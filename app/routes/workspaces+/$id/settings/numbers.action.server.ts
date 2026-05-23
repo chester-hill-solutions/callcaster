@@ -1,14 +1,31 @@
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { User, WorkspaceNumbers } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { ActionFunctionArgs } from "react-router";
 import { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers, removeWorkspacePhoneNumber, requireWorkspaceAccess, updateCallerId, updateWorkspacePhoneNumber } from "@/lib/database.server";
+import { MemberRole } from "@/lib/member-role";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { User, WorkspaceNumbers } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
+import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
+
+type CallerIDResponse = {
+  validationRequest: {
+    accountSid: string;
+    callSid: string;
+    friendlyName: string;
+    phoneNumber: string;
+    validationCode: string;
+  };
+  numberRequest: Array<{
+    id: bigint;
+    created_at: string;
+    workspace: string;
+    friendly_name: string;
+    phone_number: string;
+    capabilities: Record<string, boolean>;
+  }>;
+  error?: string;
+};
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

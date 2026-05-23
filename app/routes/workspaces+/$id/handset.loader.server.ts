@@ -1,11 +1,10 @@
-import type { LoaderFunctionArgs } from "react-router";
-
-import { requireWorkspaceAccess } from "@/lib/database.server";
 import {
   getHandsetLoaderData,
   type HandsetLoaderData,
 } from "@/lib/handset/handset-session.server";
+import { requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 export type { HandsetLoaderData };
 

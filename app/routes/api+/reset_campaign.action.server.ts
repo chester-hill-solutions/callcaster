@@ -1,10 +1,8 @@
-import { ActionFunctionArgs } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
 
     const { supabaseClient, user } = await verifyAuth(request);
     const formData = await request.formData();

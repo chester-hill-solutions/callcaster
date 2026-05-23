@@ -11,7 +11,15 @@ import { MemberRole } from "@/lib/member-role";
 
 import type { User } from "@/lib/types";
 
-;
+export type LoaderData = {
+  workspaceId: string;
+  creditsBalance: number;
+};
+
+export type LoaderData = {
+  workspaceId: string;
+  creditsBalance: number;
+};
 
 export default function PurchaseNumberPage() {
   const { workspaceId, creditsBalance } = useLoaderData<LoaderData>();

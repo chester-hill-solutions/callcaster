@@ -1,16 +1,10 @@
-import type { ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
-import Twilio from "twilio";
-
-import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForPhoneNumber } from "@/lib/twilio-webhook.server";
+import Twilio from "twilio";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
 
-/**
- * Twilio calls this when the handset <Dial> ends (timeout, hang up, etc.).
- * Only play "No one is available" when DialCallStatus is no-answer;
- * otherwise just hang up so the caller is not sent to a voicemail-style message.
- */
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     return new Response(null, { status: 405 });

@@ -1,11 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "@/lib/database.types";
 import { data as routeData } from "react-router";
-import { parseCSV } from '@/lib/csv';
-import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { parseCSV } from '@/lib/csv';
+import { processAudienceUpload } from "@/lib/audience-upload-process.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { Database, Tables } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 interface StorageBucket {
   id: string;
@@ -44,7 +43,6 @@ export const action = async ({
   request: Request;
   deps?: AudienceUploadDeps;
 }) => {
-
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? verifyAuth,

@@ -1,16 +1,25 @@
-import { redirect, type LoaderFunctionArgs } from "react-router";
-import Stripe from "stripe";
-import { redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
+import { verifyAuth } from "@/lib/supabase.server";
+import Stripe from "stripe";
+import type { LoaderFunctionArgs } from "react-router";
+
+function buildBillingRedirect(
+  workspaceId: string,
+  params: Record<string, string | number>,
+) {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    searchParams.set(key, String(value));
+  });
+
+  return redirect(`/workspaces/${workspaceId}/billing?${searchParams.toString()}`);
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
-
-
-
 
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("session_id");

@@ -1,15 +1,12 @@
-import type { Database } from "@/lib/database.types";
-import { type ActionFunctionArgs } from "react-router";
 import { createClient } from "@supabase/supabase-js";
+import { env } from "@/lib/env.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import type { Database } from "@/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
-
 
   if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });

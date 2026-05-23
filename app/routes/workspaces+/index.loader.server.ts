@@ -1,10 +1,8 @@
-import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
-import { FaPlus } from "react-icons/fa";
-import { redirect } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { createNewWorkspace } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { LoaderFunctionArgs } from "react-router";
 
 interface Workspace {
   id: string;
@@ -24,8 +22,6 @@ interface LoaderData {
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
 

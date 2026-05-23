@@ -1,13 +1,10 @@
-import type { TablesInsert } from "@/lib/database.types";
 import { data as routeData } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { TablesInsert } from "@/lib/database.types";
 
 export const action = async ({ request }: { request: Request }) => {
-
-
 
   const { supabaseClient: supabase, user } =
     await verifyAuth(request);

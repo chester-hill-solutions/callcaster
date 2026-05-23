@@ -1,7 +1,6 @@
-import type { ActionFunctionArgs } from "react-router";
-
 import { endHandsetSession } from "@/lib/handset/handset-session.server";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   if (request.method !== "POST") return null;

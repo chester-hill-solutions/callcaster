@@ -1,6 +1,3 @@
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
-import { downloadCsv } from "@/lib/csvDownload";
 import {
   Audience,
   Campaign,
@@ -11,18 +8,18 @@ import {
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { data as routeData, redirect } from "react-router";
-import type { ActionFunctionArgs } from "react-router";
+import { downloadCsv } from "@/lib/csvDownload";
 import { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } from "@/lib/database.server";
+import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger as  loggerServer } from "@/lib/logger.server";
+import { MemberRole } from "@/lib/member-role";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { verifyAuth } from "@/lib/supabase.server";
-
+import type { ActionFunctionArgs } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
-
 
   const { id: workspace_id, selected_id } = params;
   if (!workspace_id || !selected_id) {
@@ -82,8 +79,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-
-
 
   const { supabaseClient, user } = await verifyAuth(request);
   const rpcClient = supabaseClient as SupabaseClient<any>;

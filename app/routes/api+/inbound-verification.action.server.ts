@@ -1,14 +1,12 @@
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 import { createClient } from "@supabase/supabase-js";
-import Twilio from "twilio";
-import { normalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { normalizePhoneNumber } from "@/lib/utils";
+import Twilio from "twilio";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/database.types";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
 
   const twiml = new Twilio.twiml.VoiceResponse();
   const supabase = createClient<Database>(
