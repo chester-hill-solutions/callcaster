@@ -1,7 +1,7 @@
 import { useNavigation } from "react-router";
 import ResultsScreen from "./ResultsScreen";
 import MessageResultsScreen from "./MessageResultsScreen";
-import type { CampaignState } from "@/routes/workspaces+/$id/campaigns/$selected_id.route";
+import type { CampaignState } from "@/lib/campaign-home.types";
 import { Campaign } from "@/lib/types";
 
 type CampaignResult = {

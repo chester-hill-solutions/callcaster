@@ -13,6 +13,8 @@ import {
   TwilioAccountData,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
+import { normalizeCampaignData } from "@/lib/campaign-settings";
+import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
 import { fetchQueueCounts, getCampaignTableKey, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
@@ -34,20 +36,6 @@ type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
   script?: Script;
   mediaLinks?: string[];
 };
-
-function normalizeSchedule(schedule: unknown) {
-  if (!schedule) return null;
-
-  if (typeof schedule === "string") {
-    try {
-      return JSON.parse(schedule);
-    } catch {
-      return null;
-    }
-  }
-
-  return schedule;
-}
 
 async function updateCampaignStatus(
   supabaseClient: SupabaseClient,
@@ -258,7 +246,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
             throw detailError;
           }
 
-          const queueCounts = await fetchQueueCounts(supabaseClient as any, selected_id);
+          const queueCounts = await fetchQueueCounts(supabaseClient, selected_id);
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
           });

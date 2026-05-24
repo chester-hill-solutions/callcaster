@@ -26,6 +26,7 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";
 import { syncWorkspaceTwilioBootstrapState } from "@/lib/twilio-bootstrap.server";
+import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
 async function syncWorkspaceTwilioBootstrapStateSafely(args: {
   supabaseClient: SupabaseClient<Database>;
@@ -68,10 +69,6 @@ const DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT: WorkspaceTwilioSyncSnapshot = {
   lastSyncError: null,
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function pickEnumValue<const T extends readonly string[]>(
   value: unknown,
   allowedValues: T,
@@ -80,10 +77,6 @@ function pickEnumValue<const T extends readonly string[]>(
   return typeof value === "string" && allowedValues.includes(value)
     ? value
     : fallback;
-}
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function parseAuditTrail(value: unknown): WorkspaceTwilioOpsAuditEntry[] {

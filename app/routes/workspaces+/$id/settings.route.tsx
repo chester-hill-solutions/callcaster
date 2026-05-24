@@ -25,6 +25,7 @@ import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -50,25 +51,6 @@ type WorkspaceNumbers = {
     verification_status: 'success' | 'failed' | 'pending';
   };
 };
-
-function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  const aRole = a.role as MemberRole;
-  const bRole = b.role as MemberRole;
-
-  if (
-    memberRoleArray.indexOf(aRole) <
-    memberRoleArray.indexOf(bRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(aRole) >
-    memberRoleArray.indexOf(bRole)
-  )
-    return 1;
-  return 0;
-}
 
 export default function WorkspaceSettings() {
   const outlet = useOutlet();

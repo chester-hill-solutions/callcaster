@@ -17,16 +17,9 @@ import {
   WORKSPACE_ONBOARDING_STEP_STATUS_VALUES,
   WORKSPACE_TWILIO_AUTH_MODE_VALUES,
 } from "@/lib/types";
+import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
 const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 1;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
 
 function parseString(value: unknown): string {
   return typeof value === "string" ? value : "";

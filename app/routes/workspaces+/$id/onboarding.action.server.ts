@@ -20,94 +20,18 @@ import { data as routeData, redirect } from "react-router";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import type {
-  User,
-  WorkspaceMessagingBusinessProfile,
-  WorkspaceOnboardingChannel,
-  WorkspaceOnboardingStatus,
-} from "@/lib/types";
+import type { User } from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
-
-export type OnboardingActionData = {
-  success?: string;
-  error?: string;
-};
-
-const CHANNEL_OPTIONS: Array<{
-  id: WorkspaceOnboardingChannel;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: "a2p10dlc",
-    label: "A2P 10DLC",
-    description: "Register US application-to-person SMS campaigns and sender trust.",
-  },
-  {
-    id: "rcs",
-    label: "RCS for business",
-    description: "Track rich-messaging readiness while the provider path matures.",
-  },
-  {
-    id: "voice_compliance",
-    label: "Voice emergency compliance",
-    description: "Track emergency address and emergency-capable number readiness.",
-  },
-];
-
-function asWorkspaceOnboardingStatus(value: FormDataEntryValue | null): WorkspaceOnboardingStatus {
-  switch (value) {
-    case "not_started":
-    case "collecting_business":
-    case "provisioning":
-    case "submitting":
-    case "in_review":
-    case "approved":
-    case "rejected":
-    case "live":
-      return value;
-    default:
-      return "in_review";
-  }
-}
-
-function readSelectedChannels(formData: FormData): WorkspaceOnboardingChannel[] {
-  const values = formData.getAll("selectedChannels").map(String);
-  return values.filter((value): value is WorkspaceOnboardingChannel =>
-    CHANNEL_OPTIONS.some((option) => option.id === value),
-  );
-}
-
-function buildBusinessProfile(formData: FormData): WorkspaceMessagingBusinessProfile {
-  const sampleMessages = String(formData.get("sampleMessages") ?? "")
-    .split("\n")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return {
-    legalBusinessName: String(formData.get("legalBusinessName") ?? ""),
-    businessType: String(formData.get("businessType") ?? ""),
-    websiteUrl: String(formData.get("websiteUrl") ?? ""),
-    privacyPolicyUrl: String(formData.get("privacyPolicyUrl") ?? ""),
-    termsOfServiceUrl: String(formData.get("termsOfServiceUrl") ?? ""),
-    supportEmail: String(formData.get("supportEmail") ?? ""),
-    supportPhone: String(formData.get("supportPhone") ?? ""),
-    useCaseSummary: String(formData.get("useCaseSummary") ?? ""),
-    optInWorkflow: String(formData.get("optInWorkflow") ?? ""),
-    optInKeywords: String(formData.get("optInKeywords") ?? ""),
-    optOutKeywords: String(formData.get("optOutKeywords") ?? ""),
-    helpKeywords: String(formData.get("helpKeywords") ?? ""),
-    sampleMessages,
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function hasVoiceCapability(capabilities: unknown) {
-  return isRecord(capabilities) && (capabilities.voice === true || capabilities.voice === "true");
-}
+import { isRecord } from "@/lib/parse-utils.server";
+import { hasVoiceCapability } from "./onboarding/utils";
+import type Twilio from "twilio";
+import {
+  asWorkspaceOnboardingStatus,
+  buildBusinessProfile,
+  readSelectedChannels,
+  type OnboardingActionData,
+} from "@/lib/onboarding-actions.server";
+export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user, headers } = await verifyAuth(request);
@@ -268,29 +192,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const twilio = (await createWorkspaceTwilioInstance({
           supabase: supabaseClient,
           workspace_id: workspaceId,
-        })) as any;
+        })) as Twilio.Twilio;
+        const addressPayload = {
+          customerName,
+          street: address.street.trim(),
+          city: address.city.trim(),
+          region: address.region.trim(),
+          postalCode: address.postalCode.trim(),
+          isoCountry: countryCode,
+          friendlyName: `${customerName} emergency address`,
+          emergencyEnabled: true,
+        };
         const twilioAddress =
           address.addressSid && typeof twilio.addresses === "function"
-            ? await twilio.addresses(address.addressSid).update({
-                customerName,
-                street: address.street.trim(),
-                city: address.city.trim(),
-                region: address.region.trim(),
-                postalCode: address.postalCode.trim(),
-                isoCountry: countryCode,
-                friendlyName: `${customerName} emergency address`,
-                emergencyEnabled: true,
-              })
-            : await twilio.addresses.create({
-                customerName,
-                street: address.street.trim(),
-                city: address.city.trim(),
-                region: address.region.trim(),
-                postalCode: address.postalCode.trim(),
-                isoCountry: countryCode,
-                friendlyName: `${customerName} emergency address`,
-                emergencyEnabled: true,
-              });
+            ? await twilio.addresses(address.addressSid).update(addressPayload as never)
+            : await twilio.addresses.create(addressPayload as never);
 
         const eligiblePhoneNumbers: string[] = [];
         const ineligibleCallerIds: string[] = [];

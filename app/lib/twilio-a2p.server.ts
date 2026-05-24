@@ -13,10 +13,7 @@ import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
 } from "@/lib/types";
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { parseOptionalString } from "@/lib/parse-utils.server";
 
 async function loadWorkspaceTwilioContext(
   supabaseClient: SupabaseClient<Database>,

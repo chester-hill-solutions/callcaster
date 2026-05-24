@@ -43,6 +43,20 @@ const requireValue = (
   return value;
 };
 
+type OutreachAttemptUpdateResult =
+  | Pick<Tables<"outreach_attempt">, "disposition" | "contact_id">
+  | Tables<"outreach_attempt">
+  | Response;
+
+function resolveOutreachUpdate(
+  result: OutreachAttemptUpdateResult,
+): Pick<Tables<"outreach_attempt">, "disposition" | "contact_id"> | Tables<"outreach_attempt"> | null {
+  if (result instanceof Response) {
+    return null;
+  }
+  return result;
+}
+
 export const updateOutreachAttempt = async (
   id: string,
   update: Partial<OutreachAttempt>,
@@ -64,7 +78,7 @@ export const updateOutreachAttempt = async (
             current: c,
             next: n,
           });
-          return current as any;
+          return current as Pick<Tables<"outreach_attempt">, "disposition" | "contact_id">;
         }
       }
     }
@@ -151,10 +165,15 @@ const handleCallStatus = async (
     if (!callUpdate.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for auto-dial status update");
     }
-    const outreachStatus = await updateOutreachAttempt(
-      String(callUpdate.outreach_attempt_id),
-      { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
+    const outreachStatus = resolveOutreachUpdate(
+      await updateOutreachAttempt(
+        String(callUpdate.outreach_attempt_id),
+        { disposition: status?.toLowerCase() as Tables<"outreach_attempt">["disposition"] },
+      ),
     );
+    if (!outreachStatus) {
+      return;
+    }
     await updateTransaction(callUpdate, duration);
 
     const { error } = await supabase.rpc("dequeue_contact", {
@@ -272,10 +291,15 @@ const handleParticipantJoin = async (
       if (!dbCall.campaign_id) {
         throw new Error("Missing campaign_id for participant join");
       }
-      const outreachStatus = await updateOutreachAttempt(
-        `${dbCall.outreach_attempt_id}`,
-        { disposition: "in-progress", answered_at: new Date().toISOString() },
+      const outreachStatus = resolveOutreachUpdate(
+        await updateOutreachAttempt(
+          `${dbCall.outreach_attempt_id}`,
+          { disposition: "in-progress", answered_at: new Date().toISOString() },
+        ),
       );
+      if (!outreachStatus) {
+        return;
+      }
       await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
         ...buildProviderStatusQueueUpdate(
           parsedBody.FriendlyName ?? parsedBody.ConferenceSid ?? "in-progress",

@@ -9,14 +9,9 @@ import {
 export type { TransactionType } from "@/lib/transaction-history-display";
 export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
 
-function isUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
+import { isUniqueViolation } from "@/lib/parse-utils.server";
 
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && code === "23505";
-}
+export { isUniqueViolation } from "@/lib/parse-utils.server";
 
 /**
  * DB-backed idempotent insert for transaction_history.

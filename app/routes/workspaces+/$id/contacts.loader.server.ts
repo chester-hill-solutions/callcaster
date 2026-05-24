@@ -11,45 +11,8 @@ import type { User } from "@/lib/types";
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
 
-export type ContactsPagination = {
-  currentPage: number;
-  totalPages: number;
-  totalCount: number;
-  pageSize: number;
-};
-
-export type ContactListRow = Pick<
-  Database["public"]["Tables"]["contact"]["Row"],
-  | "id"
-  | "firstname"
-  | "surname"
-  | "phone"
-  | "email"
-  | "address"
-  | "city"
-  | "other_data"
-  | "created_at"
->;
-
-export type ContactsLoaderData = {
-  contacts: ContactListRow[] | null;
-  workspace: {
-    id: string;
-    name: string;
-    credits: number;
-    feature_flags: unknown;
-  } | null;
-  error: string | null;
-  userRole: MemberRole | null;
-  flags: { feature_flags: unknown } | null;
-  campaigns: Array<{
-    id: string | number;
-    title?: string | null;
-    status?: string | null;
-  }>;
-  pagination: ContactsPagination;
-  searchQuery?: string;
-};
+import type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
+export type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
 
 function errorPayload(
   partial: Omit<ContactsLoaderData, "pagination"> & {

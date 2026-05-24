@@ -12,9 +12,7 @@ import type {
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isRecord } from "@/lib/parse-utils.server";
 
 const DEFAULT_RCS_PREREQUISITES = [
   "Provision a Twilio Messaging Service so SMS and MMS fallback is ready before RCS launch.",

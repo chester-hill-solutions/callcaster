@@ -2,31 +2,13 @@ import { capitalize } from "@/lib/utils";
 import { data as routeData } from "react-router";
 import { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } from "@/lib/database.server";
 import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { MemberRole } from "@/lib/member-role";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 
 type UserWithRole = Partial<User> & { role: string };
-
-function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  const aRole = a.role as MemberRole;
-  const bRole = b.role as MemberRole;
-
-  if (
-    memberRoleArray.indexOf(aRole) <
-    memberRoleArray.indexOf(bRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(aRole) >
-    memberRoleArray.indexOf(bRole)
-  )
-    return 1;
-  return 0;
-}
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 

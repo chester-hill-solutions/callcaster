@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { logger } from "@/lib/logger.client";
-import type { ImageFetcherData } from "@/routes/workspaces+/$id/chats/types";
+import type { ImageFetcherData } from "@/lib/chats/types";
 
 export function useImageHandling(workspaceId: string) {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);

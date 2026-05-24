@@ -1,12 +1,8 @@
 import { createCampaign, deleteCampaign, parseActionRequest, updateCampaign } from "@/lib/database.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { data as routeData } from "react-router";
+import { parseJsonField } from "@/lib/parse-utils.server";
 import { verifyAuth } from "@/lib/supabase.server";
-
-function parseJsonField<T>(value: unknown): T {
-  if (typeof value === "string") return JSON.parse(value) as T;
-  return value as T;
-}
 
 export const action = async ({ request }: { request: Request }) => {
 

@@ -26,6 +26,12 @@ import {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
+import { normalizeSchedule } from "@/lib/workspace-members";
+import {
+  buildCampaignDetailsForType,
+  DETAIL_FIELDS,
+  normalizeCampaignData,
+} from "@/lib/campaign-settings";
 import { deepEqual } from "@/lib/utils";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import {
@@ -68,64 +74,6 @@ type ActionData = {
   actionType?: "save" | "status" | "duplicate";
 };
 
-const DETAIL_FIELDS = new Set(["script_id", "body_text", "message_media", "voicedrop_audio"]);
-
-function normalizeSchedule(schedule: unknown) {
-  if (!schedule) return null;
-
-  if (typeof schedule === "string") {
-    try {
-      return JSON.parse(schedule);
-    } catch {
-      return null;
-    }
-  }
-
-  return schedule;
-}
-
-function normalizeCampaignData(campaignData: CampaignWithAudiences): CampaignWithAudiences {
-  return {
-    ...campaignData,
-    schedule: normalizeSchedule(campaignData.schedule) as Schedule | null,
-  } as CampaignWithAudiences;
-}
-
-function buildCampaignDetailsForType(
-  campaignType: Campaign["type"],
-  currentDetails: CampaignDetails,
-  campaignId: number,
-  workspaceId: string,
-): CampaignDetails {
-  const sharedFields = {
-    campaign_id: campaignId,
-    workspace: workspaceId,
-  };
-
-  if (campaignType === "message") {
-    return {
-      ...sharedFields,
-      body_text: "body_text" in currentDetails ? currentDetails.body_text ?? "" : "",
-      message_media: "message_media" in currentDetails ? currentDetails.message_media ?? [] : [],
-    } as CampaignDetails;
-  }
-
-  if (campaignType === "robocall" || campaignType === "simple_ivr" || campaignType === "complex_ivr") {
-    return {
-      ...sharedFields,
-      script_id: "script_id" in currentDetails ? currentDetails.script_id ?? null : null,
-    } as CampaignDetails;
-  }
-
-  return {
-    ...sharedFields,
-    disposition_options: "disposition_options" in currentDetails ? currentDetails.disposition_options : [],
-    questions: "questions" in currentDetails ? currentDetails.questions : [],
-    script_id: "script_id" in currentDetails ? currentDetails.script_id ?? null : null,
-    voicedrop_audio: "voicedrop_audio" in currentDetails ? currentDetails.voicedrop_audio ?? null : null,
-  } as CampaignDetails;
-}
-
 export default function CampaignSettingsRoute() {
   const {
     audiences,
@@ -134,6 +82,7 @@ export default function CampaignSettingsRoute() {
     phoneNumbers,
     workspace,
   } = useOutletContext<Context>();
+  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
 
   const {
     workspace_id,
@@ -449,7 +398,7 @@ export default function CampaignSettingsRoute() {
         workspace={workspace_id}
         campaignData={draftCampaignData}
         campaignDetails={draftCampaignDetails as any}
-        credits={(workspace as any)?.credits || 0}
+        credits={Number((workspaceRecord as { credits?: number })?.credits ?? 0)}
         isActive={draftCampaignData?.status === "running" || false}
         scripts={scripts}
         audiences={audiences}

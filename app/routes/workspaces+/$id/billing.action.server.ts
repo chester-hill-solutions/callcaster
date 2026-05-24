@@ -8,21 +8,13 @@ import { env } from "@/lib/env.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import Stripe from "stripe";
 import type { ActionFunctionArgs } from "react-router";
-
-const CREDIT_PRICE_CAD = 0.003;
-const MIN_PURCHASE_CAD = 0.5;
-const MIN_CREDITS = Math.ceil(MIN_PURCHASE_CAD / CREDIT_PRICE_CAD);
-
-function formatCredits(amount: number) {
-  return amount.toLocaleString();
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-  }).format(amount);
-}
+import {
+  CREDIT_PRICE_CAD,
+  MIN_CREDITS,
+  MIN_PURCHASE_CAD,
+  formatCredits,
+  formatCurrency,
+} from "@/lib/billing-format";
 
 export async function action({ request, params }: ActionFunctionArgs) {
 
