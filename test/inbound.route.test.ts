@@ -135,32 +135,34 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.logger.warn.mockReset();
   });
 
-  test("throws 400-like object when Called missing", async () => {
+  test("returns 400 when Called missing", async () => {
     const supabase = makeSupabase();
     mocks.createClient.mockReturnValueOnce(supabase);
     const mod = await import("../app/routes/api+/inbound");
-    await expect(
-      mod.action({
+    const res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", {
           method: "POST",
           body: new FormData(),
         }),
       } as any),
-    ).rejects.toMatchObject({ status: 400 });
+    );
+    expect(res.status).toBe(400);
   });
 
-  test("workspace number errors/not found throw", async () => {
+  test("workspace number errors/not found return error responses", async () => {
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ number: null, numberError: null }),
     );
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
-    await expect(
-      mod.action({
+    let res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 404 });
+    );
+    expect(res.status).toBe(404);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
@@ -173,15 +175,16 @@ describe("app/routes/api+/inbound/route.tsx", () => {
         numberError: new Error("n"),
       }),
     );
-    await expect(
-      mod.action({
+    res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 500 });
+    );
+    expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("throws 403-like object when Twilio signature validation fails", async () => {
+  test("returns 403 when Twilio signature validation fails", async () => {
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({
@@ -202,11 +205,12 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
-    await expect(
-      mod.action({
+    const res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 403 });
+    );
+    expect(res.status).toBe(403);
   });
 
   test("inserts call, optionally sends webhook, and returns TwiML for phone/email/none", async () => {
@@ -295,7 +299,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     expect(await res.text()).toContain("unable to answer");
   });
 
-  test("throws for missing CallSid, logs+throws on call upsert error", async () => {
+  test("returns 400 for missing CallSid, 500 on call upsert error", async () => {
     const baseNumber = {
       inbound_action: null,
       inbound_audio: null,
@@ -312,21 +316,23 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const fd = new FormData();
     fd.set("Called", "+1");
     const mod = await import("../app/routes/api+/inbound");
-    await expect(
-      mod.action({
+    let res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 400 });
+    );
+    expect(res.status).toBe(400);
 
     mocks.createClient.mockReturnValueOnce(
       makeSupabase({ number: baseNumber, callError: new Error("call") }),
     );
     fd.set("CallSid", "CA1");
-    await expect(
-      mod.action({
+    res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 500 });
+    );
+    expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error on function insert call",
       expect.any(Error),
@@ -354,11 +360,12 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       }),
     );
     mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    await expect(
-      mod.action({
+    const res = await asRouteResponse(
+      await mod.action({
         request: new Request("http://x", { method: "POST", body: fd }),
       } as any),
-    ).rejects.toMatchObject({ status: 403 });
+    );
+    expect(res.status).toBe(403);
 
     // Workspace id empty string => workspaceId fallback "" in webhook notification
     mocks.isPhoneNumber.mockReturnValue(true);

@@ -6,10 +6,7 @@
 :contactId
 :contact_number
 :id
-:id
 :number
-:outreachId
-:pageId
 :roomId
 :scriptId
 :selected_id
@@ -94,7 +91,6 @@ edit
 end
 export
 exports
-fixed
 handset
 invite
 new
@@ -103,8 +99,6 @@ new
 new
 new
 numbers
-old/api/ivr/:campaignId
-old/dashboard
 onboarding
 other-services
 pricing

@@ -1,3 +1,6 @@
+import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import { logger } from "@/lib/logger.server";
+import { DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE, buildOnboardingStepsForState, deriveWorkspaceMessagingReadiness } from "@/lib/messaging-onboarding.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
@@ -48,14 +51,8 @@ export async function loadTwilioData(
   supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ): Promise<TwilioPageData> {
-  const { logger } = await import("@/lib/logger.server");
-  const {
-    buildOnboardingStepsForState,
-    DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-    deriveWorkspaceMessagingReadiness,
-  } = await import("@/lib/messaging-onboarding.server");
-  const { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } =
-    await import("@/lib/database.server");
+
+
 
   let twilioAccountInfo: TwilioPageData["twilioAccountInfo"] = null;
   let twilioNumbers: TwilioPageData["twilioNumbers"] = [];

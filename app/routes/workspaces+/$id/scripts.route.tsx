@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+export { loader } from "./scripts.loader.server";
+export { action } from "./scripts.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
 import { MdDownload, MdEdit } from "react-icons/md";
@@ -55,105 +55,6 @@ type LoaderData =
     };
 
 // ActionData inferred from action's return via typeof action
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params["id"];
-  if (workspaceId == null) {
-    return routeData<LoaderData>(
-      {
-        scripts: null,
-        error: "Workspace does not exist",
-        userRole: null,
-      },
-      { headers },
-    );
-  }
-
-  const roleResult = await getUserRole({ supabaseClient: supabaseClient as SupabaseClient, user: user as unknown as User, workspaceId: workspaceId as string });
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-
-  const { data: scripts, error: scriptsError } = await supabaseClient
-    .from("script")
-    .select()
-    .eq("workspace", workspaceId);
-
-  if (scriptsError || workspaceError) {
-    const errorMessage = [scriptsError, workspaceError]
-      .filter((e): e is PostgrestError => e !== null)
-      .map((error) => error.message)
-      .join(", ");
-
-    return routeData<LoaderData>(
-      {
-        scripts: null,
-        error: errorMessage,
-        userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null,
-      },
-      { headers },
-    );
-  }
-
-  return routeData<LoaderData>({ scripts, workspace, error: null, userRole: (roleResult?.role as Database["public"]["Enums"]["workspace_role"]) ?? null }, { headers });
-}
-
-export async function action({ request }: ActionFunctionArgs) {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers } = await verifyAuth(request);
-
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData.entries());
-
-  const idValue = data["id"];
-  if (!idValue) {
-    return routeData({ error: "Script ID is required" }, { status: 400 });
-  }
-
-  const { data: script, error: scriptError } = await supabaseClient
-    .from("script")
-    .select("name, steps")
-    .eq("id", Number(idValue) || 0)
-    .single();
-
-  if (scriptError) {
-    logger.error("Error fetching script:", scriptError);
-    return routeData({ error: "Error fetching script" }, { status: 500 });
-  }
-
-  if (!script) {
-    return routeData({ error: "Script not found" }, { status: 404 });
-  }
-
-  const scriptJson = JSON.stringify(script.steps, null, 2);
-
-  const fileName = script.name
-    ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
-    : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
-
-  return routeData(
-    {
-      fileContent: scriptJson,
-      fileName: fileName,
-      contentType: "application/json",
-    },
-    {
-      headers: {
-        ...headers,
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Content-Type": "application/json",
-      },
-    },
-  );
-}
 
 export default function WorkspaceScripts() {
   const loaderData = useLoaderData<LoaderData>();

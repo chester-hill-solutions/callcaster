@@ -1,4 +1,15 @@
-import { data as routeData } from "react-router";
+/**
+ * Twilio webhook validation helpers.
+ *
+ * Auth policy asymmetry (callSid vs messageSid):
+ * - validateTwilioWebhookForCallSid: when no `call` row exists yet, validation falls
+ *   back to resolveTwilioWebhookAuthToken(null), which uses the main-account
+ *   TWILIO_AUTH_TOKEN in non-production. This supports early lifecycle callbacks
+ *   (e.g. first status before upsert) during local/dev testing.
+ * - validateTwilioWebhookForMessageSid: when no `message` row exists, validation
+ *   fails closed (403). Inbound SMS must attribute workspace before persisting the
+ *   message, so there is no dev fallback for unknown MessageSid.
+ */
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
@@ -15,6 +26,11 @@ export type TwilioWebhookValidationResult =
   | { ok: true; params: Record<string, string>; authToken: string }
   | { ok: false; response: Response };
 
+export type TwilioWebhookNumberRow = Pick<
+  Database["public"]["Tables"]["workspace_number"]["Row"],
+  "workspace" | "handset_enabled"
+>;
+
 export function resolveTwilioWebhookRequestUrl(request: Request): string {
   return new URL(request.url).href;
 }
@@ -23,14 +39,38 @@ export function resolveWorkspaceWebhookAuthToken(twilioData: unknown): string | 
   return resolveTwilioWebhookAuthToken(readTwilioWorkspaceCredentials(twilioData));
 }
 
+function twilioWebhookJsonResponse(
+  error: string,
+  status: number,
+): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export function twilioWebhookForbidden(message = "Invalid Twilio signature"): Response {
-  return routeData({ error: message }, { status: 403 }) as unknown as Response;
+  return twilioWebhookJsonResponse(message, 403);
+}
+
+export function twilioWebhookBadRequest(message: string): Response {
+  return twilioWebhookJsonResponse(message, 400);
+}
+
+export function twilioWebhookNotFound(message = "Not Found"): Response {
+  return twilioWebhookJsonResponse(message, 404);
+}
+
+export function twilioWebhookInternalError(
+  message = "Internal Server Error",
+): Response {
+  return twilioWebhookJsonResponse(message, 500);
 }
 
 export function twilioWebhookMissingCredentials(
   message = "Workspace Twilio credentials missing",
 ): Response {
-  return routeData({ error: message }, { status: 500 }) as unknown as Response;
+  return twilioWebhookJsonResponse(message, 500);
 }
 
 /** Reject before DB when signature header is required but absent. */
@@ -224,6 +264,7 @@ export type TwilioWebhookPhoneValidationResult =
       authToken: string;
       workspaceId: string;
       twilioData: unknown;
+      numberRow: TwilioWebhookNumberRow;
     }
   | { ok: false; response: Response };
 
@@ -268,6 +309,7 @@ export async function validateTwilioWebhookForPhoneNumber(args: {
     authToken: validation.authToken,
     workspaceId: resolved.workspaceId,
     twilioData: resolved.twilioData,
+    numberRow: resolved.numberRow,
   };
 }
 
@@ -275,12 +317,13 @@ export async function resolveTwilioDataForPhoneNumber(
   supabase: SupabaseClient<Database>,
   phoneNumber: string,
   logger?: { info: (message: string, ...args: unknown[]) => void },
-): Promise<{ workspaceId: string; twilioData: unknown } | null> {
+): Promise<{ workspaceId: string; twilioData: unknown; numberRow: TwilioWebhookNumberRow } | null> {
   const { data: numberRow, error } = await supabase
     .from("workspace_number")
     .select(
       `
         workspace,
+        handset_enabled,
         ...workspace!inner(id, twilio_data)`,
     )
     .eq("phone_number", phoneNumber)
@@ -292,6 +335,7 @@ export async function resolveTwilioDataForPhoneNumber(
 
   const row = numberRow as {
     workspace?: string | { id: string; twilio_data?: unknown };
+    handset_enabled?: boolean;
   };
   const workspaceId =
     row.workspace && typeof row.workspace === "object" && "id" in row.workspace
@@ -316,5 +360,12 @@ export async function resolveTwilioDataForPhoneNumber(
     return null;
   }
 
-  return { workspaceId, twilioData };
+  return {
+    workspaceId,
+    twilioData,
+    numberRow: {
+      workspace: workspaceId,
+      handset_enabled: Boolean(row.handset_enabled),
+    },
+  };
 }

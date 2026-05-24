@@ -110,7 +110,6 @@
   "workspaces_.$id_.settings_.numbers": "workspaces+/$id/settings/numbers.route",
   "workspaces_.$id_.settings_.numbers.purchase": "workspaces+/$id/settings/numbers/purchase.route",
   "admin": "admin+",
-  "admin.fixed": "admin+/fixed",
   "admin_.users.$userId.edit": "admin+/users/$userId/edit.route",
   "admin_.users.$userId.workspaces": "admin+/users/$userId/workspaces.route",
   "admin_.workspaces.$workspaceId": "admin+/workspaces/$workspaceId.route",

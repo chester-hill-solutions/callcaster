@@ -46,25 +46,10 @@ vi.mock("twilio", () => {
 });
 
 function makeSupabase(opts?: {
-  numberRow?: { workspace: string } | null;
   session?: { client_identity: string } | null;
 }) {
   return {
     from: (table: string) => {
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: opts?.numberRow ?? { workspace: "w1" },
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-        };
-      }
       if (table === "handset_session") {
         return {
           select: () => ({
@@ -107,6 +92,7 @@ describe("app/routes/api+/inbound-handset", () => {
       authToken: "tok",
       workspaceId: "w1",
       twilioData: { sid: "AC1", authToken: "tok" },
+      numberRow: { workspace: "w1", handset_enabled: true },
     });
   });
 

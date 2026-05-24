@@ -1,4 +1,6 @@
-// @ts-nocheck
+export { loader } from "./index.loader.server";
+export { action } from "./index.action.server";
+
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
 import React, { useEffect, useMemo } from "react";
 
@@ -21,7 +23,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Heading } from "@/components/ui/typography";
-export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 interface Workspace {
   id: string;
@@ -39,65 +40,6 @@ interface LoaderData {
   userId: string;
   error: string | null;
 }
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { createNewWorkspace } = await import("@/lib/database.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-
-  const userId = user.id;
-  if (!userId) {
-    return redirect("/signin", { headers });
-  }
-
-  const { data: workspaces, error: workspacesError } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
-
-  if (workspacesError) {
-    return { workspaces: null, userId: userId, error: workspacesError }
-  }
-  return { workspaces: workspaces, userId: userId, error: null };
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { createNewWorkspace } = await import("@/lib/database.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const formData = await request.formData();
-
-  const newWorkspaceName = formData.get("newWorkspaceName") as string;
-  const userId = formData.get("userId") as string;
-
-  if (!newWorkspaceName || !userId) {
-    return { error: "Workspace name or User Id missing!" };
-  }
-
-  const { data: newWorkspaceId, error } = await createNewWorkspace({
-    supabaseClient,
-    workspaceName: newWorkspaceName,
-    user_id: userId,
-  });
-  if (error) {
-    logger.error("Error creating workspace:", error);
-    return { error: "Failed to create Workspace" };
-  }
-
-  if (newWorkspaceId) {
-    return redirect(`/workspaces/${newWorkspaceId}`, { headers });
-  }
-
-  return { ok: true, error: null };
-};
 
 const WorkspaceCard = React.memo(
   ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {

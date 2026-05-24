@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./audiences.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, Link, useLoaderData, useNavigate } from "react-router";
 import { DataTable } from "@/components/workspace/tables/DataTable";
@@ -8,45 +7,6 @@ import { Button } from "@/components/ui/button";
 
 
 import { User } from "@/lib/types";
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { workspace: null, error: "Workspace does not exist", userRole: null },
-      { headers },
-    );
-  }
-
-  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
-
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-
-  const { data: audienceData, error: audienceError } = await supabaseClient
-    .from("audience")
-    .select()
-    .eq("workspace", workspaceId);
-
-  if (workspaceError) {
-    return routeData(
-      { workspace: null, error: workspaceError.message, userRole },
-      { headers },
-    );
-  }
-
-  return routeData(
-    { audienceData, workspace: workspaceData, error: null, userRole },
-    { headers },
-  );
-}
 
 export default function WorkspaceAudiencesPage() {
   const loaderData = useLoaderData();

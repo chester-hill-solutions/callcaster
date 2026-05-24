@@ -1,7 +1,13 @@
-// @ts-nocheck
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import {
+  createWorkspaceTwilioInstance,
+  getWorkspaceTwilioPortalConfig,
+} from "@/lib/database.server";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import { processUrls } from "@/lib/sms.server";
 import { resolveTwilioSmsMessagingServiceSid } from "@/lib/sms-send-resolve";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
@@ -74,14 +80,6 @@ export const sendMessage = async ({
   messageIntent?: TwilioMessageIntent | null;
   messagingServiceSid?: string | null;
 }) => {
-  const { processUrls } = await import("@/lib/sms.server");
-  const { env } = await import("@/lib/env.server");
-  const { logger } = await import("@/lib/logger.server");
-  const {
-    createWorkspaceTwilioInstance,
-    getWorkspaceTwilioPortalConfig,
-  } = await import("@/lib/database.server");
-
   const mediaData = media && JSON.parse(media);
   const resolvedPortalConfig =
     portalConfig ??

@@ -2,7 +2,6 @@
   "batches": [
     [
       "admin",
-      "admin.fixed",
       "admin_.users.$userId.edit",
       "admin_.users.$userId.workspaces",
       "admin_.workspaces.$workspaceId",

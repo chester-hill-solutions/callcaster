@@ -1,29 +1,28 @@
-
-
-import { data as routeData, Links, Meta, Outlet, Params, Scripts, ScrollRestoration, redirect, useLoaderData, useNavigate, isRouteErrorResponse, useRouteError } from "react-router";
-import type { LinksFunction, LoaderFunctionArgs } from "react-router";
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  isRouteErrorResponse,
+  useLoaderData,
+  useNavigate,
+  useRouteError,
+} from "react-router";
+import type { LinksFunction } from "react-router";
 import { createBrowserClient } from "@supabase/ssr";
 import { useEffect, useMemo } from "react";
 import { Toaster } from "sonner";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 
 import Navbar from "@/components/layout/Navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
-import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import stylesheet from "@/tailwind.css?url";
 import { Database } from "./lib/database.types";
 
-import { Session } from "@supabase/supabase-js";
-import { env as envUtil } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+import type { RootLoaderData } from "./root.loader.server";
 
-type LoaderData = {
-  env: ENV;
-  session: Session;
-  workspaces: WorkspaceData[] | null;
-  user: User & { workspace_invite: WorkspaceInvite[] } | null;
-  params: Params<string>;
-};  
+export { loader } from "./root.loader.server";
+export type { RootLoaderData } from "./root.loader.server";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -39,89 +38,23 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const env: ENV = {
-    SUPABASE_URL: envUtil.SUPABASE_URL(),
-    SUPABASE_KEY: envUtil.SUPABASE_PUBLISHABLE_KEY(),
-    BASE_URL: envUtil.BASE_URL(),
-  };
-  
-  const url = new URL(request.url);
-  const qParam = url.searchParams.get('q');
-
-  // Check if this is a survey link with encoded contact and survey info
-  if (qParam) {
-    try {
-      const decoded = atob(qParam);
-      const [contactId, surveyId] = decoded.split(':');
-        
-      if (contactId && surveyId) {
-        return redirect(`/survey/${surveyId}?contact=${contactId}`);
-      }
-    } catch (error) {
-      // If decoding fails, continue with normal flow
-      logger.error('Failed to decode survey link:', error);
-    }
-  }
-  
-  const { supabaseClient: supabase, headers } = createSupabaseServerClient(request);
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) {
-    return routeData({
-      env,
-      session,  
-      workspaces: null,
-      user: null,
-      params,
-    }, { headers });
-  }
-  const { data: userData, error: userError } = await supabase
-    .from("user")
-    .select(`*, workspace_invite(workspace(id, name))`)
-    .eq("id", user.data.user.id)
-    .single();
-
-  const { data: workspaceData, error: workspacesError } = await supabase
-    .from("workspace_users")
-    .select("workspace ( id, name )")
-    .eq("user_id", user.data.user.id)
-    .order("last_accessed", { ascending: false });
-  if (workspacesError || userError) {
-    logger.error("Error loading workspaces or user data", { workspacesError, userError });
-  }
-  const workspaces = workspaceData?.map((data) => data.workspace);
-  
-  return routeData(
-    {
-      env,
-      session,
-      workspaces,
-      user: userData,
-      params,
-    },
-    {
-      headers: headers,
-    },
-  );
-};
-
 export default function App() {
-  const { env, session, workspaces, user, params } = useLoaderData<LoaderData>();
+  const { env, session, workspaces, user, params } =
+    useLoaderData<RootLoaderData>();
 
   const supabase = useMemo(
     () =>
-      createBrowserClient<Database>(
-        env.SUPABASE_URL!,
-        env.SUPABASE_KEY!,
-      ),
+      createBrowserClient<Database>(env.SUPABASE_URL!, env.SUPABASE_KEY!),
     [env.SUPABASE_KEY, env.SUPABASE_URL],
   );
-  
+
   const serverAccessToken = session?.access_token;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<{ success: string | null; error: string | null }> {
+  async function signOut(): Promise<{
+    success: string | null;
+    error: string | null;
+  }> {
     const { error: signOutError } = await supabase.auth.signOut();
 
     if (signOutError) {
@@ -193,7 +126,9 @@ export function ErrorBoundary() {
       <body>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
-            <h3 className="text-lg font-medium text-gray-900">Something went wrong</h3>
+            <h3 className="text-lg font-medium text-gray-900">
+              Something went wrong
+            </h3>
             <p className="mt-2 text-sm text-gray-500">{message}</p>
             <button
               type="button"

@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+export { loader } from "./new.loader.server";
+export { action } from "./new.action.server";
 
 import { data as routeData, Form, Link, useActionData, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -10,90 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
 
 import { MdAdd, MdClose } from "react-icons/md";
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { handleNewAudience } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  const campaignId = params.campaign_id;
-
-  if (workspaceId == null || campaignId == null) {
-    return routeData(
-      {
-        campaign: null,
-        error:
-          workspaceId == null ? "Workspace not found" : "Campaign not found",
-      },
-      { headers },
-    );
-  }
-
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select()
-    .eq("id", parseInt(campaignId))
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (campaignError) {
-    return routeData({ campaign: null, error: campaignError }, { headers });
-  }
-
-  return routeData({ campaign: campaignData, error: null }, { headers });
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {  const { handleNewAudience } = await import("@/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  const campaignId = params.campaign_id;
-
-  if (!(workspaceId && campaignId)) {
-    return routeData(
-      {
-        audienceData: null,
-        campaignAudienceData: null,
-        error: !workspaceId ? "Workspace not found" : "Campaign not found",
-      },
-      { headers },
-    );
-  }
-
-  const formData = await request.formData();
-  const formAction = formData.get("formAction") as string;
-  const contactsFile = formData.get("contacts") as File;
-
-  if (!formData.get("audience-name")) {
-    return routeData(
-      {
-        success: false,
-        error: "Audience name is required",
-      },
-      { headers },
-    );
-  }
-  switch (formAction) {
-    case "newAudience": {
-      return handleNewAudience({
-        supabaseClient,
-        formData,
-        workspaceId,
-        headers,
-        contactsFile,
-        campaignId,
-        userId: user.id,
-      });
-    }
-    default:
-      break;
-  }
-
-  return routeData({ error: "Form Action not recognized" }, { headers });
-}
 
 export default function NewAudience() {
   const { campaign, error } = useLoaderData();

@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+export { loader } from "./billing.loader.server";
+export { action } from "./billing.action.server";
 
 import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -33,124 +33,23 @@ function formatUnitPrice() {
   return "$0.003 CAD";
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
-  const { env } = await import("@/lib/env.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
+type TransactionRow = {
+  id: string;
+  created_at: string;
+  type: string;
+  amount: number;
+  note?: string | null;
+};
 
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("Workspace ID is required");
-  const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id, transaction_history(*)").eq("id", workspaceId).single();
-
-  if (workspaceError) throw workspaceError;
-  const history = workspace?.transaction_history ?? [];
-  const sortedHistory = Array.isArray(history)
-    ? [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : [];
-  return routeData({
-    credits: {
-      balance: workspace?.credits ?? 0,
-      history: sortedHistory,
-    },
-  });
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
-  const { env } = await import("@/lib/env.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient } = await verifyAuth(request);
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("Workspace ID is required");
-
-  const formData = await request.formData();
-  const amount = Math.floor(Number(formData.get("amount")));
-
-  if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
-    return routeData({
-      error: `Choose at least ${formatCredits(MIN_CREDITS)} credits (${formatCurrency(MIN_PURCHASE_CAD)} minimum).`,
-    }, { status: 400 });
-  }
-
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select("stripe_id")
-    .eq("id", workspaceId)
-    .single();
-
-  if (workspaceError) {
-    return routeData({ error: "We could not load billing for this workspace." }, { status: 400 });
-  }
-
-  let stripeCustomerId = workspace?.stripe_id ?? null;
-
-  if (!stripeCustomerId) {
-    try {
-      const customer = await createStripeContact({
-        supabaseClient,
-        workspace_id: workspaceId,
-      });
-      stripeCustomerId = customer.id;
-
-      await supabaseClient
-        .from("workspace")
-        .update({ stripe_id: stripeCustomerId })
-        .eq("id", workspaceId);
-    } catch {
-      return routeData(
-        {
-          error:
-            "Billing is not ready for this workspace yet. Please try again in a moment or contact support.",
-        },
-        { status: 400 },
-      );
-    }
-  }
-
-  try {
-    const baseUrl = new URL(request.url).origin;
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY());
-    const priceInCents = Math.round(amount * CREDIT_PRICE_CAD * 100);
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "cad",
-            product_data: {
-              name: "Workspace credits",
-              description: `${formatCredits(amount)} credits for your workspace`,
-            },
-            unit_amount: priceInCents,
-            tax_behavior: "exclusive",
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/workspaces/${workspaceId}/billing?payment_status=canceled`,
-      metadata: {
-        workspaceId,
-        creditAmount: amount,
-      },
-    });
-
-    return redirect(session.url!);
-  } catch {
-    return routeData(
-      {
-        error: "We could not open Stripe Checkout right now. Please try again.",
-      },
-      { status: 400 },
-    );
-  }
-}
+type LoaderData = {
+  credits: {
+    balance: number;
+    history: TransactionRow[];
+  };
+};
 
 export default function Credits() {
-  const { credits } = useLoaderData();
+  const { credits } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(1667);
@@ -314,7 +213,7 @@ export default function Credits() {
               </tr>
             </thead>
             <tbody>
-              {credits.history.map((transaction) => (
+              {credits.history.map((transaction: TransactionRow) => (
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
                   <td className="py-2 px-2 max-w-xs text-xs">

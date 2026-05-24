@@ -20,7 +20,7 @@ vi.mock("@/lib/database.server", () => ({
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
 }));
-vi.mock("../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route", () => ({
+vi.mock("@/lib/queue-filter-search.server", () => ({
   filteredSearch: (...args: any[]) => mocks.filteredSearch(...args),
 }));
 

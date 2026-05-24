@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./campaigns.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
@@ -7,49 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Tables } from "@/lib/database.types";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+type CampaignRow = Tables<"campaign">;
 
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const workspaceId = params.workspaceId;
-    
-    if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    // Get workspace details with campaigns
-    const { data: workspace } = await supabaseClient
-        .from("workspace")
-        .select("*, campaign(*)")
-        .eq("id", workspaceId)
-        .single();
-
-    if (!workspace) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    return routeData({ 
-        workspace
-    });
+type LoaderData = {
+  workspace: Tables<"workspace"> & { campaign: CampaignRow[] | null };
 };
 
 export default function WorkspaceCampaigns() {
-    const { workspace } = useLoaderData();
+    const { workspace } = useLoaderData<LoaderData>();
 
     return (
         <Card>
@@ -70,7 +36,7 @@ export default function WorkspaceCampaigns() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {workspace.campaign.map((campaign) => (
+                            {workspace.campaign.map((campaign: CampaignRow) => (
                                 <TableRow key={campaign.id}>
                                     <TableCell className="font-medium">{campaign.title}</TableCell>
                                     <TableCell>
@@ -110,4 +76,4 @@ export default function WorkspaceCampaigns() {
             </CardContent>
         </Card>
     );
-} 
+}

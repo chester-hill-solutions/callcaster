@@ -85,11 +85,19 @@ module.exports = {
         "import/no-unresolved": "off",
       },
     },
-    // RR7 routes: dynamic server imports; @ts-nocheck until route types are tightened
+    // RR7 routes + lib: disallow file-level @ts-nocheck (archive/old.* exempt)
     {
-      files: ["app/routes/**/*.{ts,tsx}"],
+      files: ["app/routes/**/*.{ts,tsx}", "app/lib/**/*.ts"],
+      excludedFiles: ["app/routes/archive/**", "**/old.*"],
       rules: {
-        "@typescript-eslint/ban-ts-comment": "off",
+        "@typescript-eslint/ban-ts-comment": [
+          "error",
+          {
+            "ts-expect-error": "allow-with-description",
+            "ts-ignore": "allow-with-description",
+            "ts-nocheck": false,
+          },
+        ],
       },
     },
     {
