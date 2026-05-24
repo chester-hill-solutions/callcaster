@@ -132,14 +132,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         nextDisposition: disposition,
       });
 
-      const { data: outreachResult, error: outreachError } = shouldSkip
-        ? ({ data: null, error: null } as any)
+      const outreachUpdate = shouldSkip
+        ? { data: null, error: null }
         : await supabase
             .from("outreach_attempt")
             .update({ disposition })
             .eq("id", messageData.outreach_attempt_id)
             .select(`*, campaign(end_date)`)
             .single();
+
+      const { data: outreachResult, error: outreachError } = outreachUpdate;
 
       if (outreachError) {
         logger.error("Error updating outreach attempt:", outreachError);

@@ -2,13 +2,10 @@ import { env } from "@/lib/env.server";
 import { getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { sendMessage } from "./chat_sms.send.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { sendMessage } from "@/lib/chat-sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import type { TwilioMessageIntent } from "@/lib/types";
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
 
 export const action = async ({ request }: { request: Request }) => {
 

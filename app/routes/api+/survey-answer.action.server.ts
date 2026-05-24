@@ -5,14 +5,7 @@ import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "23505"
-  );
-}
+import { isUniqueViolation } from "@/lib/parse-utils.server";
 
 async function handleSaveAnswer(
   request: Request,

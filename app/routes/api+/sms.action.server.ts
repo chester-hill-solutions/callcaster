@@ -61,9 +61,7 @@ interface SendMessageParams {
 
 const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
 
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { parseOptionalString } from "@/lib/parse-utils.server";
 
 async function hasDuplicateCampaignSms(args: {
   supabase: SupabaseClient;

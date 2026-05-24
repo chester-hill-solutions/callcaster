@@ -1,6 +1,7 @@
 import { capitalize } from "@/lib/utils";
 import { data as routeData } from "react-router";
 import { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
@@ -12,22 +13,6 @@ type MemberUser = Pick<
 > & {
   role: MemberRole;
 };
-
-function compareMembersByRole(a: MemberUser, b: MemberUser) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) <
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) >
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return 1;
-  return 0;
-}
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
 

@@ -11,13 +11,7 @@ import {
 import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
 import type { TwilioAccountData } from "@/lib/types";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
 async function persistWorkspaceTwilioData({
   supabaseClient,

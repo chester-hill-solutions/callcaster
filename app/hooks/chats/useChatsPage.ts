@@ -31,13 +31,13 @@ import {
   mergeConversationPages,
   phoneRegex,
   upsertConversationFromMessage,
-} from "@/routes/workspaces+/$id/chats/conversation-utils";
+} from "@/lib/chats/conversation-utils";
 import type {
   Chat,
   ChatInputWorkspaceNumber,
   ChatsLoaderData,
   ChatsWorkspaceContextType,
-} from "@/routes/workspaces+/$id/chats/types";
+} from "@/lib/chats/types";
 
 export function useChatsPage() {
   const { supabase, workspace } = useOutletContext<ChatsWorkspaceContextType>();

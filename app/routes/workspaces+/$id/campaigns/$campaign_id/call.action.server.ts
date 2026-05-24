@@ -15,7 +15,7 @@ import {
   getStateMachineAction,
 } from "@/lib/call-status";
 import { checkSchedule, getUserRole } from "@/lib/database.server";
-import { generateToken } from "@/routes/api+/token.loader.server";
+import { generateToken } from "@/lib/twilio-token.server";
 import { playTone } from "@/lib/utils";
 import { redirect } from "react-router";
 import { SupabaseClient } from "@supabase/supabase-js";

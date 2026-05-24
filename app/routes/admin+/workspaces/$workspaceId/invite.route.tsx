@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { capitalize } from "@/lib/utils";
 import type { Database, Tables } from "@/lib/database.types";
 
@@ -67,22 +68,6 @@ const memberRoles = new Set(Object.values(MemberRole));
 
 const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
-
-function compareMembersByRole(a: MemberUser, b: MemberUser) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) <
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) >
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return 1;
-  return 0;
-}
 
 export default function WorkspaceUsers() {
   const {

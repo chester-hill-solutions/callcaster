@@ -9,9 +9,7 @@ import type { WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 
-function parseOptionalString(value: FormDataEntryValue | null): string | null {
-    return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { parseOptionalString } from "@/lib/parse-utils.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, user, userData } = await requireSudoAdmin(request);

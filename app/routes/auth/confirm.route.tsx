@@ -1,5 +1,7 @@
-import { redirect, type LoaderFunctionArgs } from "react-router"
-import { createServerClient, parse, serialize } from '@supabase/ssr'
+import { env } from "@/lib/env.server";
+import { redirect, type LoaderFunctionArgs } from "react-router";
+import { createServerClient, parse, serialize } from "@supabase/ssr";
+import type { EmailOtpType } from "@supabase/supabase-js";
 
 export async function loader({ request }: LoaderFunctionArgs) {
     const requestUrl = new URL(request.url);
@@ -11,7 +13,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (token_hash && type) {
         const cookies = parse(request.headers.get('Cookie') ?? '')
 
-        const supabase = createServerClient(process.env['SUPABASE_URL'] ?? '', process.env['SUPABASE_ANON_KEY'] ?? '', {
+        const supabase = createServerClient(env.SUPABASE_URL(), env.SUPABASE_ANON_KEY(), {
             cookies: {
                 get(key) {
                     return cookies[key]
@@ -26,7 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         })
 
         const { error } = await supabase.auth.verifyOtp({
-            type: (type as any),
+            type: type as EmailOtpType,
             token_hash,
         })
 

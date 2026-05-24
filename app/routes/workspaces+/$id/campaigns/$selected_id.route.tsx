@@ -35,33 +35,8 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
-export type CampaignState = {
-  campaign_id: string;
-  workspace: string;
-  title: string;
-  status: string;
-  type:
-    | "message"
-    | "robocall"
-    | "live_call"
-    | "simple_ivr"
-    | "complex_ivr"
-    | "email";
-  dial_type: "call" | "predictive" | null;
-  group_household_queue: boolean;
-  start_date: string;
-  end_date: string;
-  caller_id: string | null;
-  voicemail_file: string | null;
-  script_id: number | null;
-  audiences: NonNullable<Audience>[];
-  body_text: string | null;
-  message_media: string[] | null;
-  voicedrop_audio: string | null;
-  schedule: Schedule | null;
-  is_active: boolean;
-  details: LiveCampaign | MessageCampaign | IVRCampaign;
-};
+import type { CampaignState } from "@/lib/campaign-home.types";
+export type { CampaignState } from "@/lib/campaign-home.types";
 
 type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
 

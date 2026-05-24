@@ -7,7 +7,7 @@ import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ContactsLoaderData } from "@/routes/workspaces+/$id/contacts.loader.server";
+import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
 
 type OtherDataItem =

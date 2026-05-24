@@ -4,6 +4,7 @@ import { twMerge } from "tailwind-merge";
 import type { OutreachExportData } from "./outreach-export-types";
 import type { Json } from "./database.types";
 import type { Contact, QueueItem, OutreachAttempt, Call } from "./types";
+import { escapeCSV } from "@/lib/csv";
 import { normalizePhoneNumber as normalizeNorthAmericanPhoneNumber } from "./utils/phone";
 
 export function cn(...inputs: ClassValue[]) {
@@ -621,14 +622,9 @@ export function getAllKeys(obj: unknown, prefix: string = "", target: Set<string
   return target;
 }
 
-export function escapeCSV(field: unknown) {
-  if (field == null) return "";
-  const stringField = String(field);
-  if (/[",\n]/.test(stringField)) {
-    return `"${stringField.replace(/"/g, '""')}"`;
-  }
-  return stringField;
-}
+export { escapeCSV } from "@/lib/csv";
+
+export { processTemplateTags } from "@/lib/message-templates";
 
 export const days = [
   "Monday",
@@ -639,84 +635,3 @@ export const days = [
   "Saturday",
   "Sunday",
 ];
-
-/**
- * Process template tags in message text by replacing them with contact data, supporting:
- * - {field} and {field|fallback}
- * - function calls like btoa(...), e.g. btoa({phone}:{external_id})
- * - arbitrary text and multiple tags inside function calls
- *
- * @param text - The message text containing template tags
- * @param contact - The contact object with field data
- * @returns The processed text with template tags replaced
- */
-export function processTemplateTags(text: string, contact: Contact): string {
-  if (!text || !contact) return text;
-
-  // Helper to process {field} and {field|fallback} inside a string
-  const processBraces = (input: string): string => {
-    return input.replace(/\{\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}/g, (match, field, fallback) => {
-      let value = '';
-      switch (field) {
-        case 'firstname':
-          value = contact.firstname || '';
-          break;
-        case 'surname':
-          value = contact.surname || '';
-          break;
-        case 'fullname':
-          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
-          break;
-        case 'phone':
-          value = contact.phone || '';
-          break;
-        case 'email':
-          value = contact.email || '';
-          break;
-        case 'address':
-          value = contact.address || '';
-          break;
-        case 'city':
-          value = contact.city || '';
-          break;
-        case 'province':
-          value = contact.province || '';
-          break;
-        case 'postal':
-          value = contact.postal || '';
-          break;
-        case 'country':
-          value = contact.country || '';
-          break;
-        case 'external_id':
-          value = contact.external_id || '';
-          break;
-        default:
-          value = '';
-      }
-      if (!value && typeof fallback === 'string') {
-        return fallback.trim();
-      }
-      return value || '';
-    });
-  };
-
-  // Process function calls like btoa(...)
-  const processFunctions = (input: string): string => {
-    // Support btoa(...) with nested {field} tags and text
-    return input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
-      const processed = processBraces(inner);
-      try {
-        return typeof window !== 'undefined' && window.btoa ? window.btoa(processed) : Buffer.from(processed, 'utf-8').toString('base64');
-      } catch (e) {
-        return '';
-      }
-    });
-  };
-
-  // First, process all function calls (which will process their inner {field} tags)
-  let result = processFunctions(text);
-  // Then, process any remaining {field} tags outside of function calls
-  result = processBraces(result);
-  return result;
-}

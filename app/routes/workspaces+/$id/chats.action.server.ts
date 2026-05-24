@@ -14,7 +14,7 @@ import { data as routeData, redirect } from "react-router";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { sendMessage } from "@/routes/api+/chat_sms.send.server";
+import { sendMessage } from "@/lib/chat-sms.server";
 import { useInfiniteScroll } from "@/hooks";
 import { verifyAuth } from "@/lib/supabase.server";
 import type {
