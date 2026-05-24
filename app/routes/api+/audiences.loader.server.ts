@@ -1,4 +1,4 @@
-import { csvResponse, toCsvString } from "@/lib/csv";
+import { csvResponse, toCsvString, type CsvCell } from "@/lib/csv";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
@@ -20,6 +20,12 @@ interface AudienceData {
     id: number;
     [key: string]: string | number | boolean | null | undefined;
 }
+
+type AudiencesDeps = {
+  verifyAuth: (request: Request) => Promise<{ supabaseClient: SupabaseResponse["supabaseClient"]; headers: Headers; user?: any }>;
+  parseActionRequest: (request: Request) => Promise<Record<string, unknown>>;
+  requireWorkspaceAccess: (args: unknown) => Promise<void>;
+};
 
 export const loader = async ({ request, deps }: { request: Request; deps?: Partial<AudiencesDeps> }) => {
 

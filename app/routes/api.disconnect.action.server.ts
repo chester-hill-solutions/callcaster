@@ -4,6 +4,8 @@ import { safeParseJson } from "@/lib/database.server";
 import twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
+const TWIML_PAUSE_RESPONSE = '<Response><Pause length="60"/></Response>';
+
 type DisconnectRequestBody = {
   call?: {
     parameters?: {

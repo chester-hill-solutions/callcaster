@@ -13,6 +13,66 @@ import { verifyAuth } from "@/lib/supabase.server";
 import type { AppError } from "@/lib/errors.server";
 import type { LoaderFunctionArgs } from "react-router";
 
+interface QueueResponse {
+    queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
+    queueError: AppError | Error | null;
+    totalCount: number | null;
+    unfilteredCount: number | null;
+    queuedCount: number | null;
+    currentPage: number;
+    pageSize: number;
+    filters: {
+        name: string;
+        phone: string;
+        email: string;
+        address: string;
+        audiences: string;
+        disposition: string;
+        queueStatus: string;
+    }
+}
+
+interface LoaderData {
+    queuePromise: Promise<QueueResponse>;
+    selectedAudienceIds: number[];
+    campaignId: string;
+}
+
+export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, disposition: string, queueStatus: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
+    let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
+    if (query) {
+        searchQuery = searchQuery.or(`firstname.ilike.%${query}%,surname.ilike.%${query}%`, { foreignTable: 'contact' });
+    }
+    if (filters.name) {
+        searchQuery = searchQuery.or(`firstname.ilike.%${filters.name}%,surname.ilike.%${filters.name}%`, { foreignTable: 'contact' });
+    }
+    if (filters.phone) {
+        searchQuery = searchQuery.ilike('contact.phone', `%${filters.phone}%`);
+    }
+    if (filters.disposition) {
+        if (filters.disposition === 'unknown') {
+            searchQuery = searchQuery.is('contact.outreach_attempt.disposition', null);
+        } else {
+            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.disposition);
+        }
+    }
+    if (filters.queueStatus) {
+        const queueStatus = filters.queueStatus as QueueStatusFilter;
+        searchQuery = applyQueueStatusFilter(searchQuery, queueStatus);
+    }
+    if (filters.audiences) {
+        const audienceId = Number(filters.audiences);
+        searchQuery = searchQuery.in('contact.contact_audience.audience_id', [audienceId]);
+    }
+    if (filters.email) {
+        searchQuery = searchQuery.ilike('contact.email', `%${filters.email}%`);
+    }
+    if (filters.address) {
+        searchQuery = searchQuery.ilike('contact.address', `%${filters.address}%`);
+    }
+    return searchQuery;
+}
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     const { selected_id } = params;

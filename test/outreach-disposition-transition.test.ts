@@ -17,6 +17,7 @@ const twilioMocks = vi.hoisted(() => {
 vi.mock("@/twilio.server", () => {
   return {
     validateTwilioWebhookParams: twilioMocks.validateTwilioWebhookParams,
+    shouldValidateTwilioWebhooks: () => true,
   };
 });
 

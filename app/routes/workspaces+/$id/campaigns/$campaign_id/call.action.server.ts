@@ -1,14 +1,41 @@
 import {
   buildQueuedQueueUpdate,
+  COMPLETED_QUEUE_COUNT_FILTER,
   isAssignedToUser,
+  isQueued,
 } from "@/lib/queue-status";
-import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
+import {
+  handleCall,
+  handleConference,
+  handleContact,
+  handleQueue,
+} from "@/lib/callscreenActions";
+import {
+  normalizeProviderStatus,
+  getStateMachineAction,
+} from "@/lib/call-status";
+import { checkSchedule, getUserRole } from "@/lib/database.server";
+import { generateToken } from "@/routes/api+/token.loader.server";
+import { playTone } from "@/lib/utils";
 import { redirect } from "react-router";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Tables } from "@/lib/database.types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type {
+  LoaderData,
+  QueueItem,
+  OutreachAttempt,
+  UseSupabaseRealtimeProps,
+  AppUser,
+  BaseUser,
+  ActiveCall,
+  CampaignDetails
+} from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
+import { logger } from "@/lib/logger.server";
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
+
   const { campaign_id } = params;
 
   const { supabaseClient, headers, user } = await verifyAuth(request);
@@ -44,4 +71,4 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     throw update.error;
   }
   return redirect("/workspaces");
-};
+}

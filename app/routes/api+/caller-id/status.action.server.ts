@@ -25,7 +25,9 @@ interface Capabilities {
   emergency_compliance_status: string;
 }
 
-export const action: ActionFunction = async ({ request }) => {
+import type { ActionFunctionArgs } from "react-router";
+
+export const action = async ({ request }: ActionFunctionArgs) => {
   const missingHeader = rejectMissingTwilioSignatureHeader(request);
   if (missingHeader) {
     return missingHeader;

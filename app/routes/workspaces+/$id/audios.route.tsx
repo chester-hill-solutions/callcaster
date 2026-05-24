@@ -9,13 +9,21 @@ import { Button } from "@/components/ui/button";
 
 
 import { User } from "@/lib/types";
+import type { FileObject } from "@supabase/storage-js";
+
+type LoaderData = {
+  audioMedia: FileObject[] | null;
+  workspace: { name: string } | null;
+  error: string | null;
+  userRole: unknown;
+};
 
 export default function WorkspaceAudiosPage() {
   const { audioMedia, workspace, error, userRole } =
-    useLoaderData();
+    useLoaderData<LoaderData>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter((media) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
+  const workspaceAudios = audioMedia?.filter((media: FileObject) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
       <div className="flex flex-col sm:flex-row sm:justify-between">

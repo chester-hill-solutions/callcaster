@@ -3,12 +3,13 @@ import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
-import type { Audience, Contact, User, WorkspaceData } from "@/lib/types";
+import type { Audience, Contact, User } from "@/lib/types";
+import type { Tables } from "@/lib/database.types";
 import type { LoaderFunctionArgs } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ContactIdLoaderData = {
-  workspace: WorkspaceData;
+  workspace: Tables<"workspace">;
   workspace_id: string;
   selected_id: string;
   contact: Contact | null;
@@ -88,7 +89,7 @@ export const loader = async ({
       workspace_id,
       selected_id,
       contact,
-      userRole,
+      userRole: userRole.role as MemberRole,
       audiences: audiences || [],
     } satisfies ContactIdLoaderData);
   } catch (error) {

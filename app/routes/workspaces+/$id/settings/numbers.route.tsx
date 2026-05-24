@@ -24,7 +24,7 @@ import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import { User, WorkspaceNumbers } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
-;
+
 
 type ValidationRequest = {
   accountSid: string;

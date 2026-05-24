@@ -16,9 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { Heading } from "@/components/ui/typography";
 
-;
 
-;
+
+
 
 // Removed unused legacy styles
 
@@ -27,6 +27,10 @@ type FetcherData =
       success?: boolean;
     }
   | undefined;
+
+type ActionData = {
+  error: string;
+};
 
 export default function SignUp() {
   const actionData = useActionData<ActionData>();

@@ -6,11 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Tables } from "@/lib/database.types";
 
-;
+type CampaignRow = Tables<"campaign">;
+
+type LoaderData = {
+  workspace: Tables<"workspace"> & { campaign: CampaignRow[] | null };
+};
 
 export default function WorkspaceCampaigns() {
-    const { workspace } = useLoaderData();
+    const { workspace } = useLoaderData<LoaderData>();
 
     return (
         <Card>
@@ -31,7 +36,7 @@ export default function WorkspaceCampaigns() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {workspace.campaign.map((campaign) => (
+                            {workspace.campaign.map((campaign: CampaignRow) => (
                                 <TableRow key={campaign.id}>
                                     <TableCell className="font-medium">{campaign.title}</TableCell>
                                     <TableCell>

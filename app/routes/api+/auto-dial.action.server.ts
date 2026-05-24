@@ -1,25 +1,40 @@
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+  safeParseJson,
+} from "@/lib/database.server";
 import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import Twilio from "twilio";
+import type { Database } from "@/lib/database.types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type TwilioSDK from "twilio";
+
+type Supabase = SupabaseClient<Database>;
+type TwilioClient = TwilioSDK.Twilio;
 
 type AutoDialDeps = Partial<{
-  createSupabaseServerClient: (request: Request) => { supabaseClient: unknown };
+  createSupabaseServerClient: (
+    request: Request,
+  ) => { supabaseClient: Supabase; headers?: Headers };
   safeParseJson: <T>(request: Request) => Promise<T>;
   createWorkspaceTwilioInstance: (args: {
-    supabase: unknown;
+    supabase: Supabase;
     workspace_id: string;
-  }) => Promise<unknown>;
-  requireWorkspaceAccess: (args: unknown) => Promise<void>;
-  getAuthenticatedUser: (supabase: unknown) => Promise<{ id: string } | null>;
-  env: { BASE_URL: () => string };
-  logger: { error: (...args: unknown[]) => void };
+  }) => Promise<TwilioClient>;
+  requireWorkspaceAccess: (args: {
+    supabaseClient: Supabase;
+    user: { id: string };
+    workspaceId: string;
+  }) => Promise<void>;
+  getAuthenticatedUser: (supabase: Supabase) => Promise<{ id: string } | null>;
+  env: typeof env;
+  logger: typeof logger;
 }>;
 
 async function defaultGetAuthenticatedUser(
-  supabase: unknown,
+  supabase: Supabase,
 ): Promise<{ id: string } | null> {
   const authClient = (
     supabase as { auth?: { getUser?: () => Promise<unknown> } }

@@ -5,7 +5,7 @@ import { env } from "@/lib/env.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action: ActionFunction = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

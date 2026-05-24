@@ -3,16 +3,23 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/database.types";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type TwilioSDK from "twilio";
+
+type Supabase = SupabaseClient<Database>;
+type TwilioClient = TwilioSDK.Twilio;
 
 type AutoDialEndDeps = Partial<{
-  verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown; user: unknown }>;
-  safeParseJson: (request: Request) => Promise<unknown>;
+  verifyAuth: (
+    request: Request,
+  ) => Promise<{ supabaseClient: Supabase; user: User }>;
+  safeParseJson: <T>(request: Request) => Promise<T>;
   createWorkspaceTwilioInstance: (args: {
-    supabase: unknown;
+    supabase: Supabase;
     workspace_id: string;
-  }) => Promise<unknown>;
-  logger: { error: (...args: unknown[]) => void };
+  }) => Promise<TwilioClient>;
+  logger: typeof logger;
 }>;
 
 export const action = async ({
@@ -28,7 +35,7 @@ export const action = async ({
     logger: deps?.logger ?? logger,
   };
   const { supabaseClient, user } = await d.verifyAuth(request);
-  const { workspaceId: workspace_id } = await d.safeParseJson(request);
+  const { workspaceId: workspace_id } = await d.safeParseJson<{ workspaceId?: string }>(request);
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }

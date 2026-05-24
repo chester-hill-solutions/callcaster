@@ -1,5 +1,7 @@
 export { action } from "./questions.action.server";
 
+import type { Json } from "@/lib/database.types";
+
 interface RequestData {
   update?: Json;
   contact_id: number;

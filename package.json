@@ -34,7 +34,8 @@
     "test:coverage:merge": "node scripts/coverage/merge-and-check.mjs",
     "test:coverage:merge:strict": "COVERAGE_FULL=1 node scripts/coverage/merge-and-check.mjs",
     "test:coverage": "npm run test:coverage:vitest && npm run test:coverage:deno && npm run test:coverage:merge",
-    "check:client-bundle": "node scripts/check-client-bundle-for-server-imports.mjs"
+    "check:client-bundle": "node scripts/check-client-bundle-for-server-imports.mjs",
+    "check:route-server-leaks": "node scripts/check-route-server-leaks.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.15",

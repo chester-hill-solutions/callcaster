@@ -14,7 +14,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const { supabaseClient: userSupabase, user } = await verifyAuth(request);
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
-    const { phoneNumber, workspace_id } = Object.fromEntries(formData) as unknown as FormData;
+    const phoneNumber = formData.get("phoneNumber") as string;
+    const workspace_id = formData.get("workspace_id") as string;
     try {
         await requireWorkspaceAccess({ supabaseClient: userSupabase, user, workspaceId: workspace_id });
         const { data: users, error } = await getWorkspaceUsers({

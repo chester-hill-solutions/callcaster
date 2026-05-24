@@ -21,7 +21,6 @@ import {
   ContextType,
   type WorkspaceMessagingReadiness,
 } from "@/lib/types";
-import type { WorkspaceMessagingReadiness } from "@/lib/types";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 
 type LoaderData = {

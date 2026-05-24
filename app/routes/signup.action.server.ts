@@ -22,6 +22,10 @@ type FetcherData =
     }
   | undefined;
 
+type ActionData = {
+  error: string;
+};
+
 export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { headers } = createSupabaseServerClient(request);

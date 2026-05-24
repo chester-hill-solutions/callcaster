@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-;
 
-;
+
+
 
 export default function EditUser() {
     const { currentUser, targetUser } = useLoaderData();

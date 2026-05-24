@@ -64,10 +64,18 @@ interface Survey {
   is_active: boolean;
   created_at: string;
   survey_page?: SurveyPage[];
+  survey_response?: Array<{ count: number }>;
 }
 
+type LoaderData = {
+  survey: Survey;
+  recentResponses: SurveyResponse[];
+  workspaceId: string;
+  userRole: unknown;
+};
+
 export default function SurveyDetailPage() {
-  const { survey, recentResponses, workspaceId, userRole } = useLoaderData();
+  const { survey, recentResponses, workspaceId, userRole } = useLoaderData<LoaderData>();
 
   const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
 
@@ -127,7 +135,7 @@ export default function SurveyDetailPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Responses</p>
                 <p className="text-2xl font-bold">
-                  {survey.survey_response[0]?.count || 0}
+                  {survey.survey_response?.[0]?.count || 0}
                 </p>
               </div>
               <Users className="w-8 h-8 text-muted-foreground" />
@@ -209,7 +217,7 @@ export default function SurveyDetailPage() {
                 <p className="text-muted-foreground">No responses yet</p>
               ) : (
                 <div className="space-y-4">
-                  {recentResponses.map((response) => (
+                  {recentResponses.map((response: SurveyResponse) => (
                     <div key={response.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">

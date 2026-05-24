@@ -6,11 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Tables } from "@/lib/database.types";
 
-;
+type WorkspaceUserRow = Tables<"workspace_users"> & {
+  user?: Tables<"user"> | null;
+};
+
+type LoaderData = {
+  workspaceUsers: WorkspaceUserRow[];
+};
 
 export default function WorkspaceUsers() {
-    const { workspaceUsers } = useLoaderData();
+    const { workspaceUsers } = useLoaderData<LoaderData>();
 
     return (
         <Card>
@@ -38,7 +45,7 @@ export default function WorkspaceUsers() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {workspaceUsers.map((workspaceUser) => (
+                            {workspaceUsers.map((workspaceUser: WorkspaceUserRow) => (
                                 <TableRow key={workspaceUser.id}>
                                     <TableCell className="font-medium">{workspaceUser.user?.username}</TableCell>
                                     <TableCell>{workspaceUser.user?.first_name} {workspaceUser.user?.last_name}</TableCell>

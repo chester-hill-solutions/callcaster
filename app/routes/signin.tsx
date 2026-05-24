@@ -13,9 +13,9 @@ import { Input } from "@/components/ui/input";
 
 import { Text } from "@/components/ui/typography";
 
-;
 
-;
+
+
 
 export default function SignIn() {
   const actionData = useActionData();

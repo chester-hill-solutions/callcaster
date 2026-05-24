@@ -37,6 +37,11 @@ type WorkspaceMemberWithUser = WorkspaceMemberRecord & {
   >;
 };
 
+type WorkspaceWithMembers = Pick<Tables<"workspace">, "id" | "name"> & {
+  workspace_users: Array<WorkspaceMemberRecord | null> | null;
+  workspace_invite: Array<PendingInvite | null> | null;
+};
+
 type LoaderData = {
   workspace: Pick<Tables<"workspace">, "id" | "name">;
   userRole: MemberRole | null;

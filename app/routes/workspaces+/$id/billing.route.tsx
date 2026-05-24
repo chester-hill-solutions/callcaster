@@ -33,8 +33,23 @@ function formatUnitPrice() {
   return "$0.003 CAD";
 }
 
+type TransactionRow = {
+  id: string;
+  created_at: string;
+  type: string;
+  amount: number;
+  note?: string | null;
+};
+
+type LoaderData = {
+  credits: {
+    balance: number;
+    history: TransactionRow[];
+  };
+};
+
 export default function Credits() {
-  const { credits } = useLoaderData();
+  const { credits } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(1667);
@@ -198,7 +213,7 @@ export default function Credits() {
               </tr>
             </thead>
             <tbody>
-              {credits.history.map((transaction) => (
+              {credits.history.map((transaction: TransactionRow) => (
                 <tr key={transaction.id} className="border-b">
                   <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
                   <td className="py-2 px-2 max-w-xs text-xs">

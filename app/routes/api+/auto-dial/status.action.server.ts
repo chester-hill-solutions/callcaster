@@ -53,7 +53,7 @@ export const updateOutreachAttempt = async (
       const { data: current, error: currentError } = await supabase
         .from("outreach_attempt")
         .select("disposition, contact_id")
-        .eq("id", id)
+        .eq("id", Number(id))
         .single();
       if (!currentError && current?.disposition) {
         const c = String(current.disposition).toLowerCase();
@@ -72,7 +72,7 @@ export const updateOutreachAttempt = async (
     const { data, error } = await supabase
       .from("outreach_attempt")
       .update(update)
-      .eq("id", id)
+      .eq("id", Number(id))
       .select()
       .single();
     if (error) throw error;
@@ -87,7 +87,7 @@ export const updateOutreachAttempt = async (
 };
 
 const updateCampaignQueue = async (
-  contactId: string,
+  contactId: number,
   campaignId: number,
   update: Partial<Tables<"campaign_queue">>,
 ) => {
@@ -160,7 +160,7 @@ const handleCallStatus = async (
     const { error } = await supabase.rpc("dequeue_contact", {
       passed_contact_id: outreachStatus.contact_id,
       group_on_household: true,
-      dequeued_by_id: callUpdate.conference_id,
+      dequeued_by_id: callUpdate.conference_id ?? "",
       dequeued_reason_text: `Call ${status?.toLowerCase()}`
     });
     if (error) {

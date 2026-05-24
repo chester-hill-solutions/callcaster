@@ -3,11 +3,12 @@ import { getUserRole, listMedia } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
-import type { Script, WorkspaceData } from "@/lib/types";
+import type { Script } from "@/lib/types";
+import type { Tables } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ScriptIdLoaderData = {
-  workspace: WorkspaceData;
+  workspace: Tables<"workspace">;
   workspace_id: string;
   selected_id: string;
   script: Script | null;
@@ -17,6 +18,9 @@ export type ScriptIdLoaderData = {
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { id: workspace_id, scriptId: selected_id } = params;
+  if (!workspace_id || !selected_id) {
+    throw redirect("/workspaces");
+  }
   const { supabaseClient, user } = await verifyAuth(request);
   if (!user) {
     throw redirect("/signin");
@@ -46,6 +50,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     selected_id,
     script,
     mediaNames,
-    userRole,
+    userRole: (userRole?.role ?? MemberRole.Member) as MemberRole,
   } satisfies ScriptIdLoaderData);
 };

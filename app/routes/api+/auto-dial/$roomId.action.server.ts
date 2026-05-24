@@ -19,7 +19,7 @@ const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>
 
 const fetchCampaignData = async (campaignId: string) => {
   const supabase = getSupabase();
-    const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', campaignId).single();
+    const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', Number(campaignId)).single();
     if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
     return data;
 };
@@ -36,7 +36,7 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
   const supabase = getSupabase();
     if (groupOnHousehold) {
         const { data, error } = await supabase.rpc('dequeue_contact', {
-            passed_contact_id: contactId,
+            passed_contact_id: Number(contactId),
             group_on_household: groupOnHousehold,
             dequeued_by_id: userId,
             dequeued_reason_text: "Auto-dial completed"
@@ -49,7 +49,7 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
             dequeued_by: userId,
             dequeued_at: new Date().toISOString(),
             dequeued_reason: "Auto-dial completed"
-        }).eq('contact_id', contactId).select();
+        }).eq('contact_id', Number(contactId)).select();
         if (error) throw new Error(`Error updating queue status: ${error.message}`);
         return data;
     }
@@ -57,7 +57,7 @@ const dequeueContact = async (contactId: string, groupOnHousehold: boolean, user
 
 const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"outreach_attempt">>) => {
   const supabase = getSupabase();
-    const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', attemptId).select();
+    const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', Number(attemptId)).select();
     if (error) throw new Error(`Error updating outreach attempt: ${error.message}`);
     return data;
 };
@@ -71,8 +71,8 @@ const triggerAutoDialer = async (conferenceId: string, campaignId: string, works
 };
 
 type OutreachStatusItem = {
-  user_id: string | number;
-  campaign_id: string | number;
+  user_id: string | number | null;
+  campaign_id: string | number | null;
 };
 
 const handleMachineAnswer = async (

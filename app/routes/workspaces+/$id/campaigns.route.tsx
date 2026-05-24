@@ -12,7 +12,7 @@ import {
 
 import { SupabaseClient } from "@supabase/supabase-js";
 
-;
+
 
 export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();

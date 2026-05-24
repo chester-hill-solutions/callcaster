@@ -6,6 +6,11 @@ import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
+interface Script {
+  pages: Record<string, { blocks: string[] }>;
+  blocks: Record<string, { id: string; type: string; audioFile: string; options?: Array<{ value: string; next?: string }> }>;
+}
+
 const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
   const { data: campaign, error } = await supabase
     .from("campaign")

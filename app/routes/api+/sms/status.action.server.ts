@@ -12,7 +12,9 @@ import Twilio from "twilio";
 import type { Database } from "@/lib/database.types";
 import type { TwilioSmsStatus, TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
 
-export const action: ActionFunction = async ({ request }) => {
+import type { ActionFunctionArgs } from "react-router";
+
+export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
     env.SUPABASE_SERVICE_KEY(),

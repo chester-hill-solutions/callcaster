@@ -7,23 +7,15 @@ import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
+import {
+  type BaseCampaignDetails,
+  type CampaignType,
+  getScriptRecordingFileNames,
+  type ScriptEditLoaderData,
+} from "./edit.types";
 
-type CampaignType = "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
-
-type LoaderData = {
-  workspace_id: string;
-  selected_id: string;
-  data: {
-    id: number;
-    type: CampaignType;
-    campaignDetails: BaseCampaignDetails;
-  };
-  mediaNames: string[];
-  userRole: string;
-  scripts: Script[];
-};
-
-type PageData = LoaderData['data'];
+type LoaderData = ScriptEditLoaderData;
+type PageData = LoaderData["data"];
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 

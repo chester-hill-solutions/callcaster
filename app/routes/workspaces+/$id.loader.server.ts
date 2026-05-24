@@ -10,6 +10,7 @@ import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import type { User } from "@/lib/types";
 
 type LoaderData = {
   userRole: string | null | undefined;

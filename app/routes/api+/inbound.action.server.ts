@@ -46,14 +46,8 @@ function dispatchInboundCallWebhookNotification(args: {
     start_time: string | null;
   };
   supabaseClient: ReturnType<typeof createClient<Database>>;
-  sendWebhookNotification: (input: {
-    eventCategory: string;
-    eventType: string;
-    workspaceId: string;
-    payload: Record<string, unknown>;
-    supabaseClient: ReturnType<typeof createClient<Database>>;
-  }) => Promise<unknown>;
-  logger: { warn: (...args: unknown[]) => void };
+  sendWebhookNotification: typeof sendWebhookNotification;
+  logger: Pick<typeof logger, "warn">;
 }) {
   void Promise.resolve(
     args.sendWebhookNotification({

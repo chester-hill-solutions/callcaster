@@ -1,9 +1,9 @@
 import { data as routeData } from "react-router";
 import { Database } from "@/lib/database.types";
 import { verifyAuth } from "@/lib/supabase.server";
+import type { AudienceDetailLoaderData } from "./$audience_id.types";
 import type { LoaderFunctionArgs } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 

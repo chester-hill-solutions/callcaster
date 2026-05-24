@@ -8,6 +8,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { useInfiniteScroll } from "@/hooks";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
+import { fetchMessagePage } from "./$contact_number.messages.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
 

@@ -3,7 +3,9 @@ import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
 import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 
-export const action: ActionFunction = async ({ request }) => {
+import type { ActionFunctionArgs } from "react-router";
+
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { event, destination_url, custom_headers } = await safeParseJson<{
     event: string;
     destination_url: string;

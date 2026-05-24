@@ -4,7 +4,7 @@ import { parseCSV } from '@/lib/csv';
 import { processAudienceUpload } from "@/lib/audience-upload-process.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { Database, Tables } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 interface StorageBucket {
   id: string;
@@ -32,7 +32,13 @@ interface MappedContact {
 // Type guard for other_data array
 
 type AudienceUploadDeps = Partial<{
-  verifyAuth: (request: Request) => Promise<{ supabaseClient: unknown; headers: Headers; user: unknown }>;
+  verifyAuth: (
+    request: Request,
+  ) => Promise<{
+    supabaseClient: SupabaseClient<Database>;
+    headers: Headers;
+    user: User | null;
+  }>;
   processAudienceUpload: typeof processAudienceUpload;
 }>;
 

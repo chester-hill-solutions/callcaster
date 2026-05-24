@@ -36,6 +36,7 @@ vi.mock("@/lib/env.server", () => {
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: (...args: any[]) =>
     (twilioMocks.validateTwilioWebhookParams as any)(...args),
+  shouldValidateTwilioWebhooks: () => true,
 }));
 
 function makeCallerIdRequest(body: FormData) {

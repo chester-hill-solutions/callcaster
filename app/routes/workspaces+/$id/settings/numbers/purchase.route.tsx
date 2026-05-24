@@ -16,11 +16,6 @@ export type LoaderData = {
   creditsBalance: number;
 };
 
-export type LoaderData = {
-  workspaceId: string;
-  creditsBalance: number;
-};
-
 export default function PurchaseNumberPage() {
   const { workspaceId, creditsBalance } = useLoaderData<LoaderData>();
   const fetcher = useFetcher<NumbersSearchFetcherData>();

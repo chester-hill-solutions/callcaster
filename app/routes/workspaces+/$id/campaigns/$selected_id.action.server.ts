@@ -19,6 +19,24 @@ import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 
+type CampaignTable =
+  | "live_campaign"
+  | "message_campaign"
+  | "ivr_campaign";
+
+const getTable = (
+  campaignType: string | null | undefined,
+): CampaignTable | null => {
+  return campaignType === "live_call"
+    ? "live_campaign"
+    : campaignType === "message"
+      ? "message_campaign"
+      : campaignType &&
+          ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
+        ? "ivr_campaign"
+        : null;
+};
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   const { id: workspace_id, selected_id } = params;

@@ -10,18 +10,31 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import type { Tables } from "@/lib/database.types";
 
-;
+type WorkspaceRow = Tables<"workspace">;
+type UserWorkspaceRow = Tables<"workspace_users"> & {
+  workspace?: WorkspaceRow | null;
+};
+type PendingInviteRow = Tables<"workspace_invite"> & {
+  workspace?: WorkspaceRow | null;
+};
 
-;
+type LoaderData = {
+  currentUser: Tables<"user">;
+  targetUser: Tables<"user">;
+  allWorkspaces: WorkspaceRow[];
+  userWorkspaces: UserWorkspaceRow[];
+  pendingInvites: PendingInviteRow[];
+};
 
 export default function UserWorkspaces() {
-    const { currentUser, targetUser, allWorkspaces, userWorkspaces, pendingInvites } = useLoaderData();
+    const { currentUser, targetUser, allWorkspaces, userWorkspaces, pendingInvites } = useLoaderData<LoaderData>();
     const actionData = useActionData();
 
     // Filter out workspaces the user is already a member of
     const availableWorkspaces = allWorkspaces.filter(
-        (workspace) => !userWorkspaces.some((uw) => uw.workspace_id === workspace.id)
+        (workspace: WorkspaceRow) => !userWorkspaces.some((uw: UserWorkspaceRow) => uw.workspace_id === workspace.id)
     );
 
     useEffect(() => {

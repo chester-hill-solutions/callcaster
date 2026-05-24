@@ -82,6 +82,7 @@ const skip = new Set([
   "app/routes/api+/audience-upload.tsx",
   "app/routes/api+/campaign-export.tsx",
   "app/routes/api+/sms.tsx",
+  "app/routes/api+/workspace.tsx",
   "app/routes/api+/auto-dial/dialer.route.tsx",
 ]);
 let n = 0;

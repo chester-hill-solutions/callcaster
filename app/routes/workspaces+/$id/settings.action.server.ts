@@ -7,6 +7,8 @@ import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/t
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 
+type UserWithRole = Partial<User> & { role: string };
+
 function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
   const memberRoleArray = Object.values(MemberRole);
 

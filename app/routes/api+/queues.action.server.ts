@@ -5,6 +5,9 @@ import { logger } from "@/lib/logger.server";
 import { safeParseJson } from "@/lib/database.server";
 import type { ActionFunctionArgs } from "react-router";
 
+type DequeueRequest = { contact_id: string | number; household: boolean };
+type ResetRequest = { campaignId: string | number };
+
 export const action = async ({ request }: ActionFunctionArgs) => {
 
     const { supabaseClient: supabase, serverSession } = await getSupabaseServerClientWithSession(request);
