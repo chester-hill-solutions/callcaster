@@ -252,6 +252,7 @@ function listSourceFiles() {
     if (rel.endsWith(".d.ts")) return true;
     if (rel.endsWith(".types.ts")) return true;
     if (rel.endsWith("-types.ts")) return true;
+    if (rel.endsWith("-types.server.ts")) return true;
     if (rel === path.join("app", "env.ts")) return true;
     if (
       rel ===
@@ -260,6 +261,7 @@ function listSourceFiles() {
       return true;
     if (rel === path.join("app", "lib", "queue-filter-search.server.ts"))
       return true;
+    if (rel === path.join("app", "lib", "chats", "types.ts")) return true;
     if (rel.endsWith("database.types.ts")) return true;
     if (rel.endsWith("supabase.types.ts")) return true;
     if (rel.endsWith("twilio.types.ts")) return true;

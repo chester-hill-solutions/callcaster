@@ -329,7 +329,7 @@ export async function processMessageCampaignExport(
       logger.error("Error writing error status:", statusError);
     }
   }
-};
+}
 
 // Process call campaign export in chunks
 
@@ -677,7 +677,7 @@ export async function processCallCampaignExport(
       logger.error("Error writing error status:", statusError);
     }
   }
-};
+}
 
 const escapeExportCell = (value: unknown): string =>
   escapeCsvCell(value as CsvCell, { protectFromInjection: true });
