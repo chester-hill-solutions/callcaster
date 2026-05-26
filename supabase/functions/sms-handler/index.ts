@@ -586,9 +586,14 @@ const createOutreachAttempt = async ({
   return data;
 };
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   try {
-    const supabase = createClient(
+    const supabase =
+      options?.supabase ??
+      createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );

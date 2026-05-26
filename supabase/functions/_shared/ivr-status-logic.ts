@@ -96,6 +96,7 @@ export async function getCallWithRetry<TCall = any>(
     attempt++;
     await sleep(retryDelayMs);
   }
+  throw new Error("Failed to retrieve call after multiple attempts");
 }
 
 export async function insertTransactionHistoryIdempotent(args: {

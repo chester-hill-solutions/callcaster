@@ -1,14 +1,24 @@
+import path from "node:path";
 import { defineConfig, mergeConfig } from "vitest/config";
 import shared from "./vitest.shared.config";
 
 export default mergeConfig(
   shared,
   defineConfig({
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./app"),
+        "@twilio/voice-sdk": path.resolve(__dirname, "test/mocks/twilio-voice-sdk.ts"),
+      },
+    },
     test: {
       name: "ui",
       environment: "jsdom",
       include: ["test/ui/**/*.test.{ts,tsx,js,jsx}"],
       setupFiles: ["test/setup.ui.ts"],
+      pool: "forks",
+      maxWorkers: 2,
+      isolate: true,
       coverage: {
         provider: "istanbul",
         reportsDirectory: "coverage/vitest-ui",

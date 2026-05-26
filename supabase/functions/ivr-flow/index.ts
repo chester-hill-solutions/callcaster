@@ -311,7 +311,10 @@ const getWorkspaceData = async (supabase, workspace_id: string) => {
   return { twilio_data: creds };
 };
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const startTime = Date.now();
   
   try {
@@ -323,7 +326,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     const params = Object.fromEntries(formData.entries());
     const event: TwilioEventData = params;
 
-    const supabase = createClient(
+    const supabase =
+      options?.supabase ??
+      createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );

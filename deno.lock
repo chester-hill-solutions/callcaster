@@ -85,6 +85,7 @@
     "https://deno.land/std@0.224.0/internal/diff.ts": "6234a4b493ebe65dc67a18a0eb97ef683626a1166a1906232ce186ae9f65f4e6",
     "https://deno.land/std@0.224.0/internal/format.ts": "0a98ee226fd3d43450245b1844b47003419d34d210fa989900861c79820d21c2",
     "https://deno.land/std@0.224.0/internal/mod.ts": "534125398c8e7426183e12dc255bb635d94e06d0f93c60a297723abe69d3b22e",
+    "https://deno.land/std@0.224.0/testing/mock.ts": "a963181c2860b6ba3eb60e08b62c164d33cf5da7cd445893499b2efda20074db",
     "https://esm.sh/@supabase/functions-js@2.1.5/denonext/functions-js.mjs": "e6c31ad2262a84ed55da33f4a253a9ec5cd5cc41a6b4393b5ab9b0a108a2e9a8",
     "https://esm.sh/@supabase/functions-js@2.106.1/denonext/functions-js.mjs": "85fb07538aaa092210b598b4d0c46077491e3f7ed4a39a3a00c019ede40bf0c0",
     "https://esm.sh/@supabase/functions-js@2.106.1?target=denonext": "7c7e06e3d0bbf5f53a546819d4466de4e24b5c2ee8964de5df8951e8e497f782",

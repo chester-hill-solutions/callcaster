@@ -201,8 +201,10 @@ export function useForm<T extends Record<string, unknown>>(
 
       touchedFields.forEach((field) => {
         const error = validateField(field);
-        if (error !== errors[field]) {
-          newErrors[field] = error || '';
+        const normalizedError = error ?? '';
+        const previousError = errors[field] ?? '';
+        if (normalizedError !== previousError) {
+          newErrors[field] = normalizedError;
           hasChanges = true;
         }
       });

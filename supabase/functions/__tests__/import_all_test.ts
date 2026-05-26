@@ -3,8 +3,13 @@ import { assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 const modules = [
   "../_shared/audience-upload.ts",
   "../_shared/call-provider-status.ts",
+  "../_shared/getFunctionHeaders.ts",
+  "../_shared/getFunctionsBaseUrl.ts",
   "../_shared/ivr-status-logic.ts",
+  "../_shared/number-rental-billing.ts",
   "../_shared/queue-sync.ts",
+  "../_shared/queue-writes.ts",
+  "../_shared/sms-send-resolve.ts",
   "../_shared/sms-status-logic.ts",
   "../_shared/twilio-open-sync-candidates.ts",
   "../_shared/twilio-workspace-credentials.ts",

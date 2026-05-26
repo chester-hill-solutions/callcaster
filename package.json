@@ -31,9 +31,10 @@
     "test:coverage:vitest": "npm run test:coverage:node && npm run test:coverage:ui",
     "test:coverage:node": "vitest run -c vitest.node.config.ts --coverage",
     "test:coverage:ui": "vitest run -c vitest.ui.config.ts --coverage",
-    "test:coverage:deno": "npx deno test --allow-env --allow-read --allow-net --coverage=coverage/deno supabase/functions/__tests__ && npx deno coverage --lcov --output=coverage/deno/lcov.info coverage/deno",
+    "test:coverage:deno": "npx deno test --no-check --allow-env --allow-read --allow-net --coverage=coverage/deno supabase/functions/__tests__ && npx deno coverage --lcov --output=coverage/deno/lcov.info coverage/deno",
     "test:coverage:merge": "node scripts/coverage/merge-and-check.mjs",
     "test:coverage:merge:strict": "COVERAGE_FULL=1 node scripts/coverage/merge-and-check.mjs",
+    "test:coverage:report:strict": "node scripts/coverage/report-strict-failures.mjs",
     "test:coverage": "npm run test:coverage:vitest && npm run test:coverage:deno && npm run test:coverage:merge",
     "check:client-bundle": "node scripts/check-client-bundle-for-server-imports.mjs",
     "check:route-server-leaks": "node scripts/check-route-server-leaks.mjs"

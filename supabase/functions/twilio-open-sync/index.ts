@@ -390,7 +390,10 @@ async function syncMessageRow(
   }
 }
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "POST required" }), {
       status: 405,
@@ -398,7 +401,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     });
   }
 
-  const supabase = createClient(
+  const supabase =
+    options?.supabase ??
+    createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
