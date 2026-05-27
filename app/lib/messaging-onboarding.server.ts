@@ -17,9 +17,26 @@ import {
   WORKSPACE_ONBOARDING_STEP_STATUS_VALUES,
   WORKSPACE_TWILIO_AUTH_MODE_VALUES,
 } from "@/lib/types";
+import { isRcsOnboardingEnabled, stripDisabledRcsChannel } from "@/lib/rcs-onboarding.server";
 import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
-const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 1;
+const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 2;
+
+/** Steps shown in the guided onboarding wizard (single screen each). */
+export const WIZARD_ONBOARDING_STEP_IDS = [
+  "business_profile",
+  "path_selection",
+  "messaging_service",
+  "first_number",
+  "provider_provisioning",
+  "launch_checks",
+] as const;
+
+export type WizardOnboardingStepId = (typeof WIZARD_ONBOARDING_STEP_IDS)[number];
+
+export function isWizardOnboardingStepId(value: string): value is WizardOnboardingStepId {
+  return (WIZARD_ONBOARDING_STEP_IDS as readonly string[]).includes(value);
+}
 
 function parseString(value: unknown): string {
   return typeof value === "string" ? value : "";
@@ -37,6 +54,22 @@ function pickEnumValue<const T extends readonly string[]>(
   fallback: T[number],
 ): T[number] {
   return typeof value === "string" && allowedValues.includes(value) ? value : fallback;
+}
+
+function mergeStoredOnboardingSteps(
+  storedSteps: unknown[],
+): WorkspaceOnboardingStepState[] {
+  const storedById = new Map<string, unknown>();
+  for (const step of storedSteps) {
+    if (isRecord(step) && typeof step.id === "string" && step.id.trim()) {
+      storedById.set(step.id, step);
+    }
+  }
+
+  return DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((defaultStep) => {
+    const stored = storedById.get(defaultStep.id);
+    return stored ? normalizeStep(stored, defaultStep) : { ...defaultStep };
+  });
 }
 
 function normalizeStep(value: unknown, fallback: WorkspaceOnboardingStepState): WorkspaceOnboardingStepState {
@@ -80,6 +113,12 @@ export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] 
     label: "Messaging Service",
     status: "pending",
     description: "Provision or confirm the shared Messaging Service used for sending.",
+  },
+  {
+    id: "first_number",
+    label: "Your first number",
+    status: "pending",
+    description: "Rent a Canadian number to send and receive calls and texts.",
   },
   {
     id: "provider_provisioning",
@@ -256,17 +295,13 @@ export function normalizeWorkspaceMessagingOnboardingState(
 
     return {
       ...defaultState,
-      steps: buildOnboardingStepsForState(defaultState),
+      steps: buildOnboardingStepsForState(defaultState, { hasFirstNumber: false }),
     };
   }
 
   const steps =
     Array.isArray(value.steps) && value.steps.length > 0
-      ? value.steps.map((step, index) =>
-          normalizeStep(step, DEFAULT_WORKSPACE_ONBOARDING_STEPS[
-            Math.min(index, DEFAULT_WORKSPACE_ONBOARDING_STEPS.length - 1)
-          ]!),
-        )
+      ? mergeStoredOnboardingSteps(value.steps)
       : DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step }));
 
   const selectedChannels = parseStringArray(value.selectedChannels).filter(
@@ -472,8 +507,22 @@ export function normalizeWorkspaceMessagingOnboardingState(
 
   return {
     ...normalizedState,
-    steps: buildOnboardingStepsForState(normalizedState),
+    steps: buildOnboardingStepsForState(normalizedState, { hasFirstNumber: false }),
   };
+}
+
+export function applyWorkspaceOnboardingChannelPolicy(
+  onboarding: WorkspaceMessagingOnboardingState,
+): WorkspaceMessagingOnboardingState {
+  const selectedChannels = stripDisabledRcsChannel(onboarding.selectedChannels);
+  if (
+    selectedChannels.length === onboarding.selectedChannels.length &&
+    selectedChannels.every((channel, index) => channel === onboarding.selectedChannels[index])
+  ) {
+    return onboarding;
+  }
+
+  return mergeWorkspaceMessagingOnboardingState(onboarding, { selectedChannels });
 }
 
 export function getWorkspaceMessagingOnboardingFromTwilioData(
@@ -684,7 +733,12 @@ export function deriveWorkspaceMessagingReadiness({
     warnings.push("Emergency voice readiness is incomplete.");
   }
   if (callerIds.length > 0 && rentedNumbers.length === 0) {
-    warnings.push("Only verified caller IDs are present, so voice readiness remains limited.");
+    warnings.push(
+      "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
+    );
+  }
+  if (!workspaceHasFirstNumber(numbers)) {
+    warnings.push("No phone number yet.");
   }
 
   const shouldRedirectToOnboarding = !hasLegacyTraffic && warnings.length > 0;
@@ -707,11 +761,31 @@ export function deriveWorkspaceMessagingReadiness({
   };
 }
 
+export type BuildOnboardingStepsContext = {
+  hasFirstNumber?: boolean;
+};
+
 export function buildOnboardingStepsForState(
   onboarding: WorkspaceMessagingOnboardingState,
+  context: BuildOnboardingStepsContext = {},
 ): WorkspaceOnboardingStepState[] {
-  const [businessProfileStep, useCaseStep, pathSelectionStep, messagingServiceStep, providerProvisioningStep, launchChecksStep] =
-    DEFAULT_WORKSPACE_ONBOARDING_STEPS;
+  const hasFirstNumber = context.hasFirstNumber ?? false;
+  const stepById = Object.fromEntries(
+    DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => [step.id, step]),
+  ) as Record<string, WorkspaceOnboardingStepState>;
+  const businessProfileStep = stepById.business_profile!;
+  const useCaseStep = stepById.use_case!;
+  const pathSelectionStep = stepById.path_selection!;
+  const messagingServiceStep = stepById.messaging_service!;
+  const firstNumberStep = stepById.first_number!;
+  const providerProvisioningStep = stepById.provider_provisioning!;
+  const launchChecksStep = stepById.launch_checks!;
+  const businessBasicsComplete = Boolean(
+    onboarding.businessProfile.legalBusinessName &&
+      onboarding.businessProfile.websiteUrl &&
+      onboarding.businessProfile.useCaseSummary &&
+      onboarding.businessProfile.sampleMessages.length > 0,
+  );
   const emergencyReady =
     onboarding.emergencyVoice.address.status === "validated" &&
     onboarding.emergencyVoice.emergencyEligiblePhoneNumbers.length > 0;
@@ -719,50 +793,107 @@ export function buildOnboardingStepsForState(
     (!onboarding.selectedChannels.includes("a2p10dlc") ||
       onboarding.a2p10dlc.status === "approved" ||
       onboarding.a2p10dlc.status === "live") &&
-    (!onboarding.selectedChannels.includes("rcs") ||
+    (!isRcsOnboardingEnabled() ||
+      !onboarding.selectedChannels.includes("rcs") ||
       onboarding.rcs.status === "approved" ||
       onboarding.rcs.status === "live" ||
       onboarding.rcs.status === "in_review");
+  const hasFirstNumberComplete = hasFirstNumber;
 
   return [
     {
-      ...businessProfileStep!,
-      status:
-        onboarding.businessProfile.legalBusinessName &&
-        onboarding.businessProfile.websiteUrl
-          ? "complete"
-          : "in_progress",
+      ...businessProfileStep,
+      status: businessBasicsComplete ? "complete" : "in_progress",
     },
     {
-      ...useCaseStep!,
-      status:
-        onboarding.businessProfile.useCaseSummary &&
-        onboarding.businessProfile.sampleMessages.length > 0
-          ? "complete"
-          : "in_progress",
+      ...useCaseStep,
+      status: businessBasicsComplete ? "complete" : "in_progress",
     },
     {
-      ...pathSelectionStep!,
+      ...pathSelectionStep,
       status: onboarding.selectedChannels.length > 0 ? "complete" : "in_progress",
     },
     {
-      ...messagingServiceStep!,
+      ...messagingServiceStep,
       status: onboarding.messagingService.serviceSid ? "complete" : "in_progress",
     },
     {
-      ...providerProvisioningStep!,
+      ...firstNumberStep,
+      status: hasFirstNumberComplete ? "complete" : "in_progress",
+    },
+    {
+      ...providerProvisioningStep,
       status: providerReady ? "complete" : "in_progress",
     },
     {
-      ...launchChecksStep!,
+      ...launchChecksStep,
       status:
         onboarding.messagingService.serviceSid &&
+        hasFirstNumberComplete &&
         providerReady &&
         (!onboarding.selectedChannels.includes("voice_compliance") || emergencyReady)
           ? "complete"
           : "pending",
     },
   ];
+}
+
+export function countRentedWorkspaceNumbers(
+  workspaceNumbers: Array<{ type?: string | null }>,
+): number {
+  return workspaceNumbers.filter((number) => number.type === "rented").length;
+}
+
+export function isVerifiedCallerIdNumber(number: {
+  type?: string | null;
+  capabilities?: unknown;
+}): boolean {
+  if (number.type !== "caller_id") {
+    return false;
+  }
+  if (
+    !number.capabilities ||
+    typeof number.capabilities !== "object" ||
+    Array.isArray(number.capabilities)
+  ) {
+    return false;
+  }
+  return (
+    (number.capabilities as Record<string, unknown>).verification_status === "success"
+  );
+}
+
+export function countVerifiedCallerIdNumbers(
+  workspaceNumbers: Array<{
+    type?: string | null;
+    capabilities?: unknown;
+  }>,
+): number {
+  return workspaceNumbers.filter(isVerifiedCallerIdNumber).length;
+}
+
+export function workspaceHasFirstNumber(
+  workspaceNumbers: Array<{
+    type?: string | null;
+    capabilities?: unknown;
+  }>,
+): boolean {
+  return (
+    countRentedWorkspaceNumbers(workspaceNumbers) > 0 ||
+    countVerifiedCallerIdNumbers(workspaceNumbers) > 0
+  );
+}
+
+export function applyOnboardingStepsWithWorkspaceNumbers(
+  onboarding: WorkspaceMessagingOnboardingState,
+  workspaceNumbers: Array<{ type?: string | null; capabilities?: unknown }>,
+): WorkspaceMessagingOnboardingState {
+  return {
+    ...onboarding,
+    steps: buildOnboardingStepsForState(onboarding, {
+      hasFirstNumber: workspaceHasFirstNumber(workspaceNumbers),
+    }),
+  };
 }
 
 export function updateMessagingServiceSenders(

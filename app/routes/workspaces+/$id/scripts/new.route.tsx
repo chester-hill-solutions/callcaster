@@ -1,11 +1,11 @@
 export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
-import React, { useEffect, useState } from "react";
+import { Form, Link, useActionData, useLoaderData } from "react-router";
+import React, { useState } from "react";
 
 import { MdAdd, MdClose } from "react-icons/md";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 import { CardContent } from "@/components/ui/card";
@@ -19,31 +19,18 @@ export default function NewScript() {
   const error = "error" in loaderData ? loaderData.error : null;
   const ref = "ref" in loaderData ? loaderData.ref : null;
   const campaignType = "campaignType" in loaderData ? loaderData.campaignType : undefined;
-  const createdScripts =
-    actionData && "data" in actionData && Array.isArray(actionData.data)
-      ? actionData.data
-      : null;
-  const createdScript = createdScripts?.[0] ?? null;
   const [pendingFileName, setPendingFileName] = useState("");
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (actionData?.success && createdScript) {
-      toast.success("Script successfully added to your workspace!");
-      setTimeout(
-        () => navigate(`../${createdScript.id}`, { relative: "path" }),
-        750,
-      );
-    } else if (actionData?.error) {
-      const errorMessage =
-        actionData.error instanceof Error
-          ? actionData.error.message
-          : typeof actionData.error === "string"
-            ? actionData.error
-            : "An error occurred";
-      toast.error(`Error: ${errorMessage}`);
-    }
-  }, [actionData, createdScript, navigate]);
+  useActionFeedback(actionData as { error?: unknown } | undefined, {
+    getSuccess: () => false,
+    getError: (data) => data?.error,
+    errorMessage: (data) => {
+      const error = (data as { error?: unknown })?.error;
+      if (error instanceof Error) return error.message;
+      if (typeof error === "string") return error;
+      return "An error occurred";
+    },
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

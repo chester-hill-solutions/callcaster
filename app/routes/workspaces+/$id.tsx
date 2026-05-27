@@ -12,6 +12,7 @@ import {
   type LoaderFunctionArgs,
 } from "react-router";
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
@@ -93,7 +94,7 @@ function WorkspaceResolvedView({
   );
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
       <WorkspaceNav
         workspace={
           workspaceData?.[0] ?? {
@@ -107,7 +108,9 @@ function WorkspaceResolvedView({
           (userRole as MemberRole | null | undefined) ?? MemberRole.Member
         }
       />
-      <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
+      <div
+        className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+      >
         {!outlet ? (
           <div className="space-y-4">
             {onboardingReadiness.shouldShowOnboardingBanner ? (

@@ -10,10 +10,21 @@ import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { validateTwilioWebhookForMessageSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { Database } from "@/lib/database.types";
-import type { TwilioSmsStatus, TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
+import {
+  isTerminalSmsStatus,
+  normalizeSmsStatus,
+  smsStatusToOutreachDisposition,
+} from "@/lib/sms-status";
+import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
 
 import type { ActionFunctionArgs } from "react-router";
 
+/**
+ * Legacy Remix SMS status webhook. Canonical handler: Edge `sms-status`.
+ * Kept as a compatibility shim for Twilio resources still pointing at `/api/sms/status`.
+ * New outbound sends use `${SUPABASE_URL}/functions/v1/sms-status` — see `chat-sms.server.ts`.
+ */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const supabase = createClient<Database>(
     env.SUPABASE_URL(),
@@ -67,14 +78,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return routeData({ message: preUpdateMessage, outreach: null });
     }
 
-    // Validate status is a valid Twilio SMS status
-    const validStatuses: TwilioSmsStatus[] = [
-      "accepted", "scheduled", "canceled", "queued", "sending", "sent",
-      "failed", "delivered", "undelivered", "receiving", "received", "read"
-    ];
-    const messageStatus = validStatuses.includes(status as TwilioSmsStatus) 
-      ? (status as TwilioSmsStatus)
-      : "failed"; // Default to failed if invalid
+    const messageStatus = normalizeSmsStatus(status) ?? "failed";
+    if (!normalizeSmsStatus(status)) {
+      logger.warn("Unknown SMS status from Twilio webhook", { sid, status });
+    }
 
     const accountSidFromWebhook =
       typeof payload.AccountSid === "string" && payload.AccountSid.trim()
@@ -97,10 +104,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     // Debit billing for SMS (campaign, API/chat, or any outbound) when terminal status
-    if (
-      messageData?.workspace &&
-      (messageStatus === "delivered" || messageStatus === "failed" || messageStatus === "undelivered")
-    ) {
+    if (messageData?.workspace && isTerminalSmsStatus(messageStatus)) {
       try {
         await insertTransactionHistoryIdempotent({
           supabase,
@@ -120,7 +124,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       | null = null;
     if (messageData?.outreach_attempt_id) {
       // Use message status as disposition for SMS outreach attempts
-      const disposition: OutreachDisposition = messageStatus;
+      const disposition: OutreachDisposition =
+        smsStatusToOutreachDisposition(messageStatus);
 
       const { data: currentAttempt } = await supabase
         .from("outreach_attempt")
@@ -166,56 +171,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     logger.debug("Message status update", { messageData });
     
-    // Send webhook notification if configured
     if (messageData?.workspace) {
-      const { data: webhook, error: webhook_error } = await supabase
-        .from('webhook')
-        .select('*')
-        .eq('workspace', messageData.workspace)
-        .filter('events', 'cs', '[{"category":"outbound_sms", "type":"UPDATE"}]');
-        
-      if (webhook_error) {
-        logger.error("Error fetching webhook:", webhook_error);
-      } else if (webhook && webhook.length > 0) {
-        const webhook_data = webhook[0];
-        if (webhook_data?.destination_url) {
-          const customHeaders: Record<string, string> = {};
-          if (webhook_data.custom_headers && typeof webhook_data.custom_headers === 'object') {
-            Object.entries(webhook_data.custom_headers).forEach(([key, value]) => {
-              customHeaders[key] = String(value);
-            });
-          }
-          
-          const webhook_response = await fetch(webhook_data.destination_url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...customHeaders
-            },
-            body: JSON.stringify({
-              event_category: 'outbound_sms',
-              event_type: 'UPDATE',
-              workspace_id: messageData.workspace,
-              payload: {
-                type: 'outbound_sms',
-                record: {
-                  message_sid: messageData.sid,
-                  from: messageData.from,
-                  to: messageData.to,
-                  body: messageData.body,
-                  num_media: messageData.num_media,
-                  status: messageData.status,
-                  date_updated: messageData.date_updated,
-                },
-                old_record: { message_sid: messageData.sid }
-              }
-            }),
-          });
-          if (!webhook_response.ok) {
-            logger.error(`Webhook request failed with status ${webhook_response.status}`);
-            throw new Error(`Error with the webhook event: ${webhook_response.statusText}`);
-          }
-        }
+      const webhookResult = await sendWorkspaceWebhookNotification({
+        supabaseClient: supabase,
+        workspaceId: messageData.workspace,
+        eventCategory: "outbound_sms",
+        eventType: "UPDATE",
+        payload: {
+          type: "outbound_sms",
+          record: {
+            message_sid: messageData.sid,
+            from: messageData.from,
+            to: messageData.to,
+            body: messageData.body,
+            num_media: messageData.num_media,
+            status: messageData.status,
+            date_updated: messageData.date_updated,
+          },
+          old_record: { message_sid: messageData.sid },
+        },
+      });
+      if (!webhookResult.success) {
+        logger.error("SMS status webhook delivery failed", webhookResult.error);
       }
     }
     return routeData({ message: messageData, outreach: outreachData });

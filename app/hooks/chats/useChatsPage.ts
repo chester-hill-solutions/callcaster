@@ -52,12 +52,7 @@ export function useChatsPage() {
     optOutKeywords,
   } = useLoaderData<ChatsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [hideStopConversations, setHideStopConversations] = useState(
-    () => searchParams.get("hide_stop") === "1",
-  );
-  useEffect(() => {
-    setHideStopConversations(searchParams.get("hide_stop") === "1");
-  }, [searchParams]);
+  const hideStopConversations = searchParams.get("hide_stop") === "1";
   const messageFetcher = useFetcher({ key: "messages" });
   const paginationFilterKey = useMemo(() => {
     const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
@@ -114,10 +109,17 @@ export function useChatsPage() {
   }, []);
 
   useEffect(() => {
+    if (paginationFetcher.state !== "idle") {
+      return;
+    }
+    const fetchedPage = paginationFetcher.data?.pagination.page;
+    if (fetchedPage != null && fetchedPage > pagination.page) {
+      return;
+    }
     setLoadedChats(chats);
     setPaginationState(pagination);
     requestedPageRef.current = pagination.page;
-  }, [chats, pagination]);
+  }, [chats, pagination, paginationFetcher.data, paginationFetcher.state]);
 
   useEffect(() => {
     if (!paginationFetcher.data) {
@@ -432,13 +434,20 @@ export function useChatsPage() {
     [setSearchParams],
   );
 
-  const handleHideStopChange = useCallback((checked: boolean) => {
-    setHideStopConversations(checked);
-    const url = new URL(window.location.href);
-    if (checked) url.searchParams.set("hide_stop", "1");
-    else url.searchParams.delete("hide_stop");
-    window.history.replaceState(null, "", url.pathname + url.search);
-  }, []);
+  const handleHideStopChange = useCallback(
+    (checked: boolean) => {
+      setSearchParams((previousParams) => {
+        const nextParams = new URLSearchParams(previousParams);
+        if (checked) {
+          nextParams.set("hide_stop", "1");
+        } else {
+          nextParams.delete("hide_stop");
+        }
+        return nextParams;
+      });
+    },
+    [setSearchParams],
+  );
 
   const handleNewChatClick = useCallback(() => {
     closeMobileConversationList();

@@ -2,11 +2,8 @@ export { loader } from "./$selected_id.loader.server";
 export { action } from "./$selected_id.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
-import { Suspense, useEffect, useRef } from "react";
-
-
-import { logger as loggerClient } from "@/lib/logger.client";
+import { Await, Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
+import { Suspense, useRef } from "react";
 
 
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -19,7 +16,6 @@ import {
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
-import { downloadCsv } from "@/lib/csvDownload";
 import {
   Audience,
   Campaign,
@@ -79,7 +75,6 @@ export default function CampaignScreen() {
       supabase: SupabaseClient;
     }>();
   const campaignData = campaigns.find((c) => c?.id.toString() === selected_id);
-  const csvData = useActionData() as { csvContent: string; filename: string };
   const location = useLocation();
   const route = location.pathname.split("/");
   const isCampaignParentRoute = route.length === 5;
@@ -113,17 +108,6 @@ export default function CampaignScreen() {
       revalidator.revalidate();
     },
   });
-
-  // Handle CSV download when csvData is available
-  useEffect(() => {
-    if (csvData?.csvContent && csvData?.filename) {
-      try {
-        downloadCsv(csvData.csvContent, csvData.filename);
-      } catch (error) {
-        loggerClient.error("Failed to download CSV:", error);
-      }
-    }
-  }, [csvData]);
 
   const readiness = getCampaignReadiness(campaignData, campaignDetails, {
     queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,

@@ -15,7 +15,6 @@ import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { sendMessage } from "@/lib/chat-sms.server";
-import { useInfiniteScroll } from "@/hooks";
 import { verifyAuth } from "@/lib/supabase.server";
 import type {
   User,

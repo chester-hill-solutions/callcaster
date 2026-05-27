@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const bulkCreateContacts = vi.fn(async () => ({ insert: [], audience_insert: [] }));
+const getWorkspacePhoneNumbers = vi.fn(async () => ({ data: [], error: null }));
 vi.mock("@/lib/database.server", async () => {
   const actual = await vi.importActual<typeof import("@/lib/database.server")>("@/lib/database.server");
-  return { ...actual, bulkCreateContacts };
+  return { ...actual, bulkCreateContacts, getWorkspacePhoneNumbers };
 });
 
 const enqueueContactsForCampaign = vi.fn(async () => undefined);
@@ -21,6 +22,8 @@ describe("WorkspaceSelectedNewUtils", () => {
   beforeEach(() => {
     bulkCreateContacts.mockReset();
     enqueueContactsForCampaign.mockReset();
+    getWorkspacePhoneNumbers.mockReset();
+    getWorkspacePhoneNumbers.mockResolvedValue({ data: [], error: null });
   });
 
   test("handleNewAudience success with no campaign and no contacts", async () => {
@@ -322,6 +325,55 @@ describe("WorkspaceSelectedNewUtils", () => {
     expect(r2.status).toBe(302);
 
     expect(insertsByTable).toEqual(["message_campaign", "ivr_campaign"]);
+  });
+
+  test("handleNewCampaign seeds schedule, dates, and auto caller_id for a single workspace number", async () => {
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+    const headers = new Headers();
+    const fd = new FormData();
+    fd.set("campaign-name", "First Campaign");
+    fd.set("campaign-type", "live_call");
+
+    getWorkspacePhoneNumbers.mockResolvedValue({
+      data: [{ phone_number: "+15555550100" }],
+      error: null,
+    });
+
+    let insertedCampaign: Record<string, unknown> | null = null;
+    const supabaseClient: any = {
+      from: (table: string) => {
+        if (table === "campaign") {
+          return {
+            insert: (payload: Record<string, unknown>) => {
+              insertedCampaign = payload;
+              return {
+                select: () => ({
+                  single: async () => ({ data: { id: 55 }, error: null }),
+                }),
+              };
+            },
+          };
+        }
+        return { insert: async () => ({ error: null }) };
+      },
+    };
+
+    const res = await asRouteResponse(await mod.handleNewCampaign({
+      supabaseClient,
+      formData: fd,
+      workspaceId: "w1",
+      headers,
+    }));
+
+    expect(res.status).toBe(302);
+    expect(insertedCampaign).toMatchObject({
+      caller_id: "+15555550100",
+      schedule: expect.objectContaining({
+        monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+      }),
+    });
+    expect(insertedCampaign?.start_date).toBeTruthy();
+    expect(insertedCampaign?.end_date).toBeTruthy();
   });
 });
 

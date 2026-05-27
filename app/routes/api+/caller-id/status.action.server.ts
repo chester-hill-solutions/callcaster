@@ -6,6 +6,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import {
+  applyOnboardingStepsWithWorkspaceNumbers,
+  getWorkspaceMessagingOnboardingState,
+  updateMessagingServiceSenders,
+  updateWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -92,6 +99,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
       if (!numberRequest || numberRequest.length === 0) {
         throw new Error("No matching record found");
+      }
+
+      if (parsedBody.VerificationStatus === "success") {
+        const updatedNumber = numberRequest[0] as { workspace?: string };
+        const workspaceId = updatedNumber.workspace;
+        if (workspaceId) {
+          const [current, phoneNumbersResult] = await Promise.all([
+            getWorkspaceMessagingOnboardingState({
+              supabaseClient: supabase,
+              workspaceId,
+            }),
+            getWorkspacePhoneNumbers({
+              supabaseClient: supabase,
+              workspaceId,
+            }),
+          ]);
+          let nextState = updateMessagingServiceSenders(current, parsedBody.To);
+          nextState = applyOnboardingStepsWithWorkspaceNumbers(
+            nextState,
+            phoneNumbersResult.data ?? [],
+          );
+          await updateWorkspaceMessagingOnboardingState({
+            supabaseClient: supabase,
+            workspaceId,
+            updates: nextState,
+            actorUserId: null,
+          });
+        }
       }
 
       return routeData(numberRequest[0]);

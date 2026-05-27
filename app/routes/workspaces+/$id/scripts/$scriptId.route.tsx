@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLoaderData } from "react-router";
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { SaveBar } from "@/components/shared/SaveBar";
-import { deepEqual } from "@/lib/utils";
+import { useHasChanges } from "@/hooks/utils/useHasChanges";
 import {
   normalizeScriptForComparison,
-  normalizeScriptPageDataForComparison,
 } from "@/lib/script-change";
 import type { Script } from "@/lib/types";
 
@@ -18,8 +18,8 @@ export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteEr
 
 export default function ScriptEditor() {
   const { script: initScript, mediaNames } = useLoaderData<ScriptIdLoaderData>();
-  const [isChanged, setChanged] = useState(false);
   const [script, setScript] = useState(initScript);
+  const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
 
   const handleSaveUpdate = async () => {
     try {
@@ -36,7 +36,6 @@ export default function ScriptEditor() {
         throw new Error(result.error);
       }
       setScript(script);
-      setChanged(false);
     } catch (error) {
       console.error("Error saving update:", error);
     }
@@ -44,7 +43,6 @@ export default function ScriptEditor() {
 
   const handleReset = () => {
     setScript(initScript);
-    setChanged(false);
   };
 
   type PageData = {
@@ -53,21 +51,19 @@ export default function ScriptEditor() {
 
   const handlePageDataChange = (newPageData: PageData) => {
     setScript(newPageData.campaignDetails.script);
-    const obj1 = normalizeScriptPageDataForComparison({
-      campaignDetails: { script },
-    });
-    const obj2 = normalizeScriptPageDataForComparison(newPageData);
-    setChanged(!deepEqual(obj1, obj2));
   };
-
-  useEffect(() => {
-    const obj1 = normalizeScriptForComparison(script);
-    const obj2 = normalizeScriptForComparison(initScript);
-    setChanged(!deepEqual(obj1, obj2));
-  }, [initScript, script]);
 
   return (
     <div className="relative flex h-full flex-col overflow-visible">
+      <QueryParamBanner
+        param="created"
+        variants={{
+          "1": {
+            title: "Script created",
+            description: "Your new script is ready to edit.",
+          },
+        }}
+      />
       <SaveBar
         isChanged={isChanged}
         onSave={handleSaveUpdate}

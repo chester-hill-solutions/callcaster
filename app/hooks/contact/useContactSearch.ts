@@ -1,5 +1,6 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { MutableRefObject, useEffect, useState, useCallback } from "react";
+import { useClickOutside } from "@/hooks/utils/useClickOutside";
 import { Contact } from "@/lib/types";
 import { formatMessageTimestamp } from "@/lib/utils";
 import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
@@ -97,7 +98,8 @@ export function useContactSearch({
 }: UseContactSearchProps) {
   const [isValid, setIsValid] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(contact_number);
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(initialContact);
+  const [manualContact, setManualContact] = useState<Contact | null>(null);
+  const selectedContact = manualContact ?? initialContact;
   const [isContactMenuOpen, setIsContactMenuOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Contact[]>(potentialContacts || []);
@@ -108,12 +110,12 @@ export function useContactSearch({
     const value = e.target.value;
     setPhoneNumber(value);
     setIsValid(isValidPhoneNumber(value));
-    setSelectedContact(null);
+    setManualContact(null);
     setExistingConversation(null);
   }, []);
 
   const handleContactSelect = useCallback((contact: Contact) => {
-    setSelectedContact(contact);
+    setManualContact(contact);
     setIsContactMenuOpen(false);
   }, []);
 
@@ -122,7 +124,7 @@ export function useContactSearch({
   }, []);
 
   const clearSelectedContact = useCallback(() => {
-    setSelectedContact(null);
+    setManualContact(null);
   }, []);
 
   const searchContact = useCallback(async (phoneNumber: string) => {
@@ -138,18 +140,18 @@ export function useContactSearch({
 
       if (data && data.length > 0) {
         setContacts(data);
-        setSelectedContact(null);
+        setManualContact(null);
         setIsContactMenuOpen(true);
         setSearchError(null);
       } else {
         setContacts([]);
-        setSelectedContact(null);
+        setManualContact(null);
         setSearchError("No contact found. A new contact will be created.");
       }
     } catch (error) {
       logger.error("Contact search error:", error);
       setContacts([]);
-      setSelectedContact(null);
+      setManualContact(null);
       const errorMessage = error instanceof Error 
         ? `Error searching for contact: ${error.message}`
         : "Unable to search for contact. Please try again.";
@@ -190,40 +192,18 @@ export function useContactSearch({
   }, [supabase, workspace_id]);
 
   useEffect(() => {
-    if (isValidPhoneNumber(contact_number)) {
-      setPhoneNumber(contact_number);
-      setIsValid(true);
-    }
-  }, [contact_number]);
-
-  useEffect(() => {
-    setSelectedContact(initialContact);
-  }, [initialContact]);
-
-  useEffect(() => {
     if (isValid && phoneNumber) {
       searchContact(phoneNumber);
       searchConversation(phoneNumber);
     } else {
       setContacts([]);
-      setSelectedContact(null);
+      setManualContact(null);
       setSearchError(null);
       setExistingConversation(null);
     }
   }, [phoneNumber, isValid, searchContact, searchConversation]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsContactMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [dropdownRef]);
+  useClickOutside(dropdownRef, () => setIsContactMenuOpen(false));
 
   return {
     selectedContact,

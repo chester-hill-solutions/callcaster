@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type { Tables } from "@/lib/database.types";
 
 type WorkspaceRow = Tables<"workspace">;
@@ -37,15 +36,14 @@ export default function UserWorkspaces() {
         (workspace: WorkspaceRow) => !userWorkspaces.some((uw: UserWorkspaceRow) => uw.workspace_id === workspace.id)
     );
 
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useActionFeedback(actionData, {
+        getSuccess: (data) => Boolean(data && "success" in data && data.success),
+        successMessage: (data) =>
+            data && "success" in data && typeof data.success === "string"
+                ? data.success
+                : "Saved",
+        getError: (data) => (data && "error" in data ? data.error : undefined),
+    });
 
     return (
         <div className="container mx-auto py-8 px-4">

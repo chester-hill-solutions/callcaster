@@ -1,4 +1,6 @@
 import {
+  applyOnboardingStepsWithWorkspaceNumbers,
+  applyWorkspaceOnboardingChannelPolicy,
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
@@ -11,6 +13,7 @@ import {
 import {
   getWorkspaceRcsBlockingIssues,
   hydrateWorkspaceRcsOnboardingState,
+  isRcsOnboardingEnabled,
 } from "@/lib/rcs-onboarding.server";
 import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -29,6 +32,7 @@ export type OnboardingLoaderData = {
   onboarding: WorkspaceMessagingOnboardingState;
   readiness: WorkspaceMessagingReadiness;
   phoneNumbers: Tables<"workspace_number">[] | null;
+  creditsBalance: number;
   rcsBlockingIssues: string[];
 };
 
@@ -56,15 +60,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspaceId,
     })
   )?.role;
-  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding] = await Promise.all([
-    getWorkspaceInfo({ supabaseClient, workspaceId }),
-    getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
-    getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
-  ]);
-  const hydratedOnboarding = hydrateWorkspaceRcsOnboardingState(onboarding);
-  const rcsBlockingIssues = hydratedOnboarding.selectedChannels.includes("rcs")
-    ? getWorkspaceRcsBlockingIssues(hydratedOnboarding)
-    : [];
+  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding, workspaceCredits] =
+    await Promise.all([
+      getWorkspaceInfo({ supabaseClient, workspaceId }),
+      getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
+      getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
+      supabaseClient.from("workspace").select("credits").eq("id", workspaceId).single(),
+    ]);
+  const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
+    hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
+    phoneNumbers ?? [],
+  );
+  const rcsBlockingIssues =
+    isRcsOnboardingEnabled() && hydratedOnboarding.selectedChannels.includes("rcs")
+      ? getWorkspaceRcsBlockingIssues(hydratedOnboarding)
+      : [];
 
   const readiness = deriveWorkspaceMessagingReadiness({
     onboarding: hydratedOnboarding,
@@ -84,6 +94,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       onboarding: hydratedOnboarding,
       readiness,
       phoneNumbers,
+      creditsBalance: workspaceCredits.data?.credits ?? 0,
       rcsBlockingIssues,
     },
     { headers },

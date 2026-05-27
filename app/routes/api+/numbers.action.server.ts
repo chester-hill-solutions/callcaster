@@ -1,12 +1,26 @@
-import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import {
+  applyOnboardingStepsWithWorkspaceNumbers,
+  getWorkspaceMessagingOnboardingState,
+  mergeWorkspaceMessagingOnboardingState,
+  updateWorkspaceMessagingOnboardingState,
+} from "@/lib/messaging-onboarding.server";
 import { createClient } from '@supabase/supabase-js';
 import { createErrorResponse } from "@/lib/errors.server";
-import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  getWorkspacePhoneNumbers,
+  getWorkspaceUsers,
+  requireWorkspaceAccess,
+} from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import Twilio from 'twilio';
+import { twilioErrorUserMessage } from "@/lib/twilio-errors";
+import {
+  attachPhoneNumberToMessagingService,
+} from "@/lib/twilio-bootstrap.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -43,23 +57,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             supabaseClient: supabase,
             workspaceId: workspace_id,
         });
-        const number = await twilio.incomingPhoneNumbers.create({
-            phoneNumber,
-            statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
-            statusCallbackMethod:"POST",
-            voiceUrl: `${env.BASE_URL()}/api/inbound`,
-            smsUrl: `${env.BASE_URL()}/api/inbound-sms`
-        }).catch((error) => {
-            logger.error("Error creating Twilio number:", error);
-            throw error;
-        });
+        const number = await withTwilioRetry(
+          () =>
+            twilio.incomingPhoneNumbers.create({
+              phoneNumber,
+              statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
+              statusCallbackMethod: "POST",
+              voiceUrl: `${env.BASE_URL()}/api/inbound`,
+              smsUrl: `${env.BASE_URL()}/api/inbound-sms`,
+            }),
+          { workspaceId: workspace_id, operation: "incomingPhoneNumbers.create" },
+        );
+
+        let messagingServiceAttachError: string | undefined;
+        let messagingServiceAttached = true;
+
         if (onboarding.messagingService.serviceSid && number.sid) {
-            await (twilio as any).messaging?.v1?.services?.(onboarding.messagingService.serviceSid)?.phoneNumbers?.create?.({
-                phoneNumberSid: number.sid,
-            }).catch((error: unknown) => {
-                logger.error("Error attaching number to Messaging Service:", error);
-            });
+            try {
+                await attachPhoneNumberToMessagingService(
+                  twilio,
+                  onboarding.messagingService.serviceSid,
+                  number.sid,
+                  { workspaceId: workspace_id, operation: "messagingService.phoneNumbers.create" },
+                );
+            } catch (attachError: unknown) {
+                messagingServiceAttached = false;
+                messagingServiceAttachError = twilioErrorUserMessage(attachError);
+                logger.error("Error attaching number to Messaging Service:", attachError);
+            }
         }
+
         const emergencyEligible =
             Boolean(number.capabilities.voice) &&
             onboarding.emergencyVoice.address.status === "validated";
@@ -82,13 +109,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             })
             .select().single();
         if (newNumberError) throw newNumberError;
-        const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
+
+        const mergedOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
             messagingService: {
                 ...onboarding.messagingService,
-                attachedSenderPhoneNumbers: Array.from(new Set([
-                    ...onboarding.messagingService.attachedSenderPhoneNumbers,
-                    number.phoneNumber,
-                ])),
+                attachedSenderPhoneNumbers: messagingServiceAttached
+                  ? Array.from(new Set([
+                      ...onboarding.messagingService.attachedSenderPhoneNumbers,
+                      number.phoneNumber,
+                  ]))
+                  : onboarding.messagingService.attachedSenderPhoneNumbers,
+                lastError: messagingServiceAttachError ?? onboarding.messagingService.lastError,
             },
             emergencyVoice: {
                 ...onboarding.emergencyVoice,
@@ -99,8 +130,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     ]))
                     : onboarding.emergencyVoice.emergencyEligiblePhoneNumbers,
             },
+            currentStep:
+              onboarding.currentStep === "first_number"
+                ? "provider_provisioning"
+                : onboarding.currentStep,
         });
-        nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
+        const { data: workspacePhoneNumbers } = await getWorkspacePhoneNumbers({
+            supabaseClient: supabase,
+            workspaceId: workspace_id,
+        });
+        const nextOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
+          mergedOnboarding,
+          workspacePhoneNumbers ?? [newNumber],
+        );
         await updateWorkspaceMessagingOnboardingState({
             supabaseClient: supabase,
             workspaceId: workspace_id,
@@ -115,15 +157,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             note: "Rented number - " + number.friendlyName,
             idempotencyKey: `number_rent_purchase:${workspace_id}:${number.sid}`,
         });
-        return new Response(JSON.stringify({ newNumber }), {
+        return new Response(JSON.stringify({
+          newNumber,
+          messagingServiceAttached,
+          messagingServiceAttachError,
+          partialSuccess: !messagingServiceAttached && Boolean(onboarding.messagingService.serviceSid),
+        }), {
             headers: {
                 "Content-Type": "application/json"
             },
-            status: 201
+            status: messagingServiceAttached ? 201 : 207
         })
     } catch (error) {
         logger.error('Failed to register number', error);
-        return createErrorResponse(error, "Failed to register number");
+        return createErrorResponse(
+          new Error(twilioErrorUserMessage(error)),
+          "Failed to register number",
+        );
 
     }
 }

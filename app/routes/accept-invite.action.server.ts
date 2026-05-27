@@ -1,6 +1,6 @@
 import { acceptWorkspaceInvitations } from "@/lib/database.server";
 import { createSupabaseServerClient, verifyAuth } from "@/lib/supabase.server";
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
 import type { ActionData } from "./accept-invite.types";
 import type { ActionFunctionArgs } from "react-router";
@@ -111,7 +111,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       );
     }
 
-    return routeData<ActionData>({ status: "accepted" }, { headers: authContext.headers });
+    return redirect("/workspaces?invite=accepted", {
+      headers: authContext.headers,
+    });
   }
 
   return routeData<ActionData>({ status: "error", error: "Invalid action type" }, { headers, status: 400 });

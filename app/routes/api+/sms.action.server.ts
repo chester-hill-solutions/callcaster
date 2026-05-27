@@ -11,6 +11,8 @@ import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { processUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
+import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
 
 interface CampaignData {
   body_text: string;
@@ -131,6 +133,8 @@ const sendMessage = async ({
   campaignSmsRow,
 }: SendMessageParams) => {
 
+  await assertWorkspaceCanSendSms({ supabaseClient: supabase, workspaceId: workspace });
+
   const twilio = await createWorkspaceTwilioInstance({
     supabase,
     workspace_id: workspace,
@@ -147,20 +151,22 @@ const sendMessage = async ({
   });
 
   const [message, outreachAttempt] = await Promise.all([
-    twilio.messages
-      .create(
-        buildTwilioMessageCreateParams({
-          body: processedBody,
-          to,
-          media,
-          messageIntent,
-          defaultMessageIntent: portalConfig.defaultMessageIntent,
-          resolvedMessagingServiceSid,
-          from,
-          statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
-        }),
-      )
-      .catch(e => ({ error: e })),
+    withTwilioRetry(
+      () =>
+        twilio.messages.create(
+          buildTwilioMessageCreateParams({
+            body: processedBody,
+            to,
+            media,
+            messageIntent,
+            defaultMessageIntent: portalConfig.defaultMessageIntent,
+            resolvedMessagingServiceSid,
+            from,
+            statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+          }),
+        ),
+      { workspaceId: workspace, operation: "messages.create.campaign" },
+    ).catch((e) => ({ error: e })),
     createOutreachAttempt({
       supabase,
       contact_id,

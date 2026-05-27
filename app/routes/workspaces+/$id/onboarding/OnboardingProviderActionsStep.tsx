@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import { TWILIO_RCS_DOCS_URL, TWILIO_RCS_PROVIDER, TWILIO_RCS_SENDERS_URL } from "./constants";
 import type { OnboardingProviderActionsProps } from "./types";
 
@@ -17,16 +18,17 @@ export function OnboardingProviderActionsStep({
   a2pErrors,
 }: OnboardingProviderActionsProps) {
   const { isProvisioningA2P, isSavingRcs } = pending;
+  const showRcsOnboarding = isRcsOnboardingEnabled();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>4. Provider actions</CardTitle>
+        <CardTitle>Provider setup</CardTitle>
         <CardDescription>
-          Start the provider steps after the business details and messaging setup above look correct.
+          Submit provider registrations for the channels you selected. Review can take several days.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-6 xl:grid-cols-2">
+      <CardContent className={showRcsOnboarding ? "grid gap-6 xl:grid-cols-2" : "grid gap-6"}>
         <div className="space-y-4 rounded-lg border p-4">
           <div>
             <div className="flex items-center justify-between gap-3">
@@ -100,6 +102,7 @@ export function OnboardingProviderActionsStep({
             </Form>
           ) : null}
         </div>
+        {showRcsOnboarding ? (
         <div className="space-y-4 rounded-lg border p-4">
           <div className="space-y-3">
             <div className="font-medium">Twilio RCS sender onboarding</div>
@@ -352,6 +355,7 @@ export function OnboardingProviderActionsStep({
             ) : null}
           </Form>
         </div>
+        ) : null}
       </CardContent>
     </Card>
   );

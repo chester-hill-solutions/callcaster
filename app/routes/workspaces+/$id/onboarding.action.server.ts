@@ -1,6 +1,8 @@
+import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import {
-  buildOnboardingStepsForState,
+  applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
+  isWizardOnboardingStepId,
   mergeWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
@@ -14,11 +16,14 @@ import {
 import {
   TWILIO_RCS_PROVIDER,
   hydrateWorkspaceRcsOnboardingState,
+  isRcsOnboardingEnabled,
+  stripDisabledRcsChannel,
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
 import { data as routeData, redirect } from "react-router";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
+import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { User } from "@/lib/types";
 import type { ActionFunctionArgs } from "react-router";
@@ -39,22 +44,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     throw redirect("/signin", { headers });
   }
 
-  const workspaceId = params.id;
-  if (!workspaceId) {
+  const wsId = params.id;
+  if (!wsId) {
     return routeData<OnboardingActionData>({ error: "Workspace ID is required." }, { status: 400 });
   }
+  const actorUserId = user.id ?? null;
 
   await requireWorkspaceAccess({
     supabaseClient,
     user,
-    workspaceId,
+    workspaceId: wsId,
   });
 
   const role = (
     await getUserRole({
       supabaseClient,
       user: user as unknown as User,
-      workspaceId,
+      workspaceId: wsId,
     })
   )?.role;
 
@@ -68,13 +74,75 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const formData = await request.formData();
   const actionName = String(formData.get("_action") ?? "");
 
+  async function persistOnboardingState(
+    workspaceId: string,
+    updates: Parameters<typeof updateWorkspaceMessagingOnboardingState>[0]["updates"],
+  ) {
+    const phoneNumbers = await getWorkspacePhoneNumbers({
+      supabaseClient,
+      workspaceId,
+    });
+    const current = await getWorkspaceMessagingOnboardingState({
+      supabaseClient,
+      workspaceId,
+    });
+    const merged = mergeWorkspaceMessagingOnboardingState(current, updates);
+    const withSteps = applyOnboardingStepsWithWorkspaceNumbers(
+      merged,
+      phoneNumbers.data ?? [],
+    );
+    return updateWorkspaceMessagingOnboardingState({
+      supabaseClient,
+      workspaceId,
+      updates: withSteps,
+      actorUserId,
+    });
+  }
+
   try {
+    if (actionName === "advance_step") {
+      const targetStep = String(formData.get("targetStep") ?? "");
+      if (!isWizardOnboardingStepId(targetStep)) {
+        return routeData<OnboardingActionData>({ error: "Invalid onboarding step." }, { status: 400 });
+      }
+      await persistOnboardingState(wsId, { currentStep: targetStep });
+      return routeData<OnboardingActionData>({ success: "Onboarding step updated." });
+    }
+
+    if (actionName === "skip_first_number") {
+      await persistOnboardingState(wsId, { currentStep: "provider_provisioning" });
+      return routeData<OnboardingActionData>({
+        success: "Skipped number rental for now. You can add a number later in Settings.",
+      });
+    }
+
+    if (actionName === "verify_caller_id") {
+      const phoneNumber = String(formData.get("phoneNumber") ?? "");
+      const friendlyName = String(formData.get("friendlyName") ?? "");
+      if (!phoneNumber.trim() || !friendlyName.trim()) {
+        return routeData<OnboardingActionData>(
+          { error: "Phone number and caller ID name are required." },
+          { status: 400 },
+        );
+      }
+      const { validationRequest } = await startWorkspaceCallerIdVerification({
+        supabaseClient,
+        workspaceId: wsId,
+        phoneNumber,
+        friendlyName,
+      });
+      return routeData<OnboardingActionData>({
+        success: "Verification call started. Enter the code when prompted.",
+        validationRequest,
+      });
+    }
+
     if (actionName === "save_channels") {
       const current = await getWorkspaceMessagingOnboardingState({
         supabaseClient,
-        workspaceId,
+        workspaceId: wsId,
       });
-      const selectedChannels = readSelectedChannels(formData);
+      const selectedChannels = stripDisabledRcsChannel(readSelectedChannels(formData));
       let nextState = mergeWorkspaceMessagingOnboardingState(current, {
         selectedChannels,
         status: "collecting_business",
@@ -87,29 +155,49 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             },
       });
       nextState = hydrateWorkspaceRcsOnboardingState(nextState);
-      nextState.steps = buildOnboardingStepsForState(nextState);
-      await updateWorkspaceMessagingOnboardingState({
-        supabaseClient,
-        workspaceId,
-        updates: nextState,
-        actorUserId: user.id,
-      });
+      await persistOnboardingState(wsId, nextState);
       return routeData<OnboardingActionData>({ success: "Onboarding channels updated." });
     }
 
     if (actionName === "bootstrap_messaging_service") {
-      await ensureWorkspaceTwilioBootstrap({
+      const bootstrap = await ensureWorkspaceTwilioBootstrap({
         supabaseClient,
-        workspaceId,
+        workspaceId: wsId,
         actorUserId: user.id,
       });
-      return routeData<OnboardingActionData>({ success: "Messaging Service bootstrap completed." });
+
+      if (bootstrap.serviceSid) {
+        await persistOnboardingState(wsId, { currentStep: "first_number" });
+      }
+
+      if (bootstrap.outcome === "success") {
+        return routeData<OnboardingActionData>({
+          success: "Messaging Service is ready.",
+        });
+      }
+
+      if (bootstrap.outcome === "partial") {
+        return routeData<OnboardingActionData>({
+          warning:
+            bootstrap.lastError ??
+            "Messaging Service was created but some configuration is still incomplete. Review details below and retry.",
+        });
+      }
+
+      return routeData<OnboardingActionData>(
+        {
+          error:
+            bootstrap.lastError ??
+            "Messaging Service could not be provisioned. Try again or contact support.",
+        },
+        { status: 500 },
+      );
     }
 
     if (actionName === "save_business_profile") {
       const current = await getWorkspaceMessagingOnboardingState({
         supabaseClient,
-        workspaceId,
+        workspaceId: wsId,
       });
       const businessProfile = buildBusinessProfile(formData);
       const addressStreet = String(formData.get("addressStreet") ?? "");
@@ -126,7 +214,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       let nextState = mergeWorkspaceMessagingOnboardingState(current, {
         businessProfile,
         status: "collecting_business",
-        currentStep: "use_case",
+        currentStep: "path_selection",
         emergencyVoice: {
           ...current.emergencyVoice,
           status: hasEmergencyAddress ? "collecting_business" : current.emergencyVoice.status,
@@ -150,13 +238,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         },
       });
       nextState = hydrateWorkspaceRcsOnboardingState(nextState);
-      nextState.steps = buildOnboardingStepsForState(nextState);
-      await updateWorkspaceMessagingOnboardingState({
-        supabaseClient,
-        workspaceId,
-        updates: nextState,
-        actorUserId: user.id,
-      });
+      await persistOnboardingState(wsId, nextState);
       return routeData<OnboardingActionData>({ success: "Business and compliance details saved." });
     }
 
@@ -164,11 +246,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       const [current, workspacePhoneNumbers] = await Promise.all([
         getWorkspaceMessagingOnboardingState({
           supabaseClient,
-          workspaceId,
+          workspaceId: wsId,
         }),
         getWorkspacePhoneNumbers({
           supabaseClient,
-          workspaceId,
+          workspaceId: wsId,
         }),
       ]);
       const address = current.emergencyVoice.address;
@@ -191,7 +273,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       try {
         const twilio = (await createWorkspaceTwilioInstance({
           supabase: supabaseClient,
-          workspace_id: workspaceId,
+          workspace_id: wsId,
         })) as Twilio.Twilio;
         const addressPayload = {
           customerName,
@@ -229,7 +311,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             if (workspaceNumber?.id != null) {
               await updateWorkspacePhoneNumber({
                 supabaseClient,
-                workspaceId,
+                workspaceId: wsId,
                 numberId: workspaceNumber.id,
                 updates: {
                   capabilities: {
@@ -266,7 +348,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           if (workspaceNumber?.id != null) {
             await updateWorkspacePhoneNumber({
               supabaseClient,
-              workspaceId,
+              workspaceId: wsId,
               numberId: workspaceNumber.id,
               updates: {
                 capabilities: {
@@ -303,13 +385,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           },
         });
         nextState = hydrateWorkspaceRcsOnboardingState(nextState);
-        nextState.steps = buildOnboardingStepsForState(nextState);
-        await updateWorkspaceMessagingOnboardingState({
-          supabaseClient,
-          workspaceId,
-          updates: nextState,
-          actorUserId: user.id,
-        });
+        await persistOnboardingState(wsId, nextState);
 
         if (eligiblePhoneNumbers.length === 0) {
           return routeData<OnboardingActionData>({
@@ -341,13 +417,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
           },
         });
         failedState = hydrateWorkspaceRcsOnboardingState(failedState);
-        failedState.steps = buildOnboardingStepsForState(failedState);
-        await updateWorkspaceMessagingOnboardingState({
-          supabaseClient,
-          workspaceId,
-          updates: failedState,
-          actorUserId: user.id,
-        });
+        await persistOnboardingState(wsId, failedState);
         return routeData<OnboardingActionData>(
           {
             error:
@@ -361,9 +431,10 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (actionName === "provision_a2p") {
       const nextState = await provisionWorkspaceA2P({
         supabaseClient,
-        workspaceId,
+        workspaceId: wsId,
         actorUserId: user.id,
       });
+      await persistOnboardingState(wsId, { currentStep: "launch_checks" });
       if (nextState.reviewState.blockingIssues.length > 0) {
         return routeData<OnboardingActionData>({
           error: "A2P submission is blocked until the required onboarding and Trust Hub prerequisites are completed.",
@@ -381,9 +452,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     if (actionName === "save_rcs") {
+      if (!isRcsOnboardingEnabled()) {
+        return routeData<OnboardingActionData>(
+          { error: "RCS onboarding is not available." },
+          { status: 400 },
+        );
+      }
+
       await updateWorkspaceRcsOnboarding({
         supabaseClient,
-        workspaceId,
+        workspaceId: wsId,
         actorUserId: user.id,
         provider: TWILIO_RCS_PROVIDER,
         displayName: String(formData.get("rcsDisplayName") ?? ""),
@@ -406,6 +484,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         notes: String(formData.get("rcsNotes") ?? ""),
         status: asWorkspaceOnboardingStatus(formData.get("rcsStatus")),
       });
+      await persistOnboardingState(wsId, { currentStep: "launch_checks" });
       return routeData<OnboardingActionData>({ success: "RCS onboarding state updated." });
     }
 

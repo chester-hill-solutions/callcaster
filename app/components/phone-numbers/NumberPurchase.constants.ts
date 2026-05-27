@@ -1,20 +1,10 @@
-import type { NumberSearchMode, NumbersSearchResponse } from "@/lib/numbers-search.server";
+import type { NumberSearchMode } from "@/lib/numbers-search.server";
 
-export type AvailableNumber = {
-  phoneNumber: string;
-  friendlyName: string;
-  region?: string;
-  locality?: string;
-  capabilities: Record<string, boolean>;
-};
-
-export type NumbersSearchFetcherData = NumbersSearchResponse | undefined;
-
-export type PurchaseFetcherData = {
-  newNumber?: { friendly_name?: string; phone_number?: string };
-  creditsError?: boolean;
-  error?: string;
-};
+export type {
+  AvailableNumber,
+  NumbersSearchFetcherData,
+  PurchaseFetcherData,
+} from "@/lib/numbers-search.types";
 
 export const SEARCH_MODE_LABELS: Record<NumberSearchMode, string> = {
   areaCode: "Area code",

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { MdBubbleChart, MdMic, MdArrowDropDown } from 'react-icons/md';
+import { useClickOutside } from '@/hooks/utils/useClickOutside';
 
 interface VoxTypeSelectorProps {
   value: "recorded" | "synthetic";
@@ -15,28 +16,17 @@ interface RadioButtonProps {
 }
 
 export const VoxTypeSelector = ({ value, onChange }: VoxTypeSelectorProps) => {
-    const [selectedType, setSelectedType] = useState<"recorded" | "synthetic">(value);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    useClickOutside(dropdownRef, () => setIsOpen(false));
+
     const handleChange = (type: "recorded" | "synthetic") => {
-        setSelectedType(type);
         onChange(type);
         setIsOpen(false);
     };
 
     const toggleDropdown = () => setIsOpen(!isOpen);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     return (
         <div className="relative w-[120px]" ref={dropdownRef} style={{zIndex:"10"}}>
@@ -45,21 +35,21 @@ export const VoxTypeSelector = ({ value, onChange }: VoxTypeSelectorProps) => {
                 className="flex items-center justify-between p-2 border-2 rounded-lg cursor-pointer bg-opacity-75 bg-white "
                 onClick={toggleDropdown}
             >
-                {selectedType === 'synthetic' ? <MdBubbleChart size={24} /> : <MdMic size={24} />}
-                <span className="ml-2 text-xs font-semibold uppercase">{selectedType}</span>
+                {value === 'synthetic' ? <MdBubbleChart size={24} /> : <MdMic size={24} />}
+                <span className="ml-2 text-xs font-semibold uppercase">{value}</span>
                 <MdArrowDropDown size={24} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
             <div className={`absolute top-full left-0 w-full mt-1 bg-white border-2 rounded-lg overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-[200px] opacity-100' : 'max-h-0 opacity-0'}`}>
                 <RadioButton
                     id="synthetic"
-                    selected={selectedType === 'synthetic'}
+                    selected={value === 'synthetic'}
                     onClick={() => handleChange('synthetic')}
                     icon={<MdBubbleChart size={24} />}
                     label="SYNTHETIC"
                 />
                 <RadioButton
                     id="recorded"
-                    selected={selectedType === 'recorded'}
+                    selected={value === 'recorded'}
                     onClick={() => handleChange('recorded')}
                     icon={<MdMic size={24} />}
                     label="RECORDED"

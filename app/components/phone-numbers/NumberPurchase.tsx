@@ -1,18 +1,14 @@
 import { DataTable } from "@/components/workspace/tables/DataTable";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/typography";
-import {
-  hasCreditsForNumberRental,
-  NUMBER_RENTAL_MONTHLY_CREDITS,
-} from "@/lib/number-rental";
+import { hasCreditsForNumberRental } from "@/lib/number-rental";
 import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
-import { Link, useFetcher, type FetcherWithComponents } from "react-router";
-import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
+import { useFetcher, type FetcherWithComponents } from "react-router";
+import { useMemo, useState } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
+import { NumberRentalCreditsAlert } from "./NumberRentalCreditsAlert";
 import {
   emptyMessageForMode,
   type NumbersSearchFetcherData,
@@ -28,11 +24,13 @@ export const NumberPurchase = ({
   workspaceId,
   creditsBalance,
   billingLink = "../../billing",
+  onPurchaseComplete,
 }: {
   fetcher: FetcherWithComponents<NumbersSearchFetcherData>;
   workspaceId: string;
   creditsBalance: number;
   billingLink?: string;
+  onPurchaseComplete?: () => void;
 }) => {
   const purchaseFetcher = useFetcher<PurchaseFetcherData>();
   const [searchMode, setSearchMode] = useState<NumberSearchMode>("areaCode");
@@ -53,25 +51,29 @@ export const NumberPurchase = ({
     searchData?.ok === false ? searchData.error : undefined;
   const hasSearched = searchData !== undefined;
 
-  const purchaseComplete =
-    purchaseFetcher.state === "idle" &&
-    Boolean(purchaseFetcher.data?.newNumber);
-
-  useEffect(() => {
-    if (purchaseComplete) {
-      const purchased = purchaseFetcher.data?.newNumber;
-      toast.success(
-        `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`,
-      );
-      setSelectedNumber(null);
-    }
-  }, [purchaseComplete, purchaseFetcher.data?.newNumber]);
-
-  useEffect(() => {
-    if (purchaseFetcher.data?.error && purchaseFetcher.state === "idle") {
-      toast.error(purchaseFetcher.data.error);
-    }
-  }, [purchaseFetcher.data?.error, purchaseFetcher.state]);
+  useActionFeedback(
+    purchaseFetcher.state === "idle" ? purchaseFetcher.data : undefined,
+    {
+      getWarning: (data) =>
+        data?.partialSuccess && data.messagingServiceAttachError
+          ? data.messagingServiceAttachError
+          : undefined,
+      warningMessage: (data) => {
+        const purchased = data?.newNumber;
+        return `Number purchased (${purchased?.phone_number ?? "new number"}), but it was not added to the Messaging Service sender pool. Retry provisioning from workspace onboarding or contact an admin.`;
+      },
+      getSuccess: (data) => Boolean(data?.newNumber),
+      successMessage: (data) => {
+        const purchased = data?.newNumber;
+        return `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`;
+      },
+      getError: (data) => data?.error,
+      onSuccess: () => {
+        setSelectedNumber(null);
+        onPurchaseComplete?.();
+      },
+    },
+  );
 
   const columns = useMemo(
     () =>
@@ -88,26 +90,15 @@ export const NumberPurchase = ({
         <Text variant="muted">
           Search Canadian local numbers and rent one for your workspace.
         </Text>
-        <Alert variant={canAfford ? "default" : "destructive"}>
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            <span>
-              Balance: <strong>{creditsBalance}</strong> credits · Rent:{" "}
-              <strong>{NUMBER_RENTAL_MONTHLY_CREDITS}</strong> credits per
-              30-day period
-            </span>
-            {!canAfford ? (
-              <Button size="sm" variant="outline" asChild>
-                <Link to={billingLink} relative="path">
-                  Buy credits
-                </Link>
-              </Button>
-            ) : null}
-          </AlertDescription>
-        </Alert>
+        <NumberRentalCreditsAlert
+          creditsBalance={creditsBalance}
+          billingLink={billingLink}
+        />
       </div>
 
       <NumberPurchaseSearchForm
         fetcher={fetcher}
+        workspaceId={workspaceId}
         searchMode={searchMode}
         onSearchModeChange={setSearchMode}
         query={query}

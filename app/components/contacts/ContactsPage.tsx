@@ -3,6 +3,7 @@ import { MdEdit } from "react-icons/md";
 import { Search, X } from "lucide-react";
 
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
+import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import TablePagination from "@/components/shared/TablePagination";
 import { Button } from "@/components/ui/button";
@@ -83,7 +84,7 @@ export default function ContactsPage() {
 
   return (
     <main className="mx-auto flex h-full w-full max-w-[1500px] flex-col gap-4 px-4 py-6 sm:px-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
         {workspace && userRole && (
           <WorkspaceNav
             workspace={workspace}
@@ -91,7 +92,9 @@ export default function ContactsPage() {
             userRole={userRole}
           />
         )}
-        <div className="min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6">
+        <div
+          className={`min-w-0 flex-1 rounded-2xl border border-border/80 bg-card/70 p-4 shadow-sm sm:p-6 ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+        >
           <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary">
               {workspace != null

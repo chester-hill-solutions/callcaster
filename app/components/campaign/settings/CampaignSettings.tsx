@@ -24,6 +24,8 @@ import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
+import { CampaignSetupGuide } from "./CampaignSetupGuide";
+import type { CampaignSetupStep } from "@/lib/campaign-setup-steps";
 import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
@@ -79,6 +81,12 @@ export type CampaignSettingsProps = {
     defaultMessagingServiceSid: string | null;
     attachedSenderPhoneNumbers: string[];
   };
+  showSetupGuide?: boolean;
+  setupGuideSteps?: CampaignSetupStep[];
+  setupGuideCurrentStepNumber?: number;
+  setupGuideTotalSteps?: number;
+  setupGuideAllComplete?: boolean;
+  onDismissSetupGuide?: () => void;
 };
 
 export const CampaignSettings = ({
@@ -116,6 +124,12 @@ export const CampaignSettings = ({
   surveys,
   outboundEstimateInputs,
   smsSendContext,
+  showSetupGuide = false,
+  setupGuideSteps = [],
+  setupGuideCurrentStepNumber = 1,
+  setupGuideTotalSteps = 1,
+  setupGuideAllComplete = false,
+  onDismissSetupGuide,
 }: CampaignSettingsProps) => {
   const confirmActionLabel =
     confirmStatus === "play"
@@ -253,6 +267,16 @@ export const CampaignSettings = ({
             {feedbackMessage}
           </div>
         )}
+        {showSetupGuide && setupGuideSteps.length > 0 ? (
+          <CampaignSetupGuide
+            steps={setupGuideSteps}
+            currentStepNumber={setupGuideCurrentStepNumber}
+            totalSteps={setupGuideTotalSteps}
+            allComplete={setupGuideAllComplete}
+            onDismiss={() => onDismissSetupGuide?.()}
+            onStartCampaign={() => handleConfirmStatus("play")}
+          />
+        ) : null}
         <Form method="patch">
           <input
             type="hidden"
@@ -282,6 +306,7 @@ export const CampaignSettings = ({
                   campaignData.type === "message" &&
                   campaignData.sms_send_mode === "messaging_service"
                 }
+                hideReadinessAlerts={showSetupGuide}
               />
             </section>
             <section className="rounded-lg border p-4">
@@ -298,12 +323,14 @@ export const CampaignSettings = ({
                 isBusy={formFetcher.state !== "idle"}
                 joinDisabled={startDisabledReason}
                 scheduleDisabled={scheduleDisabled}
+                readinessIssues={readinessIssues}
                 surveys={surveys}
                 handleNavigate={handleNavigate}
                 queueCount={queueCount}
                 phoneNumbers={phoneNumbers}
                 outboundEstimateInputs={outboundEstimateInputs}
                 smsSendContext={smsSendContext}
+                hideReadinessAlerts={showSetupGuide}
               />
             </section>
 
@@ -312,6 +339,7 @@ export const CampaignSettings = ({
               queueCount={queueCount}
               dequeuedCount={dequeuedCount}
               totalCount={totalCount}
+              setupGuideActive={showSetupGuide}
             />
           </div>
         </Form>

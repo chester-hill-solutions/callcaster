@@ -14,6 +14,18 @@ import type {
 
 import { isRecord } from "@/lib/parse-utils.server";
 
+export const RCS_ONBOARDING_ENABLED = false;
+
+export function isRcsOnboardingEnabled(): boolean {
+  return RCS_ONBOARDING_ENABLED;
+}
+
+export function stripDisabledRcsChannel(
+  channels: WorkspaceOnboardingChannel[],
+): WorkspaceOnboardingChannel[] {
+  return isRcsOnboardingEnabled() ? channels : channels.filter((channel) => channel !== "rcs");
+}
+
 const DEFAULT_RCS_PREREQUISITES = [
   "Provision a Twilio Messaging Service so SMS and MMS fallback is ready before RCS launch.",
   "Prepare public brand assets, policy URLs, and opt-in evidence for Twilio Console registration.",
@@ -59,7 +71,7 @@ function getDerivedRcsState(
   };
 }
 
-export function hydrateWorkspaceRcsOnboardingState(
+export function hydrateWorkspaceRcsOnboardingStateEnabled(
   onboarding: WorkspaceMessagingOnboardingState,
 ): WorkspaceMessagingOnboardingState {
   const supportedChannels: WorkspaceOnboardingChannel[] =
@@ -86,6 +98,16 @@ export function hydrateWorkspaceRcsOnboardingState(
   });
   nextState.steps = buildOnboardingStepsForState(nextState);
   return nextState;
+}
+
+export function hydrateWorkspaceRcsOnboardingState(
+  onboarding: WorkspaceMessagingOnboardingState,
+): WorkspaceMessagingOnboardingState {
+  if (!isRcsOnboardingEnabled()) {
+    return onboarding;
+  }
+
+  return hydrateWorkspaceRcsOnboardingStateEnabled(onboarding);
 }
 
 export function getWorkspaceRcsBlockingIssues(

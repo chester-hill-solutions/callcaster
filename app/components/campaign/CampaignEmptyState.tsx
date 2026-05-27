@@ -19,7 +19,7 @@ const CampaignEmptyState = ({hasAccess = false, type}:{hasAccess:boolean; type: 
               Get started!
             </h1>
             {type === 'campaign' ? <p className="font-Zilla-Slab text-lg max-w-md text-center">Select an available campaign{hasAccess  ?', or add a new one to get started!':' or contact your admin team to get set up.'}</p> :
-            <p className="font-Zilla-Slab text-lg max-w-md text-center">Get started by renting a number or setting up your own.</p>
+            <p className="font-Zilla-Slab text-lg max-w-md text-center">Start by renting a number. After you create your first campaign, we&apos;ll walk you through script, queue, and launch setup step by step.</p>
             }
           </CardHeader>
          {hasAccess && <div className="py-4 flex justify-center">

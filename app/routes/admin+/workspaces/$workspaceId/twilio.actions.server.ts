@@ -4,7 +4,15 @@ import { syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } from "
 import { logger } from "@/lib/logger.server";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
-import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import {
+  ensureWorkspaceTwilioBootstrap,
+  repairWorkspaceTwilioWebhooks,
+  syncWorkspaceTwilioBootstrapState,
+} from "@/lib/twilio-bootstrap.server";
+import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server";
+import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
+import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
+import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import type { WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
@@ -40,18 +48,98 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "bootstrap_workspace_messaging") {
         try {
-            await ensureWorkspaceTwilioBootstrap({
+            const bootstrap = await ensureWorkspaceTwilioBootstrap({
                 supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
             });
-            return routeData({ success: "Workspace messaging bootstrap completed" });
+            if (bootstrap.outcome === "success") {
+              return routeData({ success: "Workspace messaging bootstrap completed" });
+            }
+            if (bootstrap.outcome === "partial") {
+              return routeData({
+                success: `Bootstrap partial: ${bootstrap.lastError ?? "review drift messages"}`,
+              });
+            }
+            return routeData(
+              { error: bootstrap.lastError ?? "Bootstrap failed" },
+              { status: 500 },
+            );
         } catch (error) {
             logger.error("Error bootstrapping workspace messaging:", error);
             return routeData(
-                { error: error instanceof Error ? error.message : "Failed to bootstrap workspace messaging" },
+                { error: twilioErrorUserMessage(error) },
                 { status: 500 },
             );
+        }
+    }
+
+    if (actionName === "audit_twilio_webhooks") {
+        try {
+            const audit = await auditWorkspaceTwilioWebhooks({
+              supabaseClient,
+              workspaceId,
+            });
+            await syncWorkspaceTwilioBootstrapState({ supabaseClient, workspaceId });
+            return routeData({
+              success:
+                audit.driftMessages.length === 0
+                  ? `No webhook drift. IVR hint: ${audit.ivrRuntimeHint}.`
+                  : `Drift found (${audit.driftMessages.length}): ${audit.driftMessages[0]}`,
+            });
+        } catch (error) {
+            logger.error("Twilio webhook audit failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "repair_twilio_webhooks") {
+        try {
+            const { repaired } = await repairWorkspaceTwilioWebhooks({
+              supabaseClient,
+              workspaceId,
+              actorUserId: user.id,
+            });
+            return routeData({
+              success:
+                repaired.length > 0
+                  ? `Repaired: ${repaired.join(", ")}`
+                  : "Nothing to repair",
+            });
+        } catch (error) {
+            logger.error("Twilio webhook repair failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "sync_a2p_status") {
+        try {
+            await syncWorkspaceA2pStatus({
+              supabaseClient,
+              workspaceId,
+              actorUserId: user.id,
+            });
+            return routeData({ success: "A2P status synced from Twilio" });
+        } catch (error) {
+            logger.error("A2P status sync failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "verify_sender_pool") {
+        try {
+            const result = await verifyWorkspaceMessagingSenderPool({
+              supabaseClient,
+              workspaceId,
+            });
+            return routeData({
+              success: result.inSync
+                ? "Sender pool matches onboarding state"
+                : `Sender pool drift: missing ${result.missingFromPool.join(", ") || "none"}; extra ${result.extraInPool.join(", ") || "none"}`,
+            });
+        } catch (error) {
+            logger.error("Sender pool verification failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
         }
     }
 

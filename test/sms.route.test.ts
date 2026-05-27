@@ -68,6 +68,12 @@ vi.mock("@/lib/utils", () => ({
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/twilio-readiness.server", () => ({
+  assertWorkspaceCanSendSms: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/twilio-client.server", () => ({
+  withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
 
 function makeSupabase(opts: {
   campaign?: any;

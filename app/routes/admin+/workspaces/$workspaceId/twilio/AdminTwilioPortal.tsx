@@ -1,6 +1,6 @@
 import { Await, useActionData, useLoaderData } from "react-router";
-import { Suspense, useEffect } from "react";
-import { toast } from "sonner";
+import { Suspense } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import type { TwilioPageData } from "../loadTwilioData.server";
 
@@ -13,15 +13,11 @@ export default function WorkspaceTwilio() {
     const { twilioData } = useLoaderData<{ twilioData: Promise<TwilioPageData> }>();
     const actionData = useActionData<TwilioActionData>();
 
-    useEffect(() => {
-        if (actionData && "success" in actionData) {
-            toast.success(actionData.success);
-        }
-
-        if (actionData && "error" in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useActionFeedback(actionData, {
+        getSuccess: (data) => Boolean(data?.success),
+        successMessage: (data) => data?.success ?? "Saved",
+        getError: (data) => data?.error,
+    });
 
     return (
         <div className="grid grid-cols-1 gap-6">

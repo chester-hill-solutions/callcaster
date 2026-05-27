@@ -2,7 +2,7 @@ export { loader } from "./$audience_id.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
@@ -22,7 +22,6 @@ export default function AudienceView() {
   const navigate = useNavigate();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
   const [activeTab, setActiveTab] = useState("contacts");
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const revalidator = useRevalidator();
 
   // Track current upload status
@@ -53,17 +52,11 @@ export default function AudienceView() {
     currentUploadId ? 2000 : null
   );
 
-  const handleUploadComplete = (uploadId: string) => {
+  const handleUploadComplete = (_uploadId: string) => {
     setCurrentUploadId(null);
-    setRefreshTrigger(prev => prev + 1);
+    revalidator.revalidate();
     setActiveTab("contacts");
   };
-
-  useEffect(() => {
-    if (refreshTrigger > 0) {
-      revalidator.revalidate();
-    }
-  }, [refreshTrigger, revalidator]);
 
   return (
     <main className="flex h-full flex-col gap-4 text-white">

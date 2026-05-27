@@ -4,6 +4,17 @@ import { logger } from "@/lib/logger.server";
 
 /** When false, skips X-Twilio-Signature checks (local dev only). Defaults to true. */
 export function shouldValidateTwilioWebhooks(): boolean {
+  if (process.env.NODE_ENV === "production") {
+    const value = env.TWILIO_VALIDATE_WEBHOOKS();
+    if (value === "false" || value === "0") {
+      logger.error(
+        "TWILIO_VALIDATE_WEBHOOKS=false is not allowed in production; signature validation remains enabled.",
+      );
+      return true;
+    }
+    return true;
+  }
+
   const value = env.TWILIO_VALIDATE_WEBHOOKS();
   if (value === undefined || value === "") {
     return true;

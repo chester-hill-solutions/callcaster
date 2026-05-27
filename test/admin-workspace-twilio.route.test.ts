@@ -271,7 +271,14 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       supabaseClient,
       user: { id: "u1" },
     });
-    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValueOnce({});
+    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValueOnce({
+      outcome: "success",
+      onboarding: {},
+      serviceSid: "MG123",
+      lastError: null,
+      driftMessages: [],
+      createdResources: ["messaging_service"],
+    });
 
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();

@@ -1,6 +1,7 @@
 export { loader } from "./audios.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, Link, useLoaderData } from "react-router";
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
@@ -26,6 +27,15 @@ export default function WorkspaceAudiosPage() {
   const workspaceAudios = audioMedia?.filter((media: FileObject) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
+      <QueryParamBanner
+        param="uploaded"
+        variants={{
+          "1": {
+            title: "Audio uploaded",
+            description: "Your audio file was added to this workspace.",
+          },
+        }}
+      />
       <div className="flex flex-col sm:flex-row sm:justify-between">
         <div className="flex">
           <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">

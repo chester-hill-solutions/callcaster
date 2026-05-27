@@ -1,5 +1,5 @@
 import { AudioUploadError, getSafeMediaBaseName, normalizeUploadedAudio } from "@/lib/audio.server";
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
@@ -45,7 +45,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return routeData({ success: false, error: uploadError }, { headers });
     }
 
-    return routeData({ success: true, error: null }, { headers });
+    return redirect(`../audios?uploaded=1`, { headers });
   } catch (error) {
     logger.error("Workspace audio upload failed", error);
     const message =

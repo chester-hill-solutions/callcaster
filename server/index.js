@@ -96,9 +96,11 @@ function buildRequestLogger() {
 
 export function createApp({
   build,
+  configureApp,
   mode = process.env.NODE_ENV ?? "production",
   readyState = { acceptingTraffic: true, buildReady: false },
   remixHandler,
+  serveBuildAssets = true,
 } = {}) {
   const app = express();
 
@@ -107,18 +109,22 @@ export function createApp({
   app.use(securityHeaders());
   app.use(compression());
   app.use(buildRequestLogger());
-  app.use(
-    "/assets",
-    express.static(CLIENT_ASSETS_DIR, {
-      immutable: true,
-      maxAge: "1y",
-    }),
-  );
-  app.use(
-    express.static(CLIENT_BUILD_DIR, {
-      maxAge: "1h",
-    }),
-  );
+
+  if (serveBuildAssets) {
+    app.use(
+      "/assets",
+      express.static(CLIENT_ASSETS_DIR, {
+        immutable: true,
+        maxAge: "1y",
+      }),
+    );
+    app.use(
+      express.static(CLIENT_BUILD_DIR, {
+        maxAge: "1h",
+      }),
+    );
+  }
+
   app.use(
     express.static(PUBLIC_DIR, {
       maxAge: "1h",
@@ -141,6 +147,8 @@ export function createApp({
 
     response.status(200).json({ ok: true });
   });
+
+  configureApp?.(app);
 
   const handleRemixRequest =
     remixHandler ??

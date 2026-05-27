@@ -24,7 +24,8 @@ import {
   Eye,
   Clock,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { downloadBlobPart } from "@/lib/download-blob.client";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/database.types";
 
@@ -60,21 +61,16 @@ export default function SurveyResponsesPage() {
     useLoaderData();
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
   const exportFetcher = useFetcher();
-
-  useEffect(() => {
-    if (exportFetcher.data && typeof exportFetcher.data === "string") {
-      // Create a blob from the CSV data and trigger download
-      const blob = new Blob([exportFetcher.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+  const handleExport = async () => {
+    await exportFetcher.load("./export");
+    if (typeof exportFetcher.data === "string") {
+      downloadBlobPart({
+        data: exportFetcher.data,
+        filename: `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`,
+        mimeType: "text/csv",
+      });
     }
-  }, [exportFetcher.data, survey.title]);
+  };
 
   const allQuestions =
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
@@ -146,7 +142,7 @@ export default function SurveyResponsesPage() {
         <Button 
           variant="outline"
           onClick={() => {
-            exportFetcher.load(`./export`);
+            void handleExport();
           }}
           disabled={exportFetcher.state === "loading"}
         >

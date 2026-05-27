@@ -4,7 +4,6 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { User, WorkspaceNumbers } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
 
 type CallerIDResponse = {
   validationRequest: {

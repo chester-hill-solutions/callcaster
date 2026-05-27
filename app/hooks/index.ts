@@ -9,7 +9,6 @@ export { useLocalStorage, useLocalStorageMulti, useSessionStorage } from "./useL
 export { useForm } from "./useForm";
 
 export { useCallState, useTwilioDevice, useStartConferenceAndDial, useCallDuration, useTwilioConnection, useCallHandling, useCallStatusPolling } from "./call";
-export { useCampaignSettings, useScriptState } from "./campaign";
 export { useContactSearch } from "./contact";
 export { usePhoneNumbers } from "./phone";
 export { useQueue, useAttempts, useCalls } from "./queue";
@@ -25,7 +24,6 @@ export {
   useDebounce,
   useDebouncedSave,
   useInterval,
-  useIntersectionObserver as useUtilsIntersectionObserver,
   useOptimisticMutation,
   useOptimisticCollection,
 } from "./utils";

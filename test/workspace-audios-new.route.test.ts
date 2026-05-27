@@ -96,11 +96,8 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       params: { id: "w1" },
     } as any));
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      success: true,
-      error: null,
-    });
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
     expect(supabase.upload).toHaveBeenCalledWith(

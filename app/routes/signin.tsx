@@ -3,8 +3,7 @@ export { action } from "./signin.action.server";
 
 import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -20,11 +19,10 @@ import { Text } from "@/components/ui/typography";
 export default function SignIn() {
   const actionData = useActionData();
 
-  useEffect(() => {
-    if (actionData?.error != null) {
-      toast.error(actionData.error, { duration: 4000 });
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
 
   return (
     <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
