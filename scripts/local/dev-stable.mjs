@@ -12,8 +12,14 @@ import { setTimeout as delay } from "node:timers/promises";
 const APP_PORT = process.env.PORT ?? "3000";
 const BUILD_PATH = path.resolve("build/server/index.js");
 const BUILD_DIR = path.dirname(BUILD_PATH);
-const CLIENT_BUILD_DIR = path.resolve("public/build");
-const REMIX_BIN = resolveLocalBin("react-router");
+const CLIENT_BUILD_DIR = path.resolve("build/client");
+const CLIENT_ASSETS_DIR = path.join(CLIENT_BUILD_DIR, "assets");
+const REACT_ROUTER_BIN = resolveLocalBin("react-router");
+const SOURCE_WATCH_PATHS = [
+  path.resolve("app"),
+  path.resolve("vite.config.ts"),
+  path.resolve("react-router.config.ts"),
+];
 const SERVER_ENTRY = path.resolve("server/index.js");
 const startupTimestamp = Date.now();
 
@@ -22,6 +28,10 @@ let isShuttingDown = false;
 let restartTimer = null;
 let restartInFlight = false;
 let buildWatcher = null;
+let sourceWatchers = [];
+let buildProcess = null;
+let buildQueue = Promise.resolve();
+let buildDebounceTimer = null;
 
 const devPingServer = createServer((request, response) => {
   if (request.method === "POST" && request.url === "/ping") {
@@ -52,25 +62,11 @@ const DEV_ENV = {
   REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
 };
 
-const watchProcess = spawn(REMIX_BIN, ["build", "--watch"], {
-  env: DEV_ENV,
-  stdio: ["inherit", "pipe", "pipe"],
-});
-
-pipeOutput("remix-vite-watch", watchProcess);
-
-watchProcess.on("exit", (code, signal) => {
-  if (isShuttingDown) {
-    return;
-  }
-
-  console.error(
-    `[remix-vite-watch] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
-  );
-  shutdown(code ?? 1);
-});
+// React Router 7 has no `build --watch`; rebuild on source changes instead.
+void queueBuild();
 
 await waitForInitialBuild();
+startSourceWatcher();
 await startAppServer();
 
 buildWatcher = watch(BUILD_DIR, (eventType, fileName) => {
@@ -122,7 +118,7 @@ async function waitForInitialBuild() {
 }
 
 function hasFreshBuildOutput() {
-  if (!existsSync(BUILD_PATH) || !existsSync(CLIENT_BUILD_DIR)) {
+  if (!existsSync(BUILD_PATH) || !existsSync(CLIENT_ASSETS_DIR)) {
     return false;
   }
 
@@ -132,16 +128,114 @@ function hasFreshBuildOutput() {
     return false;
   }
 
-  const clientEntries = readdirSync(CLIENT_BUILD_DIR);
+  const clientEntries = readdirSync(CLIENT_ASSETS_DIR);
 
   if (clientEntries.length === 0) {
     return false;
   }
 
   return clientEntries.some((entry) => {
-    const entryPath = path.join(CLIENT_BUILD_DIR, entry);
+    const entryPath = path.join(CLIENT_ASSETS_DIR, entry);
     return statSync(entryPath).mtimeMs >= startupTimestamp;
   });
+}
+
+function queueBuild() {
+  buildQueue = buildQueue
+    .then(() => runBuild())
+    .catch((error) => {
+      if (!isShuttingDown) {
+        console.error(
+          `[react-router-build] ${error instanceof Error ? error.message : String(error)}`,
+        );
+        shutdown(1);
+      }
+    });
+
+  return buildQueue;
+}
+
+function runBuild() {
+  return new Promise((resolve, reject) => {
+    if (isShuttingDown) {
+      resolve();
+      return;
+    }
+
+    if (buildProcess) {
+      buildProcess.removeAllListeners("exit");
+      buildProcess.kill("SIGTERM");
+      buildProcess = null;
+    }
+
+    buildProcess = spawn(REACT_ROUTER_BIN, ["build"], {
+      env: DEV_ENV,
+      stdio: ["inherit", "pipe", "pipe"],
+    });
+
+    pipeOutput("react-router-build", buildProcess);
+
+    buildProcess.on("exit", (code, signal) => {
+      const exitedProcess = buildProcess;
+      buildProcess = null;
+
+      if (isShuttingDown) {
+        resolve();
+        return;
+      }
+
+      if (signal) {
+        reject(new Error(`build terminated by signal ${signal}`));
+        return;
+      }
+
+      if (code !== 0) {
+        reject(new Error(`build failed with exit code ${code ?? 1}`));
+        return;
+      }
+
+      resolve(exitedProcess);
+    });
+  });
+}
+
+function startSourceWatcher() {
+  const scheduleBuild = () => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    if (buildDebounceTimer) {
+      clearTimeout(buildDebounceTimer);
+    }
+
+    buildDebounceTimer = setTimeout(() => {
+      buildDebounceTimer = null;
+      void queueBuild();
+    }, 200);
+  };
+
+  for (const watchPath of SOURCE_WATCH_PATHS) {
+    if (!existsSync(watchPath)) {
+      continue;
+    }
+
+    const recursive = statSync(watchPath).isDirectory();
+
+    sourceWatchers.push(
+      watch(watchPath, { recursive }, (eventType, fileName) => {
+        if (eventType !== "change" && eventType !== "rename") {
+          return;
+        }
+
+        if (fileName && typeof fileName === "string" && fileName.includes(".test.")) {
+          return;
+        }
+
+        scheduleBuild();
+      }),
+    );
+  }
 }
 
 async function startAppServer() {
@@ -234,17 +328,27 @@ async function shutdown(exitCode) {
   isShuttingDown = true;
   buildWatcher?.close();
 
+  for (const sourceWatcher of sourceWatchers) {
+    sourceWatcher.close();
+  }
+
+  sourceWatchers = [];
+
+  if (buildDebounceTimer) {
+    clearTimeout(buildDebounceTimer);
+    buildDebounceTimer = null;
+  }
+
   if (restartTimer) {
     clearTimeout(restartTimer);
     restartTimer = null;
   }
 
-  const processes = [appProcess, watchProcess].filter(Boolean);
+  const processes = [appProcess, buildProcess].filter(Boolean);
 
   await Promise.all(
-    processes.map(
-      (childProcess) =>
-        terminateProcess(childProcess, childProcess === appProcess ? "app" : "remix-vite-watch"),
+    processes.map((childProcess) =>
+      terminateProcess(childProcess, childProcess === appProcess ? "app" : "react-router-build"),
     ),
   );
 
