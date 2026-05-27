@@ -8,7 +8,7 @@ import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilio
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { processUrls } from "@/lib/sms.server";
+import { bodyHasUrls, processUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
@@ -110,7 +110,10 @@ function buildTwilioMessageCreateParams({
     statusCallback,
     ...(media?.length && { mediaUrl: media }),
     ...(resolvedMessagingServiceSid
-      ? { messagingServiceSid: resolvedMessagingServiceSid }
+      ? {
+          messagingServiceSid: resolvedMessagingServiceSid,
+          ...(bodyHasUrls(body) ? { shortenUrls: true } : {}),
+        }
       : { from: effectiveFrom }),
     ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
   };

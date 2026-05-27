@@ -1,4 +1,5 @@
 import {
+  getNumberSearchNumberType,
   jsonNumbersSearchResponse,
   mapTwilioAvailableNumbers,
   parseNumberSearchRequest,
@@ -41,15 +42,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
     }
 
-    const locals = await twilio.availablePhoneNumbers("CA").local.list(
-      parsed.listParams as Parameters<
-        ReturnType<typeof twilio.availablePhoneNumbers>["local"]["list"]
-      >[0],
-    );
+    const numberType = getNumberSearchNumberType(url.searchParams);
+    const available = twilio.availablePhoneNumbers("CA");
+    const numbers =
+      numberType === "tollfree"
+        ? await available.tollFree.list(
+            parsed.listParams as Parameters<
+              typeof available.tollFree.list
+            >[0],
+          )
+        : await available.local.list(
+            parsed.listParams as Parameters<
+              typeof available.local.list
+            >[0],
+          );
 
     return jsonNumbersSearchResponse({
       ok: true,
-      numbers: mapTwilioAvailableNumbers(locals),
+      numbers: mapTwilioAvailableNumbers(numbers),
     });
   } catch (error) {
     logger.error("Fetching numbers failed", error);

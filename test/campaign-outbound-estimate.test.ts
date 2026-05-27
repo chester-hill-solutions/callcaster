@@ -20,6 +20,11 @@ const basePortalConfig: WorkspaceTwilioOpsConfig = {
   sendMode: "messaging_service",
   messagingServiceSid: "MG123",
   onboardingStatus: "enabled",
+  smsSenderClass: "ca_short_code",
+  smsTargetMps: 100,
+  voiceTargetCps: 1,
+  voiceConcurrentCallLimit: 100,
+  parallelDispatchEnabled: false,
   supportNotes: "",
   updatedAt: null,
   updatedBy: null,
@@ -64,6 +69,8 @@ describe("campaign-outbound-estimate", () => {
         trafficClass: "unknown",
         throughputProduct: "none",
         sendMode: "from_number",
+        smsSenderClass: "unknown",
+        smsTargetMps: 1,
       },
       syncSnapshot: {
         ...baseSyncSnapshot,
@@ -81,6 +88,7 @@ describe("campaign-outbound-estimate", () => {
 
   test("IVR estimate uses queue-next + ivr-handler pacing math", () => {
     const estimate = estimateIvrCampaignOutbound({
+      portalConfig: basePortalConfig,
       voiceCapableLocalNumbers: 20,
     });
 

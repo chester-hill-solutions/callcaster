@@ -76,7 +76,7 @@ describe("workspace-twilio.server", () => {
     expect(detectTwilioTrafficClass(["InternationalLongCode"])).toBe(
       "international_long_code",
     );
-    expect(detectTwilioTrafficClass(["local"])).toBe("a2p10dlc");
+    expect(detectTwilioTrafficClass(["local"])).toBe("international_long_code");
     expect(detectTwilioTrafficClass(["other"])).toBe("unknown");
   });
 

@@ -7,7 +7,7 @@ import {
 } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { processUrls } from "@/lib/sms.server";
+import { bodyHasUrls, processUrls } from "@/lib/sms.server";
 import { resolveTwilioSmsMessagingServiceSid } from "@/lib/sms-send-resolve";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
@@ -52,7 +52,10 @@ function resolveSmsRequest({
     statusCallback,
     ...(media.length > 0 && { mediaUrl: [...media] }),
     ...(resolvedMessagingServiceSid
-      ? { messagingServiceSid: resolvedMessagingServiceSid }
+      ? {
+          messagingServiceSid: resolvedMessagingServiceSid,
+          ...(bodyHasUrls(body) ? { shortenUrls: true } : {}),
+        }
       : { from: effectiveFrom }),
     ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
   };

@@ -37,6 +37,48 @@ export function MessagingSignalsPanel({ metrics }: MessagingSignalsPanelProps) {
                     </div>
                 </div>
 
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Legacy pipeline SMS</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.legacyDispatcherSmsMps.toFixed(1)} MPS</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Configured dispatcher SMS</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.configuredDispatcherSmsMps.toFixed(1)} MPS</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Twilio assumed SMS</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.twilioAssumedSmsMps.toFixed(1)} MPS</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Effective SMS rate</div>
+                        <div className="mt-1 text-lg font-semibold">
+                            {Math.min(metrics.configuredDispatcherSmsMps, metrics.twilioAssumedSmsMps).toFixed(1)} MPS
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Legacy pipeline IVR</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.legacyDispatcherVoiceCps.toFixed(1)} CPS</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Configured dispatcher IVR</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.configuredDispatcherVoiceCps.toFixed(1)} CPS</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">IVR concurrency limit</div>
+                        <div className="mt-1 text-lg font-semibold">{metrics.voiceConcurrentCallLimit}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Dispatch mode</div>
+                        <div className="mt-1 font-medium">
+                            {metrics.parallelDispatchEnabled ? "Parallel" : "Legacy"}
+                        </div>
+                    </div>
+                </div>
+
                 <Alert>
                     <AlertTitle>What is auto-detected here?</AlertTitle>
                     <AlertDescription>

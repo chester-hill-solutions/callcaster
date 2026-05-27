@@ -1,10 +1,16 @@
 export {
   NUMBER_SEARCH_MODES,
+  NUMBER_SEARCH_NUMBER_TYPES,
   NUMBER_SEARCH_LIMIT,
+  getNumberSearchNumberType,
   parseNumberSearchRequest,
   buildNumberSearchListParams,
 } from "@/lib/schemas/api/numbers-search";
-export type { NumberSearchMode, NumberSearchQuery } from "@/lib/schemas/api/numbers-search";
+export type {
+  NumberSearchMode,
+  NumberSearchNumberType,
+  NumberSearchQuery,
+} from "@/lib/schemas/api/numbers-search";
 
 export type AvailableNumberRecord = {
   phoneNumber: string;

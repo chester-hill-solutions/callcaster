@@ -10,6 +10,16 @@ import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 import { resolveTwilioSmsMessagingServiceSid } from "../_shared/sms-send-resolve.ts";
+import {
+  completeQueueContact,
+  failQueueContact,
+  requeueContact,
+} from "../_shared/campaign-dispatch.ts";
+import {
+  isRetryableSmsTwilioError,
+  withTwilioRetry,
+} from "../_shared/twilio-retry.ts";
+import { MAX_QUEUE_ATTEMPTS } from "../_shared/throughput-config.ts";
 
 const TWILIO_MESSAGE_INTENTS = new Set([
   "otp",
@@ -99,36 +109,9 @@ function normalizePortalConfig(value: unknown): WorkspaceTwilioOpsConfig {
   };
 }
 
-// Link shortening function using TinyURL API
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const shortenedUrl = await response.text();
-      return shortenedUrl;
-    }
-  } catch (error) {
-    console.error('Error shortening URL:', error);
-  }
-  return url; // Return original URL if shortening fails
-}
-
-// Process URLs in text and shorten them
-async function processUrls(text: string): Promise<string> {
-  // Regex to match URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  
-  let processedText = text;
-  const urlMatches = text.match(urlRegex);
-  
-  if (urlMatches) {
-    for (const url of urlMatches) {
-      const shortenedUrl = await shortenUrl(url);
-      processedText = processedText.replace(url, shortenedUrl);
-    }
-  }
-  
-  return processedText;
+/** Twilio Link Shortening is preferred when sending via Messaging Service. */
+function bodyHasUrls(text: string): boolean {
+  return /https?:\/\/[^\s]+/g.test(text);
 }
 
 interface ContactData {
@@ -470,9 +453,6 @@ const sendMessage = async ({
       throw new Error("Failed to create outreach attempt");
     }
 
-    // Process URLs in the message body to shorten them
-    const processedBody = await processUrls(body);
-
     const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
       explicitRequestSid: requestMessagingServiceSid ?? null,
       campaignSmsSendMode,
@@ -486,16 +466,30 @@ const sendMessage = async ({
       throw new Error("Missing sender: set caller_id or Messaging Service on the campaign");
     }
 
-    const message = await twilio.messages.create({
-      body: processedBody,
-      to,
-      statusCallback: `${baseUrl}sms-status`,
-      ...(media?.length && { mediaUrl: media }),
-      ...(resolvedMessagingServiceSid
-        ? { messagingServiceSid: resolvedMessagingServiceSid }
-        : { from: effectiveFrom }),
-      ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
-    }).catch((e: Error) => ({ error: e }));
+    const useTwilioLinkShortening = Boolean(
+      resolvedMessagingServiceSid && bodyHasUrls(body),
+    );
+
+    const message = await withTwilioRetry(
+      () =>
+        twilio.messages.create({
+          body,
+          to,
+          statusCallback: `${baseUrl}sms-status`,
+          ...(media?.length && { mediaUrl: media }),
+          ...(resolvedMessagingServiceSid
+            ? {
+              messagingServiceSid: resolvedMessagingServiceSid,
+              ...(useTwilioLinkShortening ? { shortenUrls: true } : {}),
+            }
+            : { from: effectiveFrom }),
+          ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
+        }),
+      {
+        operation: "messages.create",
+        isRetryable: isRetryableSmsTwilioError,
+      },
+    ).catch((e: Error) => ({ error: e }));
 
     if ('error' in message) {
       // Update outreach attempt as failed
@@ -607,7 +601,10 @@ export async function handleRequest(
       user_id,
       message_intent,
       messaging_service_sid,
+      dispatch_mode: dispatchModeRaw,
     } = await req.json();
+    const dispatchMode =
+      dispatchModeRaw === "parallel" ? "parallel" : "legacy";
 
     // Check if campaign is still active
     const { data: campaignRow, error: campaignError } = await supabase
@@ -679,21 +676,50 @@ export async function handleRequest(
       campaignSmsMessagingServiceSid: campaignRow.sms_messaging_service_sid,
     });
 
-    if ('error' in result) {
-      await processNextMessage(user_id, campaign_id);
+    if ("error" in result) {
+      const errorMessage = String(result.error);
+      if (isRetryableSmsTwilioError(result.error)) {
+        await requeueContact({
+          supabase,
+          queueId: queue_id,
+          errorText: errorMessage.slice(0, 500),
+        });
+      } else {
+        await failQueueContact({
+          supabase,
+          queueId: queue_id,
+          errorText: errorMessage.slice(0, 500),
+          dequeuedById: user_id ?? null,
+        });
+      }
+
+      if (dispatchMode === "legacy") {
+        await processNextMessage(user_id, campaign_id);
+      }
+
       return new Response(
-        JSON.stringify({ success: false, error: result.error }),
+        JSON.stringify({ success: false, error: errorMessage }),
         {
           headers: { "Content-Type": "application/json" },
           status: 500,
-        }
+        },
       );
     }
 
-    await processNextMessage(user_id, campaign_id);
+    await completeQueueContact({
+      supabase,
+      queueId: queue_id,
+      dequeuedById: user_id ?? null,
+      reason: "SMS dispatched",
+    });
+
+    if (dispatchMode === "legacy") {
+      await processNextMessage(user_id, campaign_id);
+    }
+
     return new Response(
       JSON.stringify({ success: true, result }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { "Content-Type": "application/json" } },
     );
 
   } catch (error) {

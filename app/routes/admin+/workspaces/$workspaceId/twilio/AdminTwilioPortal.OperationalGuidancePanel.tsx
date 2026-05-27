@@ -78,12 +78,33 @@ export function OperationalGuidancePanel({
                         <div className="mt-1 font-medium">{formatLabel(detectedTrafficClass)}</div>
                     </div>
                     <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">SMS sender class</div>
+                        <div className="mt-1 font-medium">{formatLabel(config.smsSenderClass)}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Dispatch mode</div>
+                        <div className="mt-1 font-medium">
+                            {config.parallelDispatchEnabled ? "Parallel" : "Legacy sequential"}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-lg border p-4">
                         <div className="text-sm text-muted-foreground">Onboarding status</div>
                         <div className="mt-1 font-medium">{formatLabel(config.onboardingStatus)}</div>
                     </div>
                     <div className="rounded-lg border p-4">
                         <div className="text-sm text-muted-foreground">Throughput product</div>
                         <div className="mt-1 font-medium">{formatLabel(config.throughputProduct)}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Dispatcher SMS MPS</div>
+                        <div className="mt-1 font-medium">{config.smsTargetMps}</div>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <div className="text-sm text-muted-foreground">Dispatcher voice CPS</div>
+                        <div className="mt-1 font-medium">{config.voiceTargetCps}</div>
                     </div>
                 </div>
 

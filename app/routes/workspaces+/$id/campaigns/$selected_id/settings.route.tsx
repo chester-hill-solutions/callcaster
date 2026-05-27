@@ -213,6 +213,7 @@ export default function CampaignSettingsRoute() {
     () =>
       getCampaignReadiness(draftCampaignData, draftCampaignDetails, {
         queueCount: queueCount ?? 0,
+        smsSenderClass: outboundEstimateInputs.portalConfig.smsSenderClass,
         smsMessagingServiceSendersReady:
           draftCampaignData.type === "message" &&
           draftCampaignData.sms_send_mode === "messaging_service"
@@ -224,6 +225,7 @@ export default function CampaignSettingsRoute() {
       draftCampaignDetails,
       queueCount,
       smsSendContext?.messagingServiceReady,
+      outboundEstimateInputs.portalConfig.smsSenderClass,
     ],
   );
   const startDisabledReason = isChanged

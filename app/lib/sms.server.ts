@@ -1,34 +1,13 @@
-import { logger } from "@/lib/logger.server";
+const URL_REGEX = /https?:\/\/[^\s]+/g;
 
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(
-      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
-    );
-
-    if (response.ok) {
-      return await response.text();
-    }
-  } catch (error) {
-    logger.error("Error shortening URL:", error);
-  }
-
-  return url;
+export function bodyHasUrls(text: string): boolean {
+  return URL_REGEX.test(text);
 }
 
+/**
+ * Remix chat/API paths rely on Twilio Link Shortening (`shortenUrls: true`)
+ * when sending via a Messaging Service. Do not pre-shorten with third-party URLs.
+ */
 export async function processUrls(text: string): Promise<string> {
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  const urlMatches = text.match(urlRegex);
-
-  if (!urlMatches) {
-    return text;
-  }
-
-  let processedText = text;
-  for (const url of urlMatches) {
-    const shortenedUrl = await shortenUrl(url);
-    processedText = processedText.replace(url, shortenedUrl);
-  }
-
-  return processedText;
+  return text;
 }

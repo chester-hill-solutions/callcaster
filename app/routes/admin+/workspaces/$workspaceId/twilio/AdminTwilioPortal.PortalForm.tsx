@@ -9,8 +9,9 @@ import {
     TWILIO_MESSAGE_INTENT_VALUES,
     TWILIO_MULTI_TENANCY_MODE_VALUES,
     TWILIO_ONBOARDING_STATUS_VALUES,
-    TWILIO_SEND_MODE_VALUES,
-    TWILIO_THROUGHPUT_PRODUCT_VALUES,
+  TWILIO_SEND_MODE_VALUES,
+  TWILIO_SMS_SENDER_CLASS_VALUES,
+  TWILIO_THROUGHPUT_PRODUCT_VALUES,
     TWILIO_TRAFFIC_CLASS_VALUES,
     type WorkspaceTwilioOpsConfig,
 } from "@/lib/types";
@@ -215,6 +216,100 @@ export function PortalForm({
                                 </option>
                             ))}
                         </select>
+                    </FormField>
+                </div>
+            </div>
+
+            <div className="space-y-4">
+                <div>
+                    <h3 className="text-sm font-semibold">Campaign throughput</h3>
+                    <p className="text-sm text-muted-foreground">
+                        Controls parallel campaign dispatch pacing. Keep legacy mode until Twilio sender and voice limits are confirmed.
+                    </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                        htmlFor="smsSenderClass"
+                        label="SMS sender class"
+                        description="Used for throughput estimates and bulk SMS deliverability warnings."
+                    >
+                        <select
+                            id="smsSenderClass"
+                            name="smsSenderClass"
+                            defaultValue={config.smsSenderClass}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        >
+                            {TWILIO_SMS_SENDER_CLASS_VALUES.map((value) => (
+                                <option key={value} value={value}>
+                                    {formatLabel(value)}
+                                </option>
+                            ))}
+                        </select>
+                    </FormField>
+
+                    <FormField
+                        htmlFor="smsTargetMps"
+                        label="SMS target MPS"
+                        description="Segments per second for parallel SMS dispatch."
+                    >
+                        <Input
+                            id="smsTargetMps"
+                            name="smsTargetMps"
+                            type="number"
+                            min={0.1}
+                            step={0.1}
+                            defaultValue={config.smsTargetMps}
+                        />
+                    </FormField>
+
+                    <FormField
+                        htmlFor="voiceTargetCps"
+                        label="Voice target CPS"
+                        description="Outbound IVR dial starts per second."
+                    >
+                        <Input
+                            id="voiceTargetCps"
+                            name="voiceTargetCps"
+                            type="number"
+                            min={0.1}
+                            step={0.1}
+                            defaultValue={config.voiceTargetCps}
+                        />
+                    </FormField>
+
+                    <FormField
+                        htmlFor="voiceConcurrentCallLimit"
+                        label="IVR concurrent call limit"
+                        description="Dispatcher guardrail for active/ringing campaign calls."
+                    >
+                        <Input
+                            id="voiceConcurrentCallLimit"
+                            name="voiceConcurrentCallLimit"
+                            type="number"
+                            min={1}
+                            step={1}
+                            defaultValue={config.voiceConcurrentCallLimit}
+                        />
+                    </FormField>
+
+                    <FormField
+                        htmlFor="parallelDispatchEnabled"
+                        label="Parallel dispatch"
+                        description="When enabled, queue-next batches work instead of the legacy one-at-a-time chain."
+                    >
+                        <div className="flex min-h-10 items-center gap-2 rounded-md border border-input px-3">
+                            <input
+                                id="parallelDispatchEnabled"
+                                name="parallelDispatchEnabled"
+                                type="checkbox"
+                                defaultChecked={config.parallelDispatchEnabled}
+                                className="h-4 w-4 rounded border border-input"
+                            />
+                            <Label htmlFor="parallelDispatchEnabled" className="cursor-pointer">
+                                Enable parallel campaign dispatch
+                            </Label>
+                        </div>
                     </FormField>
                 </div>
             </div>

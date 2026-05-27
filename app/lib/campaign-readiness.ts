@@ -5,7 +5,9 @@ import type {
   MessageCampaign,
   ScheduleDay,
   ScheduleInterval,
+  TwilioSmsSenderClass,
 } from "@/lib/types";
+import { isBulkSmsSenderMisaligned } from "@/lib/throughput-config.server";
 
 type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | undefined;
 
@@ -24,6 +26,8 @@ type CampaignReadinessOptions = {
    * When omitted, sender inventory is not validated here.
    */
   smsMessagingServiceSendersReady?: boolean;
+  /** Workspace SMS sender class for bulk throughput/deliverability gates. */
+  smsSenderClass?: TwilioSmsSenderClass;
 };
 
 type NormalizedSchedule = Record<string, ScheduleDay>;
@@ -249,6 +253,17 @@ export function getCampaignReadiness(
 
   if (typeof options.queueCount === "number" && options.queueCount <= 0) {
     commonIssues.push("Add at least one contact before starting or scheduling");
+  }
+
+  if (
+    campaignData.type === "message" &&
+    options.smsSenderClass &&
+    typeof options.queueCount === "number" &&
+    isBulkSmsSenderMisaligned(options.smsSenderClass, options.queueCount)
+  ) {
+    commonIssues.push(
+      "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
+    );
   }
 
   const contentIssue = getContentIssue(campaignData, details);

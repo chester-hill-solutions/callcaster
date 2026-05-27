@@ -11,8 +11,10 @@ import {
   TWILIO_MULTI_TENANCY_MODE_VALUES,
   TWILIO_ONBOARDING_STATUS_VALUES,
   TWILIO_SEND_MODE_VALUES,
+  TWILIO_SMS_SENDER_CLASS_VALUES,
   TWILIO_THROUGHPUT_PRODUCT_VALUES,
   TWILIO_TRAFFIC_CLASS_VALUES,
+  type TwilioSmsSenderClass,
   type TwilioTrafficClass,
   type WorkspaceTwilioOpsAuditEntry,
   type WorkspaceTwilioOpsConfig,
@@ -25,6 +27,17 @@ import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";
+import {
+  configuredDispatcherSmsMps,
+  configuredDispatcherVoiceCps,
+  defaultSmsTargetMps,
+  defaultVoiceConcurrentCallLimit,
+  defaultVoiceTargetCps,
+  inferSmsSenderClassFromNumberTypes,
+  LEGACY_IVR_PIPELINE_CPS,
+  LEGACY_MESSAGE_PIPELINE_MPS,
+  twilioAssumedSmsMps,
+} from "@/lib/throughput-config.server";
 import { syncWorkspaceTwilioBootstrapState } from "@/lib/twilio-bootstrap.server";
 import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
@@ -51,6 +64,11 @@ const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   sendMode: "from_number",
   messagingServiceSid: null,
   onboardingStatus: "not_started",
+  smsSenderClass: "unknown",
+  smsTargetMps: 1,
+  voiceTargetCps: 1,
+  voiceConcurrentCallLimit: 100,
+  parallelDispatchEnabled: false,
   supportNotes: "",
   updatedAt: null,
   updatedBy: null,
@@ -143,6 +161,33 @@ export function normalizeWorkspaceTwilioOpsConfig(
       ? (value.defaultMessageIntent as TwilioMessageIntent)
       : null;
 
+  const smsSenderClass = pickEnumValue(
+    value.smsSenderClass,
+    TWILIO_SMS_SENDER_CLASS_VALUES,
+    DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.smsSenderClass,
+  );
+
+  const smsTargetMps =
+    typeof value.smsTargetMps === "number" &&
+    Number.isFinite(value.smsTargetMps) &&
+    value.smsTargetMps > 0
+      ? value.smsTargetMps
+      : defaultSmsTargetMps(smsSenderClass);
+
+  const voiceTargetCps =
+    typeof value.voiceTargetCps === "number" &&
+    Number.isFinite(value.voiceTargetCps) &&
+    value.voiceTargetCps > 0
+      ? value.voiceTargetCps
+      : defaultVoiceTargetCps();
+
+  const voiceConcurrentCallLimit =
+    typeof value.voiceConcurrentCallLimit === "number" &&
+    Number.isFinite(value.voiceConcurrentCallLimit) &&
+    value.voiceConcurrentCallLimit > 0
+      ? Math.floor(value.voiceConcurrentCallLimit)
+      : defaultVoiceConcurrentCallLimit();
+
   return {
     trafficClass: pickEnumValue(
       value.trafficClass,
@@ -175,6 +220,14 @@ export function normalizeWorkspaceTwilioOpsConfig(
       TWILIO_ONBOARDING_STATUS_VALUES,
       DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.onboardingStatus,
     ),
+    smsSenderClass,
+    smsTargetMps,
+    voiceTargetCps,
+    voiceConcurrentCallLimit,
+    parallelDispatchEnabled:
+      typeof value.parallelDispatchEnabled === "boolean"
+        ? value.parallelDispatchEnabled
+        : DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.parallelDispatchEnabled,
     supportNotes:
       typeof value.supportNotes === "string" ? value.supportNotes : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
@@ -275,13 +328,20 @@ export function detectTwilioTrafficClass(
   if (
     normalizedTypes.some(
       (value) =>
-        value.includes("10dlc") ||
+        value.includes("10dlc"),
+    )
+  ) {
+    return "a2p10dlc";
+  }
+  if (
+    normalizedTypes.some(
+      (value) =>
         value.includes("local") ||
         value.includes("mobile") ||
         value.includes("long"),
     )
   ) {
-    return "a2p10dlc";
+    return "international_long_code";
   }
 
   return "unknown";
@@ -325,6 +385,30 @@ function buildTwilioPortalAuditSummary(
   }
   if (currentConfig.supportNotes !== nextConfig.supportNotes) {
     changedFields.push("support notes");
+  }
+  if (currentConfig.smsSenderClass !== nextConfig.smsSenderClass) {
+    changedFields.push(`SMS sender class to ${nextConfig.smsSenderClass}`);
+  }
+  if (currentConfig.smsTargetMps !== nextConfig.smsTargetMps) {
+    changedFields.push(`SMS target MPS to ${nextConfig.smsTargetMps}`);
+  }
+  if (currentConfig.voiceTargetCps !== nextConfig.voiceTargetCps) {
+    changedFields.push(`voice target CPS to ${nextConfig.voiceTargetCps}`);
+  }
+  if (
+    currentConfig.voiceConcurrentCallLimit !==
+    nextConfig.voiceConcurrentCallLimit
+  ) {
+    changedFields.push("voice concurrent call limit");
+  }
+  if (
+    currentConfig.parallelDispatchEnabled !== nextConfig.parallelDispatchEnabled
+  ) {
+    changedFields.push(
+      nextConfig.parallelDispatchEnabled
+        ? "enabled parallel dispatch"
+        : "disabled parallel dispatch",
+    );
   }
 
   if (changedFields.length === 0) {
@@ -590,10 +674,12 @@ function buildTwilioPortalRecommendations({
   config,
   detectedTrafficClass,
   metrics,
+  advancedOptOutEnabled,
 }: {
   config: WorkspaceTwilioOpsConfig;
   detectedTrafficClass: TwilioTrafficClass;
   metrics: WorkspaceTwilioPortalMetrics;
+  advancedOptOutEnabled: boolean;
 }): WorkspaceTwilioPortalRecommendation[] {
   const recommendations: WorkspaceTwilioPortalRecommendation[] = [];
 
@@ -604,7 +690,53 @@ function buildTwilioPortalRecommendations({
     recommendations.push({
       severity: "warning",
       message:
-        "US/Canada A2P 10DLC traffic is carrier-capped, so parent-account throughput products will not raise campaign MPS.",
+        "US A2P 10DLC traffic is carrier-capped, so parent-account throughput products will not raise campaign MPS.",
+    });
+  }
+
+  if (config.smsSenderClass === "ca_local") {
+    recommendations.push({
+      severity: "warning",
+      message:
+        "Bulk SMS on Canadian local long codes has poor deliverability at volume. Use verified toll-free or a Canadian short code for campaigns.",
+    });
+  }
+
+  if (
+    config.parallelDispatchEnabled &&
+    config.smsTargetMps > defaultSmsTargetMps(config.smsSenderClass)
+  ) {
+    recommendations.push({
+      severity: "warning",
+      message:
+        "Configured SMS target MPS exceeds the typical Twilio limit for the selected sender class. Confirm Twilio MPS before raising further.",
+    });
+  }
+
+  if (
+    config.parallelDispatchEnabled &&
+    config.voiceTargetCps > 5
+  ) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "Voice target CPS above 5 usually requires an approved Business Profile and a Twilio CPS increase request.",
+    });
+  }
+
+  if (!config.parallelDispatchEnabled) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "Campaign dispatch is still on the legacy sequential pipeline (~2 MPS SMS / ~1.4 CPS IVR). Enable parallel dispatch after Twilio limits are confirmed.",
+    });
+  }
+
+  if (config.parallelDispatchEnabled) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "Parallel dispatch is enabled. Monitor duplicate sends and stuck assigned queue rows during rollout; disable parallel dispatch to roll back to legacy pacing.",
     });
   }
 
@@ -613,6 +745,14 @@ function buildTwilioPortalRecommendations({
       severity: "warning",
       message:
         "This workspace is set to Messaging Service mode, but no Messaging Service SID is configured.",
+    });
+  }
+
+  if (advancedOptOutEnabled && config.messagingServiceSid) {
+    recommendations.push({
+      severity: "info",
+      message:
+        "Advanced Opt-Out is requested for this workspace. Enable it in Twilio Console → Messaging Service → Opt-Out Management (not available via API).",
     });
   }
 
@@ -731,12 +871,32 @@ export async function getWorkspaceTwilioPortalSnapshot({
     ).length,
     statusCounts,
     numberTypes,
+    legacyDispatcherSmsMps: LEGACY_MESSAGE_PIPELINE_MPS,
+    configuredDispatcherSmsMps: configuredDispatcherSmsMps(config),
+    twilioAssumedSmsMps: twilioAssumedSmsMps({
+      smsSenderClass:
+        config.smsSenderClass === "unknown"
+          ? inferSmsSenderClassFromNumberTypes(numberTypes)
+          : config.smsSenderClass,
+      trafficClass: config.trafficClass,
+      throughputProduct: config.throughputProduct,
+      senderPoolSize: Math.max(1, syncSnapshot.phoneNumberCount),
+    }),
+    legacyDispatcherVoiceCps: LEGACY_IVR_PIPELINE_CPS,
+    configuredDispatcherVoiceCps: configuredDispatcherVoiceCps(config),
+    voiceConcurrentCallLimit: config.voiceConcurrentCallLimit,
+    parallelDispatchEnabled: config.parallelDispatchEnabled,
+    smsSenderClass:
+      config.smsSenderClass === "unknown"
+        ? inferSmsSenderClassFromNumberTypes(numberTypes)
+        : config.smsSenderClass,
   };
 
   const recommendations = buildTwilioPortalRecommendations({
     config,
     detectedTrafficClass,
     metrics,
+    advancedOptOutEnabled: onboarding.messagingService.advancedOptOutEnabled,
   });
   const readiness = deriveWorkspaceMessagingReadiness({
     onboarding,
@@ -772,6 +932,12 @@ export async function getWorkspaceTwilioPortalSnapshot({
     `Recent raw-from sends: ${metrics.rawFromCount}`,
     `Messaging ready: ${readiness.messagingReady ? "yes" : "no"}`,
     `Voice ready: ${readiness.voiceReady ? "yes" : "no"}`,
+    `SMS sender class: ${metrics.smsSenderClass}`,
+    `Parallel dispatch: ${metrics.parallelDispatchEnabled ? "enabled" : "legacy"}`,
+    `Dispatcher SMS MPS: ${metrics.configuredDispatcherSmsMps}`,
+    `Twilio assumed SMS MPS: ${metrics.twilioAssumedSmsMps}`,
+    `Dispatcher voice CPS: ${metrics.configuredDispatcherVoiceCps}`,
+    `IVR concurrent call limit: ${metrics.voiceConcurrentCallLimit}`,
     `Support notes: ${config.supportNotes || "none"}`,
   ].join("\n");
 

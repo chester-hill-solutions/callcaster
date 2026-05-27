@@ -164,12 +164,21 @@ export const TWILIO_ONBOARDING_STATUS_VALUES = [
   "enabled",
 ] as const;
 
+export const TWILIO_SMS_SENDER_CLASS_VALUES = [
+  "unknown",
+  "ca_local",
+  "verified_toll_free",
+  "ca_short_code",
+  "us_a2p10dlc",
+] as const;
+
 export type TwilioTrafficClass = (typeof TWILIO_TRAFFIC_CLASS_VALUES)[number];
 export type TwilioThroughputProduct = (typeof TWILIO_THROUGHPUT_PRODUCT_VALUES)[number];
 export type TwilioMultiTenancyMode = (typeof TWILIO_MULTI_TENANCY_MODE_VALUES)[number];
 export type TwilioMessageIntent = (typeof TWILIO_MESSAGE_INTENT_VALUES)[number];
 export type TwilioSendMode = (typeof TWILIO_SEND_MODE_VALUES)[number];
 export type TwilioOnboardingStatus = (typeof TWILIO_ONBOARDING_STATUS_VALUES)[number];
+export type TwilioSmsSenderClass = (typeof TWILIO_SMS_SENDER_CLASS_VALUES)[number];
 export type WorkspaceTwilioSyncStatus =
   | "never_synced"
   | "syncing"
@@ -192,6 +201,16 @@ export interface WorkspaceTwilioOpsConfig {
   sendMode: TwilioSendMode;
   messagingServiceSid: string | null;
   onboardingStatus: TwilioOnboardingStatus;
+  /** Canada-first bulk SMS sender classification for throughput/deliverability. */
+  smsSenderClass: TwilioSmsSenderClass;
+  /** Target outbound SMS segments/sec for campaign dispatcher pacing. */
+  smsTargetMps: number;
+  /** Target outbound voice call starts/sec (CPS) for IVR campaign pacing. */
+  voiceTargetCps: number;
+  /** Guardrail for concurrent active/ringing IVR campaign calls. */
+  voiceConcurrentCallLimit: number;
+  /** When true, queue-next uses parallel batch dispatch instead of legacy chain. */
+  parallelDispatchEnabled: boolean;
   supportNotes: string;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -209,6 +228,19 @@ export interface WorkspaceTwilioPortalMetrics {
   messagingServiceCount: number;
   statusCounts: Partial<Record<Database["public"]["Enums"]["message_status"], number>>;
   numberTypes: string[];
+  /** Legacy sequential pipeline SMS rate (MPS). */
+  legacyDispatcherSmsMps: number;
+  /** Configured parallel/legacy dispatcher SMS rate (MPS). */
+  configuredDispatcherSmsMps: number;
+  /** Heuristic Twilio-side SMS ceiling (MPS). */
+  twilioAssumedSmsMps: number;
+  /** Legacy sequential pipeline IVR dial rate (CPS). */
+  legacyDispatcherVoiceCps: number;
+  /** Configured parallel/legacy dispatcher IVR dial rate (CPS). */
+  configuredDispatcherVoiceCps: number;
+  voiceConcurrentCallLimit: number;
+  parallelDispatchEnabled: boolean;
+  smsSenderClass: TwilioSmsSenderClass;
 }
 
 export interface WorkspaceTwilioSyncSnapshot {

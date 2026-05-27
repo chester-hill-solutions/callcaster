@@ -88,6 +88,7 @@ async function configureMessagingServiceInTwilio({
       stickySender: onboarding.messagingService.stickySenderEnabled,
       areaCodeGeomatch: true,
       useInboundWebhookOnNumber: true,
+      smartEncoding: true,
     },
     { workspaceId, operation: "messagingService.update" },
   );

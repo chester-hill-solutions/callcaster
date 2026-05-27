@@ -3,6 +3,16 @@ import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import {
+  completeQueueContact,
+  failQueueContact,
+  requeueContact,
+} from "../_shared/campaign-dispatch.ts";
+import {
+  isRetryableVoiceTwilioError,
+  withTwilioRetry,
+} from "../_shared/twilio-retry.ts";
+
 const baseUrl = getFunctionsBaseUrl();
 
 interface RequestBody {
@@ -11,13 +21,14 @@ interface RequestBody {
   workspace_id: string;
   contact_id: string;
   caller_id: string;
-  queue_id?: string;
+  queue_id?: number;
   user_id?: string;
   index?: number;
   total?: number;
   isLastContact?: boolean;
   type: string;
   owner: string;
+  dispatch_mode?: "legacy" | "parallel";
 }
 
 async function getTwilioData(supabase, workspace_id) {
@@ -78,6 +89,7 @@ async function processNextCall(owner, campaign_id) {
 export async function handleRequest(req: Request): Promise<Response> {
   try {
     const body: RequestBody = await req.json();
+    const dispatchMode = body.dispatch_mode === "parallel" ? "parallel" : "legacy";
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -91,16 +103,23 @@ export async function handleRequest(req: Request): Promise<Response> {
     if (!twilio_data || !creds) throw new Error("Twilio data retrieval failed");
     try {
       const twilio = new Twilio(creds.sid, creds.authToken);
-      const call = await twilio.calls.create({
-        to: body.to_number,
-        from: body.caller_id,
-        url: `${baseUrl}/ivr-flow`,
-        machineDetection: "DetectMessageEnd",
-        machineDetectionSpeechThreshold: 1900,
-        machineDetectionSpeechEndThreshold: 1200,
-        statusCallbackEvent: ["initiated", "answered", "completed"],
-        statusCallback: `${baseUrl}/ivr-status`,
-      }).catch((callError: unknown) => {
+      const call = await withTwilioRetry(
+        () =>
+          twilio.calls.create({
+            to: body.to_number,
+            from: body.caller_id,
+            url: `${baseUrl}/ivr-flow`,
+            machineDetection: "DetectMessageEnd",
+            machineDetectionSpeechThreshold: 1900,
+            machineDetectionSpeechEndThreshold: 1200,
+            statusCallbackEvent: ["initiated", "answered", "completed"],
+            statusCallback: `${baseUrl}/ivr-status`,
+          }),
+        {
+          operation: "calls.create",
+          isRetryable: isRetryableVoiceTwilioError,
+        },
+      ).catch((callError: unknown) => {
         console.error('Error placing call to Twilio', callError);
         return null;
       });
@@ -113,11 +132,20 @@ export async function handleRequest(req: Request): Promise<Response> {
             })
             .eq("id", outreach_attempt_id);
         }
-        try {
-          await processNextCall(body.owner || body.user_id, body.campaign_id);
-        } catch (error) {
-          console.error('Error processing next call:', error);
-        }        
+        if (body.queue_id) {
+          await requeueContact({
+            supabase,
+            queueId: body.queue_id,
+            errorText: "Failed to place Twilio call",
+          });
+        }
+        if (dispatchMode === "legacy") {
+          try {
+            await processNextCall(body.owner || body.user_id, body.campaign_id);
+          } catch (error) {
+            console.error('Error processing next call:', error);
+          }
+        }
         return new Response(
           JSON.stringify({ success: false, error: "Failed to place Twilio call" }),
           { headers: { "Content-Type": "application/json" } }
@@ -146,19 +174,38 @@ export async function handleRequest(req: Request): Promise<Response> {
             })
             .eq("id", outreach_attempt_id);
         }
-        await processNextCall(body.owner || body.user_id, body.campaign_id)
+        if (body.queue_id) {
+          await failQueueContact({
+            supabase,
+            queueId: body.queue_id,
+            errorText: "Failed to insert call record",
+            dequeuedById: body.user_id ?? body.owner ?? null,
+          });
+        }
+        if (dispatchMode === "legacy") {
+          await processNextCall(body.owner || body.user_id, body.campaign_id)
+        }
         return new Response(
           JSON.stringify({ success: false, error: "Failed to insert call record" }),
           { headers: { "Content-Type": "application/json" }, status: 500 }
         );
       }
-      if (!body.owner || !body.user_id){
-        console.log('No owner passed.')
+
+      if (body.queue_id) {
+        await completeQueueContact({
+          supabase,
+          queueId: body.queue_id,
+          dequeuedById: body.user_id ?? body.owner ?? null,
+          reason: "IVR call initiated",
+        });
       }
-      try {
-        await processNextCall(body.owner || body.user_id, body.campaign_id)
-      } catch (error) {
-        console.error('Error processing next call:', error);
+
+      if (dispatchMode === "legacy") {
+        try {
+          await processNextCall(body.owner || body.user_id, body.campaign_id)
+        } catch (error) {
+          console.error('Error processing next call:', error);
+        }
       }
 
       return new Response(
@@ -175,10 +222,28 @@ export async function handleRequest(req: Request): Promise<Response> {
           })
           .eq("id", outreach_attempt_id);
       }
-      try {
-        await processNextCall(body.owner || body.user_id, body.campaign_id)
-      } catch (error) {
-        console.error('Error processing next call:', error);
+      if (body.queue_id) {
+        if (isRetryableVoiceTwilioError(error)) {
+          await requeueContact({
+            supabase,
+            queueId: body.queue_id,
+            errorText: error instanceof Error ? error.message : String(error),
+          });
+        } else {
+          await failQueueContact({
+            supabase,
+            queueId: body.queue_id,
+            errorText: error instanceof Error ? error.message : String(error),
+            dequeuedById: body.user_id ?? body.owner ?? null,
+          });
+        }
+      }
+      if (dispatchMode === "legacy") {
+        try {
+          await processNextCall(body.owner || body.user_id, body.campaign_id)
+        } catch (nextError) {
+          console.error('Error processing next call:', nextError);
+        }
       }
       return new Response(
         JSON.stringify({
