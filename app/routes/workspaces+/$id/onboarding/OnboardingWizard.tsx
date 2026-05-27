@@ -1,14 +1,6 @@
-import {
-  Form,
-  useFetcher,
-  useLocation,
-  useNavigate,
-  useNavigation,
-  useSearchParams,
-} from "react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Form, Link, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import {
   isWizardOnboardingStepId,
   type WizardOnboardingStepId,
@@ -16,7 +8,6 @@ import {
   workspaceHasFirstNumber,
 } from "@/lib/messaging-onboarding.server";
 import type { OnboardingLoaderData } from "../onboarding.loader.server";
-import type { OnboardingActionData } from "../onboarding.action.server";
 import { OnboardingBusinessBasicsStep } from "./OnboardingBusinessBasicsStep";
 import { OnboardingChannelsStep } from "./OnboardingChannelsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
@@ -39,7 +30,7 @@ function resolveWizardStep(currentStep: string | null | undefined): WizardOnboar
   return "business_profile";
 }
 
-function readInitialWizardStep(
+function readWizardStep(
   urlStep: string | null,
   currentStep: string | null | undefined,
 ): WizardOnboardingStepId {
@@ -69,19 +60,14 @@ export function OnboardingWizard({
   a2pErrors,
 }: OnboardingWizardProps) {
   const [searchParams] = useSearchParams();
-  const location = useLocation();
   const navigate = useNavigate();
   const navigation = useNavigation();
-  const advanceFetcher = useFetcher<OnboardingActionData>();
-  const userNavigatedRef = useRef(false);
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const urlStep = searchParams.get("step");
   const [showIntro, setShowIntro] = useState(
     () => onboarding.status === "not_started" && urlStep !== "business_profile",
   );
-  const wizardStep = readInitialWizardStep(urlStep, onboarding.currentStep);
-
-  const activeStep = showIntro ? null : wizardStep;
+  const activeStep = showIntro ? null : readWizardStep(urlStep, onboarding.currentStep);
 
   const stepIndex = activeStep
     ? WIZARD_ONBOARDING_STEP_IDS.indexOf(activeStep)
@@ -90,94 +76,25 @@ export function OnboardingWizard({
     stepIndex >= 0 ? ((stepIndex + 1) / WIZARD_ONBOARDING_STEP_IDS.length) * 100 : 0;
 
   const hasFirstNumber = workspaceHasFirstNumber(phoneNumbers ?? []);
+  const isFormSubmitting = navigation.state !== "idle";
+  const messagingProvisioned = Boolean(onboarding.messagingService.serviceSid);
 
-  const syncStepToUrl = useCallback(
-    (step: WizardOnboardingStepId) => {
-      const params = new URLSearchParams(location.search);
-      params.set("step", step);
-      const search = params.toString();
-      navigate(
-        { pathname: location.pathname, search: search ? `?${search}` : "" },
-        { replace: true },
-      );
-    },
-    [location.pathname, location.search, navigate],
-  );
-
-  const goToStep = useCallback(
-    (step: WizardOnboardingStepId) => {
-      setShowIntro(false);
-      syncStepToUrl(step);
-    },
-    [syncStepToUrl],
-  );
-
-  useEffect(() => {
-    if (showIntro || advanceFetcher.state !== "idle" || !advanceFetcher.data?.success) {
-      return;
-    }
-    const resolved = resolveWizardStep(onboarding.currentStep);
-    if (urlStep !== resolved) {
-      syncStepToUrl(resolved);
-    }
-  }, [
-    advanceFetcher.data,
-    advanceFetcher.state,
-    onboarding.currentStep,
-    showIntro,
-    syncStepToUrl,
-    urlStep,
-  ]);
-
-  const goToPrevious = useCallback(() => {
-    if (!activeStep) {
-      return;
-    }
-    const index = WIZARD_ONBOARDING_STEP_IDS.indexOf(activeStep);
-    if (index <= 0) {
-      userNavigatedRef.current = true;
-      setShowIntro(true);
-      navigate(location.pathname, { replace: true });
-      return;
-    }
-    goToStep(WIZARD_ONBOARDING_STEP_IDS[index - 1]!);
-  }, [activeStep, goToStep, location.pathname, navigate]);
-
-  const advanceToStep = useCallback(
-    (targetStep: WizardOnboardingStepId) => {
-      if (isReadOnly) {
-        goToStep(targetStep);
-        return;
-      }
-      const formData = new FormData();
-      formData.set("_action", "advance_step");
-      formData.set("targetStep", targetStep);
-      advanceFetcher.submit(formData, { method: "post" });
-      goToStep(targetStep);
-    },
-    [advanceFetcher, goToStep, isReadOnly],
-  );
-
-  const goToNext = useCallback(() => {
-    if (!activeStep) {
-      return;
-    }
-    const index = WIZARD_ONBOARDING_STEP_IDS.indexOf(activeStep);
-    const next = WIZARD_ONBOARDING_STEP_IDS[index + 1];
-    if (next) {
-      advanceToStep(next);
-    }
-  }, [activeStep, advanceToStep]);
+  const previousStep =
+    activeStep && stepIndex > 0 ? WIZARD_ONBOARDING_STEP_IDS[stepIndex - 1]! : null;
+  const nextStep =
+    activeStep && stepIndex >= 0 && stepIndex < WIZARD_ONBOARDING_STEP_IDS.length - 1
+      ? WIZARD_ONBOARDING_STEP_IDS[stepIndex + 1]!
+      : null;
 
   const emergencyEligibleNumbers = new Set(onboarding.emergencyVoice.emergencyEligiblePhoneNumbers);
   const voiceCapableWorkspaceNumbers = (phoneNumbers ?? []).filter(
     (number) => number?.phone_number && number.type === "rented" && hasVoiceCapability(number.capabilities),
   );
 
-  const isFormSubmitting = navigation.state !== "idle";
-  const isAdvancingStep = advanceFetcher.state !== "idle";
-  const isSubmitting = isFormSubmitting || isAdvancingStep;
-  const messagingProvisioned = Boolean(onboarding.messagingService.serviceSid);
+  const goToPreviousIntro = () => {
+    setShowIntro(true);
+    navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
+  };
 
   const footerContinue = (() => {
     if (!activeStep || isReadOnly) {
@@ -207,11 +124,15 @@ export function OnboardingWizard({
           </Button>
         );
       case "messaging_service":
-        if (messagingProvisioned) {
+        if (messagingProvisioned && nextStep) {
           return (
-            <Button type="button" onClick={goToNext} disabled={isSubmitting}>
-              Next
-            </Button>
+            <Form method="post">
+              <input type="hidden" name="_action" value="advance_step" />
+              <input type="hidden" name="targetStep" value={nextStep} />
+              <Button type="submit" disabled={isFormSubmitting}>
+                Next
+              </Button>
+            </Form>
           );
         }
         return (
@@ -229,17 +150,25 @@ export function OnboardingWizard({
       case "first_number":
         if (hasFirstNumber) {
           return (
-            <Button type="button" onClick={() => advanceToStep("provider_provisioning")} disabled={isSubmitting}>
-              Continue
-            </Button>
+            <Form method="post">
+              <input type="hidden" name="_action" value="advance_step" />
+              <input type="hidden" name="targetStep" value="provider_provisioning" />
+              <Button type="submit" disabled={isFormSubmitting}>
+                Continue
+              </Button>
+            </Form>
           );
         }
         return null;
       case "provider_provisioning":
         return (
-          <Button type="button" onClick={() => advanceToStep("launch_checks")} disabled={isSubmitting}>
-            Continue to review
-          </Button>
+          <Form method="post">
+            <input type="hidden" name="_action" value="advance_step" />
+            <input type="hidden" name="targetStep" value="launch_checks" />
+            <Button type="submit" disabled={isFormSubmitting}>
+              Continue to review
+            </Button>
+          </Form>
         );
       case "launch_checks":
         return (
@@ -274,7 +203,7 @@ export function OnboardingWizard({
           creditsBalance={creditsBalance}
           onStart={() => {
             setShowIntro(false);
-            goToStep("business_profile");
+            navigate(`/workspaces/${workspaceId}/onboarding?step=business_profile`, { replace: true });
           }}
         />
       ) : null}
@@ -342,14 +271,22 @@ export function OnboardingWizard({
 
       {!showIntro && activeStep ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <Button type="button" variant="outline" onClick={goToPrevious} disabled={isFormSubmitting}>
-            Back
-          </Button>
+          {previousStep ? (
+            <Button type="button" variant="outline" asChild disabled={isFormSubmitting}>
+              <Link to={`?step=${previousStep}`} replace>
+                Back
+              </Link>
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" onClick={goToPreviousIntro} disabled={isFormSubmitting}>
+              Back
+            </Button>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {activeStep === "first_number" && !hasFirstNumber && !isReadOnly ? (
               <Form method="post">
                 <input type="hidden" name="_action" value="skip_first_number" />
-                <Button type="submit" variant="ghost" disabled={isSubmitting}>
+                <Button type="submit" variant="ghost" disabled={isFormSubmitting}>
                   Skip for now
                 </Button>
               </Form>

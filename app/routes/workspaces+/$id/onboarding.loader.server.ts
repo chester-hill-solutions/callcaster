@@ -3,6 +3,7 @@ import {
   applyWorkspaceOnboardingChannelPolicy,
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingState,
+  isWizardOnboardingStepId,
 } from "@/lib/messaging-onboarding.server";
 import {
   getUserRole,
@@ -85,6 +86,25 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     })),
     recentOutboundCount: 0,
   });
+
+  const requestUrl = new URL(request.url);
+  const stepParam = requestUrl.searchParams.get("step");
+  const serverStep =
+    hydratedOnboarding.currentStep === "use_case"
+      ? "business_profile"
+      : isWizardOnboardingStepId(hydratedOnboarding.currentStep)
+        ? hydratedOnboarding.currentStep
+        : "business_profile";
+
+  if (stepParam && !isWizardOnboardingStepId(stepParam)) {
+    requestUrl.searchParams.set("step", serverStep);
+    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
+  }
+
+  if (!stepParam && hydratedOnboarding.status !== "not_started") {
+    requestUrl.searchParams.set("step", serverStep);
+    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
+  }
 
   return routeData<OnboardingLoaderData>(
     {

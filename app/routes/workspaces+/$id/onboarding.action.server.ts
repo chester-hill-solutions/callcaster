@@ -38,6 +38,16 @@ import {
 } from "@/lib/onboarding-actions.server";
 export type { OnboardingActionData } from "@/lib/onboarding-actions.server";
 
+function redirectToOnboardingStep(
+  workspaceId: string,
+  step: string,
+  headers: Headers,
+  searchParams?: Record<string, string>,
+) {
+  const params = new URLSearchParams({ step, ...searchParams });
+  throw redirect(`/workspaces/${workspaceId}/onboarding?${params.toString()}`, { headers });
+}
+
 export const action = async ({ request, params }: ActionFunctionArgs) => {
   const { supabaseClient, user, headers } = await verifyAuth(request);
   if (!user) {
@@ -106,13 +116,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return routeData<OnboardingActionData>({ error: "Invalid onboarding step." }, { status: 400 });
       }
       await persistOnboardingState(wsId, { currentStep: targetStep });
-      return routeData<OnboardingActionData>({ success: "Onboarding step updated." });
+      redirectToOnboardingStep(wsId, targetStep, headers);
     }
 
     if (actionName === "skip_first_number") {
       await persistOnboardingState(wsId, { currentStep: "provider_provisioning" });
-      return routeData<OnboardingActionData>({
-        success: "Skipped number rental for now. You can add a number later in Settings.",
+      redirectToOnboardingStep(wsId, "provider_provisioning", headers, {
+        skipped: "first_number",
       });
     }
 
@@ -156,7 +166,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       });
       nextState = hydrateWorkspaceRcsOnboardingState(nextState);
       await persistOnboardingState(wsId, nextState);
-      return routeData<OnboardingActionData>({ success: "Onboarding channels updated." });
+      redirectToOnboardingStep(wsId, "messaging_service", headers);
     }
 
     if (actionName === "bootstrap_messaging_service") {
@@ -168,6 +178,19 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
       if (bootstrap.serviceSid) {
         await persistOnboardingState(wsId, { currentStep: "first_number" });
+        if (bootstrap.outcome === "success") {
+          redirectToOnboardingStep(wsId, "first_number", headers, {
+            provisioned: "messaging_service",
+          });
+        }
+        if (bootstrap.outcome === "partial") {
+          redirectToOnboardingStep(wsId, "first_number", headers, {
+            provisioned: "messaging_service",
+            warning:
+              bootstrap.lastError ??
+              "Messaging Service was created but some configuration is still incomplete.",
+          });
+        }
       }
 
       if (bootstrap.outcome === "success") {
@@ -239,7 +262,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       });
       nextState = hydrateWorkspaceRcsOnboardingState(nextState);
       await persistOnboardingState(wsId, nextState);
-      return routeData<OnboardingActionData>({ success: "Business and compliance details saved." });
+      redirectToOnboardingStep(wsId, "path_selection", headers);
     }
 
     if (actionName === "review_emergency_voice") {
@@ -490,6 +513,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     return routeData<OnboardingActionData>({ error: "Unknown onboarding action." }, { status: 400 });
   } catch (error) {
+    if (error instanceof Response) {
+      throw error;
+    }
     return routeData<OnboardingActionData>(
       {
         error: error instanceof Error ? error.message : "Onboarding update failed.",

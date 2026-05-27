@@ -1,7 +1,9 @@
 export { loader } from "./onboarding.loader.server";
 export { action } from "./onboarding.action.server";
 
-import { useActionData, useLoaderData, useNavigation } from "react-router";
+import { useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type { OnboardingActionData } from "./onboarding.action.server";
 import type { OnboardingLoaderData } from "./onboarding.loader.server";
@@ -20,6 +22,35 @@ export default function WorkspaceMessagingOnboardingRoute() {
   } = useLoaderData<OnboardingLoaderData>();
   const actionData = useActionData<OnboardingActionData>();
   const navigation = useNavigation();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const skipped = searchParams.get("skipped");
+    const provisioned = searchParams.get("provisioned");
+    const warning = searchParams.get("warning");
+    if (!skipped && !provisioned && !warning) {
+      return;
+    }
+    if (skipped === "first_number") {
+      toast.success("Skipped number rental for now. You can add a number later in Settings.");
+    }
+    if (provisioned === "messaging_service") {
+      toast.success("Messaging Service is ready.");
+    }
+    if (warning) {
+      toast.warning(warning);
+    }
+    setSearchParams(
+      (previous) => {
+        const next = new URLSearchParams(previous);
+        next.delete("skipped");
+        next.delete("provisioned");
+        next.delete("warning");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   useActionFeedback(actionData, {
     getWarning: (data) => data?.warning,
