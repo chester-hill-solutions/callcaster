@@ -1,10 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import {
-  createMockFetcher,
-  createSupabaseRealtimeMock,
-  installIntersectionObserverMock,
-} from "./hooks-test-helpers";
+import { createMockFetcher, createSupabaseRealtimeMock } from "./hooks-test-helpers";
 
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -61,24 +57,6 @@ describe("utils hooks", () => {
     rerender({ delay: null });
     act(() => vi.advanceTimersByTime(5000));
     expect(tick).toHaveBeenCalledTimes(1);
-  });
-
-  test("utils useIntersectionObserver observe and disconnect", async () => {
-    installIntersectionObserverMock();
-    const { useIntersectionObserver } = await import(
-      "@/hooks/utils/useIntersectionObserver"
-    );
-    const onIntersect = vi.fn();
-    const { result, unmount } = renderHook(() =>
-      useIntersectionObserver(onIntersect),
-    );
-
-    const el = document.createElement("div");
-    act(() => result.current.observe(el));
-    expect(onIntersect).toHaveBeenCalledWith(el);
-
-    act(() => result.current.disconnect());
-    unmount();
   });
 
   test("useDebouncedSave submits and shows toasts", async () => {

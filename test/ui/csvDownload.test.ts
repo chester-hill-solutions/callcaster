@@ -42,7 +42,7 @@ describe("csvDownload", () => {
       throw new Error("boom");
     });
 
-    expect(() => downloadCsv("a,b", "x.csv")).toThrow("Failed to download CSV: boom");
+    expect(() => downloadCsv("a,b", "x.csv")).toThrow("Failed to download file: boom");
     expect(console.error).toHaveBeenCalled();
   });
 
@@ -51,7 +51,7 @@ describe("csvDownload", () => {
       throw "nope";
     });
 
-    expect(() => downloadCsv("a,b", "x.csv")).toThrow("Failed to download CSV: Unknown error");
+    expect(() => downloadCsv("a,b", "x.csv")).toThrow("Failed to download file: Unknown error");
   });
 });
 

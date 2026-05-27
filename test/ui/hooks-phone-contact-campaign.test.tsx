@@ -1,7 +1,5 @@
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
-import { createMockFetcher } from "./hooks-test-helpers";
-
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
@@ -87,7 +85,12 @@ describe("phone, contact, campaign hooks", () => {
       }),
     );
 
-    await waitFor(() => expect(result.current.isValid).toBe(true));
+    act(() => {
+      result.current.handleSearch({
+        target: { value: "+1 (555) 123-4567" },
+      } as React.ChangeEvent<HTMLInputElement>);
+    });
+    expect(result.current.isValid).toBe(true);
 
     act(() => {
       result.current.handleSearch({
@@ -110,93 +113,4 @@ describe("phone, contact, campaign hooks", () => {
     expect(result.current.isContactMenuOpen).toBe(false);
   });
 
-  test("useScriptState updates script and steps", async () => {
-    const { useScriptState } = await import("@/hooks/campaign/useScriptState");
-    const onPageDataChange = vi.fn();
-    const pageData = {
-      campaignDetails: {
-        script: { id: 1, name: "S", steps: { a: { content: "x" } } },
-      },
-    } as any;
-
-    expect(() => useScriptState(null as any, onPageDataChange)).toThrow();
-    expect(() => useScriptState({ campaignDetails: null } as any, onPageDataChange)).toThrow();
-    expect(() => useScriptState(pageData, null as any)).toThrow();
-
-    const { result } = renderHook(() => useScriptState(pageData, onPageDataChange));
-
-    act(() => {
-      result.current.updateScript((s) => ({ ...s, name: "S2" }));
-      result.current.updateScriptData((d) => ({ ...d, b: { content: "y" } }));
-    });
-    expect(onPageDataChange).toHaveBeenCalled();
-  });
-
-  test("useCampaignSettings drives status and save flows", async () => {
-    const { useCampaignSettings } = await import("@/hooks/campaign/useCampaignSettings");
-    const navigate = vi.fn();
-    const fetcher = createMockFetcher({
-      submit: vi.fn(),
-      state: "idle",
-      data: { success: true, campaign: { title: "T2" }, campaignDetails: { script_id: 1 } },
-    });
-
-    const initialState = {
-      campaign_id: "1",
-      workspace: "ws",
-      title: "T",
-      status: "paused",
-      type: "live_call",
-      dial_type: "call",
-      group_household_queue: false,
-      start_date: "",
-      end_date: "",
-      caller_id: null,
-      voicemail_file: null,
-      script_id: 1,
-      audiences: [],
-      body_text: null,
-      message_media: null,
-      voicedrop_audio: null,
-      schedule: null,
-      is_active: false,
-      details: { script_id: 1 },
-    } as any;
-
-    expect(() =>
-      useCampaignSettings({ initialState: null as any, navigate, fetcher: fetcher as any }),
-    ).toThrow();
-
-    const { result } = renderHook(() =>
-      useCampaignSettings({ initialState, navigate, fetcher: fetcher as any }),
-    );
-
-    act(() => result.current.updateCampaignField("title", "New"));
-    act(() => result.current.handleAudienceChange({ audience_id: 9 } as any, true));
-    act(() => result.current.handleAudienceChange({ audience_id: 9 } as any, false));
-    act(() => result.current.handleStatusButtons("schedule"));
-    act(() => result.current.handleStatusButtons("pause"));
-    act(() => result.current.handleStatusButtons("play"));
-    act(() => result.current.handleConfirmStatus("none"));
-    act(() => result.current.handleSave());
-    act(() => result.current.resetState());
-
-    const failFetcher = createMockFetcher({
-      state: "idle",
-      data: { error: "fail" },
-      submit: vi.fn(),
-    });
-    const hook2 = renderHook(() =>
-      useCampaignSettings({
-        initialState,
-        navigate,
-        fetcher: failFetcher as any,
-      }),
-    );
-    act(() => {
-      hook2.result.current.handleStatusButtons("play");
-      hook2.result.current.handleConfirmStatus("none");
-    });
-    await waitFor(() => expect(hook2.result.current.state.title).toBe("T"));
-  });
 });

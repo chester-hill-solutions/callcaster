@@ -307,7 +307,11 @@ describe("app/components/file-assets/columns.tsx", () => {
     };
     for (const col of mediaColumns) {
       if (col.cell && typeof col.cell === "function") {
-        render(<>{(col.cell as Function)({ row } as never)}</>);
+        render(
+          <>
+            {(col.cell as (ctx: { row: typeof row }) => React.ReactNode)({ row })}
+          </>,
+        );
       }
     }
   });
