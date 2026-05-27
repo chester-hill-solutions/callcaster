@@ -6,10 +6,10 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
-import type { TwilioAccountData } from "@/lib/types";
+import type { TwilioAccountData, WorkspaceOnboardingStatus } from "@/lib/types";
 import { isRecord } from "@/lib/parse-utils.server";
 
-function mapBrandStatus(raw: string | undefined): string {
+function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
   const normalized = (raw ?? "").toLowerCase();
   if (normalized === "approved") return "approved";
   if (normalized === "failed" || normalized === "rejected") return "rejected";
