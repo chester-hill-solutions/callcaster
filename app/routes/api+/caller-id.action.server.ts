@@ -1,23 +1,10 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createErrorResponse } from "@/lib/errors.server";
+import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { normalizePhoneNumber } from "@/lib/utils";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-
-interface WorkspaceData {
-  key: string;
-  token: string;
-  twilio_data: {
-    sid: string;
-    authToken: string;
-  };
-}
 
 interface RequestBody {
   phoneNumber: string;
@@ -26,13 +13,8 @@ interface RequestBody {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
   const { supabaseClient: userSupabase, user } = await verifyAuth(request);
   try {
-    const supabase: SupabaseClient = createClient(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY(),
-    );
     const { phoneNumber, workspace_id, friendlyName }: RequestBody =
       await safeParseJson(request);
 
@@ -42,66 +24,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       workspaceId: workspace_id,
     });
 
-    const { data, error } = await supabase
-      .from("workspace")
-      .select()
-      .eq("id", workspace_id)
-      .single();
-    if (error) throw new Error(`Supabase query error: ${error.message}`);
-    if (!data) throw new Error("No workspace data found");
-
-    const workspaceData = data as WorkspaceData;
-
-    const creds = readTwilioWorkspaceCredentials(workspaceData.twilio_data);
-    if (!creds) {
-      throw new Error("Workspace twilio_data not found");
-    }
-
-    const twilio = new Twilio.Twilio(creds.sid, creds.authToken, {
-      accountSid: creds.sid,
-    });
-
-    const validationRequest = await twilio.validationRequests.create({
-      friendlyName,
+    const { validationRequest, numberRequest } = await startWorkspaceCallerIdVerification({
+      supabaseClient: userSupabase,
+      workspaceId: workspace_id,
       phoneNumber,
-      statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
+      friendlyName,
     });
-    const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-
-    const { data: numberRequest, error: numberError } = await supabase
-      .from("workspace_number")
-      .upsert(
-        {
-          workspace: workspace_id,
-          friendly_name: friendlyName,
-          phone_number: normalizedPhoneNumber,
-          type: 'caller_id',
-          capabilities: {
-            fax: false,
-            mms: false,
-            sms: false,
-            voice: false,
-            verification_status: 'pending',
-            emergency_address_status: 'not_started',
-            emergency_address_sid: null,
-            emergency_eligible: false,
-            emergency_compliance_status: 'not_started',
-          },
-        },
-        {
-          onConflict: "phone_number, workspace",
-        },
-      )
-      .select();
-
-    if (numberError)
-      throw new Error(
-        `Error inserting workspace number: ${numberError.message}`,
-      );
 
     return routeData({ validationRequest, numberRequest });
   } catch (error) {
     logger.error("Action error:", error);
     return createErrorResponse(error, "Failed to create caller ID");
   }
-}
+};

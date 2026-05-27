@@ -3,7 +3,6 @@ import { getUserRole } from "@/lib/database.server";
 import { MemberRole } from "@/lib/member-role";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
 import type { User } from "@/lib/types";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {

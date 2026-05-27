@@ -6,33 +6,25 @@ import type { NumbersSearchFetcherData } from "@/components/phone-numbers/Number
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
 import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 
 import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
+import {
+  CallerIdVerificationDialog,
+  type CallerIdValidationRequest,
+} from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { User, WorkspaceNumbers } from "@/lib/types";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 
 
-type ValidationRequest = {
-  accountSid: string;
-  callSid: string;
-  friendlyName: string;
-  phoneNumber: string;
-  validationCode: string;
-};
+type ValidationRequest = CallerIdValidationRequest;
 
 type NumberCapabilities = {
   fax: boolean;
@@ -117,14 +109,12 @@ const WorkspaceSettings = () => {
     setUpdate: () => null,
   });
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
-    if (actionData?.validationRequest) {
-      setDialog(true);
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: (data) => Boolean(data?.validationRequest),
+    onSuccess: () => setDialog(true),
+    successMessage: undefined,
+  });
 
   const handleIncomingActivityChange = (numberId: number, value: string) => {
     updateFetcher.submit(
@@ -182,10 +172,10 @@ const WorkspaceSettings = () => {
 
   return (
     <>
-      <VerificationDialog
+      <CallerIdVerificationDialog
         isOpen={isDialogOpen}
         onOpenChange={setDialog}
-        validationRequest={actionData?.validationRequest as ValidationRequest}
+        validationRequest={actionData?.validationRequest}
       />
       <div className="flex min-h-screen flex-col">
         <BackButton disabled={updateFetcher.state !== "idle"} />
@@ -220,37 +210,6 @@ const WorkspaceSettings = () => {
     </>
   );
 };
-
-const VerificationDialog = ({
-  isOpen,
-  onOpenChange,
-  validationRequest,
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  validationRequest: ValidationRequest;
-}) => (
-  <Dialog open={isOpen} onOpenChange={onOpenChange}>
-    <DialogContent className="flex w-[450px] flex-col items-center bg-card">
-      <DialogHeader>
-        <DialogTitle className="text-center font-Zilla-Slab text-4xl text-primary">
-          Your verification code
-        </DialogTitle>
-        <div className="w-[400px]">
-          <p className="text-center">
-            You will receive a call at {validationRequest?.phoneNumber}.
-          </p>
-          <div className="flex justify-center">
-            <div className="my-4 rounded-md border-2 border-secondary bg-slate-50 p-4 text-5xl shadow-lg">
-              {validationRequest?.validationCode}
-            </div>
-          </div>
-          <p className="text-center">Enter this code when prompted</p>
-        </div>
-      </DialogHeader>
-    </DialogContent>
-  </Dialog>
-);
 
 const BackButton = ({ disabled }: { disabled: boolean }) => (
   <div className="flex justify-end pr-4 pt-4">

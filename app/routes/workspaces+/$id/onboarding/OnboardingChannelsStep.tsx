@@ -6,22 +6,25 @@ import { CHANNEL_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 
 export function OnboardingChannelsStep({
+  formId = "onboarding-channels-form",
   onboarding,
   isReadOnly,
   pending,
-}: Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending">) {
+}: Pick<OnboardingStepProps, "onboarding" | "isReadOnly" | "pending"> & {
+  formId?: string;
+}) {
   const { isSavingChannels } = pending;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>2. Choose channels</CardTitle>
+        <CardTitle>Choose channels</CardTitle>
         <CardDescription>
           After the business details are in place, choose which tracks we should prepare for this workspace.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form method="post" className="space-y-4">
+        <Form id={formId} method="post" className="space-y-4">
           <input type="hidden" name="_action" value="save_channels" />
           <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
             Keep this focused. Only enable the channels or compliance tracks the workspace will actually use in the near term.

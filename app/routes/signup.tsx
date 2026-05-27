@@ -3,10 +3,10 @@ export { action } from "./signup.action.server";
 
 import { data as routeData, Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -38,24 +38,15 @@ export default function SignUp() {
   const fetcher = useFetcher<FetcherData>();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // legacy error UI removed; keep actionData for toast only
-
-  useEffect(() => {
-    /* if (actionData?.data != null && actionData.data.user != null) {
-      toast.success(
-        "You have successfully signed-up! Redirecting to your dashboard...",
-      ); */
-    if (
-      fetcher?.data &&
-      typeof (fetcher.data as any).success === "boolean" &&
-      (fetcher.data as any).success
-    ) {
-      toast.success("Your request has been sent! We'll be in touch soon.");
-      formRef.current?.reset();
-    }
-    const timeout = setTimeout(() => /* navigate("/workspaces") */ null, 2000);
-    return () => clearTimeout(timeout);
-  }, [actionData, fetcher?.data]);
+  useActionFeedback(fetcher.state === "idle" ? fetcher.data : undefined, {
+    getSuccess: (data) => Boolean(data?.success),
+    successMessage: "Your request has been sent! We'll be in touch soon.",
+    onSuccess: () => formRef.current?.reset(),
+  });
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">

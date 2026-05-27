@@ -39,6 +39,12 @@ vi.mock("@/lib/utils", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
+vi.mock("@/lib/twilio-readiness.server", () => ({
+  assertWorkspaceCanSendSms: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/twilio-client.server", () => ({
+  withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
 
 function makeSupabaseStub(opts: {
   messageInsertError?: any;
@@ -69,9 +75,14 @@ function makeSupabaseStub(opts: {
       return { insert: messageInsert };
     }
     if (table === "webhook") {
+      const webhookRow = opts.webhookRows?.[0] ?? null;
       return {
         select: () => ({
           eq: () => ({
+            single: vi.fn(async () => ({
+              data: webhookRow,
+              error: opts.webhookError ?? null,
+            })),
             filter: webhookFilter,
           }),
         }),
@@ -135,7 +146,13 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const supabase = makeSupabaseStub({
-      webhookRows: [{ destination_url: "http://hook", custom_headers: { X: 1 } }],
+      webhookRows: [
+        {
+          destination_url: "http://hook",
+          custom_headers: { X: 1 },
+          events: [{ category: "outbound_sms", type: "INSERT" }],
+        },
+      ],
     });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: {
@@ -282,7 +299,14 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       return { ok: false, status: 500, statusText: "NO" } as any;
     });
     vi.stubGlobal("fetch", fetchMock);
-    const supabase2 = makeSupabaseStub({ webhookRows: [{ destination_url: "http://hook" }] });
+    const supabase2 = makeSupabaseStub({
+      webhookRows: [
+        {
+          destination_url: "http://hook",
+          events: [{ category: "outbound_sms", type: "INSERT" }],
+        },
+      ],
+    });
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1", body: "x" })) },
     });

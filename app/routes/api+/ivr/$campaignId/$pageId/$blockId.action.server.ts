@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
+import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
@@ -129,6 +129,24 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   
   if (!campaignId || !pageId || !blockId) {
     return new Response("Missing required parameters", { status: 400 });
+  }
+
+  const formData = await request.formData();
+  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
+  const callSid = formParams.CallSid ?? null;
+
+  if (!callSid) {
+    return new Response("Missing CallSid parameter", { status: 400 });
+  }
+
+  const validation = await validateTwilioWebhookForCallSid({
+    request,
+    supabase,
+    callSid,
+    params: formParams,
+  });
+  if (!validation.ok) {
+    return validation.response;
   }
 
   try {

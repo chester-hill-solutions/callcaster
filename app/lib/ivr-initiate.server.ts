@@ -7,6 +7,9 @@ import {
 import { env } from "@/lib/env.server";
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
+import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import type { Database } from "@/lib/database.types";
 export type InitiateIvrContact = {
   id: number;
@@ -65,14 +68,22 @@ export async function initiateIvrCall(
   }
 
   try {
-    const call = await twilio.calls.create({
-      to: input.contact.phone,
-      from: input.contact.caller_id,
-      url: `${env.BASE_URL()}/api/ivr/${input.campaign_id}/page_1/`,
-      machineDetection: "Enable",
-      statusCallbackEvent: ["answered", "completed"],
-      statusCallback: `${env.BASE_URL()}/api/ivr/status`,
-    });
+    const ivrUrls = resolveIvrCallUrls(input.campaign_id);
+    const call = await withTwilioRetry(
+      () =>
+        twilio.calls.create({
+          to: input.contact.phone,
+          from: input.contact.caller_id,
+          url: ivrUrls.flowUrl,
+          machineDetection: "Enable",
+          statusCallbackEvent: ["answered", "completed"],
+          statusCallback: ivrUrls.statusCallback,
+        }),
+      {
+        workspaceId: input.workspace_id,
+        operation: "calls.create.ivr",
+      },
+    );
 
     const { error: insertError } = await supabase.from("call").insert({
       sid: call.sid,
@@ -101,7 +112,7 @@ export async function initiateIvrCall(
 
     return { success: true, callSid: call.sid };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = twilioErrorUserMessage(error);
     if (message.toLowerCase().includes("credit")) {
       return { success: false, creditsError: true };
     }

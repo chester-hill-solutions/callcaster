@@ -12,11 +12,13 @@ type OnboardingBusinessBasicsStepProps = Pick<
   OnboardingStepProps,
   "onboarding" | "isReadOnly" | "pending"
 > & {
+  formId?: string;
   voiceCapableWorkspaceNumbers: Tables<"workspace_number">[];
   emergencyEligibleNumbers: Set<string>;
 };
 
 export function OnboardingBusinessBasicsStep({
+  formId = "onboarding-business-form",
   onboarding,
   isReadOnly,
   pending,
@@ -28,13 +30,13 @@ export function OnboardingBusinessBasicsStep({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>1. Business basics</CardTitle>
+        <CardTitle>Business basics</CardTitle>
         <CardDescription>
           Start here. These answers explain who is sending messages and what the program does.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form method="post" className="space-y-6">
+        <Form id={formId} method="post" className="space-y-6">
           <input type="hidden" name="_action" value="save_business_profile" />
           <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
             Good answers are concrete. For example: name the exact business entity, link the public pages customers can review, describe how someone opts in, and paste real example messages instead of placeholders.

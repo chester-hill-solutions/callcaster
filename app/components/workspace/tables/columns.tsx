@@ -4,46 +4,35 @@ import { formatDateToLocale, formatTableText } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { MdDownload, MdEdit, MdRemoveCircle } from "react-icons/md";
 import { Button } from "@/components/ui/button";
-import { NavLink, useFetcher, useSubmit } from "react-router";
-import { useEffect } from "react";
+import { NavLink, useSubmit } from "react-router";
+import { downloadBlobPart } from "@/lib/download-blob.client";
 
 function AudienceDownloadCell({ audienceId }: { audienceId: string | number }) {
-  const fetcher = useFetcher();
-
-  useEffect(() => {
-    if (!fetcher.data) {
+  const handleDownload = async () => {
+    const response = await fetch(
+      `/api/audiences?audienceId=${encodeURIComponent(String(audienceId))}&returnType=csv`,
+      { credentials: "include" },
+    );
+    if (!response.ok) {
       return;
     }
-
-    const blob = new Blob([fetcher.data as BlobPart], {
-      type: "text/csv;charset=utf-8",
+    downloadBlobPart({
+      data: await response.text(),
+      filename: "audiences.csv",
+      mimeType: "text/csv;charset=utf-8",
     });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "audiences.csv");
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode?.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  }, [fetcher.data]);
+  };
 
   return (
-    <fetcher.Form method="GET" action="/api/audiences">
-      <input type="hidden" name="audienceId" value={audienceId} />
-      <input type="hidden" name="returnType" value="csv" />
-      <Button
-        type="submit"
+    <Button
+        type="button"
         variant="ghost"
-        disabled={fetcher.state === "submitting"}
+        onClick={() => {
+          void handleDownload();
+        }}
       >
-        {fetcher.state === "submitting" ? (
-          "Downloading..."
-        ) : (
-          <MdDownload className="text-brand-primary dark:text-white" />
-        )}
+        <MdDownload className="text-brand-primary dark:text-white" />
       </Button>
-    </fetcher.Form>
   );
 }
 

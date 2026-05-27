@@ -22,6 +22,7 @@ import type { NumbersSearchFetcherData } from "./NumberPurchase.constants";
 
 type NumberPurchaseSearchFormProps = {
   fetcher: FetcherWithComponents<NumbersSearchFetcherData>;
+  workspaceId: string;
   searchMode: NumberSearchMode;
   onSearchModeChange: (mode: NumberSearchMode) => void;
   query: string;
@@ -37,6 +38,7 @@ type NumberPurchaseSearchFormProps = {
 
 export function NumberPurchaseSearchForm({
   fetcher,
+  workspaceId,
   searchMode,
   onSearchModeChange,
   query,
@@ -56,6 +58,7 @@ export function NumberPurchaseSearchForm({
       className="space-y-4 rounded-lg border border-border p-4"
       onSubmit={onSubmit}
     >
+      <input type="hidden" name="workspace_id" value={workspaceId} />
       <input type="hidden" name="searchMode" value={searchMode} />
       {filterVoice ? <input type="hidden" name="voice" value="true" /> : null}
       {filterSms ? <input type="hidden" name="sms" value="true" /> : null}

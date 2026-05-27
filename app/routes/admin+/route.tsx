@@ -2,8 +2,7 @@ export { loader } from "./route.loader.server";
 export { action } from "./route.action.server";
 
 import { Outlet, useActionData, useLoaderData, useSearchParams } from "react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,15 +29,14 @@ export default function Admin() {
         });
     };
 
-    useEffect(() => {
-        if (actionData && "success" in actionData) {
-            toast.success(actionData.success);
-        }
-
-        if (actionData && "error" in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useActionFeedback(actionData, {
+        getSuccess: (data) => Boolean(data && "success" in data && data.success),
+        successMessage: (data) =>
+            data && "success" in data && typeof data.success === "string"
+                ? data.success
+                : "Saved",
+        getError: (data) => (data && "error" in data ? data.error : undefined),
+    });
 
     return (
         <div className="container mx-auto py-8 px-4">

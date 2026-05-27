@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  ensureWorkspaceTwilioBootstrap: vi.fn(),
+  ensureWorkspaceTwilioBootstrap: vi.fn(async () => ({
+    outcome: "success",
+    serviceSid: "MG_TEST",
+    lastError: null,
+    createdResources: [],
+    driftMessages: [],
+    onboarding: {},
+  })),
   logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   brandCreate: vi.fn(),
   campaignCreate: vi.fn(),
@@ -179,7 +186,17 @@ describe("twilio A2P service", () => {
     mocks.logger.error.mockReset();
     mocks.brandCreate.mockReset();
     mocks.campaignCreate.mockReset();
-    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
+    mocks.ensureWorkspaceTwilioBootstrap.mockImplementation(async () => {
+      const data = makeWorkspaceTwilioData();
+      return {
+        outcome: "success" as const,
+        serviceSid: "MG123",
+        lastError: null,
+        createdResources: [],
+        driftMessages: [],
+        onboarding: data.onboarding,
+      };
+    });
   });
 
   test("stores blocking issues when required business information is missing", async () => {

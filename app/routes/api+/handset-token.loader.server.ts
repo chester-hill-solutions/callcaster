@@ -1,13 +1,10 @@
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { requireWorkspaceAccess } from "@/lib/database.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import twilio from "twilio";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-
   const { supabaseClient: supabase, user } = await verifyAuth(request);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -20,7 +17,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!workspace || !clientIdentity) {
     return routeData(
       { error: "workspace and client_identity are required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -30,33 +27,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     workspaceId: workspace,
   });
 
-  const { data, error } = await supabase
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspace)
-    .single();
+  const result = await createHandsetAccessToken({
+    supabaseClient: supabase,
+    workspaceId: workspace,
+    clientIdentity,
+  });
 
-  if (error || !data) {
-    return routeData({ error: "Workspace not found" }, { status: 404 });
+  if (result.error) {
+    const status = result.error === "Workspace not found" ? 404 : 400;
+    return routeData({ error: result.error }, { status });
   }
 
-  const twilioData = (data.twilio_data ?? {}) as Record<string, unknown>;
-  const twilioAccountSid =
-    typeof twilioData["sid"] === "string" ? (twilioData["sid"] as string) : "";
-  const twilioApiKey = (data.key ?? "") as string;
-  const twilioApiSecret = (data.token ?? "") as string;
-
-  const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
-    outgoingApplicationSid: env.TWILIO_APP_SID(),
-    incomingAllow: true,
-  });
-  const token = new twilio.jwt.AccessToken(
-    twilioAccountSid,
-    twilioApiKey,
-    twilioApiSecret,
-    { identity: clientIdentity }
-  );
-  token.addGrant(voiceGrant);
-  logger.debug("Generated handset Twilio token");
-  return routeData({ token: token.toJwt() });
-}
+  return routeData({ token: result.token });
+};

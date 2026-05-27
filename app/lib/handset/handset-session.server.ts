@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getHandsetNumberForWorkspace } from "@/lib/database.server";
+import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { env } from "@/lib/env.server";
 import type { User } from "@supabase/supabase-js";
 
@@ -11,6 +12,8 @@ export type HandsetLoaderData = {
   handsetNumber: string | null;
   clientIdentity: string;
   workspaceId: string;
+  token: string | null;
+  tokenError: string | null;
 };
 
 export async function getHandsetLoaderData({
@@ -32,6 +35,8 @@ export async function getHandsetLoaderData({
       handsetNumber: null,
       clientIdentity: "",
       workspaceId,
+      token: null,
+      tokenError: null,
     };
   }
 
@@ -52,10 +57,18 @@ export async function getHandsetLoaderData({
     throw new Response("Failed to create handset session", { status: 500 });
   }
 
+  const tokenResult = await createHandsetAccessToken({
+    supabaseClient,
+    workspaceId,
+    clientIdentity,
+  });
+
   return {
     handsetNumber: handsetData.phone_number,
     clientIdentity,
     workspaceId,
+    token: tokenResult.token,
+    tokenError: tokenResult.error,
   };
 }
 

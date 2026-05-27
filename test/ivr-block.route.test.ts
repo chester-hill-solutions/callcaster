@@ -5,6 +5,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
+    validateTwilioWebhookForCallSid: vi.fn(),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -17,6 +18,10 @@ const mocks = vi.hoisted(() => {
 vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
+    mocks.validateTwilioWebhookForCallSid(...args),
+}));
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -74,11 +79,59 @@ function makeSupabase(opts?: {
   return supabase;
 }
 
+function ivrBlockRequest(callSid = "CA123") {
+  const fd = new FormData();
+  fd.set("CallSid", callSid);
+  return new Request("http://x", {
+    method: "POST",
+    headers: { "x-twilio-signature": "sig" },
+    body: fd,
+  });
+}
+
 describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
     mocks.logger.error.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
+      ok: true,
+      params: { CallSid: "CA123" },
+    });
+  });
+
+  test("returns 403 when Twilio signature validation fails", async () => {
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response("Invalid", { status: 403 }),
+    });
+    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+        request: ivrBlockRequest(),
+      } as any),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test("returns 400 when CallSid missing", async () => {
+    mocks.createClient.mockReturnValueOnce(makeSupabase());
+    const fd = new FormData();
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(
+      await mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+        request: new Request("http://x", {
+          method: "POST",
+          headers: { "x-twilio-signature": "sig" },
+          body: fd,
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(400);
   });
 
   test("returns 400 when required params missing", async () => {
@@ -100,7 +153,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any));
     const xml = await res.text();
     expect(xml).toContain("play:https://signed");
@@ -123,28 +176,28 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_1/b2");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b2" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_2/b3");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_2", blockId: "b3" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("hangup");
 
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "missing" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("There was an error in the IVR flow");
   });
@@ -154,7 +207,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("An error occurred. Please try again later.");
 
@@ -165,7 +218,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase({ campaignData: { workspace: "w1", ivr_campaign: [{ script: { steps: script } }] }, signedUrlError: new Error("sig") }));
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any);
     expect(await res.text()).toContain("An error occurred. Please try again later.");
     expect(mocks.logger.error).toHaveBeenCalled();
@@ -176,7 +229,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
     const res = await asRouteResponse(await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
-      request: new Request("http://x"),
+      request: ivrBlockRequest(),
     } as any));
     expect(await res.text()).toContain("An error occurred. Please try again later.");
   });

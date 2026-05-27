@@ -7,6 +7,7 @@ import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
 import type { Database } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type TwilioSDK from "twilio";
@@ -192,11 +193,15 @@ export const action = async ({
   }
 
   try {
-    const call: CallInstance = await twilio.calls.create({
-      to: targetDevice,
-      from: caller_id,
-      url: `${d.env.BASE_URL()}/api/auto-dial/${conferenceName}`,
-    });
+    const call: CallInstance = await withTwilioRetry(
+      () =>
+        twilio.calls.create({
+          to: targetDevice,
+          from: caller_id,
+          url: `${d.env.BASE_URL()}/api/auto-dial/${conferenceName}`,
+        }),
+      { workspaceId: workspace_id, operation: "calls.create" },
+    );
 
     const callData = {
       sid: call.sid,
@@ -237,7 +242,10 @@ export const action = async ({
       d.logger.error("Error saving the call to the database:", upsertError);
 
       try {
-        await twilio.calls(call.sid).update({ status: "canceled" });
+        await withTwilioRetry(
+          () => twilio.calls(call.sid).update({ status: "canceled" }),
+          { workspaceId: workspace_id, operation: "calls.update" },
+        );
       } catch (cancelError) {
         d.logger.error("Failed to cancel Twilio call after DB upsert failure", {
           callSid: call.sid,

@@ -4,6 +4,7 @@ import { createErrorResponse } from "@/lib/errors.server";
 import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -46,14 +47,18 @@ export const action = async ({ request }:ActionFunctionArgs) => {
     if (outreachError) throw outreachError;
     outreachAttemptId = data;
 
-    call = await twilio.calls.create({
-      to: to_number,
-      from: caller_id,
-      url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
-      machineDetection: "Enable",
-      statusCallbackEvent: ["answered", "completed"],
-      statusCallback: `${env.BASE_URL()}/api/ivr/status`,
-    });
+    call = await withTwilioRetry(
+      () =>
+        twilio.calls.create({
+          to: to_number,
+          from: caller_id,
+          url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
+          machineDetection: "Enable",
+          statusCallbackEvent: ["answered", "completed"],
+          statusCallback: `${env.BASE_URL()}/api/ivr/status`,
+        }),
+      { workspaceId: workspace_id, operation: "calls.create" },
+    );
 
     
     const { error: insertError } = await supabase.from("call").insert({

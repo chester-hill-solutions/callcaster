@@ -5,7 +5,6 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { User, WorkspaceNumbers } from "@/lib/types";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
-import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase.constants";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 

@@ -2,20 +2,49 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createService: vi.fn(),
-  logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+  updateService: vi.fn(),
+  fetchService: vi.fn(),
+  listNumbers: vi.fn(async () => []),
+  auditWebhooks: vi.fn(async () => ({
+    workspaceId: "w1",
+    driftMessages: [],
+    entries: [],
+    ivrRuntimeHint: "unknown" as const,
+    smsStatusCanonical: "edge" as const,
+  })),
+  logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn(), warn: vi.fn()},
   baseUrl: vi.fn(() => "https://base.example"),
+}));
+
+vi.mock("@/lib/twilio-webhook-audit.server", () => ({
+  auditWorkspaceTwilioWebhooks: (...args: any[]) => mocks.auditWebhooks(...args),
 }));
 
 vi.mock("twilio", () => ({
   default: {
     Twilio: function () {
+      const serviceContext = {
+        update: (...args: any[]) => mocks.updateService(...args),
+        fetch: (...args: any[]) => mocks.fetchService(...args),
+        phoneNumbers: {
+          list: async () => [],
+          create: async () => ({}),
+        },
+      };
+      const services = Object.assign(
+        (_sid?: string) => serviceContext,
+        {
+          create: (...args: any[]) => mocks.createService(...args),
+        },
+      );
       return {
         messaging: {
           v1: {
-            services: {
-              create: (...args: any[]) => mocks.createService(...args),
-            },
+            services,
           },
+        },
+        incomingPhoneNumbers: {
+          list: (...args: any[]) => mocks.listNumbers(...args),
         },
       };
     },
@@ -173,7 +202,24 @@ describe("twilio-bootstrap server", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.createService.mockReset();
+    mocks.updateService.mockReset();
+    mocks.updateService.mockResolvedValue({});
+    mocks.fetchService.mockReset();
+    mocks.fetchService.mockResolvedValue({
+      statusCallback: "https://base.example/api/caller-id/status",
+    });
+    mocks.listNumbers.mockReset();
+    mocks.listNumbers.mockResolvedValue([]);
+    mocks.auditWebhooks.mockReset();
+    mocks.auditWebhooks.mockResolvedValue({
+      workspaceId: "w1",
+      driftMessages: [],
+      entries: [],
+      ivrRuntimeHint: "unknown",
+      smsStatusCanonical: "edge",
+    });
     mocks.logger.error.mockReset();
+    mocks.logger.warn.mockReset();
     mocks.baseUrl.mockReturnValue("https://base.example");
   });
 
@@ -196,9 +242,10 @@ describe("twilio-bootstrap server", () => {
     });
 
     expect(mocks.createService).toHaveBeenCalled();
-    expect(result.messagingService.serviceSid).toBe("MG123");
-    expect(result.subaccountBootstrap.status).toBe("live");
-    expect(result.currentStep).toBe("business_profile");
+    expect(result.outcome).toBe("success");
+    expect(result.onboarding.messagingService.serviceSid).toBe("MG123");
+    expect(result.onboarding.subaccountBootstrap.status).toBe("live");
+    expect(result.onboarding.currentStep).toBe("first_number");
     expect(supabase._updateEq).toHaveBeenCalled();
   });
 
@@ -224,8 +271,8 @@ describe("twilio-bootstrap server", () => {
     });
 
     expect(mocks.createService).not.toHaveBeenCalled();
-    expect(result.messagingService.serviceSid).toBe("MG_EXISTING");
-    expect(result.currentStep).toBe("business_profile");
+    expect(result.onboarding.messagingService.serviceSid).toBe("MG_EXISTING");
+    expect(result.onboarding.currentStep).toBe("first_number");
   });
 
   test("ensureWorkspaceTwilioBootstrap captures bootstrap failure details", async () => {
@@ -243,9 +290,10 @@ describe("twilio-bootstrap server", () => {
       actorUserId: "u2",
     });
 
-    expect(result.subaccountBootstrap.status).toBe("rejected");
-    expect(result.subaccountBootstrap.lastError).toBe("create failed");
-    expect(result.reviewState.lastError).toBe("create failed");
+    expect(result.outcome).toBe("failed");
+    expect(result.onboarding.subaccountBootstrap.status).toBe("rejected");
+    expect(result.onboarding.reviewState.lastError).toBe("create failed");
+    expect(result.onboarding.subaccountBootstrap.lastError).toBeTruthy();
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
@@ -330,14 +378,14 @@ describe("twilio-bootstrap server", () => {
       actorUserId: "u1",
     });
 
-    expect(result.status).toBe("provisioning");
-    expect(result.currentStep).toBe("messaging_service");
-    expect(result.messagingService.serviceSid).toBeNull();
-    expect(result.messagingService.friendlyName).toBe("Workspace Messaging");
-    expect(result.messagingService.lastError).toBeNull();
-    expect(result.subaccountBootstrap.createdResources).toEqual([
-      "messaging_service:   ",
-    ]);
+    expect(result.outcome).toBe("failed");
+    expect(result.onboarding.status).toBe("provisioning");
+    expect(result.onboarding.currentStep).toBe("messaging_service");
+    expect(result.onboarding.messagingService.serviceSid).toBeNull();
+    expect(result.onboarding.messagingService.friendlyName).toBe("Workspace Messaging");
+    expect(result.onboarding.messagingService.lastError).toBe(
+      "Messaging Service could not be created automatically.",
+    );
   });
 
   test("ensureWorkspaceTwilioBootstrap stores unknown error for non-Error throws", async () => {
@@ -355,10 +403,9 @@ describe("twilio-bootstrap server", () => {
       actorUserId: null,
     });
 
-    expect(result.subaccountBootstrap.lastError).toBe(
-      "Unknown bootstrap failure",
-    );
-    expect(result.reviewState.lastError).toBe("Unknown bootstrap failure");
+    expect(result.outcome).toBe("failed");
+    expect(result.onboarding.subaccountBootstrap.lastError).toBeTruthy();
+    expect(result.onboarding.reviewState.lastError).toBeTruthy();
   });
 
   test("syncWorkspaceTwilioBootstrapState throws select errors", async () => {

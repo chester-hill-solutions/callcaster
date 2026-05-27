@@ -37,6 +37,7 @@ import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,
 } from "@/lib/campaign-outbound-estimate";
+import { getCampaignContentReadinessIssues } from "@/lib/campaign-readiness";
 
 type LiveCampaignDetails = Tables<"live_campaign"> & { script: Script };
 type MessageCampaignDetails = Tables<"message_campaign">;
@@ -108,6 +109,29 @@ function getEtaRange(queueCount: number, ratePerSecond: number) {
   return `${formatCompletionTime(fastFinish)} - ${formatCompletionTime(slowFinish)}`;
 }
 
+function SectionReadinessAlert({ issues }: { issues: string[] }) {
+  if (issues.length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      className="w-full rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+      role="alert"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span className="font-medium">Complete these settings to start or schedule</span>
+      </div>
+      <ul className="list-disc space-y-1 pl-5">
+        {issues.map((issue) => (
+          <li key={issue}>{issue}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function OutboundEstimateAlert({
   title,
   lines,
@@ -151,12 +175,14 @@ export const CampaignTypeSpecificSettings = ({
   isBusy,
   joinDisabled,
   scheduleDisabled,
+  readinessIssues,
   surveys,
   queueCount,
   phoneNumbers,
   outboundEstimateInputs,
   smsSendContext,
   handleNavigate: _handleNavigate,
+  hideReadinessAlerts = false,
 }: {
   campaignData: NonNullable<Campaign>,
   handleInputChange: (name: string, value: unknown) => void,
@@ -170,18 +196,17 @@ export const CampaignTypeSpecificSettings = ({
   isBusy: boolean,
   joinDisabled: string | null,
   scheduleDisabled: string | boolean,
+  readinessIssues: string[],
   surveys: Pick<Survey, "survey_id" | "title">[],
   queueCount: number,
   phoneNumbers: WorkspaceNumbers[],
   outboundEstimateInputs: OutboundEstimateInputs,
   smsSendContext?: SmsSendContext;
   handleNavigate: (e: React.MouseEvent<HTMLButtonElement>) => void,
+  hideReadinessAlerts?: boolean,
 }) => {
   const isScriptMissing = "script_id" in details && !details.script_id;
-  const isMessageContentMissing =
-    "body_text" in details &&
-    !details.body_text?.trim() &&
-    (!("message_media" in details) || !details.message_media?.length);
+  const contentReadinessIssues = getCampaignContentReadinessIssues(readinessIssues);
   const isIvrCampaign =
     campaignData.type === "robocall" ||
     campaignData.type === "simple_ivr" ||
@@ -257,8 +282,12 @@ export const CampaignTypeSpecificSettings = ({
   return (
     <>
       {campaignData.type !== "message" && (
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-end gap-2">
+        <div id="campaign-setup-content" className="flex flex-col gap-4">
+          {!hideReadinessAlerts ? (
+            <SectionReadinessAlert issues={contentReadinessIssues} />
+          ) : null}
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex items-end gap-2">
               <SelectVoicemail
                 handleInputChange={handleInputChange}
                 mediaData={mediaData}
@@ -266,18 +295,18 @@ export const CampaignTypeSpecificSettings = ({
                   ...(campaignData.voicemail_file && { voicemail_file: campaignData.voicemail_file }),
                 }}
               />
-            <Button variant="outline" asChild size="icon" disabled={isBusy}>
-              <NavLink to="../../../audios/new">
-                <MdAdd />
-              </NavLink>
-            </Button>
-          </div>
-          <div className="flex flex-col gap-1">
+              <Button variant="outline" asChild size="icon" disabled={isBusy}>
+                <NavLink to="../../../audios/new">
+                  <MdAdd />
+                </NavLink>
+              </Button>
+            </div>
             <div className="flex items-end gap-2">
               <SelectScript
                 handleInputChange={handleInputChange}
                 selectedScript={'script_id' in details && details.script_id ? details.script_id : 0}
                 scripts={scripts}
+                invalid={isScriptMissing}
               />
               <Button variant="outline" asChild size="icon" disabled={isBusy}>
                 <NavLink
@@ -287,27 +316,21 @@ export const CampaignTypeSpecificSettings = ({
                 </NavLink>
               </Button>
             </div>
-            {isScriptMissing && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-4 w-4" />
-                Script is required
-              </p>
-            )}
-          </div>
-          <ActivateButtons
+            <ActivateButtons
             joinDisabled={joinDisabled}
             scheduleDisabled={scheduleDisabled}
             isBusy={isBusy}
             handleScheduleButton={() => handleScheduleButton()}
           />
-          {isIvrCampaign ? (
-            <div className="w-full">
-              <OutboundEstimateAlert
-                title="Outbound IVR pacing estimate"
-                lines={ivrTooltipLines}
-              />
-            </div>
-          ) : null}
+            {isIvrCampaign ? (
+              <div className="w-full">
+                <OutboundEstimateAlert
+                  title="Outbound IVR pacing estimate"
+                  lines={ivrTooltipLines}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
       {campaignData.type === "live_call" && (
@@ -340,7 +363,10 @@ export const CampaignTypeSpecificSettings = ({
         </>
       )}
       {campaignData.type === "message" && (
-        <div className="flex flex-col gap-4">
+        <div id="campaign-setup-content" className="flex flex-col gap-4">
+          {!hideReadinessAlerts ? (
+            <SectionReadinessAlert issues={contentReadinessIssues} />
+          ) : null}
           <FormField
             label="Send using"
             description={
@@ -387,12 +413,6 @@ export const CampaignTypeSpecificSettings = ({
             onChange={handleInputChange}
             surveys={surveys}
           />
-          {isMessageContentMissing && (
-            <p className="text-sm text-destructive flex items-center gap-1">
-              <AlertCircle className="h-4 w-4" />
-              Message content or media is required
-            </p>
-          )}
           {isChanged && (
             <p className="text-sm text-muted-foreground">
               Save your edits before sending or scheduling this message campaign.

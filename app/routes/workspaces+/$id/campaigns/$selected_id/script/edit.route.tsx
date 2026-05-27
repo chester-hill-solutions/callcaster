@@ -3,11 +3,11 @@ export { action } from "./edit.action.server";
 
 import { data as routeData, redirect } from "react-router";
 import { useLoaderData, useSubmit } from "react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
-import { deepEqual } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useHasChanges } from "@/hooks/utils/useHasChanges";
 import { SaveBar } from "@/components/shared/SaveBar";
 
 import { MessageSettings } from "@/components/MessageSettings";
@@ -32,8 +32,12 @@ export default function ScriptEditor() {
   const [initData, setInitData] = useState<PageData>(data);
   const submit = useSubmit();
   const [pageData, setPageData] = useState<PageData>(data);
-  const [isChanged, setChanged] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const isChanged = useHasChanges(
+    pageData,
+    initData,
+    normalizeScriptPageDataForComparison,
+  );
 
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
     try {
@@ -49,7 +53,6 @@ export default function ScriptEditor() {
         navigate: false,
       });
       setInitData(pageData);
-      setChanged(false);
       setShowSaveModal(false);
     } catch (error) {
       loggerClient.error("Error saving update:", error);
@@ -58,21 +61,11 @@ export default function ScriptEditor() {
 
   const handleReset = () => {
     setPageData(data);
-    setChanged(false);
   };
 
   const handlePageDataChange = (newPageData: PageData) => {
     setPageData(newPageData);
-    const obj1 = normalizeScriptPageDataForComparison(initData);
-    const obj2 = normalizeScriptPageDataForComparison(newPageData);
-    setChanged(!deepEqual(obj1, obj2));
   };
-
-  useEffect(() => {
-    const obj1 = normalizeScriptPageDataForComparison(initData);
-    const obj2 = normalizeScriptPageDataForComparison(pageData);
-    setChanged(!deepEqual(obj1, obj2));
-  }, [data, initData, pageData]);
 
   const renderCampaignSettingsScript = (mediaNames: string[] = []) => {
     if (!pageData.campaignDetails.script) return null;

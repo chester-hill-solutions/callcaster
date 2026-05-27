@@ -9,7 +9,6 @@ import {
   WorkspaceNumbers,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { downloadCsv } from "@/lib/csvDownload";
 import { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } from "@/lib/database.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { logger as  loggerServer } from "@/lib/logger.server";

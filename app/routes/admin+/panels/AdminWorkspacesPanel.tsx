@@ -1,6 +1,7 @@
 import { Form, NavLink } from "react-router";
 import { ChevronLeft, ChevronRight, MoreHorizontal, RefreshCw, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useFilterPagination } from "@/hooks/utils/useFilterPagination";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,6 @@ type AdminWorkspacesPanelProps = {
 };
 
 export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProps) {
-    const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [filter, setFilter] = useState<{
         search: string;
@@ -46,6 +46,8 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
         sortKey: "created_at",
         sortDirection: "desc",
     });
+    const filterKey = JSON.stringify(filter);
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
 
     const filteredRows = useMemo(
         () =>
@@ -76,10 +78,6 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                 .sort((left, right) => left.username.localeCompare(right.username)),
         [workspaceRows],
     );
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filter]);
 
     return (
         <TabsContent value="workspaces">

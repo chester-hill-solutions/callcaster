@@ -3,6 +3,7 @@ import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAcce
 import { env } from "@/lib/env.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
 import type { ActionFunctionArgs } from "react-router";
@@ -88,12 +89,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
-        const call = await twilio.calls.create({
-            to: selected_device && selected_device !== 'computer' ? selected_device : `client:${user_id}`,
-            from: caller_id,
-            url: `${env.BASE_URL()}/api/dial/${encodeURIComponent(to)}`,
-
-        })
+        const call = await withTwilioRetry(
+          () =>
+            twilio.calls.create({
+              to:
+                selected_device && selected_device !== "computer"
+                  ? selected_device
+                  : `client:${user_id}`,
+              from: caller_id,
+              url: `${env.BASE_URL()}/api/dial/${encodeURIComponent(to)}`,
+            }),
+          { workspaceId: workspace_id, operation: "calls.create" },
+        );
         let outreach_attempt_id;
         const campaignId = parseInt(campaign_id, 10);
         const contactId = parseInt(contact_id, 10);

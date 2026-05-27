@@ -1,3 +1,5 @@
+import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
+import type { CallerIdValidationRequest } from "@/lib/caller-id-verification.server";
 import type {
   WorkspaceMessagingBusinessProfile,
   WorkspaceOnboardingChannel,
@@ -6,10 +8,12 @@ import type {
 
 export type OnboardingActionData = {
   success?: string;
+  warning?: string;
   error?: string;
+  validationRequest?: CallerIdValidationRequest;
 };
 
-export const CHANNEL_OPTIONS: Array<{
+const ALL_CHANNEL_OPTIONS: Array<{
   id: WorkspaceOnboardingChannel;
   label: string;
   description: string;
@@ -30,6 +34,10 @@ export const CHANNEL_OPTIONS: Array<{
     description: "Track emergency address and emergency-capable number readiness.",
   },
 ];
+
+export const CHANNEL_OPTIONS = ALL_CHANNEL_OPTIONS.filter(
+  (option) => option.id !== "rcs" || isRcsOnboardingEnabled(),
+);
 
 export function asWorkspaceOnboardingStatus(
   value: FormDataEntryValue | null,
@@ -87,7 +95,10 @@ export type OnboardingActionName =
   | "save_business_profile"
   | "review_emergency_voice"
   | "provision_a2p"
-  | "save_rcs";
+  | "save_rcs"
+  | "advance_step"
+  | "skip_first_number"
+  | "verify_caller_id";
 
 export const ONBOARDING_ACTION_NAMES = new Set<OnboardingActionName>([
   "save_channels",
@@ -96,6 +107,9 @@ export const ONBOARDING_ACTION_NAMES = new Set<OnboardingActionName>([
   "review_emergency_voice",
   "provision_a2p",
   "save_rcs",
+  "advance_step",
+  "skip_first_number",
+  "verify_caller_id",
 ]);
 
 export function isOnboardingActionName(value: string): value is OnboardingActionName {

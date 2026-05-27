@@ -3,358 +3,96 @@
 
 import "dotenv/config";
 
-import { spawn } from "node:child_process";
-import { existsSync, readdirSync, statSync, watch } from "node:fs";
-import { createServer } from "node:http";
-import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
+import { createRequestHandler } from "@react-router/express";
+import { createServer as createViteServer } from "vite";
+import { createApp, createHttpServer, validateEnvironment } from "../../server/index.js";
 
-const APP_PORT = process.env.PORT ?? "3000";
-const BUILD_PATH = path.resolve("build/server/index.js");
-const BUILD_DIR = path.dirname(BUILD_PATH);
-const CLIENT_BUILD_DIR = path.resolve("build/client");
-const CLIENT_ASSETS_DIR = path.join(CLIENT_BUILD_DIR, "assets");
-const REACT_ROUTER_BIN = resolveLocalBin("react-router");
-const SOURCE_WATCH_PATHS = [
-  path.resolve("app"),
-  path.resolve("vite.config.ts"),
-  path.resolve("react-router.config.ts"),
-];
-const SERVER_ENTRY = path.resolve("server/index.js");
-const startupTimestamp = Date.now();
+const HOST = process.env.HOST ?? "0.0.0.0";
+const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
+const SERVER_BUILD_MODULE_ID = "virtual:react-router/server-build";
 
-let appProcess = null;
 let isShuttingDown = false;
-let restartTimer = null;
-let restartInFlight = false;
-let buildWatcher = null;
-let sourceWatchers = [];
-let buildProcess = null;
-let buildQueue = Promise.resolve();
-let buildDebounceTimer = null;
+let shutdownPromise = null;
 
-const devPingServer = createServer((request, response) => {
-  if (request.method === "POST" && request.url === "/ping") {
-    response.writeHead(200, { "Content-Type": "text/plain" });
-    response.end("ok");
-    return;
-  }
+validateEnvironment(process.env);
 
-  response.writeHead(204);
-  response.end();
+const vite = await createViteServer({
+  appType: "custom",
+  server: {
+    hmr: {
+      port: PORT + 1,
+    },
+    middlewareMode: true,
+  },
+});
+
+const readyState = { acceptingTraffic: true, buildReady: true };
+const app = createApp({
+  configureApp: (expressApp) => {
+    expressApp.use(vite.middlewares);
+  },
+  mode: "development",
+  readyState,
+  remixHandler: createRequestHandler({
+    build: () => vite.ssrLoadModule(SERVER_BUILD_MODULE_ID),
+    mode: "development",
+  }),
+  serveBuildAssets: false,
+});
+
+app.use((error, _request, _response, next) => {
+  vite.ssrFixStacktrace(error);
+  next(error);
+});
+
+const server = createHttpServer(app);
+const sockets = new Set();
+
+server.on("connection", (socket) => {
+  sockets.add(socket);
+  socket.on("close", () => sockets.delete(socket));
+});
+
+server.on("error", async (error) => {
+  console.error(`[app] ${error instanceof Error ? error.message : String(error)}`);
+  await shutdown(1);
 });
 
 await new Promise((resolve, reject) => {
-  devPingServer.once("error", reject);
-  devPingServer.listen(0, "127.0.0.1", resolve);
+  server.once("error", reject);
+  server.listen(PORT, HOST, resolve);
 });
 
-const devPingAddress = devPingServer.address();
+console.log(`[app] development server listening on http://${HOST}:${PORT}`);
 
-if (!devPingAddress || typeof devPingAddress === "string") {
-  throw new Error("Could not determine Remix dev ping server address");
-}
-
-const DEV_ENV = {
-  ...process.env,
-  NODE_ENV: "development",
-  PORT: APP_PORT,
-  REMIX_DEV_ORIGIN: `http://127.0.0.1:${devPingAddress.port}`,
-};
-
-// React Router 7 has no `build --watch`; rebuild on source changes instead.
-void queueBuild();
-
-await waitForInitialBuild();
-startSourceWatcher();
-await startAppServer();
-
-buildWatcher = watch(BUILD_DIR, (eventType, fileName) => {
-  if (!fileName || typeof fileName !== "string") {
-    return;
-  }
-
-  if (fileName !== "index.js") {
-    return;
-  }
-
-  if (eventType !== "change" && eventType !== "rename") {
-    return;
-  }
-
-  scheduleRestart();
+process.on("SIGINT", () => {
+  void shutdown(0);
 });
-
-process.on("SIGINT", () => shutdown(0));
-process.on("SIGTERM", () => shutdown(0));
-
-function resolveLocalBin(name) {
-  const executable = process.platform === "win32" ? `${name}.cmd` : name;
-  return path.resolve("node_modules", ".bin", executable);
-}
-
-function pipeOutput(label, childProcess) {
-  childProcess.stdout?.on("data", (chunk) => {
-    process.stdout.write(`[${label}] ${chunk}`);
-  });
-
-  childProcess.stderr?.on("data", (chunk) => {
-    process.stderr.write(`[${label}] ${chunk}`);
-  });
-}
-
-async function waitForInitialBuild() {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (hasFreshBuildOutput()) {
-      return;
-    }
-
-    await delay(500);
-  }
-
-  throw new Error(
-    `Timed out waiting for initial build output at ${BUILD_PATH} and ${CLIENT_BUILD_DIR}`,
-  );
-}
-
-function hasFreshBuildOutput() {
-  if (!existsSync(BUILD_PATH) || !existsSync(CLIENT_ASSETS_DIR)) {
-    return false;
-  }
-
-  const serverBuildMtime = statSync(BUILD_PATH).mtimeMs;
-
-  if (serverBuildMtime < startupTimestamp) {
-    return false;
-  }
-
-  const clientEntries = readdirSync(CLIENT_ASSETS_DIR);
-
-  if (clientEntries.length === 0) {
-    return false;
-  }
-
-  return clientEntries.some((entry) => {
-    const entryPath = path.join(CLIENT_ASSETS_DIR, entry);
-    return statSync(entryPath).mtimeMs >= startupTimestamp;
-  });
-}
-
-function queueBuild() {
-  buildQueue = buildQueue
-    .then(() => runBuild())
-    .catch((error) => {
-      if (!isShuttingDown) {
-        console.error(
-          `[react-router-build] ${error instanceof Error ? error.message : String(error)}`,
-        );
-        shutdown(1);
-      }
-    });
-
-  return buildQueue;
-}
-
-function runBuild() {
-  return new Promise((resolve, reject) => {
-    if (isShuttingDown) {
-      resolve();
-      return;
-    }
-
-    if (buildProcess) {
-      buildProcess.removeAllListeners("exit");
-      buildProcess.kill("SIGTERM");
-      buildProcess = null;
-    }
-
-    buildProcess = spawn(REACT_ROUTER_BIN, ["build"], {
-      env: DEV_ENV,
-      stdio: ["inherit", "pipe", "pipe"],
-    });
-
-    pipeOutput("react-router-build", buildProcess);
-
-    buildProcess.on("exit", (code, signal) => {
-      const exitedProcess = buildProcess;
-      buildProcess = null;
-
-      if (isShuttingDown) {
-        resolve();
-        return;
-      }
-
-      if (signal) {
-        reject(new Error(`build terminated by signal ${signal}`));
-        return;
-      }
-
-      if (code !== 0) {
-        reject(new Error(`build failed with exit code ${code ?? 1}`));
-        return;
-      }
-
-      resolve(exitedProcess);
-    });
-  });
-}
-
-function startSourceWatcher() {
-  const scheduleBuild = () => {
-    if (isShuttingDown) {
-      return;
-    }
-
-    if (buildDebounceTimer) {
-      clearTimeout(buildDebounceTimer);
-    }
-
-    buildDebounceTimer = setTimeout(() => {
-      buildDebounceTimer = null;
-      void queueBuild();
-    }, 200);
-  };
-
-  for (const watchPath of SOURCE_WATCH_PATHS) {
-    if (!existsSync(watchPath)) {
-      continue;
-    }
-
-    const recursive = statSync(watchPath).isDirectory();
-
-    sourceWatchers.push(
-      watch(watchPath, { recursive }, (eventType, fileName) => {
-        if (eventType !== "change" && eventType !== "rename") {
-          return;
-        }
-
-        if (fileName && typeof fileName === "string" && fileName.includes(".test.")) {
-          return;
-        }
-
-        scheduleBuild();
-      }),
-    );
-  }
-}
-
-async function startAppServer() {
-  appProcess = spawn(process.execPath, [SERVER_ENTRY], {
-    env: DEV_ENV,
-    stdio: ["inherit", "pipe", "pipe"],
-  });
-
-  pipeOutput("app", appProcess);
-
-  appProcess.on("exit", (code, signal) => {
-    if (isShuttingDown || restartInFlight) {
-      return;
-    }
-
-    console.error(
-      `[app] exited ${signal ? `from signal ${signal}` : `with code ${code ?? 0}`}`,
-    );
-    shutdown(code ?? 1);
-  });
-}
-
-function scheduleRestart() {
-  if (isShuttingDown) {
-    return;
-  }
-
-  if (restartTimer) {
-    clearTimeout(restartTimer);
-  }
-
-  restartTimer = setTimeout(() => {
-    restartTimer = null;
-    restartAppServer().catch((error) => {
-      console.error(`[app] restart failed: ${error instanceof Error ? error.message : String(error)}`);
-      shutdown(1);
-    });
-  }, 200);
-}
-
-async function restartAppServer() {
-  if (!appProcess) {
-    await startAppServer();
-    return;
-  }
-
-  restartInFlight = true;
-  const previousProcess = appProcess;
-
-  await terminateProcess(previousProcess, "app");
-
-  restartInFlight = false;
-  await startAppServer();
-}
-
-async function terminateProcess(childProcess, label) {
-  await new Promise((resolve) => {
-    let settled = false;
-
-    const finish = () => {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      clearTimeout(killTimer);
-      resolve();
-    };
-
-    const killTimer = setTimeout(() => {
-      if (childProcess.exitCode !== null || childProcess.killed) {
-        finish();
-        return;
-      }
-
-      console.error(`[${label}] did not exit after SIGTERM, sending SIGKILL`);
-      childProcess.kill("SIGKILL");
-    }, 5_000);
-
-    childProcess.once("exit", finish);
-    childProcess.kill("SIGTERM");
-  });
-}
+process.on("SIGTERM", () => {
+  void shutdown(0);
+});
 
 async function shutdown(exitCode) {
-  if (isShuttingDown) {
-    return;
+  if (shutdownPromise) {
+    return shutdownPromise;
   }
 
   isShuttingDown = true;
-  buildWatcher?.close();
+  readyState.acceptingTraffic = false;
 
-  for (const sourceWatcher of sourceWatchers) {
-    sourceWatcher.close();
-  }
+  shutdownPromise = (async () => {
+    await new Promise((resolve) => {
+      server.close(() => resolve());
+      server.closeIdleConnections?.();
+    });
 
-  sourceWatchers = [];
+    for (const socket of sockets) {
+      socket.destroy();
+    }
 
-  if (buildDebounceTimer) {
-    clearTimeout(buildDebounceTimer);
-    buildDebounceTimer = null;
-  }
+    await vite.close();
+    process.exit(exitCode);
+  })();
 
-  if (restartTimer) {
-    clearTimeout(restartTimer);
-    restartTimer = null;
-  }
-
-  const processes = [appProcess, buildProcess].filter(Boolean);
-
-  await Promise.all(
-    processes.map((childProcess) =>
-      terminateProcess(childProcess, childProcess === appProcess ? "app" : "react-router-build"),
-    ),
-  );
-
-  await new Promise((resolve) => {
-    devPingServer.close(() => resolve());
-  });
-
-  process.exit(exitCode);
+  return shutdownPromise;
 }

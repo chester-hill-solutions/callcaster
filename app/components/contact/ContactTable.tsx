@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { useFetcher } from "react-router";
 import { Trash } from "lucide-react";
 
@@ -60,15 +61,16 @@ const ContactTable: React.FC<ContactTableProps> = ({
     ),
   );
 
-  // Handle bulk delete completion
-  useEffect(() => {
-    if (fetcher.state === 'idle' && fetcher.data?.success) {
+  useActionFeedback(fetcher.state === "idle" ? fetcher.data : undefined, {
+    getSuccess: (data) => Boolean(data?.success),
+    onSuccess: () => {
       if (onBulkDeleteComplete && selectedContacts.length > 0) {
         onBulkDeleteComplete(selectedContacts);
         setSelectedContacts([]);
       }
-    }
-  }, [fetcher.state, fetcher.data, onBulkDeleteComplete, selectedContacts]);
+    },
+    successMessage: (data) => data?.message ?? "Contacts removed",
+  });
 
   // Contact selection handlers with better type safety
   const handleSelectContact = (contactId: number, isSelected: boolean): void => {

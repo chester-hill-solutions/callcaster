@@ -1,8 +1,7 @@
 export { action } from "./remember.action.server";
 
 import { Form, useActionData } from "react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -16,15 +15,18 @@ type ActionData = {
 export default function Remember() {
   const actionData = useActionData<ActionData>();
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(
-        typeof actionData.error === "string"
-          ? actionData.error
-          : actionData.error?.message,
-      );
-    }
-  }, [actionData]);
+  useActionFeedback(actionData as ActionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+    errorMessage: (data) => {
+      const error = (data as ActionData)?.error;
+      if (typeof error === "string") return error;
+      if (error && typeof error === "object" && "message" in error) {
+        return String((error as { message?: string }).message);
+      }
+      return "Unable to send reset email";
+    },
+  });
 
   return (
     <main className="flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-slate-800">

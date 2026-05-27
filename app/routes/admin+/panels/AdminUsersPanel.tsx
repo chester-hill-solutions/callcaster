@@ -1,6 +1,7 @@
 import { Form, Link } from "react-router";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useFilterPagination } from "@/hooks/utils/useFilterPagination";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,12 +21,13 @@ type AdminUsersPanelProps = {
 };
 
 export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUsersPanelProps) {
-    const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [filter, setFilter] = useState({
         search: "",
         accessLevel: "all",
     });
+    const filterKey = `${filter.search}:${filter.accessLevel}`;
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
 
     const filteredUsers =
         users?.filter((user) => {
@@ -62,10 +64,6 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
     const paginatedUsers = filteredUsers.slice(startIndex, startIndex + itemsPerPage);
 
     const accessLevels = Array.from(new Set(users?.map((u) => u.access_level).filter(Boolean))) || [];
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filter]);
 
     return (
         <TabsContent value="users">

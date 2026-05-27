@@ -1,43 +1,64 @@
-import { buildOnboardingStepsForState, getWorkspaceMessagingOnboardingState, mergeWorkspaceMessagingOnboardingState, updateWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { createClient } from '@supabase/supabase-js';
-import { createErrorResponse } from "@/lib/errors.server";
-import { createWorkspaceTwilioInstance, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  jsonNumbersSearchResponse,
+  mapTwilioAvailableNumbers,
+  parseNumberSearchRequest,
+} from "@/lib/numbers-search.server";
+import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { logger } from "@/lib/logger.server";
 import { verifyAuth } from "@/lib/supabase.server";
-import Twilio from 'twilio';
+import { twilioErrorUserMessage } from "@/lib/twilio-errors";
+import Twilio from "twilio";
 import type { LoaderFunctionArgs } from "react-router";
 
-interface FormData {
-  phoneNumber: string;
-  workspace_id: string;
-}
-
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { supabaseClient, user } = await verifyAuth(request);
+  if (!user) {
+    return jsonNumbersSearchResponse({ ok: false, error: "Unauthorized." }, 401);
+  }
 
-    await verifyAuth(request);
-    const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
-    const url = new URL(request.url);
-    const params = url.searchParams;
-    const areaCode = params.get('areaCode')
-    try {
-        const listParams = areaCode ? { areaCode: Number(areaCode), limit: 10 } : { limit: 10 };
-        const locals = await twilio.availablePhoneNumbers('CA').local.list(listParams as any)
-        return new Response(JSON.stringify(locals), {
-            headers: {
-                "Content-Type": "application/json"
-            },
-            status: 200
-        })
+  const url = new URL(request.url);
+  const parsed = parseNumberSearchRequest(url.searchParams);
+  if (!parsed.ok) {
+    return jsonNumbersSearchResponse({ ok: false, error: parsed.error }, 400);
+  }
 
-    } catch (error) {
-        logger.error('Fetching numbers failed', error);
-        return new Response(JSON.stringify({ error }), {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            status: 500
-        });
+  const workspaceId = url.searchParams.get("workspace_id")?.trim() || null;
+
+  try {
+    let twilio: Twilio.Twilio;
+    if (workspaceId) {
+      await requireWorkspaceAccess({
+        supabaseClient,
+        user,
+        workspaceId,
+      });
+      twilio = (await createWorkspaceTwilioInstance({
+        supabase: supabaseClient,
+        workspace_id: workspaceId,
+      })) as Twilio.Twilio;
+    } else {
+      twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
     }
-}
+
+    const locals = await twilio.availablePhoneNumbers("CA").local.list(
+      parsed.listParams as Parameters<
+        ReturnType<typeof twilio.availablePhoneNumbers>["local"]["list"]
+      >[0],
+    );
+
+    return jsonNumbersSearchResponse({
+      ok: true,
+      numbers: mapTwilioAvailableNumbers(locals),
+    });
+  } catch (error) {
+    logger.error("Fetching numbers failed", error);
+    return jsonNumbersSearchResponse(
+      {
+        ok: false,
+        error: twilioErrorUserMessage(error),
+      },
+      500,
+    );
+  }
+};

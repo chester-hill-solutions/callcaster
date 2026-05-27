@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
 
-import { getCampaignReadiness } from "../app/lib/campaign-readiness";
+import {
+  getCampaignContentReadinessIssues,
+  getCampaignReadiness,
+} from "../app/lib/campaign-readiness";
 
 const validSchedule = {
   monday: {
@@ -202,6 +205,19 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
 
     expect(readiness.startIssues).toContain("Script is required");
+  });
+
+  test("filters content readiness issues for the detailed settings section", () => {
+    const issues = getCampaignContentReadinessIssues([
+      "Script is required",
+      "An outbound phone number is required",
+      "Message content or media is required",
+    ]);
+
+    expect(issues).toEqual([
+      "Script is required",
+      "Message content or media is required",
+    ]);
   });
 
   test("flags missing dates and missing calling hours for empty schedule", () => {

@@ -2,8 +2,8 @@ export { loader } from "./invite.loader.server";
 export { action } from "./invite.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
-import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { useRef } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
@@ -97,20 +97,18 @@ export default function WorkspaceUsers() {
   };
   const formRef = useRef<HTMLFormElement | null>(null);
   
-  useEffect(() => {
-    if (actionData && 'error' in actionData && actionData.error) {
-      toast.error(actionData.error as string);
-    }
-    if (actionData) {
-      if ('success' in actionData && actionData.success) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
-      } else if ('data' in actionData && actionData.data) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
-      }
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) =>
+      data && "error" in data && data.error ? data.error : undefined,
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (("success" in data && data.success) ||
+            ("data" in data && data.data)),
+      ),
+    successMessage: "Action completed successfully!",
+    onSuccess: () => formRef.current?.reset(),
+  });
 
   if (!hasAccess) {
     return (

@@ -11,6 +11,7 @@ export type OnboardingPendingActions = {
   isProvisioningA2P: boolean;
   isSavingRcs: boolean;
   isReviewingEmergencyVoice: boolean;
+  isVerifyingCallerId: boolean;
 };
 
 export type OnboardingStepProps = {

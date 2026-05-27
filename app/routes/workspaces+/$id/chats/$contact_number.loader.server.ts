@@ -5,7 +5,6 @@ import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { useInfiniteScroll } from "@/hooks";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { LoaderFunctionArgs } from "react-router";
 import { fetchMessagePage } from "./$contact_number.messages.server";

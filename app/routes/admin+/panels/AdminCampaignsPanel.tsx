@@ -1,6 +1,7 @@
 import { NavLink } from "react-router";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useFilterPagination } from "@/hooks/utils/useFilterPagination";
 
 import { AdminAsyncExportButton } from "@/components/campaign/home/CampaignHomeScreen/AdminAsyncExportButton";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,6 @@ type AdminCampaignsPanelProps = {
 };
 
 export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPanelProps) {
-    const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
     const [filter, setFilter] = useState({
         search: "",
@@ -27,6 +27,8 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
         type: "all",
         workspace: "all",
     });
+    const filterKey = JSON.stringify(filter);
+    const { currentPage, setCurrentPage } = useFilterPagination(filterKey);
 
     const filteredCampaigns = campaigns.filter((campaign) => {
         let matchesSearch = true;
@@ -69,10 +71,6 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
 
     const campaignTypes = Array.from(new Set(campaigns.map((c) => c.type).filter(Boolean)));
     const campaignStatuses = Array.from(new Set(campaigns.map((c) => c.status).filter(Boolean)));
-
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filter]);
 
     return (
         <TabsContent value="campaigns">

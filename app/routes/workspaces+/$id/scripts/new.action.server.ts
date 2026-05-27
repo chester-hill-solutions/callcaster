@@ -1,4 +1,4 @@
-import { data as routeData } from "react-router";
+import { data as routeData, redirect } from "react-router";
 import { verifyAuth } from "@/lib/supabase.server";
 import type { ActionFunctionArgs } from "react-router";
 import type { Json } from "@/lib/database.types";
@@ -89,5 +89,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     );
   }
 
-  return routeData({ data, success: true, error: null }, { headers });
+  const createdScript = data[0];
+  if (!createdScript) {
+    return routeData(
+      { success: false, error: "Failed to create script" },
+      { headers },
+    );
+  }
+
+  return redirect(`../${createdScript.id}?created=1`, { headers });
 }

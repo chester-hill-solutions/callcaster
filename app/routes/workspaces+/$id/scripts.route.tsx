@@ -1,14 +1,16 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, NavLink, useActionData, useLoaderData } from "react-router";
+import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, useLoaderData } from "react-router";
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Button } from "@/components/ui/button";
 
 
 import { formatDateToLocale } from "@/lib/utils";
-import { useEffect } from "react";
+import { downloadBlobPart } from "@/lib/download-blob.client";
+import { useFetcher } from "react-router";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
 
 import type { Json , Database } from "@/lib/database.types";
@@ -58,7 +60,11 @@ type LoaderData =
 
 export default function WorkspaceScripts() {
   const loaderData = useLoaderData<LoaderData>();
-  const actionData = useActionData();
+  const downloadFetcher = useFetcher<{
+    fileContent?: string;
+    contentType?: string;
+    fileName?: string;
+  }>();
 
   // Narrow the type of loaderData
   const { error } = loaderData;
@@ -71,22 +77,24 @@ export default function WorkspaceScripts() {
     steps: typeof script.steps === 'string' ? JSON.parse(script.steps) : script.steps
   })) ?? null;
 
-  useEffect(() => {
-    if (actionData && 'fileContent' in actionData) {
-      const blob = new Blob([actionData.fileContent], {
-        type: actionData.contentType,
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", actionData.fileName);
-      document.body.appendChild(link);
-      link.click();
-      if (link.parentNode) {
-        link.parentNode.removeChild(link);
-      }
-    }
-  }, [actionData]);
+  useActionFeedback(
+    downloadFetcher.state === "idle" ? downloadFetcher.data : undefined,
+    {
+      getSuccess: (data) =>
+        data != null && "fileContent" in data && Boolean(data.fileContent),
+      onSuccess: (data) => {
+        if (!data?.fileContent || !data.fileName) {
+          return;
+        }
+        downloadBlobPart({
+          data: data.fileContent,
+          filename: data.fileName,
+          mimeType: data.contentType ?? "application/json",
+        });
+      },
+      successMessage: undefined,
+    },
+  );
 
   const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;
 
@@ -155,12 +163,19 @@ export default function WorkspaceScripts() {
               cell: ({ row }) => {
                 const script = row.original as ScriptWithParsedSteps;
                 return (
-                  <Form method="POST">
-                    <input hidden value={script.id} name="id" id="id" />
-                    <Button variant="ghost" type="submit">
-                      <MdDownload />
-                    </Button>
-                  </Form>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    disabled={downloadFetcher.state !== "idle"}
+                    onClick={() => {
+                      downloadFetcher.submit(
+                        { id: String(script.id) },
+                        { method: "post" },
+                      );
+                    }}
+                  >
+                    <MdDownload />
+                  </Button>
                 );
               },
             },

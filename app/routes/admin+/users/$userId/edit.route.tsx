@@ -8,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 
 
@@ -19,15 +18,14 @@ export default function EditUser() {
     const { currentUser, targetUser } = useLoaderData();
     const actionData = useActionData();
 
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useActionFeedback(actionData, {
+        getSuccess: (data) => Boolean(data && "success" in data && data.success),
+        successMessage: (data) =>
+            data && "success" in data && typeof data.success === "string"
+                ? data.success
+                : "Saved",
+        getError: (data) => (data && "error" in data ? data.error : undefined),
+    });
 
     return (
         <div className="container mx-auto py-8 px-4">

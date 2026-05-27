@@ -114,11 +114,16 @@ export async function provisionWorkspaceA2P({
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  await ensureWorkspaceTwilioBootstrap({
+  const bootstrap = await ensureWorkspaceTwilioBootstrap({
     supabaseClient,
     workspaceId,
     actorUserId,
   });
+  if (bootstrap.outcome === "failed" || !bootstrap.serviceSid) {
+    throw new Error(
+      bootstrap.lastError ?? "Messaging Service must be provisioned before A2P registration.",
+    );
+  }
 
   const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(
     supabaseClient,

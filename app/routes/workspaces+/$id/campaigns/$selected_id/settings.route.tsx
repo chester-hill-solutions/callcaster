@@ -35,6 +35,11 @@ import {
 import { deepEqual } from "@/lib/utils";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import {
+  getCampaignSetupDismissKey,
+  getCampaignSetupSteps,
+  shouldShowCampaignSetupGuide,
+} from "@/lib/campaign-setup-steps";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -98,11 +103,21 @@ export default function CampaignSettingsRoute() {
     surveys,
     outboundEstimateInputs,
     smsSendContext,
+    isFirstDraftCampaign,
   } = useLoaderData();
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();
   const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none">("none");
+  const [setupGuideDismissed, setSetupGuideDismissed] = useState(() => {
+    if (typeof window === "undefined" || !selected_id) {
+      return false;
+    }
+    return (
+      window.sessionStorage.getItem(getCampaignSetupDismissKey(selected_id)) ===
+      "1"
+    );
+  });
   const initialCampaignData = useMemo(() => {
     const normalized = normalizeCampaignData(campaignData);
     if (normalized.type !== "message") {
@@ -220,6 +235,47 @@ export default function CampaignSettingsRoute() {
   const readinessIssues = isChanged
     ? ["Save your changes to refresh campaign readiness."]
     : readiness.startIssues;
+
+  const setupGuideState = useMemo(
+    () =>
+      getCampaignSetupSteps({
+        campaignData: draftCampaignData,
+        campaignDetails: draftCampaignDetails,
+        phoneNumbers,
+        queueCount: queueCount ?? 0,
+        audienceCount: audiences?.length ?? 0,
+        scriptsCount: scripts?.length ?? 0,
+        workspaceId: workspace_id,
+        smsMessagingServiceSendersReady:
+          draftCampaignData.type === "message" &&
+          draftCampaignData.sms_send_mode === "messaging_service"
+            ? smsSendContext?.messagingServiceReady
+            : undefined,
+      }),
+    [
+      audiences?.length,
+      draftCampaignData,
+      draftCampaignDetails,
+      phoneNumbers,
+      queueCount,
+      scripts?.length,
+      smsSendContext?.messagingServiceReady,
+      workspace_id,
+    ],
+  );
+
+  const showSetupGuide = shouldShowCampaignSetupGuide({
+    isFirstDraftCampaign: Boolean(isFirstDraftCampaign),
+    dismissed: setupGuideDismissed,
+    allComplete: setupGuideState.allComplete,
+  });
+
+  const handleDismissSetupGuide = () => {
+    if (typeof window !== "undefined" && selected_id) {
+      window.sessionStorage.setItem(getCampaignSetupDismissKey(selected_id), "1");
+    }
+    setSetupGuideDismissed(true);
+  };
 
   const handleDuplicate = () => {
     const { id, ...dataToDuplicate } = draftCampaignData;
@@ -445,6 +501,12 @@ export default function CampaignSettingsRoute() {
         surveys={surveys || []}
         outboundEstimateInputs={outboundEstimateInputs}
         smsSendContext={smsSendContext}
+        showSetupGuide={showSetupGuide}
+        setupGuideSteps={setupGuideState.steps}
+        setupGuideCurrentStepNumber={setupGuideState.currentStepNumber}
+        setupGuideTotalSteps={setupGuideState.totalSteps}
+        setupGuideAllComplete={setupGuideState.allComplete}
+        onDismissSetupGuide={handleDismissSetupGuide}
       />
     </>
   );

@@ -38,6 +38,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     workspaceAudioList,
     workspaceTwilioResult,
     phoneNumbersResult,
+    campaignCountResult,
+    campaignStatusResult,
   ] = await Promise.all([
     fetchCampaignAudience(supabaseClient, selected_id, workspace_id),
     supabaseClient
@@ -61,6 +63,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       supabaseClient,
       workspaceId: workspace_id,
     }),
+    supabaseClient
+      .from("campaign")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace", workspace_id),
+    supabaseClient
+      .from("campaign")
+      .select("status")
+      .eq("id", Number(selected_id))
+      .eq("workspace", workspace_id)
+      .single(),
   ]);
 
   const campaignType = campaignTypeResult.data;
@@ -107,6 +119,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     mediaLinks,
     surveys,
     outboundEstimateInputs,
+    isFirstDraftCampaign:
+      (campaignCountResult.count ?? 0) === 1 &&
+      campaignStatusResult.data?.status === "draft",
     smsSendContext: {
       messagingServiceReady,
       defaultMessagingServiceSid,

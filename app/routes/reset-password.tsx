@@ -7,18 +7,15 @@ import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
-import { toast } from "sonner";
-
-import { useEffect } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 export default function ResetPassword() {
   const actionData = useActionData();
 
-  useEffect(() => {
-    if (actionData?.success != null) {
-      toast.success("Email successfully updated! Redirecting...");
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getSuccess: (data) => data?.success != null,
+    successMessage: "Email successfully updated! Redirecting...",
+  });
 
   return (
     <main className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center px-4 py-16 text-white">

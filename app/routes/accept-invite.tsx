@@ -1,9 +1,8 @@
 export { loader } from "./accept-invite.loader.server";
 export { action } from "./accept-invite.action.server";
 
-import { useActionData, useLoaderData, useNavigation, NavLink, useNavigate } from "react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionData, useLoaderData, useNavigation, NavLink } from "react-router";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 import { NewUserSignup } from "@/components/invite/welcome/NewUserSignUp";
 import { ExistingUserInvites } from "@/components/invite/welcome/ExistingUserInvites";
@@ -57,27 +56,22 @@ function NotSignedIn() {
 export default function AcceptInvite() {
   const loaderData = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
-  const navigate = useNavigate();
   const { state } = useNavigation();
   const verifiedEmail =
     loaderData.status === "verified" ? loaderData.email ?? "" : "";
 
-  useEffect(() => {
-    if (
-      state === "idle" &&
-      actionData &&
-      (actionData.status === "accepted" || actionData.status === "updated")
-    ) {
-      toast.success("Successfully signed up and accepted invitation");
-      const timeout = setTimeout(() => navigate("/workspaces"), 3000);
-
-      return () => clearTimeout(timeout);
-    }
-    if (state === "idle" && actionData?.status === "accept_failed") {
-      toast.error("We could not accept all invitations. Please try again.");
-    }
-    return undefined;
-  }, [actionData, navigate, state]);
+  useActionFeedback(state === "idle" ? actionData : undefined, {
+    getSuccess: (data) =>
+      data?.status === "updated",
+    successMessage: "Successfully signed up and accepted invitation",
+    getError: (data) =>
+      data?.status === "accept_failed"
+        ? "accept_failed"
+        : data && "error" in data
+          ? data.error
+          : undefined,
+    errorMessage: "We could not accept all invitations. Please try again.",
+  });
 
   return (
     <main className="mt-16 flex flex-col items-center justify-center text-slate-800 sm:w-full">

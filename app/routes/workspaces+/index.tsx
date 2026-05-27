@@ -2,7 +2,9 @@ export { loader } from "./index.loader.server";
 export { action } from "./index.action.server";
 
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,6 @@ import { Input } from "@/components/ui/input";
 
 
 
-import { toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
@@ -136,17 +137,23 @@ export default function Workspaces() {
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
-    if (error) {
-      toast.error(error);
-    }
-    if (paymentStatus === "error" && paymentMessage) {
-      toast.error(paymentMessage);
-    }
-  }, [actionData, error, paymentMessage, paymentStatus]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
+  useActionFeedback(error ? { error } : undefined, {
+    getError: (data) => (data as { error?: string }).error,
+    getSuccess: () => false,
+  });
+  useActionFeedback(
+    paymentStatus === "error" && paymentMessage
+      ? { error: paymentMessage }
+      : undefined,
+    {
+      getError: (data) => (data as { error?: string }).error,
+      getSuccess: () => false,
+    },
+  );
 
   const workspaceCards = useMemo(
     () =>
@@ -163,6 +170,17 @@ export default function Workspaces() {
 
   return (
     <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
+      <div className="w-full max-w-3xl">
+        <QueryParamBanner
+          param="invite"
+          variants={{
+            accepted: {
+              title: "Invitation accepted",
+              description: "You can open your workspace from the list below.",
+            },
+          }}
+        />
+      </div>
       <Heading className="text-center" branded>
         Your Workspaces
       </Heading>

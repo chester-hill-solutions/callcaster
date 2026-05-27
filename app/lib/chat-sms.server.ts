@@ -10,6 +10,9 @@ import { logger } from "@/lib/logger.server";
 import { processUrls } from "@/lib/sms.server";
 import { resolveTwilioSmsMessagingServiceSid } from "@/lib/sms-send-resolve";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
+import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
+import { withTwilioRetry } from "@/lib/twilio-client.server";
+import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
 
 function resolveSmsRequest({
   body,
@@ -87,6 +90,8 @@ export const sendMessage = async ({
       supabaseClient: supabase,
       workspaceId: workspace,
     }));
+  await assertWorkspaceCanSendSms({ supabaseClient: supabase, workspaceId: workspace });
+
   const twilio = await createWorkspaceTwilioInstance({
     supabase,
     workspace_id: workspace,
@@ -96,17 +101,21 @@ export const sendMessage = async ({
   try {
     const processedBody = await processUrls(body);
 
-    const message = await twilio.messages.create(
-      resolveSmsRequest({
-        body: processedBody,
-        to,
-        from,
-        media: mediaData && mediaData.length > 0 ? [...mediaData] : [],
-        portalConfig: resolvedPortalConfig,
-        messagingServiceSid,
-        messageIntent,
-        statusCallback,
-      }),
+    const message = await withTwilioRetry(
+      () =>
+        twilio.messages.create(
+          resolveSmsRequest({
+            body: processedBody,
+            to,
+            from,
+            media: mediaData && mediaData.length > 0 ? [...mediaData] : [],
+            portalConfig: resolvedPortalConfig,
+            messagingServiceSid,
+            messageIntent,
+            statusCallback,
+          }),
+        ),
+      { workspaceId: workspace, operation: "messages.create.chat" },
     );
 
     const {
@@ -162,52 +171,23 @@ export const sendMessage = async ({
       .select();
 
     if (error) throw { "message_entry_error:": error };
-    const { data: webhook, error: webhook_error } = await supabase
-      .from("webhook")
-      .select("*")
-      .eq("workspace", workspace)
-      .filter("events", "cs", '[{"category":"outbound_sms"}]');
-    if (webhook_error) {
-      logger.error("Error fetching webhook:", webhook_error);
-      throw { "webhook_error:": webhook_error };
+
+    const webhookResult = await sendWorkspaceWebhookNotification({
+      supabaseClient: supabase,
+      workspaceId: workspace,
+      eventCategory: "outbound_sms",
+      eventType: "INSERT",
+      payload: { type: "outbound_sms", record: message, old_record: null },
+      optional: true,
+    });
+    if (!webhookResult.success) {
+      logger.error("Outbound SMS webhook delivery failed", webhookResult.error);
+      throw new Error(
+        `Error with the webhook event: ${webhookResult.error ?? "delivery failed"}`,
+      );
     }
-    if (webhook && webhook.length > 0) {
-      const webhookData = webhook[0];
-      if (webhookData) {
-        const webhookResponse = await fetch(webhookData.destination_url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(webhookData.custom_headers &&
-            typeof webhookData.custom_headers === "object"
-              ? Object.entries(webhookData.custom_headers).reduce(
-                  (acc, [key, value]) => ({
-                    ...acc,
-                    [key]: String(value),
-                  }),
-                  {},
-                )
-              : {}),
-          },
-          body: JSON.stringify({
-            event_category: "outbound_sms",
-            event_type: "outbound_sms",
-            workspace_id: workspace,
-            timestamp: new Date().toISOString(),
-            payload: { type: "outbound_sms", record: message, old_record: null },
-          }),
-        });
-        if (!webhookResponse.ok) {
-          logger.error(
-            `Webhook request failed with status ${webhookResponse.status}`,
-          );
-          throw new Error(
-            `Error with the webhook event: ${webhookResponse.statusText}`,
-          );
-        }
-      }
-    }
-    return { message, data, webhook };
+
+    return { message, data };
   } catch (error) {
     logger.error("Error sending message:", error);
     throw new Error("Failed to send message");

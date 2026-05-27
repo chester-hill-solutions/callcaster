@@ -29,30 +29,12 @@ import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { normalizePhoneNumber } from "@/lib/utils/phone";
 
 export default function HandsetCallPanel() {
-  const { handsetNumber, clientIdentity, workspaceId } =
+  const { handsetNumber, clientIdentity, workspaceId, token, tokenError } =
     useLoaderData<HandsetLoaderData>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const sessionEndedRef = useRef(false);
-
-  const [token, setToken] = useState<string | null>(null);
-  const [tokenError, setTokenError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!clientIdentity || !workspaceId) return;
-    const url = `/api/handset-token?workspace=${encodeURIComponent(workspaceId)}&client_identity=${encodeURIComponent(clientIdentity)}`;
-    fetch(url, { credentials: "include" })
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) {
-          setTokenError(data.error ?? `Request failed (${r.status})`);
-          return;
-        }
-        if (data.token) setToken(data.token);
-        else setTokenError(data.error ?? "Failed to get token");
-      })
-      .catch(() => setTokenError("Failed to get token"));
-  }, [clientIdentity, workspaceId]);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   const endSession = useCallback(() => {
     if (sessionEndedRef.current) return;
@@ -88,12 +70,12 @@ export default function HandsetCallPanel() {
     );
   }
 
-  if (tokenError) {
+  if (tokenError || runtimeError) {
     return (
       <div className="container mx-auto max-w-md p-6">
         <Card className="p-6">
           <h1 className="text-xl font-semibold">Handset</h1>
-          <p className="mt-2 text-destructive">{tokenError}</p>
+          <p className="mt-2 text-destructive">{tokenError ?? runtimeError}</p>
           <Button asChild variant="outline" className="mt-4">
             <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
           </Button>
@@ -120,7 +102,7 @@ export default function HandsetCallPanel() {
       clientIdentity={clientIdentity}
       workspaceId={workspaceId}
       endSession={endSession}
-      onError={setTokenError}
+      onError={setRuntimeError}
       onNavigateBack={() => navigate(`/workspaces/${workspaceId}`)}
     />
   );

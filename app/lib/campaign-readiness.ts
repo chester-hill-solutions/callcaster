@@ -173,6 +173,19 @@ function getContentIssue(campaignData: Campaign, details: CampaignDetails) {
   return hasScript ? null : "Script is required";
 }
 
+/** Readiness messages tied to campaign content fields in the detailed settings section. */
+export const CAMPAIGN_CONTENT_READINESS_ISSUES = [
+  "Script is required",
+  "Message content or media is required",
+] as const;
+
+export function getCampaignContentReadinessIssues(
+  issues: readonly string[],
+): string[] {
+  const contentIssues = new Set<string>(CAMPAIGN_CONTENT_READINESS_ISSUES);
+  return issues.filter((issue) => contentIssues.has(issue));
+}
+
 export function getCampaignReadiness(
   campaignData: Campaign | null | undefined,
   details: CampaignDetails,

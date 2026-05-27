@@ -14,12 +14,12 @@ import {
   useOutlet,
   useOutletContext,
 } from "react-router";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 
 
-import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
@@ -65,9 +65,10 @@ export default function WorkspaceSettings() {
     workspace,
   } = useLoaderData<LoaderData>();
   const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
-  const { workspace: outletWorkspace } = useOutletContext<{
+  const outletContext = useOutletContext<{
     workspace: WorkspaceData;
   }>();
+  const { workspace: outletWorkspace } = outletContext;
   const actionData = useActionData();
   const canManageWebhook =
     hasAccess &&
@@ -81,15 +82,17 @@ export default function WorkspaceSettings() {
   ) as UserWithRole | undefined;
   users?.sort((a, b) => compareMembersByRole(a, b));
   const formRef = useRef<HTMLFormElement | null>(null);
-  useEffect(() => {
-    if (actionData && actionData?.error) {
-      toast.error(JSON.stringify(actionData.error));
-    }
-    if (actionData && (('data' in actionData && actionData.data) || ('success' in actionData && actionData.success))) {
-      toast.success("Action completed succesfully!");
-      formRef?.current?.reset();
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (("data" in data && data.data) ||
+            ("success" in data && data.success)),
+      ),
+    successMessage: "Action completed successfully!",
+    onSuccess: () => formRef.current?.reset(),
+  });
 
   const addUserTabs = (
     <Form method="POST" className="flex w-full flex-col gap-2" ref={formRef}>
@@ -178,7 +181,7 @@ export default function WorkspaceSettings() {
   );
 
   if (outlet) {
-    return <Outlet />;
+    return <Outlet context={outletContext} />;
   }
 
   return (

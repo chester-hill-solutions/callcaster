@@ -138,6 +138,7 @@ Relevant runtime wiring:
 
 ## Build, Typegen, And Production Server
 
+- `npm run dev` runs the custom Express server with Vite middleware, so local edits use Vite HMR/SSR module loading instead of rebuilding `build/`.
 - `npm run build` runs `react-router build` (client + server bundles under `build/`).
 - `npm run typecheck` runs `react-router typegen` then `tsc`.
 - `npm start` runs the custom Express server (`server/index.js`) against `build/server/index.js`.

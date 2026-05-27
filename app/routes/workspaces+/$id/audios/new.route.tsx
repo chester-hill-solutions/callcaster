@@ -1,10 +1,9 @@
 export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useNavigate, useNavigation } from "react-router";
-import { useEffect, useState } from "react";
+import { Form, Link, useActionData, useNavigation } from "react-router";
+import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
@@ -12,15 +11,7 @@ import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 export default function Media() {
   const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
-  const navigate = useNavigate();
   const {state} = useNavigation();
-
-  useEffect(() => {
-    if (actionData?.success) {
-      toast.success("Media successfully uploaded to your workspace!");
-      setTimeout(() => navigate("../", { relative: "path" }), 750);
-    }
-  }, [actionData]);
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
