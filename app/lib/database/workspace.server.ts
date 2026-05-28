@@ -26,11 +26,11 @@ export {
   getEffectiveWorkspaceTwilioPortalConfig,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
-  detectTwilioTrafficClass,
   getWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioSyncSnapshot,
   syncWorkspaceTwilioSnapshot,
+  buildDefaultWorkspaceTwilioPortalSnapshot,
   getWorkspaceTwilioPortalSnapshot,
 } from "./workspace-twilio.server";
 

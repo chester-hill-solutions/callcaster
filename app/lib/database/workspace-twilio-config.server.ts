@@ -23,6 +23,7 @@ import {
   defaultVoiceTargetCps,
 } from "@/lib/throughput-config.server";
 import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 export const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
@@ -368,22 +369,10 @@ export async function updateWorkspaceTwilioPortalConfig({
     auditTrail: [auditEntry, ...currentConfig.auditTrail].slice(0, 10),
   };
 
-  const nextTwilioData = {
+  await mergeWorkspaceTwilioData(supabaseClient, workspaceId, (currentTwilioData) => ({
     ...currentTwilioData,
     portalConfig: nextConfig,
-  };
-
-  const { error: updateError } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (updateError) {
-    throw updateError;
-  }
+  }));
 
   return nextConfig;
 }

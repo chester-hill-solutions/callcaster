@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
 
 import {
-  detectTwilioTrafficClass,
+  detectTwilioTrafficClassFromSenderTypes,
+} from "../app/lib/twilio-sender-class.server";
+import {
   getEffectiveWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
@@ -70,11 +72,11 @@ describe("workspace-twilio.server", () => {
     });
   });
 
-  test("detectTwilioTrafficClass maps sender types", () => {
-    expect(detectTwilioTrafficClass(["short_code"])).toBe("short_code");
-    expect(detectTwilioTrafficClass(["toll_free"])).toBe("toll_free");
-    expect(detectTwilioTrafficClass(["local"])).toBe("international_long_code");
-    expect(detectTwilioTrafficClass(["other"])).toBe("unknown");
+  test("detectTwilioTrafficClassFromSenderTypes maps sender types", () => {
+    expect(detectTwilioTrafficClassFromSenderTypes(["short_code"])).toBe("short_code");
+    expect(detectTwilioTrafficClassFromSenderTypes(["toll_free"])).toBe("toll_free");
+    expect(detectTwilioTrafficClassFromSenderTypes(["local"])).toBe("international_long_code");
+    expect(detectTwilioTrafficClassFromSenderTypes(["other"])).toBe("unknown");
   });
 
   test("saved portal config does not merge onboarding overrides", () => {

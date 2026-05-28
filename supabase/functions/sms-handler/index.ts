@@ -35,7 +35,38 @@ function parseOptionalString(value: unknown): string | null {
 
 /** Twilio Link Shortening is preferred when sending via Messaging Service. */
 function bodyHasUrls(text: string): boolean {
-  return /https?:\/\/[^\s]+/g.test(text);
+  return /https?:\/\/[^\s]+/.test(text);
+}
+
+function resolveContactField(field: string, contact: ContactData): string {
+  switch (field) {
+    case "firstname":
+      return contact.firstname || "";
+    case "surname":
+      return contact.surname || "";
+    case "fullname":
+      return contact.fullname || `${contact.firstname || ""} ${contact.surname || ""}`.trim();
+    case "phone":
+      return contact.phone || "";
+    case "email":
+      return contact.email || "";
+    case "address":
+      return contact.address || "";
+    case "city":
+      return contact.city || "";
+    case "province":
+      return contact.province || "";
+    case "postal":
+      return contact.postal || "";
+    case "country":
+      return contact.country || "";
+    case "external_id":
+      return contact.external_id || "";
+    case "contact_id":
+      return contact.id?.toString() || "";
+    default:
+      return "";
+  }
 }
 
 interface ContactData {
@@ -58,140 +89,54 @@ function processTemplateTags(text: string, contact: ContactData): string {
   if (!text || !contact) return text;
 
   const processBraces = (input: string): string => {
-    // First, handle {{field|"fallback"}} pattern with quoted fallback
-    let result = input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"([^"]+)"\s*\}\}/g, (match, field, fallback) => {
-      let value = '';
-      switch (field) {
-        case 'firstname':
-          value = contact.firstname || '';
-          break;
-        case 'surname':
-          value = contact.surname || '';
-          break;
-        case 'fullname':
-          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
-          break;
-        case 'phone':
-          value = contact.phone || '';
-          break;
-        case 'email':
-          value = contact.email || '';
-          break;
-        case 'address':
-          value = contact.address || '';
-          break;
-        case 'city':
-          value = contact.city || '';
-          break;
-        case 'province':
-          value = contact.province || '';
-          break;
-        case 'postal':
-          value = contact.postal || '';
-          break;
-        case 'country':
-          value = contact.country || '';
-          break;
-        case 'external_id':
-          value = contact.external_id || '';
-          break;
-        case 'contact_id':
-          value = contact.id?.toString() || '';
-          break;
-        default:
-          value = '';
-      }
-      if (!value && typeof fallback === 'string') {
+    let result = input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"([^"]+)"\s*\}\}/g, (_match, field, fallback) => {
+      const value = resolveContactField(field, contact);
+      if (!value && typeof fallback === "string") {
         return fallback.trim();
       }
-      return value || '';
+      return value || "";
     });
-    
-    // Then, handle {{field}} pattern (without fallback)
-    result = result.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, field) => {
-      let value = '';
-      switch (field) {
-        case 'firstname':
-          value = contact.firstname || '';
-          break;
-        case 'surname':
-          value = contact.surname || '';
-          break;
-        case 'fullname':
-          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
-          break;
-        case 'phone':
-          value = contact.phone || '';
-          break;
-        case 'email':
-          value = contact.email || '';
-          break;
-        case 'address':
-          value = contact.address || '';
-          break;
-        case 'city':
-          value = contact.city || '';
-          break;
-        case 'province':
-          value = contact.province || '';
-          break;
-        case 'postal':
-          value = contact.postal || '';
-          break;
-        case 'country':
-          value = contact.country || '';
-          break;
-        case 'external_id':
-          value = contact.external_id || '';
-          break;
-        case 'contact_id':
-          value = contact.id?.toString() || '';
-          break;
-        default:
-          value = '';
-      }
-      return value || '';
-    });
-    
+
+    result = result.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, field) =>
+      resolveContactField(field, contact),
+    );
+
     return result;
   };
 
   const processFunctions = (input: string): string => {
-    // Process btoa functions
-    let result = input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
+    let result = input.replace(/btoa\(([^)]*)\)/g, (_match, inner) => {
       const processed = processBraces(inner);
       try {
         return btoa(processed);
-      } catch (e) {
-        return '';
+      } catch {
+        return "";
       }
     });
-    
-    // Process survey functions
-    result = result.replace(/survey\(([^)]*)\)/g, (match, inner) => {
+
+    result = result.replace(/survey\(([^)]*)\)/g, (_match, inner) => {
       const processed = processBraces(inner);
-      // Expected format: contact_id, "survey_id"
-      const parts = processed.split(',').map(part => part.trim());
+      const parts = processed.split(",").map((part) => part.trim());
       if (parts.length >= 2) {
         const contactId = parts[0];
-        const surveyId = parts[1].replace(/"/g, ''); // Remove quotes
-        
+        const surveyId = parts[1].replace(/"/g, "");
         if (contactId && surveyId) {
-          // Generate the survey link
           const encoded = btoa(`${contactId}:${surveyId}`);
-          const baseUrl = "https://callcaster.com";
-          return `${baseUrl}/?q=${encoded}`;
+          const surveyBaseUrl = "https://callcaster.com";
+          return `${surveyBaseUrl}/?q=${encoded}`;
         }
       }
-      return ''; // Return empty string if parsing fails
+      return "";
     });
-    
+
     return result;
   };
+
   let result = processFunctions(text);
   result = processBraces(result);
   return result;
 }
+
 const baseUrl = `${getFunctionsBaseUrl()}/`;
 interface SendMessageParams {
   body: string;

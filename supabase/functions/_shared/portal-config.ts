@@ -1,4 +1,7 @@
-import { normalizePortalThroughputConfig } from "./throughput-config.ts";
+import {
+  normalizePortalThroughputConfig,
+  type WorkspaceThroughputPortalConfig,
+} from "./throughput-config.ts";
 
 export const TWILIO_MESSAGE_INTENTS = new Set([
   "otp",
@@ -23,6 +26,11 @@ export type WorkspaceTwilioOpsConfig = {
   sendMode: "from_number" | "messaging_service";
   messagingServiceSid: string | null;
   onboardingStatus: string;
+  smsSenderClass: WorkspaceThroughputPortalConfig["smsSenderClass"];
+  smsTargetMps: number;
+  voiceTargetCps: number;
+  voiceConcurrentCallLimit: number;
+  parallelDispatchEnabled: boolean;
   supportNotes: string;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -34,6 +42,8 @@ export type WorkspaceTwilioOpsConfig = {
   }>;
 };
 
+const DEFAULT_THROUGHPUT = normalizePortalThroughputConfig(null);
+
 const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
   throughputProduct: "none",
@@ -43,6 +53,11 @@ const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   sendMode: "from_number",
   messagingServiceSid: null,
   onboardingStatus: "not_started",
+  smsSenderClass: DEFAULT_THROUGHPUT.smsSenderClass,
+  smsTargetMps: DEFAULT_THROUGHPUT.smsTargetMps,
+  voiceTargetCps: DEFAULT_THROUGHPUT.voiceTargetCps,
+  voiceConcurrentCallLimit: DEFAULT_THROUGHPUT.voiceConcurrentCallLimit,
+  parallelDispatchEnabled: DEFAULT_THROUGHPUT.parallelDispatchEnabled,
   supportNotes: "",
   updatedAt: null,
   updatedBy: null,
@@ -68,6 +83,8 @@ export function normalizePortalOpsConfig(value: unknown): WorkspaceTwilioOpsConf
       ? value.defaultMessageIntent
       : null;
 
+  const throughput = normalizePortalThroughputConfig({ portalConfig: value });
+
   return {
     ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
     trafficClass: typeof value.trafficClass === "string" ? value.trafficClass : "unknown",
@@ -79,6 +96,11 @@ export function normalizePortalOpsConfig(value: unknown): WorkspaceTwilioOpsConf
     sendMode: value.sendMode === "messaging_service" ? "messaging_service" : "from_number",
     messagingServiceSid: parseOptionalString(value.messagingServiceSid),
     onboardingStatus: typeof value.onboardingStatus === "string" ? value.onboardingStatus : "not_started",
+    smsSenderClass: throughput.smsSenderClass,
+    smsTargetMps: throughput.smsTargetMps,
+    voiceTargetCps: throughput.voiceTargetCps,
+    voiceConcurrentCallLimit: throughput.voiceConcurrentCallLimit,
+    parallelDispatchEnabled: throughput.parallelDispatchEnabled,
     supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
     updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
@@ -92,8 +114,9 @@ export function normalizePortalConfigFromTwilioData(twilioData: unknown) {
   const portalConfig = isRecord(twilioData) && isRecord(twilioData.portalConfig)
     ? twilioData.portalConfig
     : null;
+  const ops = normalizePortalOpsConfig(portalConfig);
   return {
-    ops: normalizePortalOpsConfig(portalConfig),
+    ops,
     throughput: normalizePortalThroughputConfig(twilioData),
   };
 }

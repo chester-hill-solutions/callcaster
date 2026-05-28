@@ -178,6 +178,16 @@ export function useChatsPage() {
     }
   }, [contact_number, navigate, outlet, paginationFetcher.state]);
 
+  const clearUnreadCount = useCallback((number: string) => {
+    setLoadedChats((currentChats) =>
+      currentChats.map((chat) =>
+        phoneNumbersMatch(chat.contact_phone, number)
+          ? { ...chat, unread_count: 0 }
+          : chat,
+      ),
+    );
+  }, []);
+
   useSupabaseRealtimeSubscription({
     supabase,
     table: "message",
@@ -233,13 +243,7 @@ export function useChatsPage() {
         return;
       }
 
-      setLoadedChats((currentChats) =>
-        currentChats.map((chat) =>
-          phoneNumbersMatch(chat.contact_phone, contactPhone)
-            ? { ...chat, unread_count: 0 }
-            : chat,
-        ),
-      );
+      clearUnreadCount(contactPhone);
     },
   });
 
@@ -309,13 +313,7 @@ export function useChatsPage() {
 
   const markConversationRead = useCallback(
     (number: string) => {
-      setLoadedChats((currentChats) =>
-        currentChats.map((chat) =>
-          phoneNumbersMatch(chat.contact_phone, number)
-            ? { ...chat, unread_count: 0 }
-            : chat,
-        ),
-      );
+      clearUnreadCount(number);
 
       supabase
         .from("message")
@@ -339,7 +337,7 @@ export function useChatsPage() {
             logger.error("Error marking messages as read:", err),
         );
     },
-    [supabase, workspace.id],
+    [clearUnreadCount, supabase, workspace.id],
   );
 
   const handleContactSelect = useCallback(
@@ -350,7 +348,6 @@ export function useChatsPage() {
         navigate(`./${number}`);
         markConversationRead(number);
       }
-      return null;
     },
     [closeMobileConversationList, navigate, markConversationRead],
   );
@@ -375,27 +372,6 @@ export function useChatsPage() {
     ],
   );
 
-  const toggleContactMenuAdapter = useCallback(() => {
-    toggleContactMenu();
-    return null;
-  }, [toggleContactMenu]);
-
-  const handleContactSelectAdapter = useCallback(
-    (selected: Contact) => {
-      handleContactSelect(selected);
-      return null;
-    },
-    [handleContactSelect],
-  );
-
-  const handleExistingConversationClickAdapter = useCallback(
-    (nextPhoneNumber: string) => {
-      handleExistingConversationClick(nextPhoneNumber);
-      return null;
-    },
-    [handleExistingConversationClick],
-  );
-
   useEffect(() => {
     const handleMessageRead = (event: Event) => {
       const customEvent = event as CustomEvent<{ contactNumber?: string }>;
@@ -405,13 +381,7 @@ export function useChatsPage() {
         return;
       }
 
-      setLoadedChats((currentChats) =>
-        currentChats.map((chat) =>
-          phoneNumbersMatch(chat.contact_phone, readContactNumber)
-            ? { ...chat, unread_count: 0 }
-            : chat,
-        ),
-      );
+      clearUnreadCount(readContactNumber);
     };
 
     window.addEventListener("message-read", handleMessageRead);
@@ -421,7 +391,7 @@ export function useChatsPage() {
       window.removeEventListener("message-read", handleMessageRead);
       window.removeEventListener("messages-read", handleMessageRead);
     };
-  }, []);
+  }, [clearUnreadCount]);
 
   const updateFilters = useCallback(
     (updater: (params: URLSearchParams) => URLSearchParams) => {
@@ -486,13 +456,13 @@ export function useChatsPage() {
     isValid,
     selectedContact,
     contacts,
-    toggleContactMenuAdapter,
+    toggleContactMenu,
     isContactMenuOpen,
-    handleContactSelectAdapter,
+    handleContactSelect,
     dropdownRef,
     searchError,
     existingConversation: existingConversation as unknown as Chat,
-    handleExistingConversationClickAdapter,
+    handleExistingConversationClick,
     setDialog,
     dialogContact,
     isMobileConversationListOpen,

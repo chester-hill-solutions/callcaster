@@ -13,6 +13,7 @@ import {
   type ClaimedContact,
 } from "../_shared/campaign-dispatch.ts";
 import { parseHandlerOutcome } from "../_shared/handler-response.ts";
+import type { HandlerOutcome } from "../_shared/queue-policy.ts";
 import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 import {
@@ -34,7 +35,7 @@ async function invokeHandler(args: {
   contact: ClaimedContact;
   campaignId: number;
   owner: string | null;
-}): Promise<{ response: Response; outcome: ReturnType<typeof parseHandlerOutcome> extends infer T ? T : never; errorText: string }> {
+}): Promise<{ response: Response; outcome: HandlerOutcome; errorText: string }> {
   const headers = getFunctionHeaders();
   const bodyBase = {
     campaign_id: args.campaignId,

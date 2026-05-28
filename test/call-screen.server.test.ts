@@ -99,7 +99,7 @@ describe("call-screen.server", () => {
         })),
       })),
     };
-    await expect(getQueueByDialType(supabase as never, "1", "invalid", "user-1")).rejects.toBe(
+    await expect(getQueueByDialType(supabase as never, "1", "invalid", "user-1")).rejects.toThrow(
       "Invalid dial type",
     );
   });
@@ -140,7 +140,7 @@ describe("call-screen.server", () => {
       }),
       rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     };
-    await expect(getCallScreenData(supabase as never, "1", "ws-1", "user-1")).rejects.toBe(
+    await expect(getCallScreenData(supabase as never, "1", "ws-1", "user-1")).rejects.toThrow(
       "Error fetching campaign data",
     );
   });

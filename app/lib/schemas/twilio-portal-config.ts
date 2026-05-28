@@ -54,3 +54,64 @@ export function parseTwilioPortalConfigForm(
     parallelDispatchEnabled: formData.get("parallelDispatchEnabled") === "on",
   });
 }
+
+const workspaceOnboardingStatusSchema = z.enum([
+  "not_started",
+  "collecting_business",
+  "provisioning",
+  "submitting",
+  "in_review",
+  "approved",
+  "rejected",
+  "live",
+]);
+
+export const twilioRcsOnboardingFormSchema = z.object({
+  displayName: z.string(),
+  publicDescription: z.string(),
+  logoImageUrl: z.string(),
+  bannerImageUrl: z.string(),
+  accentColor: z.string(),
+  optInPolicyImageUrl: z.string(),
+  useCaseVideoUrl: z.string(),
+  representativeName: z.string(),
+  representativeTitle: z.string(),
+  representativeEmail: z.string(),
+  notificationEmail: z.string(),
+  agentId: z.string().nullable(),
+  senderId: z.string().nullable(),
+  regions: z.array(z.string()),
+  notes: z.string(),
+  status: workspaceOnboardingStatusSchema,
+});
+
+export type TwilioRcsOnboardingFormValues = z.infer<typeof twilioRcsOnboardingFormSchema>;
+
+export function parseTwilioRcsOnboardingForm(formData: FormData): TwilioRcsOnboardingFormValues {
+  const agentId = String(formData.get("rcsAgentId") ?? "").trim();
+  const senderId = String(formData.get("rcsSenderId") ?? "").trim();
+  const statusRaw = String(formData.get("rcsStatus") ?? "in_review");
+  const status = workspaceOnboardingStatusSchema.safeParse(statusRaw);
+
+  return twilioRcsOnboardingFormSchema.parse({
+    displayName: String(formData.get("rcsDisplayName") ?? ""),
+    publicDescription: String(formData.get("rcsPublicDescription") ?? ""),
+    logoImageUrl: String(formData.get("rcsLogoImageUrl") ?? ""),
+    bannerImageUrl: String(formData.get("rcsBannerImageUrl") ?? ""),
+    accentColor: String(formData.get("rcsAccentColor") ?? ""),
+    optInPolicyImageUrl: String(formData.get("rcsOptInPolicyImageUrl") ?? ""),
+    useCaseVideoUrl: String(formData.get("rcsUseCaseVideoUrl") ?? ""),
+    representativeName: String(formData.get("rcsRepresentativeName") ?? ""),
+    representativeTitle: String(formData.get("rcsRepresentativeTitle") ?? ""),
+    representativeEmail: String(formData.get("rcsRepresentativeEmail") ?? ""),
+    notificationEmail: String(formData.get("rcsNotificationEmail") ?? ""),
+    agentId: agentId || null,
+    senderId: senderId || null,
+    regions: String(formData.get("rcsRegions") ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    notes: String(formData.get("rcsNotes") ?? ""),
+    status: status.success ? status.data : "in_review",
+  });
+}

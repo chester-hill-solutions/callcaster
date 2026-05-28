@@ -2,6 +2,11 @@
  * Normalize Twilio SDK / REST failures into user-safe and admin-facing shapes.
  */
 
+import {
+  isRetryableSmsTwilioError,
+  isRetryableVoiceTwilioError,
+} from "../../shared/twilio-retry-predicates";
+
 export type TwilioErrorPresentation = {
   userMessage: string;
   adminDetail: string;
@@ -31,17 +36,12 @@ function readMessage(error: unknown): string {
   return "An unexpected Twilio error occurred.";
 }
 
-/** Whether a Twilio failure is worth retrying (429, 5xx, network). */
+/** Whether a Twilio failure is worth retrying (429, 5xx, network, known transient codes). */
 export function isRetryableTwilioError(error: unknown): boolean {
-  const status = readHttpStatus(error);
-  if (status === 429) return true;
-  if (status != null && status >= 500) return true;
-  const code = readTwilioCode(error);
-  if (code === 20429 || code === 20500 || code === 20503) return true;
-  const message = readMessage(error).toLowerCase();
-  if (message.includes("timeout") || message.includes("econnreset")) return true;
-  return false;
+  return isRetryableSmsTwilioError(error);
 }
+
+export { isRetryableVoiceTwilioError };
 
 export function presentTwilioError(error: unknown): TwilioErrorPresentation {
   const message = readMessage(error);

@@ -11,7 +11,7 @@ import {
   LEGACY_IVR_PIPELINE_CPS,
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
-} from "@/lib/throughput-config.server";
+} from "@/lib/throughput-config";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;

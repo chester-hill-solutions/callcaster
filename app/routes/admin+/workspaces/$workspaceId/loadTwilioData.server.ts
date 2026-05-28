@@ -1,15 +1,14 @@
-import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import {
+  buildDefaultWorkspaceTwilioPortalSnapshot,
+  createWorkspaceTwilioInstance,
+  getWorkspaceTwilioPortalSnapshot,
+} from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE, buildOnboardingStepsForState, deriveWorkspaceMessagingReadiness } from "@/lib/messaging-onboarding.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import type {
-  WorkspaceTwilioOpsConfig,
-  WorkspaceTwilioPortalSnapshot,
-  WorkspaceTwilioSyncSnapshot,
-} from "@/lib/types";
+import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
 
 export interface TwilioPageData {
   twilioAccountInfo: {
@@ -63,86 +62,7 @@ export async function loadTwilioData(
     workspaceId,
   }).catch((error): WorkspaceTwilioPortalSnapshot => {
     logger.error("Error fetching Twilio portal snapshot:", error);
-    const onboarding = {
-      ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      steps: buildOnboardingStepsForState(DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE),
-    };
-    return {
-      config: {
-        trafficClass: "unknown",
-        throughputProduct: "none",
-        multiTenancyMode: "none",
-        trafficShapingEnabled: false,
-        defaultMessageIntent: null,
-        sendMode: "from_number",
-        messagingServiceSid: null,
-        onboardingStatus: "not_started",
-        smsSenderClass: "unknown",
-        smsTargetMps: 1,
-        voiceTargetCps: 1,
-        voiceConcurrentCallLimit: 100,
-        parallelDispatchEnabled: false,
-        supportNotes: "",
-        updatedAt: null,
-        updatedBy: null,
-        auditTrail: [],
-      } satisfies WorkspaceTwilioOpsConfig,
-      effectiveConfig: {
-        trafficClass: "unknown",
-        throughputProduct: "none",
-        multiTenancyMode: "none",
-        trafficShapingEnabled: false,
-        defaultMessageIntent: null,
-        sendMode: "from_number",
-        messagingServiceSid: null,
-        onboardingStatus: "not_started",
-        smsSenderClass: "unknown",
-        smsTargetMps: 1,
-        voiceTargetCps: 1,
-        voiceConcurrentCallLimit: 100,
-        parallelDispatchEnabled: false,
-        supportNotes: "",
-        updatedAt: null,
-        updatedBy: null,
-        auditTrail: [],
-      } satisfies WorkspaceTwilioOpsConfig,
-      detectedTrafficClass: "unknown" as const,
-      metrics: {
-        recentOutboundCount: 0,
-        rawFromCount: 0,
-        messagingServiceCount: 0,
-        statusCounts: {},
-        numberTypes: [],
-        legacyDispatcherSmsMps: 2,
-        configuredDispatcherSmsMps: 2,
-        twilioAssumedSmsMps: 1,
-        legacyDispatcherVoiceCps: 1000 / 700,
-        configuredDispatcherVoiceCps: 1000 / 700,
-        voiceConcurrentCallLimit: 100,
-        parallelDispatchEnabled: false,
-        smsSenderClass: "unknown",
-      },
-      recommendations: [],
-      supportRequestSummary: "Unable to generate a Twilio support summary.",
-      syncSnapshot: {
-        accountStatus: null,
-        accountFriendlyName: null,
-        phoneNumberCount: 0,
-        numberTypes: [],
-        senderTypes: [],
-        recentUsageCount: 0,
-        usageTotalPrice: null,
-        lastSyncedAt: null,
-        lastSyncStatus: "never_synced" as const,
-        lastSyncError: null,
-      } satisfies WorkspaceTwilioSyncSnapshot,
-      onboarding,
-      readiness: deriveWorkspaceMessagingReadiness({
-        onboarding,
-        workspaceNumbers: [],
-        recentOutboundCount: 0,
-      }),
-    };
+    return buildDefaultWorkspaceTwilioPortalSnapshot();
   });
 
   try {

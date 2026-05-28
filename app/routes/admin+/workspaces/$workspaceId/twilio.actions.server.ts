@@ -2,7 +2,7 @@ import { data as routeData, type ActionFunctionArgs } from "react-router";
 
 import { syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { parseTwilioPortalConfigForm } from "@/lib/schemas/twilio-portal-config";
+import { parseTwilioPortalConfigForm, parseTwilioRcsOnboardingForm } from "@/lib/schemas/twilio-portal-config";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
@@ -16,8 +16,6 @@ import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.ser
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
-import { parseOptionalString } from "@/lib/parse-utils.server";
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, user, userData } = await requireSudoAdmin(request);
 
@@ -161,72 +159,28 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "save_workspace_rcs") {
         try {
+            const rcsForm = parseTwilioRcsOnboardingForm(formData);
             await updateWorkspaceRcsOnboarding({
                 supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
                 provider: TWILIO_RCS_PROVIDER,
-                displayName: typeof formData.get("rcsDisplayName") === "string" ? String(formData.get("rcsDisplayName")) : "",
-                publicDescription:
-                    typeof formData.get("rcsPublicDescription") === "string"
-                        ? String(formData.get("rcsPublicDescription"))
-                        : "",
-                logoImageUrl:
-                    typeof formData.get("rcsLogoImageUrl") === "string"
-                        ? String(formData.get("rcsLogoImageUrl"))
-                        : "",
-                bannerImageUrl:
-                    typeof formData.get("rcsBannerImageUrl") === "string"
-                        ? String(formData.get("rcsBannerImageUrl"))
-                        : "",
-                accentColor:
-                    typeof formData.get("rcsAccentColor") === "string"
-                        ? String(formData.get("rcsAccentColor"))
-                        : "",
-                optInPolicyImageUrl:
-                    typeof formData.get("rcsOptInPolicyImageUrl") === "string"
-                        ? String(formData.get("rcsOptInPolicyImageUrl"))
-                        : "",
-                useCaseVideoUrl:
-                    typeof formData.get("rcsUseCaseVideoUrl") === "string"
-                        ? String(formData.get("rcsUseCaseVideoUrl"))
-                        : "",
-                representativeName:
-                    typeof formData.get("rcsRepresentativeName") === "string"
-                        ? String(formData.get("rcsRepresentativeName"))
-                        : "",
-                representativeTitle:
-                    typeof formData.get("rcsRepresentativeTitle") === "string"
-                        ? String(formData.get("rcsRepresentativeTitle"))
-                        : "",
-                representativeEmail:
-                    typeof formData.get("rcsRepresentativeEmail") === "string"
-                        ? String(formData.get("rcsRepresentativeEmail"))
-                        : "",
-                notificationEmail:
-                    typeof formData.get("rcsNotificationEmail") === "string"
-                        ? String(formData.get("rcsNotificationEmail"))
-                        : "",
-                agentId: parseOptionalString(formData.get("rcsAgentId")),
-                senderId: parseOptionalString(formData.get("rcsSenderId")),
-                regions: typeof formData.get("rcsRegions") === "string"
-                    ? String(formData.get("rcsRegions"))
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean)
-                    : [],
-                notes: typeof formData.get("rcsNotes") === "string" ? String(formData.get("rcsNotes")) : "",
-                status:
-                    formData.get("rcsStatus") === "not_started" ||
-                    formData.get("rcsStatus") === "collecting_business" ||
-                    formData.get("rcsStatus") === "provisioning" ||
-                    formData.get("rcsStatus") === "submitting" ||
-                    formData.get("rcsStatus") === "in_review" ||
-                    formData.get("rcsStatus") === "approved" ||
-                    formData.get("rcsStatus") === "rejected" ||
-                    formData.get("rcsStatus") === "live"
-                        ? (formData.get("rcsStatus") as "not_started" | "collecting_business" | "provisioning" | "submitting" | "in_review" | "approved" | "rejected" | "live")
-                        : "in_review",
+                displayName: rcsForm.displayName,
+                publicDescription: rcsForm.publicDescription,
+                logoImageUrl: rcsForm.logoImageUrl,
+                bannerImageUrl: rcsForm.bannerImageUrl,
+                accentColor: rcsForm.accentColor,
+                optInPolicyImageUrl: rcsForm.optInPolicyImageUrl,
+                useCaseVideoUrl: rcsForm.useCaseVideoUrl,
+                representativeName: rcsForm.representativeName,
+                representativeTitle: rcsForm.representativeTitle,
+                representativeEmail: rcsForm.representativeEmail,
+                notificationEmail: rcsForm.notificationEmail,
+                agentId: rcsForm.agentId,
+                senderId: rcsForm.senderId,
+                regions: rcsForm.regions,
+                notes: rcsForm.notes,
+                status: rcsForm.status,
             });
             return routeData({ success: "Workspace RCS state updated" });
         } catch (error) {

@@ -7,7 +7,6 @@ import {
 } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { processUrls } from "@/lib/sms.server";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
@@ -55,7 +54,7 @@ export const sendMessage = async ({
   const statusCallback = `${env.SUPABASE_URL()}/functions/v1/sms-status`;
 
   try {
-    const processedBody = await processUrls(body);
+    const processedBody = body;
 
     const message = await withTwilioRetry(
       () =>

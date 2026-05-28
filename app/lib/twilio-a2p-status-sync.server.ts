@@ -5,9 +5,9 @@ import {
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { patchWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
 import type { TwilioAccountData, WorkspaceOnboardingStatus } from "@/lib/types";
-import { isRecord } from "@/lib/parse-utils.server";
 
 function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
   const normalized = (raw ?? "").toLowerCase();
@@ -54,17 +54,19 @@ export async function syncWorkspaceA2pStatus({
 
   try {
     if (brandSid) {
-      const brand = await (twilio as any).messaging?.v1?.brandRegistrations?.(brandSid)?.fetch?.();
-      brandStatus = mapBrandStatus(brand?.status);
-      if (brand?.failureReason) {
+      const brand = await twilio.messaging.v1.brandRegistrations(brandSid).fetch();
+      brandStatus = mapBrandStatus(brand.status);
+      if (brand.failureReason) {
         rejectionReason = String(brand.failureReason);
       }
     }
     if (campaignSid) {
-      const campaign = await (twilio as any).messaging?.v1?.services?.(
-        onboarding.messagingService.serviceSid ?? "",
-      )?.usAppToPerson?.(campaignSid)?.fetch?.();
-      const rawStatus = campaign?.campaignStatus ?? campaign?.status;
+      const serviceSid = onboarding.messagingService.serviceSid ?? "";
+      const campaign = await twilio.messaging.v1
+        .services(serviceSid)
+        .usAppToPerson(campaignSid)
+        .fetch();
+      const rawStatus = campaign.campaignStatus;
       campaignStatus = mapBrandStatus(rawStatus);
     }
   } catch (syncError) {
@@ -89,17 +91,9 @@ export async function syncWorkspaceA2pStatus({
     lastUpdatedBy: actorUserId,
   });
 
-  const { error: updateError } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data: {
-        ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
-        onboarding: nextOnboarding,
-      } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (updateError) throw updateError;
+  await patchWorkspaceTwilioData(supabaseClient, workspaceId, {
+    onboarding: nextOnboarding,
+  });
 
   return nextOnboarding;
 }

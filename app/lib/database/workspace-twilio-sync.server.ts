@@ -13,6 +13,7 @@ import {
   tollFreeVerificationBlocksBulkSms,
 } from "@/lib/twilio-toll-free.server";
 import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 
 async function syncWorkspaceTwilioBootstrapStateSafely(args: {
   supabaseClient: SupabaseClient<Database>;
@@ -128,33 +129,10 @@ export async function updateWorkspaceTwilioSyncSnapshot({
   workspaceId: string;
   snapshot: WorkspaceTwilioSyncSnapshot;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
-  const nextTwilioData = {
+  await mergeWorkspaceTwilioData(supabaseClient, workspaceId, (currentTwilioData) => ({
     ...currentTwilioData,
     portalSync: normalizeWorkspaceTwilioSyncSnapshot(snapshot),
-  };
-
-  const { error: updateError } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        nextTwilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (updateError) {
-    throw updateError;
-  }
+  }));
 
   return normalizeWorkspaceTwilioSyncSnapshot(snapshot);
 }

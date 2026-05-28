@@ -137,7 +137,7 @@ export async function markCampaignCompleteIfDrained(args: {
   supabase: SupabaseClient;
   campaignId: number;
 }): Promise<boolean> {
-  const { data, error } = await supabase.rpc("try_complete_campaign_if_drained", {
+  const { data, error } = await args.supabase.rpc("try_complete_campaign_if_drained", {
     campaign_id_pro: args.campaignId,
   });
   if (error) throw error;
@@ -149,7 +149,7 @@ export async function requeueContact(args: {
   queueId: number;
   errorText?: string | null;
 }): Promise<RequeueResult> {
-  const { data, error } = await supabase.rpc("requeue_campaign_queue_contact", {
+  const { data, error } = await args.supabase.rpc("requeue_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     error_text: args.errorText ?? null,
   });
@@ -171,7 +171,7 @@ export async function failQueueContact(args: {
   errorText?: string | null;
   dequeuedById?: string | null;
 }): Promise<void> {
-  const { error } = await supabase.rpc("fail_campaign_queue_contact", {
+  const { error } = await args.supabase.rpc("fail_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     error_text: args.errorText ?? null,
     dequeued_by_id: args.dequeuedById ?? null,
@@ -185,7 +185,7 @@ export async function completeQueueContact(args: {
   dequeuedById?: string | null;
   reason?: string;
 }): Promise<void> {
-  const { error } = await supabase.rpc("complete_campaign_queue_contact", {
+  const { error } = await args.supabase.rpc("complete_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     dequeued_by_id: args.dequeuedById ?? null,
     reason_text: args.reason ?? "Dispatched",
@@ -199,7 +199,7 @@ export async function dequeueDuplicateQueueContact(args: {
   dequeuedById?: string | null;
   reason?: string;
 }): Promise<void> {
-  const { error } = await supabase.rpc("dequeue_duplicate_campaign_queue_contact", {
+  const { error } = await args.supabase.rpc("dequeue_duplicate_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     dequeued_by_id: args.dequeuedById ?? null,
     reason_text: args.reason ?? "Duplicate SMS prevented",
@@ -214,7 +214,7 @@ export async function claimCampaignQueueContacts(args: {
   claimLimit: number;
   maxInflight?: number | null;
 }): Promise<ClaimedContact[]> {
-  const { data, error } = await supabase.rpc("claim_campaign_queue_contacts", {
+  const { data, error } = await args.supabase.rpc("claim_campaign_queue_contacts", {
     campaign_id_pro: args.campaignId,
     claimed_by_user_id: args.owner,
     claim_limit: args.claimLimit,

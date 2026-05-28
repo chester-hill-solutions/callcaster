@@ -9,7 +9,7 @@ import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilio
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { processUrls } from "@/lib/sms.server";
+import { bodyHasUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
@@ -109,7 +109,7 @@ const sendMessage = async ({
   });
 
   // Process URLs in the message body to shorten them
-  const processedBody = await processUrls(body);
+  const processedBody = body;
 
   const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
     explicitRequestSid: messagingServiceSidFromRequest,

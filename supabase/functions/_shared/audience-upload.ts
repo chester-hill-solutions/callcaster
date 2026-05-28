@@ -20,15 +20,7 @@ export interface AudienceUploadContact {
 }
 
 export function decodeBase64ToString(base64: string): string {
-  if (typeof atob === "function") {
-    return atob(base64);
-  }
-  // Node fallback
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(base64, "base64").toString("utf8");
-  }
-  throw new Error("No base64 decoder available");
+  return atob(base64);
 }
 
 // Parse a single CSV line, handling quoted fields correctly

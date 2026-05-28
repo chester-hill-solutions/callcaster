@@ -31,28 +31,7 @@ export type WorkspaceTwilioBootstrapResult = {
   driftMessages: string[];
 };
 
-async function persistWorkspaceTwilioData({
-  supabaseClient,
-  workspaceId,
-  twilioData,
-}: {
-  supabaseClient: SupabaseClient<Database>;
-  workspaceId: string;
-  twilioData: Record<string, unknown>;
-}) {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        twilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (error) {
-    throw error;
-  }
-}
-
+import { persistWorkspaceTwilioData as saveWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 function buildBootstrapUrls(callbackBaseUrl: string) {
   return {
     callbackBaseUrl,
@@ -281,13 +260,9 @@ export async function ensureWorkspaceTwilioBootstrap({
 
   const outcome = resolveBootstrapOutcome(nextOnboarding, bootstrapThrew);
 
-  await persistWorkspaceTwilioData({
-    supabaseClient,
-    workspaceId,
-    twilioData: {
-      ...currentTwilioData,
-      onboarding: nextOnboarding,
-    },
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...currentTwilioData,
+    onboarding: nextOnboarding,
   });
 
   return {
@@ -356,13 +331,9 @@ export async function syncWorkspaceTwilioBootstrapState({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await persistWorkspaceTwilioData({
-    supabaseClient,
-    workspaceId,
-    twilioData: {
-      ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
-      onboarding: nextOnboarding,
-    },
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
+    onboarding: nextOnboarding,
   });
 
   return nextOnboarding;
@@ -434,13 +405,9 @@ export async function repairWorkspaceTwilioWebhooks({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await persistWorkspaceTwilioData({
-    supabaseClient,
-    workspaceId,
-    twilioData: {
-      ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
-      onboarding: nextOnboarding,
-    },
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
+    onboarding: nextOnboarding,
   });
 
   return { repaired, onboarding: nextOnboarding };

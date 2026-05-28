@@ -3,6 +3,7 @@
     "app/env.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
+    "shared/**/*.ts",
     ".react-router/types/**/*"
   ],
   "exclude": [

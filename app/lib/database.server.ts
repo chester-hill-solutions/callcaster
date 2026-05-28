@@ -34,7 +34,7 @@ export {
   updateWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioSyncSnapshot,
   syncWorkspaceTwilioSnapshot,
-  detectTwilioTrafficClass,
+  buildDefaultWorkspaceTwilioPortalSnapshot,
   getWorkspaceTwilioPortalSnapshot,
   removeWorkspacePhoneNumber,
   updateCallerId,

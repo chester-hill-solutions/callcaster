@@ -2,12 +2,13 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../database.types";
 import {
   type TwilioAccountData,
-  type TwilioTrafficClass,
   type WorkspaceTwilioPortalMetrics,
 } from "../types";
 import {
   deriveWorkspaceMessagingReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
+  buildOnboardingStepsForState,
+  DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
 } from "@/lib/messaging-onboarding.server";
 import {
   detectTwilioTrafficClassFromSenderTypes,
@@ -23,17 +24,53 @@ import {
 import {
   getEffectiveWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
+  DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
 } from "./workspace-twilio-config.server";
-import { getWorkspaceTwilioSyncSnapshotFromTwilioData } from "./workspace-twilio-sync.server";
+import {
+  DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT,
+  getWorkspaceTwilioSyncSnapshotFromTwilioData,
+} from "./workspace-twilio-sync.server";
+import type { WorkspaceTwilioPortalSnapshot } from "../types";
 import {
   buildTwilioPortalRecommendations,
   buildTwilioSupportRequestSummary,
 } from "./workspace-twilio-recommendations.server";
 
-export function detectTwilioTrafficClass(
-  senderTypes: string[],
-): TwilioTrafficClass {
-  return detectTwilioTrafficClassFromSenderTypes(senderTypes);
+export function buildDefaultWorkspaceTwilioPortalSnapshot(): WorkspaceTwilioPortalSnapshot {
+  const onboarding = {
+    ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+    steps: buildOnboardingStepsForState(DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE),
+  };
+
+  return {
+    config: DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
+    effectiveConfig: DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
+    detectedTrafficClass: "unknown",
+    metrics: {
+      recentOutboundCount: 0,
+      rawFromCount: 0,
+      messagingServiceCount: 0,
+      statusCounts: {},
+      numberTypes: [],
+      legacyDispatcherSmsMps: LEGACY_MESSAGE_PIPELINE_MPS,
+      configuredDispatcherSmsMps: LEGACY_MESSAGE_PIPELINE_MPS,
+      twilioAssumedSmsMps: 1,
+      legacyDispatcherVoiceCps: LEGACY_IVR_PIPELINE_CPS,
+      configuredDispatcherVoiceCps: LEGACY_IVR_PIPELINE_CPS,
+      voiceConcurrentCallLimit: DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG.voiceConcurrentCallLimit,
+      parallelDispatchEnabled: false,
+      smsSenderClass: "unknown",
+    },
+    recommendations: [],
+    supportRequestSummary: "Unable to generate a Twilio support summary.",
+    syncSnapshot: DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT,
+    onboarding,
+    readiness: deriveWorkspaceMessagingReadiness({
+      onboarding,
+      workspaceNumbers: [],
+      recentOutboundCount: 0,
+    }),
+  };
 }
 
 export async function getWorkspaceTwilioPortalSnapshot({
@@ -90,7 +127,7 @@ export async function getWorkspaceTwilioPortalSnapshot({
             (value): value is string =>
               typeof value === "string" && value.length > 0,
           );
-  const detectedTrafficClass = detectTwilioTrafficClass(senderTypes);
+  const detectedTrafficClass = detectTwilioTrafficClassFromSenderTypes(senderTypes);
   const statusCounts = (recentMessages ?? []).reduce<
     WorkspaceTwilioPortalMetrics["statusCounts"]
   >((acc, message) => {

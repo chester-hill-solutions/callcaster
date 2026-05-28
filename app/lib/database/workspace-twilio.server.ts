@@ -22,6 +22,6 @@ export {
 } from "./workspace-twilio-recommendations.server";
 
 export {
-  detectTwilioTrafficClass,
+  buildDefaultWorkspaceTwilioPortalSnapshot,
   getWorkspaceTwilioPortalSnapshot,
 } from "./workspace-twilio-portal-snapshot.server";

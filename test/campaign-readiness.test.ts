@@ -209,9 +209,9 @@ describe("app/lib/campaign-readiness.ts", () => {
 
   test("filters content readiness issues for the detailed settings section", () => {
     const issues = getCampaignContentReadinessIssues([
-      "Script is required",
-      "An outbound phone number is required",
-      "Message content or media is required",
+      { code: "script_required", message: "Script is required" },
+      { code: "outbound_number_required", message: "An outbound phone number is required" },
+      { code: "message_content_required", message: "Message content or media is required" },
     ]);
 
     expect(issues).toEqual([

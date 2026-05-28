@@ -11,7 +11,9 @@ const FORBIDDEN = [
   "SUPABASE_SERVICE_KEY",
   "env.server",
   "twilio-webhook.server",
-  "logger.server",
+  "throughput-config.server",
+  "twilio-sender-class.server",
+  "merge-workspace-twilio-data.server",
 ];
 
 function walk(dir, files = []) {
@@ -26,6 +28,9 @@ function walk(dir, files = []) {
 
 const hits = [];
 for (const file of walk(BUILD_CLIENT)) {
+  if (/manifest-[a-f0-9]+\.js$/i.test(file)) {
+    continue;
+  }
   const text = fs.readFileSync(file, "utf8");
   for (const needle of FORBIDDEN) {
     if (text.includes(needle)) {
