@@ -476,11 +476,15 @@ export type Database = {
       campaign_queue: {
         Row: {
           assigned_to_user_id: string | null;
+          attempt_count: number;
           attempts: number;
           campaign_id: number;
+          claimed_at: string | null;
           contact_id: number;
           created_at: string;
           id: number;
+          last_attempt_at: string | null;
+          last_attempt_error: string | null;
           provider_status: string | null;
           queue_order: number | null;
           queue_state: string | null;
@@ -491,11 +495,15 @@ export type Database = {
         };
         Insert: {
           assigned_to_user_id?: string | null;
+          attempt_count?: number;
           attempts?: number;
           campaign_id: number;
+          claimed_at?: string | null;
           contact_id: number;
           created_at?: string;
           id?: number;
+          last_attempt_at?: string | null;
+          last_attempt_error?: string | null;
           provider_status?: string | null;
           queue_order?: number | null;
           queue_state?: string | null;
@@ -506,11 +514,15 @@ export type Database = {
         };
         Update: {
           assigned_to_user_id?: string | null;
+          attempt_count?: number;
           attempts?: number;
           campaign_id?: number;
+          claimed_at?: string | null;
           contact_id?: number;
           created_at?: string;
           id?: number;
+          last_attempt_at?: string | null;
+          last_attempt_error?: string | null;
           provider_status?: string | null;
           queue_order?: number | null;
           queue_state?: string | null;
@@ -2189,6 +2201,63 @@ export type Database = {
         };
         Returns: Database["public"]["CompositeTypes"]["campaigndata"][];
       };
+      campaign_queue_has_pending_work: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: boolean;
+      };
+      claim_campaign_queue_contacts: {
+        Args: {
+          campaign_id_pro: number;
+          claimed_by_user_id: string;
+          claim_limit?: number;
+          max_inflight?: number;
+        };
+        Returns: {
+          id: number;
+          contact_id: number;
+          phone: string;
+          workspace: string;
+          caller_id: string;
+        }[];
+      };
+      complete_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          dequeued_by_id?: string;
+          reason_text?: string;
+        };
+        Returns: undefined;
+      };
+      count_active_ivr_campaign_calls: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: number;
+      };
+      dequeue_duplicate_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          dequeued_by_id?: string;
+          reason_text?: string;
+        };
+        Returns: undefined;
+      };
+      fail_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          error_text?: string;
+          dequeued_by_id?: string;
+        };
+        Returns: undefined;
+      };
+      fail_exhausted_campaign_queue_contacts: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: number;
+      };
       get_campaign_queue: {
         Args: {
           campaign_id_pro: number;
@@ -2200,6 +2269,26 @@ export type Database = {
           workspace: string;
           caller_id: string;
         }[];
+      };
+      requeue_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          error_text?: string;
+        };
+        Returns: string;
+      };
+      reset_stale_campaign_queue_claims: {
+        Args: {
+          campaign_id_pro: number;
+          stale_after?: unknown;
+        };
+        Returns: number;
+      };
+      try_complete_campaign_if_drained: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: boolean;
       };
       get_campaign_stats: {
         Args: {

@@ -4,6 +4,7 @@ import type {
   TwilioTrafficClass,
   WorkspaceTwilioOpsConfig,
 } from "@/lib/types";
+import { inferSmsSenderClassFromSenderTypes } from "@/lib/twilio-sender-class.server";
 
 export const LEGACY_MESSAGE_PIPELINE_MPS = 2;
 export const LEGACY_IVR_PIPELINE_CPS = 1000 / 700;
@@ -39,27 +40,7 @@ export function defaultVoiceConcurrentCallLimit(): number {
 export function inferSmsSenderClassFromNumberTypes(
   numberTypes: string[],
 ): TwilioSmsSenderClass {
-  const normalized = numberTypes.map((value) => value.toLowerCase());
-  if (normalized.some((value) => value.includes("short"))) {
-    return "ca_short_code";
-  }
-  if (normalized.some((value) => value.includes("toll"))) {
-    return "verified_toll_free";
-  }
-  if (normalized.some((value) => value.includes("10dlc"))) {
-    return "us_a2p10dlc";
-  }
-  if (
-    normalized.some(
-      (value) =>
-        value.includes("local") ||
-        value.includes("mobile") ||
-        value.includes("long"),
-    )
-  ) {
-    return "ca_local";
-  }
-  return "unknown";
+  return inferSmsSenderClassFromSenderTypes(numberTypes);
 }
 
 export function twilioAssumedSmsMps(args: {

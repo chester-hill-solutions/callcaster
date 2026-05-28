@@ -23,6 +23,7 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
+  getEffectiveWorkspaceTwilioPortalConfig,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   detectTwilioTrafficClass,

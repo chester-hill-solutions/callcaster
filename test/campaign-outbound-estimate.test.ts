@@ -6,36 +6,25 @@ import {
   IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND,
   MESSAGE_PIPELINE_MESSAGES_PER_SECOND,
 } from "../app/lib/campaign-outbound-estimate";
-import type {
-  WorkspaceTwilioOpsConfig,
-  WorkspaceTwilioSyncSnapshot,
-} from "../app/lib/types";
+import type { WorkspaceTwilioSyncSnapshot } from "../app/lib/types";
+import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
-const basePortalConfig: WorkspaceTwilioOpsConfig = {
+const basePortalConfig = makePortalConfig({
   trafficClass: "short_code",
   throughputProduct: "account_based_throughput",
-  multiTenancyMode: "none",
-  trafficShapingEnabled: false,
-  defaultMessageIntent: null,
   sendMode: "messaging_service",
   messagingServiceSid: "MG123",
   onboardingStatus: "enabled",
   smsSenderClass: "ca_short_code",
   smsTargetMps: 100,
-  voiceTargetCps: 1,
-  voiceConcurrentCallLimit: 100,
-  parallelDispatchEnabled: false,
-  supportNotes: "",
-  updatedAt: null,
-  updatedBy: null,
-  auditTrail: [],
-};
+});
 
 const baseSyncSnapshot: WorkspaceTwilioSyncSnapshot = {
   accountStatus: null,
   accountFriendlyName: null,
   phoneNumberCount: 10,
   numberTypes: [],
+  senderTypes: [],
   recentUsageCount: 0,
   usageTotalPrice: null,
   lastSyncedAt: null,
@@ -138,14 +127,20 @@ describe("campaign-outbound-estimate", () => {
     expect(estimate.senderContextLabel).toContain("+15551112222");
   });
 
-  test("messaging_service mode prefers selected service SID in context label", () => {
+  test("parallel dispatch estimate uses configured dispatcher rates", () => {
     const estimate = estimateMessageCampaignOutbound({
-      portalConfig: basePortalConfig,
+      portalConfig: {
+        ...basePortalConfig,
+        parallelDispatchEnabled: true,
+        smsTargetMps: 3,
+      },
       syncSnapshot: baseSyncSnapshot,
       smsCapableLocalNumbers: 2,
-      selectedMessagingServiceSid: "MG_SELECTED",
     });
 
-    expect(estimate.senderContextLabel).toContain("MG_SELECTED");
+    expect(estimate.configuredDispatcherMessagesPerSecond).toBe(3);
+    expect(estimate.warnings.some((warning) =>
+      warning.includes("Legacy sequential dispatch"),
+    )).toBe(false);
   });
 });

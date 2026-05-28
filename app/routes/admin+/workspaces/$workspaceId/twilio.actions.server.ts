@@ -2,6 +2,7 @@ import { data as routeData, type ActionFunctionArgs } from "react-router";
 
 import { syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
+import { parseTwilioPortalConfigForm } from "@/lib/schemas/twilio-portal-config";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
@@ -13,32 +14,9 @@ import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server"
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import type {
-  TwilioSmsSenderClass,
-  WorkspaceTwilioOpsConfig,
-} from "@/lib/types";
-import { TWILIO_SMS_SENDER_CLASS_VALUES } from "@/lib/types";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
-
 import { parseOptionalString } from "@/lib/parse-utils.server";
-
-function parsePositiveNumber(
-  value: FormDataEntryValue | null,
-  fallback: number,
-): number {
-  const parsed = Number(String(value ?? "").trim());
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function parseSmsSenderClass(
-  value: FormDataEntryValue | null,
-): TwilioSmsSenderClass {
-  const raw = String(value ?? "").trim();
-  return TWILIO_SMS_SENDER_CLASS_VALUES.includes(raw as TwilioSmsSenderClass)
-    ? (raw as TwilioSmsSenderClass)
-    : "unknown";
-}
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, user, userData } = await requireSudoAdmin(request);
@@ -265,30 +243,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     try {
+        const updates = parseTwilioPortalConfigForm(formData);
         await updateWorkspaceTwilioPortalConfig({
             supabaseClient,
             workspaceId,
             actorUserId: user.id,
             actorUsername: userData.username ?? null,
-            updates: {
-                trafficClass: formData.get("trafficClass") as WorkspaceTwilioOpsConfig["trafficClass"],
-                throughputProduct: formData.get("throughputProduct") as WorkspaceTwilioOpsConfig["throughputProduct"],
-                multiTenancyMode: formData.get("multiTenancyMode") as WorkspaceTwilioOpsConfig["multiTenancyMode"],
-                trafficShapingEnabled: formData.get("trafficShapingEnabled") === "on",
-                defaultMessageIntent: parseOptionalString(formData.get("defaultMessageIntent")) as WorkspaceTwilioOpsConfig["defaultMessageIntent"],
-                sendMode: formData.get("sendMode") as WorkspaceTwilioOpsConfig["sendMode"],
-                messagingServiceSid: parseOptionalString(formData.get("messagingServiceSid")),
-                onboardingStatus: formData.get("onboardingStatus") as WorkspaceTwilioOpsConfig["onboardingStatus"],
-                supportNotes: typeof formData.get("supportNotes") === "string" ? String(formData.get("supportNotes")) : "",
-                smsSenderClass: parseSmsSenderClass(formData.get("smsSenderClass")),
-                smsTargetMps: parsePositiveNumber(formData.get("smsTargetMps"), 1),
-                voiceTargetCps: parsePositiveNumber(formData.get("voiceTargetCps"), 1),
-                voiceConcurrentCallLimit: Math.floor(
-                  parsePositiveNumber(formData.get("voiceConcurrentCallLimit"), 100),
-                ),
-                parallelDispatchEnabled:
-                  formData.get("parallelDispatchEnabled") === "on",
-            },
+            updates,
         });
 
         return routeData({ success: "Twilio portal settings updated" });

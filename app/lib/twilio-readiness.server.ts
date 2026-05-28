@@ -4,7 +4,11 @@ import {
   getWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
-import { getWorkspaceTwilioPortalConfig } from "@/lib/database.server";
+import {
+  getWorkspaceTwilioPortalConfig,
+  getWorkspaceTwilioSyncSnapshotFromTwilioData,
+} from "@/lib/database.server";
+import type { TwilioAccountData } from "@/lib/types";
 
 export class WorkspaceSmsNotReadyError extends Error {
   readonly reasons: string[];
@@ -26,11 +30,20 @@ export async function assertWorkspaceCanSendSms({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<void> {
-  const [onboarding, portalConfig, senderPool] = await Promise.all([
+  const [onboarding, portalConfig, senderPool, workspaceRow] = await Promise.all([
     getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
     getWorkspaceTwilioPortalConfig({ supabaseClient, workspaceId }),
     verifyWorkspaceMessagingSenderPool({ supabaseClient, workspaceId }),
+    supabaseClient
+      .from("workspace")
+      .select("twilio_data")
+      .eq("id", workspaceId)
+      .single(),
   ]);
+
+  const syncSnapshot = getWorkspaceTwilioSyncSnapshotFromTwilioData(
+    (workspaceRow.data?.twilio_data ?? null) as TwilioAccountData,
+  );
 
   const reasons: string[] = [];
 
@@ -59,6 +72,12 @@ export async function assertWorkspaceCanSendSms({
     onboarding.a2p10dlc.status !== "live"
   ) {
     reasons.push("A2P 10DLC registration is not approved yet.");
+  }
+
+  if (syncSnapshot.tollFreeVerificationBlocked) {
+    reasons.push(
+      "Toll-free verification is pending or rejected. Bulk SMS is blocked until Twilio approves verification.",
+    );
   }
 
   if (reasons.length > 0) {

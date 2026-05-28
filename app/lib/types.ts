@@ -247,16 +247,23 @@ export interface WorkspaceTwilioSyncSnapshot {
   accountStatus: string | null;
   accountFriendlyName: string | null;
   phoneNumberCount: number;
+  /** Capability flags observed on workspace numbers (sms, mms, voice). */
   numberTypes: string[];
+  /** Twilio sender taxonomy inferred from phone inventory (toll_free, local, …). */
+  senderTypes: string[];
   recentUsageCount: number;
   usageTotalPrice: number | null;
   lastSyncedAt: string | null;
   lastSyncStatus: WorkspaceTwilioSyncStatus;
   lastSyncError: string | null;
+  /** True when toll-free verification blocks bulk SMS for synced inventory. */
+  tollFreeVerificationBlocked?: boolean;
 }
 
 export interface WorkspaceTwilioPortalSnapshot {
   config: WorkspaceTwilioOpsConfig;
+  /** Onboarding/provisioning overrides applied at runtime for send routing. */
+  effectiveConfig: WorkspaceTwilioOpsConfig;
   onboarding: WorkspaceMessagingOnboardingState;
   readiness: WorkspaceMessagingReadiness;
   detectedTrafficClass: TwilioTrafficClass;

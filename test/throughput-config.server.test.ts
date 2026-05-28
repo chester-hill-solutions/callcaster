@@ -10,8 +10,47 @@ import {
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "../app/lib/throughput-config.server";
+import { throughputConfigVectors } from "./fixtures/throughput-config-vectors";
 
 describe("throughput-config.server", () => {
+  test("golden vectors", () => {
+    for (const vector of throughputConfigVectors) {
+      switch (vector.id) {
+        case "legacy-sms-dispatcher":
+        case "parallel-sms-dispatcher":
+          expect(
+            configuredDispatcherSmsMps(vector.input),
+            vector.id,
+          ).toBe(vector.expected.configuredDispatcherSmsMps);
+          break;
+        case "legacy-voice-dispatcher":
+        case "parallel-voice-dispatcher":
+          expect(
+            configuredDispatcherVoiceCps(vector.input),
+            vector.id,
+          ).toBe(vector.expected.configuredDispatcherVoiceCps);
+          break;
+        case "claim-batch-low-rate":
+        case "claim-batch-at-rate":
+        case "claim-batch-capped":
+          expect(
+            claimBatchSizeForRate(vector.input.rate, vector.input.tickMs),
+            vector.id,
+          ).toBe(vector.expected.claimBatchSize);
+          break;
+        case "default-sms-mps-toll-free":
+        case "default-sms-mps-short-code":
+          expect(
+            defaultSmsTargetMps(vector.input.senderClass as never),
+            vector.id,
+          ).toBe(vector.expected.defaultSmsTargetMps);
+          break;
+        default:
+          break;
+      }
+    }
+  });
+
   test("legacy dispatcher rates when parallel dispatch is disabled", () => {
     expect(
       configuredDispatcherSmsMps({
@@ -40,18 +79,6 @@ describe("throughput-config.server", () => {
         voiceTargetCps: 5,
       }),
     ).toBe(5);
-  });
-
-  test("claim batch size scales with target rate", () => {
-    expect(claimBatchSizeForRate(2, 1000)).toBe(2);
-    expect(claimBatchSizeForRate(0.5, 1000)).toBe(1);
-    expect(claimBatchSizeForRate(25, 1000)).toBe(25);
-  });
-
-  test("default SMS MPS by sender class", () => {
-    expect(defaultSmsTargetMps("ca_short_code")).toBe(100);
-    expect(defaultSmsTargetMps("verified_toll_free")).toBe(3);
-    expect(defaultSmsTargetMps("ca_local")).toBe(1);
   });
 
   test("bulk SMS misalignment warns on CA local at volume", () => {

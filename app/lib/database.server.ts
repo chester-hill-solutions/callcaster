@@ -27,6 +27,7 @@ export {
   createWorkspaceTwilioInstance,
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
+  getEffectiveWorkspaceTwilioPortalConfig,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   getWorkspaceTwilioPortalConfig,

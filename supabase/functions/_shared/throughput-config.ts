@@ -13,9 +13,13 @@ export type WorkspaceThroughputPortalConfig = {
   parallelDispatchEnabled: boolean;
 };
 
-export const MAX_QUEUE_ATTEMPTS = 5;
-export const STALE_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
-export const DISPATCH_TICK_MS = 1000;
+import {
+  DISPATCH_TICK_MS,
+  MAX_QUEUE_ATTEMPTS,
+  STALE_CLAIM_TIMEOUT_MS,
+} from "./queue-policy.ts";
+
+export { DISPATCH_TICK_MS, MAX_QUEUE_ATTEMPTS, STALE_CLAIM_TIMEOUT_MS };
 export const LEGACY_MESSAGE_PIPELINE_MPS = 2;
 export const LEGACY_IVR_PIPELINE_CPS = 1000 / 700;
 

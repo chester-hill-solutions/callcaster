@@ -4,8 +4,10 @@ export type TwilioRetryOptions = {
   operation: string;
 };
 
-const DEFAULT_MAX_ATTEMPTS = 3;
-const DEFAULT_BASE_DELAY_MS = 250;
+import {
+  PROVIDER_BASE_DELAY_MS,
+  PROVIDER_MAX_ATTEMPTS,
+} from "./queue-policy.ts";
 
 function readCode(error: unknown): number | null {
   if (!error || typeof error !== "object") return null;
@@ -62,8 +64,8 @@ export async function withTwilioRetry<T>(
     isRetryable?: (error: unknown) => boolean;
   },
 ): Promise<T> {
-  const maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const baseDelayMs = options.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
+  const maxAttempts = options.maxAttempts ?? PROVIDER_MAX_ATTEMPTS;
+  const baseDelayMs = options.baseDelayMs ?? PROVIDER_BASE_DELAY_MS;
   const isRetryable = options.isRetryable ?? isRetryableSmsTwilioError;
   let lastError: unknown;
 

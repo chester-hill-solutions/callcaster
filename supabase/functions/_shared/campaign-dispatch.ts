@@ -3,10 +3,13 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
   configuredDispatcherVoiceCps,
-  DISPATCH_TICK_MS,
   normalizePortalThroughputConfig,
   type WorkspaceThroughputPortalConfig,
 } from "./throughput-config.ts";
+import {
+  DISPATCH_TICK_MS,
+  type RequeueResult,
+} from "./queue-policy.ts";
 
 export type DispatchMode = "legacy" | "parallel";
 
@@ -87,6 +90,24 @@ export function resolveClaimLimit(args: {
   return 1;
 }
 
+export function resolveIvrClaimLimit(args: {
+  config: WorkspaceThroughputPortalConfig;
+  activeCalls: number;
+}): number {
+  const rateLimit = resolveClaimLimit({
+    campaignType: "robocall",
+    config: args.config,
+  });
+  const headroom = Math.max(
+    0,
+    args.config.voiceConcurrentCallLimit - args.activeCalls,
+  );
+  if (headroom <= 0) {
+    return 0;
+  }
+  return Math.min(rateLimit, headroom);
+}
+
 export async function scheduleNextDispatch(args: {
   fetchImpl: typeof fetch;
   queueNextUrl: string;
@@ -116,33 +137,32 @@ export async function markCampaignCompleteIfDrained(args: {
   supabase: SupabaseClient;
   campaignId: number;
 }): Promise<boolean> {
-  const pending = await campaignHasPendingWork(args.supabase, args.campaignId);
-  if (pending) {
-    return false;
-  }
-
-  const { error } = await args.supabase
-    .from("campaign")
-    .update({ status: "complete" })
-    .eq("id", args.campaignId);
-
-  if (error) {
-    throw error;
-  }
-
-  return true;
+  const { data, error } = await supabase.rpc("try_complete_campaign_if_drained", {
+    campaign_id_pro: args.campaignId,
+  });
+  if (error) throw error;
+  return Boolean(data);
 }
 
 export async function requeueContact(args: {
   supabase: SupabaseClient;
   queueId: number;
   errorText?: string | null;
-}): Promise<void> {
-  const { error } = await args.supabase.rpc("requeue_campaign_queue_contact", {
+}): Promise<RequeueResult> {
+  const { data, error } = await supabase.rpc("requeue_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     error_text: args.errorText ?? null,
   });
   if (error) throw error;
+  const result = String(data ?? "requeued");
+  if (
+    result === "requeued" ||
+    result === "failed_max_attempts" ||
+    result === "not_found"
+  ) {
+    return result;
+  }
+  return "requeued";
 }
 
 export async function failQueueContact(args: {
@@ -151,7 +171,7 @@ export async function failQueueContact(args: {
   errorText?: string | null;
   dequeuedById?: string | null;
 }): Promise<void> {
-  const { error } = await args.supabase.rpc("fail_campaign_queue_contact", {
+  const { error } = await supabase.rpc("fail_campaign_queue_contact", {
     queue_id_pro: args.queueId,
     error_text: args.errorText ?? null,
     dequeued_by_id: args.dequeuedById ?? null,
@@ -165,18 +185,41 @@ export async function completeQueueContact(args: {
   dequeuedById?: string | null;
   reason?: string;
 }): Promise<void> {
-  const { error } = await args.supabase
-    .from("campaign_queue")
-    .update({
-      status: "dequeued",
-      queue_state: "dequeued",
-      assigned_to_user_id: null,
-      provider_status: null,
-      dequeued_by: args.dequeuedById ?? null,
-      dequeued_at: new Date().toISOString(),
-      dequeued_reason: args.reason ?? "Dispatched",
-    })
-    .eq("id", args.queueId);
-
+  const { error } = await supabase.rpc("complete_campaign_queue_contact", {
+    queue_id_pro: args.queueId,
+    dequeued_by_id: args.dequeuedById ?? null,
+    reason_text: args.reason ?? "Dispatched",
+  });
   if (error) throw error;
+}
+
+export async function dequeueDuplicateQueueContact(args: {
+  supabase: SupabaseClient;
+  queueId: number;
+  dequeuedById?: string | null;
+  reason?: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("dequeue_duplicate_campaign_queue_contact", {
+    queue_id_pro: args.queueId,
+    dequeued_by_id: args.dequeuedById ?? null,
+    reason_text: args.reason ?? "Duplicate SMS prevented",
+  });
+  if (error) throw error;
+}
+
+export async function claimCampaignQueueContacts(args: {
+  supabase: SupabaseClient;
+  campaignId: number;
+  owner: string | null;
+  claimLimit: number;
+  maxInflight?: number | null;
+}): Promise<ClaimedContact[]> {
+  const { data, error } = await supabase.rpc("claim_campaign_queue_contacts", {
+    campaign_id_pro: args.campaignId,
+    claimed_by_user_id: args.owner,
+    claim_limit: args.claimLimit,
+    max_inflight: args.maxInflight ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as ClaimedContact[];
 }

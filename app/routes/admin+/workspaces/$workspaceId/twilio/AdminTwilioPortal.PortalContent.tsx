@@ -13,6 +13,7 @@ import { UsagePanel } from "./AdminTwilioPortal.UsagePanel";
 export function PortalContent({ data }: { data: TwilioPageData }) {
     const {
         config,
+        effectiveConfig,
         detectedTrafficClass,
         metrics,
         recommendations,
@@ -28,6 +29,7 @@ export function PortalContent({ data }: { data: TwilioPageData }) {
             <HealthPanel onboarding={onboarding} syncSnapshot={syncSnapshot} />
             <SendingSetupPanel
                 config={config}
+                effectiveConfig={effectiveConfig}
                 detectedTrafficClass={detectedTrafficClass}
                 metrics={metrics}
                 syncSnapshot={syncSnapshot}

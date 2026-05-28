@@ -1,22 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
 import {
-  completeQueueContact,
+  claimCampaignQueueContacts,
   countActiveIvrCampaignCalls,
   loadWorkspaceThroughputConfig,
   markCampaignCompleteIfDrained,
-  requeueContact,
   resetStaleClaims,
   resolveClaimLimit,
   resolveDispatchMode,
+  resolveIvrClaimLimit,
   scheduleNextDispatch,
   type ClaimedContact,
 } from "../_shared/campaign-dispatch.ts";
+import { parseHandlerOutcome } from "../_shared/handler-response.ts";
 import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
-import { DISPATCH_TICK_MS } from "../_shared/throughput-config.ts";
-
-const LEGACY_QUEUE_DELAY_MS = 200;
+import {
+  DISPATCH_TICK_MS,
+  LEGACY_QUEUE_DELAY_MS,
+} from "../_shared/queue-policy.ts";
 
 type CampaignRow = {
   is_active: boolean;
@@ -32,8 +34,7 @@ async function invokeHandler(args: {
   contact: ClaimedContact;
   campaignId: number;
   owner: string | null;
-  dispatchMode: "legacy" | "parallel";
-}): Promise<Response> {
+}): Promise<{ response: Response; outcome: ReturnType<typeof parseHandlerOutcome> extends infer T ? T : never; errorText: string }> {
   const headers = getFunctionHeaders();
   const bodyBase = {
     campaign_id: args.campaignId,
@@ -43,11 +44,11 @@ async function invokeHandler(args: {
     queue_id: args.contact.id,
     user_id: args.owner,
     owner: args.owner,
-    dispatch_mode: args.dispatchMode,
   };
 
+  let response: Response;
   if (args.campaign.type === "robocall") {
-    return fetch(getFunctionUrl("ivr-handler"), {
+    response = await fetch(getFunctionUrl("ivr-handler"), {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -56,10 +57,8 @@ async function invokeHandler(args: {
         type: args.campaign.type,
       }),
     });
-  }
-
-  if (args.campaign.type === "message") {
-    return fetch(getFunctionUrl("sms-handler"), {
+  } else if (args.campaign.type === "message") {
+    response = await fetch(getFunctionUrl("sms-handler"), {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -69,78 +68,51 @@ async function invokeHandler(args: {
         sms_messaging_service_sid: args.campaign.sms_messaging_service_sid,
       }),
     });
+  } else {
+    throw new Error(`Unknown campaign type: ${args.campaign.type}`);
   }
 
-  throw new Error(`Unknown campaign type: ${args.campaign.type}`);
+  const errorText = await response.text();
+  const outcome = parseHandlerOutcome(response, errorText);
+  return { response, outcome, errorText };
 }
 
-async function handleLegacyDispatch(args: {
-  supabase: ReturnType<typeof createClient>;
-  campaign: CampaignRow;
-  campaignId: number;
-  owner: string | null;
-  contact: ClaimedContact;
-}): Promise<Response> {
-  await new Promise((resolve) => setTimeout(resolve, LEGACY_QUEUE_DELAY_MS));
-
-  const response = await invokeHandler({
-    campaign: args.campaign,
-    contact: args.contact,
-    campaignId: args.campaignId,
-    owner: args.owner,
-    dispatchMode: "legacy",
-  });
-
-  if (!response.ok) {
-    await args.supabase.rpc("handle_campaign_queue_entry", {
-      p_contact_id: args.contact.contact_id,
-      p_campaign_id: Number(args.campaignId),
-      p_requeue: true,
-    });
-    throw new Error(`handler failed with status ${response.status}`);
-  }
-
-  return new Response(JSON.stringify([args.contact]), {
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-async function handleParallelDispatch(args: {
+async function dispatchContacts(args: {
   supabase: ReturnType<typeof createClient>;
   campaign: CampaignRow;
   campaignId: number;
   owner: string | null;
   contacts: ClaimedContact[];
-}): Promise<Response> {
+  legacyDelayMs?: number;
+}): Promise<{ attempted: number; failed: number }> {
+  if (args.legacyDelayMs) {
+    await new Promise((resolve) => setTimeout(resolve, args.legacyDelayMs));
+  }
+
   const results = await Promise.allSettled(
     args.contacts.map(async (contact) => {
-      const response = await invokeHandler({
+      const { outcome, errorText } = await invokeHandler({
         campaign: args.campaign,
         contact,
         campaignId: args.campaignId,
         owner: args.owner,
-        dispatchMode: "parallel",
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        await requeueContact({
-          supabase: args.supabase,
-          queueId: contact.id,
-          errorText: errorText.slice(0, 500),
-        });
-        throw new Error(errorText);
+      if (outcome === "retryable_failure" || outcome === "permanent_failure") {
+        throw new Error(errorText.slice(0, 500) || outcome);
       }
     }),
   );
 
   const failed = results.filter((result) => result.status === "rejected").length;
-  console.log("Parallel dispatch batch complete", {
-    campaignId: args.campaignId,
-    attempted: args.contacts.length,
-    failed,
-  });
+  return { attempted: args.contacts.length, failed };
+}
 
+async function finishDispatchTick(args: {
+  supabase: ReturnType<typeof createClient>;
+  campaignId: number;
+  owner: string | null;
+}): Promise<boolean> {
   const completed = await markCampaignCompleteIfDrained({
     supabase: args.supabase,
     campaignId: args.campaignId,
@@ -157,14 +129,7 @@ async function handleParallelDispatch(args: {
     });
   }
 
-  return new Response(
-    JSON.stringify({
-      status: completed ? "campaign_completed" : "batch_dispatched",
-      attempted: args.contacts.length,
-      failed,
-    }),
-    { headers: { "Content-Type": "application/json" } },
-  );
+  return completed;
 }
 
 export async function handleRequest(req: Request): Promise<Response> {
@@ -199,58 +164,59 @@ export async function handleRequest(req: Request): Promise<Response> {
     );
     const dispatchMode = resolveDispatchMode(throughputConfig);
 
-    if (
-      dispatchMode === "parallel" &&
-      campaign.type === "robocall"
-    ) {
-      const activeCalls = await countActiveIvrCampaignCalls(
-        supabase,
-        Number(campaign_id),
-      );
-      if (activeCalls >= throughputConfig.voiceConcurrentCallLimit) {
-        console.warn("IVR concurrency limit reached; deferring dispatch", {
-          campaignId: campaign_id,
+    let claimLimit = 1;
+    let maxInflight: number | null = null;
+
+    if (dispatchMode === "parallel") {
+      if (campaign.type === "robocall") {
+        const activeCalls = await countActiveIvrCampaignCalls(
+          supabase,
+          Number(campaign_id),
+        );
+        claimLimit = resolveIvrClaimLimit({
+          config: throughputConfig,
           activeCalls,
-          limit: throughputConfig.voiceConcurrentCallLimit,
         });
-        await scheduleNextDispatch({
-          fetchImpl: fetch,
-          queueNextUrl: getFunctionUrl("queue-next"),
-          headers: getFunctionHeaders(),
-          campaignId: Number(campaign_id),
-          owner: owner || null,
-          delayMs: DISPATCH_TICK_MS,
-        });
-        return new Response(
-          JSON.stringify({
-            status: "concurrency_deferred",
+        if (claimLimit <= 0) {
+          console.warn("IVR concurrency limit reached; deferring dispatch", {
+            campaignId: campaign_id,
             activeCalls,
             limit: throughputConfig.voiceConcurrentCallLimit,
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        );
+          });
+          await scheduleNextDispatch({
+            fetchImpl: fetch,
+            queueNextUrl: getFunctionUrl("queue-next"),
+            headers: getFunctionHeaders(),
+            campaignId: Number(campaign_id),
+            owner: owner || null,
+            delayMs: DISPATCH_TICK_MS,
+          });
+          return new Response(
+            JSON.stringify({
+              status: "concurrency_deferred",
+              activeCalls,
+              limit: throughputConfig.voiceConcurrentCallLimit,
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
+        }
+        maxInflight = claimLimit;
+      } else {
+        claimLimit = resolveClaimLimit({
+          campaignType: campaign.type,
+          config: throughputConfig,
+        });
       }
     }
 
-    const claimLimit =
-      dispatchMode === "parallel"
-        ? resolveClaimLimit({
-          campaignType: campaign.type,
-          config: throughputConfig,
-        })
-        : 1;
+    const contacts = await claimCampaignQueueContacts({
+      supabase,
+      campaignId: Number(campaign_id),
+      owner: owner || null,
+      claimLimit,
+      maxInflight,
+    });
 
-    const { data: claimed, error: claimError } = await supabase.rpc(
-      "claim_campaign_queue_contacts",
-      {
-        campaign_id_pro: campaign_id,
-        claimed_by_user_id: owner || null,
-        claim_limit: claimLimit,
-      },
-    );
-    if (claimError) throw claimError;
-
-    const contacts = (claimed ?? []) as ClaimedContact[];
     if (!contacts.length) {
       const completed = await markCampaignCompleteIfDrained({
         supabase,
@@ -262,23 +228,35 @@ export async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    if (dispatchMode === "parallel") {
-      return handleParallelDispatch({
-        supabase,
-        campaign,
-        campaignId: Number(campaign_id),
-        owner: owner || null,
-        contacts,
-      });
-    }
-
-    return handleLegacyDispatch({
+    const batch = await dispatchContacts({
       supabase,
       campaign,
       campaignId: Number(campaign_id),
       owner: owner || null,
-      contact: contacts[0],
+      contacts,
+      legacyDelayMs: dispatchMode === "legacy" ? LEGACY_QUEUE_DELAY_MS : undefined,
     });
+
+    const completed = await finishDispatchTick({
+      supabase,
+      campaignId: Number(campaign_id),
+      owner: owner || null,
+    });
+
+    if (dispatchMode === "legacy") {
+      return new Response(JSON.stringify([contacts[0]]), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(
+      JSON.stringify({
+        status: completed ? "campaign_completed" : "batch_dispatched",
+        attempted: batch.attempted,
+        failed: batch.failed,
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
   } catch (error) {
     console.error("queue-next error", error);
     return new Response(JSON.stringify({ error: String(error) }), {

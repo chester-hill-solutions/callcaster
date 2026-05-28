@@ -7,68 +7,23 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
-import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 import { resolveTwilioSmsMessagingServiceSid } from "../_shared/sms-send-resolve.ts";
 import {
   completeQueueContact,
+  dequeueDuplicateQueueContact,
   failQueueContact,
   requeueContact,
 } from "../_shared/campaign-dispatch.ts";
+import { jsonHandlerResponse } from "../_shared/handler-response.ts";
+import {
+  normalizePortalOpsConfig,
+  type WorkspaceTwilioOpsConfig,
+} from "../_shared/portal-config.ts";
 import {
   isRetryableSmsTwilioError,
   withTwilioRetry,
 } from "../_shared/twilio-retry.ts";
-import { MAX_QUEUE_ATTEMPTS } from "../_shared/throughput-config.ts";
-
-const TWILIO_MESSAGE_INTENTS = new Set([
-  "otp",
-  "notifications",
-  "fraud",
-  "security",
-  "customercare",
-  "delivery",
-  "education",
-  "events",
-  "polling",
-  "announcements",
-  "marketing",
-]);
-
-type WorkspaceTwilioOpsConfig = {
-  trafficClass: string;
-  throughputProduct: string;
-  multiTenancyMode: string;
-  trafficShapingEnabled: boolean;
-  defaultMessageIntent: string | null;
-  sendMode: "from_number" | "messaging_service";
-  messagingServiceSid: string | null;
-  onboardingStatus: string;
-  supportNotes: string;
-  updatedAt: string | null;
-  updatedBy: string | null;
-  auditTrail: Array<{
-    changedAt: string;
-    actorUserId: string | null;
-    actorUsername: string | null;
-    summary: string;
-  }>;
-};
-
-const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
-  trafficClass: "unknown",
-  throughputProduct: "none",
-  multiTenancyMode: "none",
-  trafficShapingEnabled: false,
-  defaultMessageIntent: null,
-  sendMode: "from_number",
-  messagingServiceSid: null,
-  onboardingStatus: "not_started",
-  supportNotes: "",
-  updatedAt: null,
-  updatedBy: null,
-  auditTrail: [],
-};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -76,37 +31,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function normalizePortalConfig(value: unknown): WorkspaceTwilioOpsConfig {
-  if (!isRecord(value)) {
-    return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
-  }
-
-  const defaultMessageIntent =
-    typeof value.defaultMessageIntent === "string" &&
-    TWILIO_MESSAGE_INTENTS.has(value.defaultMessageIntent)
-      ? value.defaultMessageIntent
-      : null;
-
-  return {
-    ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
-    trafficClass: typeof value.trafficClass === "string" ? value.trafficClass : "unknown",
-    throughputProduct: typeof value.throughputProduct === "string" ? value.throughputProduct : "none",
-    multiTenancyMode: typeof value.multiTenancyMode === "string" ? value.multiTenancyMode : "none",
-    trafficShapingEnabled:
-      typeof value.trafficShapingEnabled === "boolean" ? value.trafficShapingEnabled : false,
-    defaultMessageIntent,
-    sendMode: value.sendMode === "messaging_service" ? "messaging_service" : "from_number",
-    messagingServiceSid: parseOptionalString(value.messagingServiceSid),
-    onboardingStatus: typeof value.onboardingStatus === "string" ? value.onboardingStatus : "not_started",
-    supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
-    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
-    updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
-    auditTrail: Array.isArray(value.auditTrail)
-      ? (value.auditTrail as WorkspaceTwilioOpsConfig["auditTrail"])
-      : [],
-  };
 }
 
 /** Twilio Link Shortening is preferred when sending via Messaging Service. */
@@ -314,28 +238,6 @@ const normalizePhoneNumber = (input: string): string => {
   return cleaned;
 };
 
-async function processNextMessage(user_id: string, campaign_id: string) {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await fetch(
-      `${baseUrl}/queue-next`,
-      {
-        method: 'POST',
-        headers: getFunctionHeaders(),
-        body: JSON.stringify({
-          owner: user_id,
-          campaign_id: campaign_id,
-        })
-      }
-    );
-  } catch (error) {
-    console.error(`Error initiating next message for campaign ${campaign_id}:`, {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-
 const createWorkspaceTwilioInstance = async ({
   supabase,
   workspace_id
@@ -361,7 +263,7 @@ const createWorkspaceTwilioInstance = async ({
   return {
     twilio: new Twilio(creds.sid, creds.authToken),
     credits: workspace.credits,
-    portalConfig: normalizePortalConfig(
+    portalConfig: normalizePortalOpsConfig(
       isRecord(workspace.twilio_data) ? workspace.twilio_data.portalConfig : null,
     ),
   };
@@ -405,15 +307,12 @@ const sendMessage = async ({
       to,
     });
     if (duplicateExists) {
-      await supabase
-        .from("campaign_queue")
-        .update({
-          status: "dequeued",
-          dequeued_at: new Date().toISOString(),
-          dequeued_by: user_id,
-          dequeued_reason: DUPLICATE_SMS_DEQUEUED_REASON,
-        })
-        .eq("id", queue_id);
+      await dequeueDuplicateQueueContact({
+        supabase,
+        queueId: Number(queue_id),
+        dequeuedById: user_id ?? null,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      });
       return {
         skipped: true,
         reason: DUPLICATE_SMS_DEQUEUED_REASON,
@@ -601,10 +500,8 @@ export async function handleRequest(
       user_id,
       message_intent,
       messaging_service_sid,
-      dispatch_mode: dispatchModeRaw,
+      dispatch_mode: _dispatchModeRaw,
     } = await req.json();
-    const dispatchMode =
-      dispatchModeRaw === "parallel" ? "parallel" : "legacy";
 
     // Check if campaign is still active
     const { data: campaignRow, error: campaignError } = await supabase
@@ -676,6 +573,12 @@ export async function handleRequest(
       campaignSmsMessagingServiceSid: campaignRow.sms_messaging_service_sid,
     });
 
+    if ("skipped" in result && result.skipped) {
+      return jsonHandlerResponse("skipped", {
+        reason: result.reason ?? DUPLICATE_SMS_DEQUEUED_REASON,
+      });
+    }
+
     if ("error" in result) {
       const errorMessage = String(result.error);
       if (isRetryableSmsTwilioError(result.error)) {
@@ -684,26 +587,16 @@ export async function handleRequest(
           queueId: queue_id,
           errorText: errorMessage.slice(0, 500),
         });
-      } else {
-        await failQueueContact({
-          supabase,
-          queueId: queue_id,
-          errorText: errorMessage.slice(0, 500),
-          dequeuedById: user_id ?? null,
-        });
+        return jsonHandlerResponse("retryable_failure", { error: errorMessage });
       }
 
-      if (dispatchMode === "legacy") {
-        await processNextMessage(user_id, campaign_id);
-      }
-
-      return new Response(
-        JSON.stringify({ success: false, error: errorMessage }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 500,
-        },
-      );
+      await failQueueContact({
+        supabase,
+        queueId: queue_id,
+        errorText: errorMessage.slice(0, 500),
+        dequeuedById: user_id ?? null,
+      });
+      return jsonHandlerResponse("permanent_failure", { error: errorMessage });
     }
 
     await completeQueueContact({
@@ -713,27 +606,12 @@ export async function handleRequest(
       reason: "SMS dispatched",
     });
 
-    if (dispatchMode === "legacy") {
-      await processNextMessage(user_id, campaign_id);
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, result }),
-      { headers: { "Content-Type": "application/json" } },
-    );
+    return jsonHandlerResponse("success", { extra: { result } });
 
   } catch (error) {
     console.error("Error in SMS handler:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return jsonHandlerResponse("permanent_failure", { error: errorMessage });
   }
 }
 

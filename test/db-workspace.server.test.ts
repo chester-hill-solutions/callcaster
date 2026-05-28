@@ -1699,9 +1699,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     ]);
   });
 
-  test("portal config prefers onboarding Messaging Service defaults when present", async () => {
+  test("effective portal config prefers onboarding Messaging Service defaults when present", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const config = mod.getWorkspaceTwilioPortalConfigFromTwilioData({
+    const config = mod.getEffectiveWorkspaceTwilioPortalConfig({
       sid: "AC123",
       authToken: "auth",
       portalConfig: {

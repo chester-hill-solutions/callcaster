@@ -3,27 +3,9 @@ import {
   messageCampaignRequiresCallerId,
   resolveTwilioSmsMessagingServiceSid,
 } from "../app/lib/sms-send-resolve";
-import type { WorkspaceTwilioOpsConfig } from "../app/lib/types";
+import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
-const basePortal: WorkspaceTwilioOpsConfig = {
-  trafficClass: "unknown",
-  throughputProduct: "none",
-  multiTenancyMode: "none",
-  trafficShapingEnabled: false,
-  defaultMessageIntent: null,
-  sendMode: "from_number",
-  messagingServiceSid: null,
-  onboardingStatus: "not_started",
-  smsSenderClass: "unknown",
-  smsTargetMps: 1,
-  voiceTargetCps: 1,
-  voiceConcurrentCallLimit: 100,
-  parallelDispatchEnabled: false,
-  supportNotes: "",
-  updatedAt: null,
-  updatedBy: null,
-  auditTrail: [],
-};
+const basePortal = makePortalConfig();
 
 describe("app/lib/sms-send-resolve.ts", () => {
   test("explicit request SID wins", () => {
