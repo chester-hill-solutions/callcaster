@@ -344,5 +344,14 @@ as $$
   from public.call c
   where c.campaign_id = campaign_id_pro
     and c.end_time is null
-    and coalesce(c.status, '') not in ('completed', 'failed', 'busy', 'no-answer', 'canceled', 'cancelled');
+    and (
+      c.status is null
+      or c.status not in (
+        'completed',
+        'failed',
+        'busy',
+        'no-answer',
+        'canceled'
+      )
+    );
 $$;
