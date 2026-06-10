@@ -10,7 +10,12 @@ import { env } from "@/lib/env.server";
 import { isEmail, isPhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
+import {
+  appendInboundVoicemailTwiml,
+  resolveInboundVoicemailAudio,
+} from "@/lib/inbound-voicemail-twiml.server";
 import Twilio from "twilio";
+import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import type {
   TwilioInboundCallWebhook,
   WebhookEvent,
@@ -22,6 +27,7 @@ interface WorkspaceNumberData {
   handset_enabled: boolean | null;
   inbound_action: string | null;
   inbound_audio: string | null;
+  inbound_ring_count: number | null;
   type: string | null;
   workspace: {
     id: string;
@@ -95,6 +101,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       handset_enabled,
       inbound_action,
       inbound_audio,
+      inbound_ring_count,
       type,
       workspace,
       ...workspace!inner(id, twilio_data, webhook(*))`,
@@ -158,36 +165,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const workspaceId = workspaceIdFromNumber ?? null;
-
-  let voicemail: { signedUrl: string } | null = null;
-  if (number?.inbound_audio && workspaceId) {
-    // Prefer treating inbound_audio as storage path; fallback to constrained lookup by search.
-    const { data: signedByPath } = await supabase.storage
-      .from("workspaceAudio")
-      .createSignedUrl(`${workspaceId}/${number.inbound_audio}`, 3600);
-    if (signedByPath?.signedUrl) {
-      voicemail = { signedUrl: signedByPath.signedUrl };
-    } else {
-      const { data: files } = await supabase.storage
-        .from("workspaceAudio")
-        .list(workspaceId, {
-          search: number.inbound_audio,
-          limit: 20,
-          offset: 0,
-        });
-      const file = files?.find(
-        (f) =>
-          String(f.id) === String(number.inbound_audio) ||
-          f.name === number.inbound_audio,
-      );
-      if (file) {
-        const { data: signed } = await supabase.storage
-          .from("workspaceAudio")
-          .createSignedUrl(`${workspaceId}/${file.name}`, 3600);
-        if (signed?.signedUrl) voicemail = { signedUrl: signed.signedUrl };
-      }
-    }
-  }
+  const dialTimeout = inboundRingCountToDialTimeoutSeconds(
+    number?.inbound_ring_count ?? null,
+  );
+  const voicemail = workspaceId
+    ? await resolveInboundVoicemailAudio({
+        supabase,
+        workspaceId,
+        inboundAudio: number?.inbound_audio ?? null,
+      })
+    : null;
 
   // Insert call record
   if (!data.CallSid || typeof data.CallSid !== "string") {
@@ -281,7 +268,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
       const dial = handsetTwiml.dial({
-        timeout: 30,
+        timeout: dialTimeout,
         action: `${baseUrl}/api/inbound-handset-dial-end`,
       });
       dial.client(clientIdentity);
@@ -301,7 +288,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       inbound_action: number.inbound_action,
     });
     twiml.pause({ length: 1 });
-    twiml.dial(number.inbound_action || "");
+    const dial = twiml.dial({ timeout: dialTimeout });
+    dial.number(number.inbound_action || "");
     return new Response(twiml.toString(), {
       headers: {
         "Content-Type": "text/xml",
@@ -316,20 +304,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       CallSid: data.CallSid,
       inbound_action: number.inbound_action,
     });
-    const phoneNumber = data.Called;
-    if (voicemail?.signedUrl) {
-      twiml.play(voicemail.signedUrl);
-    } else {
-      twiml.say(
-        `Thank you for calling ${phoneNumber}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`,
-      );
-    }
-    twiml.pause({ length: 1 });
-    twiml.record({
-      transcribe: true,
-      timeout: 10,
-      playBeep: true,
-      recordingStatusCallback: `${env.BASE_URL()}/api/email-vm`,
+    appendInboundVoicemailTwiml({
+      twiml,
+      phoneNumber: data.Called,
+      voicemailAudioUrl: voicemail?.signedUrl ?? null,
     });
     return new Response(twiml.toString(), {
       headers: {

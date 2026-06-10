@@ -25,6 +25,10 @@ import {
 } from "@/components/ui/select";
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
+import {
+  declineIncomingCall,
+  IncomingCallPanel,
+} from "@/components/calls/IncomingCallPanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { normalizePhoneNumber } from "@/lib/utils/phone";
 
@@ -159,30 +163,11 @@ function HandsetConnected({
   });
 
   const incomingCall = callHandling.incomingCall;
-  const fromNumber =
-    incomingCall &&
-    typeof incomingCall === "object" &&
-    "parameters" in incomingCall &&
-    typeof (incomingCall as { parameters?: { From?: string } }).parameters
-      ?.From === "string"
-      ? (incomingCall as unknown as { parameters: { From: string } }).parameters
-          .From
-      : null;
-
-  const handleAnswer = useCallback(() => {
-    callHandling.answer();
-  }, [callHandling]);
 
   const handleDecline = useCallback(() => {
-    if (
-      incomingCall &&
-      typeof incomingCall === "object" &&
-      "reject" in incomingCall &&
-      typeof (incomingCall as { reject: () => void }).reject === "function"
-    ) {
-      (incomingCall as { reject: () => void }).reject();
-    }
-  }, [incomingCall]);
+    declineIncomingCall(callHandling.incomingCall);
+    setIncomingCallState(null);
+  }, [callHandling.incomingCall]);
 
   const handleEndSession = useCallback(async () => {
     try {
@@ -474,49 +459,12 @@ function HandsetConnected({
           )}
 
         {incomingCall ? (
-          <div className="mt-6 rounded-lg border-2 border-primary p-4">
-            <p className="font-medium">
-              Incoming call from {fromNumber ?? "unknown"}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {callHandling.activeCall ? (
-                <>
-                  <Button
-                    onClick={callHandling.holdAndAnswer}
-                    className="min-w-[140px] flex-1 gap-2"
-                  >
-                    <Pause size={16} />
-                    Hold & answer
-                  </Button>
-                  <Button
-                    onClick={handleDecline}
-                    variant="outline"
-                    className="min-w-[100px] flex-1 gap-2"
-                  >
-                    Decline
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    onClick={handleAnswer}
-                    className="min-w-[140px] flex-1 gap-2"
-                  >
-                    <Phone size={16} />
-                    Pick up
-                  </Button>
-                  <Button
-                    onClick={handleDecline}
-                    variant="destructive"
-                    className="min-w-[100px] flex-1 gap-2"
-                  >
-                    <PhoneOff size={16} />
-                    Decline
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
+          <IncomingCallPanel
+            incomingCall={incomingCall}
+            callHandling={callHandling}
+            onDecline={handleDecline}
+            className="mt-6"
+          />
         ) : (
           <p className="mt-6 text-center text-muted-foreground">
             Waiting for calls...

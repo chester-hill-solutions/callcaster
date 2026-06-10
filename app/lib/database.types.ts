@@ -1519,6 +1519,7 @@ export type Database = {
           id: number;
           inbound_action: string | null;
           inbound_audio: string | null;
+          inbound_ring_count: number;
           phone_number: string | null;
           type: string;
           workspace: string;
@@ -1531,6 +1532,7 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_ring_count?: number;
           phone_number?: string | null;
           type: string;
           workspace: string;
@@ -1543,6 +1545,7 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_ring_count?: number;
           phone_number?: string | null;
           type?: string;
           workspace?: string;

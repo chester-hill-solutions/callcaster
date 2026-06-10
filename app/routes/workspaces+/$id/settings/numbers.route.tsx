@@ -163,6 +163,17 @@ const WorkspaceSettings = () => {
     );
   };
 
+  const handleInboundRingCountChange = (numberId: number, value: string) => {
+    updateFetcher.submit(
+      {
+        formName: "update-inbound-ring-count",
+        numberId: String(numberId),
+        inboundRingCount: value,
+      },
+      { method: "POST" },
+    );
+  };
+
   const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId: String(numberId) },
@@ -189,6 +200,7 @@ const WorkspaceSettings = () => {
               onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
               onCallerIdChange={handleCallerIdChange}
               onHandsetChange={handleHandsetChange}
+              onInboundRingCountChange={handleInboundRingCountChange}
               onNumberRemoval={handleNumberRemoval}
               isBusy={updateFetcher.state !== "idle"}
             />

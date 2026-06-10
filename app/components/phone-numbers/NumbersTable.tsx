@@ -14,6 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { User, WorkspaceNumbers } from "@/lib/types";
+import {
+  INBOUND_RING_COUNT_OPTIONS,
+  normalizeInboundRingCount,
+} from "../../../shared/inbound-rings";
 
 export const NumbersTable = ({
   phoneNumbers,
@@ -23,6 +27,7 @@ export const NumbersTable = ({
   onIncomingVoiceMessageChange,
   onCallerIdChange,
   onHandsetChange,
+  onInboundRingCountChange,
   onNumberRemoval,
   isBusy,
 }: {
@@ -33,6 +38,7 @@ export const NumbersTable = ({
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
   onHandsetChange?: (numberId: number, enabled: boolean) => void;
+  onInboundRingCountChange?: (numberId: number, value: string) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
 }) => {
@@ -86,6 +92,15 @@ export const NumbersTable = ({
     [updateNumber, onHandsetChange],
   );
 
+  const handleInboundRingCountChange = useCallback(
+    (numberId: number, value: string) => {
+      const ringCount = normalizeInboundRingCount(value);
+      updateNumber(numberId, { inbound_ring_count: ringCount });
+      onInboundRingCountChange?.(numberId, String(ringCount));
+    },
+    [updateNumber, onInboundRingCountChange],
+  );
+
   const handleNumberRemoval = useCallback(
     (numberId: number) => {
       setNumbers((prevNumbers: WorkspaceNumbers[]) =>
@@ -113,6 +128,7 @@ export const NumbersTable = ({
               <TableHead className="py-2 text-left">Phone Number</TableHead>
               <TableHead className="py-2 text-left">Status</TableHead>
               <TableHead className="py-2 text-left">Handset</TableHead>
+              <TableHead className="py-2 text-left">Rings</TableHead>
               <TableHead className="py-2 text-left">Handle Voicemail</TableHead>
               <TableHead className="py-2 text-left">Voicemail Message</TableHead>
             </TableRow>
@@ -129,6 +145,7 @@ export const NumbersTable = ({
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
                 handleHandsetChange={handleHandsetChange}
+                onInboundRingCountChange={handleInboundRingCountChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
@@ -147,6 +164,7 @@ const NumberRow = ({
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
   handleHandsetChange,
+  onInboundRingCountChange,
   handleNumberRemoval,
   isBusy,
 }: {
@@ -158,6 +176,7 @@ const NumberRow = ({
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
   handleHandsetChange?: (numberId: number, enabled: boolean) => void;
+  onInboundRingCountChange?: (numberId: number, value: string) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -253,6 +272,27 @@ const NumberRow = ({
             />
             <span className="text-sm">Ring handset</span>
           </label>
+        )}
+      </TableCell>
+      <TableCell className="px-2 py-2">
+        {number.type !== "caller_id" ? (
+          <select
+            className="w-full rounded border p-2"
+            disabled={isBusy}
+            value={String(normalizeInboundRingCount(number.inbound_ring_count))}
+            onChange={(event) =>
+              onInboundRingCountChange?.(number.id, event.target.value)
+            }
+            aria-label={`Ring count for ${number.phone_number ?? "number"}`}
+          >
+            {INBOUND_RING_COUNT_OPTIONS.map((ringCount) => (
+              <option key={ringCount} value={ringCount}>
+                {ringCount} {ringCount === 1 ? "ring" : "rings"}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
         )}
       </TableCell>
       <TableCell className="px-2 py-2">

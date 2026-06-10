@@ -1,7 +1,9 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
+  MdBarChart,
   MdCampaign,
+  MdCall,
   MdChat,
   MdCreditCard,
   MdGraphicEq,
@@ -54,6 +56,8 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { name: "Chats", path: "chats", icon: MdChat },
+  { name: "Calls", path: "calls", icon: MdCall },
+  { name: "Analytics", path: "analytics", icon: MdBarChart },
   { name: "Handset", path: "handset", icon: MdHeadsetMic },
   { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
   { name: "Audio", path: "audios", callerHidden: true, icon: MdGraphicEq },
