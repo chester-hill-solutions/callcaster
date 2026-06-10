@@ -325,9 +325,29 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
-        {hasAccess && (
-          <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
-        )}
+          {hasAccess && (
+            <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
+              <div className="flex-1">
+                <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+                  Manage Agent Queues
+                </h3>
+                <p className="p-2 text-center text-muted-foreground">
+                  Configure inbound call routing queues for your agents
+                </p>
+              </div>
+              <Button
+                asChild
+                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
+              >
+                <NavLink to={"./queues"} relative="path">
+                  Manage Queues
+                </NavLink>
+              </Button>
+            </Card>
+          )}
+          {hasAccess && (
+            <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
+          )}
         {hasAccess && <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">

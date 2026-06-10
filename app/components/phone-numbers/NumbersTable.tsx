@@ -23,22 +23,26 @@ export const NumbersTable = ({
   phoneNumbers,
   users = [],
   mediaNames = [],
+  queues = [],
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
   onHandsetChange,
   onInboundRingCountChange,
+  onInboundQueueChange,
   onNumberRemoval,
   isBusy,
 }: {
   phoneNumbers: WorkspaceNumbers[];
   users: User[];
-  mediaNames: { id: number; name: string; }[];
+  mediaNames: { id: number; name: string }[];
+  queues?: { id: number; name: string }[];
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
   onHandsetChange?: (numberId: number, enabled: boolean) => void;
   onInboundRingCountChange?: (numberId: number, value: string) => void;
+  onInboundQueueChange?: (numberId: number, queueId: string) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
 }) => {
@@ -101,6 +105,14 @@ export const NumbersTable = ({
     [updateNumber, onInboundRingCountChange],
   );
 
+  const handleInboundQueueChange = useCallback(
+    (numberId: number, queueId: string) => {
+      updateNumber(numberId, { inbound_queue_id: queueId ? Number(queueId) : null });
+      onInboundQueueChange?.(numberId, queueId);
+    },
+    [updateNumber, onInboundQueueChange],
+  );
+
   const handleNumberRemoval = useCallback(
     (numberId: number) => {
       setNumbers((prevNumbers: WorkspaceNumbers[]) =>
@@ -129,6 +141,7 @@ export const NumbersTable = ({
               <TableHead className="py-2 text-left">Status</TableHead>
               <TableHead className="py-2 text-left">Handset</TableHead>
               <TableHead className="py-2 text-left">Rings</TableHead>
+              <TableHead className="py-2 text-left">Queue</TableHead>
               <TableHead className="py-2 text-left">Handle Voicemail</TableHead>
               <TableHead className="py-2 text-left">Voicemail Message</TableHead>
             </TableRow>
@@ -141,11 +154,13 @@ export const NumbersTable = ({
                 members={users}
                 verifiedNumbers={verifiedNumbers}
                 mediaNames={mediaNames}
+                queues={queues}
                 handleIncomingActivityChange={handleIncomingActivityChange}
                 handleIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
                 handleCallerIdChange={handleCallerIdChange}
                 handleHandsetChange={handleHandsetChange}
                 onInboundRingCountChange={handleInboundRingCountChange}
+                onInboundQueueChange={handleInboundQueueChange}
                 handleNumberRemoval={handleNumberRemoval}
                 isBusy={isBusy} />
             ))}
@@ -160,23 +175,27 @@ const NumberRow = ({
   members,
   verifiedNumbers,
   mediaNames,
+  queues = [],
   handleIncomingActivityChange,
   handleIncomingVoiceMessageChange,
   handleCallerIdChange,
   handleHandsetChange,
   onInboundRingCountChange,
+  onInboundQueueChange,
   handleNumberRemoval,
   isBusy,
 }: {
   number: WorkspaceNumbers;
   members: User[];
   verifiedNumbers: WorkspaceNumbers[];
-  mediaNames: { id: number; name: string; }[];
+  mediaNames: { id: number; name: string }[];
+  queues?: { id: number; name: string }[];
   handleIncomingActivityChange: (id: number, value: string) => void;
   handleIncomingVoiceMessageChange: (id: number, value: string) => void;
   handleCallerIdChange: (number: number, name: string) => void;
   handleHandsetChange?: (numberId: number, enabled: boolean) => void;
   onInboundRingCountChange?: (numberId: number, value: string) => void;
+  onInboundQueueChange?: (numberId: number, queueId: string) => void;
   handleNumberRemoval: (numberId: number) => void;
   isBusy: boolean;
 }) => {
@@ -288,6 +307,26 @@ const NumberRow = ({
             {INBOUND_RING_COUNT_OPTIONS.map((ringCount) => (
               <option key={ringCount} value={ringCount}>
                 {ringCount} {ringCount === 1 ? "ring" : "rings"}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className="px-2 py-2">
+        {number.type !== "caller_id" && onInboundQueueChange ? (
+          <select
+            className="w-full rounded border p-2"
+            disabled={isBusy}
+            value={number.inbound_queue_id ? String(number.inbound_queue_id) : ""}
+            onChange={(e) => onInboundQueueChange(number.id, e.target.value)}
+            aria-label={`Inbound queue for ${number.phone_number ?? "number"}`}
+          >
+            <option value="">No queue</option>
+            {queues.map((q) => (
+              <option key={q.id} value={String(q.id)}>
+                {q.name}
               </option>
             ))}
           </select>

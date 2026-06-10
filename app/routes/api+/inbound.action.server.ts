@@ -27,6 +27,7 @@ interface WorkspaceNumberData {
   handset_enabled: boolean | null;
   inbound_action: string | null;
   inbound_audio: string | null;
+  inbound_queue_id: number | null;
   inbound_ring_count: number | null;
   type: string | null;
   workspace: {
@@ -101,6 +102,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       handset_enabled,
       inbound_action,
       inbound_audio,
+      inbound_queue_id,
       inbound_ring_count,
       type,
       workspace,
@@ -224,6 +226,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       supabaseClient: supabase,
       sendWebhookNotification,
       logger,
+    });
+  }
+
+  // Priority 1: Queue routing (if number is assigned to an inbound queue)
+  if (number?.inbound_queue_id && workspaceId) {
+    const supabaseUrl = env.SUPABASE_URL().replace(/\/$/, "");
+    const acdUrl = `${supabaseUrl}/functions/v1/acd-router`;
+    const queueName = `inbound_q_${number.inbound_queue_id}`;
+    logger.info("api.inbound routing to queue", {
+      workspaceId,
+      CallSid: data.CallSid,
+      queueId: number.inbound_queue_id,
+    });
+    const enqueue = twiml.enqueue({
+      waitUrl: `${acdUrl}?queue_id=${number.inbound_queue_id}&CallSid=${data.CallSid}&From=${data.From || ""}`,
+      action: `${acdUrl}/complete?entry_id=0&queue_name=${queueName}`,
+    });
+    enqueue.queue(queueName);
+    return new Response(twiml.toString(), {
+      headers: { "Content-Type": "text/xml" },
     });
   }
 

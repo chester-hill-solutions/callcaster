@@ -109,6 +109,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     if (ringCountError) return { error: ringCountError };
     return null;
+  } else if (formName === "update-inbound-queue") {
+    const { numberId, inboundQueueId } = data;
+    const { error: queueError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { inbound_queue_id: inboundQueueId ? Number(inboundQueueId) : null },
+    });
+    if (queueError) return { error: queueError };
+    return null;
   } else if (formName === "update-handset") {
     const { numberId, handsetEnabled } = data;
     const { error: handsetError } = await updateWorkspacePhoneNumber({

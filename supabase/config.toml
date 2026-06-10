@@ -164,3 +164,7 @@ verify_jwt = false
 # pg_cron net.http_post (see migrations) sends no Authorization header for this job.
 [functions.number-rental-billing]
 verify_jwt = false
+
+# Twilio calls these webhooks with X-Twilio-Signature, not a Supabase JWT.
+[functions.acd-router]
+verify_jwt = false

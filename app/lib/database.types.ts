@@ -1603,6 +1603,156 @@ export type Database = {
           },
         ];
       };
+      inbound_queue: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          hold_audio: string | null;
+          id: number;
+          name: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          hold_audio?: string | null;
+          id?: number;
+          name: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          hold_audio?: string | null;
+          id?: number;
+          name?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      inbound_queue_member: {
+        Row: {
+          created_at: string;
+          id: number;
+          queue_id: number;
+          user_id: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: number;
+          queue_id: number;
+          user_id: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: number;
+          queue_id?: number;
+          user_id?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_member_queue_id_fkey";
+            columns: ["queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_member_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_member_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      inbound_queue_entry: {
+        Row: {
+          abandoned_at: string | null;
+          accepted_at: string | null;
+          call_sid: string | null;
+          caller_number: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: number;
+          offered_at: string | null;
+          offered_to_user_id: string | null;
+          queue_id: number;
+          status: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          abandoned_at?: string | null;
+          accepted_at?: string | null;
+          call_sid?: string | null;
+          caller_number?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: number;
+          offered_at?: string | null;
+          offered_to_user_id?: string | null;
+          queue_id: number;
+          status?: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid?: string | null;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          abandoned_at?: string | null;
+          accepted_at?: string | null;
+          call_sid?: string | null;
+          caller_number?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: number;
+          offered_at?: string | null;
+          offered_to_user_id?: string | null;
+          queue_id?: number;
+          status?: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid?: string | null;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_entry_queue_id_fkey";
+            columns: ["queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_entry_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       workspace_number: {
         Row: {
           capabilities: Json | null;
@@ -1612,6 +1762,7 @@ export type Database = {
           id: number;
           inbound_action: string | null;
           inbound_audio: string | null;
+          inbound_queue_id: number | null;
           inbound_ring_count: number;
           phone_number: string | null;
           type: string;
@@ -1625,6 +1776,7 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_queue_id?: number | null;
           inbound_ring_count?: number;
           phone_number?: string | null;
           type: string;
@@ -1638,6 +1790,7 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_queue_id?: number | null;
           inbound_ring_count?: number;
           phone_number?: string | null;
           type?: string;
@@ -1649,6 +1802,13 @@ export type Database = {
             columns: ["workspace"];
             isOneToOne: false;
             referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_number_inbound_queue_id_fkey";
+            columns: ["inbound_queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
             referencedColumns: ["id"];
           },
         ];
@@ -2688,6 +2848,54 @@ export type Database = {
         };
         Returns: undefined;
       };
+      claim_inbound_queue_entry: {
+        Args: {
+          p_queue_id: number;
+          p_workspace_id: string;
+          p_call_sid: string;
+          p_caller_number: string;
+        };
+        Returns: {
+          agent_user_id: string;
+          entry_id: number;
+        }[];
+      };
+      release_inbound_offer: {
+        Args: {
+          p_entry_id: number;
+          p_outcome?: string;
+        };
+        Returns: undefined;
+      };
+      complete_inbound_queue_entry: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      abandon_inbound_queue_entry: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      accept_inbound_offer: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      next_inbound_queue_offer: {
+        Args: {
+          p_queue_id: number;
+          p_agent_user_id: string;
+          p_workspace_id: string;
+        };
+        Returns: {
+          call_sid: string;
+          entry_id: number;
+        }[];
+      };
     };
     Enums: {
       agent_state: "offline" | "available" | "busy" | "wrap_up" | "away";
@@ -2736,6 +2944,7 @@ export type Database = {
         | "receiving"
         | "received"
         | "read";
+      queue_entry_state: "queued" | "offered" | "accepted" | "declined" | "timed_out" | "abandoned" | "completed";
       queue_status: "queued" | "dequeued";
       workspace_permission:
         | "workspace.delete"

@@ -240,8 +240,25 @@ RLS: workspace-membership read; `agent_status` self-update for own row; queue co
 
 ## Rollout order & dependencies
 
-1. M1 schema + agent desktop status (shippable alone — replaces the heartbeat hack), including the going-Available preflight and single-session takeover.
-2. M1 queue routing end-to-end behind a per-workspace flag (`workspace_number.inbound_queue_id` simply unset = current behavior; zero migration risk), with queue settings UI, guard rails, and the "Call my queue" test flow.
+1. ✅ M1 schema + agent desktop status (shippable alone — replaces the heartbeat hack), including the going-Available preflight and single-session takeover.
+   - Migration `20260610210000`: `agent_state` enum, `agent_status` + `agent_status_event` tables with RLS.
+   - `api+/agent-status` (GET/POST) for status transitions with validation + event logging.
+   - `useAgentStatus` hook with 30s heartbeat and realtime `postgres_changes`.
+   - `AgentDesktop` component: status bar, preflight device check, away/offline reasons, status-aware idle state.
+   - Old `user.activity` heartbeat continues during deprecation window per plan.
+2. ✅ M1 queue routing end-to-end behind a per-workspace flag (`workspace_number.inbound_queue_id` simply unset = current behavior; zero migration risk), with queue settings UI, guard rails, and the "Call my queue" test flow.
+   - Migration `20260610215000`: `queue_entry_state` enum, `inbound_queue`, `inbound_queue_member`, `inbound_queue_entry` tables with RLS, RPCs (claim/release/complete/abandon/accept/next), `workspace_number.inbound_queue_id` FK.
+   - `supabase/functions/_shared/acd-utils.ts` — pure utility functions (TwiML generation, queue name helpers).
+   - `supabase/functions/_shared/acd-router.ts` — DB operations (agent claim, lookup, dial, release, next offer).
+   - `supabase/functions/acd-router/index.ts` — Edge Function serving four URL paths: `/` (wait URL, TwiML + side-effect agent dialing), `/agent-bridge` (agent answer → `<Queue>` dequeue), `/agent-status` (dial status callback → timed_out release), `/complete` (Enqueue action → completed/abandoned).
+   - `supabase/config.toml`: `acd-router` added with `verify_jwt = false`.
+   - `app/routes/api+/inbound.action.server.ts`: Queue routing is the highest priority check before handset/forward/voicemail. Returns `<Enqueue waitUrl="acd-router?queue_id=X">` when number has `inbound_queue_id`.
+   - `app/routes/api+/inbound-queue.tsx` + loader/action: CRUD for queues and member management (GET list, POST create, PUT update, DELETE delete, PATCH add/remove member).
+   - `app/routes/workspaces+/$id/settings/queues.route.tsx`: Queue settings UI (list, create, edit, delete queues, manage members, view linked numbers).
+   - `app/routes/workspaces+/$id/settings/numbers.route.tsx` + `NumbersTable.tsx`: Added queue assignment column per number (dropdown of workspace queues).
+   - `app/routes/workspaces+/$id/settings.route.tsx`: Added "Manage Agent Queues" card with NavLink.
+   - Tests: Deno unit tests for `acd-utils` (`acd_router_test.ts`), SQL integration tests for RPCs (`inbound_queue_routing.sql`), Vitest tests (`inbound-queue.test.ts`).
+   - `database.types.ts`: `queue_entry_state` enum, `inbound_queue`/`inbound_queue_member`/`inbound_queue_entry` tables, `workspace_number.inbound_queue_id`, RPC function types.
 3. M2 inbound IVR (depends on M1 queues as routing targets, but `forward:`/`voicemail:` targets work without queues), with activation validation and the always-an-exit rule.
 4. M3 wallboard (reads M1 tables) → then monitor/whisper/barge (monitoring-announcement toggle ships earlier, in M1 greetings).
 5. M4 export jobs (independent; can start anytime) → shift/analytics (depends on M1 `agent_status_event`).

@@ -13,6 +13,7 @@
 :surveyId
 accept-invite
 admin
+analytics
 api/agent-status
 api/audience-upload
 api/audience-upload-status
@@ -45,6 +46,7 @@ api/hangup
 api/inbound
 api/inbound-handset
 api/inbound-handset-dial-end
+api/inbound-queue
 api/inbound-sms
 api/inbound-verification
 api/initiate-ivr
@@ -74,17 +76,16 @@ api/verify-call-in-session
 api/verify-pin-input
 api/workspace
 api/workspace-api-keys
-analytics
 archive
 audiences
 audios
 auth/confirm
 billing
 bulk-delete
+calls
 campaigns
 campaigns
 chats
-calls
 confirm-payment
 contacts
 create-with-script
@@ -107,6 +108,7 @@ other-services
 pricing
 purchase
 queue
+queues
 remember
 reset
 reset-password
