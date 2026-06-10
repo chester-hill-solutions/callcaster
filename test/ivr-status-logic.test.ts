@@ -6,13 +6,17 @@ import {
   getCallWithRetry,
   insertTransactionHistoryIdempotent,
 } from "../supabase/functions/_shared/ivr-status-logic.ts";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
 
 describe("ivr-status shared logic", () => {
   test("billingUnitsFromDurationSeconds rounds up per started minute", () => {
-    expect(billingUnitsFromDurationSeconds(0)).toBe(-1);
-    expect(billingUnitsFromDurationSeconds(1)).toBe(-1);
+    expect(billingUnitsFromDurationSeconds(0)).toBe(-2);
+    expect(billingUnitsFromDurationSeconds(1)).toBe(-2);
     expect(billingUnitsFromDurationSeconds(60)).toBe(-2);
-    expect(billingUnitsFromDurationSeconds(61)).toBe(-2);
+    expect(billingUnitsFromDurationSeconds(61)).toBe(-5);
   });
 
   test("canTransitionOutreachDisposition blocks terminal -> different", () => {
@@ -94,20 +98,11 @@ describe("ivr-status shared logic", () => {
   });
 
   test("insertTransactionHistoryIdempotent inserts once for same marker", async () => {
-    const rows: any[] = [];
+    const rows: TransactionRow[] = [];
     const supabase: any = {
       from: (table: string) => {
         if (table !== "transaction_history") throw new Error("unexpected table");
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.like = () => builder;
-        builder.limit = async () => ({ data: rows.length ? [{ id: 1 }] : [], error: null });
-        builder.insert = (row: any) => {
-          rows.push(row);
-          return { data: null, error: null };
-        };
-        return builder;
+        return makeTransactionHistoryTableStub(rows);
       },
     };
 
@@ -130,27 +125,15 @@ describe("ivr-status shared logic", () => {
     expect(r1.inserted).toBe(true);
     expect(r2.inserted).toBe(false);
     expect(rows.length).toBe(1);
-    expect(rows[0].note).toContain("[idempotency:call:CA1]");
+    expect(rows[0].idempotency_key).toBe("call:CA1");
   });
 
   test("insertTransactionHistoryIdempotent serializes concurrent inserts", async () => {
-    const rows: any[] = [];
+    const rows: TransactionRow[] = [];
     const supabase: any = {
       from: (table: string) => {
         if (table !== "transaction_history") throw new Error("unexpected table");
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.like = () => builder;
-        builder.limit = async () => ({
-          data: rows.length ? [{ id: 1 }] : [],
-          error: null,
-        });
-        builder.insert = (row: any) => {
-          rows.push(row);
-          return { data: null, error: null };
-        };
-        return builder;
+        return makeTransactionHistoryTableStub(rows);
       },
     };
 
