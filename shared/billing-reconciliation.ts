@@ -218,3 +218,44 @@ export function buildBillingReconciliationReport(args: {
     unrecognizedDebitEvents: ledgerSummary.other.events,
   };
 }
+
+export function hasMaterialBillingVariance(
+  report: BillingReconciliationReport,
+): boolean {
+  return (
+    Math.abs(report.categories.sms.variance) > 2 ||
+    Math.abs(report.categories.voice.variance) > 2 ||
+    Math.abs(report.entityAudit.messageGap) > 2 ||
+    Math.abs(report.entityAudit.callGap) > 2 ||
+    report.unrecognizedDebitEvents > 0
+  );
+}
+
+export type BillingReconciliationSnapshot = {
+  lastRunAt: string;
+  lastRunSource: "cron" | "admin";
+  materialVariance: boolean;
+  period: BillingReconciliationPeriod;
+  smsVariance: number;
+  voiceVariance: number;
+  messageGap: number;
+  callGap: number;
+  unrecognizedDebitEvents: number;
+};
+
+export function buildBillingReconciliationSnapshot(
+  report: BillingReconciliationReport,
+  source: BillingReconciliationSnapshot["lastRunSource"],
+): BillingReconciliationSnapshot {
+  return {
+    lastRunAt: new Date().toISOString(),
+    lastRunSource: source,
+    materialVariance: hasMaterialBillingVariance(report),
+    period: report.period,
+    smsVariance: report.categories.sms.variance,
+    voiceVariance: report.categories.voice.variance,
+    messageGap: report.entityAudit.messageGap,
+    callGap: report.entityAudit.callGap,
+    unrecognizedDebitEvents: report.unrecognizedDebitEvents,
+  };
+}

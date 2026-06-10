@@ -53,10 +53,20 @@ Edge / project secrets (Dashboard → Edge Functions → Secrets):
 
 ## Nightly reconcile logs
 
-Supabase Edge Function logs for `twilio-billing-reconcile` emit `twilio-billing-reconcile variance` warnings when material drift is detected.
+Supabase Edge Function logs for `twilio-billing-reconcile` emit `twilio-billing-reconcile variance` warnings when material drift is detected. Each run also persists `billingReconciliationSnapshot` on `workspace.twilio_data` for admin alerting.
+
+Structured debit logs use the `billing.transaction` event (app logger + Edge `console.info`).
+
+## Admin repair actions
+
+Workspace Twilio ops portal → **Billing Reconciliation**:
+
+- **Run reconciliation** — on-demand Twilio vs ledger report; stores snapshot
+- **Repair open sync** — invokes `twilio-open-sync` scoped to this workspace (backfills stale SMS/call statuses and missing debits)
 
 ## Local verification
 
 ```bash
 npm run typecheck && npm run typecheck:deno && npm run test -- test/billing-reconciliation.test.ts
+node scripts/check-twilio-webhook-coverage.mjs
 ```

@@ -66,7 +66,14 @@ Shared logic: [`shared/billing-reconciliation.ts`](../shared/billing-reconciliat
 ## Customer-facing surfaces
 
 - **Billing page** — balance, purchase, Credit Usage Log (source, idempotency key, timestamp)
-- **Admin Twilio portal** — Twilio cost vs ledger variance
+- **Admin Twilio portal** — Twilio cost vs ledger variance, on-demand reconciliation, open-sync repair
+
+## Observability
+
+- **Structured debit logs** — `billing.transaction` (app `logger.info`, Edge `console.info`) on every idempotent ledger write
+- **Nightly reconcile snapshots** — `workspace.twilio_data.billingReconciliationSnapshot` written by `twilio-billing-reconcile` cron
+- **Admin repair** — Run reconciliation / Repair open sync buttons on Billing Reconciliation panel
+- **Webhook inventory** — `node scripts/check-twilio-webhook-coverage.mjs`
 
 ## Related docs
 

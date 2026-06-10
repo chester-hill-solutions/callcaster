@@ -17,17 +17,20 @@ Deno.test("parseTwilioOpenSyncBody caps and defaults", () => {
     callLimit: 100,
     messageLimit: 100,
     maxAgeMinutes: 2,
+    workspaceId: null,
   });
   assertEquals(
     parseTwilioOpenSyncBody({
       callLimit: 9999,
       messageLimit: "10",
       maxAgeMinutes: -1,
+      workspaceId: "ws-1",
     }),
     {
       callLimit: 250,
       messageLimit: 10,
       maxAgeMinutes: 2,
+      workspaceId: "ws-1",
     },
   );
 });

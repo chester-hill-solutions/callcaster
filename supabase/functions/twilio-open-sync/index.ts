@@ -427,14 +427,14 @@ export async function handleRequest(
   } catch {
     body = {};
   }
-  const { callLimit, messageLimit, maxAgeMinutes } = parseTwilioOpenSyncBody(
+  const { callLimit, messageLimit, maxAgeMinutes, workspaceId } = parseTwilioOpenSyncBody(
     body,
   );
   const staleIso = staleBeforeIso(maxAgeMinutes);
 
   const twilioCache = new Map<string, Twilio.Twilio>();
 
-  const { data: calls, error: callsErr } = await supabase
+  let callsQuery = supabase
     .from("call")
     .select(
       "sid, workspace, account_sid, outreach_attempt_id, parent_call_sid, status, date_updated",
@@ -446,6 +446,12 @@ export async function handleRequest(
     .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(callLimit);
 
+  if (workspaceId) {
+    callsQuery = callsQuery.eq("workspace", workspaceId);
+  }
+
+  const { data: calls, error: callsErr } = await callsQuery;
+
   if (callsErr) {
     console.error("twilio-open-sync calls query", callsErr);
     return new Response(JSON.stringify({ error: callsErr.message }), {
@@ -455,7 +461,7 @@ export async function handleRequest(
   }
 
   const minD = TWILIO_OPEN_SYNC_MIN_DATE_CREATED;
-  const { data: messages, error: msgErr } = await supabase
+  let messagesQuery = supabase
     .from("message")
     .select(
       "sid, workspace, account_sid, direction, status, date_updated, outreach_attempt_id, campaign_id, from, to, body, num_media",
@@ -469,6 +475,12 @@ export async function handleRequest(
     .or(`date_updated.is.null,date_updated.lt.${staleIso}`)
     .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(messageLimit);
+
+  if (workspaceId) {
+    messagesQuery = messagesQuery.eq("workspace", workspaceId);
+  }
+
+  const { data: messages, error: msgErr } = await messagesQuery;
 
   if (msgErr) {
     console.error("twilio-open-sync messages query", msgErr);

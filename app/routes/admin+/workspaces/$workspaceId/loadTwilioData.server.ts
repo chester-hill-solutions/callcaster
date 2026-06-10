@@ -4,13 +4,17 @@ import {
   getWorkspaceTwilioPortalSnapshot,
 } from "@/lib/database.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import {
+  getWorkspaceBillingReconciliationSnapshot,
+  type BillingReconciliationSnapshot,
+} from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
-import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 
 export interface TwilioPageData {
   twilioAccountInfo: {
@@ -47,6 +51,7 @@ export interface TwilioPageData {
   }>;
   portalSnapshot: WorkspaceTwilioPortalSnapshot;
   billingReconciliation: BillingReconciliationReport | null;
+  billingReconciliationSnapshot: BillingReconciliationSnapshot | null;
 }
 
 export async function loadTwilioData(
@@ -60,6 +65,7 @@ export async function loadTwilioData(
   let twilioNumbers: TwilioPageData["twilioNumbers"] = [];
   let twilioUsage: TwilioPageData["twilioUsage"] = [];
   let billingReconciliation: BillingReconciliationReport | null = null;
+  let billingReconciliationSnapshot: BillingReconciliationSnapshot | null = null;
 
   const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
     supabaseClient,
@@ -77,6 +83,9 @@ export async function loadTwilioData(
       .single();
 
     const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+    billingReconciliationSnapshot = getWorkspaceBillingReconciliationSnapshot(
+      workspace?.twilio_data,
+    );
     if (adminTwilioCreds?.sid) {
       const twilio = await createWorkspaceTwilioInstance({
         supabase: supabaseClient,
@@ -137,5 +146,6 @@ export async function loadTwilioData(
     twilioUsage,
     portalSnapshot,
     billingReconciliation,
+    billingReconciliationSnapshot,
   };
 }

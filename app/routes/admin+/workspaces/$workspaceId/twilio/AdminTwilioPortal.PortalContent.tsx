@@ -46,7 +46,10 @@ export function PortalContent({ data }: { data: TwilioPageData }) {
             <SubaccountPanel twilioAccountInfo={data.twilioAccountInfo} />
             <PhoneNumbersPanel twilioNumbers={data.twilioNumbers} />
             <UsagePanel twilioUsage={data.twilioUsage} />
-            <BillingReconciliationPanel report={data.billingReconciliation} />
+            <BillingReconciliationPanel
+                report={data.billingReconciliation}
+                snapshot={data.billingReconciliationSnapshot}
+            />
         </>
     );
 }

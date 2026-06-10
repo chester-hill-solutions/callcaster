@@ -139,6 +139,16 @@ export async function insertTransactionHistoryIdempotent(args: {
         .single()) as Awaited<SupabaseSingleResult<{ id: number }>>;
 
       if (!error) {
+        console.info(
+          "billing.transaction",
+          JSON.stringify({
+            workspaceId: args.workspaceId,
+            type: args.type,
+            amount: args.amount,
+            idempotencyKey,
+            inserted: true,
+          }),
+        );
         return { inserted: true };
       }
 
@@ -153,6 +163,16 @@ export async function insertTransactionHistoryIdempotent(args: {
           .limit(1)) as Awaited<SupabaseArrayResult<{ id: number }>>;
 
         if (!existingError && existing && existing.length > 0) {
+          console.info(
+            "billing.transaction",
+            JSON.stringify({
+              workspaceId: args.workspaceId,
+              type: args.type,
+              amount: args.amount,
+              idempotencyKey,
+              inserted: false,
+            }),
+          );
           return { inserted: false };
         }
       }

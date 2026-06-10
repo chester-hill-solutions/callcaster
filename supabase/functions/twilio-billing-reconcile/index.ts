@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@^2.
 import Twilio from "npm:twilio@^5.3.0";
 import {
   buildBillingReconciliationReport,
+  buildBillingReconciliationSnapshot,
+  hasMaterialBillingVariance,
   type BillingReconciliationReport,
   type LedgerTransactionRow,
   type TwilioUsageRecord,
@@ -135,13 +137,35 @@ async function reconcileWorkspace(args: {
 }
 
 function hasMaterialVariance(report: BillingReconciliationReport): boolean {
-  return (
-    Math.abs(report.categories.sms.variance) > 2 ||
-    Math.abs(report.categories.voice.variance) > 2 ||
-    Math.abs(report.entityAudit.messageGap) > 2 ||
-    Math.abs(report.entityAudit.callGap) > 2 ||
-    report.unrecognizedDebitEvents > 0
-  );
+  return hasMaterialBillingVariance(report);
+}
+
+async function persistBillingReconciliationSnapshot(args: {
+  supabase: SupabaseClient;
+  workspaceId: string;
+  report: BillingReconciliationReport;
+}) {
+  const snapshot = buildBillingReconciliationSnapshot(args.report, "cron");
+  const { data: workspace } = await args.supabase
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", args.workspaceId)
+    .single();
+
+  const twilioData =
+    workspace?.twilio_data && typeof workspace.twilio_data === "object"
+      ? (workspace.twilio_data as Record<string, unknown>)
+      : {};
+
+  await args.supabase
+    .from("workspace")
+    .update({
+      twilio_data: {
+        ...twilioData,
+        billingReconciliationSnapshot: snapshot,
+      },
+    })
+    .eq("id", args.workspaceId);
 }
 
 export async function handleRequest(
@@ -218,6 +242,22 @@ export async function handleRequest(
           }),
         );
       }
+
+      await persistBillingReconciliationSnapshot({
+        supabase,
+        workspaceId: workspace.id,
+        report,
+      }).catch((persistError) => {
+        const message =
+          persistError instanceof Error
+            ? persistError.message
+            : String(persistError);
+        console.error(
+          "twilio-billing-reconcile snapshot persist failed",
+          workspace.id,
+          message,
+        );
+      });
     } catch (reconcileError) {
       const message =
         reconcileError instanceof Error

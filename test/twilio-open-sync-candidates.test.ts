@@ -23,17 +23,20 @@ describe("twilio-open-sync-candidates", () => {
       callLimit: 100,
       messageLimit: 100,
       maxAgeMinutes: 2,
+      workspaceId: null,
     });
     expect(
       parseTwilioOpenSyncBody({
         callLimit: 9999,
         messageLimit: "10",
         maxAgeMinutes: -1,
+        workspaceId: " ws-1 ",
       }),
     ).toEqual({
       callLimit: 250,
       messageLimit: 10,
       maxAgeMinutes: 2,
+      workspaceId: "ws-1",
     });
   });
 

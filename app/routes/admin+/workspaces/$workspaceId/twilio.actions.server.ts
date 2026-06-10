@@ -1,6 +1,12 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 
-import { syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  syncWorkspaceTwilioSnapshot,
+  updateWorkspaceTwilioPortalConfig,
+} from "@/lib/database.server";
+import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
 import { parseTwilioPortalConfigForm, parseTwilioRcsOnboardingForm } from "@/lib/schemas/twilio-portal-config";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
@@ -14,6 +20,7 @@ import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server"
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
 export const action = async ({ request, params }: ActionFunctionArgs) => {
@@ -105,6 +112,89 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             });
         } catch (error) {
             logger.error("Twilio webhook repair failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "run_billing_reconciliation") {
+        try {
+            const { data: workspace } = await supabaseClient
+              .from("workspace")
+              .select("twilio_data")
+              .eq("id", workspaceId)
+              .single();
+
+            const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+            if (!creds?.sid) {
+              return routeData(
+                { error: "Workspace has no Twilio credentials" },
+                { status: 400 },
+              );
+            }
+
+            const twilio = await createWorkspaceTwilioInstance({
+              supabase: supabaseClient,
+              workspace_id: workspaceId,
+            });
+            const usageRecords = await twilio.usage.records.list();
+            const twilioUsage = usageRecords.map((record) => ({
+              category: record.category,
+              description: record.description,
+              usage: record.usage,
+              usageUnit: record.usageUnit,
+              price: record.price.toString(),
+              startDate: record.startDate?.toISOString(),
+              endDate: record.endDate?.toISOString(),
+            }));
+
+            const report = await loadBillingReconciliationReport({
+              supabaseClient,
+              workspaceId,
+              twilioUsage,
+            });
+            const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
+              supabaseClient,
+              workspaceId,
+              report,
+              source: "admin",
+            });
+
+            return routeData({
+              success: snapshot.materialVariance
+                ? "Reconciliation complete — material variance detected (see Billing Reconciliation panel)."
+                : "Reconciliation complete — no material variance.",
+            });
+        } catch (error) {
+            logger.error("Billing reconciliation run failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "trigger_twilio_open_sync") {
+        try {
+            const { data, error } = await supabaseClient.functions.invoke(
+              "twilio-open-sync",
+              {
+                body: {
+                  workspaceId,
+                  callLimit: 50,
+                  messageLimit: 50,
+                  maxAgeMinutes: 120,
+                },
+              },
+            );
+
+            if (error) {
+              return routeData({ error: error.message }, { status: 500 });
+            }
+
+            const summary =
+              data && typeof data === "object"
+                ? JSON.stringify(data)
+                : "Open sync completed";
+            return routeData({ success: `Twilio open sync triggered: ${summary}` });
+        } catch (error) {
+            logger.error("Twilio open sync trigger failed:", error);
             return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
         }
     }

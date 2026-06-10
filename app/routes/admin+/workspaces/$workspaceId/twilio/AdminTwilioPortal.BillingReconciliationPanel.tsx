@@ -1,10 +1,16 @@
+import { Form } from "react-router";
+import { RefreshCw, RotateCcw } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import type { BillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 
 type BillingReconciliationPanelProps = {
   report: BillingReconciliationReport | null;
+  snapshot: BillingReconciliationSnapshot | null;
 };
 
 function varianceBadge(variance: number) {
@@ -22,7 +28,10 @@ function varianceBadge(variance: number) {
   );
 }
 
-export function BillingReconciliationPanel({ report }: BillingReconciliationPanelProps) {
+export function BillingReconciliationPanel({
+  report,
+  snapshot,
+}: BillingReconciliationPanelProps) {
   if (!report) {
     return (
       <Card>
@@ -50,12 +59,54 @@ export function BillingReconciliationPanel({ report }: BillingReconciliationPane
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Billing Reconciliation</CardTitle>
-        <CardDescription>
-          Twilio vs ledger for {report.period.startDate} through {report.period.endDate}.
-        </CardDescription>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <CardTitle>Billing Reconciliation</CardTitle>
+            <CardDescription>
+              Twilio vs ledger for {report.period.startDate} through {report.period.endDate}.
+            </CardDescription>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Form method="post">
+              <input type="hidden" name="_action" value="run_billing_reconciliation" />
+              <Button variant="outline" type="submit" size="sm">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Run reconciliation
+              </Button>
+            </Form>
+            <Form method="post">
+              <input type="hidden" name="_action" value="trigger_twilio_open_sync" />
+              <Button variant="outline" type="submit" size="sm">
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Repair open sync
+              </Button>
+            </Form>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {snapshot?.lastRunAt ? (
+          <div className="rounded-lg border p-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-muted-foreground">Last recorded run</span>
+              <Badge variant={snapshot.materialVariance ? "destructive" : "secondary"}>
+                {snapshot.materialVariance ? "Material variance" : "Balanced"}
+              </Badge>
+              <Badge variant="outline">{snapshot.lastRunSource}</Badge>
+            </div>
+            <div className="mt-2 font-medium">{new Date(snapshot.lastRunAt).toLocaleString()}</div>
+            <p className="mt-2 text-muted-foreground">
+              Nightly cron writes snapshots when drift is detected. Use repair actions above to backfill
+              missed webhooks or refresh the report after fixes.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No reconciliation snapshot stored yet. Run reconciliation to record a baseline, or wait for the
+            nightly cron after deploy.
+          </p>
+        )}
+
         <Table>
           <TableHeader>
             <TableRow>
@@ -147,8 +198,8 @@ export function BillingReconciliationPanel({ report }: BillingReconciliationPane
             </TableBody>
           </Table>
           <p className="mt-3 text-sm text-muted-foreground">
-            Positive gaps suggest billable activity without a matching ledger debit. Investigate missing webhooks,
-            pre-cutover traffic, or multi-segment SMS billed as a single debit.
+            Positive gaps suggest billable activity without a matching ledger debit. Use Repair open sync to
+            backfill stale SMS/call statuses, then re-run reconciliation.
           </p>
         </div>
       </CardContent>

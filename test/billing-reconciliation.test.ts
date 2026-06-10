@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 
 import {
   buildBillingReconciliationReport,
+  buildBillingReconciliationSnapshot,
   categorizeLedgerRow,
   filterLedgerRowsInPeriod,
+  hasMaterialBillingVariance,
   summarizeLedger,
   type TwilioUsageRecord,
 } from "../shared/billing-reconciliation";
@@ -142,5 +144,9 @@ describe("billing-reconciliation", () => {
     expect(report.categories.numbers.variance).toBe(1);
     expect(report.entityAudit.messageGap).toBe(116);
     expect(report.ledgerCreditPurchases).toBe(500);
+    expect(hasMaterialBillingVariance(report)).toBe(true);
+    const snapshot = buildBillingReconciliationSnapshot(report, "admin");
+    expect(snapshot.materialVariance).toBe(true);
+    expect(snapshot.smsVariance).toBe(118);
   });
 });
