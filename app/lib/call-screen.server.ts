@@ -58,7 +58,7 @@ export async function getCallScreenData(
 
   if (errors.length) {
     logger.error("Error fetching campaign data:", errors);
-    throw "Error fetching campaign data";
+    throw new Error("Error fetching campaign data");
   }
   return {
     workspaceData: workspaceData.data,
@@ -112,7 +112,7 @@ export async function getQueueByDialType(
   } else if (dialType === "call") {
     queue = rows.filter((item) => isAssignedToUser(item, userId)).slice(0, 50);
   } else {
-    throw "Invalid dial type";
+    throw new Error("Invalid dial type");
   }
   return queue;
 }
@@ -131,14 +131,16 @@ export function getInitialCallsList(attempts: OutreachAttempt[]) {
   return attempts.flatMap((attempt) => attempt.call);
 }
 
-export function getInitialRecentCall(attempts: OutreachAttempt[]) {
-  return attempts.sort(
+function getMostRecentAttempt(attempts: OutreachAttempt[]) {
+  return [...attempts].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   )[0];
 }
 
+export function getInitialRecentCall(attempts: OutreachAttempt[]) {
+  return getMostRecentAttempt(attempts);
+}
+
 export function getInitialRecentAttempt(attempts: OutreachAttempt[]) {
-  return attempts.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-  )[0];
+  return getMostRecentAttempt(attempts);
 }

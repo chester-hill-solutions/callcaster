@@ -15,6 +15,7 @@ vi.mock("@/lib/env.server", () => {
 const loggerMocks = vi.hoisted(() => ({
   error: vi.fn(),
   debug: vi.fn(),
+  info: vi.fn(),
 }));
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
@@ -214,6 +215,7 @@ describe("api.auto-dial.status", () => {
     twilioClientMock.conferences.list.mockResolvedValue([]);
     loggerMocks.error.mockReset();
     loggerMocks.debug.mockReset();
+    loggerMocks.info.mockReset();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
   });
 

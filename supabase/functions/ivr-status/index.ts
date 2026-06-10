@@ -165,6 +165,7 @@ const handleCallCompletion = async (
       error: error instanceof Error ? error.message : String(error),
       callSid: callData.sid
     });
+    throw error;
   }
 };
 

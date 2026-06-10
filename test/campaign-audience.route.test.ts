@@ -58,6 +58,7 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Set-Cookie")).toBe("a=1");
     await expect(res.json()).resolves.toEqual({
+      success: true,
       message: "Audience already added to campaign",
     });
   }, 30000);
@@ -113,7 +114,11 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      audienceLinked: true,
+      enqueued: 2,
+    });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
       supabaseClient,
       20,
@@ -157,7 +162,11 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      audienceLinked: true,
+      enqueued: 0,
+    });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
   }, 30000);
 
@@ -196,7 +205,11 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      audienceLinked: true,
+      enqueued: 0,
+    });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
   }, 30000);
 

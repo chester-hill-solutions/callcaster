@@ -10,6 +10,7 @@ export function getDefaultSectionTitle(sectionNumber: number): string {
 }
 
 export function getFlowType(script: Script): Flow["type"] {
+  if (script.type === "inbound_ivr") return "inbound_ivr";
   return script.type === "ivr" ? "ivr" : "script";
 }
 
@@ -43,7 +44,7 @@ export function createDefaultBlock(
     options: [],
   };
 
-  if (flowType === "ivr") {
+  if (flowType === "ivr" || flowType === "inbound_ivr") {
     return {
       ...baseBlock,
       title: isFirstInSection ? "Welcome Message" : baseBlock.title,
@@ -51,7 +52,11 @@ export function createDefaultBlock(
         ? "Hello, thanks for taking this call. Please listen to the following question."
         : "",
       speechType: "synthetic",
-      responseType: isFirstInSection ? "speech" : null,
+      responseType: isFirstInSection
+        ? flowType === "inbound_ivr"
+          ? "dtmf"
+          : "speech"
+        : null,
     };
   }
 
@@ -71,7 +76,7 @@ export function normalizeFlow(script: Script): Flow {
 
   return {
     type:
-      raw.type === "ivr" ? "ivr" : raw.type === "script" ? "script" : flowType,
+      raw.type === "ivr" ? "ivr" : raw.type === "inbound_ivr" ? "inbound_ivr" : raw.type === "script" ? "script" : flowType,
     pages,
     blocks,
     startPage: isString(raw.startPage) ? raw.startPage : firstPageId,

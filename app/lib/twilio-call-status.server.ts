@@ -1,6 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, TablesInsert } from "@/lib/database.types";
+import {
+  voiceBillingKindFromCampaignType,
+  voiceCreditsFromDurationSeconds,
+  type VoiceBillingKind,
+} from "../../shared/pricing";
+
+export {
+  voiceBillingKindFromCampaignType,
+  type VoiceBillingKind,
+} from "../../shared/pricing";
 
 export function twilioParamToUnderCase(str: string): string {
   return str.replace(/(?!^)([A-Z])/g, "_$1").toLowerCase();
@@ -96,8 +106,11 @@ export async function resolveCallOutreachContext(
   return { outreachAttemptId, workspaceId };
 }
 
-export function billingUnitsFromCallDurationSeconds(duration: number): number {
-  return Math.floor(duration / 60) + 1;
+export function billingUnitsFromCallDurationSeconds(
+  duration: number,
+  kind: VoiceBillingKind = "staffed",
+): number {
+  return voiceCreditsFromDurationSeconds(duration, kind);
 }
 
 export const TERMINAL_CALL_STATUSES = [

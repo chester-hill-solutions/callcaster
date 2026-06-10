@@ -13,6 +13,8 @@
 :surveyId
 accept-invite
 admin
+analytics
+api/agent-status
 api/audience-upload
 api/audience-upload-status
 api/audiences
@@ -44,6 +46,8 @@ api/hangup
 api/inbound
 api/inbound-handset
 api/inbound-handset-dial-end
+api/inbound-ivr/:numberId/:pageId
+api/inbound-queue
 api/inbound-sms
 api/inbound-verification
 api/initiate-ivr
@@ -79,6 +83,7 @@ audios
 auth/confirm
 billing
 bulk-delete
+calls
 campaigns
 campaigns
 chats
@@ -104,6 +109,7 @@ other-services
 pricing
 purchase
 queue
+queues
 remember
 reset
 reset-password

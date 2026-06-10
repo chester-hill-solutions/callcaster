@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
@@ -90,6 +90,7 @@ describe("phone, contact, campaign hooks", () => {
         target: { value: "+1 (555) 123-4567" },
       } as React.ChangeEvent<HTMLInputElement>);
     });
+    await waitFor(() => expect(result.current.isSearching).toBe(false));
     expect(result.current.isValid).toBe(true);
 
     act(() => {
@@ -97,6 +98,8 @@ describe("phone, contact, campaign hooks", () => {
         target: { value: "+1 (555) 987-6543" },
       } as React.ChangeEvent<HTMLInputElement>);
     });
+    await waitFor(() => expect(rpc).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.isSearching).toBe(false));
     expect(result.current.isValid).toBe(true);
 
     act(() => {

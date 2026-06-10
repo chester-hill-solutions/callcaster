@@ -64,6 +64,8 @@ type LoaderData = {
   mediaNames: { id: number; name: string }[];
   users: User[];
   user: User;
+  queues: { id: number; name: string }[];
+  scripts: { id: number; name: string }[];
   creditsBalance: number;
 };
 
@@ -74,6 +76,8 @@ const WorkspaceSettings = () => {
     user,
     users,
     mediaNames,
+    queues,
+    scripts,
     creditsBalance,
   } = useLoaderData<LoaderData>();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
@@ -163,6 +167,39 @@ const WorkspaceSettings = () => {
     );
   };
 
+  const handleInboundRingCountChange = (numberId: number, value: string) => {
+    updateFetcher.submit(
+      {
+        formName: "update-inbound-ring-count",
+        numberId: String(numberId),
+        inboundRingCount: value,
+      },
+      { method: "POST" },
+    );
+  };
+
+  const handleInboundQueueChange = (numberId: number, queueId: string) => {
+    updateFetcher.submit(
+      {
+        formName: "update-inbound-queue",
+        numberId: String(numberId),
+        inboundQueueId: queueId,
+      },
+      { method: "POST" },
+    );
+  };
+
+  const handleInboundScriptChange = (numberId: number, scriptId: string) => {
+    updateFetcher.submit(
+      {
+        formName: "update-inbound-script",
+        numberId: String(numberId),
+        inboundScriptId: scriptId,
+      },
+      { method: "POST" },
+    );
+  };
+
   const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId: String(numberId) },
@@ -185,10 +222,15 @@ const WorkspaceSettings = () => {
               phoneNumbers={phoneNumbers || []}
               users={users}
               mediaNames={mediaNames}
+              queues={queues}
+              scripts={scripts}
               onIncomingActivityChange={handleIncomingActivityChange}
               onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
               onCallerIdChange={handleCallerIdChange}
               onHandsetChange={handleHandsetChange}
+              onInboundRingCountChange={handleInboundRingCountChange}
+              onInboundQueueChange={handleInboundQueueChange}
+              onInboundScriptChange={handleInboundScriptChange}
               onNumberRemoval={handleNumberRemoval}
               isBusy={updateFetcher.state !== "idle"}
             />

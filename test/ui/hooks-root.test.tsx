@@ -90,12 +90,14 @@ describe("root hooks", () => {
     act(() => ls.result.current[1](null));
     act(() => ls.result.current[2]());
 
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key: "k1",
-        newValue: JSON.stringify({ a: 9 }),
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent("storage", {
+          key: "k1",
+          newValue: JSON.stringify({ a: 9 }),
+        }),
+      );
+    });
     await waitFor(() => expect(ls.result.current[0]).toEqual({ a: 9 }));
 
     const multi = renderHook(() =>

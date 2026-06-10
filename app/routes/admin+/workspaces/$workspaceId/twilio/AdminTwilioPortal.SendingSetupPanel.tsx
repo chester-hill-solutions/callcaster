@@ -9,10 +9,10 @@ import { buildWorkspaceSummary, formatLabel, getSyncStatusBadgeVariant } from ".
 
 type SendingSetupPanelProps = Pick<
     TwilioPageData["portalSnapshot"],
-    "config" | "detectedTrafficClass" | "metrics" | "syncSnapshot"
+    "config" | "effectiveConfig" | "detectedTrafficClass" | "metrics" | "syncSnapshot"
 >;
 
-export function SendingSetupPanel({ config, detectedTrafficClass, metrics, syncSnapshot }: SendingSetupPanelProps) {
+export function SendingSetupPanel({ config, effectiveConfig, detectedTrafficClass, metrics, syncSnapshot }: SendingSetupPanelProps) {
     return (
         <Card>
             <CardHeader>
@@ -37,7 +37,7 @@ export function SendingSetupPanel({ config, detectedTrafficClass, metrics, syncS
                     <div className="rounded-lg border p-4">
                         <div className="text-sm text-muted-foreground">Current send path</div>
                         <div className="mt-1 font-medium">
-                            {config.sendMode === "messaging_service" ? "Messaging Service" : "Phone number"}
+                            {effectiveConfig.sendMode === "messaging_service" ? "Messaging Service" : "Phone number"}
                         </div>
                     </div>
                     <div className="rounded-lg border p-4">
@@ -59,7 +59,12 @@ export function SendingSetupPanel({ config, detectedTrafficClass, metrics, syncS
                     </div>
                 </div>
 
-                <PortalForm config={config} detectedTrafficClass={detectedTrafficClass} metrics={metrics} />
+                <PortalForm
+                    config={config}
+                    effectiveConfig={effectiveConfig}
+                    detectedTrafficClass={detectedTrafficClass}
+                    metrics={metrics}
+                />
             </CardContent>
         </Card>
     );

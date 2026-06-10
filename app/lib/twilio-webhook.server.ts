@@ -39,6 +39,28 @@ export function resolveWorkspaceWebhookAuthToken(twilioData: unknown): string | 
   return resolveTwilioWebhookAuthToken(readTwilioWorkspaceCredentials(twilioData));
 }
 
+function validateParamsWithToken(args: {
+  request: Request;
+  params: Record<string, string>;
+  authToken: string | null;
+  missingCredentialsResponse?: () => Response;
+}): TwilioWebhookValidationResult {
+  if (!args.authToken) {
+    return {
+      ok: false,
+      response: (args.missingCredentialsResponse ?? twilioWebhookForbidden)(),
+    };
+  }
+
+  const signature = args.request.headers.get("x-twilio-signature");
+  const url = resolveTwilioWebhookRequestUrl(args.request);
+  if (!validateTwilioWebhookParams(args.params, signature, url, args.authToken)) {
+    return { ok: false, response: twilioWebhookForbidden() };
+  }
+
+  return { ok: true, params: args.params, authToken: args.authToken };
+}
+
 function twilioWebhookJsonResponse(
   error: string,
   status: number,
@@ -137,17 +159,12 @@ export function validateWorkspaceTwilioWebhook(args: {
   twilioData: unknown;
 }): TwilioWebhookValidationResult {
   const authToken = resolveWorkspaceWebhookAuthToken(args.twilioData);
-  if (!authToken) {
-    return { ok: false, response: twilioWebhookMissingCredentials() };
-  }
-
-  const signature = args.request.headers.get("x-twilio-signature");
-  const url = resolveTwilioWebhookRequestUrl(args.request);
-  if (!validateTwilioWebhookParams(args.params, signature, url, authToken)) {
-    return { ok: false, response: twilioWebhookForbidden() };
-  }
-
-  return { ok: true, params: args.params, authToken };
+  return validateParamsWithToken({
+    request: args.request,
+    params: args.params,
+    authToken,
+    missingCredentialsResponse: twilioWebhookMissingCredentials,
+  });
 }
 
 export function validateTwilioWebhookForPhoneCandidates(args: {
@@ -165,6 +182,40 @@ export function validateTwilioWebhookForPhoneCandidates(args: {
       validateTwilioWebhookParams(args.params, signature, url, authToken)
     );
   });
+}
+
+export async function validateTwilioWebhookForWorkspace(args: {
+  request: Request;
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+}): Promise<
+  | ({ ok: true; params: Record<string, string>; authToken: string } & { workspaceId: string })
+  | { ok: false; response: Response }
+> {
+  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
+  if (missingHeader) {
+    return { ok: false, response: missingHeader };
+  }
+
+  const url = new URL(args.request.url);
+  const params = Object.fromEntries(url.searchParams.entries());
+
+  const { data: workspace } = await args.supabase
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", args.workspaceId)
+    .single();
+
+  const validation = validateWorkspaceTwilioWebhook({
+    request: args.request,
+    params,
+    twilioData: workspace?.twilio_data,
+  });
+  if (!validation.ok) {
+    return validation;
+  }
+
+  return { ...validation, workspaceId: args.workspaceId };
 }
 
 export async function validateTwilioWebhookForCallSid(args: {
@@ -190,12 +241,11 @@ export async function validateTwilioWebhookForCallSid(args: {
 
   if (!existingCall?.workspace) {
     const authToken = resolveWorkspaceWebhookAuthToken(null);
-    const signature = args.request.headers.get("x-twilio-signature");
-    const url = resolveTwilioWebhookRequestUrl(args.request);
-    if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
-      return { ok: false, response: twilioWebhookForbidden() };
-    }
-    return { ok: true, params, authToken };
+    return validateParamsWithToken({
+      request: args.request,
+      params,
+      authToken,
+    });
   }
 
   const { data: workspace } = await args.supabase
@@ -204,15 +254,11 @@ export async function validateTwilioWebhookForCallSid(args: {
     .eq("id", existingCall.workspace)
     .single();
 
-  const authToken = resolveWorkspaceWebhookAuthToken(workspace?.twilio_data);
-  const signature = args.request.headers.get("x-twilio-signature");
-  const url = resolveTwilioWebhookRequestUrl(args.request);
-
-  if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
-    return { ok: false, response: twilioWebhookForbidden() };
-  }
-
-  return { ok: true, params, authToken };
+  return validateParamsWithToken({
+    request: args.request,
+    params,
+    authToken: resolveWorkspaceWebhookAuthToken(workspace?.twilio_data),
+  });
 }
 
 export async function validateTwilioWebhookForMessageSid(args: {
@@ -246,15 +292,11 @@ export async function validateTwilioWebhookForMessageSid(args: {
     .eq("id", messageRow.workspace)
     .single();
 
-  const authToken = resolveWorkspaceWebhookAuthToken(workspace?.twilio_data);
-  const signature = args.request.headers.get("x-twilio-signature");
-  const url = resolveTwilioWebhookRequestUrl(args.request);
-
-  if (!authToken || !validateTwilioWebhookParams(params, signature, url, authToken)) {
-    return { ok: false, response: twilioWebhookForbidden() };
-  }
-
-  return { ok: true, params, authToken };
+  return validateParamsWithToken({
+    request: args.request,
+    params,
+    authToken: resolveWorkspaceWebhookAuthToken(workspace?.twilio_data),
+  });
 }
 
 export type TwilioWebhookPhoneValidationResult =

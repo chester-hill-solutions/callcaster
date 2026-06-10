@@ -5,21 +5,30 @@ import type {
   WorkspaceTwilioOpsConfig,
   WorkspaceTwilioSyncSnapshot,
 } from "@/lib/types";
+import {
+  configuredDispatcherSmsMps,
+  configuredDispatcherVoiceCps,
+  LEGACY_IVR_PIPELINE_CPS,
+  LEGACY_MESSAGE_PIPELINE_MPS,
+  twilioAssumedSmsMps,
+} from "@/lib/throughput-config";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
 export const IVR_HANDLER_NEXT_DELAY_MS = 500;
 
-export const MESSAGE_PIPELINE_MESSAGES_PER_SECOND =
-  1000 / (QUEUE_NEXT_DELAY_MS + SMS_HANDLER_NEXT_DELAY_MS);
-export const IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND =
-  1000 / (QUEUE_NEXT_DELAY_MS + IVR_HANDLER_NEXT_DELAY_MS);
+/** @deprecated Use configuredDispatcherSmsMps with portal config instead. */
+export const MESSAGE_PIPELINE_MESSAGES_PER_SECOND = LEGACY_MESSAGE_PIPELINE_MPS;
+/** @deprecated Use configuredDispatcherVoiceCps with portal config instead. */
+export const IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND = LEGACY_IVR_PIPELINE_CPS;
 
 type ThroughputContext = {
+  smsSenderClass: WorkspaceTwilioOpsConfig["smsSenderClass"];
   trafficClass: TwilioTrafficClass;
   throughputProduct: TwilioThroughputProduct;
   sendMode: TwilioSendMode;
   senderPoolSize: number;
+  portalConfig: WorkspaceTwilioOpsConfig;
 };
 
 export type MessageCampaignEstimateInput = {
@@ -32,6 +41,7 @@ export type MessageCampaignEstimateInput = {
 };
 
 export type IvrCampaignEstimateInput = {
+  portalConfig: WorkspaceTwilioOpsConfig;
   voiceCapableLocalNumbers: number;
   selectedCallerId?: string | null;
   selectedCallerIdVoiceCapable?: boolean;
@@ -39,72 +49,52 @@ export type IvrCampaignEstimateInput = {
 
 export type MessageCampaignEstimate = {
   pipelineMessagesPerSecond: number;
+  configuredDispatcherMessagesPerSecond: number;
   twilioAssumedMessagesPerSecond: number;
   effectiveMessagesPerSecond: number;
   senderPoolSize: number;
   senderContextLabel: string;
   footnotes: string[];
+  warnings: string[];
 };
 
 export type IvrCampaignEstimate = {
   pipelineDialAttemptsPerSecond: number;
+  configuredDispatcherDialAttemptsPerSecond: number;
   twilioAssumedDialAttemptsPerSecond: number;
   effectiveDialAttemptsPerSecond: number;
+  voiceConcurrentCallLimit: number;
   senderPoolSize: number;
   senderContextLabel: string;
   footnotes: string[];
+  warnings: string[];
 };
 
 function normalizeSenderPoolSize(value: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
 }
 
-function baseMessagesPerSecondByTrafficClass(
-  trafficClass: TwilioTrafficClass,
-): number {
-  switch (trafficClass) {
-    case "short_code":
-      return 25;
-    case "alphanumeric":
-      return 8;
-    case "toll_free":
-      return 3;
-    case "a2p10dlc":
-      return 1;
-    case "international_long_code":
-      return 1;
-    case "unknown":
-    default:
-      return 1;
-  }
-}
-
-function throughputMultiplier(
-  throughputProduct: TwilioThroughputProduct,
-): number {
-  switch (throughputProduct) {
-    case "market_throughput":
-      return 1.5;
-    case "account_based_throughput":
-      return 2;
-    case "none":
-    default:
-      return 1;
-  }
-}
-
 function estimateTwilioMessagesPerSecond({
+  smsSenderClass,
   trafficClass,
   throughputProduct,
   senderPoolSize,
 }: ThroughputContext): number {
-  const basePerSender = baseMessagesPerSecondByTrafficClass(trafficClass);
-  const productMultiplier = throughputMultiplier(throughputProduct);
-  return basePerSender * productMultiplier * normalizeSenderPoolSize(senderPoolSize);
+  return twilioAssumedSmsMps({
+    smsSenderClass,
+    trafficClass,
+    throughputProduct,
+    senderPoolSize,
+  });
 }
 
-function estimateTwilioDialAttemptsPerSecond(senderPoolSize: number): number {
-  return normalizeSenderPoolSize(senderPoolSize);
+function estimateTwilioDialAttemptsPerSecond(
+  portalConfig: WorkspaceTwilioOpsConfig,
+): number {
+  if (portalConfig.parallelDispatchEnabled) {
+    return Math.max(0.1, portalConfig.voiceTargetCps);
+  }
+  return LEGACY_IVR_PIPELINE_CPS;
 }
 
 export function estimateMessageCampaignOutbound(
@@ -127,25 +117,53 @@ export function estimateMessageCampaignOutbound(
       : "workspace sender numbers";
 
   const twilioAssumedMessagesPerSecond = estimateTwilioMessagesPerSecond({
+    smsSenderClass: input.portalConfig.smsSenderClass,
     trafficClass: input.portalConfig.trafficClass,
     throughputProduct: input.portalConfig.throughputProduct,
     sendMode,
     senderPoolSize,
+    portalConfig: input.portalConfig,
   });
-  const pipelineMessagesPerSecond = MESSAGE_PIPELINE_MESSAGES_PER_SECOND;
+  const pipelineMessagesPerSecond = LEGACY_MESSAGE_PIPELINE_MPS;
+  const configuredDispatcherMessagesPerSecond = configuredDispatcherSmsMps(
+    input.portalConfig,
+  );
   const effectiveMessagesPerSecond = Math.min(
-    pipelineMessagesPerSecond,
+    configuredDispatcherMessagesPerSecond,
     twilioAssumedMessagesPerSecond,
   );
 
+  const warnings: string[] = [];
+  if (input.portalConfig.smsSenderClass === "ca_local") {
+    warnings.push(
+      "Canadian local long codes are not recommended for bulk SMS campaigns. Use verified toll-free or a Canadian short code for higher deliverability.",
+    );
+  }
+  if (
+    input.portalConfig.parallelDispatchEnabled &&
+    configuredDispatcherMessagesPerSecond > twilioAssumedMessagesPerSecond
+  ) {
+    warnings.push(
+      "Configured SMS dispatch rate exceeds the estimated Twilio sender limit.",
+    );
+  }
+  if (!input.portalConfig.parallelDispatchEnabled) {
+    warnings.push(
+      "Legacy sequential dispatch is still enabled (~2 MPS). Enable parallel dispatch after Twilio limits are confirmed.",
+    );
+  }
+
   return {
     pipelineMessagesPerSecond,
+    configuredDispatcherMessagesPerSecond,
     twilioAssumedMessagesPerSecond,
     effectiveMessagesPerSecond,
     senderPoolSize,
     senderContextLabel,
+    warnings,
     footnotes: [
-      "Estimated Twilio throughput is based on workspace traffic class, throughput product, and sender pool size.",
+      "MPS is measured in message segments per second.",
+      "Configured dispatcher rate reflects parallel dispatch when enabled; otherwise legacy pipeline pacing applies.",
       "Carrier filtering, compliance checks, and real-time Twilio queueing can reduce actual throughput.",
     ],
   };
@@ -161,22 +179,43 @@ export function estimateIvrCampaignOutbound(
     ? `selected number ${input.selectedCallerId}`
     : "workspace voice-capable numbers";
   const twilioAssumedDialAttemptsPerSecond =
-    estimateTwilioDialAttemptsPerSecond(senderPoolSize);
-  const pipelineDialAttemptsPerSecond = IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND;
+    estimateTwilioDialAttemptsPerSecond(input.portalConfig);
+  const pipelineDialAttemptsPerSecond = LEGACY_IVR_PIPELINE_CPS;
+  const configuredDispatcherDialAttemptsPerSecond = configuredDispatcherVoiceCps(
+    input.portalConfig,
+  );
   const effectiveDialAttemptsPerSecond = Math.min(
-    pipelineDialAttemptsPerSecond,
+    configuredDispatcherDialAttemptsPerSecond,
     twilioAssumedDialAttemptsPerSecond,
   );
 
+  const warnings: string[] = [];
+  if (
+    input.portalConfig.parallelDispatchEnabled &&
+    configuredDispatcherDialAttemptsPerSecond > 5
+  ) {
+    warnings.push(
+      "Voice CPS above 5 typically requires Twilio Business Profile approval and a CPS increase.",
+    );
+  }
+  if (!input.portalConfig.parallelDispatchEnabled) {
+    warnings.push(
+      "Legacy sequential IVR dispatch is still enabled (~1.4 dial starts/sec).",
+    );
+  }
+
   return {
     pipelineDialAttemptsPerSecond,
+    configuredDispatcherDialAttemptsPerSecond,
     twilioAssumedDialAttemptsPerSecond,
     effectiveDialAttemptsPerSecond,
+    voiceConcurrentCallLimit: input.portalConfig.voiceConcurrentCallLimit,
     senderPoolSize,
     senderContextLabel,
+    warnings,
     footnotes: [
-      "Dial-attempt rate reflects queue pacing plus an assumed 1 CPS per voice-capable sender.",
-      "Total IVR completion time also depends on ring time, answer rate, and call duration.",
+      "Dial-attempt rate reflects dial starts per second, not completed calls.",
+      "Total IVR completion time also depends on ring time, answer rate, call duration, and concurrent call limits.",
     ],
   };
 }

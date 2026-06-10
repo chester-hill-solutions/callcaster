@@ -205,8 +205,12 @@ export async function handleNewCampaign({
     .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
-    return routeData(
-      { campaignData: campaignData, error: detailsError },
+    logger.error(
+      "Campaign details insert failed; redirecting to settings for lazy repair",
+      detailsError,
+    );
+    return redirect(
+      `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
       { headers },
     );
   }

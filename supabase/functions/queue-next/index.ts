@@ -1,137 +1,269 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2.39.6";
+import {
+  claimCampaignQueueContacts,
+  countActiveIvrCampaignCalls,
+  loadWorkspaceThroughputConfig,
+  markCampaignCompleteIfDrained,
+  resetStaleClaims,
+  resolveClaimLimit,
+  resolveDispatchMode,
+  resolveIvrClaimLimit,
+  scheduleNextDispatch,
+  type ClaimedContact,
+} from "../_shared/campaign-dispatch.ts";
+import { parseHandlerOutcome } from "../_shared/handler-response.ts";
+import type { HandlerOutcome } from "../_shared/queue-policy.ts";
 import { getFunctionUrl } from "../_shared/getFunctionsBaseUrl.ts";
 import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
+import {
+  DISPATCH_TICK_MS,
+  LEGACY_QUEUE_DELAY_MS,
+} from "../_shared/queue-policy.ts";
 
+type CampaignRow = {
+  is_active: boolean;
+  group_household_queue: boolean;
+  type: string;
+  sms_send_mode: string | null;
+  sms_messaging_service_sid: string | null;
+  caller_id: string | null;
+};
+
+async function invokeHandler(args: {
+  campaign: CampaignRow;
+  contact: ClaimedContact;
+  campaignId: number;
+  owner: string | null;
+}): Promise<{ response: Response; outcome: HandlerOutcome; errorText: string }> {
+  const headers = getFunctionHeaders();
+  const bodyBase = {
+    campaign_id: args.campaignId,
+    workspace_id: args.contact.workspace,
+    contact_id: args.contact.contact_id,
+    caller_id: args.contact.caller_id || args.campaign.caller_id,
+    queue_id: args.contact.id,
+    user_id: args.owner,
+    owner: args.owner,
+  };
+
+  let response: Response;
+  if (args.campaign.type === "robocall") {
+    response = await fetch(getFunctionUrl("ivr-handler"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...bodyBase,
+        to_number: args.contact.phone,
+        type: args.campaign.type,
+      }),
+    });
+  } else if (args.campaign.type === "message") {
+    response = await fetch(getFunctionUrl("sms-handler"), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        ...bodyBase,
+        to_number: args.contact.phone,
+        sms_send_mode: args.campaign.sms_send_mode,
+        sms_messaging_service_sid: args.campaign.sms_messaging_service_sid,
+      }),
+    });
+  } else {
+    throw new Error(`Unknown campaign type: ${args.campaign.type}`);
+  }
+
+  const errorText = await response.text();
+  const outcome = parseHandlerOutcome(response, errorText);
+  return { response, outcome, errorText };
+}
+
+async function dispatchContacts(args: {
+  supabase: ReturnType<typeof createClient>;
+  campaign: CampaignRow;
+  campaignId: number;
+  owner: string | null;
+  contacts: ClaimedContact[];
+  legacyDelayMs?: number;
+}): Promise<{ attempted: number; failed: number }> {
+  if (args.legacyDelayMs) {
+    await new Promise((resolve) => setTimeout(resolve, args.legacyDelayMs));
+  }
+
+  const results = await Promise.allSettled(
+    args.contacts.map(async (contact) => {
+      const { outcome, errorText } = await invokeHandler({
+        campaign: args.campaign,
+        contact,
+        campaignId: args.campaignId,
+        owner: args.owner,
+      });
+
+      if (outcome === "retryable_failure" || outcome === "permanent_failure") {
+        throw new Error(errorText.slice(0, 500) || outcome);
+      }
+    }),
+  );
+
+  const failed = results.filter((result) => result.status === "rejected").length;
+  return { attempted: args.contacts.length, failed };
+}
+
+async function finishDispatchTick(args: {
+  supabase: ReturnType<typeof createClient>;
+  campaignId: number;
+  owner: string | null;
+}): Promise<boolean> {
+  const completed = await markCampaignCompleteIfDrained({
+    supabase: args.supabase,
+    campaignId: args.campaignId,
+  });
+
+  if (!completed) {
+    await scheduleNextDispatch({
+      fetchImpl: fetch,
+      queueNextUrl: getFunctionUrl("queue-next"),
+      headers: getFunctionHeaders(),
+      campaignId: args.campaignId,
+      owner: args.owner,
+      delayMs: DISPATCH_TICK_MS,
+    });
+  }
+
+  return completed;
+}
 
 export async function handleRequest(req: Request): Promise<Response> {
   try {
-    const { campaign_id, owner } = await req.json()
+    const { campaign_id, owner } = await req.json();
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-    const { data: claimed, error: claimError } = await supabase.rpc(
-      "claim_campaign_queue_contacts",
-      {
-        campaign_id_pro: campaign_id,
-        claimed_by_user_id: owner || null,
-        claim_limit: 1,
-      },
-    );
-    if (claimError) throw claimError;
-    const data = claimed ?? [];
-    if (!data.length) {
-      console.log(`Queue is now empty. Marking completed.`)
-      const { error: campaignUpdateError } = await supabase
-        .from("campaign")
-        .update({ status: "complete" })
-        .eq("id", campaign_id);
-      if (campaignUpdateError) throw campaignUpdateError
-      return new Response(
-        JSON.stringify({ status: "queue_empty" }),
-        { headers: { "Content-Type": "application/json" } },
-      )
-    }
+
     const { data: campaign, error: campaignError } = await supabase
       .from("campaign")
-      .select("is_active, group_household_queue, type, sms_send_mode, sms_messaging_service_sid, caller_id")
+      .select(
+        "is_active, group_household_queue, type, sms_send_mode, sms_messaging_service_sid, caller_id, workspace",
+      )
       .eq("id", campaign_id)
       .single();
+
     if (campaignError) throw campaignError;
+
     if (!campaign.is_active) {
-      return new Response(
-        JSON.stringify({ status: "campaign_completed" }),
-        { headers: { "Content-Type": "application/json" } },
-      )
-    }
-    const contact = data[0];
-    if (campaign.type === "message") {
-      console.log(`Sending message to contact`, contact, campaign);
-    } else {
-      console.log(`Calling contact`, contact, campaign);
+      return new Response(JSON.stringify({ status: "campaign_completed" }), {
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    await new Promise(resolve => setTimeout(resolve, 200));
-    if (campaign.type === "robocall") {
-      const response = await fetch(
-        getFunctionUrl("ivr-handler"),
-        {
-          method: 'POST',
-          headers: getFunctionHeaders(),
-          body: JSON.stringify({
-            to_number: contact.phone,
-            campaign_id: campaign_id,
-            workspace_id: contact.workspace,
-            contact_id: contact.contact_id,
-            caller_id: contact.caller_id,
-            queue_id: contact.id,
-            user_id: owner,
-            index: 0,
-            total: data.length,
-            isLastContact: 0 === data.length - 1,
-            type: campaign.type,
-            owner
-          })
-        }
-      );
+    await resetStaleClaims(supabase, Number(campaign_id));
 
-      if (!response.ok) {
-        await supabase.rpc("handle_campaign_queue_entry", {
-          p_contact_id: contact.contact_id,
-          p_campaign_id: Number(campaign_id),
-          p_requeue: true,
+    const throughputConfig = await loadWorkspaceThroughputConfig(
+      supabase,
+      campaign.workspace,
+    );
+    const dispatchMode = resolveDispatchMode(throughputConfig);
+
+    let claimLimit = 1;
+    let maxInflight: number | null = null;
+
+    if (dispatchMode === "parallel") {
+      if (campaign.type === "robocall") {
+        const activeCalls = await countActiveIvrCampaignCalls(
+          supabase,
+          Number(campaign_id),
+        );
+        claimLimit = resolveIvrClaimLimit({
+          config: throughputConfig,
+          activeCalls,
         });
-        throw new Error(`ivr-handler failed with status ${response.status}`);
-      }
-
-      return new Response(
-        JSON.stringify(data),
-        { headers: { "Content-Type": "application/json" } },
-      )
-    } else if (campaign.type === "message") {
-      const response = await fetch(
-        getFunctionUrl("sms-handler"),
-        {
-          method: 'POST',
-          headers: getFunctionHeaders(),
-          body: JSON.stringify({
-            to_number: contact.phone,
-            campaign_id: campaign_id,
-            workspace_id: contact.workspace,
-            contact_id: contact.contact_id,
-            caller_id: contact.caller_id || campaign.caller_id,
-            queue_id: contact.id,
-            user_id: owner,
-            index: 0,
-            total: data.length,
-            isLastContact: 0 === data.length - 1,
-            type: campaign.type,
-            sms_send_mode: campaign.sms_send_mode,
-            sms_messaging_service_sid: campaign.sms_messaging_service_sid,
-          })
+        if (claimLimit <= 0) {
+          console.warn("IVR concurrency limit reached; deferring dispatch", {
+            campaignId: campaign_id,
+            activeCalls,
+            limit: throughputConfig.voiceConcurrentCallLimit,
+          });
+          await scheduleNextDispatch({
+            fetchImpl: fetch,
+            queueNextUrl: getFunctionUrl("queue-next"),
+            headers: getFunctionHeaders(),
+            campaignId: Number(campaign_id),
+            owner: owner || null,
+            delayMs: DISPATCH_TICK_MS,
+          });
+          return new Response(
+            JSON.stringify({
+              status: "concurrency_deferred",
+              activeCalls,
+              limit: throughputConfig.voiceConcurrentCallLimit,
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          );
         }
-      );
-      if (!response.ok) {
-        await supabase.rpc("handle_campaign_queue_entry", {
-          p_contact_id: contact.contact_id,
-          p_campaign_id: Number(campaign_id),
-          p_requeue: true,
+        maxInflight = claimLimit;
+      } else {
+        claimLimit = resolveClaimLimit({
+          campaignType: campaign.type,
+          config: throughputConfig,
         });
-        throw new Error(`sms-handler failed with status ${response.status}`);
       }
-      return new Response(
-        JSON.stringify(data),
-        { headers: { "Content-Type": "application/json" } },
-      )
-    } else {
-      throw new Error("Unknown campaign type");
     }
-  } catch (error) {
+
+    const contacts = await claimCampaignQueueContacts({
+      supabase,
+      campaignId: Number(campaign_id),
+      owner: owner || null,
+      claimLimit,
+      maxInflight,
+    });
+
+    if (!contacts.length) {
+      const completed = await markCampaignCompleteIfDrained({
+        supabase,
+        campaignId: Number(campaign_id),
+      });
+      return new Response(
+        JSON.stringify({ status: completed ? "queue_empty" : "awaiting_inflight" }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const batch = await dispatchContacts({
+      supabase,
+      campaign,
+      campaignId: Number(campaign_id),
+      owner: owner || null,
+      contacts,
+      legacyDelayMs: dispatchMode === "legacy" ? LEGACY_QUEUE_DELAY_MS : undefined,
+    });
+
+    const completed = await finishDispatchTick({
+      supabase,
+      campaignId: Number(campaign_id),
+      owner: owner || null,
+    });
+
+    if (dispatchMode === "legacy") {
+      return new Response(JSON.stringify([contacts[0]]), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(
-      JSON.stringify(error),
-      { headers: { "Content-Type": "application/json" } }
-    )
+      JSON.stringify({
+        status: completed ? "campaign_completed" : "batch_dispatched",
+        attempted: batch.attempted,
+        failed: batch.failed,
+      }),
+      { headers: { "Content-Type": "application/json" } },
+    );
+  } catch (error) {
+    console.error("queue-next error", error);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      headers: { "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 }
 

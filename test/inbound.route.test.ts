@@ -41,8 +41,15 @@ vi.mock("twilio", () => {
     pause(opts: any) {
       this.parts.push(`pause:${opts?.length}`);
     }
-    dial(n: string) {
-      this.parts.push(`dial:${n}`);
+    dial(n?: string | Record<string, unknown>) {
+      if (typeof n === "string") {
+        this.parts.push(`dial:${n}`);
+      }
+      return {
+        number: (number: string) => {
+          this.parts.push(`dial:${number}`);
+        },
+      };
     }
     play(u: string) {
       this.parts.push(`play:${u}`);

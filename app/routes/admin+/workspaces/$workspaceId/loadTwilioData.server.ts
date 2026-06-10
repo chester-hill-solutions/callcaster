@@ -1,15 +1,20 @@
-import { createWorkspaceTwilioInstance, getWorkspaceTwilioPortalSnapshot } from "@/lib/database.server";
+import {
+  buildDefaultWorkspaceTwilioPortalSnapshot,
+  createWorkspaceTwilioInstance,
+  getWorkspaceTwilioPortalSnapshot,
+} from "@/lib/database.server";
+import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import {
+  getWorkspaceBillingReconciliationSnapshot,
+  type BillingReconciliationSnapshot,
+} from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
-import { DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE, buildOnboardingStepsForState, deriveWorkspaceMessagingReadiness } from "@/lib/messaging-onboarding.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import type {
-  WorkspaceTwilioOpsConfig,
-  WorkspaceTwilioPortalSnapshot,
-  WorkspaceTwilioSyncSnapshot,
-} from "@/lib/types";
+import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
 
 export interface TwilioPageData {
   twilioAccountInfo: {
@@ -45,6 +50,8 @@ export interface TwilioPageData {
     endDate?: string;
   }>;
   portalSnapshot: WorkspaceTwilioPortalSnapshot;
+  billingReconciliation: BillingReconciliationReport | null;
+  billingReconciliationSnapshot: BillingReconciliationSnapshot | null;
 }
 
 export async function loadTwilioData(
@@ -57,59 +64,15 @@ export async function loadTwilioData(
   let twilioAccountInfo: TwilioPageData["twilioAccountInfo"] = null;
   let twilioNumbers: TwilioPageData["twilioNumbers"] = [];
   let twilioUsage: TwilioPageData["twilioUsage"] = [];
+  let billingReconciliation: BillingReconciliationReport | null = null;
+  let billingReconciliationSnapshot: BillingReconciliationSnapshot | null = null;
 
   const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
     supabaseClient,
     workspaceId,
   }).catch((error): WorkspaceTwilioPortalSnapshot => {
     logger.error("Error fetching Twilio portal snapshot:", error);
-    const onboarding = {
-      ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      steps: buildOnboardingStepsForState(DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE),
-    };
-    return {
-      config: {
-        trafficClass: "unknown",
-        throughputProduct: "none",
-        multiTenancyMode: "none",
-        trafficShapingEnabled: false,
-        defaultMessageIntent: null,
-        sendMode: "from_number",
-        messagingServiceSid: null,
-        onboardingStatus: "not_started",
-        supportNotes: "",
-        updatedAt: null,
-        updatedBy: null,
-        auditTrail: [],
-      } satisfies WorkspaceTwilioOpsConfig,
-      detectedTrafficClass: "unknown" as const,
-      metrics: {
-        recentOutboundCount: 0,
-        rawFromCount: 0,
-        messagingServiceCount: 0,
-        statusCounts: {},
-        numberTypes: [],
-      },
-      recommendations: [],
-      supportRequestSummary: "Unable to generate a Twilio support summary.",
-      syncSnapshot: {
-        accountStatus: null,
-        accountFriendlyName: null,
-        phoneNumberCount: 0,
-        numberTypes: [],
-        recentUsageCount: 0,
-        usageTotalPrice: null,
-        lastSyncedAt: null,
-        lastSyncStatus: "never_synced" as const,
-        lastSyncError: null,
-      } satisfies WorkspaceTwilioSyncSnapshot,
-      onboarding,
-      readiness: deriveWorkspaceMessagingReadiness({
-        onboarding,
-        workspaceNumbers: [],
-        recentOutboundCount: 0,
-      }),
-    };
+    return buildDefaultWorkspaceTwilioPortalSnapshot();
   });
 
   try {
@@ -120,6 +83,9 @@ export async function loadTwilioData(
       .single();
 
     const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+    billingReconciliationSnapshot = getWorkspaceBillingReconciliationSnapshot(
+      workspace?.twilio_data,
+    );
     if (adminTwilioCreds?.sid) {
       const twilio = await createWorkspaceTwilioInstance({
         supabase: supabaseClient,
@@ -160,6 +126,15 @@ export async function loadTwilioData(
         startDate: record.startDate?.toISOString(),
         endDate: record.endDate?.toISOString(),
       }));
+
+      billingReconciliation = await loadBillingReconciliationReport({
+        supabaseClient,
+        workspaceId,
+        twilioUsage,
+      }).catch((reconcileError) => {
+        logger.error("Error building billing reconciliation report:", reconcileError);
+        return null;
+      });
     }
   } catch (error) {
     logger.error("Error fetching Twilio information:", error);
@@ -170,5 +145,7 @@ export async function loadTwilioData(
     twilioNumbers,
     twilioUsage,
     portalSnapshot,
+    billingReconciliation,
+    billingReconciliationSnapshot,
   };
 }

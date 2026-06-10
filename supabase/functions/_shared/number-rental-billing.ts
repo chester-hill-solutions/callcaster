@@ -1,4 +1,4 @@
-export const RENTED_NUMBER_MONTHLY_CREDITS = 1000;
+export { NUMBER_RENTAL_MONTHLY_CREDITS as RENTED_NUMBER_MONTHLY_CREDITS } from "../../../shared/pricing.ts";
 export const NUMBER_RENTAL_BILLING_ROLLOUT_START_DATE = "2026-04-01";
 
 export type NotificationWindowKey = "pre25" | "pre15" | "pre3" | "post30";

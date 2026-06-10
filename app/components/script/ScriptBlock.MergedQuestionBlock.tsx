@@ -47,7 +47,7 @@ export default function MergedQuestionBlock({
   onMoveDown: () => void;
   pages: PageDictionary;
   blocks: BlockDictionary;
-  type: "script" | "ivr";
+  type: "script" | "ivr" | "inbound_ivr";
   mediaNames: string[];
   openBlock: string | null;
   setOpenBlock: (id: string | null) => void;
@@ -61,6 +61,8 @@ export default function MergedQuestionBlock({
   const [acceptDrop, setAcceptDrop] = useState<"none" | "top" | "bottom">(
     "none",
   );
+  const isAudioType = type === "ivr" || type === "inbound_ivr";
+
   const questionTypes =
     type === "script"
       ? [
@@ -76,11 +78,16 @@ export default function MergedQuestionBlock({
           { value: "recorded", label: "Audio File" },
         ];
 
-  const responseTypes = [
-    { value: "speech", label: "Speech Only (Best for recording messages)" },
-    { value: "dtmf", label: "DTMF Only (Best for simple IVR)" },
-    { value: "dtmf speech", label: "DTMF and Speech (Best for complex IVR)" },
-  ];
+  const responseTypes = type === "inbound_ivr"
+    ? [
+        { value: "dtmf", label: "DTMF Only (Best for simple IVR)" },
+        { value: "dtmf speech", label: "DTMF and Speech (Best for complex IVR)" },
+      ]
+    : [
+        { value: "speech", label: "Speech Only (Best for recording messages)" },
+        { value: "dtmf", label: "DTMF Only (Best for simple IVR)" },
+        { value: "dtmf speech", label: "DTMF and Speech (Best for complex IVR)" },
+      ];
 
   useEffect(() => {
     setLocalBlock(block);
@@ -125,7 +132,7 @@ export default function MergedQuestionBlock({
   const handleAddOption = () => {
     const newOptions = [
       ...(localBlock.options || []),
-      { content: "", next: "", value: type === "ivr" ? "vx-any" : "" },
+      { content: "", next: "", value: type === "ivr" || type === "inbound_ivr" ? "vx-any" : "" },
     ];
     handleChange("options", newOptions);
   };
@@ -229,7 +236,7 @@ export default function MergedQuestionBlock({
                   placeholder="Block Title"
                   className="bg-white"
                 />
-                {type === "script" ? (
+                {!isAudioType ? (
                   <Select
                     value={localBlock.type}
                     onValueChange={(value) => handleChange("type", value)}
@@ -274,7 +281,7 @@ export default function MergedQuestionBlock({
                   mediaNames={mediaNames}
                   onChange={handleChange}
                 />
-                {type === "ivr" && isIVRBlock(localBlock) && (
+                {isAudioType && isIVRBlock(localBlock) && (
                   <Select
                     defaultValue={localBlock.responseType ?? undefined}
                     onValueChange={(value) =>

@@ -237,6 +237,7 @@ export const CampaignTypeSpecificSettings = ({
     selectedMessagingServiceSid,
   });
   const ivrEstimate = estimateIvrCampaignOutbound({
+    portalConfig: outboundEstimateInputs.portalConfig,
     voiceCapableLocalNumbers: voiceCapableNumbers,
     selectedCallerId: campaignData.caller_id,
     selectedCallerIdVoiceCapable: selectedCallerVoiceCapable,
@@ -249,11 +250,13 @@ export const CampaignTypeSpecificSettings = ({
     ? getEtaRange(queueCount, ivrEstimate.effectiveDialAttemptsPerSecond)
     : null;
   const messageTooltipLines = [
-    `Estimated effective send rate: ${formatRatePerMinute(messageEstimate.effectiveMessagesPerSecond)}.`,
+    `Estimated effective send rate: ${formatRatePerMinute(messageEstimate.effectiveMessagesPerSecond)} (segments/sec).`,
+    `Configured dispatcher rate: ${formatRatePerMinute(messageEstimate.configuredDispatcherMessagesPerSecond)}; legacy pipeline cap: ${formatRatePerMinute(messageEstimate.pipelineMessagesPerSecond)}.`,
     `Using ${messageEstimate.senderContextLabel}, assumed Twilio ceiling is ${formatRatePerMinute(messageEstimate.twilioAssumedMessagesPerSecond)} across ${messageEstimate.senderPoolSize} sender${messageEstimate.senderPoolSize === 1 ? "" : "s"}.`,
     smsEtaRange
       ? `If sent now, queue completion is estimated around ${smsEtaRange}.`
       : "Queue completion ETA appears after contacts are queued.",
+    ...messageEstimate.warnings,
     ...messageEstimate.footnotes,
   ];
   const hasMessageContent =
@@ -271,11 +274,14 @@ export const CampaignTypeSpecificSettings = ({
       : !campaignData.caller_id);
 
   const ivrTooltipLines = [
-    `Estimated effective dial-attempt rate: ${formatRatePerMinute(ivrEstimate.effectiveDialAttemptsPerSecond)}.`,
-    `Using ${ivrEstimate.senderContextLabel}, assumed Twilio CPS cap is ${formatRatePerMinute(ivrEstimate.twilioAssumedDialAttemptsPerSecond)} across ${ivrEstimate.senderPoolSize} voice sender${ivrEstimate.senderPoolSize === 1 ? "" : "s"}.`,
+    `Estimated effective dial-start rate: ${formatRatePerMinute(ivrEstimate.effectiveDialAttemptsPerSecond)} CPS.`,
+    `Configured dispatcher CPS: ${formatRatePerMinute(ivrEstimate.configuredDispatcherDialAttemptsPerSecond)}; legacy pipeline cap: ${formatRatePerMinute(ivrEstimate.pipelineDialAttemptsPerSecond)}.`,
+    `Concurrent call guardrail: ${ivrEstimate.voiceConcurrentCallLimit} active calls.`,
+    `Using ${ivrEstimate.senderContextLabel}, assumed Twilio CPS cap is ${formatRatePerMinute(ivrEstimate.twilioAssumedDialAttemptsPerSecond)}.`,
     ivrEtaRange
       ? `If started now, queue dial attempts are estimated to complete around ${ivrEtaRange}.`
       : "Queue completion ETA appears after contacts are queued.",
+    ...ivrEstimate.warnings,
     ...ivrEstimate.footnotes,
   ];
 

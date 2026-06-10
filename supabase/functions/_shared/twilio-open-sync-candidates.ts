@@ -41,9 +41,15 @@ export function parseTwilioOpenSyncBody(raw: unknown): {
   callLimit: number;
   messageLimit: number;
   maxAgeMinutes: number;
+  workspaceId: string | null;
 } {
   /** Defaults apply when cron posts `{}`; tune for backlog without risking Edge timeouts. */
-  const defaults = { callLimit: 100, messageLimit: 100, maxAgeMinutes: 2 };
+  const defaults = {
+    callLimit: 100,
+    messageLimit: 100,
+    maxAgeMinutes: 2,
+    workspaceId: null as string | null,
+  };
   if (raw == null || typeof raw !== "object") return defaults;
   const o = raw as Record<string, unknown>;
   const maxPerKind = 250;
@@ -52,10 +58,15 @@ export function parseTwilioOpenSyncBody(raw: unknown): {
     if (!Number.isFinite(v) || v < 0) return fallback;
     return Math.min(Math.floor(v), max);
   };
+  const workspaceId =
+    typeof o.workspaceId === "string" && o.workspaceId.trim()
+      ? o.workspaceId.trim()
+      : null;
   return {
     callLimit: cap(o.callLimit, maxPerKind, defaults.callLimit),
     messageLimit: cap(o.messageLimit, maxPerKind, defaults.messageLimit),
     maxAgeMinutes: cap(o.maxAgeMinutes, 1440, defaults.maxAgeMinutes),
+    workspaceId,
   };
 }
 

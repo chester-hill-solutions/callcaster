@@ -150,7 +150,7 @@ describe("app/routes/api+/inbound-handset", () => {
   test("returns TwiML dialing client on happy path", async () => {
     mocks.createClient.mockReturnValueOnce(makeSupabase());
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await mod.action({ request: makeRequest() } as never);
+    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("client:agent-1");

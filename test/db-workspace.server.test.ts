@@ -187,7 +187,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         workspaceName: "W",
         user_id: "u1",
       }),
-    ).resolves.toEqual({ data: "w_new", error: null });
+    ).resolves.toEqual({
+      data: "w_new",
+      error: null,
+      provisioningWarning: "Twilio bootstrap is still running",
+    });
     expect(stripe.createStripeContact).toHaveBeenCalled();
 
     // rpc error now aborts before any provisioning
@@ -208,7 +212,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     ).resolves.toMatchObject({ data: null, error: "rpc" });
     expect(logger.error).toHaveBeenCalled();
 
-    // update error bubbles into catch and returns message string
+    // metadata update error is non-fatal; workspace is still created with a warning
     const supabaseUpdateErr: any = {
       rpc: vi.fn(async () => ({ data: "w_new", error: null })),
       from: () => ({
@@ -223,11 +227,17 @@ describe("app/lib/database/workspace.server.ts", () => {
         workspaceName: "W",
         user_id: "u1",
       }),
-    ).resolves.toMatchObject({ data: null, error: "upd" });
+    ).resolves.toMatchObject({
+      data: "w_new",
+      error: null,
+      provisioningWarning: expect.stringContaining(
+        "Workspace provisioning metadata update failed",
+      ),
+    });
 
     const Twilio = (await import("twilio")).default as any;
 
-    // Subaccount creation fails => specific error
+    // Subaccount creation fails => workspace still created with warning
     Twilio.__mocks.accountsCreate.mockRejectedValueOnce(new Error("nope"));
     await expect(
       mod.createNewWorkspace({
@@ -236,8 +246,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         user_id: "u1",
       }),
     ).resolves.toMatchObject({
-      data: null,
-      error: "Failed to create Twilio subaccount",
+      data: "w_new",
+      error: null,
+      provisioningWarning: expect.stringContaining("Twilio subaccount was not created"),
     });
 
     // Keys creation returns falsy without throwing
@@ -249,8 +260,9 @@ describe("app/lib/database/workspace.server.ts", () => {
         user_id: "u1",
       }),
     ).resolves.toMatchObject({
-      data: null,
-      error: "Failed to create Twilio API keys",
+      data: "w_new",
+      error: null,
+      provisioningWarning: expect.stringContaining("Twilio API keys were not created"),
     });
 
     // Non-Error throws => generic message branch
@@ -265,7 +277,11 @@ describe("app/lib/database/workspace.server.ts", () => {
         workspaceName: "W",
         user_id: "u1",
       }),
-    ).resolves.toEqual({ data: null, error: "An unexpected error occurred" });
+    ).resolves.toEqual({
+      data: null,
+      error: "An unexpected error occurred",
+      provisioningWarning: null,
+    });
     expect(logger.error).toHaveBeenCalled();
   });
 
@@ -1699,9 +1715,9 @@ describe("app/lib/database/workspace.server.ts", () => {
     ]);
   });
 
-  test("portal config prefers onboarding Messaging Service defaults when present", async () => {
+  test("effective portal config prefers onboarding Messaging Service defaults when present", async () => {
     const mod = await import("../app/lib/database/workspace.server");
-    const config = mod.getWorkspaceTwilioPortalConfigFromTwilioData({
+    const config = mod.getEffectiveWorkspaceTwilioPortalConfig({
       sid: "AC123",
       authToken: "auth",
       portalConfig: {

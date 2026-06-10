@@ -244,11 +244,6 @@ export default function ContactsPage() {
                               <div className="space-y-1">
                                 {formatOtherData(otherData as unknown[])}
                               </div>
-                              <div className="mt-2 border-t border-border pt-2">
-                                <div className="text-xs text-muted-foreground">
-                                  Raw data: {JSON.stringify(otherData)}
-                                </div>
-                              </div>
                             </div>
                           )}
                         </div>

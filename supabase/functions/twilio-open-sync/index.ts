@@ -10,7 +10,9 @@ import {
   billingUnitsFromDurationSeconds,
   canTransitionOutreachDisposition,
   insertTransactionHistoryIdempotent,
+  voiceBillingKindFromCampaignType,
 } from "../_shared/ivr-status-logic.ts";
+import { SMS_SEGMENT_CREDITS } from "../../../shared/pricing.ts";
 import {
   cancelQueuedMessages,
   normalizeTwilioSmsStatus,
@@ -146,7 +148,7 @@ async function syncCallRow(
     const { data: attempt } = outreachAttemptId != null
       ? await supabase
         .from("outreach_attempt")
-        .select("disposition, contact_id, workspace")
+        .select("disposition, contact_id, workspace, campaign(type)")
         .eq("id", outreachAttemptId)
         .maybeSingle()
       : { data: null };
@@ -177,8 +179,19 @@ async function syncCallRow(
       billingWorkspace &&
       CALL_STATUSES_BILLABLE_ON_COMPLETION.has(normalized)
     ) {
+      const campaignType =
+        attempt &&
+        typeof attempt === "object" &&
+        "campaign" in attempt &&
+        attempt.campaign &&
+        typeof attempt.campaign === "object" &&
+        "type" in attempt.campaign
+          ? String(attempt.campaign.type)
+          : null;
+      const billingKind = voiceBillingKindFromCampaignType(campaignType);
       const amount = billingUnitsFromDurationSeconds(
         Number.isFinite(durationSeconds) ? durationSeconds : 0,
+        billingKind,
       );
       const contactId = attempt?.contact_id;
       const note =
@@ -297,7 +310,7 @@ async function syncMessageRow(
         supabase: supabase as never,
         workspaceId,
         type: "DEBIT",
-        amount: -1,
+        amount: -SMS_SEGMENT_CREDITS,
         note: `SMS ${row.sid} ${status} (twilio-open-sync)`,
         idempotencyKey: `sms:${row.sid}`,
       });
@@ -414,14 +427,14 @@ export async function handleRequest(
   } catch {
     body = {};
   }
-  const { callLimit, messageLimit, maxAgeMinutes } = parseTwilioOpenSyncBody(
+  const { callLimit, messageLimit, maxAgeMinutes, workspaceId } = parseTwilioOpenSyncBody(
     body,
   );
   const staleIso = staleBeforeIso(maxAgeMinutes);
 
   const twilioCache = new Map<string, Twilio.Twilio>();
 
-  const { data: calls, error: callsErr } = await supabase
+  let callsQuery = supabase
     .from("call")
     .select(
       "sid, workspace, account_sid, outreach_attempt_id, parent_call_sid, status, date_updated",
@@ -433,6 +446,12 @@ export async function handleRequest(
     .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(callLimit);
 
+  if (workspaceId) {
+    callsQuery = callsQuery.eq("workspace", workspaceId);
+  }
+
+  const { data: calls, error: callsErr } = await callsQuery;
+
   if (callsErr) {
     console.error("twilio-open-sync calls query", callsErr);
     return new Response(JSON.stringify({ error: callsErr.message }), {
@@ -442,7 +461,7 @@ export async function handleRequest(
   }
 
   const minD = TWILIO_OPEN_SYNC_MIN_DATE_CREATED;
-  const { data: messages, error: msgErr } = await supabase
+  let messagesQuery = supabase
     .from("message")
     .select(
       "sid, workspace, account_sid, direction, status, date_updated, outreach_attempt_id, campaign_id, from, to, body, num_media",
@@ -456,6 +475,12 @@ export async function handleRequest(
     .or(`date_updated.is.null,date_updated.lt.${staleIso}`)
     .order("date_updated", { ascending: false, nullsFirst: false })
     .limit(messageLimit);
+
+  if (workspaceId) {
+    messagesQuery = messagesQuery.eq("workspace", workspaceId);
+  }
+
+  const { data: messages, error: msgErr } = await messagesQuery;
 
   if (msgErr) {
     console.error("twilio-open-sync messages query", msgErr);

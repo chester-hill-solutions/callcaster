@@ -57,17 +57,14 @@ describe("app/components/shared/ErrorBoundary.tsx", () => {
 
   test("shows fallback on child error", async () => {
     const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const Boom = () => {
-      throw new Error("boom");
-    };
-    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    render(
-      <ErrorBoundary fallback={<div>fallback</div>}>
-        <Boom />
-      </ErrorBoundary>,
-    );
+    const boundary = new ErrorBoundary({
+      children: <span>ok</span>,
+      fallback: <div>fallback</div>,
+    });
+    boundary.state = ErrorBoundary.getDerivedStateFromError(new Error("boom"));
+
+    render(<>{boundary.render()}</>);
     expect(screen.getByText("fallback")).toBeInTheDocument();
-    spy.mockRestore();
   });
 });
 

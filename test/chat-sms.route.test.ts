@@ -123,6 +123,11 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       sendMode: "from_number",
       messagingServiceSid: null,
       onboardingStatus: "not_started",
+      smsSenderClass: "unknown",
+      smsTargetMps: 1,
+      voiceTargetCps: 1,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
       supportNotes: "",
       updatedAt: null,
       updatedBy: null,
@@ -131,12 +136,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     vi.unstubAllGlobals();
   });
 
-  test("sendMessage shortens URLs, includes mediaUrl, inserts message, and posts webhook", async () => {
+  test("sendMessage preserves URLs for from-number sends and posts webhook", async () => {
     const fetchMock = vi.fn(async (input: any, init?: any) => {
       const url = String(input);
-      if (url.startsWith("https://tinyurl.com/api-create.php")) {
-        return { ok: true, text: async () => "https://tiny.url/x" } as any;
-      }
       if (url === "http://hook") {
         expect(init?.method).toBe("POST");
         return { ok: true, status: 200, statusText: "OK" } as any;
@@ -154,31 +156,30 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         },
       ],
     });
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM1",
+      body: args.body,
+      numSegments: 1,
+      direction: "outbound-api",
+      from: args.from,
+      to: args.to,
+      dateUpdated: new Date().toISOString(),
+      price: 0,
+      errorMessage: null,
+      uri: "/x",
+      accountSid: "AC",
+      numMedia: 1,
+      status: "queued",
+      messagingServiceSid: null,
+      dateSent: null,
+      dateCreated: new Date().toISOString(),
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      messages: {
-        create: vi.fn(async (args: any) => ({
-          sid: "SM1",
-          body: args.body,
-          numSegments: 1,
-          direction: "outbound-api",
-          from: args.from,
-          to: args.to,
-          dateUpdated: new Date().toISOString(),
-          price: 0,
-          errorMessage: null,
-          uri: "/x",
-          accountSid: "AC",
-          numMedia: 1,
-          status: "queued",
-          messagingServiceSid: null,
-          dateSent: null,
-          dateCreated: new Date().toISOString(),
-          errorCode: null,
-          priceUnit: "USD",
-          apiVersion: "2010-04-01",
-          subresourceUris: {},
-        })),
-      },
+      messages: { create },
     });
 
     const mod = await import("../app/routes/api+/chat_sms.send.server");
@@ -194,48 +195,132 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     });
 
     expect(res.error).toBeUndefined();
-    expect(fetchMock).toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "see https://example.com" }),
+    );
   });
 
-  test("sendMessage returns original url when tinyurl response not ok", async () => {
-    const fetchMock = vi.fn(async (input: any) => {
-      const url = String(input);
-      if (url.startsWith("https://tinyurl.com/api-create.php")) {
-        return { ok: false, text: async () => "ignored" } as any;
-      }
-      return { ok: true, status: 200, statusText: "OK" } as any;
+  test("sendMessage uses Twilio shortenUrls for messaging service sends with URLs", async () => {
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValueOnce({
+      trafficClass: "unknown",
+      throughputProduct: "none",
+      multiTenancyMode: "none",
+      trafficShapingEnabled: false,
+      defaultMessageIntent: null,
+      sendMode: "messaging_service",
+      messagingServiceSid: "MG123",
+      onboardingStatus: "enabled",
+      smsSenderClass: "verified_toll_free",
+      smsTargetMps: 3,
+      voiceTargetCps: 1,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
+      supportNotes: "",
+      updatedAt: null,
+      updatedBy: null,
+      auditTrail: [],
     });
-    vi.stubGlobal("fetch", fetchMock);
 
     const supabase = makeSupabaseStub({ webhookRows: [] });
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM1",
+      body: args.body,
+      numSegments: 1,
+      direction: "outbound-api",
+      from: args.from,
+      to: args.to,
+      dateUpdated: new Date().toISOString(),
+      price: 0,
+      errorMessage: null,
+      uri: "/x",
+      accountSid: "AC",
+      numMedia: 0,
+      status: "queued",
+      messagingServiceSid: "MG123",
+      dateSent: null,
+      dateCreated: new Date().toISOString(),
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      messages: {
-        create: vi.fn(async (args: any) => ({
-          sid: "SM1",
-          body: args.body,
-          numSegments: 1,
-          direction: "outbound-api",
-          from: args.from,
-          to: args.to,
-          dateUpdated: new Date().toISOString(),
-          uri: "/x",
-          accountSid: "AC",
-          numMedia: 0,
-          status: "queued",
-          messagingServiceSid: null,
-          dateSent: null,
-          dateCreated: new Date().toISOString(),
-          errorCode: null,
-          priceUnit: "USD",
-          apiVersion: "2010-04-01",
-          subresourceUris: {},
-        })),
-      },
+      messages: { create },
     });
 
     const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
-      body: "https://example.com",
+      body: "see https://example.com",
+      to: "+15551234567",
+      from: "+15550000000",
+      media: "[]",
+      supabase: supabase as any,
+      workspace: "w1",
+      contact_id: "1",
+      user: { id: "u1" },
+    });
+
+    expect(res.error).toBeUndefined();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messagingServiceSid: "MG123",
+        shortenUrls: true,
+        body: "see https://example.com",
+      }),
+    );
+  });
+
+  test("sendMessage skips shortenUrls when body has no URLs", async () => {
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValueOnce({
+      trafficClass: "unknown",
+      throughputProduct: "none",
+      multiTenancyMode: "none",
+      trafficShapingEnabled: false,
+      defaultMessageIntent: null,
+      sendMode: "messaging_service",
+      messagingServiceSid: "MG123",
+      onboardingStatus: "enabled",
+      smsSenderClass: "verified_toll_free",
+      smsTargetMps: 3,
+      voiceTargetCps: 1,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
+      supportNotes: "",
+      updatedAt: null,
+      updatedBy: null,
+      auditTrail: [],
+    });
+
+    const supabase = makeSupabaseStub({ webhookRows: [] });
+    const create = vi.fn(async (args: any) => ({
+      sid: "SM1",
+      body: args.body,
+      numSegments: 1,
+      direction: "outbound-api",
+      from: args.from,
+      to: args.to,
+      dateUpdated: new Date().toISOString(),
+      price: 0,
+      errorMessage: null,
+      uri: "/x",
+      accountSid: "AC",
+      numMedia: 0,
+      status: "queued",
+      messagingServiceSid: "MG123",
+      dateSent: null,
+      dateCreated: new Date().toISOString(),
+      errorCode: null,
+      priceUnit: "USD",
+      apiVersion: "2010-04-01",
+      subresourceUris: {},
+    }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      messages: { create },
+    });
+
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
+    const res = await mod.sendMessage({
+      body: "plain text only",
       to: "+15551234567",
       from: "+15550000000",
       media: "[]",
@@ -245,6 +330,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       user: null,
     });
     expect(res.error).toBeUndefined();
+    expect(create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ shortenUrls: true }),
+    );
   });
 
   test("sendMessage throws when message insert fails", async () => {
@@ -269,7 +357,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("sendMessage throws when webhook query errors and when webhook post not ok", async () => {
+  test("sendMessage logs webhook failures but still returns when webhook delivery fails", async () => {
     // webhook query error
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const supabase1 = makeSupabaseStub({ webhookError: { message: "wh" } });
@@ -288,16 +376,16 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         contact_id: "",
         user: null,
       }),
-    ).rejects.toThrow("Failed to send message");
+    ).resolves.toMatchObject({ message: { sid: "SM1" } });
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Outbound SMS webhook delivery failed",
+      expect.any(String),
+    );
+
+    mocks.logger.error.mockClear();
 
     // webhook post not ok
-    const fetchMock = vi.fn(async (input: any) => {
-      const url = String(input);
-      if (url.startsWith("https://tinyurl.com/api-create.php")) {
-        return { ok: true, text: async () => "x" } as any;
-      }
-      return { ok: false, status: 500, statusText: "NO" } as any;
-    });
+    const fetchMock = vi.fn(async () => ({ ok: false, status: 500, statusText: "NO" } as any));
     vi.stubGlobal("fetch", fetchMock);
     const supabase2 = makeSupabaseStub({
       webhookRows: [
@@ -321,24 +409,23 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         contact_id: "",
         user: null,
       }),
-    ).rejects.toThrow("Failed to send message");
+    ).resolves.toMatchObject({ message: { sid: "SM1" } });
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Outbound SMS webhook delivery failed",
+      expect.any(String),
+    );
   });
 
-  test("sendMessage logs and returns original url when tinyurl fetch throws (covers shortenUrl catch)", async () => {
-    const fetchMock = vi.fn(async (input: any) => {
-      const url = String(input);
-      if (url.startsWith("https://tinyurl.com/api-create.php")) {
-        throw new Error("net");
-      }
-      return { ok: true, status: 200, statusText: "OK" } as any;
-    });
-    vi.stubGlobal("fetch", fetchMock);
+  test("sendMessage preserves URLs when webhook delivery succeeds", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, status: 200, statusText: "OK" } as any)),
+    );
 
     const supabase = makeSupabaseStub({ webhookRows: [] });
+    const create = vi.fn(async (args: any) => ({ sid: "SM1", body: args.body }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      messages: {
-        create: vi.fn(async (args: any) => ({ sid: "SM1", body: args.body })),
-      },
+      messages: { create },
     });
     const mod = await import("../app/routes/api+/chat_sms.send.server");
     const res = await mod.sendMessage({
@@ -352,7 +439,9 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       user: null,
     });
     expect(res.error).toBeUndefined();
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error shortening URL:", expect.anything());
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "https://example.com" }),
+    );
   });
 
   test("sendMessage handles webhook array with null first element (webhook_data falsy)", async () => {

@@ -16,6 +16,7 @@ import {
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import { SMS_SEGMENT_CREDITS } from "@/lib/pricing";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
 
 import type { ActionFunctionArgs } from "react-router";
@@ -110,12 +111,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           supabase,
           workspaceId: messageData.workspace,
           type: "DEBIT",
-          amount: -1,
+          amount: -SMS_SEGMENT_CREDITS,
           note: `SMS ${sid} ${messageStatus}`,
           idempotencyKey: `sms:${sid}`,
         });
       } catch (transactionError) {
         logger.error("Failed to create SMS transaction:", transactionError);
+        return routeData({ error: "Failed to record SMS billing" }, { status: 500 });
       }
     }
 

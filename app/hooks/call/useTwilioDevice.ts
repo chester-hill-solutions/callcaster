@@ -27,6 +27,7 @@ interface TwilioDeviceHook {
   makeCall: (params: CallConnectParams) => void;
   hangUp: () => void;
   answer: () => void;
+  holdAndAnswer: () => void;
   callState: string;
   callDuration: number;
   setCallDuration: React.Dispatch<React.SetStateAction<number>>;
@@ -157,6 +158,7 @@ export function useTwilioDevice(
     makeCall: callHandling.makeCall,
     hangUp: callHandling.hangUp,
     answer: callHandling.answer,
+    holdAndAnswer: callHandling.holdAndAnswer,
     callState: callHandling.callState,
     callDuration,
     setCallDuration,

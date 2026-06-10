@@ -301,6 +301,7 @@ describe("realtime hooks", () => {
       emitStatus("CHANNEL_ERROR");
       emitStatus("TIMED_OUT");
     });
+    await waitFor(() => expect(hydrateSelect).toHaveBeenCalled());
 
     act(() => result.current.setDisposition("answered"));
     expect(result.current.disposition).toBe("answered");

@@ -209,9 +209,9 @@ describe("app/lib/campaign-readiness.ts", () => {
 
   test("filters content readiness issues for the detailed settings section", () => {
     const issues = getCampaignContentReadinessIssues([
-      "Script is required",
-      "An outbound phone number is required",
-      "Message content or media is required",
+      { code: "script_required", message: "Script is required" },
+      { code: "outbound_number_required", message: "An outbound phone number is required" },
+      { code: "message_content_required", message: "Message content or media is required" },
     ]);
 
     expect(issues).toEqual([
@@ -423,6 +423,29 @@ describe("app/lib/campaign-readiness.ts", () => {
     expect(readiness.startIssues).toContain("Calling hours are required");
     expect(readiness.startIssues).toContain(
       "Each active calling day needs at least one valid time window",
+    );
+  });
+
+  test("blocks bulk SMS on CA local sender class at volume", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+        },
+      } as any,
+      {
+        body_text: "Hello",
+        message_media: [],
+      } as any,
+      { queueCount: 500, smsSenderClass: "ca_local" },
+    );
+
+    expect(readiness.startIssues).toContain(
+      "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
     );
   });
 });

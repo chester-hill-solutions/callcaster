@@ -1,6 +1,6 @@
 # Twilio runtime inventory
 
-> Generated as part of the Twilio structural improvements plan. Last updated: 2026-05-27.
+> Generated as part of the Twilio structural improvements plan. Last updated: 2026-06-10.
 
 ## Environment-driven URLs
 
@@ -17,11 +17,12 @@
 | --- | --- | --- | --- |
 | `POST /api/inbound` | `inbound.action.server.ts` | Inbound voice TwiML | Workspace / phone lookup |
 | `POST /api/inbound-sms` | `inbound-sms.action.server.ts` | Inbound SMS | `validateWorkspaceTwilioWebhook` |
-| `POST /api/sms/status` | `sms/status.action.server.ts` | SMS status (legacy) | `validateTwilioWebhookForMessageSid` |
+| `POST /api/sms/status` | `sms/status.action.server.ts` | SMS status (legacy shim) | `validateTwilioWebhookForMessageSid` |
 | `POST /api/call-status` | `call-status.action.server.ts` | Call status | `validateTwilioWebhookForCallSid` |
 | `POST /api/dial/status` | `dial/status.action.server.ts` | Dial status | `validateTwilioWebhookForCallSid` |
 | `POST /api/auto-dial/status` | `auto-dial/status.action.server.ts` | Auto-dial status | `validateTwilioWebhookForCallSid` |
 | `POST /api/auto-dial/:roomId` | `auto-dial/$roomId.action.server.ts` | Conference TwiML | `validateTwilioWebhookForCallSid` |
+| `GET/POST /api/connect-campaign-conference/:workspaceId/:campaignId` | `connect-campaign-conference/.../loader.server.ts` | Conference connect TwiML | `validateTwilioWebhookForWorkspace` |
 | `POST /api/recording` | `recording.action.server.ts` | Recording callback | `validateTwilioWebhookForCallSid` |
 | `POST /api/email-vm` | `email-vm.action.server.ts` | Voicemail email | `validateTwilioWebhookForCallSid` |
 | `POST /api/inbound-handset` | `inbound-handset.action.server.ts` | Handset inbound | `validateTwilioWebhookForPhoneNumber` |
@@ -30,9 +31,11 @@
 | `POST /api/ivr/status` | `ivr/status.action.server.ts` | IVR status (Remix) | `validateTwilioWebhookForCallSid` |
 | `POST /api/ivr/:campaignId/:pageId` | `ivr/$campaignId/$pageId.action.server.ts` | IVR page redirect | `validateTwilioWebhookForCallSid` |
 | `POST /api/ivr/.../response` | `ivr/.../response.action.server.ts` | IVR gather response | `validateTwilioWebhookForCallSid` |
-| `POST /api/ivr/.../:blockId` | `ivr/.../blockId.action.server.ts` | IVR block TwiML | **Was unsigned; fixed in plan** |
-| `POST /api/call` | `call.action.server.ts` | Voice URL / handset | Mixed; classify before changes |
-| `POST /api/initiate-ivr` | `initiate-ivr.action.server.ts` | Starts outbound IVR | Authenticated app action |
+| `POST /api/ivr/.../:blockId` | `ivr/.../blockId.action.server.ts` | IVR block TwiML | `validateTwilioWebhookForCallSid` |
+| `POST /api/initiate-ivr` | `initiate-ivr.action.server.ts` | Starts outbound IVR | `requireWorkspaceAccess` (app auth) |
+| `POST /api/test-webhook` | `test-webhook.action.server.ts` | User-configured test hook | App auth + SSRF guard |
+
+Static coverage check: `node scripts/check-twilio-webhook-coverage.mjs`
 
 ## Supabase Edge functions (Twilio-facing)
 
@@ -47,6 +50,7 @@
 | `twilio-open-sync` | pg_cron | Service role JWT | N/A (REST poll) |
 | `workspace-twilio-sync` | Internal | Internal | N/A |
 | `number-rental-billing` | pg_cron | `false` | N/A |
+| `twilio-billing-reconcile` | pg_cron | Service role JWT | N/A (REST poll) |
 | `handle_active_change` | DB webhook | Custom HMAC | N/A |
 
 ## Twilio REST callers (app)
@@ -76,6 +80,7 @@
 | `twilio-open-sync` | Call/message status fetch |
 | `workspace-twilio-sync` | Account/number sync |
 | `number-rental-billing` | `incomingPhoneNumbers.remove` |
+| `twilio-billing-reconcile` | Usage records + ledger audit |
 | `handle_active_change` | Call/message cancel |
 
 ## Shared libraries

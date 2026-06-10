@@ -6,7 +6,11 @@ import type {
   Schedule,
   WorkspaceNumbers,
 } from "@/lib/types";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import {
+  getCampaignReadiness,
+  isContentReadinessComplete,
+  isScheduleReadinessComplete,
+} from "@/lib/campaign-readiness";
 
 export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule = {
   monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
@@ -58,24 +62,6 @@ export type CampaignSetupStepsResult = {
   totalSteps: number;
   allComplete: boolean;
 };
-
-const SCHEDULE_ISSUES = new Set([
-  "Start and end dates are required",
-  "Start and end dates must be valid",
-  "Start date must be before the end date",
-  "Calling hours are required",
-  "Each active calling day needs at least one valid time window",
-]);
-
-const CONTENT_ISSUES = new Set([
-  "Script is required",
-  "Message content or media is required",
-]);
-
-const MESSAGING_ISSUES = new Set([
-  "Messaging Service SID is required for this send mode (save Messaging Service selection)",
-  "Messaging Service has no available sender numbers; attach senders in onboarding or use a phone number",
-]);
 
 export function getDefaultCampaignDates(): { start_date: string; end_date: string } {
   const start = new Date();
@@ -141,25 +127,11 @@ function isMessagingStepComplete(
   return smsMessagingServiceSendersReady !== false;
 }
 
-function isContentStepComplete(
-  campaignData: Campaign,
-  campaignDetails: CampaignDetails,
-): boolean {
-  const readiness = getCampaignReadiness(campaignData, campaignDetails, {});
-  return !readiness.startIssues.some((issue) => CONTENT_ISSUES.has(issue));
-}
-
-function isScheduleStepComplete(campaignData: Campaign): boolean {
-  const readiness = getCampaignReadiness(campaignData, null, {});
-  return !readiness.startIssues.some((issue) => SCHEDULE_ISSUES.has(issue));
-}
-
 function isQueueStepComplete(queueCount: number): boolean {
   return queueCount > 0;
 }
 
 function buildPhoneNumberStep(
-  campaignData: Campaign,
   phoneNumbers: WorkspaceNumbers[],
   workspaceId: string,
 ): Pick<CampaignSetupStep, "description" | "action"> {
@@ -287,20 +259,7 @@ export function getCampaignSetupSteps(
     description: string;
     complete: boolean;
     action?: CampaignSetupStepAction;
-    include: boolean;
   }> = [];
-
-  if (!messageUsesMessagingService(campaignData)) {
-    const phoneMeta = buildPhoneNumberStep(campaignData, phoneNumbers, workspaceId);
-    stepDefinitions.push({
-      id: "phone_number",
-      label: "Outbound number",
-      description: phoneMeta.description,
-      complete: isPhoneNumberStepComplete(campaignData, phoneNumbers),
-      action: phoneMeta.action,
-      include: true,
-    });
-  }
 
   if (messageUsesMessagingService(campaignData)) {
     stepDefinitions.push({
@@ -317,7 +276,15 @@ export function getCampaignSetupSteps(
         href: `/workspaces/${workspaceId}/onboarding`,
         label: "Complete messaging setup",
       },
-      include: true,
+    });
+  } else {
+    const phoneMeta = buildPhoneNumberStep(phoneNumbers, workspaceId);
+    stepDefinitions.push({
+      id: "phone_number",
+      label: "Outbound number",
+      description: phoneMeta.description,
+      complete: isPhoneNumberStepComplete(campaignData, phoneNumbers),
+      action: phoneMeta.action,
     });
   }
 
@@ -326,9 +293,8 @@ export function getCampaignSetupSteps(
     id: "content",
     label: contentMeta.label,
     description: contentMeta.description,
-    complete: isContentStepComplete(campaignData, campaignDetails),
+    complete: isContentReadinessComplete(readiness.issues),
     action: contentMeta.action,
-    include: true,
   });
 
   stepDefinitions.push({
@@ -336,13 +302,12 @@ export function getCampaignSetupSteps(
     label: "Dates and hours",
     description:
       "Set when this campaign runs and which days and times outreach is allowed.",
-    complete: isScheduleStepComplete(campaignData),
+    complete: isScheduleReadinessComplete(readiness.issues),
     action: {
       type: "scroll",
       targetId: "campaign-setup-schedule",
       label: "Set schedule",
     },
-    include: true,
   });
 
   const queueMeta = buildQueueStep(audienceCount, workspaceId);
@@ -352,10 +317,9 @@ export function getCampaignSetupSteps(
     description: queueMeta.description,
     complete: isQueueStepComplete(queueCount),
     action: queueMeta.action,
-    include: true,
   });
 
-  const prerequisiteSteps = stepDefinitions.filter((step) => step.include);
+  const prerequisiteSteps = stepDefinitions;
   const prerequisitesComplete = prerequisiteSteps.every((step) => step.complete);
 
   stepDefinitions.push({
@@ -364,28 +328,25 @@ export function getCampaignSetupSteps(
     description: prerequisitesComplete
       ? "Everything is set. Save any changes, then start your campaign."
       : "Complete the steps above before starting this campaign.",
-    complete: prerequisitesComplete && readiness.startIssues.length === 0,
-    include: true,
+    complete: prerequisitesComplete && readiness.issues.length === 0,
   });
 
-  const includedSteps = stepDefinitions.filter((step) => step.include);
-  const firstIncompleteIndex = includedSteps.findIndex((step) => !step.complete);
+  const firstIncompleteIndex = stepDefinitions.findIndex((step) => !step.complete);
   const currentStepId =
     firstIncompleteIndex === -1
       ? null
-      : includedSteps[firstIncompleteIndex]?.id ?? null;
+      : stepDefinitions[firstIncompleteIndex]?.id ?? null;
 
-  const actionableSteps = includedSteps.filter((step) => step.id !== "launch");
-  const completedActionableCount = actionableSteps.filter((step) => step.complete).length;
+  const actionableSteps = stepDefinitions.filter((step) => step.id !== "launch");
   const currentStepNumber =
     firstIncompleteIndex === -1
       ? actionableSteps.length
-      : Math.min(
+      : Math.max(
           actionableSteps.findIndex((step) => step.id === currentStepId) + 1,
-          actionableSteps.length,
-        ) || 1;
+          1,
+        );
 
-  const steps: CampaignSetupStep[] = includedSteps.map((step, index) => {
+  const steps: CampaignSetupStep[] = stepDefinitions.map((step, index) => {
     let status: CampaignSetupStep["status"] = "pending";
     if (step.complete) {
       status = "complete";
@@ -405,8 +366,8 @@ export function getCampaignSetupSteps(
   return {
     steps,
     currentStepId,
-    currentStepNumber: currentStepNumber || 1,
+    currentStepNumber,
     totalSteps: actionableSteps.length,
-    allComplete: prerequisitesComplete && readiness.startIssues.length === 0,
+    allComplete: prerequisitesComplete && readiness.issues.length === 0,
   };
 }

@@ -228,27 +228,6 @@ export function useChatThread({
     );
     const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
     messageElements.forEach((el) => observer.observe(el));
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            observerCallback(entry.target as HTMLElement);
-          }
-        });
-      },
-      { threshold: 0.5 },
-    );
-    const messageElements = document.querySelectorAll<HTMLElement>(".message-item");
-    const newMessages = Array.from(messageElements).slice(lastMessageCountRef.current);
-
-    newMessages.forEach((el) => observer.observe(el));
     lastMessageCountRef.current = messageElements.length;
 
     return () => {

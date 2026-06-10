@@ -11,8 +11,12 @@ vi.mock("react-router", async () => {
     useFetcher: () => fetcher,
     useNavigate: () => vi.fn(),
     useLocation: () => ({ pathname: "/workspaces/w1/campaigns/1", search: "", hash: "" }),
-    NavLink: ({ children, to, ...rest }: any) => (
-      <a href={String(to)} {...rest}>
+    NavLink: ({ children, to, className, ...rest }: any) => (
+      <a
+        href={String(to)}
+        className={typeof className === "function" ? className({ isActive: false, isPending: false }) : className}
+        {...rest}
+      >
         {typeof children === "function" ? children({ isActive: false, isPending: false }) : children}
       </a>
     ),

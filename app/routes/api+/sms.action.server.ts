@@ -2,17 +2,22 @@ import {
   messageCampaignRequiresCallerId,
   resolveTwilioSmsMessagingServiceSid,
 } from "@/lib/sms-send-resolve";
+import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
-import { processUrls } from "@/lib/sms.server";
+import { bodyHasUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
+import {
+  claimBatchSizeForRate,
+  configuredDispatcherSmsMps,
+} from "@/lib/throughput-config.server";
 
 interface CampaignData {
   body_text: string;
@@ -79,43 +84,6 @@ async function hasDuplicateCampaignSms(args: {
   return (count ?? 0) > 0;
 }
 
-function buildTwilioMessageCreateParams({
-  body,
-  to,
-  media,
-  messageIntent,
-  defaultMessageIntent,
-  resolvedMessagingServiceSid,
-  from,
-  statusCallback,
-}: {
-  body: string;
-  to: string;
-  media: string[];
-  messageIntent?: TwilioMessageIntent | null;
-  defaultMessageIntent: TwilioMessageIntent | null;
-  resolvedMessagingServiceSid: string | null;
-  from: string;
-  statusCallback: string;
-}) {
-  const resolvedMessageIntent = messageIntent ?? defaultMessageIntent;
-  const effectiveFrom = from.trim();
-  if (!resolvedMessagingServiceSid && !effectiveFrom) {
-    throw new Error("Missing sender: caller_id or Messaging Service required");
-  }
-
-  return {
-    body,
-    to,
-    statusCallback,
-    ...(media?.length && { mediaUrl: media }),
-    ...(resolvedMessagingServiceSid
-      ? { messagingServiceSid: resolvedMessagingServiceSid }
-      : { from: effectiveFrom }),
-    ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
-  };
-}
-
 const sendMessage = async ({
   body,
   to,
@@ -141,7 +109,7 @@ const sendMessage = async ({
   });
 
   // Process URLs in the message body to shorten them
-  const processedBody = await processUrls(body);
+  const processedBody = body;
 
   const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
     explicitRequestSid: messagingServiceSidFromRequest,
@@ -154,15 +122,17 @@ const sendMessage = async ({
     withTwilioRetry(
       () =>
         twilio.messages.create(
-          buildTwilioMessageCreateParams({
+          buildTwilioOutboundSmsCreateParams({
             body: processedBody,
             to,
-            media,
-            messageIntent,
-            defaultMessageIntent: portalConfig.defaultMessageIntent,
-            resolvedMessagingServiceSid,
             from,
+            media,
             statusCallback: `${env.SUPABASE_URL()}/functions/v1/sms-status`,
+            portalConfig,
+            messageIntent,
+            explicitMessagingServiceSid: resolvedMessagingServiceSid,
+            campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
+            campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
           }),
         ),
       { workspaceId: workspace, operation: "messages.create.campaign" },
@@ -372,7 +342,18 @@ export const action = async ({ request }: { request: Request }) => {
         )
       : [];
 
-    const BATCH_SIZE = 25;
+    // Legacy direct-send path: bypasses queue-next dispatcher. When parallel dispatch
+    // is enabled, cap batch concurrency using portal throughput settings.
+    const LEGACY_MAX_BATCH = 25;
+    const BATCH_SIZE = portalConfig.parallelDispatchEnabled
+      ? Math.min(
+          LEGACY_MAX_BATCH,
+          claimBatchSizeForRate(
+            configuredDispatcherSmsMps(portalConfig),
+            1000,
+          ),
+        )
+      : LEGACY_MAX_BATCH;
     const results = [];
     const queueMembers = audience ?? [];
     

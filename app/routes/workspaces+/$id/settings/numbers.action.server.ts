@@ -1,4 +1,5 @@
 import { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers, removeWorkspacePhoneNumber, requireWorkspaceAccess, updateCallerId, updateWorkspacePhoneNumber } from "@/lib/database.server";
+import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
 import { MemberRole } from "@/lib/member-role";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { User, WorkspaceNumbers } from "@/lib/types";
@@ -97,6 +98,36 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         updates: { inbound_audio: incomingVoiceMessage as string },
       });
     if (incomingVoiceMessageError) return { error: incomingVoiceMessageError };
+    return null;
+  } else if (formName === "update-inbound-ring-count") {
+    const { numberId, inboundRingCount } = data;
+    const { error: ringCountError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { inbound_ring_count: normalizeInboundRingCount(inboundRingCount) },
+    });
+    if (ringCountError) return { error: ringCountError };
+    return null;
+  } else if (formName === "update-inbound-queue") {
+    const { numberId, inboundQueueId } = data;
+    const { error: queueError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { inbound_queue_id: inboundQueueId ? Number(inboundQueueId) : null },
+    });
+    if (queueError) return { error: queueError };
+    return null;
+  } else if (formName === "update-inbound-script") {
+    const { numberId, inboundScriptId } = data;
+    const { error: scriptError } = await updateWorkspacePhoneNumber({
+      supabaseClient,
+      numberId: numberId as string,
+      workspaceId: workspace_id as string,
+      updates: { inbound_script_id: inboundScriptId ? Number(inboundScriptId) : null },
+    });
+    if (scriptError) return { error: scriptError };
     return null;
   } else if (formName === "update-handset") {
     const { numberId, handsetEnabled } = data;

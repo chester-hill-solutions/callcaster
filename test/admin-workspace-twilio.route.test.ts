@@ -92,6 +92,30 @@ function makePortalSnapshot() {
       sendMode: "from_number",
       messagingServiceSid: null,
       onboardingStatus: "not_started",
+      smsSenderClass: "unknown",
+      smsTargetMps: 1,
+      voiceTargetCps: 1,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
+      supportNotes: "",
+      updatedAt: null,
+      updatedBy: null,
+      auditTrail: [],
+    },
+    effectiveConfig: {
+      trafficClass: "unknown",
+      throughputProduct: "none",
+      multiTenancyMode: "none",
+      trafficShapingEnabled: false,
+      defaultMessageIntent: null,
+      sendMode: "from_number",
+      messagingServiceSid: null,
+      onboardingStatus: "not_started",
+      smsSenderClass: "unknown",
+      smsTargetMps: 1,
+      voiceTargetCps: 1,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
       supportNotes: "",
       updatedAt: null,
       updatedBy: null,
@@ -104,6 +128,14 @@ function makePortalSnapshot() {
       messagingServiceCount: 0,
       statusCounts: {},
       numberTypes: [],
+      legacyDispatcherSmsMps: 2,
+      configuredDispatcherSmsMps: 2,
+      twilioAssumedSmsMps: 1,
+      legacyDispatcherVoiceCps: 1000 / 700,
+      configuredDispatcherVoiceCps: 1000 / 700,
+      voiceConcurrentCallLimit: 100,
+      parallelDispatchEnabled: false,
+      smsSenderClass: "unknown",
     },
     recommendations: [],
     supportRequestSummary: "summary",
@@ -112,6 +144,7 @@ function makePortalSnapshot() {
       accountFriendlyName: null,
       phoneNumberCount: 0,
       numberTypes: [],
+      senderTypes: [],
       recentUsageCount: 0,
       usageTotalPrice: null,
       lastSyncedAt: null,
@@ -208,12 +241,14 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     formData.set("trafficClass", "toll_free");
     formData.set("throughputProduct", "market_throughput");
     formData.set("multiTenancyMode", "weighted");
-    formData.set("sendMode", "messaging_service");
-    formData.set("messagingServiceSid", "");
-    formData.set("onboardingStatus", "requested");
     formData.set("defaultMessageIntent", "");
     formData.set("trafficShapingEnabled", "on");
     formData.set("supportNotes", "Need weighted capacity for launch week");
+    formData.set("smsSenderClass", "verified_toll_free");
+    formData.set("smsTargetMps", "3");
+    formData.set("voiceTargetCps", "2");
+    formData.set("voiceConcurrentCallLimit", "75");
+    formData.set("parallelDispatchEnabled", "on");
 
     const res = await asRouteResponse(await mod.action({
       request: new Request("http://x", { method: "POST", body: formData }),
@@ -230,15 +265,22 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
           trafficClass: "toll_free",
           throughputProduct: "market_throughput",
           multiTenancyMode: "weighted",
-          sendMode: "messaging_service",
-          messagingServiceSid: null,
-          onboardingStatus: "requested",
           defaultMessageIntent: null,
           trafficShapingEnabled: true,
           supportNotes: "Need weighted capacity for launch week",
+          smsSenderClass: "verified_toll_free",
+          smsTargetMps: 3,
+          voiceTargetCps: 2,
+          voiceConcurrentCallLimit: 75,
+          parallelDispatchEnabled: true,
         }),
       }),
     );
+    const updates =
+      mocks.updateWorkspaceTwilioPortalConfig.mock.calls[0]?.[0]?.updates;
+    expect(updates).not.toHaveProperty("sendMode");
+    expect(updates).not.toHaveProperty("messagingServiceSid");
+    expect(updates).not.toHaveProperty("onboardingStatus");
   });
 
   test("action syncs workspace snapshot directly", async () => {

@@ -5,6 +5,11 @@ import { Household } from "@/components/call/CallScreen.Household";
 import { CampaignHeader } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
+import {
+  declineIncomingCall,
+  IncomingCallPanel,
+} from "@/components/calls/IncomingCallPanel";
+import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
 import { Tables } from "@/lib/database.types";
@@ -81,6 +86,9 @@ export function CallScreenLayout({
   setErrorDialog,
   currentState,
   creditsError,
+  incomingCall,
+  answer,
+  holdAndAnswer,
 }: CallScreenLayoutProps) {
   return (
     <main className="container mx-auto p-6">
@@ -138,6 +146,17 @@ export function CallScreenLayout({
       </div>
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-6">
+          {incomingCall ? (
+            <IncomingCallPanel
+              incomingCall={incomingCall as Call}
+              callHandling={{
+                activeCall: (activeCall as Call | null) ?? null,
+                answer: answer ?? (() => undefined),
+                holdAndAnswer: holdAndAnswer ?? (() => undefined),
+              }}
+              onDecline={() => declineIncomingCall(incomingCall as Call)}
+            />
+          ) : null}
           <CallArea
             conference={conference ? { parameters: { Sid: conference } } : null}
             isBusy={isBusy || deviceIsBusy}

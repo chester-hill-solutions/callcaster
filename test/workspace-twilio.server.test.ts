@@ -1,7 +1,10 @@
 import { describe, expect, test } from "vitest";
 
 import {
-  detectTwilioTrafficClass,
+  detectTwilioTrafficClassFromSenderTypes,
+} from "../app/lib/twilio-sender-class.server";
+import {
+  getEffectiveWorkspaceTwilioPortalConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   normalizeWorkspaceTwilioOpsConfig,
@@ -69,15 +72,40 @@ describe("workspace-twilio.server", () => {
     });
   });
 
-  test("detectTwilioTrafficClass maps number types", () => {
-    expect(detectTwilioTrafficClass(["ShortCode"])).toBe("short_code");
-    expect(detectTwilioTrafficClass(["TollFree"])).toBe("toll_free");
-    expect(detectTwilioTrafficClass(["Alphanumeric"])).toBe("alphanumeric");
-    expect(detectTwilioTrafficClass(["InternationalLongCode"])).toBe(
-      "international_long_code",
-    );
-    expect(detectTwilioTrafficClass(["local"])).toBe("a2p10dlc");
-    expect(detectTwilioTrafficClass(["other"])).toBe("unknown");
+  test("detectTwilioTrafficClassFromSenderTypes maps sender types", () => {
+    expect(detectTwilioTrafficClassFromSenderTypes(["short_code"])).toBe("short_code");
+    expect(detectTwilioTrafficClassFromSenderTypes(["toll_free"])).toBe("toll_free");
+    expect(detectTwilioTrafficClassFromSenderTypes(["local"])).toBe("international_long_code");
+    expect(detectTwilioTrafficClassFromSenderTypes(["other"])).toBe("unknown");
+  });
+
+  test("saved portal config does not merge onboarding overrides", () => {
+    const twilioData = {
+      portalConfig: {
+        sendMode: "from_number",
+        messagingServiceSid: null,
+        onboardingStatus: "not_started",
+        trafficClass: "unknown",
+      },
+      onboarding: {
+        status: "approved",
+        selectedChannels: ["a2p10dlc"],
+        messagingService: {
+          desiredSendMode: "messaging_service",
+          serviceSid: "MG999",
+        },
+      },
+    };
+
+    expect(getWorkspaceTwilioPortalConfigFromTwilioData(twilioData)).toMatchObject({
+      sendMode: "from_number",
+      messagingServiceSid: null,
+    });
+    expect(getEffectiveWorkspaceTwilioPortalConfig(twilioData)).toMatchObject({
+      sendMode: "messaging_service",
+      messagingServiceSid: "MG999",
+      trafficClass: "a2p10dlc",
+    });
   });
 
   test("getWorkspaceTwilioPortalConfigFromTwilioData handles empty twilio data", () => {
@@ -90,5 +118,38 @@ describe("workspace-twilio.server", () => {
     expect(getWorkspaceTwilioSyncSnapshotFromTwilioData(null)).toMatchObject({
       lastSyncStatus: "never_synced",
     });
+  });
+
+  test.each([
+    { smsSenderClass: "verified_toll_free", expectedMps: 3 },
+    { smsSenderClass: "ca_short_code", expectedMps: 100 },
+    { smsSenderClass: "unknown", expectedMps: 1 },
+  ])(
+    "normalizeWorkspaceTwilioOpsConfig default smsTargetMps for $smsSenderClass",
+    ({ smsSenderClass, expectedMps }) => {
+      expect(
+        normalizeWorkspaceTwilioOpsConfig({ smsSenderClass }),
+      ).toMatchObject({
+        smsTargetMps: expectedMps,
+      });
+    },
+  );
+
+  test("parallelDispatchEnabled only true when explicitly boolean true", () => {
+    expect(
+      normalizeWorkspaceTwilioOpsConfig({ parallelDispatchEnabled: true }),
+    ).toMatchObject({ parallelDispatchEnabled: true });
+    expect(
+      normalizeWorkspaceTwilioOpsConfig({ parallelDispatchEnabled: "true" }),
+    ).toMatchObject({ parallelDispatchEnabled: false });
+  });
+
+  test("normalizeWorkspaceTwilioSyncSnapshot parses toll-free verification flag", () => {
+    expect(
+      normalizeWorkspaceTwilioSyncSnapshot({
+        tollFreeVerificationBlocked: true,
+        lastSyncStatus: "healthy",
+      }),
+    ).toMatchObject({ tollFreeVerificationBlocked: true });
   });
 });

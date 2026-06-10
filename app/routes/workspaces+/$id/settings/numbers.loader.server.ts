@@ -27,6 +27,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { data: mediaNames } = await supabaseClient.storage
     .from("workspaceAudio")
     .list(workspaceId);
+  const { data: queues } = await supabaseClient
+    .from("inbound_queue")
+    .select("id, name")
+    .eq("workspace_id", workspaceId)
+    .order("name");
+  const { data: scripts } = await supabaseClient
+    .from("script")
+    .select("id, name")
+    .eq("workspace", workspaceId)
+    .order("name");
   if (user) {
     const userRole = await getUserRole({
       supabaseClient,
@@ -41,6 +51,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         workspaceId,
         mediaNames,
         users,
+        queues: queues || [],
+        scripts: scripts || [],
         creditsBalance: workspace?.credits ?? 0,
       },
       { headers },
@@ -53,6 +65,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       workspaceId,
       user,
       users,
+      queues: queues || [],
+      scripts: scripts || [],
       creditsBalance: workspace?.credits ?? 0,
     },
     { headers },

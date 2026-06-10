@@ -5,7 +5,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Heading, Text } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
@@ -36,11 +35,9 @@ export function AuthCard({
       {...props}
     >
       <CardHeader className="space-y-3 text-center">
-        <CardTitle className="text-inherit">
-          <Heading level={1} branded className="text-4xl sm:text-5xl">
-            {title}
-          </Heading>
-        </CardTitle>
+        <Heading level={1} branded className="text-4xl sm:text-5xl">
+          {title}
+        </Heading>
         {description ? (
           <CardDescription className="text-base text-black/80 dark:text-white/80">
             <Text as="span" variant="lead" className="text-inherit">

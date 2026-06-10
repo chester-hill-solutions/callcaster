@@ -15,6 +15,7 @@ import {
 import { data as routeData, redirect } from "react-router";
 import { deepEqual } from "@/lib/utils";
 import { fetchCampaignAudience, fetchQueueCounts, getCampaignTableKey, getSignedUrls, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, parseActionRequest, updateCampaign } from "@/lib/database.server";
+import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -106,6 +107,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
+  const campaignBilling = await loadCampaignBillingSummary({
+    supabaseClient,
+    workspaceId: workspace_id,
+    campaignId: Number(selected_id),
+    campaignType: campaignType?.type,
+    queuedCount: campaignWithAudience.queue_count ?? 0,
+  }).catch((billingError) => {
+    logger.error("Failed to load campaign billing summary", billingError);
+    return null;
+  });
+
   return routeData({
     workspace_id,
     selected_id,
@@ -128,5 +140,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       attachedSenderPhoneNumbers:
         onboarding.messagingService.attachedSenderPhoneNumbers,
     },
+    campaignBilling,
   });
 }

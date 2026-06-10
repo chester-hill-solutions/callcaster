@@ -130,7 +130,7 @@ describe("api.call-status billing + idempotency", () => {
     expect(res.status).toBe(403);
   });
 
-  test("bills one unit for 0s, two units for 60s, two units for 61s", async () => {
+  test("bills staffed rates: 4 credits for 0-60s, 9 credits for 61s", async () => {
     const mod = await import("../app/routes/api+/call-status");
 
     const makeReq = (sid: string, duration: string) => {
@@ -153,7 +153,7 @@ describe("api.call-status billing + idempotency", () => {
     await mod.action({ request: makeReq("CA61", "61") } as any);
 
     const amounts = supabaseStub._transactionRows.map((r) => r.amount);
-    expect(amounts).toEqual([-1, -2, -2]);
+    expect(amounts).toEqual([-4, -4, -9]);
   });
 
   test("is idempotent across duplicate webhook deliveries (same CallSid)", async () => {

@@ -32,13 +32,13 @@ export default function ChatsList() {
     isValid,
     selectedContact,
     contacts,
-    toggleContactMenuAdapter,
+    toggleContactMenu,
     isContactMenuOpen,
-    handleContactSelectAdapter,
+    handleContactSelect,
     dropdownRef,
     searchError,
     existingConversation,
-    handleExistingConversationClickAdapter,
+    handleExistingConversationClick,
     setDialog,
     dialogContact,
     isMobileConversationListOpen,
@@ -70,15 +70,13 @@ export default function ChatsList() {
           isValid={isValid}
           selectedContact={selectedContact}
           contacts={contacts}
-          toggleContactMenu={toggleContactMenuAdapter}
+          toggleContactMenu={toggleContactMenu}
           isContactMenuOpen={isContactMenuOpen}
-          handleContactSelect={handleContactSelectAdapter}
+          handleContactSelect={handleContactSelect}
           dropdownRef={dropdownRef}
           searchError={searchError || undefined}
           existingConversation={existingConversation}
-          handleExistingConversationClick={
-            handleExistingConversationClickAdapter
-          }
+          handleExistingConversationClick={handleExistingConversationClick}
           setDialog={(nextContact) => setDialog(nextContact as typeof contact)}
           onShowConversationList={() => setIsMobileConversationListOpen(true)}
         />

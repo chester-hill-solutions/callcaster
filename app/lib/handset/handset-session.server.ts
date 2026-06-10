@@ -1,10 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/database.types";
 import { getHandsetNumberForWorkspace } from "@/lib/database.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
 import { env } from "@/lib/env.server";
 import type { User } from "@supabase/supabase-js";
+import { getAgentStatus } from "@/lib/agent-status.server";
 
 export const SESSION_EXPIRY_MINUTES = 60;
 
@@ -14,6 +15,8 @@ export type HandsetLoaderData = {
   workspaceId: string;
   token: string | null;
   tokenError: string | null;
+  agentStatus: Tables<"agent_status"> | null;
+  userId: string;
 };
 
 export async function getHandsetLoaderData({
@@ -30,6 +33,8 @@ export async function getHandsetLoaderData({
     workspaceId,
   });
 
+  const agentStatus = await getAgentStatus(supabaseClient, workspaceId, user.id);
+
   if (!handsetData?.phone_number) {
     return {
       handsetNumber: null,
@@ -37,6 +42,8 @@ export async function getHandsetLoaderData({
       workspaceId,
       token: null,
       tokenError: null,
+      agentStatus,
+      userId: user.id,
     };
   }
 
@@ -69,6 +76,8 @@ export async function getHandsetLoaderData({
     workspaceId,
     token: tokenResult.token,
     tokenError: tokenResult.error,
+    agentStatus,
+    userId: user.id,
   };
 }
 

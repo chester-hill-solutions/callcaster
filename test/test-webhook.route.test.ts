@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => {
   return {
     safeParseJson: vi.fn(),
     testWebhook: vi.fn(),
+    verifyAuth: vi.fn(),
     logger: { warn: vi.fn() },
   };
 });
@@ -16,6 +17,9 @@ vi.mock("@/lib/database.server", () => ({
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   testWebhook: (...args: any[]) => mocks.testWebhook(...args),
 }));
+vi.mock("@/lib/supabase.server", () => ({
+  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+}));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 describe("app/routes/api+/test-webhook/route.tsx", () => {
@@ -23,7 +27,9 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     vi.resetModules();
     mocks.safeParseJson.mockReset();
     mocks.testWebhook.mockReset();
+    mocks.verifyAuth.mockReset();
     mocks.logger.warn.mockReset();
+    mocks.verifyAuth.mockResolvedValue({ user: { id: "u1" } });
   });
 
   test("returns 400 on invalid input (event not object or destination_url not string)", async () => {
@@ -53,4 +59,3 @@ describe("app/routes/api+/test-webhook/route.tsx", () => {
     expect(mocks.testWebhook).toHaveBeenCalledWith({ category: "outbound_sms" }, "http://hook", { "X-Test": "1" });
   });
 });
-

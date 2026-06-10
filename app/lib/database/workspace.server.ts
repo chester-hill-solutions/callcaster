@@ -23,13 +23,14 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
+  getEffectiveWorkspaceTwilioPortalConfig,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
-  detectTwilioTrafficClass,
   getWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioPortalConfig,
   updateWorkspaceTwilioSyncSnapshot,
   syncWorkspaceTwilioSnapshot,
+  buildDefaultWorkspaceTwilioPortalSnapshot,
   getWorkspaceTwilioPortalSnapshot,
 } from "./workspace-twilio.server";
 
@@ -139,7 +140,14 @@ export async function createNewWorkspace({
   supabaseClient: SupabaseClient<Database>;
   workspaceName: string;
   user_id: string;
-}) {
+}): Promise<{
+  data: string | null;
+  error: string | null;
+  provisioningWarning?: string | null;
+}> {
+  let workspaceId: string | null = null;
+  const provisioningWarnings: string[] = [];
+
   try {
     const { data: insertWorkspaceData, error: insertWorkspaceError } =
       await supabaseClient.rpc("create_new_workspace", {
@@ -153,27 +161,49 @@ export async function createNewWorkspace({
       throw new Error("Workspace creation RPC returned no workspace id");
     }
 
-    const account = await createSubaccount({
-      workspace_id: insertWorkspaceData!,
-    });
+    workspaceId = insertWorkspaceData;
 
-    if (!account) {
-      throw new Error("Failed to create Twilio subaccount");
+    let account: Awaited<ReturnType<typeof createSubaccount>> | null = null;
+    try {
+      account = await createSubaccount({
+        workspace_id: workspaceId,
+      });
+      if (!account) {
+        provisioningWarnings.push("Twilio subaccount was not created");
+      }
+    } catch (subaccountError) {
+      logger.error("Twilio subaccount creation failed after workspace insert:", subaccountError);
+      provisioningWarnings.push("Twilio subaccount creation failed");
     }
 
-    const newKey = await createKeys({
-      workspace_id: insertWorkspaceData!,
-      sid: account.sid,
-      token: account.authToken,
-    });
-    if (!newKey) {
-      throw new Error("Failed to create Twilio API keys");
+    let newKey: Awaited<ReturnType<typeof createKeys>> | null = null;
+    if (account) {
+      try {
+        newKey = await createKeys({
+          workspace_id: workspaceId,
+          sid: account.sid,
+          token: account.authToken,
+        });
+        if (!newKey) {
+          provisioningWarnings.push("Twilio API keys were not created");
+        }
+      } catch (keyError) {
+        logger.error("Twilio API key creation failed after workspace insert:", keyError);
+        provisioningWarnings.push("Twilio API key creation failed");
+      }
     }
 
-    const newStripeCustomer = await createStripeContact({
-      supabaseClient,
-      workspace_id: insertWorkspaceData!,
-    });
+    let stripeCustomerId: string | null = null;
+    try {
+      const newStripeCustomer = await createStripeContact({
+        supabaseClient,
+        workspace_id: workspaceId,
+      });
+      stripeCustomerId = newStripeCustomer.id;
+    } catch (stripeError) {
+      logger.error("Stripe customer creation failed after workspace insert:", stripeError);
+      provisioningWarnings.push("Stripe customer creation failed");
+    }
 
     const seededOnboarding = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
@@ -193,42 +223,75 @@ export async function createNewWorkspace({
     );
     seededOnboarding.steps = buildOnboardingStepsForState(seededOnboarding);
 
+    const workspaceUpdate: Database["public"]["Tables"]["workspace"]["Update"] = {
+      twilio_data: account
+        ? ({
+            ...twilioAccountToPersistableJson(account),
+            onboarding: seededOnboarding,
+          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"])
+        : ({
+            onboarding: seededOnboarding,
+          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"]),
+    };
+    if (newKey) {
+      workspaceUpdate.key = newKey.sid;
+      workspaceUpdate.token = newKey.secret;
+    }
+    if (stripeCustomerId) {
+      workspaceUpdate.stripe_id = stripeCustomerId;
+    }
+
     const { error: insertWorkspaceUsersError } = await supabaseClient
       .from("workspace")
-      .update({
-        twilio_data: {
-          ...twilioAccountToPersistableJson(account),
-          onboarding: seededOnboarding,
-        } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-        key: newKey.sid,
-        token: newKey.secret,
-        stripe_id: newStripeCustomer.id,
-      })
-      .eq("id", insertWorkspaceData!);
+      .update(workspaceUpdate)
+      .eq("id", workspaceId);
     if (insertWorkspaceUsersError) {
-      throw insertWorkspaceUsersError;
-    }
-
-    try {
-      await ensureWorkspaceTwilioBootstrap({
-        supabaseClient,
-        workspaceId: insertWorkspaceData!,
-        actorUserId: user_id,
-      });
-    } catch (bootstrapError) {
       logger.error(
-        "Workspace Twilio bootstrap failed after workspace creation:",
-        bootstrapError,
+        "Workspace metadata update failed after workspace insert:",
+        insertWorkspaceUsersError,
       );
+      provisioningWarnings.push("Workspace provisioning metadata update failed");
     }
 
-    return { data: insertWorkspaceData, error: null };
+    if (account && newKey) {
+      try {
+        await ensureWorkspaceTwilioBootstrap({
+          supabaseClient,
+          workspaceId,
+          actorUserId: user_id,
+        });
+      } catch (bootstrapError) {
+        logger.error(
+          "Workspace Twilio bootstrap failed after workspace creation:",
+          bootstrapError,
+        );
+        provisioningWarnings.push("Twilio bootstrap is still running");
+      }
+    }
+
+    return {
+      data: workspaceId,
+      error: null,
+      provisioningWarning:
+        provisioningWarnings.length > 0 ? provisioningWarnings.join("; ") : null,
+    };
   } catch (error) {
     logger.error("Error in createNewWorkspace:", error);
+    if (workspaceId) {
+      return {
+        data: workspaceId,
+        error: null,
+        provisioningWarning:
+          error instanceof Error
+            ? `Workspace created but provisioning failed: ${error.message}`
+            : "Workspace created but provisioning failed",
+      };
+    }
     return {
       data: null,
       error:
         error instanceof Error ? error.message : "An unexpected error occurred",
+      provisioningWarning: null,
     };
   }
 }

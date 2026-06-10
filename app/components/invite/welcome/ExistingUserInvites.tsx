@@ -19,15 +19,14 @@ interface ExistingUserInvitesProps {
 export function ExistingUserInvites({ invites, state }: ExistingUserInvitesProps) {
   return (
     <Form method="POST" className="flex w-full flex-col gap-4 my-2" id="accept-invites-form">
-        <h3 className="font-Zilla-Slab text-xl">Pending Invitations</h3>
+      <h3 className="font-Zilla-Slab text-xl">Pending Invitations</h3>
       {invites.map((invite) => (
         <InviteCheckbox key={invite.id} invite={invite} />
       ))}
-      <input hidden value={"acceptInvitations"} id="actionType" name="actionType"/>
+      <input type="hidden" defaultValue="acceptInvitations" id="actionType" name="actionType" />
       <Button type="submit" disabled={state !== "idle"} className="mt-4">
         Accept Invitations
       </Button>
     </Form>
   );
 }
-

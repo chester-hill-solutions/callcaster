@@ -26,6 +26,10 @@ import { SaveBar } from "@/components/shared/SaveBar";
 import { CampaignSettingsQueue } from "./CampaignSettingsQueue";
 import { CampaignSetupGuide } from "./CampaignSetupGuide";
 import type { CampaignSetupStep } from "@/lib/campaign-setup-steps";
+import { CampaignCostPanel } from "./CampaignCostPanel";
+import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
+import { formatCredits, formatCurrency } from "@/lib/billing-format";
+import { CREDIT_PRICE_CAD } from "@/lib/billing-format";
 import { Tables } from "@/lib/database.types";
 
 type Contact = Tables<"contact">;
@@ -87,6 +91,7 @@ export type CampaignSettingsProps = {
   setupGuideTotalSteps?: number;
   setupGuideAllComplete?: boolean;
   onDismissSetupGuide?: () => void;
+  campaignBilling?: CampaignBillingSummary | null;
 };
 
 export const CampaignSettings = ({
@@ -130,6 +135,7 @@ export const CampaignSettings = ({
   setupGuideTotalSteps = 1,
   setupGuideAllComplete = false,
   onDismissSetupGuide,
+  campaignBilling = null,
 }: CampaignSettingsProps) => {
   const confirmActionLabel =
     confirmStatus === "play"
@@ -161,9 +167,10 @@ export const CampaignSettings = ({
               <div>
                 <p className="font-medium">Credits Available: {credits || 0}</p>
                 <p className="text-sm text-muted-foreground">
-                  Cost: {campaignData?.type === "message" ?
-                    "1 credit per message" :
-                    "1 credit per dial + 1 credit per minute after first minute"}
+                  {campaignBilling?.estimate.rateDescription ??
+                    (campaignData?.type === "message"
+                      ? "1 credit per SMS segment"
+                      : "See campaign settings for voice rates")}
                 </p>
               </div>
             </div>
@@ -175,7 +182,23 @@ export const CampaignSettings = ({
                   Contacts to {campaignData?.type === "message" ? "Message" : "Dial"}: {queueCount}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Estimated cost: {queueCount} - {queueCount * 2} credits
+                  Estimated cost:{" "}
+                  {formatCredits(
+                    campaignBilling?.estimate.totalCredits ?? queueCount,
+                  )}{" "}
+                  credits (
+                  {formatCurrency(
+                    (campaignBilling?.estimate.totalCredits ?? queueCount) *
+                      CREDIT_PRICE_CAD,
+                  )}
+                  )
+                  {campaignBilling && campaignBilling.actualDebitCredits > 0 && (
+                    <>
+                      {" "}
+                      · Actual so far: {formatCredits(campaignBilling.actualDebitCredits)}{" "}
+                      credits
+                    </>
+                  )}
                   {queueCount > (credits || 0) && (
                     <span className="text-destructive"> (Exceeds available credits)</span>
                   )}
@@ -341,6 +364,14 @@ export const CampaignSettings = ({
               totalCount={totalCount}
               setupGuideActive={showSetupGuide}
             />
+
+            {campaignBilling ? (
+              <CampaignCostPanel
+                billing={campaignBilling}
+                queuedCount={queueCount}
+                completedCount={dequeuedCount}
+              />
+            ) : null}
           </div>
         </Form>
       </div>

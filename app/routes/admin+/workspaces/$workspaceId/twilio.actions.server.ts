@@ -1,7 +1,14 @@
 import { data as routeData, type ActionFunctionArgs } from "react-router";
 
-import { syncWorkspaceTwilioSnapshot, updateWorkspaceTwilioPortalConfig } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  syncWorkspaceTwilioSnapshot,
+  updateWorkspaceTwilioPortalConfig,
+} from "@/lib/database.server";
+import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
+import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
+import { parseTwilioPortalConfigForm, parseTwilioRcsOnboardingForm } from "@/lib/schemas/twilio-portal-config";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
 import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
@@ -13,12 +20,9 @@ import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server"
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { verifyWorkspaceMessagingSenderPool } from "@/lib/twilio-sender-pool.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
-import type { WorkspaceTwilioOpsConfig } from "@/lib/types";
+import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 
 import { requireSudoAdmin } from "../../requireSudoAdmin.server";
-
-import { parseOptionalString } from "@/lib/parse-utils.server";
-
 export const action = async ({ request, params }: ActionFunctionArgs) => {
     const { supabaseClient, user, userData } = await requireSudoAdmin(request);
 
@@ -112,6 +116,89 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         }
     }
 
+    if (actionName === "run_billing_reconciliation") {
+        try {
+            const { data: workspace } = await supabaseClient
+              .from("workspace")
+              .select("twilio_data")
+              .eq("id", workspaceId)
+              .single();
+
+            const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
+            if (!creds?.sid) {
+              return routeData(
+                { error: "Workspace has no Twilio credentials" },
+                { status: 400 },
+              );
+            }
+
+            const twilio = await createWorkspaceTwilioInstance({
+              supabase: supabaseClient,
+              workspace_id: workspaceId,
+            });
+            const usageRecords = await twilio.usage.records.list();
+            const twilioUsage = usageRecords.map((record) => ({
+              category: record.category,
+              description: record.description,
+              usage: record.usage,
+              usageUnit: record.usageUnit,
+              price: record.price.toString(),
+              startDate: record.startDate?.toISOString(),
+              endDate: record.endDate?.toISOString(),
+            }));
+
+            const report = await loadBillingReconciliationReport({
+              supabaseClient,
+              workspaceId,
+              twilioUsage,
+            });
+            const snapshot = await persistWorkspaceBillingReconciliationSnapshot({
+              supabaseClient,
+              workspaceId,
+              report,
+              source: "admin",
+            });
+
+            return routeData({
+              success: snapshot.materialVariance
+                ? "Reconciliation complete — material variance detected (see Billing Reconciliation panel)."
+                : "Reconciliation complete — no material variance.",
+            });
+        } catch (error) {
+            logger.error("Billing reconciliation run failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "trigger_twilio_open_sync") {
+        try {
+            const { data, error } = await supabaseClient.functions.invoke(
+              "twilio-open-sync",
+              {
+                body: {
+                  workspaceId,
+                  callLimit: 50,
+                  messageLimit: 50,
+                  maxAgeMinutes: 120,
+                },
+              },
+            );
+
+            if (error) {
+              return routeData({ error: error.message }, { status: 500 });
+            }
+
+            const summary =
+              data && typeof data === "object"
+                ? JSON.stringify(data)
+                : "Open sync completed";
+            return routeData({ success: `Twilio open sync triggered: ${summary}` });
+        } catch (error) {
+            logger.error("Twilio open sync trigger failed:", error);
+            return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
     if (actionName === "sync_a2p_status") {
         try {
             await syncWorkspaceA2pStatus({
@@ -162,72 +249,28 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     if (actionName === "save_workspace_rcs") {
         try {
+            const rcsForm = parseTwilioRcsOnboardingForm(formData);
             await updateWorkspaceRcsOnboarding({
                 supabaseClient,
                 workspaceId,
                 actorUserId: user.id,
                 provider: TWILIO_RCS_PROVIDER,
-                displayName: typeof formData.get("rcsDisplayName") === "string" ? String(formData.get("rcsDisplayName")) : "",
-                publicDescription:
-                    typeof formData.get("rcsPublicDescription") === "string"
-                        ? String(formData.get("rcsPublicDescription"))
-                        : "",
-                logoImageUrl:
-                    typeof formData.get("rcsLogoImageUrl") === "string"
-                        ? String(formData.get("rcsLogoImageUrl"))
-                        : "",
-                bannerImageUrl:
-                    typeof formData.get("rcsBannerImageUrl") === "string"
-                        ? String(formData.get("rcsBannerImageUrl"))
-                        : "",
-                accentColor:
-                    typeof formData.get("rcsAccentColor") === "string"
-                        ? String(formData.get("rcsAccentColor"))
-                        : "",
-                optInPolicyImageUrl:
-                    typeof formData.get("rcsOptInPolicyImageUrl") === "string"
-                        ? String(formData.get("rcsOptInPolicyImageUrl"))
-                        : "",
-                useCaseVideoUrl:
-                    typeof formData.get("rcsUseCaseVideoUrl") === "string"
-                        ? String(formData.get("rcsUseCaseVideoUrl"))
-                        : "",
-                representativeName:
-                    typeof formData.get("rcsRepresentativeName") === "string"
-                        ? String(formData.get("rcsRepresentativeName"))
-                        : "",
-                representativeTitle:
-                    typeof formData.get("rcsRepresentativeTitle") === "string"
-                        ? String(formData.get("rcsRepresentativeTitle"))
-                        : "",
-                representativeEmail:
-                    typeof formData.get("rcsRepresentativeEmail") === "string"
-                        ? String(formData.get("rcsRepresentativeEmail"))
-                        : "",
-                notificationEmail:
-                    typeof formData.get("rcsNotificationEmail") === "string"
-                        ? String(formData.get("rcsNotificationEmail"))
-                        : "",
-                agentId: parseOptionalString(formData.get("rcsAgentId")),
-                senderId: parseOptionalString(formData.get("rcsSenderId")),
-                regions: typeof formData.get("rcsRegions") === "string"
-                    ? String(formData.get("rcsRegions"))
-                        .split(",")
-                        .map((value) => value.trim())
-                        .filter(Boolean)
-                    : [],
-                notes: typeof formData.get("rcsNotes") === "string" ? String(formData.get("rcsNotes")) : "",
-                status:
-                    formData.get("rcsStatus") === "not_started" ||
-                    formData.get("rcsStatus") === "collecting_business" ||
-                    formData.get("rcsStatus") === "provisioning" ||
-                    formData.get("rcsStatus") === "submitting" ||
-                    formData.get("rcsStatus") === "in_review" ||
-                    formData.get("rcsStatus") === "approved" ||
-                    formData.get("rcsStatus") === "rejected" ||
-                    formData.get("rcsStatus") === "live"
-                        ? (formData.get("rcsStatus") as "not_started" | "collecting_business" | "provisioning" | "submitting" | "in_review" | "approved" | "rejected" | "live")
-                        : "in_review",
+                displayName: rcsForm.displayName,
+                publicDescription: rcsForm.publicDescription,
+                logoImageUrl: rcsForm.logoImageUrl,
+                bannerImageUrl: rcsForm.bannerImageUrl,
+                accentColor: rcsForm.accentColor,
+                optInPolicyImageUrl: rcsForm.optInPolicyImageUrl,
+                useCaseVideoUrl: rcsForm.useCaseVideoUrl,
+                representativeName: rcsForm.representativeName,
+                representativeTitle: rcsForm.representativeTitle,
+                representativeEmail: rcsForm.representativeEmail,
+                notificationEmail: rcsForm.notificationEmail,
+                agentId: rcsForm.agentId,
+                senderId: rcsForm.senderId,
+                regions: rcsForm.regions,
+                notes: rcsForm.notes,
+                status: rcsForm.status,
             });
             return routeData({ success: "Workspace RCS state updated" });
         } catch (error) {
@@ -244,22 +287,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 
     try {
+        const updates = parseTwilioPortalConfigForm(formData);
         await updateWorkspaceTwilioPortalConfig({
             supabaseClient,
             workspaceId,
             actorUserId: user.id,
             actorUsername: userData.username ?? null,
-            updates: {
-                trafficClass: formData.get("trafficClass") as WorkspaceTwilioOpsConfig["trafficClass"],
-                throughputProduct: formData.get("throughputProduct") as WorkspaceTwilioOpsConfig["throughputProduct"],
-                multiTenancyMode: formData.get("multiTenancyMode") as WorkspaceTwilioOpsConfig["multiTenancyMode"],
-                trafficShapingEnabled: formData.get("trafficShapingEnabled") === "on",
-                defaultMessageIntent: parseOptionalString(formData.get("defaultMessageIntent")) as WorkspaceTwilioOpsConfig["defaultMessageIntent"],
-                sendMode: formData.get("sendMode") as WorkspaceTwilioOpsConfig["sendMode"],
-                messagingServiceSid: parseOptionalString(formData.get("messagingServiceSid")),
-                onboardingStatus: formData.get("onboardingStatus") as WorkspaceTwilioOpsConfig["onboardingStatus"],
-                supportNotes: typeof formData.get("supportNotes") === "string" ? String(formData.get("supportNotes")) : "",
-            },
+            updates,
         });
 
         return routeData({ success: "Twilio portal settings updated" });

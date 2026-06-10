@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   env: {
     SUPABASE_URL: () => "https://sb.example",
     SUPABASE_SERVICE_KEY: () => "svc",
+    BASE_URL: () => "https://app.example",
   },
 }));
 
@@ -26,6 +27,15 @@ vi.mock("twilio", () => {
     say(_opts: unknown, text: string) {
       this.parts.push(`say:${text}`);
     }
+    play(url: string) {
+      this.parts.push(`play:${url}`);
+    }
+    pause() {
+      this.parts.push("pause");
+    }
+    record() {
+      this.parts.push("record");
+    }
     hangup() {
       this.parts.push("hangup");
     }
@@ -35,6 +45,33 @@ vi.mock("twilio", () => {
   }
   return { default: { twiml: { VoiceResponse } } };
 });
+
+function makeSupabase(numberRow: {
+  inbound_action: string | null;
+  inbound_audio: string | null;
+  workspace: string;
+} | null) {
+  return {
+    from: (table: string) => {
+      if (table === "workspace_number") {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: numberRow, error: null }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+    storage: {
+      from: () => ({
+        createSignedUrl: async () => ({ data: null, error: null }),
+        list: async () => ({ data: [], error: null }),
+      }),
+    },
+  };
+}
 
 function makeRequest(opts?: { called?: string; dialCallStatus?: string }) {
   const fd = new FormData();
@@ -55,7 +92,13 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
     vi.resetModules();
     mocks.createClient.mockReset();
     mocks.validateTwilioWebhookForPhoneNumber.mockReset();
-    mocks.createClient.mockReturnValue({ from: vi.fn() });
+    mocks.createClient.mockReturnValue(
+      makeSupabase({
+        inbound_action: null,
+        inbound_audio: null,
+        workspace: "w1",
+      }),
+    );
     mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValue({
       ok: true,
       params: { Called: "+15551234567", DialCallStatus: "no-answer" },
@@ -67,11 +110,11 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/inbound-handset-dial-end", {
         method: "GET",
       }),
-    } as never);
+    } as never));
     expect(res.status).toBe(405);
   });
 
@@ -123,13 +166,30 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns TwiML with no-answer message on happy path", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
-    } as never);
+    } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("No one is available");
     expect(text).toContain("hangup");
+  });
+
+  test("returns voicemail TwiML when handset misses and inbound action is email", async () => {
+    mocks.createClient.mockReturnValueOnce(
+      makeSupabase({
+        inbound_action: "notify@example.com",
+        inbound_audio: null,
+        workspace: "w1",
+      }),
+    );
+    const mod = await import("../app/routes/api+/inbound-handset-dial-end");
+    const res = await asRouteResponse(await mod.action({
+      request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
+    } as never));
+    const text = await res.text();
+    expect(text).toContain("record");
+    expect(text).not.toContain("No one is available");
   });
 
   test("returns TwiML hangup only when dial completed", async () => {
@@ -141,9 +201,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
       twilioData: { sid: "AC1", authToken: "tok" },
     });
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "completed" }),
-    } as never);
+    } as never));
     const text = await res.text();
     expect(text).not.toContain("No one is available");
     expect(text).toContain("hangup");

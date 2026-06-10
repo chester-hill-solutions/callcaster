@@ -1579,7 +1579,7 @@ describe("api.campaign-export", () => {
       expect.anything(),
     );
     expect(loggerError).toHaveBeenCalledWith(
-      "Error updating error status:",
+      "Error writing error status:",
       expect.anything(),
     );
   });
