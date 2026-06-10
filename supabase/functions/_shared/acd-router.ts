@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
-import twilio from "npm:twilio@^4.23.0";
 export type { QueueRecord, TwilioCredentials } from "./acd-utils.ts";
 export { buildAgentBridgeTwiml, buildHoldMusicTwiml, makeQueueName, parseQueueIdFromName } from "./acd-utils.ts";
 import { buildHoldMusicTwiml, makeQueueName, type QueueRecord, type TwilioCredentials } from "./acd-utils.ts";
@@ -67,6 +66,7 @@ export async function dialAgent(args: {
   workspaceId: string;
   callerNumber: string;
 }): Promise<void> {
+  const { default: twilio } = await import("npm:twilio@^4.23.0");
   const client = twilio(args.twilioCredentials.accountSid, args.twilioCredentials.authToken);
   const queueName = makeQueueName(args.queueId);
   const agentBridgeUrl = `${args.baseUrl}/functions/v1/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;
@@ -123,4 +123,3 @@ export async function nextQueueOffer(args: {
   if (!data || data.length === 0) return null;
   return { callSid: data[0].call_sid, entryId: data[0].entry_id };
 }
-
