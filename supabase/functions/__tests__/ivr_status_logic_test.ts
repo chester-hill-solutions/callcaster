@@ -5,11 +5,11 @@ import {
   getCallWithRetry,
 } from "../_shared/ivr-status-logic.ts";
 
-Deno.test("billingUnitsFromDurationSeconds rounds up per started minute", () => {
-  assertEquals(billingUnitsFromDurationSeconds(0), -1);
-  assertEquals(billingUnitsFromDurationSeconds(1), -1);
+Deno.test("billingUnitsFromDurationSeconds uses Option B IVR rates", () => {
+  assertEquals(billingUnitsFromDurationSeconds(0), -2);
+  assertEquals(billingUnitsFromDurationSeconds(1), -2);
   assertEquals(billingUnitsFromDurationSeconds(60), -2);
-  assertEquals(billingUnitsFromDurationSeconds(61), -2);
+  assertEquals(billingUnitsFromDurationSeconds(61), -5);
 });
 
 Deno.test("canTransitionOutreachDisposition blocks terminal transitions", () => {

@@ -12,6 +12,7 @@ const ROOT = join(import.meta.dirname, "..");
 const SHARED_DIR = join(ROOT, "supabase/functions/_shared");
 const DENO_CONFIG = join(ROOT, "supabase/functions/deno.json");
 const SHARED_RETRY = join(ROOT, "shared/twilio-retry-predicates.ts");
+const SHARED_PRICING = join(ROOT, "shared/pricing.ts");
 
 function collectTsFiles(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -27,7 +28,7 @@ function collectTsFiles(dir, files = []) {
   return files;
 }
 
-const files = [SHARED_RETRY, ...collectTsFiles(SHARED_DIR)];
+const files = [SHARED_RETRY, SHARED_PRICING, ...collectTsFiles(SHARED_DIR)];
 console.log(`deno check: ${files.length} shared edge modules`);
 execSync(
   `npx deno check --config ${JSON.stringify(DENO_CONFIG)} ${files.map((f) => JSON.stringify(f)).join(" ")}`,
@@ -40,6 +41,7 @@ execSync(
 const EDGE_REGRESSION_TESTS = [
   "supabase/functions/__tests__/campaign_dispatch_test.ts",
   "supabase/functions/__tests__/twilio_retry_test.ts",
+  "supabase/functions/__tests__/ivr_status_logic_test.ts",
 ];
 
 console.log(`deno test: ${EDGE_REGRESSION_TESTS.join(", ")}`);

@@ -4,6 +4,7 @@ import {
   resolveCallOutreachContext,
   TERMINAL_CALL_STATUSES,
   twilioParamsToUnderCase,
+  voiceBillingKindFromCampaignType,
 } from "@/lib/twilio-call-status.server";
 import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
 import { data as routeData } from "react-router";
@@ -56,7 +57,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     outreachAttemptId != null
       ? await supabase
           .from("outreach_attempt")
-          .select("disposition, contact_id, workspace")
+          .select("disposition, contact_id, workspace, campaign(type)")
           .eq("id", outreachAttemptId)
           .single()
       : { data: null, error: null };
@@ -110,7 +111,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         Number(underCaseData.duration) || 0,
         Number(underCaseData.call_duration) || 0,
       );
-      const billingUnits = billingUnitsFromCallDurationSeconds(duration);
+      const campaignType =
+        currentAttempt &&
+        typeof currentAttempt === "object" &&
+        "campaign" in currentAttempt &&
+        currentAttempt.campaign &&
+        typeof currentAttempt.campaign === "object" &&
+        "type" in currentAttempt.campaign
+          ? String(currentAttempt.campaign.type)
+          : null;
+      const billingKind = voiceBillingKindFromCampaignType(campaignType);
+      const billingUnits = billingUnitsFromCallDurationSeconds(duration, billingKind);
       const note = currentAttempt
         ? `Call ${updateData.sid}, Contact ${currentAttempt.contact_id}, Outreach Attempt ${outreachAttemptId}`
         : `Call ${updateData.sid} (API/staffed dial)`;

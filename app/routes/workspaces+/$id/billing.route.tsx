@@ -41,7 +41,7 @@ export default function Credits() {
   const { credits } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
-  const [selectedAmount, setSelectedAmount] = useState<number>(1667);
+  const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
   const actionData = useActionData();
@@ -53,12 +53,12 @@ export default function Credits() {
   const selectedCredits = isCustom ? Number(customAmount || "0") : selectedAmount;
   const estimatedCost = selectedCredits > 0 ? selectedCredits * CREDIT_PRICE_CAD : 0;
   const creditPackages = [
-    { amount: 1667, price: 5 },
-    { amount: 5000, price: 15 },
-    { amount: 8333, price: 25 },
-    { amount: 16667, price: 50 },
-    { amount: 33333, price: 100 },
-    { amount: 66667, price: 200 },
+    { amount: 500, price: 10 },
+    { amount: 1250, price: 25 },
+    { amount: 2500, price: 50 },
+    { amount: 5000, price: 100 },
+    { amount: 12500, price: 250 },
+    { amount: 25000, price: 500 },
   ];
   return (
     <div className="container mx-auto p-6">
@@ -90,17 +90,16 @@ export default function Credits() {
             </div>
           </div>
           <div className="text-sm text-gray-500 flex flex-col gap-2 max-w-xs">
+            <div>SMS: 1 credit per segment ($0.02)</div>
             <div>
-              SMS Rates: 1 credit per inbound/outbound SMS
+              IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits per
+              additional minute ($0.06)
             </div>
             <div>
-              Voice Rates: 2 credits per outbound voice call attempt.
-              2 credits per minute of inbound voice call (after the first minute).
+              Live staffed calls: 4 credits per dial ($0.08), then 5 credits per
+              additional minute ($0.10)
             </div>
-            <div>
-              Interactive Voice Response (IVR) Rates: 1 credit per IVR attempt.
-              1 credit per minute of IVR (after the first minute).
-            </div>
+            <div>Phone numbers: 100 credits per month ($2.00)</div>
           </div>
         </div>
       </Card>

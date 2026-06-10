@@ -39,9 +39,14 @@ describe("twilio-call-status.server", () => {
     expect(row.call_duration).toBe(61);
   });
 
-  test("billingUnitsFromCallDurationSeconds bills per started minute", () => {
-    expect(billingUnitsFromCallDurationSeconds(0)).toBe(1);
-    expect(billingUnitsFromCallDurationSeconds(60)).toBe(2);
-    expect(billingUnitsFromCallDurationSeconds(61)).toBe(2);
+  test("billingUnitsFromCallDurationSeconds bills staffed Option B rates", () => {
+    expect(billingUnitsFromCallDurationSeconds(0)).toBe(4);
+    expect(billingUnitsFromCallDurationSeconds(60)).toBe(4);
+    expect(billingUnitsFromCallDurationSeconds(61)).toBe(9);
+  });
+
+  test("billingUnitsFromCallDurationSeconds bills IVR when kind is ivr", () => {
+    expect(billingUnitsFromCallDurationSeconds(60, "ivr")).toBe(2);
+    expect(billingUnitsFromCallDurationSeconds(61, "ivr")).toBe(5);
   });
 });

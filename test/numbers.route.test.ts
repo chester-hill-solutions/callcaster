@@ -282,7 +282,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 400 creditsError when credits too low", async () => {
-    const supabase = makeSupabaseStub({ credits: 1000 });
+    const supabase = makeSupabaseStub({ credits: 99 });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.getWorkspaceUsers.mockResolvedValueOnce({
       data: [{ user_workspace_role: "owner", username: "alice" }],
@@ -351,7 +351,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       expect.objectContaining({
         workspaceId: "w1",
         type: "DEBIT",
-        amount: -1000,
+        amount: -100,
       }),
     );
   });

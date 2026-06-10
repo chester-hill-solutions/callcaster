@@ -11,9 +11,9 @@ import {
 
 describe("billing-format", () => {
   test("exports pricing constants", () => {
-    expect(CREDIT_PRICE_CAD).toBe(0.003);
-    expect(MIN_PURCHASE_CAD).toBe(0.5);
-    expect(MIN_CREDITS).toBe(Math.ceil(MIN_PURCHASE_CAD / CREDIT_PRICE_CAD));
+    expect(CREDIT_PRICE_CAD).toBe(0.02);
+    expect(MIN_PURCHASE_CAD).toBe(10);
+    expect(MIN_CREDITS).toBe(500);
   });
 
   test("formatCredits uses locale string", () => {
@@ -25,6 +25,6 @@ describe("billing-format", () => {
   });
 
   test("formatUnitPrice returns fixed label", () => {
-    expect(formatUnitPrice()).toBe("$0.003 CAD");
+    expect(formatUnitPrice()).toBe("$0.02 CAD");
   });
 });

@@ -5,6 +5,8 @@ import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { voiceCreditsFromDurationSeconds } from "@/lib/pricing";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -120,6 +122,26 @@ const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string,
     ]);
 };
 
+const debitIvrCallCredits = async (
+    supabase: SupabaseClient,
+    args: {
+        callSid: string;
+        workspaceId: string;
+        campaignName: string;
+        durationSeconds: number;
+    },
+): Promise<void> => {
+    const credits = voiceCreditsFromDurationSeconds(args.durationSeconds, "ivr");
+    await insertTransactionHistoryIdempotent({
+        supabase,
+        workspaceId: args.workspaceId,
+        type: "DEBIT",
+        amount: -credits,
+        note: `IVR Call ${args.callSid}, Campaign ${args.campaignName}, Duration ${args.durationSeconds}s`,
+        idempotencyKey: `call:${args.callSid}`,
+    });
+};
+
 export const action = async ({ request }: ActionFunctionArgs) => {
     const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
     const formData = await request.formData();
@@ -199,6 +221,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         dbCall.outreach_attempt_id as number | null,
                         'completed',
                     );
+                    const durationSeconds = Math.max(
+                        Number(parsedBody.CallDuration) || 0,
+                        Number(parsedBody.Duration) || 0,
+                    );
+                    if (dbCall.workspace) {
+                        const campaign = dbCall.campaign as { name?: string } | null;
+                        await debitIvrCallCredits(supabase, {
+                            callSid,
+                            workspaceId: String(dbCall.workspace),
+                            campaignName: campaign?.name ?? "unknown",
+                            durationSeconds,
+                        });
+                    }
                     break;
                 }
                 default:

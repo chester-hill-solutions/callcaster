@@ -1,4 +1,6 @@
-export const NUMBER_RENTAL_MONTHLY_CREDITS = 1000;
+export { NUMBER_RENTAL_MONTHLY_CREDITS } from "../../shared/pricing";
+
+import { NUMBER_RENTAL_MONTHLY_CREDITS } from "../../shared/pricing";
 
 export function numberRentalPriceLabel(): string {
   return `${NUMBER_RENTAL_MONTHLY_CREDITS} credits/month`;

@@ -21,6 +21,10 @@ import {
   attachPhoneNumberToMessagingService,
 } from "@/lib/twilio-bootstrap.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
+import {
+  hasCreditsForNumberRental,
+  NUMBER_RENTAL_MONTHLY_CREDITS,
+} from "@/lib/number-rental";
 import type { ActionFunctionArgs } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -44,7 +48,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const {data: workspaceCredits, error: workspaceCreditsError} = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
         if (workspaceCreditsError) throw workspaceCreditsError;
         const credits = workspaceCredits.credits;
-        if (credits <= 1000) {
+        if (!hasCreditsForNumberRental(credits)) {
             return new Response(JSON.stringify({ creditsError: true }), {
                 headers: {
                     "Content-Type": "application/json"
@@ -153,7 +157,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             supabase,
             workspaceId: workspace_id,
             type: "DEBIT",
-            amount: -1000,
+            amount: -NUMBER_RENTAL_MONTHLY_CREDITS,
             note: "Rented number - " + number.friendlyName,
             idempotencyKey: `number_rent_purchase:${workspace_id}:${number.sid}`,
         });

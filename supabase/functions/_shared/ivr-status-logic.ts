@@ -25,10 +25,21 @@ export function canTransitionOutreachDisposition(
   return !(TERMINAL_OUTREACH_DISPOSITIONS.has(c) && c !== n);
 }
 
-export function billingUnitsFromDurationSeconds(durationSeconds: number): number {
-  const seconds = Number.isFinite(durationSeconds) ? durationSeconds : 0;
-  const units = Math.floor(Math.max(0, seconds) / 60) + 1;
-  return -units;
+import {
+  debitAmountFromCredits,
+  voiceCreditsFromDurationSeconds,
+  type VoiceBillingKind,
+} from "../../../shared/pricing.ts";
+
+export { voiceBillingKindFromCampaignType, type VoiceBillingKind } from "../../../shared/pricing.ts";
+
+export function billingUnitsFromDurationSeconds(
+  durationSeconds: number,
+  kind: VoiceBillingKind = "ivr",
+): number {
+  return debitAmountFromCredits(
+    voiceCreditsFromDurationSeconds(durationSeconds, kind),
+  );
 }
 
 export async function sleepMs(ms: number): Promise<void> {
@@ -107,44 +118,51 @@ export async function insertTransactionHistoryIdempotent(args: {
   note: string;
   idempotencyKey: string;
 }): Promise<{ inserted: boolean }> {
-  const marker = `[idempotency:${args.idempotencyKey}]`;
-  const noteWithMarker = args.note.includes(marker)
-    ? args.note
-    : `${args.note} ${marker}`;
+  const idempotencyKey = args.idempotencyKey.trim();
+  if (!idempotencyKey) {
+    throw new Error("idempotencyKey is required for transaction history insert");
+  }
 
   return withTransactionHistoryInsertLock(
-    `${args.workspaceId}:${args.type}:${args.idempotencyKey}`,
+    `${args.workspaceId}:${args.type}:${idempotencyKey}`,
     async () => {
-      try {
+      const { data, error } = (await args.supabase
+        .from("transaction_history")
+        .insert({
+          workspace: args.workspaceId,
+          type: args.type,
+          amount: args.amount,
+          note: args.note,
+          idempotency_key: idempotencyKey,
+        })
+        .select("id")
+        .single()) as Awaited<SupabaseSingleResult<{ id: number }>>;
+
+      if (!error) {
+        return { inserted: true };
+      }
+
+      const pgCode = (error as { code?: string }).code;
+      if (pgCode === "23505") {
         const { data: existing, error: existingError } = (await args.supabase
           .from("transaction_history")
           .select("id")
           .eq("workspace", args.workspaceId)
           .eq("type", args.type)
-          .like("note", `%${marker}%`)
+          .eq("idempotency_key", idempotencyKey)
           .limit(1)) as Awaited<SupabaseArrayResult<{ id: number }>>;
 
         if (!existingError && existing && existing.length > 0) {
           return { inserted: false };
         }
-
-        const { error } = (await args.supabase.from("transaction_history").insert({
-          workspace: args.workspaceId,
-          type: args.type,
-          amount: args.amount,
-          note: noteWithMarker,
-        })) as Awaited<SupabaseSingleResult<any>>;
-
-        if (error) {
-          console.error("transaction_history insert failed", { error, noteWithMarker });
-          throw error;
-        }
-
-        return { inserted: true };
-      } catch (error) {
-        console.error("transaction_history idempotent insert error", error);
-        throw error;
       }
+
+      console.error("transaction_history insert failed", {
+        error,
+        workspaceId: args.workspaceId,
+        idempotencyKey,
+      });
+      throw error;
     },
   );
 }
@@ -163,8 +181,11 @@ export async function checkWorkspaceCredits(args: {
     .single()) as Awaited<SupabaseSingleResult<{ credits: number }>>;
 
   if (workspaceCreditsError) {
-    // Allow call to proceed if we can't check credits (preserve existing behavior).
-    return true;
+    console.error("Failed to check workspace credits; blocking call", {
+      workspaceId: args.workspaceId,
+      error: workspaceCreditsError,
+    });
+    return false;
   }
 
   if ((workspaceCredits?.credits ?? 0) <= 0) {

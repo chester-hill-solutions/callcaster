@@ -10,7 +10,9 @@ import {
   billingUnitsFromDurationSeconds,
   canTransitionOutreachDisposition,
   insertTransactionHistoryIdempotent,
+  voiceBillingKindFromCampaignType,
 } from "../_shared/ivr-status-logic.ts";
+import { SMS_SEGMENT_CREDITS } from "../../../shared/pricing.ts";
 import {
   cancelQueuedMessages,
   normalizeTwilioSmsStatus,
@@ -146,7 +148,7 @@ async function syncCallRow(
     const { data: attempt } = outreachAttemptId != null
       ? await supabase
         .from("outreach_attempt")
-        .select("disposition, contact_id, workspace")
+        .select("disposition, contact_id, workspace, campaign(type)")
         .eq("id", outreachAttemptId)
         .maybeSingle()
       : { data: null };
@@ -177,8 +179,19 @@ async function syncCallRow(
       billingWorkspace &&
       CALL_STATUSES_BILLABLE_ON_COMPLETION.has(normalized)
     ) {
+      const campaignType =
+        attempt &&
+        typeof attempt === "object" &&
+        "campaign" in attempt &&
+        attempt.campaign &&
+        typeof attempt.campaign === "object" &&
+        "type" in attempt.campaign
+          ? String(attempt.campaign.type)
+          : null;
+      const billingKind = voiceBillingKindFromCampaignType(campaignType);
       const amount = billingUnitsFromDurationSeconds(
         Number.isFinite(durationSeconds) ? durationSeconds : 0,
+        billingKind,
       );
       const contactId = attempt?.contact_id;
       const note =
@@ -297,7 +310,7 @@ async function syncMessageRow(
         supabase: supabase as never,
         workspaceId,
         type: "DEBIT",
-        amount: -1,
+        amount: -SMS_SEGMENT_CREDITS,
         note: `SMS ${row.sid} ${status} (twilio-open-sync)`,
         idempotencyKey: `sms:${row.sid}`,
       });

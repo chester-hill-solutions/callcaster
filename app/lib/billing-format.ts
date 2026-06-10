@@ -1,6 +1,10 @@
-export const CREDIT_PRICE_CAD = 0.003;
-export const MIN_PURCHASE_CAD = 0.5;
-export const MIN_CREDITS = Math.ceil(MIN_PURCHASE_CAD / CREDIT_PRICE_CAD);
+export {
+  CREDIT_PRICE_CAD,
+  MIN_PURCHASE_CAD,
+  MIN_CREDITS,
+} from "../../shared/pricing";
+
+import { CREDIT_PRICE_CAD } from "../../shared/pricing";
 
 export function formatCredits(amount: number) {
   return amount.toLocaleString();
@@ -14,5 +18,5 @@ export function formatCurrency(amount: number) {
 }
 
 export function formatUnitPrice() {
-  return "$0.003 CAD";
+  return "$0.02 CAD";
 }
