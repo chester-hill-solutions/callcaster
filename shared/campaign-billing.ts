@@ -3,7 +3,7 @@ import {
   SMS_SEGMENT_CREDITS,
   STAFFED_FIRST_MINUTE_CREDITS,
   voiceBillingKindFromCampaignType,
-} from "./pricing.ts";
+} from "./pricing";
 
 export type CampaignCreditEstimate = {
   perContactCredits: number;
