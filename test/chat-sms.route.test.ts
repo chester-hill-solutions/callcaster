@@ -357,7 +357,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("sendMessage throws when webhook query errors and when webhook post not ok", async () => {
+  test("sendMessage logs webhook failures but still returns when webhook delivery fails", async () => {
     // webhook query error
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const supabase1 = makeSupabaseStub({ webhookError: { message: "wh" } });
@@ -376,7 +376,13 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         contact_id: "",
         user: null,
       }),
-    ).rejects.toThrow("Failed to send message");
+    ).resolves.toMatchObject({ message: { sid: "SM1" } });
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Outbound SMS webhook delivery failed",
+      expect.any(String),
+    );
+
+    mocks.logger.error.mockClear();
 
     // webhook post not ok
     const fetchMock = vi.fn(async () => ({ ok: false, status: 500, statusText: "NO" } as any));
@@ -403,7 +409,11 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
         contact_id: "",
         user: null,
       }),
-    ).rejects.toThrow("Failed to send message");
+    ).resolves.toMatchObject({ message: { sid: "SM1" } });
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Outbound SMS webhook delivery failed",
+      expect.any(String),
+    );
   });
 
   test("sendMessage preserves URLs when webhook delivery succeeds", async () => {

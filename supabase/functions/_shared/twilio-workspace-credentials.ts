@@ -34,7 +34,15 @@ export function resolveTwilioWebhookAuthToken(
   if (creds?.authToken) {
     return creds.authToken;
   }
-  const readEnv = (key: string): string | undefined => Deno.env.get(key);
+  const readEnv = (key: string): string | undefined => {
+    if (typeof Deno !== "undefined" && Deno.env) {
+      return Deno.env.get(key);
+    }
+    if (typeof process !== "undefined" && process.env) {
+      return process.env[key];
+    }
+    return undefined;
+  };
   const environment = readEnv("ENVIRONMENT") ?? "";
   const isProduction =
     environment === "production" || Boolean(readEnv("DENO_DEPLOYMENT_ID"));
