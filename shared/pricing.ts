@@ -62,3 +62,10 @@ export function voiceCreditsFromDurationSeconds(
 export function debitAmountFromCredits(credits: number): number {
   return -Math.abs(credits);
 }
+
+export function formatCadFromCredits(credits: number): string {
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+  }).format(credits * CREDIT_PRICE_CAD);
+}
