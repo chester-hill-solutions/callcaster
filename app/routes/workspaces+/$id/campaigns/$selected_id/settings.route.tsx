@@ -5,6 +5,7 @@ import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect } f
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
 
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
+import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 
 
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
@@ -104,6 +105,7 @@ export default function CampaignSettingsRoute() {
     outboundEstimateInputs,
     smsSendContext,
     isFirstDraftCampaign,
+    campaignBilling,
   } = useLoaderData();
 
   const navigate = useNavigate();
@@ -509,6 +511,7 @@ export default function CampaignSettingsRoute() {
         setupGuideTotalSteps={setupGuideState.totalSteps}
         setupGuideAllComplete={setupGuideState.allComplete}
         onDismissSetupGuide={handleDismissSetupGuide}
+        campaignBilling={campaignBilling as CampaignBillingSummary | null}
       />
     </>
   );

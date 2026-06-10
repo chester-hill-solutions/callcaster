@@ -35,6 +35,16 @@ async function createWorkspaceInvite(
   userId: string,
   isNew = false,
 ): Promise<any> {
+  const { data: existing, error: existingError } = await supabase
+    .from("workspace_invite")
+    .select("*")
+    .eq("workspace", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) return [existing];
+
   const { data, error } = await supabase
     .from("workspace_invite")
     .insert({ workspace: workspaceId, role, user_id: userId, isNew })

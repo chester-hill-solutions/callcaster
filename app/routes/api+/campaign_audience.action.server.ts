@@ -36,7 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
 
             if (existing) {
-                return routeData({ message: "Audience already added to campaign" }, { headers });
+                return routeData({ success: true, message: "Audience already added to campaign" }, { headers });
             }
 
             // Add the audience to the campaign
@@ -57,6 +57,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             if (contactsError) throw contactsError;
 
             const audienceContactIds = (audienceContacts ?? []).map((contact) => contact.contact_id);
+            let enqueued = 0;
+            let skipped = 0;
+            let warning: string | undefined;
 
             if (audienceContactIds.length > 0) {
                 const { data: existingQueueRows, error: queueError } = await supabaseClient
@@ -73,20 +76,40 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 const contactIds = audienceContactIds.filter(
                     (contactId) => !existingContactIds.has(contactId),
                 );
+                skipped = audienceContactIds.length - contactIds.length;
 
                 if (contactIds.length === 0) {
-                    return routeData({ success: true }, { headers });
+                    return routeData({
+                        success: true,
+                        audienceLinked: true,
+                        enqueued: 0,
+                        skipped,
+                    }, { headers });
                 }
 
-                await enqueueContactsForCampaign(
-                    supabaseClient,
-                    campaignId,
-                    contactIds,
-                    { requeue: false }
-                );
+                try {
+                    await enqueueContactsForCampaign(
+                        supabaseClient,
+                        campaignId,
+                        contactIds,
+                        { requeue: false }
+                    );
+                    enqueued = contactIds.length;
+                } catch (enqueueError) {
+                    logger.error("Audience linked but queue enqueue failed:", enqueueError);
+                    warning =
+                        "Audience was linked, but some contacts could not be added to the queue. Refresh and retry queue sync if needed.";
+                }
             }
 
-            return routeData({ success: true }, { headers });
+            return routeData({
+                success: true,
+                partial: Boolean(warning),
+                warning,
+                audienceLinked: true,
+                enqueued,
+                skipped,
+            }, { headers });
         }
 
         if (method === "DELETE") {
@@ -166,4 +189,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             { status: 500, headers }
         );
     }
-}
+};

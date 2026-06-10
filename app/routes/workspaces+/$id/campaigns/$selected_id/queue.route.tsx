@@ -2,7 +2,8 @@ export { loader } from "./queue.loader.server";
 export { action } from "./queue.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
-import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
+import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { toast } from "sonner";
 
 
 import { Spinner } from "@/components/ui/spinner";
@@ -208,6 +209,30 @@ function QueueResolvedContent({
         ...queueValue,
         queueError: queueValue.queueError || null,
     } as QueueResponse;
+
+    useEffect(() => {
+        if (queueActions.queueFetcher.state !== "idle" || !queueActions.queueFetcher.data) {
+            return;
+        }
+        const data = queueActions.queueFetcher.data as {
+            error?: string;
+            warning?: string;
+            success?: boolean;
+            partial?: boolean;
+            enqueued?: number;
+        };
+        if (data.error) {
+            toast.error(data.error);
+            return;
+        }
+        if (data.warning) {
+            toast.warning(data.warning);
+            return;
+        }
+        if (data.success && typeof data.enqueued === "number" && data.enqueued > 0) {
+            toast.success(`Added ${data.enqueued} contacts to the queue`);
+        }
+    }, [queueActions.queueFetcher.state, queueActions.queueFetcher.data]);
 
     return (
         <>

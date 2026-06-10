@@ -21,7 +21,7 @@
 | Outbound call status (agent dial) | Remix | `${BASE_URL}/api/call-status/` | |
 | Dial bridge status | Remix | `${BASE_URL}/api/dial/status` | |
 | Auto-dial status | Remix | `${BASE_URL}/api/auto-dial/status` | |
-| Conference events | Remix | `${BASE_URL}/api/auto-dial/status` | Room route |
+| Conference connect TwiML | Remix | `${BASE_URL}/api/connect-campaign-conference/:workspaceId/:campaignId` | Twilio signature required (workspace subaccount token) |
 | IVR TwiML flow (Remix candidate) | Remix | `${BASE_URL}/api/ivr/:campaignId/...` | Used by `initiateIvrCall` today |
 | IVR status (Remix candidate) | Remix | `${BASE_URL}/api/ivr/status` | Used by `initiateIvrCall` today |
 | IVR TwiML flow (Edge candidate) | Edge | `${SUPABASE_URL}/functions/v1/ivr-flow` | Used by `ivr-handler` |

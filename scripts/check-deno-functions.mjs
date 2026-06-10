@@ -14,6 +14,7 @@ const DENO_CONFIG = join(ROOT, "supabase/functions/deno.json");
 const SHARED_RETRY = join(ROOT, "shared/twilio-retry-predicates.ts");
 const SHARED_PRICING = join(ROOT, "shared/pricing.ts");
 const SHARED_BILLING_RECONCILIATION = join(ROOT, "shared/billing-reconciliation.ts");
+const SHARED_CAMPAIGN_BILLING = join(ROOT, "shared/campaign-billing.ts");
 
 function collectTsFiles(dir, files = []) {
   for (const entry of readdirSync(dir)) {
@@ -29,7 +30,7 @@ function collectTsFiles(dir, files = []) {
   return files;
 }
 
-const files = [SHARED_RETRY, SHARED_PRICING, SHARED_BILLING_RECONCILIATION, ...collectTsFiles(SHARED_DIR)];
+const files = [SHARED_RETRY, SHARED_PRICING, SHARED_BILLING_RECONCILIATION, SHARED_CAMPAIGN_BILLING, ...collectTsFiles(SHARED_DIR)];
 console.log(`deno check: ${files.length} shared edge modules`);
 execSync(
   `npx deno check --config ${JSON.stringify(DENO_CONFIG)} ${files.map((f) => JSON.stringify(f)).join(" ")}`,

@@ -277,7 +277,8 @@ describe("WorkspaceSelectedNewUtils", () => {
     insertSingle.mockResolvedValueOnce({ data: { id: 2 }, error: null });
     detailsInsert.mockResolvedValueOnce({ error: { message: "details" } });
     const r4 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
-    expect((await r4.json()).error.message).toBe("details");
+    expect(r4.status).toBe(302);
+    expect(r4.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
 
     insertSingle.mockResolvedValueOnce({ data: { id: 3 }, error: null });
     detailsInsert.mockResolvedValueOnce({ error: null });
