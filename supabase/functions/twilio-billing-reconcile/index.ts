@@ -11,6 +11,10 @@ import {
   type TwilioUsageRecord,
 } from "../../../shared/billing-reconciliation.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
+import {
+  mapWithConcurrency,
+  parseBillingReconcileBody,
+} from "../_shared/billing-reconcile-request.ts";
 
 const TERMINAL_SMS_STATUSES = ["delivered", "failed", "undelivered"];
 const BILLABLE_CALL_STATUSES = [
@@ -186,10 +190,24 @@ export async function handleRequest(
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-  const { data: workspaces, error } = await supabase
+  let body: unknown = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const request = parseBillingReconcileBody(body);
+
+  let workspaceQuery = supabase
     .from("workspace")
     .select("id, name, twilio_data")
     .not("twilio_data", "is", null);
+
+  if (request.workspaceId) {
+    workspaceQuery = workspaceQuery.eq("id", request.workspaceId);
+  }
+
+  const { data: workspaces, error } = await workspaceQuery.limit(request.limit);
 
   if (error) {
     console.error("twilio-billing-reconcile workspace query", error);
@@ -199,83 +217,99 @@ export async function handleRequest(
     });
   }
 
-  const results: Array<{
-    workspaceId: string;
-    workspaceName: string | null;
-    materialVariance: boolean;
-    report: BillingReconciliationReport;
-  }> = [];
-
-  for (const workspace of workspaces ?? []) {
+  const eligible = (workspaces ?? []).filter((workspace) => {
     const creds = readTwilioWorkspaceCredentials(workspace.twilio_data);
-    if (!creds?.sid || !creds.authToken) continue;
+    return Boolean(creds?.sid && creds.authToken);
+  });
 
-    try {
-      const twilio = new Twilio(creds.sid, creds.authToken);
-      const report = await reconcileWorkspace({
-        supabase,
-        workspaceId: workspace.id,
-        twilio,
-        accountSid: creds.sid,
-      });
-      if (!report) continue;
+  const twilioCache = new Map<string, Twilio.Twilio>();
 
-      const materialVariance = hasMaterialVariance(report);
-      results.push({
-        workspaceId: workspace.id,
-        workspaceName: workspace.name,
-        materialVariance,
-        report,
-      });
-
-      if (materialVariance) {
-        console.warn(
-          "twilio-billing-reconcile variance",
-          JSON.stringify({
-            workspaceId: workspace.id,
-            workspaceName: workspace.name,
-            smsVariance: report.categories.sms.variance,
-            voiceVariance: report.categories.voice.variance,
-            messageGap: report.entityAudit.messageGap,
-            callGap: report.entityAudit.callGap,
-            unrecognizedDebitEvents: report.unrecognizedDebitEvents,
-          }),
-        );
+  const batchResults = await mapWithConcurrency(
+    eligible,
+    request.concurrency,
+    async (workspace) => {
+      const creds = readTwilioWorkspaceCredentials(workspace.twilio_data)!;
+      let twilio = twilioCache.get(creds.sid);
+      if (!twilio) {
+        twilio = new Twilio(creds.sid, creds.authToken);
+        twilioCache.set(creds.sid, twilio);
       }
 
-      await persistBillingReconciliationSnapshot({
-        supabase,
-        workspaceId: workspace.id,
-        report,
-      }).catch((persistError) => {
+      try {
+        const report = await reconcileWorkspace({
+          supabase,
+          workspaceId: workspace.id,
+          twilio,
+          accountSid: creds.sid,
+        });
+        if (!report) {
+          return null;
+        }
+
+        const materialVariance = hasMaterialVariance(report);
+        if (materialVariance) {
+          console.warn(
+            "twilio-billing-reconcile variance",
+            JSON.stringify({
+              workspaceId: workspace.id,
+              workspaceName: workspace.name,
+              smsVariance: report.categories.sms.variance,
+              voiceVariance: report.categories.voice.variance,
+              messageGap: report.entityAudit.messageGap,
+              callGap: report.entityAudit.callGap,
+              unrecognizedDebitEvents: report.unrecognizedDebitEvents,
+            }),
+          );
+        }
+
+        await persistBillingReconciliationSnapshot({
+          supabase,
+          workspaceId: workspace.id,
+          report,
+        }).catch((persistError) => {
+          const message =
+            persistError instanceof Error
+              ? persistError.message
+              : String(persistError);
+          console.error(
+            "twilio-billing-reconcile snapshot persist failed",
+            workspace.id,
+            message,
+          );
+        });
+
+        return {
+          workspaceId: workspace.id,
+          workspaceName: workspace.name,
+          materialVariance,
+          report,
+        };
+      } catch (reconcileError) {
         const message =
-          persistError instanceof Error
-            ? persistError.message
-            : String(persistError);
+          reconcileError instanceof Error
+            ? reconcileError.message
+            : String(reconcileError);
         console.error(
-          "twilio-billing-reconcile snapshot persist failed",
+          "twilio-billing-reconcile failed",
           workspace.id,
           message,
         );
-      });
-    } catch (reconcileError) {
-      const message =
-        reconcileError instanceof Error
-          ? reconcileError.message
-          : String(reconcileError);
-      console.error(
-        "twilio-billing-reconcile failed",
-        workspace.id,
-        message,
-      );
-    }
-  }
+        return null;
+      }
+    },
+  );
+
+  const results = batchResults.filter(
+    (row): row is NonNullable<typeof row> => row != null,
+  );
 
   return new Response(
     JSON.stringify({
       scanned: (workspaces ?? []).length,
+      eligible: eligible.length,
       reconciled: results.length,
       materialVarianceCount: results.filter((row) => row.materialVariance).length,
+      concurrency: request.concurrency,
       results: results.map(({ workspaceId, workspaceName, materialVariance, report }) => ({
         workspaceId,
         workspaceName,

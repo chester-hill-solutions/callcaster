@@ -43,7 +43,17 @@ show app.settings.supabase_service_role_jwt;
 
 Edge / project secrets (Dashboard → Edge Functions → Secrets):
 
-- `NUMBER_RENTAL_CRON_SECRET` — required for `number-rental-billing` (100 credits/month at Option B)
+- `NUMBER_RENTAL_CRON_SECRET` — optional auth for `number-rental-billing` cron. When set, also configure `app.settings.number_rental_cron_secret` to the same value so pg_cron sends `x-cron-secret` (migration `20260610194500_number_rental_cron_secret_header.sql`).
+
+## Edge deploy (reconcile)
+
+Supabase CLI bundler does not support `supabase/functions/deno.lock` v5. Use:
+
+```bash
+node scripts/deploy-edge-function.mjs twilio-billing-reconcile --project-ref <ref>
+```
+
+`twilio-billing-reconcile` accepts optional POST body: `{ "workspaceId", "limit", "concurrency" }` (defaults: all workspaces, limit 100, concurrency 8). Nightly cron should pass `{"concurrency":10}` so a full scan finishes under the 150s Edge timeout (~28s for ~45 workspaces in prod smoke test, 2026-06-10).
 
 ## Manual reconciliation spot-check
 
