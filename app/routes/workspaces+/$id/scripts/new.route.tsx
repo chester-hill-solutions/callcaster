@@ -103,6 +103,7 @@ export default function NewScript() {
               >
                 <option value="script">Live Caller Script</option>
                 <option value="ivr">Interactive Voice Recording (IVR)</option>
+                <option value="inbound_ivr">Inbound IVR Menu</option>
               </select>
             </label>
             <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">

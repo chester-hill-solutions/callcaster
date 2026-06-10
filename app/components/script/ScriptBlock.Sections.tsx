@@ -22,7 +22,7 @@ function isIVRBlock(block: ScriptEditorBlock): block is IVRBlock {
 
 type ScriptBlockContentInputProps = {
   block: ScriptEditorBlock;
-  type: "script" | "ivr";
+  type: "script" | "ivr" | "inbound_ivr";
   mediaNames: string[];
   onChange: (
     field: keyof Block | keyof IVRBlock,
@@ -96,7 +96,7 @@ export function ScriptBlockContentInput({
 
 type ScriptBlockOptionsSectionProps = {
   block: ScriptEditorBlock;
-  type: "script" | "ivr";
+  type: "script" | "ivr" | "inbound_ivr";
   pages: Record<string, { id: string; title: string; blocks: string[] }>;
   blocks: Record<string, ScriptEditorBlock>;
   onAddOption: () => void;
@@ -118,7 +118,8 @@ export function ScriptBlockOptionsSection({
   const showOptions =
     (type === "script" &&
       ["radio", "dropdown", "multi"].includes(block.type)) ||
-    type === "ivr";
+    type === "ivr" ||
+    type === "inbound_ivr";
 
   if (!showOptions) {
     return null;
@@ -132,6 +133,7 @@ export function ScriptBlockOptionsSection({
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">Options</h3>
           {(type === "script" ||
+            type === "inbound_ivr" ||
             (type === "ivr" &&
               ivrBlock?.responseType &&
               ivrBlock.responseType !== "speech")) && (
@@ -158,6 +160,7 @@ export function ScriptBlockOptionsSection({
           </p>
         )}
         {(type === "script" ||
+          type === "inbound_ivr" ||
           (type === "ivr" &&
             ivrBlock?.responseType &&
             ivrBlock.responseType !== "speech")) && (

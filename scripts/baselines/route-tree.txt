@@ -46,6 +46,7 @@ api/hangup
 api/inbound
 api/inbound-handset
 api/inbound-handset-dial-end
+api/inbound-ivr/:numberId/:pageId
 api/inbound-queue
 api/inbound-sms
 api/inbound-verification

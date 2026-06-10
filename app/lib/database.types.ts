@@ -1764,6 +1764,7 @@ export type Database = {
           inbound_audio: string | null;
           inbound_queue_id: number | null;
           inbound_ring_count: number;
+          inbound_script_id: number | null;
           phone_number: string | null;
           type: string;
           workspace: string;
@@ -1778,6 +1779,7 @@ export type Database = {
           inbound_audio?: string | null;
           inbound_queue_id?: number | null;
           inbound_ring_count?: number;
+          inbound_script_id?: number | null;
           phone_number?: string | null;
           type: string;
           workspace: string;
@@ -1792,6 +1794,7 @@ export type Database = {
           inbound_audio?: string | null;
           inbound_queue_id?: number | null;
           inbound_ring_count?: number;
+          inbound_script_id?: number | null;
           phone_number?: string | null;
           type?: string;
           workspace?: string;
@@ -1809,6 +1812,13 @@ export type Database = {
             columns: ["inbound_queue_id"];
             isOneToOne: false;
             referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_number_inbound_script_id_fkey";
+            columns: ["inbound_script_id"];
+            isOneToOne: false;
+            referencedRelation: "script";
             referencedColumns: ["id"];
           },
         ];

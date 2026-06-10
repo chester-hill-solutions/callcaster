@@ -65,6 +65,7 @@ type LoaderData = {
   users: User[];
   user: User;
   queues: { id: number; name: string }[];
+  scripts: { id: number; name: string }[];
   creditsBalance: number;
 };
 
@@ -76,6 +77,7 @@ const WorkspaceSettings = () => {
     users,
     mediaNames,
     queues,
+    scripts,
     creditsBalance,
   } = useLoaderData<LoaderData>();
   const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
@@ -187,6 +189,17 @@ const WorkspaceSettings = () => {
     );
   };
 
+  const handleInboundScriptChange = (numberId: number, scriptId: string) => {
+    updateFetcher.submit(
+      {
+        formName: "update-inbound-script",
+        numberId: String(numberId),
+        inboundScriptId: scriptId,
+      },
+      { method: "POST" },
+    );
+  };
+
   const handleNumberRemoval = (numberId: number) => {
     updateFetcher.submit(
       { formName: "remove-number", numberId: String(numberId) },
@@ -210,12 +223,14 @@ const WorkspaceSettings = () => {
               users={users}
               mediaNames={mediaNames}
               queues={queues}
+              scripts={scripts}
               onIncomingActivityChange={handleIncomingActivityChange}
               onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
               onCallerIdChange={handleCallerIdChange}
               onHandsetChange={handleHandsetChange}
               onInboundRingCountChange={handleInboundRingCountChange}
               onInboundQueueChange={handleInboundQueueChange}
+              onInboundScriptChange={handleInboundScriptChange}
               onNumberRemoval={handleNumberRemoval}
               isBusy={updateFetcher.state !== "idle"}
             />

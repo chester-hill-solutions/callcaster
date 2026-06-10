@@ -170,7 +170,7 @@ export default function CampaignSettingsScript({
   );
 
   const changeType = useCallback(
-    (newType: "script" | "ivr") => {
+    (newType: "script" | "ivr" | "inbound_ivr") => {
       updateScript((prevScript) => {
         const normalizedFlow = normalizeFlow(prevScript);
         return {

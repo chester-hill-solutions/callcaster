@@ -24,10 +24,12 @@ import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/database.types";
 
 interface WorkspaceNumberData {
+  id: number;
   handset_enabled: boolean | null;
   inbound_action: string | null;
   inbound_audio: string | null;
   inbound_queue_id: number | null;
+  inbound_script_id: number | null;
   inbound_ring_count: number | null;
   type: string | null;
   workspace: {
@@ -99,10 +101,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     .from("workspace_number")
     .select(
       `
+      id,
       handset_enabled,
       inbound_action,
       inbound_audio,
       inbound_queue_id,
+      inbound_script_id,
       inbound_ring_count,
       type,
       workspace,
@@ -229,7 +233,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
   }
 
-  // Priority 1: Queue routing (if number is assigned to an inbound queue)
+  // Priority 1: Inbound IVR script (before queue routing)
+  if (number?.inbound_script_id && workspaceId) {
+    const { data: ivrScript } = await supabase
+      .from("script")
+      .select("steps")
+      .eq("id", number.inbound_script_id)
+      .eq("workspace", workspaceId)
+      .single();
+
+    const steps = ivrScript?.steps as Record<string, unknown> | null | undefined;
+    const pages = steps?.pages as Record<string, { blocks: string[] }> | undefined;
+    if (pages) {
+      const pageIds = Object.keys(pages);
+      const firstPageId = pageIds[0];
+      const firstPage = firstPageId ? pages[firstPageId] : undefined;
+      const firstBlockId = firstPage?.blocks[0];
+      if (firstPageId && firstBlockId) {
+        logger.info("api.inbound routing to IVR script", {
+          workspaceId,
+          CallSid: data.CallSid,
+          scriptId: number.inbound_script_id,
+        });
+        twiml.redirect(
+          `/api/inbound-ivr/${number.id}/${firstPageId}/${firstBlockId}`,
+        );
+        return new Response(twiml.toString(), {
+          headers: { "Content-Type": "text/xml" },
+        });
+      }
+    }
+    logger.warn("api.inbound IVR script found but has no valid pages/blocks, falling through", {
+      workspaceId,
+      scriptId: number.inbound_script_id,
+    });
+  }
+
+  // Priority 2: Queue routing (if number is assigned to an inbound queue)
   if (number?.inbound_queue_id && workspaceId) {
     const supabaseUrl = env.SUPABASE_URL().replace(/\/$/, "");
     const acdUrl = `${supabaseUrl}/functions/v1/acd-router`;

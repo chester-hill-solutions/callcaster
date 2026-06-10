@@ -32,6 +32,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     .select("id, name")
     .eq("workspace_id", workspaceId)
     .order("name");
+  const { data: scripts } = await supabaseClient
+    .from("script")
+    .select("id, name")
+    .eq("workspace", workspaceId)
+    .order("name");
   if (user) {
     const userRole = await getUserRole({
       supabaseClient,
@@ -47,6 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         mediaNames,
         users,
         queues: queues || [],
+        scripts: scripts || [],
         creditsBalance: workspace?.credits ?? 0,
       },
       { headers },
@@ -60,6 +66,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       user,
       users,
       queues: queues || [],
+      scripts: scripts || [],
       creditsBalance: workspace?.credits ?? 0,
     },
     { headers },

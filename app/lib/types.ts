@@ -560,7 +560,7 @@ export type Page = {
 };
 
 export type Flow = {
-  type: "ivr" | "script";
+  type: "ivr" | "script" | "inbound_ivr";
   pages: {
     [key: string]: Page;
   };
