@@ -3,12 +3,14 @@ import {
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalSnapshot,
 } from "@/lib/database.server";
+import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import { logger } from "@/lib/logger.server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
+import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 
 export interface TwilioPageData {
   twilioAccountInfo: {
@@ -44,6 +46,7 @@ export interface TwilioPageData {
     endDate?: string;
   }>;
   portalSnapshot: WorkspaceTwilioPortalSnapshot;
+  billingReconciliation: BillingReconciliationReport | null;
 }
 
 export async function loadTwilioData(
@@ -56,6 +59,7 @@ export async function loadTwilioData(
   let twilioAccountInfo: TwilioPageData["twilioAccountInfo"] = null;
   let twilioNumbers: TwilioPageData["twilioNumbers"] = [];
   let twilioUsage: TwilioPageData["twilioUsage"] = [];
+  let billingReconciliation: BillingReconciliationReport | null = null;
 
   const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
     supabaseClient,
@@ -113,6 +117,15 @@ export async function loadTwilioData(
         startDate: record.startDate?.toISOString(),
         endDate: record.endDate?.toISOString(),
       }));
+
+      billingReconciliation = await loadBillingReconciliationReport({
+        supabaseClient,
+        workspaceId,
+        twilioUsage,
+      }).catch((reconcileError) => {
+        logger.error("Error building billing reconciliation report:", reconcileError);
+        return null;
+      });
     }
   } catch (error) {
     logger.error("Error fetching Twilio information:", error);
@@ -123,5 +136,6 @@ export async function loadTwilioData(
     twilioNumbers,
     twilioUsage,
     portalSnapshot,
+    billingReconciliation,
   };
 }

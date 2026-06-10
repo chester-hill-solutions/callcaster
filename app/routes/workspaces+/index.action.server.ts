@@ -17,7 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return { error: "Workspace name or User Id missing!" };
   }
 
-  const { data: newWorkspaceId, error } = await createNewWorkspace({
+  const { data: newWorkspaceId, error, provisioningWarning } = await createNewWorkspace({
     supabaseClient,
     workspaceName: newWorkspaceName,
     user_id: userId,
@@ -28,7 +28,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (newWorkspaceId) {
-    return redirect(`/workspaces/${newWorkspaceId}`, { headers });
+    const redirectUrl = provisioningWarning
+      ? `/workspaces/${newWorkspaceId}?provisioning=continues`
+      : `/workspaces/${newWorkspaceId}`;
+    return redirect(redirectUrl, { headers });
   }
 
   return { ok: true, error: null };

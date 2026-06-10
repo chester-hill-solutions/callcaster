@@ -9,6 +9,7 @@ import { PhoneNumbersPanel } from "./AdminTwilioPortal.PhoneNumbersPanel";
 import { SendingSetupPanel } from "./AdminTwilioPortal.SendingSetupPanel";
 import { SubaccountPanel } from "./AdminTwilioPortal.SubaccountPanel";
 import { UsagePanel } from "./AdminTwilioPortal.UsagePanel";
+import { BillingReconciliationPanel } from "./AdminTwilioPortal.BillingReconciliationPanel";
 
 export function PortalContent({ data }: { data: TwilioPageData }) {
     const {
@@ -45,6 +46,7 @@ export function PortalContent({ data }: { data: TwilioPageData }) {
             <SubaccountPanel twilioAccountInfo={data.twilioAccountInfo} />
             <PhoneNumbersPanel twilioNumbers={data.twilioNumbers} />
             <UsagePanel twilioUsage={data.twilioUsage} />
+            <BillingReconciliationPanel report={data.billingReconciliation} />
         </>
     );
 }

@@ -2,7 +2,7 @@
 
 **Prepared:** May 2026  
 **Purpose:** Partner review — proposed credit pricing grounded in Twilio costs and competitor benchmarks  
-**Status:** Strategy only (not yet implemented in product or billing code)
+**Status:** Implemented — Option B rate card landed June 2026. See [billing-source-of-truth.md](./billing-source-of-truth.md).
 
 ---
 

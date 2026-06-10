@@ -11,6 +11,8 @@ import Stripe from "stripe";
 
 import {
   getTransactionDisplayDescription,
+  getBillingEventSource,
+  getBillingEventSourceLabel,
   type TransactionType,
 } from "@/lib/transaction-history.server";
 import {
@@ -28,6 +30,7 @@ type TransactionRow = {
   type: string;
   amount: number;
   note?: string | null;
+  idempotency_key?: string | null;
 };
 
 type LoaderData = {
@@ -188,35 +191,61 @@ export default function Credits() {
         </Form>
       </Card>
 
-      {/* Credit History */}
+      {/* Credit Usage Log */}
       <Card className="p-6">
-        <h2 className="mb-4 text-xl font-semibold">Credit History</h2>
+        <h2 className="mb-4 text-xl font-semibold">Credit Usage Log</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
                 <th className="pb-2 text-left">Date</th>
+                <th className="pb-2 text-left">Source</th>
                 <th className="pb-2 text-left">Description</th>
+                <th className="pb-2 text-left">Idempotency key</th>
                 <th className="pb-2 text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {credits.history.map((transaction: TransactionRow) => (
-                <tr key={transaction.id} className="border-b">
-                  <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
-                  <td className="py-2 px-2 max-w-xs text-xs">
-                    {getTransactionDisplayDescription({
-                      type: transaction.type as TransactionType,
-                      amount: transaction.amount,
-                      note: "note" in transaction && typeof transaction.note === "string" ? transaction.note : null,
-                    })}
-                  </td>
-                  <td className={`py-2 text-right ${transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
-                    }`}>
-                    {transaction.amount}
-                  </td>
-                </tr>
-              ))}
+              {credits.history.map((transaction: TransactionRow) => {
+                const source = getBillingEventSource({
+                  type: transaction.type as TransactionType,
+                  idempotencyKey:
+                    "idempotency_key" in transaction &&
+                    typeof transaction.idempotency_key === "string"
+                      ? transaction.idempotency_key
+                      : null,
+                });
+                return (
+                  <tr key={transaction.id} className="border-b">
+                    <td className="py-2 whitespace-nowrap">
+                      {new Date(transaction.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-2">{getBillingEventSourceLabel(source)}</td>
+                    <td className="py-2 px-2 max-w-xs text-xs">
+                      {getTransactionDisplayDescription({
+                        type: transaction.type as TransactionType,
+                        amount: transaction.amount,
+                        note:
+                          "note" in transaction && typeof transaction.note === "string"
+                            ? transaction.note
+                            : null,
+                      })}
+                    </td>
+                    <td className="py-2 font-mono text-xs text-muted-foreground">
+                      {typeof transaction.idempotency_key === "string"
+                        ? transaction.idempotency_key
+                        : "—"}
+                    </td>
+                    <td
+                      className={`py-2 text-right ${
+                        transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {transaction.amount}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

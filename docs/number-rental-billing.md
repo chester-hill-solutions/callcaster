@@ -5,7 +5,7 @@ This document describes how monthly billing works for rented phone numbers (`wor
 ## Scope
 
 - Initial purchase charge when a number is rented.
-- Monthly renewal charge (`1000` credits/month).
+- Monthly renewal charge (`100` credits/month at Option B / $2.00 CAD).
 - Renewal reminder emails (`25`, `15`, `3` days before due date).
 - Overdue final notice and auto-release (`30` days after due date if still unpaid).
 
@@ -21,7 +21,7 @@ This document describes how monthly billing works for rented phone numbers (`wor
 ## Billing rules
 
 - **Rollout start:** applies only to rented numbers with `workspace_number.created_at >= 2026-04-01` (UTC day).
-- **Monthly amount:** `1000` credits per rented number.
+- **Monthly amount:** `100` credits per rented number (Option B).
 - **Anchor date:** `workspace_number.created_at`.
 - **Due date per month:** same day-of-month as anchor, with month-end fallback.
   - Example: anchor on Jan 31 -> Feb 28/29, Apr 30, etc.

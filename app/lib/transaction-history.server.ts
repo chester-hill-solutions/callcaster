@@ -8,6 +8,11 @@ import {
 
 export type { TransactionType } from "@/lib/transaction-history-display";
 export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
+export {
+  getBillingEventSource,
+  getBillingEventSourceLabel,
+  type BillingEventSource,
+} from "@/lib/transaction-history-display";
 
 import { isUniqueViolation } from "@/lib/parse-utils.server";
 

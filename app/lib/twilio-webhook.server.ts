@@ -184,6 +184,40 @@ export function validateTwilioWebhookForPhoneCandidates(args: {
   });
 }
 
+export async function validateTwilioWebhookForWorkspace(args: {
+  request: Request;
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+}): Promise<
+  | ({ ok: true; params: Record<string, string>; authToken: string } & { workspaceId: string })
+  | { ok: false; response: Response }
+> {
+  const missingHeader = rejectMissingTwilioSignatureHeader(args.request);
+  if (missingHeader) {
+    return { ok: false, response: missingHeader };
+  }
+
+  const url = new URL(args.request.url);
+  const params = Object.fromEntries(url.searchParams.entries());
+
+  const { data: workspace } = await args.supabase
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", args.workspaceId)
+    .single();
+
+  const validation = validateWorkspaceTwilioWebhook({
+    request: args.request,
+    params,
+    twilioData: workspace?.twilio_data,
+  });
+  if (!validation.ok) {
+    return validation;
+  }
+
+  return { ...validation, workspaceId: args.workspaceId };
+}
+
 export async function validateTwilioWebhookForCallSid(args: {
   request: Request;
   supabase: SupabaseClient<Database>;
