@@ -48,9 +48,7 @@ export async function listWorkspaceTollFreeVerificationSummaries(args: {
   return args.tollFreePhoneNumbers.map((number) => {
     const phoneNumber = number.phoneNumber ?? "";
     const match = verifications.find(
-      (verification) =>
-        verification.tollfreePhoneNumberSid === number.sid ||
-        verification.tollfreePhoneNumber === phoneNumber,
+      (verification) => verification.tollfreePhoneNumberSid === number.sid,
     );
 
     return {

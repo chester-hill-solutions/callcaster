@@ -283,7 +283,12 @@ describe("app/components/ui primitives", () => {
     expect(screen.getByText("T")).toBeInTheDocument();
     const { unmount } = render(
       <Sheet open>
-        <SheetContent side="left">L</SheetContent>
+        <SheetContent side="left">
+          <SheetHeader>
+            <SheetTitle>L</SheetTitle>
+            <SheetDescription>Left sheet</SheetDescription>
+          </SheetHeader>
+        </SheetContent>
       </Sheet>,
     );
     unmount();

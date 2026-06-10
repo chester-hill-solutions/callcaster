@@ -26,7 +26,12 @@ Deno.test(
         }
         return {
           select: () => ({
-            not: async () => ({ data: [], error: null }),
+            not: () => ({
+              eq: () => ({
+                limit: async () => ({ data: [], error: null }),
+              }),
+              limit: async () => ({ data: [], error: null }),
+            }),
           }),
         };
       },

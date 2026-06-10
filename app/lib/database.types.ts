@@ -1465,6 +1465,99 @@ export type Database = {
           },
         ];
       };
+      agent_status: {
+        Row: {
+          workspace_id: string;
+          user_id: string;
+          status: Database["public"]["Enums"]["agent_state"];
+          status_reason: string | null;
+          status_started_at: string;
+          current_queue_entry_id: number | null;
+          last_heartbeat_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          user_id: string;
+          status?: Database["public"]["Enums"]["agent_state"];
+          status_reason?: string | null;
+          status_started_at?: string;
+          current_queue_entry_id?: number | null;
+          last_heartbeat_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          workspace_id?: string;
+          user_id?: string;
+          status?: Database["public"]["Enums"]["agent_state"];
+          status_reason?: string | null;
+          status_started_at?: string;
+          current_queue_entry_id?: number | null;
+          last_heartbeat_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_status_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_status_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_status_event: {
+        Row: {
+          id: number;
+          workspace_id: string;
+          user_id: string;
+          from_status: Database["public"]["Enums"]["agent_state"];
+          to_status: Database["public"]["Enums"]["agent_state"];
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          workspace_id: string;
+          user_id: string;
+          from_status: Database["public"]["Enums"]["agent_state"];
+          to_status: Database["public"]["Enums"]["agent_state"];
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          workspace_id?: string;
+          user_id?: string;
+          from_status?: Database["public"]["Enums"]["agent_state"];
+          to_status?: Database["public"]["Enums"]["agent_state"];
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_status_event_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_status_event_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       handset_session: {
         Row: {
           id: string;
@@ -2597,6 +2690,7 @@ export type Database = {
       };
     };
     Enums: {
+      agent_state: "offline" | "available" | "busy" | "wrap_up" | "away";
       answered_by: "human" | "machine" | "unknown";
       call_status:
         | "queued"

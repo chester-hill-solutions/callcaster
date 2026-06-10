@@ -13,6 +13,7 @@
 :surveyId
 accept-invite
 admin
+api/agent-status
 api/audience-upload
 api/audience-upload-status
 api/audiences

@@ -222,7 +222,9 @@ export function listSourceFiles() {
   /** @param {string} p */
   const shouldSkipDir = (p) => {
     const rel = path.relative(repoRoot, p);
-    if (rel.startsWith("node_modules")) return true;
+    const parts = rel.split(path.sep);
+    if (parts.includes("node_modules")) return true;
+    if (parts.includes(".deno")) return true;
     if (rel.startsWith("build")) return true;
     if (rel.startsWith(path.join("public", "build"))) return true;
     if (rel.startsWith(path.join("supabase", "functions", "__tests__")))

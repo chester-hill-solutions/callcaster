@@ -110,11 +110,11 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: new Request("http://localhost/api/inbound-handset-dial-end", {
         method: "GET",
       }),
-    } as never);
+    } as never));
     expect(res.status).toBe(405);
   });
 
@@ -166,9 +166,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
 
   test("returns TwiML with no-answer message on happy path", async () => {
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
-    } as never);
+    } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("No one is available");
@@ -184,9 +184,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
       }),
     );
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
-    } as never);
+    } as never));
     const text = await res.text();
     expect(text).toContain("record");
     expect(text).not.toContain("No one is available");
@@ -201,9 +201,9 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
       twilioData: { sid: "AC1", authToken: "tok" },
     });
     const mod = await import("../app/routes/api+/inbound-handset-dial-end");
-    const res = await mod.action({
+    const res = await asRouteResponse(await mod.action({
       request: makeRequest({ called: "+15551234567", dialCallStatus: "completed" }),
-    } as never);
+    } as never));
     const text = await res.text();
     expect(text).not.toContain("No one is available");
     expect(text).toContain("hangup");

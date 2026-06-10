@@ -1,15 +1,13 @@
 import { vi } from "vitest";
 
-export function mockLoggerClient() {
-  vi.mock("@/lib/logger.client", () => ({
-    logger: {
-      debug: vi.fn(),
-      error: vi.fn(),
-      warn: vi.fn(),
-      info: vi.fn(),
-    },
-  }));
-}
+vi.mock("@/lib/logger.client", () => ({
+  logger: {
+    debug: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+  },
+}));
 
 export function createMockFetcher<T = unknown>(overrides: Partial<{
   state: string;
