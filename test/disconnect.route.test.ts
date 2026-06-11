@@ -20,7 +20,7 @@ vi.mock("twilio", () => ({
   default: (...args: any[]) => mocks.twilioFactory(...args),
 }));
 
-describe("app/routes/api+/disconnect/route.ts", () => {
+describe("app/routes/api.disconnect.ts", () => {
   const origEnv = process.env;
 
   beforeEach(() => {

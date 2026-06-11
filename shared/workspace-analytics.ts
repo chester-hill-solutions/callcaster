@@ -19,12 +19,26 @@ export type WorkspaceAnalyticsSummary = {
   dialingSeconds: number;
   connectedSeconds: number;
   interfaceSeconds: number;
+  totalShifts: number;
+  totalShiftSeconds: number;
+};
+
+export type WorkspaceAnalyticsShiftRow = {
+  shiftNumber: number;
+  userId: string;
+  label: string;
+  startTime: string;
+  endTime: string;
+  dials: number;
+  connected: number;
+  shiftSeconds: number;
 };
 
 export type WorkspaceAnalyticsResult = {
   range: WorkspaceAnalyticsRange;
   summary: WorkspaceAnalyticsSummary;
   users: WorkspaceAnalyticsUserRow[];
+  shifts: WorkspaceAnalyticsShiftRow[];
   scopedUserId: string | null;
 };
 
@@ -173,6 +187,99 @@ export function formatAnalyticsDuration(totalSeconds: number): string {
   return `${seconds}s`;
 }
 
+const SHIFT_GRACE_SECONDS = 5 * 60; // 5 minutes
+
+export function buildShifts(
+  attempts: AnalyticsAttemptInput[],
+  userLabels: Map<string, string>,
+): WorkspaceAnalyticsShiftRow[] {
+  const byUser = new Map<string, AnalyticsAttemptInput[]>();
+  for (const attempt of attempts) {
+    if (!attempt.user_id) continue;
+    const list = byUser.get(attempt.user_id) ?? [];
+    list.push(attempt);
+    byUser.set(attempt.user_id, list);
+  }
+
+  const shifts: WorkspaceAnalyticsShiftRow[] = [];
+
+  for (const [userId, userAttempts] of byUser) {
+    const sorted = [...userAttempts].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+
+    let currentShift: {
+      startTime: Date;
+      endTime: Date;
+      dials: number;
+      connected: number;
+    } | null = null;
+    let shiftNumber = 0;
+
+    for (const attempt of sorted) {
+      const metrics = aggregateAttemptMetrics(attempt);
+      const attemptStart = new Date(attempt.created_at);
+      const attemptEnd = attempt.ended_at
+        ? new Date(attempt.ended_at)
+        : new Date(attemptStart.getTime() + metrics.interfaceSeconds * 1000);
+
+      if (
+        !currentShift ||
+        attemptStart.getTime() > currentShift.endTime.getTime() + SHIFT_GRACE_SECONDS * 1000
+      ) {
+        if (currentShift) {
+          shiftNumber += 1;
+          shifts.push({
+            shiftNumber,
+            userId,
+            label: userLabels.get(userId) ?? userId,
+            startTime: currentShift.startTime.toISOString(),
+            endTime: currentShift.endTime.toISOString(),
+            dials: currentShift.dials,
+            connected: currentShift.connected,
+            shiftSeconds: Math.round(
+              (currentShift.endTime.getTime() - currentShift.startTime.getTime()) / 1000,
+            ),
+          });
+        }
+        currentShift = {
+          startTime: attemptStart,
+          endTime: attemptEnd,
+          dials: 1,
+          connected: metrics.connected ? 1 : 0,
+        };
+      } else {
+        currentShift.endTime =
+          attemptEnd > currentShift.endTime ? attemptEnd : currentShift.endTime;
+        currentShift.dials += 1;
+        if (metrics.connected) currentShift.connected += 1;
+      }
+    }
+
+    if (currentShift) {
+      shiftNumber += 1;
+      shifts.push({
+        shiftNumber,
+        userId,
+        label: userLabels.get(userId) ?? userId,
+        startTime: currentShift.startTime.toISOString(),
+        endTime: currentShift.endTime.toISOString(),
+        dials: currentShift.dials,
+        connected: currentShift.connected,
+        shiftSeconds: Math.round(
+          (currentShift.endTime.getTime() - currentShift.startTime.getTime()) / 1000,
+        ),
+      });
+    }
+  }
+
+  return shifts.sort(
+    (a, b) =>
+      new Date(b.startTime).getTime() - new Date(a.startTime).getTime() ||
+      a.userId.localeCompare(b.userId),
+  );
+}
+
 export function buildWorkspaceAnalytics(args: {
   attempts: AnalyticsAttemptInput[];
   users: Array<{ id: string; label: string }>;
@@ -180,6 +287,7 @@ export function buildWorkspaceAnalytics(args: {
   scopedUserId: string | null;
 }): WorkspaceAnalyticsResult {
   const perUser = new Map<string, WorkspaceAnalyticsUserRow>();
+  const userLabels = new Map<string, string>();
 
   for (const user of args.users) {
     perUser.set(user.id, {
@@ -191,6 +299,7 @@ export function buildWorkspaceAnalytics(args: {
       connectedSeconds: 0,
       interfaceSeconds: 0,
     });
+    userLabels.set(user.id, user.label);
   }
 
   const summary: WorkspaceAnalyticsSummary = {
@@ -199,6 +308,8 @@ export function buildWorkspaceAnalytics(args: {
     dialingSeconds: 0,
     connectedSeconds: 0,
     interfaceSeconds: 0,
+    totalShifts: 0,
+    totalShiftSeconds: 0,
   };
 
   for (const attempt of args.attempts) {
@@ -231,10 +342,15 @@ export function buildWorkspaceAnalytics(args: {
     .filter((row) => row.totalDials > 0)
     .sort((left, right) => right.totalDials - left.totalDials);
 
+  const shifts = buildShifts(args.attempts, userLabels);
+  summary.totalShifts = shifts.length;
+  summary.totalShiftSeconds = shifts.reduce((sum, s) => sum + s.shiftSeconds, 0);
+
   return {
     range: args.range,
     summary,
     users,
+    shifts,
     scopedUserId: args.scopedUserId,
   };
 }

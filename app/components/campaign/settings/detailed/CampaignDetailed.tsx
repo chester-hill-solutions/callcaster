@@ -327,6 +327,7 @@ export const CampaignTypeSpecificSettings = ({
             scheduleDisabled={scheduleDisabled}
             isBusy={isBusy}
             handleScheduleButton={() => handleScheduleButton()}
+            status={campaignData.status}
           />
             {isIvrCampaign ? (
               <div className="w-full">

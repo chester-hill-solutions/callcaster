@@ -78,6 +78,7 @@ type ActionData = {
   campaign?: CampaignWithAudiences;
   campaignDetails?: CampaignDetails;
   actionType?: "save" | "status" | "duplicate";
+  status?: string;
 };
 
 export default function CampaignSettingsRoute() {
@@ -188,6 +189,11 @@ export default function CampaignSettingsRoute() {
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success && fetcher.data.actionType === "status") {
       setConfirmStatus("none");
+      const newStatus = (fetcher.data as { status?: string }).status;
+      if (newStatus) {
+        setDraftCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
+        setSavedCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
+      }
     }
   }, [fetcher.data, fetcher.state]);
 
