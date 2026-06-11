@@ -15,22 +15,32 @@ import {
 } from "@/lib/billing-format";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
-
   const { supabaseClient, user } = await verifyAuth(request);
 
   const workspaceId = params.id;
   if (!workspaceId) throw new Error("Workspace ID is required");
-  const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id, transaction_history(*)").eq("id", workspaceId).single();
+
+  const { data: workspace, error: workspaceError } = await supabaseClient
+    .from("workspace")
+    .select("credits, stripe_id")
+    .eq("id", workspaceId)
+    .single();
 
   if (workspaceError) throw workspaceError;
-  const history = workspace?.transaction_history ?? [];
-  const sortedHistory = Array.isArray(history)
-    ? [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : [];
+
+  const { data: history, error: historyError } = await supabaseClient
+    .from("transaction_history")
+    .select("id, created_at, type, amount, note, idempotency_key")
+    .eq("workspace", workspaceId)
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (historyError) throw historyError;
+
   return routeData({
     credits: {
       balance: workspace?.credits ?? 0,
-      history: sortedHistory,
+      history: history ?? [],
     },
   });
 }

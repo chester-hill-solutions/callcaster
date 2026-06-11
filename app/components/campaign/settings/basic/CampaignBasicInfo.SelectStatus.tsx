@@ -27,6 +27,7 @@ export default function SelectStatus({ handleInputChange, campaignData }: Select
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="scheduled">Scheduled</SelectItem>
           <SelectItem value="running">Running</SelectItem>
           <SelectItem value="complete">Complete</SelectItem>
           <SelectItem value="paused">Paused</SelectItem>

@@ -268,7 +268,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
           status,
           is_active === "true" ? true : is_active === "false" ? false : undefined
         );
-        return routeData({ success: true, actionType: "status" as const });
+        return routeData({ success: true, actionType: "status" as const, status });
       } catch (error) {
         logger.error("Error updating campaign status", error);
         return routeData(

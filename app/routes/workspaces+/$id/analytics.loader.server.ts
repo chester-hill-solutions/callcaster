@@ -29,8 +29,11 @@ function emptyAnalytics(): WorkspaceAnalyticsResult {
       dialingSeconds: 0,
       connectedSeconds: 0,
       interfaceSeconds: 0,
+      totalShifts: 0,
+      totalShiftSeconds: 0,
     },
     users: [],
+    shifts: [],
     scopedUserId: null,
   };
 }

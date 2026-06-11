@@ -70,6 +70,10 @@ export function WorkspaceAnalyticsPanel({
     analytics.summary.totalDials > 0
       ? Math.round((analytics.summary.totalConnected / analytics.summary.totalDials) * 100)
       : 0;
+  const avgShiftDuration =
+    analytics.summary.totalShifts > 0
+      ? Math.round(analytics.summary.totalShiftSeconds / analytics.summary.totalShifts)
+      : 0;
 
   const updateParam = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams);
@@ -169,6 +173,15 @@ export function WorkspaceAnalyticsPanel({
           title="Caller interface time"
           value={formatAnalyticsDuration(analytics.summary.interfaceSeconds)}
         />
+        <MetricCard
+          title="Shifts"
+          value={String(analytics.summary.totalShifts)}
+          detail={
+            analytics.summary.totalShifts > 0
+              ? `Avg ${formatAnalyticsDuration(avgShiftDuration)}`
+              : undefined
+          }
+        />
       </div>
 
       {canFilterUsers && analytics.users.length > 0 ? (
@@ -203,6 +216,46 @@ export function WorkspaceAnalyticsPanel({
                     <TableCell>{formatAnalyticsDuration(row.dialingSeconds)}</TableCell>
                     <TableCell>{formatAnalyticsDuration(row.connectedSeconds)}</TableCell>
                     <TableCell>{formatAnalyticsDuration(row.interfaceSeconds)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {canFilterUsers && analytics.shifts.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-Zilla-Slab text-xl">Shifts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead>Dials</TableHead>
+                  <TableHead>Connected</TableHead>
+                  <TableHead>Duration</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {analytics.shifts.map((row) => (
+                  <TableRow
+                    key={`${row.userId}-${row.shiftNumber}`}
+                    className={row.userId === currentUserId ? "bg-muted/40" : undefined}
+                  >
+                    <TableCell className="font-medium">
+                      {row.label}
+                      {row.userId === currentUserId ? " (you)" : ""}
+                    </TableCell>
+                    <TableCell>{new Date(row.startTime).toLocaleString()}</TableCell>
+                    <TableCell>{new Date(row.endTime).toLocaleString()}</TableCell>
+                    <TableCell>{row.dials}</TableCell>
+                    <TableCell>{row.connected}</TableCell>
+                    <TableCell>{formatAnalyticsDuration(row.shiftSeconds)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
