@@ -52,8 +52,8 @@ export function makeTransactionHistoryTableStub(transactionRows: TransactionRow[
       return builder;
     },
     order: () => builder,
-    limit: () => ({
-      maybeSingle: async () => {
+    limit: () => {
+      const resultPromise = (async () => {
         const matches = transactionRows.filter(
           (r) =>
             (!q.workspace || r.workspace === q.workspace) &&
@@ -61,9 +61,19 @@ export function makeTransactionHistoryTableStub(transactionRows: TransactionRow[
             (!q.idempotency_key || r.idempotency_key === q.idempotency_key),
         );
         const latest = matches.at(-1);
-        return { data: latest ? { id: latest.id } : null, error: null };
-      },
-    }),
+        return {
+          data: latest ? [{ id: latest.id }] : [],
+          error: null,
+        };
+      })();
+
+      return Object.assign(resultPromise, {
+        maybeSingle: async () => {
+          const { data } = await resultPromise;
+          return { data: data[0] ?? null, error: null };
+        },
+      });
+    },
     insert: (row) => ({
       select: () => ({
         single: async () => {

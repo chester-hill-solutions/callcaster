@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router";
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
@@ -35,6 +35,9 @@ export function ContactSearchDialog({
             <DialogContent className="bg-white">
                 <DialogHeader>
                     <DialogTitle>Search Contacts</DialogTitle>
+                    <DialogDescription>
+                        Search for contacts in this workspace and add matching contacts to the queue.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                     <div className="flex gap-2">

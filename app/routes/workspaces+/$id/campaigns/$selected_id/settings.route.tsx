@@ -1,8 +1,11 @@
-// @ts-nocheck
+export { loader } from "./settings.loader.server";
+export { action } from "./settings.action.server";
+
 import { data as routeData, LoaderFunctionArgs, ActionFunctionArgs, redirect } from "react-router";
 import { useFetcher, useLoaderData, useNavigate, useOutletContext } from "react-router";
 
 import { CampaignSettings } from "@/components/campaign/settings/CampaignSettings";
+import type { CampaignBillingSummary } from "@/lib/campaign-billing.server";
 
 
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
@@ -24,8 +27,19 @@ import {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
+import { normalizeSchedule } from "@/lib/workspace-members";
+import {
+  buildCampaignDetailsForType,
+  DETAIL_FIELDS,
+  normalizeCampaignData,
+} from "@/lib/campaign-settings";
 import { deepEqual } from "@/lib/utils";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import {
+  getCampaignSetupDismissKey,
+  getCampaignSetupSteps,
+  shouldShowCampaignSetupGuide,
+} from "@/lib/campaign-setup-steps";
 import {
   Dialog,
   DialogContent,
@@ -64,437 +78,7 @@ type ActionData = {
   campaign?: CampaignWithAudiences;
   campaignDetails?: CampaignDetails;
   actionType?: "save" | "status" | "duplicate";
-};
-
-const DETAIL_FIELDS = new Set(["script_id", "body_text", "message_media", "voicedrop_audio"]);
-
-function normalizeSchedule(schedule: unknown) {
-  if (!schedule) return null;
-
-  if (typeof schedule === "string") {
-    try {
-      return JSON.parse(schedule);
-    } catch {
-      return null;
-    }
-  }
-
-  return schedule;
-}
-
-function normalizeCampaignData(campaignData: CampaignWithAudiences): CampaignWithAudiences {
-  return {
-    ...campaignData,
-    schedule: normalizeSchedule(campaignData.schedule) as Schedule | null,
-  } as CampaignWithAudiences;
-}
-
-function buildCampaignDetailsForType(
-  campaignType: Campaign["type"],
-  currentDetails: CampaignDetails,
-  campaignId: number,
-  workspaceId: string,
-): CampaignDetails {
-  const sharedFields = {
-    campaign_id: campaignId,
-    workspace: workspaceId,
-  };
-
-  if (campaignType === "message") {
-    return {
-      ...sharedFields,
-      body_text: "body_text" in currentDetails ? currentDetails.body_text ?? "" : "",
-      message_media: "message_media" in currentDetails ? currentDetails.message_media ?? [] : [],
-    } as CampaignDetails;
-  }
-
-  if (campaignType === "robocall" || campaignType === "simple_ivr" || campaignType === "complex_ivr") {
-    return {
-      ...sharedFields,
-      script_id: "script_id" in currentDetails ? currentDetails.script_id ?? null : null,
-    } as CampaignDetails;
-  }
-
-  return {
-    ...sharedFields,
-    disposition_options: "disposition_options" in currentDetails ? currentDetails.disposition_options : [],
-    questions: "questions" in currentDetails ? currentDetails.questions : [],
-    script_id: "script_id" in currentDetails ? currentDetails.script_id ?? null : null,
-    voicedrop_audio: "voicedrop_audio" in currentDetails ? currentDetails.voicedrop_audio ?? null : null,
-  } as CampaignDetails;
-}
-
-async function updateCampaignStatus(
-  supabaseClient: SupabaseClient,
-  selected_id: string,
-  workspaceId: string,
-  status: string,
-  is_active?: boolean
-) {
-  const { logger } = await import("@/lib/logger.server");
-  const update: { status: string; is_active?: boolean } = { status };
-
-  // Use is_active from client if provided, otherwise determine based on status
-  if (is_active !== undefined) {
-    update.is_active = is_active;
-  } else {
-    if (status === "running") update.is_active = true;
-    if (status === "paused") update.is_active = false;
-  }
-
-  logger.debug("Server update object:", update);
-  const { error } = await supabaseClient
-    .from("campaign")
-    .update({ ...update })
-    .eq("id", Number(selected_id))
-    .eq("workspace", workspaceId);
-
-  if (error) throw error;
-  return { success: true };
-}
-
-async function handleCampaignDuplicate(
-  supabaseClient: SupabaseClient,
-  selected_id: string,
-  workspace_id: string,
-  campaignData: string
-) {
-  const parsedData = JSON.parse(campaignData);
-
-  // Create new campaign
-  const { data: campaign, error } = await supabaseClient
-    .from("campaign")
-    .insert({ ...parsedData, workspace: workspace_id })
-    .select('id')
-    .single();
-
-  if (error || !campaign) throw error || new Error("Failed to create campaign");
-
-  // Clone queue if it exists
-  const { data: originalQueue } = await supabaseClient
-    .from("campaign_queue")
-    .select('contact_id')
-    .eq('campaign_id', selected_id);
-
-  if (originalQueue?.length) {
-    const newQueueItems = originalQueue.map(item => ({
-      campaign_id: campaign.id,
-      contact_id: item.contact_id,
-      workspace: workspace_id
-    }));
-
-    const { error: queueError } = await supabaseClient
-      .from("campaign_queue")
-      .insert(newQueueItems);
-
-    if (queueError) throw queueError;
-  }
-
-  // Clone campaign details
-  await supabaseClient
-    .from(parsedData.type === 'live_call' ? 'live_campaign' :
-      parsedData.type === 'message' ? 'message_campaign' : 'ivr_campaign')
-    .insert({
-      campaign_id: campaign.id,
-      workspace: workspace_id,
-      script_id: parsedData.script_id,
-      body_text: parsedData.body_text,
-      message_media: parsedData.message_media,
-      voicedrop_audio: parsedData.voicedrop_audio
-    });
-
-  return { success: true };
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { logger } = await import("@/lib/logger.server");
-  const { getWorkspaceMessagingOnboardingFromTwilioData } = await import("@/lib/messaging-onboarding.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const {
-    fetchQueueCounts,
-    getCampaignTableKey,
-    parseActionRequest,
-    updateCampaign,
-  } = await import("@/lib/database.server");
-
-  const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  if (!user) return redirect("/signin");
-  if (!selected_id || !workspace_id) return redirect("/");
-
-  const data = await parseActionRequest(request);
-  const intent = String(data.intent ?? "");
-
-  switch (intent) {
-    case "save": {
-      try {
-        const campaignDataStr = data.campaignData != null ? String(data.campaignData) : "";
-        const campaignDetailsStr = data.campaignDetails != null ? String(data.campaignDetails) : "";
-
-        if (!campaignDataStr || !campaignDetailsStr) {
-          return routeData(
-            { error: "Campaign changes could not be saved", actionType: "save" as const },
-            { status: 400 },
-          );
-        }
-
-        const nextCampaignData = JSON.parse(campaignDataStr);
-        const nextCampaignDetails = JSON.parse(campaignDetailsStr);
-        const previousCampaign = await supabaseClient
-          .from("campaign")
-          .select("type")
-          .eq("id", Number(selected_id))
-          .single();
-
-        const result = await updateCampaign({
-          supabase: supabaseClient,
-          campaignData: {
-            ...nextCampaignData,
-            campaign_id: Number(selected_id),
-            workspace: workspace_id,
-            schedule: normalizeSchedule(nextCampaignData.schedule),
-          },
-          campaignDetails: {
-            ...nextCampaignDetails,
-            campaign_id: Number(selected_id),
-            workspace: workspace_id,
-          },
-        });
-
-        if (
-          previousCampaign.data?.type &&
-          previousCampaign.data.type !== nextCampaignData.type
-        ) {
-          const activeTable = getCampaignTableKey(nextCampaignData.type);
-          const tables = ["live_campaign", "message_campaign", "ivr_campaign"] as const;
-
-          await Promise.all(
-            tables
-              .filter((table) => table !== activeTable)
-              .map((table) =>
-                supabaseClient.from(table).delete().eq("campaign_id", Number(selected_id)),
-              ),
-          );
-        }
-
-        return routeData({
-          success: true,
-          actionType: "save" as const,
-          campaign: result.campaign,
-          campaignDetails: result.campaignDetails,
-        });
-      } catch (error) {
-        logger.error("Error saving campaign settings", error);
-        return routeData(
-          {
-            error: error instanceof Error ? error.message : "Campaign changes could not be saved",
-            actionType: "save" as const,
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    case "status": {
-      try {
-        const status = String(data.status ?? "") as CampaignStatus;
-        const is_active = String(data.is_active ?? "");
-        const { data: campaignRecord, error: campaignError } = await supabaseClient
-          .from("campaign")
-          .select("*")
-          .eq("id", Number(selected_id))
-          .eq("workspace", workspace_id)
-          .single();
-
-        if (campaignError || !campaignRecord) {
-          throw campaignError ?? new Error("Campaign could not be loaded");
-        }
-
-        if (status === "running" || status === "scheduled") {
-          if (
-            !campaignRecord.type ||
-            !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(
-              campaignRecord.type,
-            )
-          ) {
-            return routeData(
-              {
-                success: false,
-                error: "Campaign type must be selected before updating status",
-                actionType: "status" as const,
-              },
-              { status: 400 },
-            );
-          }
-
-          const detailTable = getCampaignTableKey(
-            campaignRecord.type as Exclude<Campaign["type"], "email" | null>,
-          );
-          const { data: campaignDetails, error: detailError } = await supabaseClient
-            .from(detailTable)
-            .select("*")
-            .eq("campaign_id", Number(selected_id))
-            .eq("workspace", workspace_id)
-            .maybeSingle();
-
-          if (detailError) {
-            throw detailError;
-          }
-
-          const queueCounts = await fetchQueueCounts(supabaseClient as any, selected_id);
-          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
-            queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
-          });
-          const readinessError =
-            status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
-
-          if (readinessError) {
-            return routeData(
-              { success: false, error: readinessError, actionType: "status" as const },
-              { status: 400 },
-            );
-          }
-        }
-
-        await updateCampaignStatus(
-          supabaseClient,
-          selected_id,
-          workspace_id,
-          status,
-          is_active === "true" ? true : is_active === "false" ? false : undefined
-        );
-        return routeData({ success: true, actionType: "status" as const });
-      } catch (error) {
-        logger.error("Error updating campaign status", error);
-        return routeData(
-          {
-            success: false,
-            error: error instanceof Error ? error.message : "Campaign status could not be updated",
-            actionType: "status" as const,
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    case "duplicate": {
-      try {
-        const campaignData = data.campaignData != null ? String(data.campaignData) : "";
-        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
-        return routeData({ success: true, actionType: "duplicate" as const });
-      } catch (error) {
-        logger.error("Error duplicating campaign", error);
-        return routeData(
-          {
-            success: false,
-            error: error instanceof Error ? error.message : "Campaign could not be duplicated",
-            actionType: "duplicate" as const,
-          },
-          { status: 400 },
-        );
-      }
-    }
-
-    default:
-      return routeData({ success: false, error: "Invalid intent" }, { status: 400 });
-  }
-}
-
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { getWorkspaceMessagingOnboardingFromTwilioData } = await import("@/lib/messaging-onboarding.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { fetchCampaignAudience, fetchQueueCounts, getWorkspacePhoneNumbers, getWorkspaceTwilioPortalConfigFromTwilioData, getWorkspaceTwilioSyncSnapshotFromTwilioData, getSignedUrls, getCampaignTableKey, parseActionRequest, updateCampaign } = await import("@/lib/database.server");
-
-  const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  if (!user) return redirect("/signin");
-  if (!selected_id || !workspace_id) return redirect("/");
-
-  const [
-    campaignWithAudience,
-    campaignTypeResult,
-    surveysResult,
-    workspaceAudioList,
-    workspaceTwilioResult,
-    phoneNumbersResult,
-  ] = await Promise.all([
-    fetchCampaignAudience(supabaseClient, selected_id, workspace_id),
-    supabaseClient
-      .from("campaign")
-      .select("type")
-      .eq("id", Number(selected_id))
-      .eq("workspace", workspace_id)
-      .single(),
-    supabaseClient
-      .from("survey")
-      .select("survey_id, title")
-      .eq("workspace", workspace_id)
-      .eq("is_active", true),
-    supabaseClient.storage.from("workspaceAudio").list(`${workspace_id}`),
-    supabaseClient
-      .from("workspace")
-      .select("twilio_data")
-      .eq("id", workspace_id)
-      .maybeSingle(),
-    getWorkspacePhoneNumbers({
-      supabaseClient,
-      workspaceId: workspace_id,
-    }),
-  ]);
-
-  const campaignType = campaignTypeResult.data;
-  const surveys = surveysResult.data;
-  const mediaData = workspaceAudioList.data;
-  let mediaLinks: string[] = [];
-  const twilioData = (workspaceTwilioResult.data?.twilio_data ?? null) as TwilioAccountData;
-  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
-  const portalConfig = getWorkspaceTwilioPortalConfigFromTwilioData(twilioData);
-  const defaultMessagingServiceSid = portalConfig.messagingServiceSid?.trim() ?? null;
-  const messagingServiceReady = workspaceMessagingServiceHasAvailableSenders({
-    messagingServiceSid: defaultMessagingServiceSid,
-    attachedSenderPhoneNumbers: onboarding.messagingService.attachedSenderPhoneNumbers,
-    workspaceNumbers: phoneNumbersResult.data ?? [],
-  });
-  const outboundEstimateInputs = {
-    portalConfig,
-    syncSnapshot: getWorkspaceTwilioSyncSnapshotFromTwilioData(twilioData),
-  };
-
-  if (campaignType?.type === "message") {
-    const { data: messageCampaign } = await supabaseClient
-      .from("message_campaign")
-      .select("message_media")
-      .eq("campaign_id", Number(selected_id))
-      .eq("workspace", workspace_id)
-      .maybeSingle();
-
-    if (Array.isArray(messageCampaign?.message_media) && messageCampaign.message_media.length > 0) {
-      mediaLinks = await getSignedUrls(supabaseClient, workspace_id, messageCampaign.message_media);
-    }
-  }
-
-  return routeData({
-    workspace_id,
-    selected_id,
-    campaignQueue: campaignWithAudience.campaign_queue as QueueItem[],
-    queueCount: campaignWithAudience.queue_count,
-    dequeuedCount: campaignWithAudience.dequeued_count,
-    totalCount: campaignWithAudience.total_count,
-    scripts: campaignWithAudience.scripts.filter((s): s is NonNullable<typeof s> => s !== null),
-    mediaData: mediaData?.filter((media) => !media.name.startsWith("voicemail-")),
-    user: user,
-    mediaLinks,
-    surveys,
-    outboundEstimateInputs,
-    smsSendContext: {
-      messagingServiceReady,
-      defaultMessagingServiceSid,
-      attachedSenderPhoneNumbers:
-        onboarding.messagingService.attachedSenderPhoneNumbers,
-    },
-  });
+  status?: string;
 };
 
 export default function CampaignSettingsRoute() {
@@ -505,6 +89,7 @@ export default function CampaignSettingsRoute() {
     phoneNumbers,
     workspace,
   } = useOutletContext<Context>();
+  const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
 
   const {
     workspace_id,
@@ -520,11 +105,22 @@ export default function CampaignSettingsRoute() {
     surveys,
     outboundEstimateInputs,
     smsSendContext,
+    isFirstDraftCampaign,
+    campaignBilling,
   } = useLoaderData();
 
   const navigate = useNavigate();
   const fetcher = useFetcher<ActionData>();
   const [confirmStatus, setConfirmStatus] = useState<"play" | "archive" | "none">("none");
+  const [setupGuideDismissed, setSetupGuideDismissed] = useState(() => {
+    if (typeof window === "undefined" || !selected_id) {
+      return false;
+    }
+    return (
+      window.sessionStorage.getItem(getCampaignSetupDismissKey(selected_id)) ===
+      "1"
+    );
+  });
   const initialCampaignData = useMemo(() => {
     const normalized = normalizeCampaignData(campaignData);
     if (normalized.type !== "message") {
@@ -593,6 +189,11 @@ export default function CampaignSettingsRoute() {
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data?.success && fetcher.data.actionType === "status") {
       setConfirmStatus("none");
+      const newStatus = (fetcher.data as { status?: string }).status;
+      if (newStatus) {
+        setDraftCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
+        setSavedCampaignData((current) => ({ ...current, status: newStatus as CampaignStatus }));
+      }
     }
   }, [fetcher.data, fetcher.state]);
 
@@ -620,6 +221,7 @@ export default function CampaignSettingsRoute() {
     () =>
       getCampaignReadiness(draftCampaignData, draftCampaignDetails, {
         queueCount: queueCount ?? 0,
+        smsSenderClass: outboundEstimateInputs.portalConfig.smsSenderClass,
         smsMessagingServiceSendersReady:
           draftCampaignData.type === "message" &&
           draftCampaignData.sms_send_mode === "messaging_service"
@@ -631,6 +233,7 @@ export default function CampaignSettingsRoute() {
       draftCampaignDetails,
       queueCount,
       smsSendContext?.messagingServiceReady,
+      outboundEstimateInputs.portalConfig.smsSenderClass,
     ],
   );
   const startDisabledReason = isChanged
@@ -642,6 +245,47 @@ export default function CampaignSettingsRoute() {
   const readinessIssues = isChanged
     ? ["Save your changes to refresh campaign readiness."]
     : readiness.startIssues;
+
+  const setupGuideState = useMemo(
+    () =>
+      getCampaignSetupSteps({
+        campaignData: draftCampaignData,
+        campaignDetails: draftCampaignDetails,
+        phoneNumbers,
+        queueCount: queueCount ?? 0,
+        audienceCount: audiences?.length ?? 0,
+        scriptsCount: scripts?.length ?? 0,
+        workspaceId: workspace_id,
+        smsMessagingServiceSendersReady:
+          draftCampaignData.type === "message" &&
+          draftCampaignData.sms_send_mode === "messaging_service"
+            ? smsSendContext?.messagingServiceReady
+            : undefined,
+      }),
+    [
+      audiences?.length,
+      draftCampaignData,
+      draftCampaignDetails,
+      phoneNumbers,
+      queueCount,
+      scripts?.length,
+      smsSendContext?.messagingServiceReady,
+      workspace_id,
+    ],
+  );
+
+  const showSetupGuide = shouldShowCampaignSetupGuide({
+    isFirstDraftCampaign: Boolean(isFirstDraftCampaign),
+    dismissed: setupGuideDismissed,
+    allComplete: setupGuideState.allComplete,
+  });
+
+  const handleDismissSetupGuide = () => {
+    if (typeof window !== "undefined" && selected_id) {
+      window.sessionStorage.setItem(getCampaignSetupDismissKey(selected_id), "1");
+    }
+    setSetupGuideDismissed(true);
+  };
 
   const handleDuplicate = () => {
     const { id, ...dataToDuplicate } = draftCampaignData;
@@ -820,7 +464,7 @@ export default function CampaignSettingsRoute() {
         workspace={workspace_id}
         campaignData={draftCampaignData}
         campaignDetails={draftCampaignDetails as any}
-        credits={(workspace as any)?.credits || 0}
+        credits={Number((workspaceRecord as { credits?: number })?.credits ?? 0)}
         isActive={draftCampaignData?.status === "running" || false}
         scripts={scripts}
         audiences={audiences}
@@ -867,6 +511,13 @@ export default function CampaignSettingsRoute() {
         surveys={surveys || []}
         outboundEstimateInputs={outboundEstimateInputs}
         smsSendContext={smsSendContext}
+        showSetupGuide={showSetupGuide}
+        setupGuideSteps={setupGuideState.steps}
+        setupGuideCurrentStepNumber={setupGuideState.currentStepNumber}
+        setupGuideTotalSteps={setupGuideState.totalSteps}
+        setupGuideAllComplete={setupGuideState.allComplete}
+        onDismissSetupGuide={handleDismissSetupGuide}
+        campaignBilling={campaignBilling as CampaignBillingSummary | null}
       />
     </>
   );

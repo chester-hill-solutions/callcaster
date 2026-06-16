@@ -88,6 +88,7 @@ interface CampaignBasicInfoProps {
   scheduleDisabled: string | boolean;
   isBusy: boolean;
   callerIdOptional?: boolean;
+  hideReadinessAlerts?: boolean;
 }
 
 // Main Component
@@ -104,6 +105,7 @@ export const CampaignBasicInfo = ({
   scheduleDisabled,
   isBusy,
   callerIdOptional = false,
+  hideReadinessAlerts = false,
 }: CampaignBasicInfoProps) => {
   const buttonStates = getButtonStates(
     campaignData.status as CampaignState,
@@ -174,17 +176,21 @@ export const CampaignBasicInfo = ({
               service&apos;s sender pool).
             </p>
           ) : null}
-          <SelectNumber
-            campaignData={{ caller_id: campaignData.caller_id ?? undefined }}
-            handleInputChange={(name, value) => handleInputChange(name, value)}
-            phoneNumbers={phoneNumbers}
-            callerIdOptional={callerIdOptional}
-          />
+          <div id="campaign-setup-number">
+            <SelectNumber
+              campaignData={{ caller_id: campaignData.caller_id ?? undefined }}
+              handleInputChange={(name, value) => handleInputChange(name, value)}
+              phoneNumbers={phoneNumbers}
+              callerIdOptional={callerIdOptional}
+            />
+          </div>
 
-          <SelectDates
-            campaignData={campaignData}
-            handleInputChange={handleInputChange}
-          />
+          <div id="campaign-setup-schedule">
+            <SelectDates
+              campaignData={campaignData}
+              handleInputChange={handleInputChange}
+            />
+          </div>
 
         </div>
 
@@ -202,7 +208,7 @@ export const CampaignBasicInfo = ({
             {renderButton("duplicate", <Copy className="h-4 w-4" />, "Duplicate campaign")}
           </div>
 
-          {readinessIssues.length > 0 && (
+          {readinessIssues.length > 0 && !hideReadinessAlerts && (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               <div className="mb-2 flex items-center space-x-2">
                 <AlertCircle className="h-4 w-4" />

@@ -1,10 +1,9 @@
-// @ts-nocheck
+export { loader } from "./$selected_id.loader.server";
+export { action } from "./$selected_id.action.server";
+
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Await, Outlet, useActionData, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
-import { Suspense, useEffect, useRef } from "react";
-
-
-import { logger as loggerClient } from "@/lib/logger.client";
+import { Await, Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
+import { Suspense, useRef } from "react";
 
 
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -17,7 +16,6 @@ import {
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
 import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
-import { downloadCsv } from "@/lib/csvDownload";
 import {
   Audience,
   Campaign,
@@ -33,33 +31,8 @@ import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRea
 import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
 import { getCampaignReadiness } from "@/lib/campaign-readiness";
 
-export type CampaignState = {
-  campaign_id: string;
-  workspace: string;
-  title: string;
-  status: string;
-  type:
-    | "message"
-    | "robocall"
-    | "live_call"
-    | "simple_ivr"
-    | "complex_ivr"
-    | "email";
-  dial_type: "call" | "predictive" | null;
-  group_household_queue: boolean;
-  start_date: string;
-  end_date: string;
-  caller_id: string | null;
-  voicemail_file: string | null;
-  script_id: number | null;
-  audiences: NonNullable<Audience>[];
-  body_text: string | null;
-  message_media: string[] | null;
-  voicedrop_audio: string | null;
-  schedule: Schedule | null;
-  is_active: boolean;
-  details: LiveCampaign | MessageCampaign | IVRCampaign;
-};
+import type { CampaignState } from "@/lib/campaign-home.types";
+export type { CampaignState } from "@/lib/campaign-home.types";
 
 type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
 
@@ -84,135 +57,6 @@ const getTable = (
         : null;
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {  const { logger: loggerServer } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } = await import("@/lib/database.server");
-
-  const { supabaseClient, user } = await verifyAuth(request);
-  const rpcClient = supabaseClient as SupabaseClient<any>;
-  if (!user) {
-    return redirect("/signin");
-  }
-  const { id: workspace_id, selected_id: campaign_id } = params;
-  if (!workspace_id || !campaign_id) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-  const { data: users } = await getWorkspaceUsers({
-    supabaseClient,
-    workspaceId: workspace_id,
-  });
-  const campaignType = await supabaseClient
-    .from("campaign")
-    .select("type")
-    .eq("id", Number(campaign_id))
-    .single();
-  if (!campaignType || !campaignType.data) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-  if (campaignType.data.type === "message") {
-    const { data, error } = await rpcClient
-      .rpc("get_campaign_messages", {
-        prop_campaign_id: Number(campaign_id),
-        prop_workspace_id: workspace_id,
-      })
-      .csv();
-    if (error || !data) {
-      loggerServer.error("Error fetching campaign messages:", error);
-      return routeData(
-        { error: error?.message || "Error fetching campaign messages" },
-        { status: 500 },
-      );
-    }
-    return routeData({
-      csvContent: data,
-      filename: `outreach_results_${campaign_id}.csv`,
-    });
-  } else if (
-    campaignType.data.type === "live_call" ||
-    campaignType.data.type === "robocall"
-  ) {
-    const { data, error } = await rpcClient
-      .rpc("get_campaign_attempts", {
-        p_campaign_id: Number(campaign_id),
-      })
-      .csv();
-    if (error || !data) {
-      loggerServer.error("Error fetching campaign attempts:", error);
-      return routeData(
-        { error: error?.message || "Error fetching campaign attempts" },
-        { status: 500 },
-      );
-    }
-    return routeData({
-      csvContent: data,
-      filename: `outreach_results_${campaign_id}.csv`,
-    });
-  } else {
-    return routeData({ error: "Invalid campaign type" }, { status: 400 });
-  }
-};
-
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { logger: loggerServer } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { fetchBasicResults, fetchCampaignData, fetchCampaignDetails, fetchQueueCounts, getUserRole, getWorkspaceUsers } = await import("@/lib/database.server");
-
-  const { id: workspace_id, selected_id } = params;
-  if (!workspace_id || !selected_id) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  if (!user) return redirect("/signin");
-  const [campaignType, queueCounts, workspace, userRole] = await Promise.all([
-    supabaseClient
-      .from("campaign")
-      .select("type")
-      .eq("id", Number(selected_id))
-      .single(),
-    fetchQueueCounts(supabaseClient, selected_id),
-    fetchCampaignData(supabaseClient, selected_id),
-    getUserRole({ supabaseClient, user, workspaceId: workspace_id }),
-  ]);
-  if (!campaignType || !campaignType.data) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-  if (workspace.error) throw workspace.error;
-
-  const campaignTable = getTable(campaignType.data.type);
-  if (!campaignTable) {
-    return redirect(`/workspaces/${workspace_id}/campaigns`);
-  }
-
-  const campaignDetails = await fetchCampaignDetails(
-    supabaseClient,
-    selected_id,
-    workspace_id,
-    campaignTable,
-  );
-
-  const resultsPromise = fetchBasicResults(
-    supabaseClient,
-    selected_id,
-  ) as unknown as {
-    disposition: string;
-    count: number;
-    average_call_duration: string;
-    average_wait_time: string;
-    expected_total: number;
-  }[];
-
-  return routeData({
-    selected_id,
-    hasAccess: [MemberRole.Owner, MemberRole.Admin].includes(
-      userRole?.role as MemberRole,
-    ),
-    campaignDetails,
-    user: user,
-    results: resultsPromise || [], // Deferred loading
-    queueCounts,
-  });
-};
-
 export default function CampaignScreen() {
   const {
     hasAccess,
@@ -231,7 +75,6 @@ export default function CampaignScreen() {
       supabase: SupabaseClient;
     }>();
   const campaignData = campaigns.find((c) => c?.id.toString() === selected_id);
-  const csvData = useActionData() as { csvContent: string; filename: string };
   const location = useLocation();
   const route = location.pathname.split("/");
   const isCampaignParentRoute = route.length === 5;
@@ -265,17 +108,6 @@ export default function CampaignScreen() {
       revalidator.revalidate();
     },
   });
-
-  // Handle CSV download when csvData is available
-  useEffect(() => {
-    if (csvData?.csvContent && csvData?.filename) {
-      try {
-        downloadCsv(csvData.csvContent, csvData.filename);
-      } catch (error) {
-        loggerClient.error("Failed to download CSV:", error);
-      }
-    }
-  }, [csvData]);
 
   const readiness = getCampaignReadiness(campaignData, campaignDetails, {
     queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,

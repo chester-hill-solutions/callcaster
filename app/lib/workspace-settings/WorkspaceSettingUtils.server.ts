@@ -26,6 +26,34 @@ export async function handleAddUser(
   if (match?.length) {
     return routeData({ user: null, error: "This user is already an agent in the workspace." }, 403);
   }
+
+  const { data: existingUser } = await supabaseClient
+    .from("user")
+    .select("id")
+    .eq("username", cleanedName)
+    .maybeSingle();
+
+  if (existingUser?.id) {
+    const { data: pendingInvite } = await supabaseClient
+      .from("workspace_invite")
+      .select("id")
+      .eq("workspace", workspaceId)
+      .eq("user_id", existingUser.id)
+      .maybeSingle();
+
+    if (pendingInvite) {
+      return routeData(
+        {
+          data: null,
+          error: null,
+          success: true,
+          warning: "An invite is already pending for this email.",
+        },
+        { headers },
+      );
+    }
+  }
+
   const { data: user, error: inviteUserError } =
     await supabaseClient.functions.invoke("invite-user-by-email", {
       body: {
@@ -35,6 +63,25 @@ export async function handleAddUser(
       },
     });
   if (inviteUserError) {
+    if (existingUser?.id) {
+      const { data: pendingInvite } = await supabaseClient
+        .from("workspace_invite")
+        .select("id")
+        .eq("workspace", workspaceId)
+        .eq("user_id", existingUser.id)
+        .maybeSingle();
+      if (pendingInvite) {
+        return routeData(
+          {
+            data: user,
+            error: null,
+            success: true,
+            warning: "Invite was created but email delivery may have failed.",
+          },
+          { headers },
+        );
+      }
+    }
     return routeData({ user: null, error: inviteUserError.message }, { headers });
   }
   return routeData({ data: user, error: null, success: true }, { headers });
@@ -290,79 +337,4 @@ export async function testWebhook(
   }
 }
 
-/**
- * Send webhook notifications for events
- */
-export async function sendWebhookNotification({
-  eventCategory,
-  eventType,
-  workspaceId,
-  payload,
-  supabaseClient,
-}: {
-  eventCategory: string;
-  eventType: "INSERT" | "UPDATE";
-  workspaceId: string;
-  payload: Record<string, unknown>;
-  supabaseClient: SupabaseClient<Database>;
-}) {
-  try {
-    // Get the webhook configuration for this workspace
-    const { data: webhook, error: webhookError } = await supabaseClient
-      .from("webhook")
-      .select("*")
-      .eq("workspace", workspaceId)
-      .single();
-    
-    if (webhookError || !webhook) {
-      logger.error(`No webhook configured for workspace ${workspaceId}`);
-      return { success: false, error: webhookError?.message || "No webhook configured" };
-    }
-
-    // Check if this event type is enabled in the events array
-    type WebhookWithEvents = Tables<"webhook"> & {
-      events?: Array<{ category: string; type: string }>;
-    };
-    const webhookWithEvents = webhook as WebhookWithEvents;
-    const hasMatchingEvent = webhookWithEvents.events && Array.isArray(webhookWithEvents.events) && 
-      webhookWithEvents.events.some((event: { category: string; type: string }) => 
-        event.category === eventCategory && event.type === eventType
-      );
-    
-    if (!hasMatchingEvent) {
-      logger.warn(`Webhook not configured for ${eventCategory}/${eventType} events`);
-      return { success: false, error: "Event type not enabled for this webhook" };
-    }
-
-    // Handle custom headers - ensure it's an object
-    const customHeaders = webhook.custom_headers 
-      ? (typeof webhook.custom_headers === 'object' ? webhook.custom_headers : {})
-      : {};
-
-    // Send the webhook
-    const result = await fetch(webhook.destination_url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(customHeaders as Record<string, string>),
-      },
-      body: JSON.stringify({
-        event_category: eventCategory,
-        event_type: eventType,
-        workspace_id: workspaceId,
-        timestamp: new Date().toISOString(),
-        payload,
-      }),
-    });
-
-    if (!result.ok) {
-      logger.error(`Webhook delivery failed: ${result.status} ${result.statusText}`);
-      return { success: false, error: `Webhook delivery failed: ${result.status} ${result.statusText}` };
-    }
-
-    return { success: true, error: null };
-  } catch (error: unknown) {
-    logger.error("Error sending webhook notification", error);
-    return { success: false, error: error instanceof Error ? error.message : String(error) };
-  }
-}
+export { sendWorkspaceWebhookNotification as sendWebhookNotification } from "@/lib/workspace-webhooks.server";

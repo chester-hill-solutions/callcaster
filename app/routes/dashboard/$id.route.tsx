@@ -1,6 +1,3 @@
-// @ts-nocheck
-
-
 import { data as routeData, useLoaderData } from "react-router";
 import type { LoaderFunctionArgs } from "react-router";
 import { useEffect, useState, useRef } from "react";

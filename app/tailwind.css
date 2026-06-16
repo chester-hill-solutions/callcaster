@@ -6,24 +6,24 @@
   @font-face {
     font-family: "Tabac Slab";
     font-weight: 400;
-    src: url("/fonts/Tabac\ Slab.otf") format("opentype");
+    src: url("/fonts/Tabac%20Slab.otf") format("opentype");
   }
   @font-face {
     font-family: "Tabac Slab";
     font-weight: 900;
-    src: url("/fonts/Tabac\ Slab\ Black.otf") format("opentype");
+    src: url("/fonts/Tabac%20Slab%20Black.otf") format("opentype");
   }
   @font-face {
     font-family: "Tabac Slab";
     font-style: italic;
     font-weight: 900;
-    src: url("/fonts/Tabac\ Slab\ Black\ Italic.otf") format("opentype");
+    src: url("/fonts/Tabac%20Slab%20Black%20Italic.otf") format("opentype");
   }
 
   @font-face {
     font-family: "Tabac Big Slab";
     font-weight: 900;
-    src: url("/fonts/Tabac\ Big\ Slab\ Black.otf") format("opentype");
+    src: url("/fonts/Tabac%20Big%20Slab%20Black.otf") format("opentype");
   }
 
   @font-face {

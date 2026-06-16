@@ -16,6 +16,15 @@ vi.mock("@/lib/env.server", () => ({
     BASE_URL: () => "https://app.example.com",
   },
 }));
+vi.mock("@/lib/twilio-client.server", () => ({
+  withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
+vi.mock("@/lib/twilio-ivr-runtime.server", () => ({
+  resolveIvrCallUrls: vi.fn(() => ({
+    url: "https://app.example.com/api/ivr/1/page_1/b1",
+    statusCallback: "https://app.example.com/api/ivr/status",
+  })),
+}));
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({

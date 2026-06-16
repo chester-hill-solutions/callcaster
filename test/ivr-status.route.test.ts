@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  makeTransactionHistoryTableStub,
+  type TransactionRow,
+} from "./helpers/transaction-history-stub";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -47,7 +51,9 @@ function makeSupabase(opts?: {
   updateOutreachError?: any;
   voicemailSignedUrl?: string | null;
   voicemailSignedUrlError?: any;
+  transactionRows?: TransactionRow[];
 }) {
+  const transactionRows = opts?.transactionRows ?? [];
   const updates: any = { call: vi.fn(), outreach: vi.fn(), callInsert: vi.fn() };
   const supabase: any = {
     storage: {
@@ -93,6 +99,9 @@ function makeSupabase(opts?: {
             eq: async () => ({ data: [], error: opts?.updateOutreachError ?? null }),
           }),
         };
+      }
+      if (table === "transaction_history") {
+        return makeTransactionHistoryTableStub(transactionRows);
       }
       throw new Error("unexpected table");
     },
@@ -385,6 +394,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     const callUpdate = vi.fn(async () => ({ data: [], error: null }));
     const outreachUpdate = vi.fn(async () => ({ data: [], error: null }));
+    const transactionRows: TransactionRow[] = [];
     const supabase: any = {
       storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
       from: (table: string) => {
@@ -416,6 +426,9 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
         }
         if (table === "outreach_attempt") {
           return { update: () => ({ eq: outreachUpdate }) };
+        }
+        if (table === "transaction_history") {
+          return makeTransactionHistoryTableStub(transactionRows);
         }
         throw new Error("unexpected");
       },

@@ -1,7 +1,7 @@
-// @ts-nocheck
-
+export { loader } from "./audios.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, Link, useLoaderData } from "react-router";
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { mediaColumns } from "@/components/file-assets/columns";
 
 import { DataTable } from "@/components/workspace/tables/DataTable";
@@ -10,113 +10,32 @@ import { Button } from "@/components/ui/button";
 
 
 import { User } from "@/lib/types";
+import type { FileObject } from "@supabase/storage-js";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: "Workspace does not exist",
-        userRole: null,
-      },
-      { headers },
-    );
-  }
-
-  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
-
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: workspaceError.message,
-        userRole,
-      },
-      { headers },
-    );
-  }
-
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspaceId);
-
-  if (mediaError) {
-    logger.warn("Media Error:", mediaError);
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: mediaError.message,
-        userRole,
-      },
-      { headers },
-    );
-  }
-
-  if (mediaData.length === 0) {
-    logger.debug("No workspace folder exists");
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: "No Audio in Workspace",
-        userRole,
-      },
-      { headers },
-    );
-  }
-
-  const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
-  const { data: signedUrls, error: signedUrlsError } =
-    await supabaseClient.storage
-      .from("workspaceAudio")
-      .createSignedUrls(mediaPaths, 60);
-
-  if (signedUrlsError) {
-    logger.warn("SignedUrls Error:", signedUrlsError);
-    return routeData({
-      audioMedia: null,
-      workspace: workspaceData,
-      error: signedUrlsError.message,
-      userRole,
-    });
-  }
-
-  const mediaWithSignedUrls = mediaData.map((media) => {
-    const signedUrl = signedUrls.find(
-      (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
-    )?.signedUrl;
-
-    return signedUrl ? { ...media, signedUrl } : media;
-  });
-
-  return routeData(
-    { audioMedia: mediaWithSignedUrls, workspace: workspaceData, error: null, userRole },
-    { headers },
-  );
-}
+type LoaderData = {
+  audioMedia: FileObject[] | null;
+  workspace: { name: string } | null;
+  error: string | null;
+  userRole: unknown;
+};
 
 export default function WorkspaceAudiosPage() {
   const { audioMedia, workspace, error, userRole } =
-    useLoaderData();
+    useLoaderData<LoaderData>();
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter((media) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
+  const workspaceAudios = audioMedia?.filter((media: FileObject) => ((!media.name.includes("voicemail-undefined") && !media.name.includes("voicemail-+") && !media.name.includes("recording-"))));
   return (
     <main className="flex h-full flex-col gap-4 rounded-sm ">
+      <QueryParamBanner
+        param="uploaded"
+        variants={{
+          "1": {
+            title: "Audio uploaded",
+            description: "Your audio file was added to this workspace.",
+          },
+        }}
+      />
       <div className="flex flex-col sm:flex-row sm:justify-between">
         <div className="flex">
           <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">

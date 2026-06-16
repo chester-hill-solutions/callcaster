@@ -1,141 +1,16 @@
-// @ts-nocheck
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useLoaderData, useNavigate } from "react-router";
-import React, { useEffect, useState } from "react";
+export { loader } from "./new.loader.server";
+export { action } from "./new.action.server";
+
+import { Form, Link, useActionData, useLoaderData } from "react-router";
+import React, { useState } from "react";
 
 import { MdAdd, MdClose } from "react-icons/md";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 import { CardContent } from "@/components/ui/card";
 import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
 import type { Json } from "@/lib/database.types";
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  const url = new URL(request.url);
-  const search = new URLSearchParams(url.search);
-  const ref = search.get("ref") || null;
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { workspace: null, error: "Workspace does not exist" },
-      { headers },
-    );
-  }
-  let campaignType;
-  if (ref) {
-    const { data: campaign } = await supabaseClient
-      .from("campaign")
-      .select("type")
-      .eq("id", Number(ref) || 0)
-      .eq("workspace", workspaceId)
-      .single();
-    campaignType = campaign?.type;
-  }
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData({ workspace: null, error: workspaceError }, { headers });
-  }
-
-  return routeData(
-    { workspace: workspaceData, error: null, ref: ref || null, campaignType },
-    { headers },
-  );
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { success: false, error: "Workspace does not exist" },
-      { headers },
-    );
-  }
-
-  const formData = await request.formData();
-  const nameValue = formData.get("script-name");
-  const typeValue = formData.get("type");
-  const stepsFileValue = formData.get("steps");
-  const refValue = formData.get("ref");
-
-  if (!nameValue || typeof nameValue !== "string") {
-    return routeData(
-      { success: false, error: "Script name is required" },
-      { headers },
-    );
-  }
-
-  const name = nameValue;
-  const type = typeof typeValue === "string" ? typeValue : "ivr";
-  const ref = typeof refValue === "string" ? refValue : null;
-
-  let steps: Record<string, unknown> = {};
-  if (stepsFileValue instanceof File && stepsFileValue.size > 0) {
-    try {
-      const stepsContent = await stepsFileValue.text();
-      steps = JSON.parse(stepsContent) as Record<string, unknown>;
-    } catch (error) {
-      return routeData(
-        { success: false, error: "Invalid JSON file for steps" },
-        { headers },
-      );
-    }
-  } else {
-    steps = { pages: {}, blocks: {} };
-  }
-  const { data, error } = await supabaseClient
-    .from("script")
-    .insert({
-      name,
-      type,
-      steps: steps as Json,
-      created_by: user?.id,
-      workspace: workspaceId,
-    })
-    .select();
-  if (ref && data && data.length > 0) {
-    const createdScript = data[0];
-    if (!createdScript) {
-      return routeData(
-        { success: false, error: "Failed to create script" },
-        { headers },
-      );
-    }
-    const tableKey = type === "script" ? "live_campaign" : "ivr_campaign";
-    const { error: updateError } = await supabaseClient
-      .from(tableKey)
-      .update({ script_id: createdScript.id })
-      .eq("campaign_id", Number(ref) || 0)
-      .select();
-    if (updateError) {
-      return routeData(
-        { success: false, error: updateError },
-        { headers },
-      );
-    }
-  }
-
-  if (error) {
-    return routeData({ success: false, error: error }, { headers });
-  }
-
-  if (!data || data.length === 0) {
-    return routeData(
-      { success: false, error: "Failed to create script" },
-      { headers },
-    );
-  }
-
-  return routeData({ data, success: true, error: null }, { headers });
-}
 
 export default function NewScript() {
   const loaderData = useLoaderData();
@@ -144,31 +19,18 @@ export default function NewScript() {
   const error = "error" in loaderData ? loaderData.error : null;
   const ref = "ref" in loaderData ? loaderData.ref : null;
   const campaignType = "campaignType" in loaderData ? loaderData.campaignType : undefined;
-  const createdScripts =
-    actionData && "data" in actionData && Array.isArray(actionData.data)
-      ? actionData.data
-      : null;
-  const createdScript = createdScripts?.[0] ?? null;
   const [pendingFileName, setPendingFileName] = useState("");
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (actionData?.success && createdScript) {
-      toast.success("Script successfully added to your workspace!");
-      setTimeout(
-        () => navigate(`../${createdScript.id}`, { relative: "path" }),
-        750,
-      );
-    } else if (actionData?.error) {
-      const errorMessage =
-        actionData.error instanceof Error
-          ? actionData.error.message
-          : typeof actionData.error === "string"
-            ? actionData.error
-            : "An error occurred";
-      toast.error(`Error: ${errorMessage}`);
-    }
-  }, [actionData, createdScript, navigate]);
+  useActionFeedback(actionData as { error?: unknown } | undefined, {
+    getSuccess: () => false,
+    getError: (data) => data?.error,
+    errorMessage: (data) => {
+      const error = (data as { error?: unknown })?.error;
+      if (error instanceof Error) return error.message;
+      if (typeof error === "string") return error;
+      return "An error occurred";
+    },
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -241,6 +103,7 @@ export default function NewScript() {
               >
                 <option value="script">Live Caller Script</option>
                 <option value="ivr">Interactive Voice Recording (IVR)</option>
+                <option value="inbound_ivr">Inbound IVR Menu</option>
               </select>
             </label>
             <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">

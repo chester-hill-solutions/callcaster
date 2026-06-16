@@ -38,6 +38,11 @@ export function sanitizeCsvInjection(value: string): string {
   return value;
 }
 
+/** @deprecated Prefer escapeCsvCell; kept for legacy imports from utils.ts */
+export function escapeCSV(field: unknown): string {
+  return escapeCsvCell(field as CsvCell);
+}
+
 export function escapeCsvCell(
   value: CsvCell,
   opts: Pick<CsvStringOptions, "protectFromInjection"> = {},

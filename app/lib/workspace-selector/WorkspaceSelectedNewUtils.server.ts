@@ -2,7 +2,11 @@
 
 import { data as routeData, redirect } from "react-router";
 import { parseCSV } from "@/lib/utils";
-import { bulkCreateContacts } from "@/lib/database.server";
+import { bulkCreateContacts, getWorkspacePhoneNumbers } from "@/lib/database.server";
+import {
+  DEFAULT_WEEKDAY_CALLING_SCHEDULE,
+  getDefaultCampaignDates,
+} from "@/lib/campaign-setup-steps";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { Contact } from "@/lib/types";
@@ -144,13 +148,30 @@ export async function handleNewCampaign({
   const newCampaignType = formData.get("campaign-type") as CampaignType;
   logger.debug("Campaign Type: ", newCampaignType);
 
+  const { start_date, end_date } = getDefaultCampaignDates();
+  const phoneNumbersResult = await getWorkspacePhoneNumbers({
+    supabaseClient,
+    workspaceId,
+  });
+  const workspaceNumbers = (phoneNumbersResult.data ?? []).filter(
+    (number) => Boolean(number?.phone_number),
+  );
+  const caller_id =
+    workspaceNumbers.length === 1
+      ? String(workspaceNumbers[0]?.phone_number)
+      : null;
+
   const { data: campaignData, error: campaignError } = await supabaseClient
     .from("campaign")
     .insert({
       title: newCampaignName,
       workspace: workspaceId,
       status: "draft",
-      type: newCampaignType
+      type: newCampaignType,
+      start_date,
+      end_date,
+      schedule: DEFAULT_WEEKDAY_CALLING_SCHEDULE,
+      caller_id,
     })
     .select()
     .single();
@@ -184,8 +205,12 @@ export async function handleNewCampaign({
     .insert({ campaign_id: campaignData.id, workspace: workspaceId });
 
   if (detailsError) {
-    return routeData(
-      { campaignData: campaignData, error: detailsError },
+    logger.error(
+      "Campaign details insert failed; redirecting to settings for lazy repair",
+      detailsError,
+    );
+    return redirect(
+      `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
       { headers },
     );
   }

@@ -15,7 +15,8 @@ const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, "..");
 const BUILD_PATH = path.resolve(ROOT_DIR, "build/server/index.js");
 const PUBLIC_DIR = path.resolve(ROOT_DIR, "public");
-const PUBLIC_BUILD_DIR = path.resolve(PUBLIC_DIR, "build");
+const CLIENT_BUILD_DIR = path.resolve(ROOT_DIR, "build/client");
+const CLIENT_ASSETS_DIR = path.resolve(CLIENT_BUILD_DIR, "assets");
 const HOST = process.env.HOST ?? "0.0.0.0";
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const SHUTDOWN_GRACE_PERIOD_MS = 10_000;
@@ -95,9 +96,11 @@ function buildRequestLogger() {
 
 export function createApp({
   build,
+  configureApp,
   mode = process.env.NODE_ENV ?? "production",
   readyState = { acceptingTraffic: true, buildReady: false },
   remixHandler,
+  serveBuildAssets = true,
 } = {}) {
   const app = express();
 
@@ -106,13 +109,22 @@ export function createApp({
   app.use(securityHeaders());
   app.use(compression());
   app.use(buildRequestLogger());
-  app.use(
-    "/build",
-    express.static(PUBLIC_BUILD_DIR, {
-      immutable: true,
-      maxAge: "1y",
-    }),
-  );
+
+  if (serveBuildAssets) {
+    app.use(
+      "/assets",
+      express.static(CLIENT_ASSETS_DIR, {
+        immutable: true,
+        maxAge: "1y",
+      }),
+    );
+    app.use(
+      express.static(CLIENT_BUILD_DIR, {
+        maxAge: "1h",
+      }),
+    );
+  }
+
   app.use(
     express.static(PUBLIC_DIR, {
       maxAge: "1h",
@@ -135,6 +147,8 @@ export function createApp({
 
     response.status(200).json({ ok: true });
   });
+
+  configureApp?.(app);
 
   const handleRemixRequest =
     remixHandler ??

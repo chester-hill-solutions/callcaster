@@ -14,10 +14,12 @@ const mocks = vi.hoisted(() => {
     createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceUsers: vi.fn(),
+    getWorkspacePhoneNumbers: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
     updateWorkspaceMessagingOnboardingState: vi.fn(),
     insertTransactionHistoryIdempotent: vi.fn(),
+    attachPhoneNumberToMessagingService: vi.fn(async () => ({})),
     env: {
       SUPABASE_URL: vi.fn(() => "http://supabase"),
       SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
@@ -40,6 +42,8 @@ vi.mock("../app/lib/database.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceUsers: (...args: any[]) => mocks.getWorkspaceUsers(...args),
+  getWorkspacePhoneNumbers: (...args: any[]) =>
+    mocks.getWorkspacePhoneNumbers(...args),
   requireWorkspaceAccess: (...args: any[]) =>
     mocks.requireWorkspaceAccess(...args),
 }));
@@ -53,9 +57,17 @@ vi.mock("../app/lib/messaging-onboarding.server", () => ({
     ...updates,
   }),
   buildOnboardingStepsForState: () => [],
+  applyOnboardingStepsWithWorkspaceNumbers: (current: unknown) => current,
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/twilio-client.server", () => ({
+  withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
+vi.mock("@/lib/twilio-bootstrap.server", () => ({
+  attachPhoneNumberToMessagingService: (...args: unknown[]) =>
+    mocks.attachPhoneNumberToMessagingService(...args),
+}));
 vi.mock("@/lib/transaction-history.server", () => ({
   insertTransactionHistoryIdempotent: (...args: any[]) =>
     mocks.insertTransactionHistoryIdempotent(...args),
@@ -120,6 +132,10 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.getWorkspaceUsers.mockReset();
+    mocks.getWorkspacePhoneNumbers.mockReset();
+    mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [], error: null });
+    mocks.attachPhoneNumberToMessagingService.mockReset();
+    mocks.attachPhoneNumberToMessagingService.mockResolvedValue({});
     mocks.requireWorkspaceAccess.mockReset();
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     mocks.getWorkspaceMessagingOnboardingState.mockReset();
@@ -147,42 +163,96 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.updateWorkspaceMessagingOnboardingState.mockResolvedValue(undefined);
   });
 
-  test("loader lists local numbers with default params", async () => {
-    listMock.mockResolvedValueOnce([{ phoneNumber: "+1" }]);
-    mocks.env.TWILIO_SID.mockReturnValueOnce("");
-    mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("");
+  test("loader returns 400 when search query is missing", async () => {
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/numbers"),
-    } as any));
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual([{ phoneNumber: "+1" }]);
-    expect(listMock).toHaveBeenCalledWith({ limit: 10 });
-    expect(twilioCtor).toHaveBeenCalledWith("", "");
+    const res = await asRouteResponse(
+      await mod.loader({
+        request: new Request("http://localhost/api/numbers?searchMode=areaCode"),
+      } as any),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      ok: false,
+      error: "Enter a search value.",
+    });
   });
 
-  test("loader uses areaCode when provided", async () => {
-    listMock.mockResolvedValueOnce([{ phoneNumber: "+2" }]);
+  test("loader lists local numbers with searchMode and query", async () => {
+    listMock.mockResolvedValueOnce([
+      {
+        phoneNumber: "+14165551234",
+        friendlyName: "+14165551234",
+        region: "ON",
+        locality: "Toronto",
+        capabilities: { voice: true, sms: true },
+      },
+    ]);
     mocks.env.TWILIO_SID.mockReturnValueOnce("sid");
     mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/numbers?areaCode=415"),
-    } as any));
+    const res = await asRouteResponse(
+      await mod.loader({
+        request: new Request(
+          "http://localhost/api/numbers?searchMode=areaCode&query=416",
+        ),
+      } as any),
+    );
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual([{ phoneNumber: "+2" }]);
-    expect(listMock).toHaveBeenCalledWith({ areaCode: 415, limit: 10 });
+    await expect(res.json()).resolves.toEqual({
+      ok: true,
+      numbers: [
+        {
+          phoneNumber: "+14165551234",
+          friendlyName: "+14165551234",
+          region: "ON",
+          locality: "Toronto",
+          capabilities: { voice: true, sms: true },
+        },
+      ],
+    });
+    expect(listMock).toHaveBeenCalledWith({ areaCode: 416, limit: 20 });
     expect(twilioCtor).toHaveBeenCalledWith("sid", "token");
+  });
+
+  test("loader uses workspace Twilio when workspace_id is provided", async () => {
+    listMock.mockResolvedValueOnce([
+      { phoneNumber: "+1999", friendlyName: "+1999", capabilities: {} },
+    ]);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      availablePhoneNumbers: () => ({ local: { list: listMock } }),
+    });
+    const mod = await import("../app/routes/api+/numbers");
+    const res = await asRouteResponse(
+      await mod.loader({
+        request: new Request(
+          "http://localhost/api/numbers?searchMode=areaCode&query=613&workspace_id=w1",
+        ),
+      } as any),
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalled();
+    expect(mocks.createWorkspaceTwilioInstance).toHaveBeenCalledWith({
+      supabase: {},
+      workspace_id: "w1",
+    });
+    expect(twilioCtor).not.toHaveBeenCalled();
   });
 
   test("loader returns 500 and logs on Twilio error", async () => {
     listMock.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.loader({
-      request: new Request("http://localhost/api/numbers"),
-    } as any));
+    const res = await asRouteResponse(
+      await mod.loader({
+        request: new Request(
+          "http://localhost/api/numbers?searchMode=areaCode&query=416",
+        ),
+      } as any),
+    );
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: expect.anything() });
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining("phone provider"),
+    });
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Fetching numbers failed",
       expect.anything(),
@@ -212,7 +282,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 400 creditsError when credits too low", async () => {
-    const supabase = makeSupabaseStub({ credits: 1000 });
+    const supabase = makeSupabaseStub({ credits: 99 });
     mocks.createClient.mockReturnValueOnce(supabase);
     mocks.getWorkspaceUsers.mockResolvedValueOnce({
       data: [{ user_workspace_role: "owner", username: "alice" }],
@@ -267,8 +337,9 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toEqual({
+    await expect(res.json()).resolves.toMatchObject({
       newNumber: { id: 9, phone_number: "+1555" },
+      messagingServiceAttached: true,
     });
 
     const workspaceNumberInsert = supabase.from.mock.results.find(
@@ -280,7 +351,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       expect.objectContaining({
         workspaceId: "w1",
         type: "DEBIT",
-        amount: -1000,
+        amount: -100,
       }),
     );
   });
@@ -317,7 +388,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toEqual({ newNumber: { id: 10 } });
+    await expect(res.json()).resolves.toMatchObject({ newNumber: { id: 10 } });
   });
 
   test("action attaches purchased number to Messaging Service when workspace has one", async () => {
@@ -341,24 +412,15 @@ describe("app/routes/api+/numbers/route.tsx", () => {
         emergencyEligiblePhoneNumbers: [],
       },
     });
-    const attach = vi.fn().mockResolvedValueOnce({});
     const create = vi.fn().mockResolvedValueOnce({
       sid: "PN789",
       friendlyName: "FN3",
       phoneNumber: "+1999",
       capabilities: { voice: true, sms: true, mms: true },
     });
+    mocks.attachPhoneNumberToMessagingService.mockResolvedValueOnce({});
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       incomingPhoneNumbers: { create },
-      messaging: {
-        v1: {
-          services: () => ({
-            phoneNumbers: {
-              create: attach,
-            },
-          }),
-        },
-      },
     });
 
     const fd = new FormData();
@@ -373,7 +435,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(201);
-    expect(attach).toHaveBeenCalledWith({ phoneNumberSid: "PN789" });
+    expect(mocks.attachPhoneNumberToMessagingService).toHaveBeenCalledWith(
+      expect.anything(),
+      "MG123",
+      "PN789",
+      expect.objectContaining({ workspaceId: "w3" }),
+    );
   });
 
   test("action returns 500 when getWorkspaceUsers returns error", async () => {
@@ -449,10 +516,6 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     } as any));
 
     expect(res.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error creating Twilio number:",
-      expect.anything(),
-    );
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Failed to register number",
       expect.anything(),

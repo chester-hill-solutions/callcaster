@@ -1,12 +1,6 @@
-export type TwilioUsageRecord = {
-  category: string;
-  description: string;
-  usage: string;
-  usageUnit: string;
-  price: string;
-  startDate?: string;
-  endDate?: string;
-};
+import type { TwilioUsageRecord } from "../../shared/billing-reconciliation";
+
+export type { TwilioUsageRecord };
 
 export type TwilioUsageGroupDetail = {
   description: string;

@@ -1,13 +1,14 @@
-// @ts-nocheck
-
+export { loader } from "./invite.loader.server";
+export { action } from "./invite.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
-import { useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { useRef } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/shared/CustomCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { capitalize } from "@/lib/utils";
 import type { Database, Tables } from "@/lib/database.types";
 
@@ -68,188 +69,6 @@ const memberRoles = new Set(Object.values(MemberRole));
 const isMemberRole = (role: string | null | undefined): role is MemberRole =>
   !!role && memberRoles.has(role as MemberRole);
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) throw new Error("No workspace id found!");
-  const userId = user.id;
-
-  const { data: userData } = await supabaseClient
-    .from("user")
-    .select("access_level")
-    .eq("id", userId)
-    .single();
-  
-  // Check if user is admin
-  const { data: userRoleData } = await supabaseClient
-    .from("workspace_users")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .single();
-
-  const hasSudoAccess = userData?.access_level === "sudo";
-  const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
-
-  if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
-    return routeData({ error: "Unauthorized" }, { status: 403, headers });
-  }
-
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(
-      `
-        id,
-        name,
-        workspace_users (
-          role,
-          user: user_id (
-            id,
-            username,
-            first_name,
-            last_name
-          )
-        ),
-        workspace_invite (
-          id,
-          created_at,
-          isNew,
-          role,
-          user_id,
-          workspace,
-          user: user_id (
-            id,
-            username,
-            first_name,
-            last_name
-          )
-        )
-      `,
-    )
-    .eq("id", workspaceId)
-    .single<WorkspaceWithMembers>();
-    
-  if (workspaceError) throw workspaceError;
-  
-  const workspaceUsers =
-    workspace.workspace_users?.filter(
-      (member: WorkspaceMemberRecord | null): member is WorkspaceMemberWithUser =>
-        member !== null && member.user !== null,
-    ) ?? [];
-
-  const users: MemberUser[] = workspaceUsers.map(({ role, user }: WorkspaceMemberWithUser) => ({
-    id: user.id,
-    username: user.username,
-    first_name: user.first_name,
-    last_name: user.last_name,
-    role: role as MemberRole,
-  }));
-  
-  const userRole =
-    workspaceUsers.find((member: WorkspaceMemberWithUser) => member.user.id === userId)?.role ?? null;
-  const normalizedUserRole = isMemberRole(userRole) ? userRole : null;
-  const hasAccess =
-    normalizedUserRole === MemberRole.Admin ||
-    normalizedUserRole === MemberRole.Owner;
-
-  const pendingInvites =
-    workspace.workspace_invite?.filter(
-      (invite: PendingInvite | null): invite is PendingInvite => invite !== null,
-    ) ?? [];
-  
-  return routeData(
-    {
-      workspace: { id: workspace.id, name: workspace.name },
-      userRole: normalizedUserRole,
-      users,
-      activeUserId: userId,
-      pendingInvites,
-      hasAccess,
-    },
-    { headers },
-  );
-};
-
-export const action = async ({ request, params }: ActionFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleUpdateUser, removeInvite } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const workspaceId = params.workspaceId;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  if (workspaceId == null) {
-    return routeData({ error: "No workspace_id found!" }, { headers });
-  }
-
-  const { data: userData } = await supabaseClient
-    .from("user")
-    .select("access_level")
-    .eq("id", user?.id)
-    .single();
-
-  // Check if user is admin
-  const { data: userRoleData } = await supabaseClient
-    .from("workspace_users")
-    .select("role")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", user?.id)
-    .single();
-
-  const hasSudoAccess = userData?.access_level === "sudo";
-  const hasWorkspaceAdminAccess = userRoleData?.role === "admin" || userRoleData?.role === "owner";
-
-  if (!hasSudoAccess && !hasWorkspaceAdminAccess) {
-    return routeData({ error: "Unauthorized" }, { status: 403, headers });
-  }
-
-  const formData = await request.formData();
-  const formName = formData.get("formName");
-
-  switch (formName) {
-    case "addUser": {
-      return handleAddUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "updateUser": {
-      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "deleteUser": {
-      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "deleteSelf": {
-      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
-    }
-    case "cancelInvite": {
-      return removeInvite({ workspaceId, supabaseClient, formData, headers });
-    }
-    default: {
-      break;
-    }
-  }
-
-  return routeData(
-    { data: null, error: "Error: Unrecognized action called" },
-    { headers },
-  );
-};
-
-function compareMembersByRole(a: MemberUser, b: MemberUser) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) <
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(a.role as MemberRole) >
-    memberRoleArray.indexOf(b.role as MemberRole)
-  )
-    return 1;
-  return 0;
-}
-
 export default function WorkspaceUsers() {
   const {
     workspace,
@@ -278,20 +97,18 @@ export default function WorkspaceUsers() {
   };
   const formRef = useRef<HTMLFormElement | null>(null);
   
-  useEffect(() => {
-    if (actionData && 'error' in actionData && actionData.error) {
-      toast.error(actionData.error as string);
-    }
-    if (actionData) {
-      if ('success' in actionData && actionData.success) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
-      } else if ('data' in actionData && actionData.data) {
-        toast.success("Action completed successfully!");
-        formRef?.current?.reset();
-      }
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) =>
+      data && "error" in data && data.error ? data.error : undefined,
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (("success" in data && data.success) ||
+            ("data" in data && data.data)),
+      ),
+    successMessage: "Action completed successfully!",
+    onSuccess: () => formRef.current?.reset(),
+  });
 
   if (!hasAccess) {
     return (
@@ -448,4 +265,4 @@ export default function WorkspaceUsers() {
       </div>
     </main>
   );
-} 
+}

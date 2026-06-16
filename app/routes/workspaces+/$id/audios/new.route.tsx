@@ -1,106 +1,17 @@
-// @ts-nocheck
+export { loader } from "./new.loader.server";
+export { action } from "./new.action.server";
 
-
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, Link, useActionData, useNavigate, useNavigation } from "react-router";
-import { useEffect, useState } from "react";
+import { Form, Link, useActionData, useNavigation } from "react-router";
+import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { toast } from "sonner";
 import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
 import { Button } from "@/components/ui/button";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { supabaseClient, headers } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { workspace: null, error: "Workspace does not exist" },
-      { headers },
-    );
-  }
-
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData({ workspace: null, error: workspaceError }, { headers });
-  }
-
-  return routeData({ workspace: workspaceData, error: null }, { headers });
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { logger } = await import("@/lib/logger.server");
-  const {
-    AudioUploadError,
-    getSafeMediaBaseName,
-    normalizeUploadedAudio,
-  } = await import("@/lib/audio.server");
-  const { supabaseClient, headers } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { success: false, error: "Workspace does not exist" },
-      { headers },
-    );
-  }
-  const formData = await request.formData();
-  const mediaName = formData.get("media-name") as string;
-  const mediaToUpload = formData.get("media");
-
-  logger.debug("Media To Upload:", mediaToUpload);
-
-  try {
-    if (!(mediaToUpload instanceof File)) {
-      throw new AudioUploadError("Please choose an audio file to upload.");
-    }
-
-    const safeMediaName = getSafeMediaBaseName(mediaName);
-    const normalizedAudio = await normalizeUploadedAudio(mediaToUpload);
-    const { error: uploadError } = await supabaseClient.storage
-      .from("workspaceAudio")
-      .upload(
-        `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`,
-        normalizedAudio.buffer,
-        {
-          cacheControl: "60",
-          upsert: false,
-          contentType: normalizedAudio.contentType,
-        },
-      );
-
-    if (uploadError) {
-      return routeData({ success: false, error: uploadError }, { headers });
-    }
-
-    return routeData({ success: true, error: null }, { headers });
-  } catch (error) {
-    logger.error("Workspace audio upload failed", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to upload audio.";
-    const status = error instanceof AudioUploadError ? error.status : 500;
-    return routeData({ success: false, error: message }, { headers, status });
-  }
-}
-
 export default function Media() {
   const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
-  const navigate = useNavigate();
   const {state} = useNavigation();
-
-  useEffect(() => {
-    if (actionData?.success) {
-      toast.success("Media successfully uploaded to your workspace!");
-      setTimeout(() => navigate("../", { relative: "path" }), 750);
-    }
-  }, [actionData]);
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;

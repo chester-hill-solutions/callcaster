@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./new.loader.server";
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
 import { useState } from "react";
@@ -13,34 +12,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save } from "lucide-react";
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, user } = await verifyAuth(request);
-  const workspaceId = params.id;
-
-  if (!workspaceId) {
-    throw new Response("Workspace ID is required", { status: 400 });
-  }
-
-  // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user as unknown as User, 
-    workspaceId 
-  });
-
-  if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  return routeData({
-    workspaceId,
-    user,
-    userRole,
-  });
-}
 
 export default function NewSurveyPage() {
   const { workspaceId } = useLoaderData();
@@ -439,4 +410,4 @@ export default function NewSurveyPage() {
       </form>
     </div>
   );
-} 
+}

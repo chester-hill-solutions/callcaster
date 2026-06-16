@@ -24,11 +24,14 @@ vi.mock("@supabase/supabase-js", () => ({
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
-  sendWebhookNotification: (...args: any[]) => mocks.sendWebhookNotification(...args),
+  sendWebhookNotification: (...args: unknown[]) => mocks.sendWebhookNotification(...args),
 }));
-vi.mock("@/twilio.server", () => ({
-  validateTwilioWebhookParams: vi.fn(() => true),
-  shouldValidateTwilioWebhooks: () => true,
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: vi.fn(async () => ({
+    ok: true,
+    params: {},
+    authToken: "tok",
+  })),
 }));
 
 vi.mock("resend", () => {
@@ -149,8 +152,13 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    const { validateTwilioWebhookParams } = await import("@/twilio.server");
-    vi.mocked(validateTwilioWebhookParams).mockReturnValueOnce(false);
+    const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
+    vi.mocked(validateTwilioWebhookForCallSid).mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     mocks.createClient.mockReturnValueOnce(makeSupabase());
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(

@@ -2,21 +2,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
 import {
+  getBillingEventSource,
   getTransactionDisplayDescription,
   type TransactionType,
 } from "@/lib/transaction-history-display";
 
 export type { TransactionType } from "@/lib/transaction-history-display";
 export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
+export {
+  getBillingEventSource,
+  getBillingEventSourceLabel,
+  type BillingEventSource,
+} from "@/lib/transaction-history-display";
 
-function isUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
+import { isUniqueViolation } from "@/lib/parse-utils.server";
 
-  const code = (error as { code?: unknown }).code;
-  return typeof code === "string" && code === "23505";
-}
+export { isUniqueViolation } from "@/lib/parse-utils.server";
 
 /**
  * DB-backed idempotent insert for transaction_history.
@@ -53,6 +54,17 @@ export async function insertTransactionHistoryIdempotent(args: {
       .single();
 
     if (!error) {
+      logger.info("billing.transaction", {
+        workspaceId: args.workspaceId,
+        type: args.type,
+        amount: args.amount,
+        idempotencyKey,
+        inserted: true,
+        source: getBillingEventSource({
+          type: args.type,
+          idempotencyKey,
+        }),
+      });
       return { inserted: true, existingId: data?.id as number | undefined };
     }
 
@@ -92,6 +104,17 @@ export async function insertTransactionHistoryIdempotent(args: {
       );
     }
 
+    logger.info("billing.transaction", {
+      workspaceId: args.workspaceId,
+      type: args.type,
+      amount: args.amount,
+      idempotencyKey,
+      inserted: false,
+      source: getBillingEventSource({
+        type: args.type,
+        idempotencyKey,
+      }),
+    });
     return { inserted: false, existingId: existing.id };
   } catch (e) {
     logger.error("transaction_history idempotent insert error", e);

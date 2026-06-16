@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./campaigns.loader.server";
 
 import { redirect, LoaderFunctionArgs, Outlet, useOutlet, useOutletContext } from "react-router";
 import CampaignEmptyState from "@/components/campaign/CampaignEmptyState";
@@ -13,14 +12,7 @@ import {
 
 import { SupabaseClient } from "@supabase/supabase-js";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
 
-  const { headers, user } = await verifyAuth(request);
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-  return null;
-};
 
 export default function WorkspaceCampaignsPage() {
   const outlet = useOutlet();

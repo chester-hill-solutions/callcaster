@@ -5,11 +5,35 @@ import type {
   MessageCampaign,
   ScheduleDay,
   ScheduleInterval,
+  TwilioSmsSenderClass,
 } from "@/lib/types";
+import { isBulkSmsSenderMisaligned } from "@/lib/throughput-config";
 
 type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | undefined;
 
+export type CampaignReadinessCode =
+  | "campaign_not_loaded"
+  | "campaign_type_required"
+  | "outbound_number_required"
+  | "messaging_sid_required"
+  | "messaging_senders_unavailable"
+  | "dates_required"
+  | "dates_invalid"
+  | "start_after_end"
+  | "calling_hours_required"
+  | "invalid_intervals"
+  | "queue_empty"
+  | "bulk_sender_misaligned"
+  | "script_required"
+  | "message_content_required";
+
+export type CampaignReadinessIssue = {
+  code: CampaignReadinessCode;
+  message: string;
+};
+
 export type CampaignReadiness = {
+  issues: CampaignReadinessIssue[];
   startIssues: string[];
   scheduleIssues: string[];
   startDisabledReason: string | null;
@@ -24,9 +48,35 @@ type CampaignReadinessOptions = {
    * When omitted, sender inventory is not validated here.
    */
   smsMessagingServiceSendersReady?: boolean;
+  /** Workspace SMS sender class for bulk throughput/deliverability gates. */
+  smsSenderClass?: TwilioSmsSenderClass;
 };
 
 type NormalizedSchedule = Record<string, ScheduleDay>;
+
+const SCHEDULE_READINESS_CODES = new Set<CampaignReadinessCode>([
+  "dates_required",
+  "dates_invalid",
+  "start_after_end",
+  "calling_hours_required",
+  "invalid_intervals",
+]);
+
+export const CAMPAIGN_CONTENT_READINESS_CODES = [
+  "script_required",
+  "message_content_required",
+] as const satisfies readonly CampaignReadinessCode[];
+
+function issue(
+  code: CampaignReadinessCode,
+  message: string,
+): CampaignReadinessIssue {
+  return { code, message };
+}
+
+function issuesToMessages(issues: CampaignReadinessIssue[]): string[] {
+  return issues.map((entry) => entry.message);
+}
 
 /** Minutes since midnight for "HH:mm" / "H:mm" in 24h form; null if malformed. */
 function parseClockMinutes(time: string): number | null {
@@ -137,7 +187,7 @@ function getScheduleValidation(schedule: Campaign["schedule"]) {
   };
 }
 
-function getDateIssue(campaignData: Campaign) {
+function getDateIssue(campaignData: Campaign): CampaignReadinessIssue | null {
   if (!campaignData.start_date || !campaignData.end_date) {
     return null;
   }
@@ -146,17 +196,20 @@ function getDateIssue(campaignData: Campaign) {
   const endDate = new Date(campaignData.end_date);
 
   if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
-    return "Start and end dates must be valid";
+    return issue("dates_invalid", "Start and end dates must be valid");
   }
 
   if (startDate > endDate) {
-    return "Start date must be before the end date";
+    return issue("start_after_end", "Start date must be before the end date");
   }
 
   return null;
 }
 
-function getContentIssue(campaignData: Campaign, details: CampaignDetails) {
+function getContentIssue(
+  campaignData: Campaign,
+  details: CampaignDetails,
+): CampaignReadinessIssue | null {
   if (!campaignData.type || !details) return null;
 
   if (campaignData.type === "message") {
@@ -165,12 +218,56 @@ function getContentIssue(campaignData: Campaign, details: CampaignDetails) {
 
     return hasMessageBody || hasMessageMedia
       ? null
-      : "Message content or media is required";
+      : issue("message_content_required", "Message content or media is required");
   }
 
   const hasScript = "script_id" in details && Boolean(details.script_id);
 
-  return hasScript ? null : "Script is required";
+  return hasScript ? null : issue("script_required", "Script is required");
+}
+
+export function getCampaignContentReadinessIssues(
+  issues: readonly CampaignReadinessIssue[] | readonly string[],
+): string[] {
+  const contentCodes = new Set<string>(CAMPAIGN_CONTENT_READINESS_CODES);
+  return issues
+    .map((entry) =>
+      typeof entry === "string"
+        ? null
+        : contentCodes.has(entry.code)
+          ? entry.message
+          : null,
+    )
+    .filter((message): message is string => Boolean(message));
+}
+
+export function hasCampaignReadinessCode(
+  issues: readonly CampaignReadinessIssue[],
+  code: CampaignReadinessCode,
+): boolean {
+  return issues.some((entry) => entry.code === code);
+}
+
+export function hasAnyCampaignReadinessCode(
+  issues: readonly CampaignReadinessIssue[],
+  codes: ReadonlySet<CampaignReadinessCode>,
+): boolean {
+  return issues.some((entry) => codes.has(entry.code));
+}
+
+export function isScheduleReadinessComplete(
+  issues: readonly CampaignReadinessIssue[],
+): boolean {
+  return !hasAnyCampaignReadinessCode(issues, SCHEDULE_READINESS_CODES);
+}
+
+export function isContentReadinessComplete(
+  issues: readonly CampaignReadinessIssue[],
+): boolean {
+  return !hasAnyCampaignReadinessCode(
+    issues,
+    new Set(CAMPAIGN_CONTENT_READINESS_CODES),
+  );
 }
 
 export function getCampaignReadiness(
@@ -179,18 +276,20 @@ export function getCampaignReadiness(
   options: CampaignReadinessOptions = {},
 ): CampaignReadiness {
   if (!campaignData) {
+    const issues = [issue("campaign_not_loaded", "Campaign could not be loaded")];
     return {
-      startIssues: ["Campaign could not be loaded"],
-      scheduleIssues: ["Campaign could not be loaded"],
-      startDisabledReason: "Campaign could not be loaded",
-      scheduleDisabledReason: "Campaign could not be loaded",
+      issues,
+      startIssues: issuesToMessages(issues),
+      scheduleIssues: issuesToMessages(issues),
+      startDisabledReason: issues[0]?.message ?? null,
+      scheduleDisabledReason: issues[0]?.message ?? null,
     };
   }
 
-  const commonIssues: string[] = [];
+  const commonIssues: CampaignReadinessIssue[] = [];
 
   if (!campaignData.type) {
-    commonIssues.push("Campaign type is required");
+    commonIssues.push(issue("campaign_type_required", "Campaign type is required"));
   }
 
   const messageUsesMessagingService =
@@ -199,25 +298,33 @@ export function getCampaignReadiness(
 
   if (!campaignData.caller_id) {
     if (!messageUsesMessagingService) {
-      commonIssues.push("An outbound phone number is required");
+      commonIssues.push(
+        issue("outbound_number_required", "An outbound phone number is required"),
+      );
     }
   }
 
   if (messageUsesMessagingService) {
     if (!String(campaignData.sms_messaging_service_sid ?? "").trim()) {
       commonIssues.push(
-        "Messaging Service SID is required for this send mode (save Messaging Service selection)",
+        issue(
+          "messaging_sid_required",
+          "Messaging Service SID is required for this send mode (save Messaging Service selection)",
+        ),
       );
     }
     if (options.smsMessagingServiceSendersReady === false) {
       commonIssues.push(
-        "Messaging Service has no available sender numbers; attach senders in onboarding or use a phone number",
+        issue(
+          "messaging_senders_unavailable",
+          "Messaging Service has no available sender numbers; attach senders in onboarding or use a phone number",
+        ),
       );
     }
   }
 
   if (!campaignData.start_date || !campaignData.end_date) {
-    commonIssues.push("Start and end dates are required");
+    commonIssues.push(issue("dates_required", "Start and end dates are required"));
   }
 
   const dateIssue = getDateIssue(campaignData);
@@ -227,15 +334,39 @@ export function getCampaignReadiness(
 
   const scheduleValidation = getScheduleValidation(campaignData.schedule);
   if (!scheduleValidation.hasCallingHours) {
-    commonIssues.push("Calling hours are required");
+    commonIssues.push(issue("calling_hours_required", "Calling hours are required"));
   }
 
   if (scheduleValidation.hasInvalidIntervals) {
-    commonIssues.push("Each active calling day needs at least one valid time window");
+    commonIssues.push(
+      issue(
+        "invalid_intervals",
+        "Each active calling day needs at least one valid time window",
+      ),
+    );
   }
 
   if (typeof options.queueCount === "number" && options.queueCount <= 0) {
-    commonIssues.push("Add at least one contact before starting or scheduling");
+    commonIssues.push(
+      issue(
+        "queue_empty",
+        "Add at least one contact before starting or scheduling",
+      ),
+    );
+  }
+
+  if (
+    campaignData.type === "message" &&
+    options.smsSenderClass &&
+    typeof options.queueCount === "number" &&
+    isBulkSmsSenderMisaligned(options.smsSenderClass, options.queueCount)
+  ) {
+    commonIssues.push(
+      issue(
+        "bulk_sender_misaligned",
+        "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
+      ),
+    );
   }
 
   const contentIssue = getContentIssue(campaignData, details);
@@ -244,10 +375,13 @@ export function getCampaignReadiness(
     commonIssues.push(contentIssue);
   }
 
+  const startIssues = issuesToMessages(commonIssues);
+
   return {
-    startIssues: commonIssues,
-    scheduleIssues: commonIssues,
-    startDisabledReason: commonIssues[0] ?? null,
-    scheduleDisabledReason: commonIssues[0] ?? null,
+    issues: commonIssues,
+    startIssues,
+    scheduleIssues: startIssues,
+    startDisabledReason: startIssues[0] ?? null,
+    scheduleDisabledReason: startIssues[0] ?? null,
   };
 }

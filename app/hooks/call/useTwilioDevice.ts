@@ -1,21 +1,12 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
-import { useCallDuration } from './useCallDuration';
-import { useTwilioConnection } from './useTwilioConnection';
-import { useCallHandling } from './useCallHandling';
-
-// The Voice SDK touches browser globals during module evaluation, so keep this
-// lazy client-only require instead of moving it to the import block.
-const getTwilioSDK = () => {
-  if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const SDK = require('@twilio/voice-sdk');
-  return { Device: SDK.Device, Call: SDK.Call };
-};
+import { useCallDuration } from "./useCallDuration";
+import { useTwilioConnection } from "./useTwilioConnection";
+import { useCallHandling } from "./useCallHandling";
 
 interface CallConnectParams {
-    To: string;
-    [key: string]: string;
+  To: string;
+  [key: string]: string;
 }
 
 interface TwilioDeviceHook {
@@ -24,9 +15,12 @@ interface TwilioDeviceHook {
   error: Error | null;
   activeCall: Call | null;
   incomingCall: Call | null;
+  isMicMuted: boolean;
+  setMicMuted: (muted: boolean) => void;
   makeCall: (params: CallConnectParams) => void;
   hangUp: () => void;
   answer: () => void;
+  holdAndAnswer: () => void;
   callState: string;
   callDuration: number;
   setCallDuration: React.Dispatch<React.SetStateAction<number>>;
@@ -35,92 +29,46 @@ interface TwilioDeviceHook {
 }
 
 /**
- * Main hook for managing Twilio device and call operations
- * 
- * This hook coordinates between useTwilioConnection (device management) and
- * useCallHandling (call operations) to provide a unified API for Twilio functionality.
- * 
- * @param token - Twilio access token
- * @param selectedDevice - Selected device identifier (currently unused but kept for API compatibility)
- * @param workspaceId - Workspace ID for call operations
- * @param send - Callback function for state machine actions (e.g., CONNECT)
- * @returns Complete Twilio device and call management interface
- * 
- * @example
- * ```tsx
- * const {
- *   device,
- *   status,
- *   activeCall,
- *   makeCall,
- *   hangUp,
- *   callState,
- *   callDuration,
- * } = useTwilioDevice(token, deviceId, workspaceId, send);
- * ```
+ * Coordinates Twilio device connection and canonical call session handling.
  */
 export function useTwilioDevice(
   token: string,
   selectedDevice: string,
   workspaceId: string,
-  send: (action: { type: string }) => void
+  send: (action: { type: string }) => void,
 ): TwilioDeviceHook {
-  // Validate required parameters
   if (!token) {
-    throw new Error('useTwilioDevice: token is required');
+    throw new Error("useTwilioDevice: token is required");
   }
   if (!workspaceId) {
-    throw new Error('useTwilioDevice: workspaceId is required');
+    throw new Error("useTwilioDevice: workspaceId is required");
   }
-  if (typeof send !== 'function') {
-    throw new Error('useTwilioDevice: send callback must be a function');
+  if (typeof send !== "function") {
+    throw new Error("useTwilioDevice: send callback must be a function");
   }
 
   const [deviceIsBusy, setIsBusy] = useState<boolean>(false);
-  const [status, setStatus] = useState<string>('disconnected');
+  const [status, setStatus] = useState<string>("disconnected");
   const [error, setError] = useState<Error | null>(null);
-  const [incomingCallFromConnection, setIncomingCallFromConnection] = useState<Call | null>(null);
-  const deviceRef = useRef<Device | null>(null);
+  const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
 
-  // Use extracted connection hook
   const connection = useTwilioConnection({
     token,
-    onIncomingCall: (call) => {
-      setIncomingCallFromConnection(call);
-    },
+    onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange: (newStatus) => {
       setStatus(newStatus);
     },
     onError: (err) => {
       setError(err);
     },
-    onCallStateChange: () => {
-      // Handled by call handling hook
-    },
     onDeviceBusyChange: (isBusy) => {
       setIsBusy(isBusy);
     },
   });
 
-  // Sync device ref with connection device
-  useEffect(() => {
-    deviceRef.current = connection.device;
-  }, [connection.device]);
-
-  // Use extracted call handling hook
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
-    incomingCall: incomingCallFromConnection,
-    onCallStateChange: () => {
-      // Handled by call duration hook
-    },
-    onActiveCallChange: () => {
-      // State managed by hook
-    },
-    onIncomingCallChange: (call) => {
-      setIncomingCallFromConnection(call);
-    },
     onStatusChange: (newStatus) => {
       setStatus(newStatus);
     },
@@ -131,17 +79,16 @@ export function useTwilioDevice(
       setIsBusy(isBusy);
     },
     onConnect: () => {
-      // Send CONNECT action to state machine for client calls
       send({ type: "CONNECT" });
     },
   });
 
-  // Use extracted call duration hook
+  useEffect(() => {
+    receiveIncomingRef.current = callHandling.receiveIncoming;
+  }, [callHandling.receiveIncoming]);
+
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
-  // Incoming call is already synced via prop to useCallHandling
-
-  // Sync error state from connection
   useEffect(() => {
     if (connection.error && connection.error !== error) {
       setError(connection.error);
@@ -154,9 +101,12 @@ export function useTwilioDevice(
     error,
     activeCall: callHandling.activeCall,
     incomingCall: callHandling.incomingCall,
+    isMicMuted: callHandling.isMicMuted,
+    setMicMuted: callHandling.setMicMuted,
     makeCall: callHandling.makeCall,
     hangUp: callHandling.hangUp,
     answer: callHandling.answer,
+    holdAndAnswer: callHandling.holdAndAnswer,
     callState: callHandling.callState,
     callDuration,
     setCallDuration,

@@ -476,11 +476,15 @@ export type Database = {
       campaign_queue: {
         Row: {
           assigned_to_user_id: string | null;
+          attempt_count: number;
           attempts: number;
           campaign_id: number;
+          claimed_at: string | null;
           contact_id: number;
           created_at: string;
           id: number;
+          last_attempt_at: string | null;
+          last_attempt_error: string | null;
           provider_status: string | null;
           queue_order: number | null;
           queue_state: string | null;
@@ -491,11 +495,15 @@ export type Database = {
         };
         Insert: {
           assigned_to_user_id?: string | null;
+          attempt_count?: number;
           attempts?: number;
           campaign_id: number;
+          claimed_at?: string | null;
           contact_id: number;
           created_at?: string;
           id?: number;
+          last_attempt_at?: string | null;
+          last_attempt_error?: string | null;
           provider_status?: string | null;
           queue_order?: number | null;
           queue_state?: string | null;
@@ -506,11 +514,15 @@ export type Database = {
         };
         Update: {
           assigned_to_user_id?: string | null;
+          attempt_count?: number;
           attempts?: number;
           campaign_id?: number;
+          claimed_at?: string | null;
           contact_id?: number;
           created_at?: string;
           id?: number;
+          last_attempt_at?: string | null;
+          last_attempt_error?: string | null;
           provider_status?: string | null;
           queue_order?: number | null;
           queue_state?: string | null;
@@ -1453,6 +1465,99 @@ export type Database = {
           },
         ];
       };
+      agent_status: {
+        Row: {
+          workspace_id: string;
+          user_id: string;
+          status: Database["public"]["Enums"]["agent_state"];
+          status_reason: string | null;
+          status_started_at: string;
+          current_queue_entry_id: number | null;
+          last_heartbeat_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          user_id: string;
+          status?: Database["public"]["Enums"]["agent_state"];
+          status_reason?: string | null;
+          status_started_at?: string;
+          current_queue_entry_id?: number | null;
+          last_heartbeat_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          workspace_id?: string;
+          user_id?: string;
+          status?: Database["public"]["Enums"]["agent_state"];
+          status_reason?: string | null;
+          status_started_at?: string;
+          current_queue_entry_id?: number | null;
+          last_heartbeat_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_status_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_status_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      agent_status_event: {
+        Row: {
+          id: number;
+          workspace_id: string;
+          user_id: string;
+          from_status: Database["public"]["Enums"]["agent_state"];
+          to_status: Database["public"]["Enums"]["agent_state"];
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          workspace_id: string;
+          user_id: string;
+          from_status: Database["public"]["Enums"]["agent_state"];
+          to_status: Database["public"]["Enums"]["agent_state"];
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          workspace_id?: string;
+          user_id?: string;
+          from_status?: Database["public"]["Enums"]["agent_state"];
+          to_status?: Database["public"]["Enums"]["agent_state"];
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "agent_status_event_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "agent_status_event_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       handset_session: {
         Row: {
           id: string;
@@ -1498,6 +1603,156 @@ export type Database = {
           },
         ];
       };
+      inbound_queue: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          hold_audio: string | null;
+          id: number;
+          name: string;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          hold_audio?: string | null;
+          id?: number;
+          name: string;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          hold_audio?: string | null;
+          id?: number;
+          name?: string;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      inbound_queue_member: {
+        Row: {
+          created_at: string;
+          id: number;
+          queue_id: number;
+          user_id: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: number;
+          queue_id: number;
+          user_id: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: number;
+          queue_id?: number;
+          user_id?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_member_queue_id_fkey";
+            columns: ["queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_member_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "user";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_member_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      inbound_queue_entry: {
+        Row: {
+          abandoned_at: string | null;
+          accepted_at: string | null;
+          call_sid: string | null;
+          caller_number: string | null;
+          completed_at: string | null;
+          created_at: string;
+          id: number;
+          offered_at: string | null;
+          offered_to_user_id: string | null;
+          queue_id: number;
+          status: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          abandoned_at?: string | null;
+          accepted_at?: string | null;
+          call_sid?: string | null;
+          caller_number?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: number;
+          offered_at?: string | null;
+          offered_to_user_id?: string | null;
+          queue_id: number;
+          status?: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid?: string | null;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          abandoned_at?: string | null;
+          accepted_at?: string | null;
+          call_sid?: string | null;
+          caller_number?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          id?: number;
+          offered_at?: string | null;
+          offered_to_user_id?: string | null;
+          queue_id?: number;
+          status?: Database["public"]["Enums"]["queue_entry_state"];
+          twilio_queue_sid?: string | null;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "inbound_queue_entry_queue_id_fkey";
+            columns: ["queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbound_queue_entry_workspace_id_fkey";
+            columns: ["workspace_id"];
+            isOneToOne: false;
+            referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       workspace_number: {
         Row: {
           capabilities: Json | null;
@@ -1507,6 +1762,9 @@ export type Database = {
           id: number;
           inbound_action: string | null;
           inbound_audio: string | null;
+          inbound_queue_id: number | null;
+          inbound_ring_count: number;
+          inbound_script_id: number | null;
           phone_number: string | null;
           type: string;
           workspace: string;
@@ -1519,6 +1777,9 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_queue_id?: number | null;
+          inbound_ring_count?: number;
+          inbound_script_id?: number | null;
           phone_number?: string | null;
           type: string;
           workspace: string;
@@ -1531,6 +1792,9 @@ export type Database = {
           id?: number;
           inbound_action?: string | null;
           inbound_audio?: string | null;
+          inbound_queue_id?: number | null;
+          inbound_ring_count?: number;
+          inbound_script_id?: number | null;
           phone_number?: string | null;
           type?: string;
           workspace?: string;
@@ -1541,6 +1805,20 @@ export type Database = {
             columns: ["workspace"];
             isOneToOne: false;
             referencedRelation: "workspace";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_number_inbound_queue_id_fkey";
+            columns: ["inbound_queue_id"];
+            isOneToOne: false;
+            referencedRelation: "inbound_queue";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workspace_number_inbound_script_id_fkey";
+            columns: ["inbound_script_id"];
+            isOneToOne: false;
+            referencedRelation: "script";
             referencedColumns: ["id"];
           },
         ];
@@ -2189,6 +2467,63 @@ export type Database = {
         };
         Returns: Database["public"]["CompositeTypes"]["campaigndata"][];
       };
+      campaign_queue_has_pending_work: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: boolean;
+      };
+      claim_campaign_queue_contacts: {
+        Args: {
+          campaign_id_pro: number;
+          claimed_by_user_id: string;
+          claim_limit?: number;
+          max_inflight?: number;
+        };
+        Returns: {
+          id: number;
+          contact_id: number;
+          phone: string;
+          workspace: string;
+          caller_id: string;
+        }[];
+      };
+      complete_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          dequeued_by_id?: string;
+          reason_text?: string;
+        };
+        Returns: undefined;
+      };
+      count_active_ivr_campaign_calls: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: number;
+      };
+      dequeue_duplicate_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          dequeued_by_id?: string;
+          reason_text?: string;
+        };
+        Returns: undefined;
+      };
+      fail_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          error_text?: string;
+          dequeued_by_id?: string;
+        };
+        Returns: undefined;
+      };
+      fail_exhausted_campaign_queue_contacts: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: number;
+      };
       get_campaign_queue: {
         Args: {
           campaign_id_pro: number;
@@ -2200,6 +2535,26 @@ export type Database = {
           workspace: string;
           caller_id: string;
         }[];
+      };
+      requeue_campaign_queue_contact: {
+        Args: {
+          queue_id_pro: number;
+          error_text?: string;
+        };
+        Returns: string;
+      };
+      reset_stale_campaign_queue_claims: {
+        Args: {
+          campaign_id_pro: number;
+          stale_after?: unknown;
+        };
+        Returns: number;
+      };
+      try_complete_campaign_if_drained: {
+        Args: {
+          campaign_id_pro: number;
+        };
+        Returns: boolean;
       };
       get_campaign_stats: {
         Args: {
@@ -2503,8 +2858,57 @@ export type Database = {
         };
         Returns: undefined;
       };
+      claim_inbound_queue_entry: {
+        Args: {
+          p_queue_id: number;
+          p_workspace_id: string;
+          p_call_sid: string;
+          p_caller_number: string;
+        };
+        Returns: {
+          agent_user_id: string;
+          entry_id: number;
+        }[];
+      };
+      release_inbound_offer: {
+        Args: {
+          p_entry_id: number;
+          p_outcome?: string;
+        };
+        Returns: undefined;
+      };
+      complete_inbound_queue_entry: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      abandon_inbound_queue_entry: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      accept_inbound_offer: {
+        Args: {
+          p_entry_id: number;
+        };
+        Returns: undefined;
+      };
+      next_inbound_queue_offer: {
+        Args: {
+          p_queue_id: number;
+          p_agent_user_id: string;
+          p_workspace_id: string;
+        };
+        Returns: {
+          call_sid: string;
+          entry_id: number;
+        }[];
+      };
     };
     Enums: {
+      agent_state: "offline" | "available" | "busy" | "wrap_up" | "away";
       answered_by: "human" | "machine" | "unknown";
       call_status:
         | "queued"
@@ -2550,6 +2954,7 @@ export type Database = {
         | "receiving"
         | "received"
         | "read";
+      queue_entry_state: "queued" | "offered" | "accepted" | "declined" | "timed_out" | "abandoned" | "completed";
       queue_status: "queued" | "dequeued";
       workspace_permission:
         | "workspace.delete"

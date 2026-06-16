@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+export const NUMBER_SEARCH_NUMBER_TYPES = ["local", "tollfree"] as const;
+
+export type NumberSearchNumberType = (typeof NUMBER_SEARCH_NUMBER_TYPES)[number];
+
 export const NUMBER_SEARCH_MODES = [
   "areaCode",
   "province",
@@ -29,6 +33,7 @@ const CA_PROVINCES = new Set([
 export const NUMBER_SEARCH_LIMIT = 20;
 
 const baseQuerySchema = z.object({
+  numberType: z.enum(NUMBER_SEARCH_NUMBER_TYPES).default("local"),
   searchMode: z.enum(NUMBER_SEARCH_MODES).default("areaCode"),
   query: z.string().optional(),
   areaCode: z.string().optional(),
@@ -124,4 +129,13 @@ export function parseNumberSearchRequest(
     };
   }
   return buildNumberSearchListParams(parsed.data);
+}
+
+export function getNumberSearchNumberType(
+  params: URLSearchParams,
+): NumberSearchNumberType {
+  const raw = params.get("numberType")?.trim() ?? "local";
+  return NUMBER_SEARCH_NUMBER_TYPES.includes(raw as NumberSearchNumberType)
+    ? (raw as NumberSearchNumberType)
+    : "local";
 }

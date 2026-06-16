@@ -1,6 +1,6 @@
-// @ts-nocheck
+export { loader } from "./index.loader.server";
 
-import { Form, Link, NavLink, useLoaderData, useNavigation, LoaderFunctionArgs } from "react-router";
+import { Form, Link, NavLink, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -13,15 +13,6 @@ import {
   VolumeX,
   MessageCircle,
 } from "lucide-react";
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
-
-  const {
-    supabaseClient: supabase,
-  } = createSupabaseServerClient(request);
-  const user = await supabase.auth.getUser();
-  return { user };
-};
 
 const ContactForm = ({ isBusy }: { isBusy: boolean }) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 font-Zilla-Slab">

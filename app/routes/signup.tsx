@@ -1,11 +1,12 @@
-// @ts-nocheck
+export { loader } from "./signup.loader.server";
+export { action } from "./signup.action.server";
 
 import { data as routeData, Form, redirect, useActionData, useFetcher, useNavigate, useNavigation } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useRef, useState } from "react";
 import { FaGithub } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -15,45 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { Heading } from "@/components/ui/typography";
 
-type ActionData =
-  | {
-      emailError: string | null;
-      passwordError: string | null;
-      error?: undefined;
-      data?: undefined;
-    }
-  | {
-      passwordError: string;
-      emailError?: null;
-      error?: undefined;
-      data?: undefined;
-    }
-  | { error: string; emailError?: null; passwordError?: null; data?: undefined }
-  | { data: unknown; error: null; emailError?: null; passwordError?: null };
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
 
-  const { headers } = createSupabaseServerClient(request);
 
-  return routeData<ActionData>(
-    {
-      error:
-        "Registration is invite-only. Please use your invitation link or request access through the contact form.",
-    },
-    { headers, status: 403 },
-  );
-};
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, headers } = await verifyAuth(request);
-  const { data: serverSession } = await supabaseClient.auth.getSession();
-
-  if (serverSession && serverSession.session) {
-    return redirect("/workspaces", { headers });
-  }
-  return routeData({ serverSession }, { headers });
-};
 
 // Removed unused legacy styles
 
@@ -63,30 +28,25 @@ type FetcherData =
     }
   | undefined;
 
+type ActionData = {
+  error: string;
+};
+
 export default function SignUp() {
   const actionData = useActionData<ActionData>();
   const { state } = useNavigation();
   const fetcher = useFetcher<FetcherData>();
   const formRef = useRef<HTMLFormElement>(null);
 
-  // legacy error UI removed; keep actionData for toast only
-
-  useEffect(() => {
-    /* if (actionData?.data != null && actionData.data.user != null) {
-      toast.success(
-        "You have successfully signed-up! Redirecting to your dashboard...",
-      ); */
-    if (
-      fetcher?.data &&
-      typeof (fetcher.data as any).success === "boolean" &&
-      (fetcher.data as any).success
-    ) {
-      toast.success("Your request has been sent! We'll be in touch soon.");
-      formRef.current?.reset();
-    }
-    const timeout = setTimeout(() => /* navigate("/workspaces") */ null, 2000);
-    return () => clearTimeout(timeout);
-  }, [actionData, fetcher?.data]);
+  useActionFeedback(fetcher.state === "idle" ? fetcher.data : undefined, {
+    getSuccess: (data) => Boolean(data?.success),
+    successMessage: "Your request has been sent! We'll be in touch soon.",
+    onSuccess: () => formRef.current?.reset(),
+  });
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">

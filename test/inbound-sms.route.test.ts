@@ -135,7 +135,11 @@ function makeInboundSmsRequest(overrides?: Partial<Record<string, unknown>>) {
   for (const [key, value] of Object.entries(makeParams(overrides))) {
     body.append(key, String(value));
   }
-  return new Request("http://x/inbound-sms", { method: "POST", body });
+  return new Request("http://x/inbound-sms", {
+    method: "POST",
+    headers: { "x-twilio-signature": "test-sig" },
+    body,
+  });
 }
 
 describe("app/routes/api+/inbound-sms", () => {
@@ -169,10 +173,30 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(res.status).toBe(403);
     expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
       expect.objectContaining({ To: "+1555" }),
-      null,
+      "test-sig",
       expect.any(String),
       "workspace-tok",
     );
+  });
+
+  test("returns 403 when Twilio signature header is missing", async () => {
+    const number = {
+      workspace: "w1",
+      twilio_data: { sid: "sid", authToken: "workspace-tok" },
+      webhook: [],
+    };
+    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const body = new FormData();
+    for (const [key, value] of Object.entries(makeParams())) {
+      body.append(key, String(value));
+    }
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x/inbound-sms", { method: "POST", body }),
+      } as never),
+    );
+    expect(res.status).toBe(403);
   });
 
   test("returns 404 when number not found", async () => {

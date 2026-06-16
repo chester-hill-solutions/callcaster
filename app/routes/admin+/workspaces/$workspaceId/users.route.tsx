@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./users.loader.server";
 
 import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
@@ -7,44 +6,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { Tables } from "@/lib/database.types";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
+type WorkspaceUserRow = Tables<"workspace_users"> & {
+  user?: Tables<"user"> | null;
+};
 
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const workspaceId = params.workspaceId;
-    
-    if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
-    }
-
-    // Get workspace users
-    const { data: workspaceUsers } = await supabaseClient
-        .from("workspace_users")
-        .select("*, user:user_id(*)")
-        .eq("workspace_id", workspaceId);
-
-    return routeData({ 
-        workspaceUsers: workspaceUsers || []
-    });
+type LoaderData = {
+  workspaceUsers: WorkspaceUserRow[];
 };
 
 export default function WorkspaceUsers() {
-    const { workspaceUsers } = useLoaderData();
+    const { workspaceUsers } = useLoaderData<LoaderData>();
 
     return (
         <Card>
@@ -72,7 +45,7 @@ export default function WorkspaceUsers() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {workspaceUsers.map((workspaceUser) => (
+                            {workspaceUsers.map((workspaceUser: WorkspaceUserRow) => (
                                 <TableRow key={workspaceUser.id}>
                                     <TableCell className="font-medium">{workspaceUser.user?.username}</TableCell>
                                     <TableCell>{workspaceUser.user?.first_name} {workspaceUser.user?.last_name}</TableCell>
@@ -95,4 +68,4 @@ export default function WorkspaceUsers() {
             </CardContent>
         </Card>
     );
-} 
+}

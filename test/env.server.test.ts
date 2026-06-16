@@ -1,29 +1,44 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
+function seedRequiredEnv() {
+  process.env.NODE_ENV = "test";
+  process.env.SUPABASE_URL = "http://localhost";
+  process.env.SUPABASE_ANON_KEY = "a";
+  process.env.SUPABASE_SERVICE_KEY = "b";
+  process.env.SUPABASE_PUBLISHABLE_KEY = "c";
+  process.env.TWILIO_SID = "d";
+  process.env.TWILIO_AUTH_TOKEN = "e";
+  process.env.TWILIO_APP_SID = "f";
+  process.env.TWILIO_PHONE_NUMBER = "+15555550100";
+  process.env.BASE_URL = "http://localhost";
+  process.env.STRIPE_SECRET_KEY = "sk";
+  process.env.RESEND_API_KEY = "re";
+}
 
 describe("env.server", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    seedRequiredEnv();
+  });
+
   test("required env getters throw when missing", async () => {
     vi.resetModules();
     delete process.env.SUPABASE_URL;
-    const mod = await import("../app/lib/env.server");
-    expect(() => mod.env.SUPABASE_URL()).toThrow(
-      /Missing required environment variable: SUPABASE_URL/,
-    );
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const mod = await import("../app/lib/env.server");
+      expect(() => mod.env.SUPABASE_URL()).toThrow(
+        /Missing required environment variable: SUPABASE_URL/,
+      );
+    } finally {
+      err.mockRestore();
+    }
   });
 
   test("optional env getter returns undefined when missing", async () => {
     vi.resetModules();
     delete process.env.OPENAI_API_KEY;
-    process.env.SUPABASE_URL = "http://localhost";
-    process.env.SUPABASE_ANON_KEY = "a";
-    process.env.SUPABASE_SERVICE_KEY = "b";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "c";
-    process.env.TWILIO_SID = "d";
-    process.env.TWILIO_AUTH_TOKEN = "e";
-    process.env.TWILIO_APP_SID = "f";
-    process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-    process.env.BASE_URL = "http://localhost";
-    process.env.STRIPE_SECRET_KEY = "sk";
-    process.env.RESEND_API_KEY = "re";
+    seedRequiredEnv();
 
     const mod = await import("../app/lib/env.server");
     expect(mod.env.OPENAI_API_KEY()).toBeUndefined();
@@ -32,6 +47,7 @@ describe("env.server", () => {
 
   test("server import logs validation errors instead of throwing", async () => {
     vi.resetModules();
+    process.env.NODE_ENV = "development";
     delete process.env.SUPABASE_URL;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -44,37 +60,23 @@ describe("env.server", () => {
   test("revalidateEnv throws when any required is missing", async () => {
     vi.resetModules();
     // Set everything except TWILIO_AUTH_TOKEN.
-    process.env.SUPABASE_URL = "http://localhost";
-    process.env.SUPABASE_ANON_KEY = "a";
-    process.env.SUPABASE_SERVICE_KEY = "b";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "c";
-    process.env.TWILIO_SID = "d";
+    seedRequiredEnv();
     delete process.env.TWILIO_AUTH_TOKEN;
-    process.env.TWILIO_APP_SID = "f";
-    process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-    process.env.BASE_URL = "http://localhost";
-    process.env.STRIPE_SECRET_KEY = "sk";
-    process.env.RESEND_API_KEY = "re";
 
-    const mod = await import("../app/lib/env.server");
-    expect(() => mod.revalidateEnv()).toThrow(
-      /Missing required environment variables: .*TWILIO_AUTH_TOKEN/,
-    );
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const mod = await import("../app/lib/env.server");
+      expect(() => mod.revalidateEnv()).toThrow(
+        /Missing required environment variables: .*TWILIO_AUTH_TOKEN/,
+      );
+    } finally {
+      err.mockRestore();
+    }
   });
 
   test("all getters return values when present and revalidateEnv passes", async () => {
     vi.resetModules();
-    process.env.SUPABASE_URL = "http://localhost";
-    process.env.SUPABASE_ANON_KEY = "a";
-    process.env.SUPABASE_SERVICE_KEY = "b";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "c";
-    process.env.TWILIO_SID = "d";
-    process.env.TWILIO_AUTH_TOKEN = "e";
-    process.env.TWILIO_APP_SID = "f";
-    process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-    process.env.BASE_URL = "http://localhost";
-    process.env.STRIPE_SECRET_KEY = "sk";
-    process.env.RESEND_API_KEY = "re";
+    seedRequiredEnv();
     process.env.OPENAI_API_KEY = "oa";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_1";
     process.env.VERIFICATION_PHONE_NUMBER = "+15551234567";
@@ -112,17 +114,7 @@ describe("env.server", () => {
 
   test("verification phone getter throws when missing", async () => {
     vi.resetModules();
-    process.env.SUPABASE_URL = "http://localhost";
-    process.env.SUPABASE_ANON_KEY = "a";
-    process.env.SUPABASE_SERVICE_KEY = "b";
-    process.env.SUPABASE_PUBLISHABLE_KEY = "c";
-    process.env.TWILIO_SID = "d";
-    process.env.TWILIO_AUTH_TOKEN = "e";
-    process.env.TWILIO_APP_SID = "f";
-    process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-    process.env.BASE_URL = "http://localhost";
-    process.env.STRIPE_SECRET_KEY = "sk";
-    process.env.RESEND_API_KEY = "re";
+    seedRequiredEnv();
     delete process.env.VERIFICATION_PHONE_NUMBER;
 
     const mod = await import("../app/lib/env.server");

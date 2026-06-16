@@ -1,5 +1,4 @@
-// @ts-nocheck
-
+export { loader } from "./$surveyId.loader.server";
 
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, Link } from "react-router";
 
@@ -65,78 +64,18 @@ interface Survey {
   is_active: boolean;
   created_at: string;
   survey_page?: SurveyPage[];
+  survey_response?: Array<{ count: number }>;
 }
 
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, user } = await verifyAuth(request);
-  const { id: workspaceId, surveyId } = params;
-
-  if (!workspaceId || !surveyId) {
-    throw new Response("Workspace ID and Survey ID are required", { status: 400 });
-  }
-
-  // Get user role for this workspace
-  const userRole = await getUserRole({
-    supabaseClient,
-    user,
-    workspaceId,
-  });
-
-  if (!userRole) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  // Get survey with pages and questions
-  const { data: survey, error: surveyError } = await supabaseClient
-    .from("survey")
-    .select(`
-      *,
-      survey_page(
-        *,
-        survey_question(
-          *,
-          question_option(*)
-        )
-      ),
-      survey_response(count)
-    `)
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (surveyError || !survey) {
-    throw new Response("Survey not found", { status: 404 });
-  }
-
-  // Get recent responses
-  const { data: recentResponses, error: responsesError } = await supabaseClient
-    .from("survey_response")
-    .select(`
-      *,
-      contact(firstname, surname, phone)
-    `)
-    .eq("survey_id", survey.id)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (responsesError) {
-    logger.error("Error fetching responses:", responsesError);
-  }
-
-  return routeData({
-    survey,
-    recentResponses: recentResponses || [],
-    workspaceId,
-    user,
-    userRole,
-  });
-}
+type LoaderData = {
+  survey: Survey;
+  recentResponses: SurveyResponse[];
+  workspaceId: string;
+  userRole: unknown;
+};
 
 export default function SurveyDetailPage() {
-  const { survey, recentResponses, workspaceId, userRole } = useLoaderData();
+  const { survey, recentResponses, workspaceId, userRole } = useLoaderData<LoaderData>();
 
   const surveyUrl = `${window.location.origin}/survey/${survey.survey_id}`;
 
@@ -196,7 +135,7 @@ export default function SurveyDetailPage() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Responses</p>
                 <p className="text-2xl font-bold">
-                  {survey.survey_response[0]?.count || 0}
+                  {survey.survey_response?.[0]?.count || 0}
                 </p>
               </div>
               <Users className="w-8 h-8 text-muted-foreground" />
@@ -278,7 +217,7 @@ export default function SurveyDetailPage() {
                 <p className="text-muted-foreground">No responses yet</p>
               ) : (
                 <div className="space-y-4">
-                  {recentResponses.map((response) => (
+                  {recentResponses.map((response: SurveyResponse) => (
                     <div key={response.id} className="flex justify-between items-center p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">
@@ -310,4 +249,4 @@ export default function SurveyDetailPage() {
       </Tabs>
     </div>
   );
-} 
+}

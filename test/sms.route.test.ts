@@ -12,6 +12,11 @@ const defaultPortalConfig = {
   sendMode: "from_number",
   messagingServiceSid: null,
   onboardingStatus: "not_started",
+  smsSenderClass: "unknown",
+  smsTargetMps: 1,
+  voiceTargetCps: 1,
+  voiceConcurrentCallLimit: 100,
+  parallelDispatchEnabled: false,
   supportNotes: "",
   updatedAt: null,
   updatedBy: null,
@@ -68,6 +73,12 @@ vi.mock("@/lib/utils", () => ({
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/twilio-readiness.server", () => ({
+  assertWorkspaceCanSendSms: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/twilio-client.server", () => ({
+  withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+}));
 
 function makeSupabase(opts: {
   campaign?: any;
@@ -251,9 +262,9 @@ describe("app/routes/api+/sms/route.tsx", () => {
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: expect.stringContaining("http://tiny"),
+        body: "Hello https://example.com A",
         mediaUrl: ["http://signed-1"],
-      })
+      }),
     );
   });
 
@@ -415,10 +426,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     expect(body.responses[0]["5"].error).toBe("update-bad");
   });
 
-  test("shortenUrl fetch throws logs and keeps original URL", async () => {
-    (globalThis as any).fetch = vi.fn(async () => {
-      throw new Error("no-network");
-    });
+  test("preserves URLs in body for from-number sends (Twilio shortening uses Messaging Service)", async () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Go https://example.com", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
@@ -437,14 +445,25 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error shortening URL:", expect.anything());
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
   });
 
-  test("shortenUrl non-ok response keeps original URL", async () => {
-    (globalThis as any).fetch = vi.fn(async () => ({ ok: false, text: async () => "ignored" }));
+  test("uses Twilio shortenUrls when messaging service send mode includes URLs", async () => {
     currentSupabase = makeSupabase({
-      campaign: { body_text: "Go https://example.com", message_media: [], campaign: { end_time: new Date().toISOString() } },
+      campaign: {
+        body_text: "Go https://example.com",
+        message_media: [],
+        campaign: {
+          end_time: new Date().toISOString(),
+          sms_send_mode: "messaging_service",
+          sms_messaging_service_sid: "MG123",
+        },
+      },
+    });
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValueOnce({
+      ...defaultPortalConfig,
+      sendMode: "messaging_service",
+      messagingServiceSid: "MG123",
     });
     mocks.safeParseJson.mockResolvedValueOnce({
       campaign_id: "c6b",
@@ -461,7 +480,13 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("https://example.com"),
+        messagingServiceSid: "MG123",
+        shortenUrls: true,
+      }),
+    );
   });
 
   test("message.sid falsy uses failed-* fallback", async () => {

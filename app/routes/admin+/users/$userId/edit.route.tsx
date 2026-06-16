@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+export { loader } from "./edit.loader.server";
+export { action } from "./edit.action.server";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useActionData, Form, Link } from "react-router";
 
@@ -8,120 +8,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
 
-    const { supabaseClient, user } = await verifyAuth(request);
 
-    if (!user) {
-        throw redirect("/signin");
-    }
 
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const userId = params.userId;
-    
-    if (!userId) {
-        throw redirect("/admin?tab=users");
-    }
-
-    // Get the user to edit
-    const { data: targetUser } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-    if (!targetUser) {
-        throw redirect("/admin?tab=users");
-    }
-
-    return routeData({ 
-        currentUser: userData,
-        targetUser
-    });
-};
-
-export const action = async ({ request, params }: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
-
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
-    const userId = params.userId;
-    
-    if (!userId) {
-        return routeData({ error: "User ID is required" });
-    }
-
-    const formData = await request.formData();
-    const action = formData.get("_action") as string;
-
-    if (action === "update_user") {
-        const firstName = formData.get("firstName") as string;
-        const lastName = formData.get("lastName") as string;
-        const username = formData.get("username") as string;
-        const accessLevel = formData.get("accessLevel") as string;
-
-        if (!username) {
-            return routeData({ error: "Username is required" });
-        }
-
-        const { error } = await supabaseClient
-            .from("user")
-            .update({
-                first_name: firstName || null,
-                last_name: lastName || null,
-                username,
-                access_level: accessLevel || 'standard'
-            })
-            .eq("id", userId);
-            
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: "User updated successfully" });
-    }
-
-    return routeData({ error: "Invalid action" });
-};
 
 export default function EditUser() {
     const { currentUser, targetUser } = useLoaderData();
     const actionData = useActionData();
 
-    useEffect(() => {
-        if (actionData && 'success' in actionData) {
-            toast.success(actionData.success);
-        }
-        
-        if (actionData && 'error' in actionData) {
-            toast.error(actionData.error);
-        }
-    }, [actionData]);
+    useActionFeedback(actionData, {
+        getSuccess: (data) => Boolean(data && "success" in data && data.success),
+        successMessage: (data) =>
+            data && "success" in data && typeof data.success === "string"
+                ? data.success
+                : "Saved",
+        getError: (data) => (data && "error" in data ? data.error : undefined),
+    });
 
     return (
         <div className="container mx-auto py-8 px-4">
@@ -204,4 +108,4 @@ export default function EditUser() {
             </Card>
         </div>
     );
-} 
+}

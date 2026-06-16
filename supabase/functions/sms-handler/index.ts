@@ -7,58 +7,23 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient, SupabaseClient } from "npm:@supabase/supabase-js@^2.39.6";
 import Twilio from "npm:twilio@^5.3.0";
 import { getFunctionsBaseUrl } from "../_shared/getFunctionsBaseUrl.ts";
-import { getFunctionHeaders } from "../_shared/getFunctionHeaders.ts";
 import { readTwilioWorkspaceCredentials } from "../_shared/twilio-workspace-credentials.ts";
 import { resolveTwilioSmsMessagingServiceSid } from "../_shared/sms-send-resolve.ts";
-
-const TWILIO_MESSAGE_INTENTS = new Set([
-  "otp",
-  "notifications",
-  "fraud",
-  "security",
-  "customercare",
-  "delivery",
-  "education",
-  "events",
-  "polling",
-  "announcements",
-  "marketing",
-]);
-
-type WorkspaceTwilioOpsConfig = {
-  trafficClass: string;
-  throughputProduct: string;
-  multiTenancyMode: string;
-  trafficShapingEnabled: boolean;
-  defaultMessageIntent: string | null;
-  sendMode: "from_number" | "messaging_service";
-  messagingServiceSid: string | null;
-  onboardingStatus: string;
-  supportNotes: string;
-  updatedAt: string | null;
-  updatedBy: string | null;
-  auditTrail: Array<{
-    changedAt: string;
-    actorUserId: string | null;
-    actorUsername: string | null;
-    summary: string;
-  }>;
-};
-
-const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
-  trafficClass: "unknown",
-  throughputProduct: "none",
-  multiTenancyMode: "none",
-  trafficShapingEnabled: false,
-  defaultMessageIntent: null,
-  sendMode: "from_number",
-  messagingServiceSid: null,
-  onboardingStatus: "not_started",
-  supportNotes: "",
-  updatedAt: null,
-  updatedBy: null,
-  auditTrail: [],
-};
+import {
+  completeQueueContact,
+  dequeueDuplicateQueueContact,
+  failQueueContact,
+  requeueContact,
+} from "../_shared/campaign-dispatch.ts";
+import { jsonHandlerResponse } from "../_shared/handler-response.ts";
+import {
+  normalizePortalOpsConfig,
+  type WorkspaceTwilioOpsConfig,
+} from "../_shared/portal-config.ts";
+import {
+  isRetryableSmsTwilioError,
+  withTwilioRetry,
+} from "../_shared/twilio-retry.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -68,67 +33,40 @@ function parseOptionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function normalizePortalConfig(value: unknown): WorkspaceTwilioOpsConfig {
-  if (!isRecord(value)) {
-    return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
-  }
-
-  const defaultMessageIntent =
-    typeof value.defaultMessageIntent === "string" &&
-    TWILIO_MESSAGE_INTENTS.has(value.defaultMessageIntent)
-      ? value.defaultMessageIntent
-      : null;
-
-  return {
-    ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG,
-    trafficClass: typeof value.trafficClass === "string" ? value.trafficClass : "unknown",
-    throughputProduct: typeof value.throughputProduct === "string" ? value.throughputProduct : "none",
-    multiTenancyMode: typeof value.multiTenancyMode === "string" ? value.multiTenancyMode : "none",
-    trafficShapingEnabled:
-      typeof value.trafficShapingEnabled === "boolean" ? value.trafficShapingEnabled : false,
-    defaultMessageIntent,
-    sendMode: value.sendMode === "messaging_service" ? "messaging_service" : "from_number",
-    messagingServiceSid: parseOptionalString(value.messagingServiceSid),
-    onboardingStatus: typeof value.onboardingStatus === "string" ? value.onboardingStatus : "not_started",
-    supportNotes: typeof value.supportNotes === "string" ? value.supportNotes : "",
-    updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : null,
-    updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : null,
-    auditTrail: Array.isArray(value.auditTrail)
-      ? (value.auditTrail as WorkspaceTwilioOpsConfig["auditTrail"])
-      : [],
-  };
+/** Twilio Link Shortening is preferred when sending via Messaging Service. */
+function bodyHasUrls(text: string): boolean {
+  return /https?:\/\/[^\s]+/.test(text);
 }
 
-// Link shortening function using TinyURL API
-async function shortenUrl(url: string): Promise<string> {
-  try {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`);
-    if (response.ok) {
-      const shortenedUrl = await response.text();
-      return shortenedUrl;
-    }
-  } catch (error) {
-    console.error('Error shortening URL:', error);
+function resolveContactField(field: string, contact: ContactData): string {
+  switch (field) {
+    case "firstname":
+      return contact.firstname || "";
+    case "surname":
+      return contact.surname || "";
+    case "fullname":
+      return contact.fullname || `${contact.firstname || ""} ${contact.surname || ""}`.trim();
+    case "phone":
+      return contact.phone || "";
+    case "email":
+      return contact.email || "";
+    case "address":
+      return contact.address || "";
+    case "city":
+      return contact.city || "";
+    case "province":
+      return contact.province || "";
+    case "postal":
+      return contact.postal || "";
+    case "country":
+      return contact.country || "";
+    case "external_id":
+      return contact.external_id || "";
+    case "contact_id":
+      return contact.id?.toString() || "";
+    default:
+      return "";
   }
-  return url; // Return original URL if shortening fails
-}
-
-// Process URLs in text and shorten them
-async function processUrls(text: string): Promise<string> {
-  // Regex to match URLs
-  const urlRegex = /https?:\/\/[^\s]+/g;
-  
-  let processedText = text;
-  const urlMatches = text.match(urlRegex);
-  
-  if (urlMatches) {
-    for (const url of urlMatches) {
-      const shortenedUrl = await shortenUrl(url);
-      processedText = processedText.replace(url, shortenedUrl);
-    }
-  }
-  
-  return processedText;
 }
 
 interface ContactData {
@@ -151,140 +89,54 @@ function processTemplateTags(text: string, contact: ContactData): string {
   if (!text || !contact) return text;
 
   const processBraces = (input: string): string => {
-    // First, handle {{field|"fallback"}} pattern with quoted fallback
-    let result = input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"([^"]+)"\s*\}\}/g, (match, field, fallback) => {
-      let value = '';
-      switch (field) {
-        case 'firstname':
-          value = contact.firstname || '';
-          break;
-        case 'surname':
-          value = contact.surname || '';
-          break;
-        case 'fullname':
-          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
-          break;
-        case 'phone':
-          value = contact.phone || '';
-          break;
-        case 'email':
-          value = contact.email || '';
-          break;
-        case 'address':
-          value = contact.address || '';
-          break;
-        case 'city':
-          value = contact.city || '';
-          break;
-        case 'province':
-          value = contact.province || '';
-          break;
-        case 'postal':
-          value = contact.postal || '';
-          break;
-        case 'country':
-          value = contact.country || '';
-          break;
-        case 'external_id':
-          value = contact.external_id || '';
-          break;
-        case 'contact_id':
-          value = contact.id?.toString() || '';
-          break;
-        default:
-          value = '';
-      }
-      if (!value && typeof fallback === 'string') {
+    let result = input.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"([^"]+)"\s*\}\}/g, (_match, field, fallback) => {
+      const value = resolveContactField(field, contact);
+      if (!value && typeof fallback === "string") {
         return fallback.trim();
       }
-      return value || '';
+      return value || "";
     });
-    
-    // Then, handle {{field}} pattern (without fallback)
-    result = result.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, field) => {
-      let value = '';
-      switch (field) {
-        case 'firstname':
-          value = contact.firstname || '';
-          break;
-        case 'surname':
-          value = contact.surname || '';
-          break;
-        case 'fullname':
-          value = contact.fullname || `${contact.firstname || ''} ${contact.surname || ''}`.trim();
-          break;
-        case 'phone':
-          value = contact.phone || '';
-          break;
-        case 'email':
-          value = contact.email || '';
-          break;
-        case 'address':
-          value = contact.address || '';
-          break;
-        case 'city':
-          value = contact.city || '';
-          break;
-        case 'province':
-          value = contact.province || '';
-          break;
-        case 'postal':
-          value = contact.postal || '';
-          break;
-        case 'country':
-          value = contact.country || '';
-          break;
-        case 'external_id':
-          value = contact.external_id || '';
-          break;
-        case 'contact_id':
-          value = contact.id?.toString() || '';
-          break;
-        default:
-          value = '';
-      }
-      return value || '';
-    });
-    
+
+    result = result.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, field) =>
+      resolveContactField(field, contact),
+    );
+
     return result;
   };
 
   const processFunctions = (input: string): string => {
-    // Process btoa functions
-    let result = input.replace(/btoa\(([^)]*)\)/g, (match, inner) => {
+    let result = input.replace(/btoa\(([^)]*)\)/g, (_match, inner) => {
       const processed = processBraces(inner);
       try {
         return btoa(processed);
-      } catch (e) {
-        return '';
+      } catch {
+        return "";
       }
     });
-    
-    // Process survey functions
-    result = result.replace(/survey\(([^)]*)\)/g, (match, inner) => {
+
+    result = result.replace(/survey\(([^)]*)\)/g, (_match, inner) => {
       const processed = processBraces(inner);
-      // Expected format: contact_id, "survey_id"
-      const parts = processed.split(',').map(part => part.trim());
+      const parts = processed.split(",").map((part) => part.trim());
       if (parts.length >= 2) {
         const contactId = parts[0];
-        const surveyId = parts[1].replace(/"/g, ''); // Remove quotes
-        
+        const surveyId = parts[1].replace(/"/g, "");
         if (contactId && surveyId) {
-          // Generate the survey link
           const encoded = btoa(`${contactId}:${surveyId}`);
-          const baseUrl = "https://callcaster.com";
-          return `${baseUrl}/?q=${encoded}`;
+          const surveyBaseUrl = "https://callcaster.com";
+          return `${surveyBaseUrl}/?q=${encoded}`;
         }
       }
-      return ''; // Return empty string if parsing fails
+      return "";
     });
-    
+
     return result;
   };
+
   let result = processFunctions(text);
   result = processBraces(result);
   return result;
 }
+
 const baseUrl = `${getFunctionsBaseUrl()}/`;
 interface SendMessageParams {
   body: string;
@@ -331,28 +183,6 @@ const normalizePhoneNumber = (input: string): string => {
   return cleaned;
 };
 
-async function processNextMessage(user_id: string, campaign_id: string) {
-  try {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await fetch(
-      `${baseUrl}/queue-next`,
-      {
-        method: 'POST',
-        headers: getFunctionHeaders(),
-        body: JSON.stringify({
-          owner: user_id,
-          campaign_id: campaign_id,
-        })
-      }
-    );
-  } catch (error) {
-    console.error(`Error initiating next message for campaign ${campaign_id}:`, {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-}
-
-
 const createWorkspaceTwilioInstance = async ({
   supabase,
   workspace_id
@@ -378,7 +208,7 @@ const createWorkspaceTwilioInstance = async ({
   return {
     twilio: new Twilio(creds.sid, creds.authToken),
     credits: workspace.credits,
-    portalConfig: normalizePortalConfig(
+    portalConfig: normalizePortalOpsConfig(
       isRecord(workspace.twilio_data) ? workspace.twilio_data.portalConfig : null,
     ),
   };
@@ -422,15 +252,12 @@ const sendMessage = async ({
       to,
     });
     if (duplicateExists) {
-      await supabase
-        .from("campaign_queue")
-        .update({
-          status: "dequeued",
-          dequeued_at: new Date().toISOString(),
-          dequeued_by: user_id,
-          dequeued_reason: DUPLICATE_SMS_DEQUEUED_REASON,
-        })
-        .eq("id", queue_id);
+      await dequeueDuplicateQueueContact({
+        supabase,
+        queueId: Number(queue_id),
+        dequeuedById: user_id ?? null,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      });
       return {
         skipped: true,
         reason: DUPLICATE_SMS_DEQUEUED_REASON,
@@ -470,9 +297,6 @@ const sendMessage = async ({
       throw new Error("Failed to create outreach attempt");
     }
 
-    // Process URLs in the message body to shorten them
-    const processedBody = await processUrls(body);
-
     const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
       explicitRequestSid: requestMessagingServiceSid ?? null,
       campaignSmsSendMode,
@@ -486,16 +310,30 @@ const sendMessage = async ({
       throw new Error("Missing sender: set caller_id or Messaging Service on the campaign");
     }
 
-    const message = await twilio.messages.create({
-      body: processedBody,
-      to,
-      statusCallback: `${baseUrl}sms-status`,
-      ...(media?.length && { mediaUrl: media }),
-      ...(resolvedMessagingServiceSid
-        ? { messagingServiceSid: resolvedMessagingServiceSid }
-        : { from: effectiveFrom }),
-      ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
-    }).catch((e: Error) => ({ error: e }));
+    const useTwilioLinkShortening = Boolean(
+      resolvedMessagingServiceSid && bodyHasUrls(body),
+    );
+
+    const message = await withTwilioRetry(
+      () =>
+        twilio.messages.create({
+          body,
+          to,
+          statusCallback: `${baseUrl}sms-status`,
+          ...(media?.length && { mediaUrl: media }),
+          ...(resolvedMessagingServiceSid
+            ? {
+              messagingServiceSid: resolvedMessagingServiceSid,
+              ...(useTwilioLinkShortening ? { shortenUrls: true } : {}),
+            }
+            : { from: effectiveFrom }),
+          ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
+        }),
+      {
+        operation: "messages.create",
+        isRetryable: isRetryableSmsTwilioError,
+      },
+    ).catch((e: Error) => ({ error: e }));
 
     if ('error' in message) {
       // Update outreach attempt as failed
@@ -586,9 +424,14 @@ const createOutreachAttempt = async ({
   return data;
 };
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   try {
-    const supabase = createClient(
+    const supabase =
+      options?.supabase ??
+      createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
@@ -602,6 +445,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       user_id,
       message_intent,
       messaging_service_sid,
+      dispatch_mode: _dispatchModeRaw,
     } = await req.json();
 
     // Check if campaign is still active
@@ -674,35 +518,45 @@ export async function handleRequest(req: Request): Promise<Response> {
       campaignSmsMessagingServiceSid: campaignRow.sms_messaging_service_sid,
     });
 
-    if ('error' in result) {
-      await processNextMessage(user_id, campaign_id);
-      return new Response(
-        JSON.stringify({ success: false, error: result.error }),
-        {
-          headers: { "Content-Type": "application/json" },
-          status: 500,
-        }
-      );
+    if ("skipped" in result && result.skipped) {
+      return jsonHandlerResponse("skipped", {
+        reason: result.reason ?? DUPLICATE_SMS_DEQUEUED_REASON,
+      });
     }
 
-    await processNextMessage(user_id, campaign_id);
-    return new Response(
-      JSON.stringify({ success: true, result }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    if ("error" in result) {
+      const errorMessage = String(result.error);
+      if (isRetryableSmsTwilioError(result.error)) {
+        await requeueContact({
+          supabase,
+          queueId: queue_id,
+          errorText: errorMessage.slice(0, 500),
+        });
+        return jsonHandlerResponse("retryable_failure", { error: errorMessage });
+      }
+
+      await failQueueContact({
+        supabase,
+        queueId: queue_id,
+        errorText: errorMessage.slice(0, 500),
+        dequeuedById: user_id ?? null,
+      });
+      return jsonHandlerResponse("permanent_failure", { error: errorMessage });
+    }
+
+    await completeQueueContact({
+      supabase,
+      queueId: queue_id,
+      dequeuedById: user_id ?? null,
+      reason: "SMS dispatched",
+    });
+
+    return jsonHandlerResponse("success", { extra: { result } });
 
   } catch (error) {
     console.error("Error in SMS handler:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 500,
-      }
-    );
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return jsonHandlerResponse("permanent_failure", { error: errorMessage });
   }
 }
 

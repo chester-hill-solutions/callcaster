@@ -14,13 +14,7 @@ type UserRecord = Tables<"user">;
 type WorkspaceUserRecord = Tables<"workspace_users">;
 type WorkspaceNumberRecord = Tables<"workspace_number">;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
 
 function getPortalConfigFromTwilioData(twilioData: unknown) {
   const config =

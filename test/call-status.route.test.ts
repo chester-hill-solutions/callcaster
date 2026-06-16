@@ -19,6 +19,7 @@ vi.mock("@/lib/env.server", () => {
 
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: (...args: any[]) => mocks.validateTwilioWebhookParams(...args),
+  shouldValidateTwilioWebhooks: () => true,
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
@@ -30,6 +31,10 @@ vi.mock("@/lib/transaction-history.server", () => ({
 
 vi.mock("@supabase/supabase-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
+}));
+
+vi.mock("@/lib/supabase.server", () => ({
+  getServiceSupabase: () => mocks.supabase,
 }));
 
 function makeSupabase() {
@@ -102,9 +107,7 @@ function makeSupabase() {
             }),
           }),
           update: () => ({
-            eq: () => ({
-              select: async () => ({ data: [], error: attemptUpdateError }),
-            }),
+            eq: async () => ({ data: null, error: attemptUpdateError }),
           }),
         };
       }

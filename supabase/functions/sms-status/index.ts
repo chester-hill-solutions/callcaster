@@ -17,6 +17,7 @@ import {
 } from "../_shared/sms-status-logic.ts";
 import { insertTransactionHistoryIdempotent } from "../_shared/ivr-status-logic.ts";
 import { readTwilioWorkspaceCredentials, resolveTwilioWebhookAuthToken } from "../_shared/twilio-workspace-credentials.ts";
+import { SMS_SEGMENT_CREDITS } from "../../../shared/pricing.ts";
 
 interface TwilioStatusEvent {
   SmsSid?: string;
@@ -115,7 +116,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         supabase: supabase as any,
         workspaceId,
         type: "DEBIT",
-        amount: -1,
+        amount: -SMS_SEGMENT_CREDITS,
         note: `SMS ${sid} ${status}`,
         idempotencyKey: `sms:${sid}`,
       });

@@ -5,7 +5,7 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
-    validateTwilioWebhookParams: vi.fn(() => true),
+    validateTwilioWebhookForCallSid: vi.fn(),
     env: {
       SUPABASE_URL: () => "https://sb.example",
       SUPABASE_SERVICE_KEY: () => "svc",
@@ -16,8 +16,11 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
-vi.mock("@/twilio.server", () => ({ validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a) }));
+vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  validateTwilioWebhookForCallSid: (...a: unknown[]) =>
+    mocks.validateTwilioWebhookForCallSid(...a),
+}));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -110,8 +113,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
   beforeEach(() => {
     vi.resetModules();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookParams.mockReset();
-    mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.validateTwilioWebhookForCallSid.mockReset();
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
+      ok: true,
+      params: { CallSid: "CA1" },
+      authToken: "tok",
+    });
     mocks.logger.error.mockReset();
   });
 
@@ -130,7 +137,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
   });
 
   test("returns 403 on invalid Twilio signature", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+        status: 403,
+      }),
+    });
     const script = { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1", options: [] } } };
     const campaignData = { ivr_campaign: [{ script: { steps: script } }] };
     mocks.createClient.mockReturnValueOnce(makeSupabase({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData, workspaceTwilioData: { authToken: "t" } }));

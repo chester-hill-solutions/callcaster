@@ -74,7 +74,9 @@ if (typeof window === 'undefined') {
     validateEnv();
   } catch (error) {
     // Log error but don't throw during module load to allow graceful handling
-    console.error('Environment validation error:', error);
+    if (process.env.NODE_ENV !== 'test') {
+      console.error('Environment validation error:', error);
+    }
   }
 }
 
@@ -110,3 +112,6 @@ export function revalidateEnv(): void {
 
 export { validateRequiredEnv, REQUIRED_ENV_KEYS };
 
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}

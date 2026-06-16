@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 import {
+  applyWorkspaceOnboardingChannelPolicy,
   buildOnboardingStepsForState,
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
   deriveWorkspaceMessagingReadiness,
@@ -10,6 +11,7 @@ import {
   normalizeWorkspaceMessagingOnboardingState,
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
+  WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "../app/lib/messaging-onboarding.server";
 
 function makeSupabase(
@@ -43,7 +45,8 @@ describe("messaging onboarding helpers", () => {
     expect(state.selectedChannels).toEqual(["a2p10dlc", "voice_compliance"]);
     expect(state.messagingService.desiredSendMode).toBe("messaging_service");
     expect(state.emergencyVoice.address.status).toBe("not_started");
-    expect(state.steps).toHaveLength(6);
+    expect(state.steps).toHaveLength(7);
+    expect(state.steps.some((step) => step.id === "first_number")).toBe(true);
   });
 
   test("derives onboarding readiness for new workspaces and legacy workspaces", () => {
@@ -57,6 +60,7 @@ describe("messaging onboarding helpers", () => {
     expect(newWorkspaceReadiness.shouldRedirectToOnboarding).toBe(true);
     expect(newWorkspaceReadiness.legacyMode).toBe(false);
     expect(newWorkspaceReadiness.sendMode).toBe("from_number");
+    expect(newWorkspaceReadiness.warnings).toContain("No phone number yet.");
 
     const legacyWorkspaceReadiness = deriveWorkspaceMessagingReadiness({
       onboarding: state,
@@ -68,8 +72,50 @@ describe("messaging onboarding helpers", () => {
     expect(legacyWorkspaceReadiness.shouldRedirectToOnboarding).toBe(false);
     expect(legacyWorkspaceReadiness.legacyMode).toBe(true);
     expect(legacyWorkspaceReadiness.warnings).toContain(
-      "Only verified caller IDs are present, so voice readiness remains limited.",
+      "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
     );
+  });
+
+  test("counts verified caller IDs as first-number readiness", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+      },
+    );
+    const verifiedCallerId = {
+      type: "caller_id",
+      phone_number: "+15551234567",
+      capabilities: { verification_status: "success" },
+    };
+    const pendingCallerId = {
+      type: "caller_id",
+      phone_number: "+15559876543",
+      capabilities: { verification_status: "pending" },
+    };
+
+    const withVerified = buildOnboardingStepsForState(state, { hasFirstNumber: true });
+    const withoutVerified = buildOnboardingStepsForState(state, { hasFirstNumber: false });
+
+    expect(withVerified.find((step) => step.id === "first_number")?.status).toBe("complete");
+    expect(withoutVerified.find((step) => step.id === "first_number")?.status).toBe("in_progress");
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding: { ...state, steps: withVerified },
+      workspaceNumbers: [verifiedCallerId],
+      recentOutboundCount: 0,
+    });
+    expect(readiness.warnings).not.toContain("No phone number yet.");
+
+    const pendingReadiness = deriveWorkspaceMessagingReadiness({
+      onboarding: state,
+      workspaceNumbers: [pendingCallerId],
+      recentOutboundCount: 0,
+    });
+    expect(pendingReadiness.warnings).toContain("No phone number yet.");
   });
 
   test("marks Messaging Service and voice readiness when onboarding is configured", () => {
@@ -97,7 +143,7 @@ describe("messaging onboarding helpers", () => {
         },
       },
     );
-    const steps = buildOnboardingStepsForState(nextState);
+    const steps = buildOnboardingStepsForState(nextState, { hasFirstNumber: true });
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding: { ...nextState, steps },
       workspaceNumbers: [
@@ -138,7 +184,7 @@ describe("messaging onboarding helpers", () => {
 
     expect(malformed.status).toBe("not_started");
     expect(malformed.selectedChannels).toEqual(["rcs"]);
-    expect(malformed.steps).toHaveLength(6);
+    expect(malformed.steps).toHaveLength(7);
     expect(malformed.messagingService.desiredSendMode).toBe("from_number");
     expect(malformed.messagingService.stickySenderEnabled).toBe(true);
     expect(malformed.subaccountBootstrap.authMode).toBe("mixed");
@@ -257,6 +303,79 @@ describe("messaging onboarding helpers", () => {
     expect(supabase._updateEq).toHaveBeenCalled();
   });
 
+  test("applyWorkspaceOnboardingChannelPolicy strips rcs from selected channels", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedChannels: ["rcs", "a2p10dlc"],
+      },
+    );
+
+    const adjusted = applyWorkspaceOnboardingChannelPolicy(state);
+
+    expect(adjusted.selectedChannels).toEqual(["a2p10dlc"]);
+  });
+
+  test("provider provisioning ignores the RCS gate when RCS onboarding is disabled", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedChannels: ["rcs"],
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+        rcs: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.rcs,
+          status: "not_started",
+        },
+      },
+    );
+
+    const steps = buildOnboardingStepsForState(state, { hasFirstNumber: true });
+
+    expect(steps.find((step) => step.id === "provider_provisioning")?.status).toBe(
+      "complete",
+    );
+  });
+
+  test("marks first_number complete when hasFirstNumber is true", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+      },
+    );
+
+    const withoutNumber = buildOnboardingStepsForState(state, { hasFirstNumber: false });
+    const withNumber = buildOnboardingStepsForState(state, { hasFirstNumber: true });
+
+    expect(withoutNumber.find((step) => step.id === "first_number")?.status).toBe(
+      "in_progress",
+    );
+    expect(withNumber.find((step) => step.id === "first_number")?.status).toBe(
+      "complete",
+    );
+  });
+
+  test("merges stored steps by id when first_number was not persisted", () => {
+    const legacySteps = DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.steps.filter(
+      (step) => step.id !== "first_number",
+    );
+    const normalized = normalizeWorkspaceMessagingOnboardingState({
+      ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      steps: legacySteps,
+    });
+
+    expect(normalized.steps).toHaveLength(7);
+    expect(normalized.steps.find((step) => step.id === "first_number")?.label).toBe(
+      "Your first number",
+    );
+  });
+
   test("get/update workspace onboarding propagate Supabase errors", async () => {
     await expect(
       getWorkspaceMessagingOnboardingState({
@@ -279,5 +398,62 @@ describe("messaging onboarding helpers", () => {
         actorUserId: null,
       }),
     ).rejects.toThrow("update failed");
+  });
+
+  test("merge preserves top-level status and currentStep on partial update", () => {
+    const merged = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        status: "collecting_business",
+        currentStep: "messaging_service",
+      },
+    );
+
+    expect(merged.status).toBe("collecting_business");
+    expect(merged.currentStep).toBe("messaging_service");
+    expect(merged.businessProfile.legalBusinessName).toBe("");
+  });
+
+  test("normalizes malformed partial onboarding input safely", () => {
+    const state = normalizeWorkspaceMessagingOnboardingState({
+      version: "not-a-number",
+      status: "bogus",
+      businessProfile: { legalBusinessName: 123 },
+      messagingService: null,
+      unknownSection: { foo: "bar" },
+    });
+
+    expect(state.version).toBe(WORKSPACE_MESSAGING_ONBOARDING_VERSION);
+    expect(state.status).toBe("not_started");
+    expect(state.businessProfile.legalBusinessName).toBe("");
+    expect(state.messagingService.desiredSendMode).toBe("messaging_service");
+    expect(state.steps.length).toBeGreaterThan(0);
+  });
+
+  test("deriveWorkspaceMessagingReadiness warns on incomplete A2P for US businesses", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+        emergencyVoice: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.emergencyVoice,
+          address: {
+            ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.emergencyVoice.address,
+            countryCode: "US",
+          },
+        },
+      },
+    );
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding: state,
+      workspaceNumbers: [{ type: "rented", phone_number: "+15550000000" }],
+      recentOutboundCount: 0,
+    });
+
+    expect(readiness.warnings).toContain("A2P 10DLC registration is not approved yet.");
   });
 });

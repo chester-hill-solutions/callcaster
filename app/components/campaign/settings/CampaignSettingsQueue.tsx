@@ -10,6 +10,7 @@ interface CampaignSettingsQueueProps {
   queueCount: number;
   dequeuedCount: number;
   totalCount: number;
+  setupGuideActive?: boolean;
 }
 
 export const CampaignSettingsQueue = ({
@@ -17,6 +18,7 @@ export const CampaignSettingsQueue = ({
   queueCount,
   dequeuedCount,
   totalCount,
+  setupGuideActive = false,
 }: CampaignSettingsQueueProps) => {
   const queued = queueCount || 0;
   const completed = dequeuedCount || 0;
@@ -32,7 +34,9 @@ export const CampaignSettingsQueue = ({
             <p className="text-sm text-muted-foreground">
               {queued > 0
                 ? `${queued} contacts are ready right now.`
-                : "Add contacts before starting this campaign."}
+                : setupGuideActive
+                  ? "Contacts you add here will be ready to dial or message when you launch."
+                  : "Add contacts before starting this campaign."}
             </p>
           </div>
           <div className="flex items-center divide-x">

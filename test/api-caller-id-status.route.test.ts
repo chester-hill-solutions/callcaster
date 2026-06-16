@@ -2,6 +2,42 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
+const onboardingMocks = vi.hoisted(() => ({
+  getWorkspaceMessagingOnboardingState: vi.fn(async () => ({
+    messagingService: { attachedSenderPhoneNumbers: [] },
+  })),
+  updateWorkspaceMessagingOnboardingState: vi.fn(async () => ({})),
+  updateMessagingServiceSenders: vi.fn((_state, phoneNumber) => ({
+    messagingService: { attachedSenderPhoneNumbers: [phoneNumber] },
+  })),
+  applyOnboardingStepsWithWorkspaceNumbers: vi.fn((state) => state),
+}));
+
+const databaseMocks = vi.hoisted(() => ({
+  getWorkspacePhoneNumbers: vi.fn(async () => ({
+    data: [{ workspace: "w1", type: "caller_id", phone_number: "+15555550100" }],
+  })),
+}));
+
+vi.mock("@/lib/messaging-onboarding.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/messaging-onboarding.server")>();
+  return {
+    ...actual,
+    getWorkspaceMessagingOnboardingState: onboardingMocks.getWorkspaceMessagingOnboardingState,
+    updateWorkspaceMessagingOnboardingState: onboardingMocks.updateWorkspaceMessagingOnboardingState,
+    updateMessagingServiceSenders: onboardingMocks.updateMessagingServiceSenders,
+    applyOnboardingStepsWithWorkspaceNumbers: onboardingMocks.applyOnboardingStepsWithWorkspaceNumbers,
+  };
+});
+
+vi.mock("@/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    getWorkspacePhoneNumbers: databaseMocks.getWorkspacePhoneNumbers,
+  };
+});
+
 const supabaseMocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
@@ -36,6 +72,7 @@ vi.mock("@/lib/env.server", () => {
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: (...args: any[]) =>
     (twilioMocks.validateTwilioWebhookParams as any)(...args),
+  shouldValidateTwilioWebhooks: () => true,
 }));
 
 function makeCallerIdRequest(body: FormData) {
@@ -51,6 +88,21 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     supabaseMocks.createClient.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReset();
     twilioMocks.validateTwilioWebhookParams.mockReturnValue(true);
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
+    onboardingMocks.updateWorkspaceMessagingOnboardingState.mockReset();
+    onboardingMocks.updateMessagingServiceSenders.mockReset();
+    onboardingMocks.applyOnboardingStepsWithWorkspaceNumbers.mockReset();
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
+      messagingService: { attachedSenderPhoneNumbers: [] },
+    });
+    onboardingMocks.updateMessagingServiceSenders.mockImplementation((_state, phoneNumber) => ({
+      messagingService: { attachedSenderPhoneNumbers: [phoneNumber] },
+    }));
+    onboardingMocks.applyOnboardingStepsWithWorkspaceNumbers.mockImplementation((state) => state);
+    databaseMocks.getWorkspacePhoneNumbers.mockReset();
+    databaseMocks.getWorkspacePhoneNumbers.mockResolvedValue({
+      data: [{ workspace: "w1", type: "caller_id", phone_number: "+15555550100" }],
+    });
     vi.resetModules();
   });
 
@@ -81,7 +133,10 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
   test("updates capabilities on success and returns first row", async () => {
     const update = vi.fn(() => ({
       eq: () => ({
-        select: async () => ({ data: [{ id: 1 }], error: null }),
+        select: async () => ({
+          data: [{ id: 1, workspace: "w1" }],
+          error: null,
+        }),
       }),
     }));
     supabaseMocks.createClient.mockReturnValueOnce({
@@ -108,7 +163,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     const res = await asRouteResponse(await mod.action({
       request: makeCallerIdRequest(fd),
     } as any));
-    expect(await res.json()).toEqual({ id: 1 });
+    expect(await res.json()).toEqual({ id: 1, workspace: "w1" });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({
         capabilities: expect.objectContaining({
@@ -118,6 +173,13 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
           verification_status: "success",
         }),
       }),
+    );
+    expect(onboardingMocks.updateMessagingServiceSenders).toHaveBeenCalledWith(
+      expect.any(Object),
+      "+15555550100",
+    );
+    expect(onboardingMocks.updateWorkspaceMessagingOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "w1" }),
     );
   });
 

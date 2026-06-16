@@ -1,6 +1,31 @@
 # IVR: Remix routes vs Supabase Edge (audit)
 
-> Audit only — no deletions until product confirms callers. Last updated: 2026-05-21.
+> Audit only — no deletions until product confirms callers. Last updated: 2026-05-27.
+
+## Runtime classification (code audit, 2026-05-27)
+
+| Component | Status | Notes |
+| --- | --- | --- |
+| `initiateIvrCall` → `/api/ivr/...` | **Active (Remix)** | Primary app-initiated outbound IVR |
+| `ivr-handler` → `/ivr-flow` | **Active (Edge)** | Queue-driven outbound IVR |
+| Remix `api+/ivr/*` TwiML tree | **Active (Remix)** | Used when calls hit Remix flow URL |
+| Edge `ivr-flow` / `ivr-status` / `ivr-recording` | **Active (Edge)** | Used when calls hit Edge flow URL |
+| `api+/ivr/.../blockId` (no signature) | **Fixed** | Signature validation added per structural improvements plan |
+
+**Production traffic split:** unknown until live audit — use admin `auditWorkspaceTwilioWebhooks` or `scripts/audit-twilio-webhooks.mjs`. See [`docs/twilio-callback-map.md`](twilio-callback-map.md).
+
+## IVR runtime decision (interim, 2026-05-27)
+
+| Decision | Value |
+| --- | --- |
+| Live traffic | **Pending** admin/script audit per workspace |
+| Default for new calls | **Remix** (`initiateIvrCall` unchanged unless `TWILIO_IVR_RUNTIME=edge`) |
+| Edge path | Available via `ivr-handler` queue and `TWILIO_IVR_RUNTIME=edge` |
+| Deprecation | Do not remove Remix `api+/ivr/*` or Edge `ivr-flow` until audit shows zero callers |
+
+Set `TWILIO_IVR_RUNTIME=edge` in environment to migrate new IVR initiation to Edge callbacks without deleting Remix routes.
+
+Related docs: [`twilio-runtime-inventory.md`](twilio-runtime-inventory.md), [`twilio-canonical-callback-map.md`](twilio-canonical-callback-map.md).
 
 ## Remix / app routes (current)
 

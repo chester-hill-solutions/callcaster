@@ -1,6 +1,10 @@
-// @ts-nocheck
+export { loader } from "./index.loader.server";
+export { action } from "./index.action.server";
+
 import { ActionFunctionArgs, LoaderFunctionArgs, redirect, Form, Link, NavLink, useActionData, useLoaderData, useNavigation, useSearchParams } from "react-router";
-import React, { useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 import { FaPlus } from "react-icons/fa";
 import { Button } from "@/components/ui/button";
@@ -9,7 +13,6 @@ import { Input } from "@/components/ui/input";
 
 
 
-import { toast } from "sonner";
 import { handleRoleTextStyles, MemberRole } from "@/components/workspace/TeamMember";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
@@ -21,7 +24,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Heading } from "@/components/ui/typography";
-export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 interface Workspace {
   id: string;
@@ -39,65 +41,6 @@ interface LoaderData {
   userId: string;
   error: string | null;
 }
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { createNewWorkspace } = await import("@/lib/database.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-
-  const userId = user.id;
-  if (!userId) {
-    return redirect("/signin", { headers });
-  }
-
-  const { data: workspaces, error: workspacesError } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
-
-  if (workspacesError) {
-    return { workspaces: null, userId: userId, error: workspacesError }
-  }
-  return { workspaces: workspaces, userId: userId, error: null };
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { createNewWorkspace } = await import("@/lib/database.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const formData = await request.formData();
-
-  const newWorkspaceName = formData.get("newWorkspaceName") as string;
-  const userId = formData.get("userId") as string;
-
-  if (!newWorkspaceName || !userId) {
-    return { error: "Workspace name or User Id missing!" };
-  }
-
-  const { data: newWorkspaceId, error } = await createNewWorkspace({
-    supabaseClient,
-    workspaceName: newWorkspaceName,
-    user_id: userId,
-  });
-  if (error) {
-    logger.error("Error creating workspace:", error);
-    return { error: "Failed to create Workspace" };
-  }
-
-  if (newWorkspaceId) {
-    return redirect(`/workspaces/${newWorkspaceId}`, { headers });
-  }
-
-  return { ok: true, error: null };
-};
 
 const WorkspaceCard = React.memo(
   ({ workspace, role }: { workspace: Workspace; role: MemberRole }) => {
@@ -194,17 +137,23 @@ export default function Workspaces() {
   const paymentStatus = searchParams.get("payment_status");
   const paymentMessage = searchParams.get("payment_message");
 
-  useEffect(() => {
-    if (actionData?.error) {
-      toast.error(actionData.error);
-    }
-    if (error) {
-      toast.error(error);
-    }
-    if (paymentStatus === "error" && paymentMessage) {
-      toast.error(paymentMessage);
-    }
-  }, [actionData, error, paymentMessage, paymentStatus]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
+  useActionFeedback(error ? { error } : undefined, {
+    getError: (data) => (data as { error?: string }).error,
+    getSuccess: () => false,
+  });
+  useActionFeedback(
+    paymentStatus === "error" && paymentMessage
+      ? { error: paymentMessage }
+      : undefined,
+    {
+      getError: (data) => (data as { error?: string }).error,
+      getSuccess: () => false,
+    },
+  );
 
   const workspaceCards = useMemo(
     () =>
@@ -221,6 +170,17 @@ export default function Workspaces() {
 
   return (
     <main className="mx-auto flex h-full w-full max-w-7xl flex-col items-center gap-8 px-4 py-8">
+      <div className="w-full max-w-3xl">
+        <QueryParamBanner
+          param="invite"
+          variants={{
+            accepted: {
+              title: "Invitation accepted",
+              description: "You can open your workspace from the list below.",
+            },
+          }}
+        />
+      </div>
       <Heading className="text-center" branded>
         Your Workspaces
       </Heading>

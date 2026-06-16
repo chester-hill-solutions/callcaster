@@ -1,5 +1,5 @@
-// @ts-nocheck
-
+export { loader } from "./billing.loader.server";
+export { action } from "./billing.action.server";
 
 import { data as routeData, redirect, type LoaderFunctionArgs, type ActionFunctionArgs, useLoaderData, Form, useActionData, useSearchParams, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
@@ -11,149 +11,40 @@ import Stripe from "stripe";
 
 import {
   getTransactionDisplayDescription,
+  getBillingEventSource,
+  getBillingEventSourceLabel,
   type TransactionType,
 } from "@/lib/transaction-history.server";
+import {
+  CREDIT_PRICE_CAD,
+  MIN_CREDITS,
+  MIN_PURCHASE_CAD,
+  formatCredits,
+  formatCurrency,
+  formatUnitPrice,
+} from "@/lib/billing-format";
 
-const CREDIT_PRICE_CAD = 0.003;
-const MIN_PURCHASE_CAD = 0.5;
-const MIN_CREDITS = Math.ceil(MIN_PURCHASE_CAD / CREDIT_PRICE_CAD);
+type TransactionRow = {
+  id: string;
+  created_at: string;
+  type: string;
+  amount: number;
+  note?: string | null;
+  idempotency_key?: string | null;
+};
 
-function formatCredits(amount: number) {
-  return amount.toLocaleString();
-}
-
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-  }).format(amount);
-}
-
-function formatUnitPrice() {
-  return "$0.003 CAD";
-}
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
-  const { env } = await import("@/lib/env.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("Workspace ID is required");
-  const { data: workspace, error: workspaceError } = await supabaseClient.from("workspace").select("credits, stripe_id, transaction_history(*)").eq("id", workspaceId).single();
-
-  if (workspaceError) throw workspaceError;
-  const history = workspace?.transaction_history ?? [];
-  const sortedHistory = Array.isArray(history)
-    ? [...history].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    : [];
-  return routeData({
-    credits: {
-      balance: workspace?.credits ?? 0,
-      history: sortedHistory,
-    },
-  });
-}
-
-export async function action({ request, params }: ActionFunctionArgs) {  const { createStripeContact } = await import("@/lib/database/stripe.server");
-  const { env } = await import("@/lib/env.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient } = await verifyAuth(request);
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("Workspace ID is required");
-
-  const formData = await request.formData();
-  const amount = Math.floor(Number(formData.get("amount")));
-
-  if (!Number.isFinite(amount) || amount < MIN_CREDITS) {
-    return routeData({
-      error: `Choose at least ${formatCredits(MIN_CREDITS)} credits (${formatCurrency(MIN_PURCHASE_CAD)} minimum).`,
-    }, { status: 400 });
-  }
-
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select("stripe_id")
-    .eq("id", workspaceId)
-    .single();
-
-  if (workspaceError) {
-    return routeData({ error: "We could not load billing for this workspace." }, { status: 400 });
-  }
-
-  let stripeCustomerId = workspace?.stripe_id ?? null;
-
-  if (!stripeCustomerId) {
-    try {
-      const customer = await createStripeContact({
-        supabaseClient,
-        workspace_id: workspaceId,
-      });
-      stripeCustomerId = customer.id;
-
-      await supabaseClient
-        .from("workspace")
-        .update({ stripe_id: stripeCustomerId })
-        .eq("id", workspaceId);
-    } catch {
-      return routeData(
-        {
-          error:
-            "Billing is not ready for this workspace yet. Please try again in a moment or contact support.",
-        },
-        { status: 400 },
-      );
-    }
-  }
-
-  try {
-    const baseUrl = new URL(request.url).origin;
-    const stripe = new Stripe(env.STRIPE_SECRET_KEY());
-    const priceInCents = Math.round(amount * CREDIT_PRICE_CAD * 100);
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price_data: {
-            currency: "cad",
-            product_data: {
-              name: "Workspace credits",
-              description: `${formatCredits(amount)} credits for your workspace`,
-            },
-            unit_amount: priceInCents,
-            tax_behavior: "exclusive",
-          },
-          quantity: 1,
-        },
-      ],
-      mode: "payment",
-      success_url: `${baseUrl}/confirm-payment?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/workspaces/${workspaceId}/billing?payment_status=canceled`,
-      metadata: {
-        workspaceId,
-        creditAmount: amount,
-      },
-    });
-
-    return redirect(session.url!);
-  } catch {
-    return routeData(
-      {
-        error: "We could not open Stripe Checkout right now. Please try again.",
-      },
-      { status: 400 },
-    );
-  }
-}
+type LoaderData = {
+  credits: {
+    balance: number;
+    history: TransactionRow[];
+  };
+};
 
 export default function Credits() {
-  const { credits } = useLoaderData();
+  const { credits } = useLoaderData<LoaderData>();
   const [searchParams] = useSearchParams();
   const navigation = useNavigation();
-  const [selectedAmount, setSelectedAmount] = useState<number>(1667);
+  const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isCustom, setIsCustom] = useState(false);
   const actionData = useActionData();
@@ -165,12 +56,12 @@ export default function Credits() {
   const selectedCredits = isCustom ? Number(customAmount || "0") : selectedAmount;
   const estimatedCost = selectedCredits > 0 ? selectedCredits * CREDIT_PRICE_CAD : 0;
   const creditPackages = [
-    { amount: 1667, price: 5 },
-    { amount: 5000, price: 15 },
-    { amount: 8333, price: 25 },
-    { amount: 16667, price: 50 },
-    { amount: 33333, price: 100 },
-    { amount: 66667, price: 200 },
+    { amount: 500, price: 10 },
+    { amount: 1250, price: 25 },
+    { amount: 2500, price: 50 },
+    { amount: 5000, price: 100 },
+    { amount: 12500, price: 250 },
+    { amount: 25000, price: 500 },
   ];
   return (
     <div className="container mx-auto p-6">
@@ -202,17 +93,16 @@ export default function Credits() {
             </div>
           </div>
           <div className="text-sm text-gray-500 flex flex-col gap-2 max-w-xs">
+            <div>SMS: 1 credit per segment ($0.02)</div>
             <div>
-              SMS Rates: 1 credit per inbound/outbound SMS
+              IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits per
+              additional minute ($0.06)
             </div>
             <div>
-              Voice Rates: 2 credits per outbound voice call attempt.
-              2 credits per minute of inbound voice call (after the first minute).
+              Live staffed calls: 4 credits per dial ($0.08), then 5 credits per
+              additional minute ($0.10)
             </div>
-            <div>
-              Interactive Voice Response (IVR) Rates: 1 credit per IVR attempt.
-              1 credit per minute of IVR (after the first minute).
-            </div>
+            <div>Phone numbers: 100 credits per month ($2.00)</div>
           </div>
         </div>
       </Card>
@@ -301,35 +191,61 @@ export default function Credits() {
         </Form>
       </Card>
 
-      {/* Credit History */}
+      {/* Credit Usage Log */}
       <Card className="p-6">
-        <h2 className="mb-4 text-xl font-semibold">Credit History</h2>
+        <h2 className="mb-4 text-xl font-semibold">Credit Usage Log</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
                 <th className="pb-2 text-left">Date</th>
+                <th className="pb-2 text-left">Source</th>
                 <th className="pb-2 text-left">Description</th>
+                <th className="pb-2 text-left">Idempotency key</th>
                 <th className="pb-2 text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
-              {credits.history.map((transaction) => (
-                <tr key={transaction.id} className="border-b">
-                  <td className="py-2">{new Date(transaction.created_at).toLocaleDateString()}</td>
-                  <td className="py-2 px-2 max-w-xs text-xs">
-                    {getTransactionDisplayDescription({
-                      type: transaction.type as TransactionType,
-                      amount: transaction.amount,
-                      note: "note" in transaction && typeof transaction.note === "string" ? transaction.note : null,
-                    })}
-                  </td>
-                  <td className={`py-2 text-right ${transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
-                    }`}>
-                    {transaction.amount}
-                  </td>
-                </tr>
-              ))}
+              {credits.history.map((transaction: TransactionRow) => {
+                const source = getBillingEventSource({
+                  type: transaction.type as TransactionType,
+                  idempotencyKey:
+                    "idempotency_key" in transaction &&
+                    typeof transaction.idempotency_key === "string"
+                      ? transaction.idempotency_key
+                      : null,
+                });
+                return (
+                  <tr key={transaction.id} className="border-b">
+                    <td className="py-2 whitespace-nowrap">
+                      {new Date(transaction.created_at).toLocaleString()}
+                    </td>
+                    <td className="py-2">{getBillingEventSourceLabel(source)}</td>
+                    <td className="py-2 px-2 max-w-xs text-xs">
+                      {getTransactionDisplayDescription({
+                        type: transaction.type as TransactionType,
+                        amount: transaction.amount,
+                        note:
+                          "note" in transaction && typeof transaction.note === "string"
+                            ? transaction.note
+                            : null,
+                      })}
+                    </td>
+                    <td className="py-2 font-mono text-xs text-muted-foreground">
+                      {typeof transaction.idempotency_key === "string"
+                        ? transaction.idempotency_key
+                        : "—"}
+                    </td>
+                    <td
+                      className={`py-2 text-right ${
+                        transaction.type === "CREDIT" ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {transaction.amount}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -1,240 +1,40 @@
-// @ts-nocheck
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, useLoaderData, useOutletContext, useSubmit } from "react-router";
-import { FaPlus } from "react-icons/fa";
-
-import { useState, useEffect, useCallback } from "react";
-
-import { deepEqual } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useState } from "react";
+import { useLoaderData, useOutletContext, useSubmit } from "react-router";
 
 import ContactDetails from "@/components/contact/ContactDetails";
-import type { Session, SupabaseClient } from "@supabase/supabase-js";
-import type { Audience, Contact, WorkspaceData, User } from "@/lib/types";
-import type { MemberRole } from "@/components/workspace/TeamMember";
-import { logger } from "@/lib/logger.server";
+import { Button } from "@/components/ui/button";
+import type { Contact } from "@/lib/types";
 
+import type { ContactIdLoaderData } from "./$contactId.loader.server";
+
+export { loader } from "./$contactId.loader.server";
+export { action } from "./$contactId.action.server";
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
-export interface LoaderData {
-  workspace: WorkspaceData;
-  workspace_id: string;
-  selected_id: string;
-  contact: Contact | null;
-  userRole: MemberRole;
-  audiences: Audience[];
-}
-
-export interface ContactFormData {
-  id?: number;
-  firstname?: string;
-  surname?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  city?: string;
-  province?: string;
-  postal?: string;
-  country?: string;
-  external_id?: string;
-  workspace: string;
-}
-
-export interface ContactScreenState {
-  isDirty: boolean;
-  isSaving: boolean;
-  hasChanges: boolean;
-}
-
-export const loader = async ({
-  request,
-  params,
-}: LoaderFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { getUserRole, requireWorkspaceAccess } = await import("@/lib/database.server");
-
-  const { id: workspace_id, contactId: selected_id } = params;
-
-  if (!workspace_id) {
-    return redirect("/workspaces");
-  }
-
-  if (!selected_id) {
-    return redirect(`/workspaces/${workspace_id}`);
-  }
-
-  try {
-    const { supabaseClient, headers, user } = await verifyAuth(request);
-
-    if (!user) {
-      return redirect("/signin");
-    }
-
-    const userRole = await getUserRole({
-      supabaseClient: supabaseClient as SupabaseClient,
-      user: user as unknown as User,
-      workspaceId: workspace_id,
-    });
-
-    if (!userRole?.role) {
-      return redirect(`/workspaces/${workspace_id}`);
-    }
-
-    const { data: workspaceData, error: workspaceError } = await supabaseClient
-      .from("workspace")
-      .select()
-      .eq("id", workspace_id)
-      .single();
-
-    if (workspaceError) {
-      throw workspaceError;
-    }
-
-    let contact: Contact | null = null;
-
-    if (selected_id !== "new") {
-      const { data, error: contactError } = await supabaseClient
-        .from("contact")
-        .select(`*, outreach_attempt(*, campaign(*)), contact_audience(*)`)
-        .eq("id", Number(selected_id) || 0)
-        .filter("outreach_attempt.workspace", "eq", workspace_id)
-        .single();
-
-      if (contactError) {
-        throw contactError;
-      }
-
-      contact = data;
-    } else {
-      contact = null;
-    }
-
-    const { data: audiences, error: audiencesError } = await supabaseClient
-      .from("audience")
-      .select(`*`)
-      .eq("workspace", workspace_id);
-
-    if (audiencesError) {
-      throw audiencesError;
-    }
-
-    return routeData({
-      workspace: workspaceData,
-      workspace_id,
-      selected_id,
-      contact,
-      userRole,
-      audiences: audiences || [],
-    });
-  } catch (error) {
-    logger.error("Error in contact loader:", error);
-    return redirect(`/workspaces/${workspace_id}`);
-  }
-};
-
-export const action = async ({
-  request,
-  params,
-}: ActionFunctionArgs) => {  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { getUserRole, requireWorkspaceAccess } = await import("@/lib/database.server");
-
-  const { id: workspace_id, contactId: selected_id } = params;
-
-  if (!workspace_id || !selected_id) {
-    return routeData({ error: "Missing required parameters" }, { status: 400 });
-  }
-
-  try {
-    const { supabaseClient, headers, user } = await verifyAuth(request);
-
-    if (!user) {
-      return redirect("/signin");
-    }
-
-    await requireWorkspaceAccess({
-      supabaseClient,
-      user: { id: user.id },
-      workspaceId: workspace_id,
-    });
-
-    const formData = await request.formData();
-    const contactData: ContactFormData = {
-      id: formData.get("id") ? Number(formData.get("id")) : undefined,
-      firstname: (formData.get("firstname") as string) || undefined,
-      surname: (formData.get("surname") as string) || undefined,
-      phone: (formData.get("phone") as string) || undefined,
-      email: (formData.get("email") as string) || undefined,
-      address: (formData.get("address") as string) || undefined,
-      city: (formData.get("city") as string) || undefined,
-      province: (formData.get("province") as string) || undefined,
-      postal: (formData.get("postal") as string) || undefined,
-      country: (formData.get("country") as string) || undefined,
-      external_id: (formData.get("external_id") as string) || undefined,
-      workspace: workspace_id,
-    };
-
-    if (selected_id === "new") {
-      // Create new contact
-      const { data: newContact, error: createError } = await supabaseClient
-        .from("contact")
-        .insert(contactData)
-        .select()
-        .single();
-
-      if (createError) {
-        throw createError;
-      }
-
-      return routeData({ success: true, contact: newContact });
-    } else {
-      // Update existing contact
-      const { data: updatedContact, error: updateError } = await supabaseClient
-        .from("contact")
-        .update(contactData)
-        .eq("id", Number(selected_id))
-        .select()
-        .single();
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      return routeData({ success: true, contact: updatedContact });
-    }
-  } catch (error) {
-    logger.error("Error in contact action:", error);
-    return routeData({ error: "Failed to save contact" }, { status: 500 });
-  }
-};
-
-export default function ContactScreen(): JSX.Element {
-  const { contact, workspace_id, selected_id, userRole, audiences } =
-    useLoaderData<LoaderData>();
+export default function ContactScreen() {
+  const { contact, selected_id, userRole, audiences } =
+    useLoaderData<ContactIdLoaderData>();
   const { setContact } = useOutletContext<{
     setContact: (contact: Contact) => void;
   }>();
   const submit = useSubmit();
 
-  const [isDirty, setIsDirty] = useState<boolean>(false);
-  const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const handleSave = useCallback((): void => {
     try {
       setIsSaving(true);
       submit({}, { method: "post" });
     } catch (error) {
-      logger.error("Error saving contact:", error);
+      console.error("Error saving contact:", error);
     } finally {
       setIsSaving(false);
     }
   }, [submit]);
 
   const handleReset = useCallback((): void => {
-    try {
-      setIsDirty(false);
-      setHasChanges(false);
-    } catch (error) {
-      logger.error("Error resetting contact:", error);
-    }
+    setHasChanges(false);
   }, []);
 
   useEffect(() => {
@@ -271,7 +71,6 @@ export default function ContactScreen(): JSX.Element {
         contact={contact ?? undefined}
         audiences={audiences}
         userRole={userRole}
-        onDirtyChange={setIsDirty}
         onChangesChange={setHasChanges}
       />
     </div>

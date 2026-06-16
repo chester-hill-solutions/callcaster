@@ -1,10 +1,9 @@
-// @ts-nocheck
-
+export { loader } from "./signin.loader.server";
+export { action } from "./signin.action.server";
 
 import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
@@ -13,52 +12,17 @@ import { Input } from "@/components/ui/input";
 
 import { Text } from "@/components/ui/typography";
 
-export const action = async ({ request }: ActionFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
 
-  const { supabaseClient, headers } = createSupabaseServerClient(request);
-  const requestUrl = new URL(request.url);
-  const next = requestUrl.searchParams.get('next');
 
-  const formData = await request.formData();
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: email,
-    password: password,
-  });
-
-  if (!error) {
-    if (next && next.startsWith('/') && !next.startsWith('/signin')) {
-      return redirect(next, {headers});
-    }
-    return redirect("/workspaces", { headers });
-  }
-  logger.error("Sign-in error", error);
-  return routeData({ error: error.message });
-};
-
-export const loader = async ({ request }: LoaderFunctionArgs) => {  const { logger } = await import("@/lib/logger.server");
-  const { createSupabaseServerClient, verifyAuth } = await import("@/lib/supabase.server");
-
-  const {supabaseClient, headers} = createSupabaseServerClient(request);
-  const { data: { user } } = await supabaseClient.auth.getUser();
-
-  if (user) {
-    return redirect("/workspaces", { headers });
-  }
-  return routeData({ user }, { headers });
-};
 
 export default function SignIn() {
   const actionData = useActionData();
 
-  useEffect(() => {
-    if (actionData?.error != null) {
-      toast.error(actionData.error, { duration: 4000 });
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: () => false,
+  });
 
   return (
     <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">

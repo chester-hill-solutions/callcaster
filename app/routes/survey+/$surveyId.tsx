@@ -1,8 +1,7 @@
-// @ts-nocheck
+export { loader } from "./$surveyId.loader.server";
 
-
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useLoaderData, useFetcher } from "react-router";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,96 +36,6 @@ type ExistingAnswerRow = {
 
 function safeString(value: string | string[]): string {
   return Array.isArray(value) ? JSON.stringify(value) : value;
-}
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { createSupabaseServerClient } = await import("@/lib/supabase.server");
-
-  const { surveyId } = params;
-  const url = new URL(request.url);
-  const contactId = url.searchParams.get('contact');
-
-  if (!surveyId) {
-    throw new Response("Survey ID is required", { status: 400 });
-  }
-
-  const { supabaseClient } = createSupabaseServerClient(request);
-
-  // Get survey with pages and questions
-  const { data: survey, error: surveyError } = await supabaseClient
-    .from("survey")
-    .select(`
-      *,
-      survey_page(
-        *,
-        survey_question(
-          *,
-          question_option(*)
-        )
-      )
-    `)
-    .eq("survey_id", surveyId)
-    .eq("is_active", true)
-    .single();
-
-  if (surveyError || !survey) {
-    throw new Response("Survey not found or inactive", { status: 404 });
-  }
-
-  // Get contact information if contactId is provided
-  let contact = null;
-  if (contactId) {
-    const { data: contactData, error: contactError } = await supabaseClient
-      .from("contact")
-      .select("*")
-      .eq("id", parseInt(contactId))
-      .single();
-    
-    if (!contactError && contactData) {
-      contact = contactData;
-    }
-  }
-
-  // Generate a unique result ID
-  const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-  // Check for existing survey response
-  let existingResponse = null;
-  let existingAnswers = {};
-  
-  if (contact?.id) {
-    const { data: response, error: responseError } = await supabaseClient
-      .from("survey_response")
-      .select(`
-        *,
-        response_answer(
-          *,
-          survey_question(question_id)
-        )
-      `)
-      .eq("survey_id", survey.id)
-      .eq("contact_id", contact.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!responseError && response) {
-      existingResponse = response;
-      // Convert answers to the format expected by the component
-      existingAnswers = (response.response_answer as ExistingAnswerRow[] | undefined)?.reduce((acc: Record<string, string | string[]>, answer) => {
-        const questionId = answer.survey_question.question_id.toString();
-        acc[questionId] = answer.answer_value as string | string[];
-        return acc;
-      }, {}) || {};
-    }
-  }
-
-  return routeData({
-    survey,
-    resultId: existingResponse?.result_id || resultId,
-    contact,
-    existingResponse,
-    existingAnswers,
-  });
 }
 
 export default function SurveyPage() {
@@ -182,7 +91,7 @@ export default function SurveyPage() {
     }
 
     // Use debounced save for text fields, immediate save for others
-    const currentQuestion = currentPage.survey_question?.find((q) => q.question_id === questionId);
+    const currentQuestion = currentPage.survey_question?.find((q: LoaderQuestion) => q.question_id === questionId);
     const isTextField = currentQuestion?.question_type === "text" || currentQuestion?.question_type === "textarea";
     
     debouncedSave(questionId, value);
@@ -465,7 +374,7 @@ export default function SurveyPage() {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
-          {currentPage.survey_question?.map((question) => (
+          {currentPage.survey_question?.map((question: LoaderQuestion) => (
             <div key={question.id} className="space-y-4">
               {renderQuestion(question)}
             </div>

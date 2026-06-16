@@ -126,7 +126,7 @@ export async function sendOutboundSmsWebhookIfConfigured(args: {
   supabase: { from: (table: string) => any };
   workspaceId: string;
   message: OutboundSmsWebhookMessage;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }) {
   const fetchImpl = args.fetchImpl ?? fetch;
   const { data: webhook, error: webhookError } = await args.supabase

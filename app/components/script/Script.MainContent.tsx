@@ -22,7 +22,7 @@ type MainContentProps = {
   openBlock: string | null;
   setOpenBlock: (blockId: string | null) => void;
   handleTitle: (event: React.ChangeEvent<HTMLInputElement>) => void;
-  changeType: (newType: "script" | "ivr") => void;
+  changeType: (newType: "script" | "ivr" | "inbound_ivr") => void;
   handleSectionNameChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   removeSection: (id: string) => void;
   removeBlock: (id: string) => void;
@@ -57,9 +57,9 @@ export default function ScriptMainContent({
   addBlock,
 }: MainContentProps) {
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
-  const [pendingType, setPendingType] = useState<"script" | "ivr" | null>(null);
+  const [pendingType, setPendingType] = useState<"script" | "ivr" | "inbound_ivr" | null>(null);
 
-  const currentType = script?.type === "script" ? "script" : "ivr";
+  const currentType = script?.type === "inbound_ivr" ? "inbound_ivr" : script?.type === "script" ? "script" : "ivr";
 
   const requestTypeChange = (nextType: "script" | "ivr") => {
     if (nextType === currentType) {
@@ -109,7 +109,11 @@ export default function ScriptMainContent({
             htmlFor="campaign-type"
             label="Script Type"
             description={
-              script?.type === "script" ? "Live Script" : "Recording/Synthetic"
+              script?.type === "script"
+                ? "Live Script"
+                : script?.type === "inbound_ivr"
+                  ? "Inbound IVR Menu"
+                  : "Recording/Synthetic"
             }
             className="gap-3"
           >
@@ -212,7 +216,7 @@ export default function ScriptMainContent({
               return (
                 <MergedQuestionBlock
                   key={blockId}
-                  type={script.type === "ivr" ? "ivr" : "script"}
+                  type={script.type === "inbound_ivr" ? "inbound_ivr" : script.type === "ivr" ? "ivr" : "script"}
                   pages={scriptData.pages}
                   blocks={scriptData.blocks}
                   block={block}

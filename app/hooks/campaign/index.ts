@@ -1,3 +1,1 @@
-export { useCampaignSettings, type CampaignUIState, type CampaignSettingsData } from './useCampaignSettings';
-export { useScriptState } from './useScriptState';
-
+// Campaign-specific hooks live next to route modules or in useCampaignDraftState when extracted.

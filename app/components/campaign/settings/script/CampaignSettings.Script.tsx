@@ -1,8 +1,13 @@
 import React, { useState, useCallback } from "react";
-import { Block, Flow, IVRBlock, Script } from "@/lib/types";
+import { Block, IVRBlock, Script } from "@/lib/types";
 import Sidebar from "@/components/script/Script.Sidebar";
 import ScriptMainContent from "@/components/script/Script.MainContent";
-import { isObject, isString } from "@/lib/type-utils";
+import {
+  createDefaultBlock,
+  getDefaultSectionTitle,
+  normalizeFlow,
+  type ScriptData,
+} from "@/components/campaign/settings/script/CampaignSettings.Script.flow";
 
 type PageData = {
   campaignDetails: {
@@ -17,85 +22,6 @@ type ScriptPageProps = {
   scripts: Script[];
   mediaNames: string[];
 };
-
-type ScriptData = Flow;
-
-const DEFAULT_SECTION_TITLES = ["Start Here", "Main Questions", "Wrap Up"];
-
-function getDefaultSectionTitle(sectionNumber: number): string {
-  return (
-    DEFAULT_SECTION_TITLES[sectionNumber - 1] ?? `Section ${sectionNumber}`
-  );
-}
-
-function getFlowType(script: Script): Flow["type"] {
-  return script.type === "ivr" ? "ivr" : "script";
-}
-
-function createEmptyFlow(type: Flow["type"]): Flow {
-  return {
-    type,
-    pages: {},
-    blocks: {},
-    startPage: "",
-  };
-}
-
-function createDefaultBlock(
-  id: string,
-  flowType: Flow["type"],
-  options?: {
-    isFirstInSection?: boolean;
-    sectionTitle?: string;
-  },
-): Block | IVRBlock {
-  const isFirstInSection = options?.isFirstInSection ?? false;
-  const sectionTitle = options?.sectionTitle?.trim() || "this section";
-
-  const baseBlock: Block = {
-    id,
-    type: "textarea",
-    title: isFirstInSection ? `Open ${sectionTitle}` : "",
-    content: isFirstInSection
-      ? "Introduce the purpose of this section, then ask the first question."
-      : "",
-    options: [],
-  };
-
-  if (flowType === "ivr") {
-    return {
-      ...baseBlock,
-      title: isFirstInSection ? "Welcome Message" : baseBlock.title,
-      audioFile: isFirstInSection
-        ? "Hello, thanks for taking this call. Please listen to the following question."
-        : "",
-      speechType: "synthetic",
-      responseType: isFirstInSection ? "speech" : null,
-    };
-  }
-
-  return baseBlock;
-}
-
-function normalizeFlow(script: Script): Flow {
-  const flowType = getFlowType(script);
-  if (!isObject(script.steps)) {
-    return createEmptyFlow(flowType);
-  }
-
-  const raw = script.steps as Record<string, unknown>;
-  const pages = isObject(raw.pages) ? (raw.pages as Flow["pages"]) : {};
-  const blocks = isObject(raw.blocks) ? (raw.blocks as Flow["blocks"]) : {};
-  const firstPageId = Object.keys(pages)[0] ?? "";
-
-  return {
-    type:
-      raw.type === "ivr" ? "ivr" : raw.type === "script" ? "script" : flowType,
-    pages,
-    blocks,
-    startPage: isString(raw.startPage) ? raw.startPage : firstPageId,
-  };
-}
 
 export default function CampaignSettingsScript({
   pageData,
@@ -175,13 +101,11 @@ export default function CampaignSettingsScript({
       updateScriptData((prevScriptData) => {
         const newScriptData = { ...prevScriptData };
 
-        // Remove block from all pages
         Object.keys(newScriptData.pages).forEach((pageId) => {
           const page = newScriptData.pages[pageId];
           if (page) page.blocks = page.blocks.filter((id) => id !== blockId);
         });
 
-        // Remove block definition
         delete newScriptData.blocks[blockId];
 
         return newScriptData;
@@ -246,7 +170,7 @@ export default function CampaignSettingsScript({
   );
 
   const changeType = useCallback(
-    (newType: "script" | "ivr") => {
+    (newType: "script" | "ivr" | "inbound_ivr") => {
       updateScript((prevScript) => {
         const normalizedFlow = normalizeFlow(prevScript);
         return {
@@ -312,7 +236,7 @@ export default function CampaignSettingsScript({
         setCurrentPage(null);
       }
     },
-    [updateScriptData],
+    [currentPage, updateScriptData],
   );
 
   const handleSectionNameChange = useCallback(

@@ -38,7 +38,16 @@ describe("WorkspaceSettingUtils", () => {
     getWorkspaceUsers.mockResolvedValueOnce({ data: [] });
 
     const invoke = vi.fn();
-    const supabaseClient: any = { functions: { invoke } };
+    const supabaseClient: any = {
+      from: (table: string) => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+      }),
+      functions: { invoke },
+    };
 
     const fd = new FormData();
     fd.set("username", "USER@EXAMPLE.COM ");

@@ -1,4 +1,6 @@
-// @ts-nocheck
+export { loader } from "./settings.loader.server";
+export { action } from "./settings.action.server";
+
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
@@ -12,17 +14,18 @@ import {
   useOutlet,
   useOutletContext,
 } from "react-router";
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
 
 
 
-import { toast } from "sonner";
 import { capitalize } from "@/lib/utils";
 import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Card } from "@/components/shared/CustomCard";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
+import { compareMembersByRole } from "@/lib/workspace-members";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -49,123 +52,6 @@ type WorkspaceNumbers = {
   };
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("No workspace id found!");
-  const userId = user?.id;
-  const {data: workspace, error: workspaceError} = await supabaseClient
-    .from("workspace")
-    .select("name, id, workspace_users(role, user(username, id)), workspace_number(*), audience(*), workspace_invite(*, user(username, id, first_name, last_name)), webhook(*)")
-    .eq("id", workspaceId)
-    .single();
-    
-  if (workspaceError) throw workspaceError;
-  const userRole = workspace.workspace_users.find((user) => user.user?.id === userId)?.role;
-  const users = [] as UserWithRole[];
-  const hasAccess = userRole !== MemberRole.Caller; 
-  const {workspace_users, workspace_number, audience, workspace_invite, webhook, ...rest} = workspace;
-  workspace_users.forEach((user) => {
-    users.push({role: user.role, id: user.user?.id, username: user.user?.username} as UserWithRole);
-  });
-  return routeData(
-      {
-        workspace: rest,
-        userRole,
-        users,
-        activeUserId: userId,
-        phoneNumbers: workspace_number,
-        pendingInvites: workspace_invite,
-        webhook: webhook[0] as WorkspaceWebhook,
-        hasAccess,
-      },
-      { headers },
-    );
-  }
-
-export const action = async ({ request, params }: ActionFunctionArgs) => {  const { handleAddUser, handleDeleteSelf, handleDeleteUser, handleDeleteWorkspace, handleTransferWorkspace, handleUpdateUser, handleUpdateWebhook, removeInvite, testWebhook } = await import("@/lib/workspace-settings/WorkspaceSettingUtils.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-  const { getUserRole, getWorkspacePhoneNumbers, getWorkspaceUsers } = await import("@/lib/database.server");
-
-  const workspaceId = params.id;
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-
-  if (workspaceId == null) {
-    return routeData({ error: "No workspace_id found!" }, { headers });
-  }
-
-  const formData = await request.formData();
-  const formName = formData.get("formName");
-
-  switch (formName) {
-    case "addUser": {
-      return handleAddUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "updateUser": {
-      return handleUpdateUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "deleteUser": {
-      return handleDeleteUser(formData, workspaceId, supabaseClient, headers);
-    }
-    case "deleteSelf": {
-      return handleDeleteSelf(formData, workspaceId, supabaseClient, headers);
-    }
-    case "transferWorkspaceOwnership": {
-      return handleTransferWorkspace(
-        formData,
-        workspaceId,
-        supabaseClient,
-        headers,
-      );
-    }
-    case "deleteWorkspace": {
-      return handleDeleteWorkspace({ workspaceId, supabaseClient, headers });
-    }
-    case "cancelInvite": {
-      return removeInvite({ workspaceId, supabaseClient, formData, headers });
-    }
-    case "updateWebhook": {
-      return handleUpdateWebhook(
-        formData,
-        workspaceId,
-        supabaseClient,
-        headers,
-      );
-    }
-    default: {
-      break;
-    }
-  }
-
-  return routeData(
-    { data: null, error: "Error: Unrecognized action called" },
-    { headers },
-  );
-};
-
-function compareMembersByRole(a: UserWithRole, b: UserWithRole  ) {
-  const memberRoleArray = Object.values(MemberRole);
-
-  const aRole = a.role as MemberRole;
-  const bRole = b.role as MemberRole;
-
-  if (
-    memberRoleArray.indexOf(aRole) <
-    memberRoleArray.indexOf(bRole)
-  )
-    return -1;
-  if (
-    memberRoleArray.indexOf(aRole) >
-    memberRoleArray.indexOf(bRole)
-  )
-    return 1;
-  return 0;
-}
-
 export default function WorkspaceSettings() {
   const outlet = useOutlet();
   const {
@@ -179,9 +65,10 @@ export default function WorkspaceSettings() {
     workspace,
   } = useLoaderData<LoaderData>();
   const workspaceRecord = Array.isArray(workspace) ? workspace[0] : workspace;
-  const { workspace: outletWorkspace } = useOutletContext<{
+  const outletContext = useOutletContext<{
     workspace: WorkspaceData;
   }>();
+  const { workspace: outletWorkspace } = outletContext;
   const actionData = useActionData();
   const canManageWebhook =
     hasAccess &&
@@ -195,15 +82,17 @@ export default function WorkspaceSettings() {
   ) as UserWithRole | undefined;
   users?.sort((a, b) => compareMembersByRole(a, b));
   const formRef = useRef<HTMLFormElement | null>(null);
-  useEffect(() => {
-    if (actionData && actionData?.error) {
-      toast.error(JSON.stringify(actionData.error));
-    }
-    if (actionData && (('data' in actionData && actionData.data) || ('success' in actionData && actionData.success))) {
-      toast.success("Action completed succesfully!");
-      formRef?.current?.reset();
-    }
-  }, [actionData]);
+  useActionFeedback(actionData, {
+    getError: (data) => data?.error,
+    getSuccess: (data) =>
+      Boolean(
+        data &&
+          (("data" in data && data.data) ||
+            ("success" in data && data.success)),
+      ),
+    successMessage: "Action completed successfully!",
+    onSuccess: () => formRef.current?.reset(),
+  });
 
   const addUserTabs = (
     <Form method="POST" className="flex w-full flex-col gap-2" ref={formRef}>
@@ -292,7 +181,7 @@ export default function WorkspaceSettings() {
   );
 
   if (outlet) {
-    return <Outlet />;
+    return <Outlet context={outletContext} />;
   }
 
   return (
@@ -436,9 +325,29 @@ export default function WorkspaceSettings() {
             </div>
           )}
         </Card>
-        {hasAccess && (
-          <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
-        )}
+          {hasAccess && (
+            <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
+              <div className="flex-1">
+                <h3 className="text-center font-Zilla-Slab text-2xl font-bold">
+                  Manage Agent Queues
+                </h3>
+                <p className="p-2 text-center text-muted-foreground">
+                  Configure inbound call routing queues for your agents
+                </p>
+              </div>
+              <Button
+                asChild
+                className="h-full w-full font-Zilla-Slab text-xl font-semibold"
+              >
+                <NavLink to={"./queues"} relative="path">
+                  Manage Queues
+                </NavLink>
+              </Button>
+            </Card>
+          )}
+          {hasAccess && (
+            <ApiKeysSection workspaceId={workspaceRecord?.id ?? ""} hasAccess={hasAccess} />
+          )}
         {hasAccess && <Card bgColor="bg-brand-secondary flex-[40%] flex-col flex">
           <div className="flex-1">
             <h3 className="text-center font-Zilla-Slab text-2xl font-bold">

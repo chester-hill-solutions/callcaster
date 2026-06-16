@@ -11,12 +11,15 @@ export default function ActivateButtons({
   scheduleDisabled,
   isBusy,
   handleScheduleButton,
+  status,
 }: {
   joinDisabled: string | null;
   scheduleDisabled: string | boolean;
   isBusy: boolean;
   handleScheduleButton: () => void;
+  status?: string | null;
 }) {
+  const isScheduled = status === "scheduled";
   return (
     <div className="flex items-end gap-1">
       <TooltipProvider delayDuration={200}>
@@ -25,13 +28,13 @@ export default function ActivateButtons({
             <div className={`flex ${joinDisabled ? "cursor-not-allowed" : ""}`}>
               <Button
                 type="button"
-                disabled={!!scheduleDisabled || isBusy}
+                disabled={!!scheduleDisabled || isBusy || isScheduled}
                 onClick={(e) => {
                   e.preventDefault();
                   handleScheduleButton();
                 }}
               >
-                Schedule Campaign
+                {isScheduled ? "Scheduled" : "Schedule Campaign"}
               </Button>
             </div>
           </TooltipTrigger>

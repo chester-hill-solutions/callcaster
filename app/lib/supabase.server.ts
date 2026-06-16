@@ -1,7 +1,21 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient, parse, serialize } from "@supabase/ssr";
 import { Database } from "./database.types";
 import { redirect } from "react-router";
 import { env } from "./env.server";
+
+let serviceSupabaseClient: SupabaseClient<Database> | null = null;
+
+/** Service-role Supabase client for webhooks and background jobs (one instance per process). */
+export function getServiceSupabase(): SupabaseClient<Database> {
+  if (!serviceSupabaseClient) {
+    serviceSupabaseClient = createClient<Database>(
+      env.SUPABASE_URL(),
+      env.SUPABASE_SERVICE_KEY(),
+    );
+  }
+  return serviceSupabaseClient;
+}
 
 export const createSupabaseServerClient = (request: Request) => {
   const cookies = parse(request.headers.get("Cookie") ?? "");

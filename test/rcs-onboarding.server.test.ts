@@ -7,6 +7,8 @@ import {
 import {
   getWorkspaceRcsBlockingIssues,
   hydrateWorkspaceRcsOnboardingState,
+  hydrateWorkspaceRcsOnboardingStateEnabled,
+  stripDisabledRcsChannel,
   updateWorkspaceRcsOnboarding,
 } from "../app/lib/rcs-onboarding.server";
 
@@ -35,8 +37,36 @@ function makeSupabase(
 }
 
 describe("RCS onboarding helpers", () => {
+  test("stripDisabledRcsChannel removes rcs while workspace onboarding is disabled", () => {
+    expect(stripDisabledRcsChannel(["a2p10dlc", "rcs", "voice_compliance"])).toEqual([
+      "a2p10dlc",
+      "voice_compliance",
+    ]);
+  });
+
+  test("hydrateWorkspaceRcsOnboardingState is a no-op when RCS onboarding is disabled", () => {
+    const input = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedChannels: ["rcs"],
+        rcs: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.rcs,
+          displayName: "Should not change",
+        },
+      },
+    );
+
+    const hydrated = hydrateWorkspaceRcsOnboardingState(input);
+
+    expect(hydrated).toBe(input);
+    expect(hydrated.rcs.displayName).toBe("Should not change");
+    expect(hydrated.messagingService.supportedChannels).toEqual(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService.supportedChannels,
+    );
+  });
+
   test("hydrates the RCS draft from saved business details", () => {
-    const hydrated = hydrateWorkspaceRcsOnboardingState(
+    const hydrated = hydrateWorkspaceRcsOnboardingStateEnabled(
       mergeWorkspaceMessagingOnboardingState(
         DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
         {
@@ -72,7 +102,7 @@ describe("RCS onboarding helpers", () => {
   });
 
   test("reports only the remaining manual RCS submission gaps", () => {
-    const hydrated = hydrateWorkspaceRcsOnboardingState(
+    const hydrated = hydrateWorkspaceRcsOnboardingStateEnabled(
       mergeWorkspaceMessagingOnboardingState(
         DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
         {
@@ -109,7 +139,7 @@ describe("RCS onboarding helpers", () => {
   });
 
   test("hydrate keeps existing status and avoids duplicate supported channels", () => {
-    const hydrated = hydrateWorkspaceRcsOnboardingState(
+    const hydrated = hydrateWorkspaceRcsOnboardingStateEnabled(
       mergeWorkspaceMessagingOnboardingState(
         DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
         {

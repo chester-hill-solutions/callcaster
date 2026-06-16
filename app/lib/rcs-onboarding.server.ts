@@ -12,8 +12,18 @@ import type {
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+import { isRecord } from "@/lib/parse-utils.server";
+
+export const RCS_ONBOARDING_ENABLED = false;
+
+export function isRcsOnboardingEnabled(): boolean {
+  return RCS_ONBOARDING_ENABLED;
+}
+
+export function stripDisabledRcsChannel(
+  channels: WorkspaceOnboardingChannel[],
+): WorkspaceOnboardingChannel[] {
+  return isRcsOnboardingEnabled() ? channels : channels.filter((channel) => channel !== "rcs");
 }
 
 const DEFAULT_RCS_PREREQUISITES = [
@@ -61,7 +71,7 @@ function getDerivedRcsState(
   };
 }
 
-export function hydrateWorkspaceRcsOnboardingState(
+export function hydrateWorkspaceRcsOnboardingStateEnabled(
   onboarding: WorkspaceMessagingOnboardingState,
 ): WorkspaceMessagingOnboardingState {
   const supportedChannels: WorkspaceOnboardingChannel[] =
@@ -88,6 +98,16 @@ export function hydrateWorkspaceRcsOnboardingState(
   });
   nextState.steps = buildOnboardingStepsForState(nextState);
   return nextState;
+}
+
+export function hydrateWorkspaceRcsOnboardingState(
+  onboarding: WorkspaceMessagingOnboardingState,
+): WorkspaceMessagingOnboardingState {
+  if (!isRcsOnboardingEnabled()) {
+    return onboarding;
+  }
+
+  return hydrateWorkspaceRcsOnboardingStateEnabled(onboarding);
 }
 
 export function getWorkspaceRcsBlockingIssues(

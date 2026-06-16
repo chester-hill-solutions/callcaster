@@ -13,10 +13,7 @@ import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
 } from "@/lib/types";
-
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
+import { parseOptionalString } from "@/lib/parse-utils.server";
 
 async function loadWorkspaceTwilioContext(
   supabaseClient: SupabaseClient<Database>,
@@ -117,11 +114,16 @@ export async function provisionWorkspaceA2P({
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  await ensureWorkspaceTwilioBootstrap({
+  const bootstrap = await ensureWorkspaceTwilioBootstrap({
     supabaseClient,
     workspaceId,
     actorUserId,
   });
+  if (bootstrap.outcome === "failed" || !bootstrap.serviceSid) {
+    throw new Error(
+      bootstrap.lastError ?? "Messaging Service must be provisioned before A2P registration.",
+    );
+  }
 
   const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(
     supabaseClient,

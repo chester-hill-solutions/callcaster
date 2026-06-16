@@ -161,7 +161,7 @@ describe("app/routes/api+/token/route.tsx", () => {
   });
 
   test("generateToken returns jwt", async () => {
-    const mod = await import("../app/routes/api+/token");
+    const mod = await import("../app/routes/api+/token.loader.server");
     const jwt = await mod.generateToken({
       twilioAccountSid: "AC2",
       twilioApiKey: "K2",

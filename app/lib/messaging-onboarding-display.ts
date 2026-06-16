@@ -2,6 +2,7 @@ import type {
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
+import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding.server";
 
 export function deriveWorkspaceMessagingReadiness({
   onboarding,
@@ -54,8 +55,11 @@ export function deriveWorkspaceMessagingReadiness({
   }
   if (callerIds.length > 0 && rentedNumbers.length === 0) {
     warnings.push(
-      "Only verified caller IDs are present, so voice readiness remains limited.",
+      "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
     );
+  }
+  if (!workspaceHasFirstNumber(numbers)) {
+    warnings.push("No phone number yet.");
   }
 
   const shouldRedirectToOnboarding = !hasLegacyTraffic && warnings.length > 0;

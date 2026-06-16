@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge,
   resolveTwilioWebhookAuthToken as resolveTwilioWebhookAuthTokenEdge,
@@ -86,8 +86,18 @@ describe("resolveTwilioWebhookAuthToken (app)", () => {
 });
 
 describe("resolveTwilioWebhookAuthToken (Edge)", () => {
+  const denoEnvGet = vi.fn<(key: string) => string | undefined>();
+
+  beforeEach(() => {
+    vi.stubGlobal("Deno", {
+      env: { get: denoEnvGet },
+    });
+  });
+
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+    denoEnvGet.mockReset();
   });
 
   test("returns workspace token when creds present", () => {
@@ -97,14 +107,20 @@ describe("resolveTwilioWebhookAuthToken (Edge)", () => {
   });
 
   test("returns null in production when creds missing", () => {
-    vi.stubEnv("ENVIRONMENT", "production");
-    vi.stubEnv("DENO_DEPLOYMENT_ID", "deploy-1");
+    denoEnvGet.mockImplementation((key) => {
+      if (key === "ENVIRONMENT") return "production";
+      if (key === "DENO_DEPLOYMENT_ID") return "deploy-1";
+      return undefined;
+    });
     expect(resolveTwilioWebhookAuthTokenEdge(null)).toBeNull();
   });
 
   test("falls back to TWILIO_AUTH_TOKEN outside production when creds missing", () => {
-    vi.stubEnv("ENVIRONMENT", "development");
-    vi.stubEnv("TWILIO_AUTH_TOKEN", "main-tok");
+    denoEnvGet.mockImplementation((key) => {
+      if (key === "ENVIRONMENT") return "development";
+      if (key === "TWILIO_AUTH_TOKEN") return "main-tok";
+      return undefined;
+    });
     expect(resolveTwilioWebhookAuthTokenEdge(null)).toBe("main-tok");
   });
 });

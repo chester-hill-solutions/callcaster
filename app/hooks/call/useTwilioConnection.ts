@@ -1,13 +1,12 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
-import { logger } from '@/lib/logger.client';
+import { Device as TwilioDevice } from "@twilio/voice-sdk";
+import { logger } from "@/lib/logger.client";
+import { attachTwilioListener } from "@/lib/twilio/call-listener-utils.client";
 
-// The Voice SDK touches browser globals during module evaluation, so keep this
-// lazy client-only require instead of moving it to the import block.
 const getTwilioSDK = () => {
-  if (typeof window === 'undefined') return null;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  return require('@twilio/voice-sdk');
+  if (typeof window === "undefined") return null;
+  return { Device: TwilioDevice };
 };
 
 export type DeviceOptions = {
@@ -33,22 +32,7 @@ interface UseTwilioConnectionReturn {
 }
 
 /**
- * Hook for managing Twilio device connection and registration
- * 
- * Handles device initialization, registration, and device-level events.
- * Call-related events are handled separately by useCallHandling.
- * 
- * @param options - Configuration options for the connection
- * @returns Device connection state and device instance
- * 
- * @example
- * ```tsx
- * const { device, status, error, isRegistered } = useTwilioConnection({
- *   token: twilioToken,
- *   onIncomingCall: (call) => handleIncomingCall(call),
- *   onStatusChange: (status) => console.log('Status:', status),
- * });
- * ```
+ * Hook for managing Twilio device connection and registration.
  */
 export function useTwilioConnection({
   token,
@@ -60,10 +44,9 @@ export function useTwilioConnection({
   onDeviceBusyChange,
 }: UseTwilioConnectionOptions): UseTwilioConnectionReturn {
   const deviceRef = useRef<Device | null>(null);
-  const [status, setStatus] = useState<string>('disconnected');
+  const [status, setStatus] = useState<string>("disconnected");
   const [error, setError] = useState<Error | null>(null);
 
-  // Keep callback refs so effect only depends on token/deviceOptions and doesn't tear down device when callbacks change
   const onIncomingCallRef = useRef(onIncomingCall);
   const onStatusChangeRef = useRef(onStatusChange);
   const onErrorRef = useRef(onError);
@@ -77,13 +60,13 @@ export function useTwilioConnection({
 
   useEffect(() => {
     if (!token) {
-      logger.error('No token provided');
-      setError(new Error('No token provided'));
-      onErrorRef.current?.(new Error('No token provided'));
+      logger.error("No token provided");
+      setError(new Error("No token provided"));
+      onErrorRef.current?.(new Error("No token provided"));
       return;
     }
 
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const SDK = getTwilioSDK();
     if (!SDK) return;
@@ -92,92 +75,88 @@ export function useTwilioConnection({
     deviceRef.current = device;
 
     const handleRegistered = () => {
-      setStatus('Registered');
-      onStatusChangeRef.current?.('Registered');
+      setStatus("Registered");
+      onStatusChangeRef.current?.("Registered");
       onDeviceBusyChangeRef.current?.(false);
     };
 
     const handleUnregistered = () => {
-      setStatus('Unregistered');
-      onStatusChangeRef.current?.('Unregistered');
+      setStatus("Unregistered");
+      onStatusChangeRef.current?.("Unregistered");
     };
 
     const handleConnecting = () => {
-      setStatus('Connecting');
-      onStatusChangeRef.current?.('Connecting');
+      setStatus("Connecting");
+      onStatusChangeRef.current?.("Connecting");
     };
 
     const handleConnected = () => {
-      setStatus('Connected');
-      onStatusChangeRef.current?.('Connected');
-      onCallStateChangeRef.current?.('connected');
+      setStatus("Connected");
+      onStatusChangeRef.current?.("Connected");
+      onCallStateChangeRef.current?.("connected");
     };
 
     const handleDisconnected = () => {
-      setStatus('Disconnected');
+      setStatus("Disconnected");
       onDeviceBusyChangeRef.current?.(false);
-      logger.debug('Call ended');
+      logger.debug("Call ended");
       device.disconnectAll();
     };
 
     const handleCancel = () => {
-      setStatus('Cancelled');
-      onStatusChangeRef.current?.('Cancelled');
+      setStatus("Cancelled");
+      onStatusChangeRef.current?.("Cancelled");
       onDeviceBusyChangeRef.current?.(false);
     };
 
-    const handleError = (err: Error) => {
-      logger.error('Twilio Device Error:', err);
+    const handleError = (err: unknown) => {
+      const error = err instanceof Error ? err : new Error("Twilio device error");
+      logger.error("Twilio Device Error:", error);
       onDeviceBusyChangeRef.current?.(false);
-      setStatus('Error');
-      setError(err);
-      onErrorRef.current?.(err);
-      onCallStateChangeRef.current?.('failed');
+      setStatus("Error");
+      setError(error);
+      onErrorRef.current?.(error);
+      onCallStateChangeRef.current?.("failed");
     };
 
-    const handleIncoming = (call: Call) => {
-      onIncomingCallRef.current?.(call);
+    const handleIncoming = (call: unknown) => {
+      onIncomingCallRef.current?.(call as Call);
     };
 
-    device.on('registered', handleRegistered);
-    device.on('unregistered', handleUnregistered);
-    device.on('connecting', handleConnecting);
-    device.on('connected', handleConnected);
-    device.on('disconnected', handleDisconnected);
-    device.on('cancel', handleCancel);
-    device.on('error', handleError);
-    device.on('incoming', handleIncoming);
+    const listenerCleanups = [
+      attachTwilioListener(device, "registered", handleRegistered),
+      attachTwilioListener(device, "unregistered", handleUnregistered),
+      attachTwilioListener(device, "connecting", handleConnecting),
+      attachTwilioListener(device, "connected", handleConnected),
+      attachTwilioListener(device, "disconnected", handleDisconnected),
+      attachTwilioListener(device, "cancel", handleCancel),
+      attachTwilioListener(device, "error", handleError),
+      attachTwilioListener(device, "incoming", handleIncoming),
+    ];
 
     device.register().catch((err: Error) => {
-      logger.error('Failed to register device:', err);
+      logger.error("Failed to register device:", err);
       setError(err);
-      setStatus('RegistrationFailed');
+      setStatus("RegistrationFailed");
       onErrorRef.current?.(err);
-      onCallStateChangeRef.current?.('failed');
+      onCallStateChangeRef.current?.("failed");
     });
 
     return () => {
-      if (device.state === 'registered') {
-        device.unregister().catch((err: Error) => logger.error('Error unregistering device:', err));
+      if (device.state === "registered") {
+        device.unregister().catch((err: Error) =>
+          logger.error("Error unregistering device:", err),
+        );
       }
-      device.removeAllListeners('registered');
-      device.removeAllListeners('unregistered');
-      device.removeAllListeners('connecting');
-      device.removeAllListeners('connected');
-      device.removeAllListeners('disconnected');
-      device.removeAllListeners('cancel');
-      device.removeAllListeners('error');
-      device.removeAllListeners('incoming');
+      listenerCleanups.forEach((cleanup) => cleanup());
       deviceRef.current = null;
     };
-    // Only recreate device when token or deviceOptions identity changes
   }, [token, deviceOptions]);
 
   return {
     device: deviceRef.current,
     status,
     error,
-    isRegistered: status === 'Registered' || status === 'Connected',
+    isRegistered: status === "Registered" || status === "Connected",
   };
 }
-

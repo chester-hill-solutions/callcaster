@@ -1,6 +1,7 @@
-// @ts-nocheck
-import { Outlet } from "react-router";
+import { Outlet, useOutletContext } from "react-router";
+import type { ContextType } from "@/lib/types";
 
 export default function WorkspacesLayout() {
-  return <Outlet />;
+  const context = useOutletContext<ContextType>();
+  return <Outlet context={context} />;
 }

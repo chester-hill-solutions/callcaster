@@ -1,7 +1,9 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
+  MdBarChart,
   MdCampaign,
+  MdCall,
   MdChat,
   MdCreditCard,
   MdGraphicEq,
@@ -22,6 +24,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { MemberRole } from "./TeamMember";
+import { workspacePanelHeightClass } from "./workspace-panel-classes";
 
 interface NavItem {
   name: string;
@@ -53,6 +56,8 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { name: "Chats", path: "chats", icon: MdChat },
+  { name: "Calls", path: "calls", icon: MdCall },
+  { name: "Analytics", path: "analytics", icon: MdBarChart },
   { name: "Handset", path: "handset", icon: MdHeadsetMic },
   { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
   { name: "Audio", path: "audios", callerHidden: true, icon: MdGraphicEq },
@@ -252,7 +257,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-        className={`hidden h-[calc(100vh-112px)] min-h-[560px] w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
+        className={`hidden ${workspacePanelHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>

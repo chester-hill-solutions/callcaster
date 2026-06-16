@@ -429,7 +429,10 @@ const handleInitiateCampaign = async (
   }
 };
 
-export async function handleRequest(req: Request): Promise<Response> {
+export async function handleRequest(
+  req: Request,
+  options?: { supabase?: SupabaseClient },
+): Promise<Response> {
   const startTime = Date.now();
   const TIMEOUT_THRESHOLD = 25000; // 25 seconds to leave buffer for response
   
@@ -455,7 +458,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       }
     } = await req.json();
     
-    const supabase = initSupabaseClient();
+    const supabase = options?.supabase ?? initSupabaseClient();
     const now = new Date();
     console.log("Start Time", now);
     console.log("record", record);

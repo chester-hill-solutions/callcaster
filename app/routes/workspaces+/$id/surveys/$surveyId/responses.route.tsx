@@ -1,4 +1,5 @@
-// @ts-nocheck
+export { loader } from "./responses.loader.server";
+
 import { data as routeData, type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
@@ -23,106 +24,10 @@ import {
   Eye,
   Clock,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { downloadBlobPart } from "@/lib/download-blob.client";
 import { Label } from "@/components/ui/label";
 import type { Tables } from "@/lib/database.types";
-
-export async function loader({ request, params }: LoaderFunctionArgs) {  const { getUserRole } = await import("@/lib/database.server");
-  const { logger } = await import("@/lib/logger.server");
-  const { verifyAuth } = await import("@/lib/supabase.server");
-
-  const { supabaseClient, user } = await verifyAuth(request);
-  const { id: workspaceId, surveyId } = params;
-
-  if (!workspaceId || !surveyId) {
-    throw new Response("Workspace ID and Survey ID are required", {
-      status: 400,
-    });
-  }
-
-  // Get user role for this workspace
-  const userRole = await getUserRole({
-    supabaseClient,
-    user: user as unknown as User,
-    workspaceId,
-  });
-
-  if (!userRole) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  // Get survey with questions
-  const { data: survey, error: surveyError } = await supabaseClient
-    .from("survey")
-    .select(
-      `
-      *,
-      survey_page(
-        survey_question(
-          id,
-          question_id,
-          question_text,
-          question_type
-        )
-      )
-    `,
-    )
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (surveyError || !survey) {
-    throw new Response("Survey not found", { status: 404 });
-  }
-
-  // Get all responses with contact info
-  const { data: responses, error: responsesError } = await supabaseClient
-    .from("survey_response")
-    .select(
-      `
-      *,
-      contact(firstname, surname, phone, email),
-      response_answer(
-        *,
-        survey_question(
-          question_id,
-          question_text,
-          question_type,
-          question_option(option_label)
-        )
-      )
-    `,
-    )
-    .eq("survey_id", survey.id)
-    .order("created_at", { ascending: false });
-
-  if (responsesError) {
-    logger.error("Error fetching responses:", responsesError);
-  }
-
-  // Get response statistics
-  const totalResponses = responses?.length || 0;
-  const completedResponses =
-    responses?.filter((r) => r.completed_at)?.length || 0;
-  const inProgressResponses = totalResponses - completedResponses;
-
-  return routeData({
-    survey,
-    responses: responses || [],
-    workspaceId,
-    user,
-    userRole,
-    stats: {
-      total: totalResponses,
-      completed: completedResponses,
-      inProgress: inProgressResponses,
-      completionRate:
-        totalResponses > 0 ? (completedResponses / totalResponses) * 100 : 0,
-    },
-  });
-}
-
-
 
 type SurveyPageWithQuestions = {
   survey_question?: Array<{
@@ -156,21 +61,16 @@ export default function SurveyResponsesPage() {
     useLoaderData();
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponseWithContact | null>(null);
   const exportFetcher = useFetcher();
-
-  useEffect(() => {
-    if (exportFetcher.data && typeof exportFetcher.data === "string") {
-      // Create a blob from the CSV data and trigger download
-      const blob = new Blob([exportFetcher.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+  const handleExport = async () => {
+    await exportFetcher.load("./export");
+    if (typeof exportFetcher.data === "string") {
+      downloadBlobPart({
+        data: exportFetcher.data,
+        filename: `survey-responses-${survey.title}-${new Date().toISOString().split("T")[0]}.csv`,
+        mimeType: "text/csv",
+      });
     }
-  }, [exportFetcher.data, survey.title]);
+  };
 
   const allQuestions =
     (survey as SurveyWithPages).survey_page?.flatMap((page) => page.survey_question || []) ||
@@ -242,7 +142,7 @@ export default function SurveyResponsesPage() {
         <Button 
           variant="outline"
           onClick={() => {
-            exportFetcher.load(`./export`);
+            void handleExport();
           }}
           disabled={exportFetcher.state === "loading"}
         >

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "legacy-sms-dispatcher",
+    "input": { "parallelDispatchEnabled": false, "smsTargetMps": 25 },
+    "expected": { "configuredDispatcherSmsMps": 2 }
+  },
+  {
+    "id": "parallel-sms-dispatcher",
+    "input": { "parallelDispatchEnabled": true, "smsTargetMps": 3 },
+    "expected": { "configuredDispatcherSmsMps": 3 }
+  },
+  {
+    "id": "legacy-voice-dispatcher",
+    "input": { "parallelDispatchEnabled": false, "voiceTargetCps": 10 },
+    "expected": { "configuredDispatcherVoiceCps": 1.4285714285714286 }
+  },
+  {
+    "id": "parallel-voice-dispatcher",
+    "input": { "parallelDispatchEnabled": true, "voiceTargetCps": 5 },
+    "expected": { "configuredDispatcherVoiceCps": 5 }
+  },
+  {
+    "id": "claim-batch-low-rate",
+    "input": { "rate": 0.5, "tickMs": 1000 },
+    "expected": { "claimBatchSize": 1 }
+  },
+  {
+    "id": "claim-batch-at-rate",
+    "input": { "rate": 3, "tickMs": 1000 },
+    "expected": { "claimBatchSize": 3 }
+  },
+  {
+    "id": "claim-batch-capped",
+    "input": { "rate": 25, "tickMs": 1000 },
+    "expected": { "claimBatchSize": 25 }
+  },
+  {
+    "id": "normalize-parallel-explicit-false",
+    "input": { "portalConfig": { "parallelDispatchEnabled": false } },
+    "expected": { "parallelDispatchEnabled": false, "smsTargetMps": 1 }
+  },
+  {
+    "id": "normalize-parallel-explicit-true",
+    "input": { "portalConfig": { "parallelDispatchEnabled": true, "smsSenderClass": "verified_toll_free", "smsTargetMps": 4 } },
+    "expected": { "parallelDispatchEnabled": true, "smsTargetMps": 4 }
+  },
+  {
+    "id": "default-sms-mps-toll-free",
+    "input": { "senderClass": "verified_toll_free" },
+    "expected": { "defaultSmsTargetMps": 3 }
+  },
+  {
+    "id": "default-sms-mps-short-code",
+    "input": { "senderClass": "ca_short_code" },
+    "expected": { "defaultSmsTargetMps": 100 }
+  }
+]

@@ -180,7 +180,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true, actionType: "status" });
+    await expect(res.json()).resolves.toEqual({ success: true, actionType: "status", status: "running" });
     expect(supabaseClient.statusUpdate).toHaveBeenCalled();
   });
 

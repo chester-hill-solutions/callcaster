@@ -1,4 +1,3 @@
-import Twilio from "twilio";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
@@ -9,36 +8,89 @@ import {
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
 import { hydrateWorkspaceRcsOnboardingState } from "@/lib/rcs-onboarding.server";
-import type { TwilioAccountData } from "@/lib/types";
+import type { TwilioAccountData, WorkspaceMessagingOnboardingState } from "@/lib/types";
+import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { presentTwilioError, twilioErrorUserMessage } from "@/lib/twilio-errors";
+import {
+  attachPhoneNumberToMessagingService,
+  createMessagingService,
+  createWorkspaceTwilioClient,
+  listMessagingServicePhoneNumbers,
+  updateMessagingService,
+} from "@/lib/twilio-client.server";
+import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+export type TwilioBootstrapOutcome = "success" | "partial" | "failed";
+
+export type WorkspaceTwilioBootstrapResult = {
+  outcome: TwilioBootstrapOutcome;
+  onboarding: WorkspaceMessagingOnboardingState;
+  serviceSid: string | null;
+  lastError: string | null;
+  createdResources: string[];
+  driftMessages: string[];
+};
+
+import { persistWorkspaceTwilioData as saveWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+function buildBootstrapUrls(callbackBaseUrl: string) {
+  return {
+    callbackBaseUrl,
+    inboundVoiceUrl: `${callbackBaseUrl}/api/inbound`,
+    inboundSmsUrl: `${callbackBaseUrl}/api/inbound-sms`,
+    statusCallbackUrl: `${callbackBaseUrl}/api/caller-id/status`,
+  };
 }
 
-function parseOptionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-async function persistWorkspaceTwilioData({
-  supabaseClient,
+async function configureMessagingServiceInTwilio({
+  twilio,
+  serviceSid,
+  onboarding,
   workspaceId,
-  twilioData,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  twilio: Awaited<ReturnType<typeof createWorkspaceTwilioClient>>;
+  serviceSid: string;
+  onboarding: WorkspaceMessagingOnboardingState;
   workspaceId: string;
-  twilioData: Record<string, unknown>;
 }) {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        twilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
+  const urls = buildBootstrapUrls(
+    onboarding.subaccountBootstrap.callbackBaseUrl ?? env.BASE_URL(),
+  );
 
-  if (error) {
-    throw error;
+  await updateMessagingService(
+    twilio,
+    serviceSid,
+    {
+      friendlyName:
+        onboarding.messagingService.friendlyName ??
+        undefined,
+      statusCallback: urls.statusCallbackUrl,
+      stickySender: onboarding.messagingService.stickySenderEnabled,
+      areaCodeGeomatch: true,
+      useInboundWebhookOnNumber: true,
+      smartEncoding: true,
+    },
+    { workspaceId, operation: "messagingService.update" },
+  );
+}
+
+function resolveBootstrapOutcome(
+  onboarding: WorkspaceMessagingOnboardingState,
+  bootstrapThrew: boolean,
+): TwilioBootstrapOutcome {
+  const sid = onboarding.messagingService.serviceSid;
+  if (bootstrapThrew || onboarding.subaccountBootstrap.status === "rejected") {
+    return "failed";
   }
+  if (!sid) {
+    return onboarding.messagingService.lastError ? "failed" : "partial";
+  }
+  if (
+    onboarding.messagingService.lastError ||
+    onboarding.subaccountBootstrap.driftMessages.length > 0
+  ) {
+    return "partial";
+  }
+  return "success";
 }
 
 export async function ensureWorkspaceTwilioBootstrap({
@@ -49,7 +101,7 @@ export async function ensureWorkspaceTwilioBootstrap({
   supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
-}) {
+}): Promise<WorkspaceTwilioBootstrapResult> {
   const { data: workspace, error } = await supabaseClient
     .from("workspace")
     .select("id, name, twilio_data")
@@ -71,7 +123,11 @@ export async function ensureWorkspaceTwilioBootstrap({
 
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const callbackBaseUrl = env.BASE_URL();
-  const nextOnboardingBase = mergeWorkspaceMessagingOnboardingState(onboarding, {
+  const urls = buildBootstrapUrls(callbackBaseUrl);
+  const createdResources: string[] = [...onboarding.subaccountBootstrap.createdResources];
+  const driftMessages: string[] = [];
+
+  let nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
     currentStep: onboarding.messagingService.serviceSid
       ? onboarding.currentStep
       : "messaging_service",
@@ -80,61 +136,96 @@ export async function ensureWorkspaceTwilioBootstrap({
     subaccountBootstrap: {
       ...onboarding.subaccountBootstrap,
       status: "provisioning",
-      callbackBaseUrl,
-      inboundVoiceUrl: `${callbackBaseUrl}/api/inbound`,
-      inboundSmsUrl: `${callbackBaseUrl}/api/inbound-sms`,
-      statusCallbackUrl: `${callbackBaseUrl}/api/caller-id/status`,
+      ...urls,
       lastError: null,
     },
   });
 
-  const twilio = new Twilio.Twilio(accountSid, authToken);
-  let nextOnboarding = nextOnboardingBase;
+  const twilio = await createWorkspaceTwilioClient({
+    supabase: supabaseClient,
+    workspaceId,
+  });
+
+  let bootstrapThrew = false;
 
   try {
     if (!nextOnboarding.messagingService.serviceSid) {
-      const createdService = await (twilio as any).messaging?.v1?.services?.create?.({
-        friendlyName: `${workspace?.name ?? workspaceId} Messaging`,
-      });
+      const createdService = await createMessagingService(
+        twilio,
+        {
+          friendlyName: `${workspace?.name ?? workspaceId} Messaging`,
+        },
+        { workspaceId, operation: "messagingService.create" },
+      );
+
+      const serviceSid = parseOptionalString(createdService?.sid);
+      if (serviceSid) {
+        createdResources.push(`messaging_service:${serviceSid}`);
+      }
 
       nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
         messagingService: {
           ...nextOnboarding.messagingService,
-          serviceSid: parseOptionalString(createdService?.sid),
+          serviceSid,
           friendlyName:
             parseOptionalString(createdService?.friendlyName) ??
             `${workspace?.name ?? workspaceId} Messaging`,
-          provisioningStatus: createdService?.sid ? "live" : "provisioning",
+          provisioningStatus: serviceSid ? "live" : "provisioning",
           lastProvisionedAt: new Date().toISOString(),
           supportedChannels: ["a2p10dlc"],
-          lastError: createdService?.sid
+          lastError: serviceSid
             ? null
             : "Messaging Service could not be created automatically.",
         },
         subaccountBootstrap: {
           ...nextOnboarding.subaccountBootstrap,
-          createdResources: [
-            ...nextOnboarding.subaccountBootstrap.createdResources,
-            ...(createdService?.sid
-              ? [`messaging_service:${String(createdService.sid)}`]
-              : []),
-          ],
+          createdResources: [...new Set(createdResources)],
         },
       });
     }
 
+    const serviceSid = nextOnboarding.messagingService.serviceSid;
+    if (serviceSid) {
+      try {
+        await configureMessagingServiceInTwilio({
+          twilio,
+          serviceSid,
+          onboarding: nextOnboarding,
+          workspaceId,
+        });
+      } catch (configError) {
+        const userMsg = twilioErrorUserMessage(configError);
+        driftMessages.push(
+          `Messaging Service ${serviceSid} was created but live configuration failed: ${userMsg}`,
+        );
+        logger.error("Messaging Service post-create configuration failed:", configError);
+        nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
+          messagingService: {
+            ...nextOnboarding.messagingService,
+            lastError: userMsg,
+          },
+        });
+      }
+    }
+
     nextOnboarding = hydrateWorkspaceRcsOnboardingState(nextOnboarding);
     nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
-      status: nextOnboarding.messagingService.serviceSid ? "collecting_business" : "provisioning",
+      status: nextOnboarding.messagingService.serviceSid
+        ? "collecting_business"
+        : "provisioning",
       currentStep: nextOnboarding.messagingService.serviceSid
-        ? "business_profile"
+        ? "first_number"
         : "messaging_service",
       steps: buildOnboardingStepsForState(nextOnboarding),
       subaccountBootstrap: {
         ...nextOnboarding.subaccountBootstrap,
         status: nextOnboarding.messagingService.serviceSid ? "live" : "provisioning",
         lastSyncedAt: new Date().toISOString(),
-        lastError: nextOnboarding.messagingService.lastError,
+        lastError:
+          nextOnboarding.messagingService.lastError ??
+          nextOnboarding.subaccountBootstrap.lastError,
+        driftMessages: [...new Set([...nextOnboarding.subaccountBootstrap.driftMessages, ...driftMessages])],
+        createdResources: [...new Set(createdResources)],
       },
       reviewState: {
         ...nextOnboarding.reviewState,
@@ -143,6 +234,9 @@ export async function ensureWorkspaceTwilioBootstrap({
       lastUpdatedBy: actorUserId,
     });
   } catch (bootstrapError) {
+    bootstrapThrew = true;
+    const userMsg = twilioErrorUserMessage(bootstrapError);
+    const adminDetail = presentTwilioError(bootstrapError).adminDetail;
     logger.error("Error bootstrapping workspace Twilio resources:", bootstrapError);
     nextOnboarding = mergeWorkspaceMessagingOnboardingState(nextOnboarding, {
       status: "provisioning",
@@ -151,33 +245,36 @@ export async function ensureWorkspaceTwilioBootstrap({
         ...nextOnboarding.subaccountBootstrap,
         status: "rejected",
         lastSyncedAt: new Date().toISOString(),
-        lastError:
-          bootstrapError instanceof Error
-            ? bootstrapError.message
-            : "Unknown bootstrap failure",
+        lastError: userMsg,
+        driftMessages: [...new Set([...nextOnboarding.subaccountBootstrap.driftMessages, ...driftMessages])],
+        createdResources: [...new Set(createdResources)],
       },
       reviewState: {
         ...nextOnboarding.reviewState,
-        lastError:
-          bootstrapError instanceof Error
-            ? bootstrapError.message
-            : "Unknown bootstrap failure",
+        lastError: adminDetail,
         lastUpdatedAt: new Date().toISOString(),
       },
       lastUpdatedBy: actorUserId,
     });
   }
 
-  await persistWorkspaceTwilioData({
-    supabaseClient,
-    workspaceId,
-    twilioData: {
-      ...currentTwilioData,
-      onboarding: nextOnboarding,
-    },
+  const outcome = resolveBootstrapOutcome(nextOnboarding, bootstrapThrew);
+
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...currentTwilioData,
+    onboarding: nextOnboarding,
   });
 
-  return nextOnboarding;
+  return {
+    outcome,
+    onboarding: nextOnboarding,
+    serviceSid: nextOnboarding.messagingService.serviceSid,
+    lastError:
+      nextOnboarding.subaccountBootstrap.lastError ??
+      nextOnboarding.messagingService.lastError,
+    createdResources: [...new Set(createdResources)],
+    driftMessages: nextOnboarding.subaccountBootstrap.driftMessages,
+  };
 }
 
 export async function syncWorkspaceTwilioBootstrapState({
@@ -199,26 +296,124 @@ export async function syncWorkspaceTwilioBootstrapState({
 
   const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+
+  let driftMessages = onboarding.messagingService.serviceSid
+    ? []
+    : ["Messaging Service is missing from the expected bootstrap resources."];
+
+  try {
+    const audit = await auditWorkspaceTwilioWebhooks({
+      supabaseClient,
+      workspaceId,
+    });
+    driftMessages = [...new Set([...driftMessages, ...audit.driftMessages])];
+  } catch (auditError) {
+    logger.error("Twilio webhook audit failed during sync:", auditError);
+    driftMessages = [
+      ...driftMessages,
+      "Could not compare live Twilio webhook URLs (audit failed).",
+    ];
+  }
+
   const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
     subaccountBootstrap: {
       ...onboarding.subaccountBootstrap,
       lastSyncedAt: new Date().toISOString(),
-      status: onboarding.messagingService.serviceSid ? "live" : onboarding.subaccountBootstrap.status,
-      driftMessages: onboarding.messagingService.serviceSid
-        ? []
-        : ["Messaging Service is missing from the expected bootstrap resources."],
+      status: onboarding.messagingService.serviceSid
+        ? onboarding.subaccountBootstrap.status === "rejected"
+          ? "rejected"
+          : driftMessages.length > 0
+            ? "provisioning"
+            : "live"
+        : onboarding.subaccountBootstrap.status,
+      driftMessages,
     },
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await persistWorkspaceTwilioData({
-    supabaseClient,
-    workspaceId,
-    twilioData: {
-      ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
-      onboarding: nextOnboarding,
-    },
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
+    onboarding: nextOnboarding,
   });
 
   return nextOnboarding;
 }
+
+export async function repairWorkspaceTwilioWebhooks({
+  supabaseClient,
+  workspaceId,
+  actorUserId,
+}: {
+  supabaseClient: SupabaseClient<Database>;
+  workspaceId: string;
+  actorUserId: string | null;
+}) {
+  const { data: workspace, error } = await supabaseClient
+    .from("workspace")
+    .select("twilio_data")
+    .eq("id", workspaceId)
+    .single();
+
+  if (error) throw error;
+
+  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+  const serviceSid = onboarding.messagingService.serviceSid;
+  const baseUrl = env.BASE_URL();
+  const urls = buildBootstrapUrls(baseUrl);
+
+  const twilio = await createWorkspaceTwilioClient({
+    supabase: supabaseClient,
+    workspaceId,
+  });
+
+  const repaired: string[] = [];
+
+  const numbers = await twilio.incomingPhoneNumbers.list({ limit: 200 });
+  for (const number of numbers) {
+    if (!number.sid) continue;
+    await twilio.incomingPhoneNumbers(number.sid).update({
+      voiceUrl: urls.inboundVoiceUrl,
+      smsUrl: urls.inboundSmsUrl,
+      statusCallback: urls.statusCallbackUrl,
+      statusCallbackMethod: "POST",
+    });
+    repaired.push(`number:${number.phoneNumber}`);
+  }
+
+  if (serviceSid) {
+    await configureMessagingServiceInTwilio({
+      twilio,
+      serviceSid,
+      onboarding: mergeWorkspaceMessagingOnboardingState(onboarding, {
+        subaccountBootstrap: { ...onboarding.subaccountBootstrap, ...urls },
+      }),
+      workspaceId,
+    });
+    repaired.push(`messaging_service:${serviceSid}`);
+  }
+
+  const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
+    subaccountBootstrap: {
+      ...onboarding.subaccountBootstrap,
+      ...urls,
+      lastSyncedAt: new Date().toISOString(),
+      driftMessages: [],
+      lastError: null,
+    },
+    lastUpdatedBy: actorUserId,
+  });
+  nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
+
+  await saveWorkspaceTwilioData(supabaseClient, workspaceId, {
+    ...(isRecord(workspace?.twilio_data) ? workspace.twilio_data : {}),
+    onboarding: nextOnboarding,
+  });
+
+  return { repaired, onboarding: nextOnboarding };
+}
+
+export {
+  attachPhoneNumberToMessagingService,
+  listMessagingServicePhoneNumbers,
+};
