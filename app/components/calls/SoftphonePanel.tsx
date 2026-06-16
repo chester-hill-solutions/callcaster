@@ -99,15 +99,15 @@ export function SoftphonePanel({
             speakers={audio.speakers}
             selectedMicId={audio.selectedMicId}
             selectedSpeakerId={audio.selectedSpeakerId}
-            micMuted={audio.micMuted}
+            micMuted={callHandling.isMicMuted}
             speakerMuted={audio.speakerMuted}
-            callOnHold={audio.callOnHold}
+            callOnHold={callHandling.isActiveCallOnLocalHold}
             onMicChange={audio.handleMicChange}
             onSpeakerChange={audio.handleSpeakerChange}
             onMuteMic={audio.handleMuteMic}
             onMuteSpeaker={audio.handleMuteSpeaker}
-            onHold={audio.handleHold}
-            onResume={audio.handleResume}
+            onHold={callHandling.holdActiveCall}
+            onResume={() => callHandling.resumeActiveCall()}
             onHangUp={() => callHandling.hangUp()}
             onKeypadPress={controller.handleKeypadPress}
           />

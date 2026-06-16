@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Call } from "@twilio/voice-sdk";
-
 import { useTwilioConnection } from "@/hooks/call/useTwilioConnection";
 import { useCallHandling } from "@/hooks/call/useCallHandling";
 import {
@@ -22,14 +21,14 @@ export function IncomingCallReceiver({
   handsetNumber,
   onError,
 }: IncomingCallReceiverProps) {
-  const [incomingCallState, setIncomingCallState] = useState<Call | null>(null);
+  const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
   const noop = useCallback(() => {}, []);
   const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
 
   const connection = useTwilioConnection({
     token,
     deviceOptions,
-    onIncomingCall: setIncomingCallState,
+    onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange: noop,
     onError: (error) => onError?.(error.message),
     onDeviceBusyChange: noop,
@@ -38,16 +37,19 @@ export function IncomingCallReceiver({
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
-    incomingCall: incomingCallState,
     onStatusChange: noop,
     onError: (error) => onError?.(error.message),
     onDeviceBusyChange: noop,
   });
 
+  useEffect(() => {
+    receiveIncomingRef.current = callHandling.receiveIncoming;
+  }, [callHandling.receiveIncoming]);
+
   const handleDecline = useCallback(() => {
     declineIncomingCall(callHandling.incomingCall);
-    setIncomingCallState(null);
-  }, [callHandling.incomingCall]);
+    callHandling.clearIncomingCall();
+  }, [callHandling]);
 
   return (
     <div className="rounded-xl border border-border/80 bg-muted/20 p-4">

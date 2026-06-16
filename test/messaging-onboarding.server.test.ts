@@ -11,6 +11,7 @@ import {
   normalizeWorkspaceMessagingOnboardingState,
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
+  WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "../app/lib/messaging-onboarding.server";
 
 function makeSupabase(
@@ -411,6 +412,22 @@ describe("messaging onboarding helpers", () => {
     expect(merged.status).toBe("collecting_business");
     expect(merged.currentStep).toBe("messaging_service");
     expect(merged.businessProfile.legalBusinessName).toBe("");
+  });
+
+  test("normalizes malformed partial onboarding input safely", () => {
+    const state = normalizeWorkspaceMessagingOnboardingState({
+      version: "not-a-number",
+      status: "bogus",
+      businessProfile: { legalBusinessName: 123 },
+      messagingService: null,
+      unknownSection: { foo: "bar" },
+    });
+
+    expect(state.version).toBe(WORKSPACE_MESSAGING_ONBOARDING_VERSION);
+    expect(state.status).toBe("not_started");
+    expect(state.businessProfile.legalBusinessName).toBe("");
+    expect(state.messagingService.desiredSendMode).toBe("messaging_service");
+    expect(state.steps.length).toBeGreaterThan(0);
   });
 
   test("deriveWorkspaceMessagingReadiness warns on incomplete A2P for US businesses", () => {

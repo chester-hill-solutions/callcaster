@@ -3,26 +3,33 @@ import type { Call } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { playTone } from "@/lib/utils";
 import {
+  logTwilioAdapterResult,
   replaceCallInputStream,
   sendCallDigits,
-  setCallMuted,
 } from "@/lib/twilio/twilio-call-adapter.client";
+import type { MicCoordinator } from "@/lib/twilio/call-session-types";
 
 type UseCallAudioControlsOptions = {
   device: import("@twilio/voice-sdk").Device | null;
   activeCall: Call | null;
+  micCoordinator: MicCoordinator;
 };
 
-export function useCallAudioControls({ device, activeCall }: UseCallAudioControlsOptions) {
+export function useCallAudioControls({
+  device,
+  activeCall,
+  micCoordinator,
+}: UseCallAudioControlsOptions) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [microphone, setMicrophone] = useState<string | null>(null);
   const [output, setOutput] = useState<string | null>(null);
-  const [isMicrophoneMuted, setIsMicrophoneMuted] = useState(false);
   const [availableMicrophones, setAvailableMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
+
+  const isMicrophoneMuted = micCoordinator.isMicMuted;
 
   const requestMicrophoneAccess = useCallback(async () => {
     try {
@@ -64,7 +71,7 @@ export function useCallAudioControls({ device, activeCall }: UseCallAudioControl
       const selectedMicrophone = event.target.value;
       const audio = device.audio;
       audio?.setInputDevice(selectedMicrophone).then(() => {
-        setIsMicrophoneMuted(false);
+        micCoordinator.setMicMuted(false);
         setMicrophone(selectedMicrophone);
         logger.debug("Microphone set to", selectedMicrophone);
 
@@ -73,8 +80,11 @@ export function useCallAudioControls({ device, activeCall }: UseCallAudioControl
           .then((newStream) => {
             if (activeCall) {
               replaceCallInputStream(activeCall, newStream)
-                .then(() => {
-                  logger.debug("Active call input tracks updated with new microphone");
+                .then((result) => {
+                  logTwilioAdapterResult(result, "replaceCallInputStream");
+                  if (result.status === "ok") {
+                    logger.debug("Active call input tracks updated with new microphone");
+                  }
                 })
                 .catch((error: unknown) => {
                   logger.error("Error updating active call input tracks:", error);
@@ -88,7 +98,7 @@ export function useCallAudioControls({ device, activeCall }: UseCallAudioControl
         logger.error("Error setting microphone:", error);
       });
     },
-    [device, activeCall],
+    [device, activeCall, micCoordinator],
   );
 
   const handleSpeakerChange = useCallback(
@@ -110,14 +120,10 @@ export function useCallAudioControls({ device, activeCall }: UseCallAudioControl
 
   const handleMuteMicrophone = useCallback(() => {
     if (!device?.audio) return;
-    const newMuteState = !isMicrophoneMuted;
-    setIsMicrophoneMuted(newMuteState);
-    device.audio.incoming(newMuteState);
-    if (activeCall) {
-      logger.debug("Mute active call", newMuteState);
-      setCallMuted(activeCall, newMuteState);
-    }
-  }, [device, activeCall, isMicrophoneMuted]);
+    const newMuteState = !micCoordinator.isMicMuted;
+    micCoordinator.setMicMuted(newMuteState);
+    logger.debug("Mute active call", newMuteState);
+  }, [device, micCoordinator]);
 
   const handleDTMF = useCallback(
     (key: string) => {

@@ -146,40 +146,40 @@ describe("useCallScreen", () => {
     const { result } = renderHook(() => useCallScreen());
 
     expect(result.current.workspaceId).toBe("ws");
-    expect(result.current.creditState).toBe("GOOD");
+    expect(result.current.callControls.creditState).toBe("GOOD");
 
-    act(() => result.current.handleResponse({ blockId: "q1", value: "yes" }));
-    act(() => result.current.handleDialButton());
-    act(() => result.current.handleDequeueNext());
-    act(() => result.current.handleNextNumber(false));
+    act(() => result.current.formState.handleResponse({ blockId: "q1", value: "yes" }));
+    act(() => result.current.callControls.handleDialButton());
+    act(() => result.current.callControls.handleDequeueNext());
+    act(() => result.current.queueControls.handleNextNumber(false));
     await act(async () => {
-      await result.current.handleConferenceEnd({
-        activeCall: result.current.activeCall,
-        setConference: () => result.current.setConference(false),
+      await result.current.callControls.handleConferenceEnd({
+        activeCall: result.current.callControls.activeCall,
+        setConference: () => result.current.callControls.setConference(false),
         workspaceId: result.current.workspaceId,
       });
     });
-    act(() => result.current.requeueContacts());
-    act(() => result.current.handleVoiceDrop());
-    act(() => result.current.handleDTMF("5"));
+    act(() => result.current.queueControls.requeueContacts());
+    act(() => result.current.callControls.handleVoiceDrop());
+    act(() => result.current.audioControls.handleDTMF("5"));
 
     act(() => {
-      result.current.handleMicrophoneChange({
+      result.current.audioControls.handleMicrophoneChange({
         target: { value: "mic1" },
       } as React.ChangeEvent<HTMLSelectElement>);
     });
     act(() => {
-      result.current.handleSpeakerChange({
+      result.current.audioControls.handleSpeakerChange({
         target: { value: "spk1" },
       } as React.ChangeEvent<HTMLSelectElement>);
     });
-    act(() => result.current.handleMuteMicrophone());
+    act(() => result.current.audioControls.handleMuteMicrophone());
 
     act(() => {
-      result.current.setNewPhoneNumber("+15551112222");
-      result.current.handleVerifyNewNumber();
+      result.current.phoneVerification.setNewPhoneNumber("+15551112222");
+      result.current.phoneVerification.handleVerifyNewNumber();
     });
-    act(() => result.current.setSelectedDevice("+15559998888"));
+    act(() => result.current.phoneVerification.setSelectedDevice("+15559998888"));
 
     window.dispatchEvent(new KeyboardEvent("keypress", { key: "3" }));
   });

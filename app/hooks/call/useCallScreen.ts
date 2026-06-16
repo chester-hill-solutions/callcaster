@@ -23,11 +23,13 @@ import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
 import { usePhoneVerification } from "@/hooks/call/usePhoneVerification";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
 import { useCampaignQueueFlow } from "@/hooks/call/useCampaignQueueFlow";
+import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
 import {
-  buildHandleDequeueNext,
-  buildHandleDialButton,
-  useCampaignCallFlow,
-} from "@/hooks/call/useCampaignCallFlow";
+  useCampaignDequeueActions,
+  useCampaignDialActions,
+} from "@/hooks/call/useCampaignDialActions";
+import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
+import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
 import { getCallSid } from "@/lib/twilio/twilio-call-adapter.client";
 import type {
   AppUser,
@@ -89,6 +91,8 @@ export function useCallScreen() {
     status: deviceStatus,
     activeCall,
     incomingCall,
+    isMicMuted,
+    setMicMuted,
     hangUp,
     answer,
     holdAndAnswer,
@@ -103,7 +107,11 @@ export function useCallScreen() {
     send as unknown as (action: { type: string }) => void,
   );
 
-  const audioControls = useCallAudioControls({ device, activeCall });
+  const audioControls = useCallAudioControls({
+    device,
+    activeCall,
+    micCoordinator: { isMicMuted, setMicMuted },
+  });
 
   const {
     status: liveStatus,
@@ -223,64 +231,34 @@ export function useCallScreen() {
     [],
   );
 
-  const handleDialButton = useCallback(
-    buildHandleDialButton({
-      campaign,
-      deviceIsBusy,
-      incomingCall,
-      deviceStatus,
-      begin,
-      startCall,
-      nextRecipient,
-      user,
-      workspaceId,
-      recentAttempt,
-      selectedDevice: phoneVerification.selectedDevice,
-    }),
-    [
-      campaign,
-      deviceIsBusy,
-      incomingCall,
-      deviceStatus,
-      begin,
-      startCall,
-      nextRecipient,
-      user,
-      workspaceId,
-      recentAttempt,
-      phoneVerification.selectedDevice,
-    ],
-  );
+  const handleDialButton = useCampaignDialActions({
+    campaign,
+    deviceIsBusy,
+    incomingCall,
+    deviceStatus,
+    begin,
+    startCall,
+    nextRecipient,
+    user,
+    workspaceId,
+    recentAttempt,
+    selectedDevice: phoneVerification.selectedDevice,
+  });
 
-  const handleDequeueNext = useCallback(
-    buildHandleDequeueNext({
-      campaign,
-      nextRecipient,
-      send: send as unknown as (action: { type: string }) => void,
-      setCallDuration,
-      handleDialButton,
-      saveData,
-      dequeue: queueFlow.dequeue,
-      fetchMore: queueFlow.fetchMore,
-      householdMap,
-      handleNextNumber: queueFlow.handleNextNumber,
-      setRecentAttempt,
-      setUpdate,
-    }),
-    [
-      campaign,
-      nextRecipient,
-      send,
-      setCallDuration,
-      handleDialButton,
-      saveData,
-      queueFlow.dequeue,
-      queueFlow.fetchMore,
-      householdMap,
-      queueFlow.handleNextNumber,
-      setRecentAttempt,
-    ],
-  );
+  const handleDequeueNext = useCampaignDequeueActions({
+    campaign,
+    nextRecipient,
+    send: send as unknown as (action: { type: string }) => void,
+    setCallDuration,
+    handleDialButton,
+    saveData,
+    dequeue: queueFlow.dequeue,
+    fetchMore: queueFlow.fetchMore,
+    householdMap,
+    handleNextNumber: queueFlow.handleNextNumber,
+    setRecentAttempt,
+    setUpdate,
+  });
 
   const handleVoiceDrop = () => {
     const sid = getCallSid(activeCall);
@@ -323,54 +301,21 @@ export function useCallScreen() {
     return () => window.removeEventListener("keypress", handleKeypress);
   }, [activeCall, audioControls.handleDTMF]);
 
-  useEffect(() => {
-    if (nextRecipient) {
-      setQuestionContact(nextRecipient);
-      send({ type: "NEXT" });
-      setCallDuration(0);
-    }
-  }, [nextRecipient, send, setCallDuration]);
+  useNextRecipientSync({
+    nextRecipient,
+    send: send as unknown as (action: { type: string }) => void,
+    setQuestionContact,
+    setCallDuration,
+  });
 
-  useEffect(() => {
-    if (predictiveState.contact_id && predictiveState.status) {
-      const contact = queue.find(
-        (c) => c.contact_id === predictiveState.contact_id,
-      );
-      if (contact) setNextRecipient(contact);
-
-      switch (predictiveState.status) {
-        case "dialing":
-          send({ type: "START_DIALING" });
-          break;
-        case "connected":
-          send({ type: "CONNECT" });
-          break;
-        case "completed":
-        case "failed":
-        case "no-answer":
-          send({ type: "HANG_UP" });
-          break;
-        default:
-          send({ type: "NEXT" });
-      }
-    }
-    if (!predictiveState.contact_id && predictiveState.status === "dialing") {
-      setUpdate(null);
-    }
-    if (
-      predictiveState.contact_id !== nextRecipient?.contact_id &&
-      predictiveState.status === "dialing"
-    ) {
-      setUpdate(null);
-    }
-  }, [
+  usePredictiveCallSync({
     predictiveState,
-    contacts,
-    send,
     queue,
+    nextRecipient,
+    send: send as unknown as (action: { type: string }) => void,
     setNextRecipient,
-    nextRecipient?.contact_id,
-  ]);
+    setUpdate,
+  });
 
   useEffect(() => {
     if (phoneVerification.selectedDevice !== "computer") {
@@ -395,6 +340,74 @@ export function useCallScreen() {
       availableCredits > 0 && availableCredits < queue.length ? "WARNING" :
         "BAD";
 
+  const callControls = {
+    hangUp,
+    answer,
+    holdAndAnswer,
+    incomingCall,
+    activeCall,
+    callState,
+    callDuration,
+    deviceIsBusy,
+    handleDialButton,
+    handleDequeueNext,
+    handleVoiceDrop,
+    handleConferenceEnd,
+    displayState,
+    displayColor,
+    conference,
+    setConference,
+    disposition,
+    setDisposition,
+    recentCall,
+    recentAttempt,
+    availableCredits,
+    creditState,
+  };
+
+  const queueControls = {
+    queue,
+    predictiveQueue,
+    nextRecipient,
+    house,
+    switchQuestionContact: queueFlow.switchQuestionContact,
+    handleNextNumber: queueFlow.handleNextNumber,
+    fetchMore: queueFlow.fetchMore,
+    householdMap,
+    groupByHousehold,
+    requeueContacts,
+  };
+
+  const formState = {
+    questionContact,
+    attemptList,
+    handleResponse,
+    update,
+    saveData,
+    isSaving,
+  };
+
+  const dialogControls = {
+    isDialogOpen: dialogs.isDialogOpen,
+    setDialog: dialogs.setDialog,
+    isErrorDialogOpen: dialogs.isErrorDialogOpen,
+    setErrorDialog: dialogs.setErrorDialog,
+    isReportDialogOpen: dialogs.isReportDialogOpen,
+    setReportDialog: dialogs.setReportDialog,
+  };
+
+  const audioControlsGroup = {
+    stream: audioControls.stream,
+    availableMicrophones: audioControls.availableMicrophones,
+    availableSpeakers: audioControls.availableSpeakers,
+    handleMicrophoneChange: audioControls.handleMicrophoneChange,
+    handleSpeakerChange: audioControls.handleSpeakerChange,
+    handleMuteMicrophone: audioControls.handleMuteMicrophone,
+    isMicrophoneMuted: audioControls.isMicrophoneMuted,
+    handleDTMF: audioControls.handleDTMF,
+    requestMicrophoneAccess: audioControls.requestMicrophoneAccess,
+  };
+
   return {
     isBusy,
     campaign,
@@ -406,70 +419,16 @@ export function useCallScreen() {
     isActive,
     hasAccess,
     verifiedNumbers,
-    stream: audioControls.stream,
-    availableMicrophones: audioControls.availableMicrophones,
-    availableSpeakers: audioControls.availableSpeakers,
-    handleMicrophoneChange: audioControls.handleMicrophoneChange,
-    handleSpeakerChange: audioControls.handleSpeakerChange,
-    handleMuteMicrophone: audioControls.handleMuteMicrophone,
-    isMicrophoneMuted: audioControls.isMicrophoneMuted,
-    availableCredits,
-    creditState,
-    phoneConnectionStatus: phoneVerification.phoneConnectionStatus,
-    selectedDevice: phoneVerification.selectedDevice,
-    setSelectedDevice: phoneVerification.setSelectedDevice,
-    isAddingNumber: phoneVerification.isAddingNumber,
-    setIsAddingNumber: phoneVerification.setIsAddingNumber,
-    newPhoneNumber: phoneVerification.newPhoneNumber,
-    setNewPhoneNumber: phoneVerification.setNewPhoneNumber,
-    handleVerifyNewNumber: phoneVerification.handleVerifyNewNumber,
-    pin: phoneVerification.pin,
-    hangUp,
-    answer,
-    holdAndAnswer,
-    incomingCall,
-    device,
-    requeueContacts,
     navigate,
-    isReportDialogOpen: dialogs.isReportDialogOpen,
-    setReportDialog: dialogs.setReportDialog,
-    handleDTMF: audioControls.handleDTMF,
-    displayState,
-    displayColor,
-    callDuration,
-    conference,
-    setConference,
-    deviceIsBusy,
-    nextRecipient,
-    activeCall,
-    recentCall,
-    handleVoiceDrop,
-    handleConferenceEnd,
-    disposition,
-    setDisposition,
-    recentAttempt,
-    callState,
-    handleDialButton,
-    handleDequeueNext,
-    house,
-    switchQuestionContact: queueFlow.switchQuestionContact,
-    attemptList,
-    questionContact,
-    handleResponse,
-    update,
-    saveData,
-    householdMap,
-    groupByHousehold,
-    queue,
-    predictiveQueue,
-    handleNextNumber: queueFlow.handleNextNumber,
-    fetchMore: queueFlow.fetchMore,
-    isDialogOpen: dialogs.isDialogOpen,
-    setDialog: dialogs.setDialog,
-    isErrorDialogOpen: dialogs.isErrorDialogOpen,
-    setErrorDialog: dialogs.setErrorDialog,
+    device,
     currentState,
     creditsError,
+    callControls,
+    queueControls,
+    formState,
+    dialogControls,
+    audioControls: audioControlsGroup,
+    phoneVerification,
   };
 }
 

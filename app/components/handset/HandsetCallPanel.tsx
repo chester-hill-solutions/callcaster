@@ -119,6 +119,10 @@ function HandsetConnected({
   const audio = useSoftphoneAudioDevices({
     device: controller.connection.device,
     activeCall: controller.callHandling.activeCall,
+    micCoordinator: {
+      isMicMuted: controller.callHandling.isMicMuted,
+      setMicMuted: controller.callHandling.setMicMuted,
+    },
   });
 
   return (

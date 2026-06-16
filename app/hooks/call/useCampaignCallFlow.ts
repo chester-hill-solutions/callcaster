@@ -114,7 +114,8 @@ export function useCampaignCallFlow({
   };
 }
 
-type StartCallArgs = {
+/** @deprecated Use useCampaignDialActions instead */
+export type StartCallArgs = {
   contact: Contact;
   campaign: Campaign;
   user: { id: string };
@@ -124,99 +125,3 @@ type StartCallArgs = {
   selectedDevice: string | null;
 };
 
-export function buildHandleDialButton({
-  campaign,
-  deviceIsBusy,
-  incomingCall,
-  deviceStatus,
-  begin,
-  startCall,
-  nextRecipient,
-  user,
-  workspaceId,
-  recentAttempt,
-  selectedDevice,
-}: {
-  campaign: Campaign | null | undefined;
-  deviceIsBusy: boolean;
-  incomingCall: Call | null;
-  deviceStatus: string;
-  begin: () => void;
-  startCall: (args: StartCallArgs) => void;
-  nextRecipient: QueueItem | null;
-  user: { id: string };
-  workspaceId: string;
-  recentAttempt: OutreachAttempt | null;
-  selectedDevice: string;
-}) {
-  return () => {
-    if (!campaign) return;
-
-    if (campaign.dial_type === "predictive") {
-      if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
-        return;
-      }
-      begin();
-    } else if (campaign.dial_type === "call") {
-      if (!nextRecipient?.contact) return;
-
-      startCall({
-        contact: nextRecipient.contact,
-        campaign,
-        user,
-        workspaceId,
-        nextRecipient,
-        recentAttempt,
-        selectedDevice,
-      });
-    }
-  };
-}
-
-export function buildHandleDequeueNext({
-  campaign,
-  nextRecipient,
-  send,
-  setCallDuration,
-  handleDialButton,
-  saveData,
-  dequeue,
-  fetchMore,
-  householdMap,
-  handleNextNumber,
-  setRecentAttempt,
-  setUpdate,
-}: {
-  campaign: Campaign | null | undefined;
-  nextRecipient: QueueItem | null;
-  send: CallStateMachineSend;
-  setCallDuration: (duration: number) => void;
-  handleDialButton: () => void;
-  saveData: () => void;
-  dequeue: (args: { contact: QueueItem }) => void;
-  fetchMore: (args: { householdMap: Record<string, QueueItem[]> }) => Promise<void>;
-  householdMap: Record<string, QueueItem[]>;
-  handleNextNumber: (skipHousehold?: boolean) => void;
-  setRecentAttempt: (attempt: OutreachAttempt | null) => void;
-  setUpdate: (update: Record<string, unknown> | null) => void;
-}) {
-  return () => {
-    if (!campaign || !nextRecipient) return;
-
-    if (campaign.dial_type === "predictive") {
-      send({ type: "HANG_UP" });
-      setCallDuration(0);
-      handleDialButton();
-      saveData();
-    } else if (campaign.dial_type === "call") {
-      saveData();
-      dequeue({ contact: nextRecipient });
-      fetchMore({ householdMap });
-      handleNextNumber(campaign?.group_household_queue || false);
-      send({ type: "HANG_UP" });
-      setRecentAttempt(null);
-      setUpdate({});
-      setCallDuration(0);
-    }
-  };
-}

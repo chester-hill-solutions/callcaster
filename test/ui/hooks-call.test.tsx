@@ -213,6 +213,58 @@ describe("call hooks", () => {
     act(() => noDevice.result.current.answer());
   });
 
+  test("mic mute does not set hold; resume respects mic state", async () => {
+    const { useCallHandling } = await import("@/hooks/call/useCallHandling");
+    const active = createMockTwilioCall({ parameters: { CallSid: "CA-mic-hold" } });
+
+    const { result } = renderHook(() =>
+      useCallHandling({ device: mockTwilioDevice as any, workspaceId: "ws" }),
+    );
+
+    act(() => result.current.setActiveCall(active));
+
+    act(() => result.current.setMicMuted(true));
+    expect(result.current.isMicMuted).toBe(true);
+    expect(result.current.isActiveCallOnLocalHold).toBe(false);
+    expect(active.mute).toHaveBeenCalledWith(true);
+
+    act(() => result.current.holdActiveCall());
+    expect(result.current.isActiveCallOnLocalHold).toBe(true);
+    expect(result.current.isMicMuted).toBe(true);
+
+    act(() => result.current.setMicMuted(false));
+    expect(result.current.isMicMuted).toBe(false);
+    expect(result.current.isActiveCallOnLocalHold).toBe(true);
+    expect(active.mute).toHaveBeenLastCalledWith(true);
+
+    act(() => result.current.resumeActiveCall());
+    expect(result.current.isActiveCallOnLocalHold).toBe(false);
+    expect(active.mute).toHaveBeenLastCalledWith(false);
+
+    act(() => result.current.setMicMuted(true));
+    act(() => result.current.holdActiveCall());
+    act(() => result.current.resumeActiveCall());
+    expect(result.current.isMicMuted).toBe(true);
+    expect(active.mute).toHaveBeenLastCalledWith(true);
+  });
+
+  test("clearIncomingCall clears incoming session", async () => {
+    const { useCallHandling } = await import("@/hooks/call/useCallHandling");
+    const incoming = createMockTwilioCall({ parameters: { CallSid: "CA-in" } });
+
+    const { result } = renderHook(() =>
+      useCallHandling({
+        device: mockTwilioDevice as any,
+        workspaceId: "ws",
+        incomingCall: incoming,
+      }),
+    );
+
+    expect(result.current.incomingCall).toBeTruthy();
+    act(() => result.current.clearIncomingCall());
+    expect(result.current.incomingCall).toBeNull();
+  });
+
   test("useTwilioDevice wires connection and handling", async () => {
     const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
     const send = vi.fn();

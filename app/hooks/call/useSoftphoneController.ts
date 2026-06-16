@@ -23,17 +23,13 @@ export function useSoftphoneController({
   onNavigateBack,
   onError,
 }: UseSoftphoneControllerOptions) {
-  const [incomingCallState, setIncomingCallState] = useState<Call | null>(null);
   const [outboundTo, setOutboundTo] = useState("");
   const [outboundError, setOutboundError] = useState<string | null>(null);
+  const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
 
   const noop = useCallback(() => {}, []);
   const deviceOptions = useMemo(() => ({ allowIncomingWhileBusy: true }), []);
 
-  const handleIncomingCall = useCallback(
-    (call: Call) => setIncomingCallState(call),
-    [],
-  );
   const handleConnectionError = useCallback(
     (err: Error) => onError(err.message),
     [onError],
@@ -42,7 +38,7 @@ export function useSoftphoneController({
   const connection = useTwilioConnection({
     token,
     deviceOptions,
-    onIncomingCall: handleIncomingCall,
+    onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange: noop,
     onError: handleConnectionError,
     onDeviceBusyChange: noop,
@@ -51,16 +47,19 @@ export function useSoftphoneController({
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
-    incomingCall: incomingCallState,
     onStatusChange: noop,
     onError: (err) => onError(err.message),
     onDeviceBusyChange: noop,
   });
 
+  useEffect(() => {
+    receiveIncomingRef.current = callHandling.receiveIncoming;
+  }, [callHandling.receiveIncoming]);
+
   const handleDecline = useCallback(() => {
     declineIncomingCall(callHandling.incomingCall);
-    setIncomingCallState(null);
-  }, [callHandling.incomingCall]);
+    callHandling.clearIncomingCall();
+  }, [callHandling]);
 
   const handleEndSession = useCallback(async () => {
     try {

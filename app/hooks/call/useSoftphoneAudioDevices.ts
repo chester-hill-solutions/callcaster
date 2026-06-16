@@ -1,28 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import {
+  logTwilioAdapterResult,
   replaceCallInputStream,
-  setCallMuted,
 } from "@/lib/twilio/twilio-call-adapter.client";
+import type { MicCoordinator } from "@/lib/twilio/call-session-types";
 
 type UseSoftphoneAudioDevicesOptions = {
   device: Device | null;
   activeCall: Call | null;
+  micCoordinator: MicCoordinator;
   micSelectIdPrefix?: string;
   speakerSelectIdPrefix?: string;
 };
 
+/**
+ * Audio device selection and local speaker mute — mic mute is coordinated by call session owner.
+ */
 export function useSoftphoneAudioDevices({
   device,
   activeCall,
+  micCoordinator,
 }: UseSoftphoneAudioDevicesOptions) {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [selectedMicId, setSelectedMicId] = useState("");
   const [selectedSpeakerId, setSelectedSpeakerId] = useState("");
-  const [micMuted, setMicMuted] = useState(false);
   const [speakerMuted, setSpeakerMuted] = useState(false);
-  const [callOnHold, setCallOnHold] = useState(false);
 
   const refreshDevices = useCallback(async () => {
     try {
@@ -71,11 +75,6 @@ export function useSoftphoneAudioDevices({
   }, [refreshDevices]);
 
   useEffect(() => {
-    setCallOnHold(false);
-    setMicMuted(false);
-  }, [activeCall]);
-
-  useEffect(() => {
     if (!activeCall || !device?.audio) return;
     if (selectedMicId) {
       device.audio.setInputDevice(selectedMicId).catch(() => {});
@@ -92,17 +91,21 @@ export function useSoftphoneAudioDevices({
       device.audio
         .setInputDevice(deviceId)
         .then(() => {
-          setMicMuted(false);
+          micCoordinator.setMicMuted(false);
           if (activeCall) {
             navigator.mediaDevices
               .getUserMedia({ audio: { deviceId } })
-              .then((stream) => replaceCallInputStream(activeCall, stream))
+              .then((stream) =>
+                replaceCallInputStream(activeCall, stream).then((result) =>
+                  logTwilioAdapterResult(result, "replaceCallInputStream"),
+                ),
+              )
               .catch(() => {});
           }
         })
         .catch(() => {});
     },
-    [device, activeCall],
+    [device, activeCall, micCoordinator],
   );
 
   const handleSpeakerChange = useCallback(
@@ -115,28 +118,8 @@ export function useSoftphoneAudioDevices({
 
   const handleMuteMic = useCallback(() => {
     if (!device?.audio) return;
-    const next = !micMuted;
-    setMicMuted(next);
-    if (next) setCallOnHold(false);
-    device.audio.outgoing(next);
-    setCallMuted(activeCall, next);
-  }, [device, activeCall, micMuted]);
-
-  const handleHold = useCallback(() => {
-    if (!activeCall) return;
-    setCallOnHold(true);
-    setMicMuted(true);
-    if (device?.audio) device.audio.outgoing(true);
-    setCallMuted(activeCall, true);
-  }, [activeCall, device]);
-
-  const handleResume = useCallback(() => {
-    if (!activeCall) return;
-    setCallOnHold(false);
-    setMicMuted(false);
-    if (device?.audio) device.audio.outgoing(false);
-    setCallMuted(activeCall, false);
-  }, [activeCall, device]);
+    micCoordinator.setMicMuted(!micCoordinator.isMicMuted);
+  }, [device, micCoordinator]);
 
   const handleMuteSpeaker = useCallback(() => {
     if (!device?.audio) return;
@@ -150,14 +133,11 @@ export function useSoftphoneAudioDevices({
     speakers,
     selectedMicId,
     selectedSpeakerId,
-    micMuted,
+    micMuted: micCoordinator.isMicMuted,
     speakerMuted,
-    callOnHold,
     handleMicChange,
     handleSpeakerChange,
     handleMuteMic,
-    handleHold,
-    handleResume,
     handleMuteSpeaker,
   };
 }

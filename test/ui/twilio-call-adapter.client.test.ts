@@ -2,10 +2,16 @@ import { describe, expect, test, vi } from "vitest";
 import {
   getCallFrom,
   getCallSid,
+  logTwilioAdapterResult,
   replaceCallInputStream,
   sendCallDigits,
   setCallMuted,
 } from "@/lib/twilio/twilio-call-adapter.client";
+import { logger } from "@/lib/logger.client";
+
+vi.mock("@/lib/logger.client", () => ({
+  logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
+}));
 
 function makeCall(overrides: {
   parameters?: Record<string, string>;
@@ -31,32 +37,56 @@ describe("twilio-call-adapter", () => {
     expect(getCallFrom(call)).toBe("+15551234567");
   });
 
-  test("setCallMuted only invokes mute when supported", () => {
+  test("setCallMuted returns explicit adapter results", () => {
+    expect(setCallMuted(null, true)).toEqual({ status: "invalid_call" });
+
     const mute = vi.fn();
-    setCallMuted(makeCall({ mute }), true);
+    expect(setCallMuted(makeCall({ mute }), true)).toEqual({ status: "ok" });
     expect(mute).toHaveBeenCalledWith(true);
 
-    setCallMuted(makeCall(), true);
+    expect(setCallMuted(makeCall(), true)).toEqual({ status: "unsupported" });
     expect(mute).toHaveBeenCalledTimes(1);
   });
 
-  test("replaceCallInputStream only invokes SDK hook when supported", async () => {
+  test("replaceCallInputStream returns explicit adapter results", async () => {
     const setInputStream = vi.fn().mockResolvedValue(undefined);
     const stream = {} as MediaStream;
 
-    await replaceCallInputStream(makeCall({ setInputStream }), stream);
+    expect(await replaceCallInputStream(null, stream)).toEqual({
+      status: "invalid_call",
+    });
+
+    expect(
+      await replaceCallInputStream(makeCall({ setInputStream }), stream),
+    ).toEqual({ status: "ok" });
     expect(setInputStream).toHaveBeenCalledWith(stream);
 
-    await replaceCallInputStream(makeCall(), stream);
+    expect(await replaceCallInputStream(makeCall(), stream)).toEqual({
+      status: "unsupported",
+    });
     expect(setInputStream).toHaveBeenCalledTimes(1);
   });
 
-  test("sendCallDigits delegates to call.sendDigits", () => {
+  test("sendCallDigits returns explicit adapter results", () => {
     const sendDigits = vi.fn();
     const call = makeCall({ sendDigits });
-    sendCallDigits(call, "5");
+
+    expect(sendCallDigits(null, "1")).toEqual({ status: "invalid_call" });
+    expect(sendCallDigits(call, "5")).toEqual({ status: "ok" });
     expect(sendDigits).toHaveBeenCalledWith("5");
-    sendCallDigits(null, "1");
-    expect(sendDigits).toHaveBeenCalledTimes(1);
+  });
+
+  test("logTwilioAdapterResult logs unsupported and error results", () => {
+    logTwilioAdapterResult({ status: "ok" }, "ctx");
+    logTwilioAdapterResult({ status: "invalid_call" }, "ctx");
+    expect(logger.debug).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+
+    logTwilioAdapterResult({ status: "unsupported" }, "mute");
+    expect(logger.debug).toHaveBeenCalledWith("Twilio adapter unsupported: mute");
+
+    const err = new Error("boom");
+    logTwilioAdapterResult({ status: "error", error: err }, "stream");
+    expect(logger.error).toHaveBeenCalledWith("Twilio adapter error: stream", err);
   });
 });
