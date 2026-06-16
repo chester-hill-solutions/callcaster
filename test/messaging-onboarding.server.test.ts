@@ -398,4 +398,45 @@ describe("messaging onboarding helpers", () => {
       }),
     ).rejects.toThrow("update failed");
   });
+
+  test("merge preserves top-level status and currentStep on partial update", () => {
+    const merged = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        status: "collecting_business",
+        currentStep: "messaging_service",
+      },
+    );
+
+    expect(merged.status).toBe("collecting_business");
+    expect(merged.currentStep).toBe("messaging_service");
+    expect(merged.businessProfile.legalBusinessName).toBe("");
+  });
+
+  test("deriveWorkspaceMessagingReadiness warns on incomplete A2P for US businesses", () => {
+    const state = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        messagingService: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
+          serviceSid: "MG123",
+        },
+        emergencyVoice: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.emergencyVoice,
+          address: {
+            ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.emergencyVoice.address,
+            countryCode: "US",
+          },
+        },
+      },
+    );
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding: state,
+      workspaceNumbers: [{ type: "rented", phone_number: "+15550000000" }],
+      recentOutboundCount: 0,
+    });
+
+    expect(readiness.warnings).toContain("A2P 10DLC registration is not approved yet.");
+  });
 });

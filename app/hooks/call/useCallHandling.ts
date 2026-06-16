@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type { Call, Device } from "@twilio/voice-sdk";
 import { hangupCall } from '@/lib/services/hooks-api';
 import { logger } from '@/lib/logger.client';
+import { getCallSid, setCallMuted } from '@/lib/twilio/twilio-call-adapter.client';
 
 interface CallConnectParams {
   To: string;
@@ -24,9 +25,7 @@ interface UseCallHandlingOptions {
 }
 
 function muteCall(call: Call, muted: boolean): void {
-  if (typeof (call as Call & { mute?: (m: boolean) => void }).mute === 'function') {
-    (call as Call & { mute: (m: boolean) => void }).mute(muted);
-  }
+  setCallMuted(call, muted);
 }
 
 interface UseCallHandlingReturn {
@@ -231,7 +230,7 @@ export function useCallHandling({
       const held = heldCallsRef.current;
 
       try {
-        const callSid = target.parameters.CallSid;
+        const callSid = getCallSid(target);
         if (!callSid) {
           throw new Error("Call is missing a CallSid");
         }
