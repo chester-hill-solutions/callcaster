@@ -55,6 +55,13 @@ describe("openapi spec", () => {
       caller_id: "+1",
       script_id: 1,
     }).success).toBe(true);
+    expect(createWithScriptBodySchema.safeParse({
+      title: "t",
+      type: "live_call",
+      caller_id: "+1",
+      script: { name: "s", steps: {} },
+      script_id: 1,
+    }).success).toBe(false);
   });
 
   test("chat_sms required fields match Zod schema", () => {
@@ -84,5 +91,34 @@ describe("openapi spec", () => {
         campaign_id: "123",
       }).success,
     ).toBe(true);
+  });
+
+  test("create-with-script operation description documents XOR rule", () => {
+    const op =
+      openApiSpec.paths["/api/campaigns/create-with-script"].post;
+    expect(op?.description).toMatch(/exactly one/i);
+    expect(
+      openApiSpec.components.schemas.CreateCampaignWithScriptRequest.description,
+    ).toMatch(/Zod/i);
+  });
+
+  test("each public operation has success response with content schema", () => {
+    const successByPath: Record<(typeof PUBLIC_API_PATHS)[number], string> = {
+      "/api/campaigns/create-with-script": "201",
+      "/api/chat_sms": "201",
+      "/api/sms": "200",
+    };
+    for (const path of PUBLIC_API_PATHS) {
+      const op = openApiSpec.paths[path].post;
+      const code = successByPath[path];
+      const schema =
+        op?.responses?.[code]?.content?.["application/json"]?.schema;
+      expect(schema).toBeDefined();
+    }
+  });
+
+  test("dispatchCampaignSms description mentions queue/batch caveat", () => {
+    const op = openApiSpec.paths["/api/sms"].post;
+    expect(op?.description).toMatch(/queue|batch|dequeue/i);
   });
 });

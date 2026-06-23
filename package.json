@@ -20,6 +20,8 @@
     "tools:routes:dynamic-imports": "node scripts/route-dynamic-server-imports.mjs && node scripts/fix-route-module-scope-server-refs.mjs",
     "tools:routes:legacy-delete": "node scripts/delete-legacy-routes.mjs",
     "tools:routes:sync-config": "node scripts/sync-config-after-route-cleanup.mjs",
+    "tools:api:export-openapi": "tsx --tsconfig tsconfig.json scripts/export-openapi-spec.ts",
+    "tools:api:codegen": "npm run tools:api:export-openapi && openapi-ts",
     "tools:components:move-settings": "node scripts/move-component-settings.mjs",
     "tools:prune:hygiene": "node scripts/prune-repo-hygiene.mjs",
     "lint": "eslint --ignore-path .gitignore --cache --cache-location ./node_modules/.cache/eslint .",
@@ -96,6 +98,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@hey-api/client-fetch": "^0.13.1",
+    "@hey-api/openapi-ts": "^0.66.7",
     "@react-router/dev": "^7.0.0",
     "@react-router/fs-routes": "^7.0.0",
     "@react-router/remix-routes-option-adapter": "^7.15.1",
@@ -107,7 +111,6 @@
     "@types/twilio": "^3.19.2",
     "@typescript-eslint/eslint-plugin": "^8.48.1",
     "@typescript-eslint/parser": "^8.48.1",
-    "@vitest/coverage-istanbul": "^4.0.18",
     "@vitest/coverage-v8": "^4.0.18",
     "autoprefixer": "^10.4.19",
     "deno": "^2.6.8",
@@ -125,6 +128,7 @@
     "prettier-plugin-tailwindcss": "^0.5.14",
     "remix-flat-routes": "^0.8.5",
     "tailwindcss": "^3.4.3",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "vite": "^6.4.2",
     "vite-tsconfig-paths": "^5.1.4",

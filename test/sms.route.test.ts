@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  TEST_WORKSPACE_ID,
+  TEST_WORKSPACE_ID_ALT,
+} from "./helpers/public-api-fixtures";
 
 let currentSupabase: any = null;
 const defaultPortalConfig = {
@@ -183,7 +187,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({
       authType: "api_key",
-      workspaceId: "w1",
+      workspaceId: TEST_WORKSPACE_ID,
       supabase: {},
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
@@ -204,7 +208,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({});
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
-      workspace_id: "w2",
+      workspace_id: TEST_WORKSPACE_ID_ALT,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -226,7 +230,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
 
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -287,7 +291,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c2",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -310,7 +314,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c3",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -338,7 +342,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c-dup",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -367,7 +371,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c-no-dup",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -390,7 +394,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c4",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -416,7 +420,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c5",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -441,7 +445,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c6",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -476,7 +480,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c6b",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -505,7 +509,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c7",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -552,7 +556,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c10",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
       message_intent: "fraud",
@@ -618,7 +622,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c11",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "",
       user_id: "u1",
     });
@@ -672,7 +676,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c12",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "",
       user_id: "u1",
     });
@@ -692,7 +696,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c8",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -711,7 +715,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c9",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });
@@ -733,7 +737,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c9b",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       caller_id: "+15551234567",
       user_id: "u1",
     });

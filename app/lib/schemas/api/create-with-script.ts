@@ -33,6 +33,10 @@ export const createWithScriptBodySchema = z
   .refine((body) => body.script != null || body.script_id != null, {
     message: "Either script or script_id is required",
     path: ["script"],
+  })
+  .refine((body) => !(body.script != null && body.script_id != null), {
+    message: "Provide exactly one of script or script_id, not both",
+    path: ["script_id"],
   });
 
 export type CreateWithScriptBody = z.infer<typeof createWithScriptBodySchema>;

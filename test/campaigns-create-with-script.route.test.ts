@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  TEST_WORKSPACE_ID,
+  TEST_WORKSPACE_ID_ALT,
+} from "./helpers/public-api-fixtures";
 
 type VerifyError = { error: string; status: number };
 type VerifyApiKey = {
@@ -31,10 +35,14 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
-  createCampaign: (...args: any[]) => mocks.createCampaign(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
-}));
+vi.mock("@/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    createCampaign: (...args: any[]) => mocks.createCampaign(...args),
+    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  };
+});
 vi.mock("@/lib/queue.server", () => ({
   enqueueContactsForCampaign: (...args: any[]) => mocks.enqueueContactsForCampaign(...args),
 }));
@@ -128,7 +136,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("returns 400 on invalid JSON body", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: {} } as any);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: {} } as any);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
@@ -164,9 +172,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("api_key auth rejects mismatched workspace_id", async () => {
     const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w2",
+      workspace_id: TEST_WORKSPACE_ID_ALT,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -180,7 +188,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("validates title/type/caller_id/script requirements", async () => {
     const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
         "@/lib/api-parse.server",
@@ -205,7 +213,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
     const r2 = await asRouteResponse(
       await post({
-        workspace_id: "w1",
+        workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "message",
         caller_id: "+1555",
@@ -216,7 +224,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
     const r3 = await asRouteResponse(
       await post({
-        workspace_id: "w1",
+        workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "live_call",
         script_id: 1,
@@ -226,20 +234,35 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
     const r4 = await asRouteResponse(
       await post({
-        workspace_id: "w1",
+        workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "live_call",
         caller_id: "+1555",
       }),
     );
     expect(r4.status).toBe(400);
+
+    const r5 = await asRouteResponse(
+      await post({
+        workspace_id: TEST_WORKSPACE_ID,
+        title: "t",
+        type: "live_call",
+        caller_id: "+1555",
+        script: { name: "s", steps: {} },
+        script_id: 1,
+      }),
+    );
+    expect(r5.status).toBe(400);
+    await expect(r5.json()).resolves.toMatchObject({
+      error: expect.stringMatching(/exactly one of script or script_id/i),
+    });
   });
 
   test("returns 500 when workspace_number query errors", async () => {
     const supabase = makeSupabaseForValidations({ numbersError: { message: "db" } });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -254,9 +277,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("returns 400 when caller_id does not belong to workspace", async () => {
     const supabase = makeSupabaseForValidations({ callerNumbers: ["+1999"] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -276,9 +299,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
       }),
     };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -293,9 +316,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
 
     const supabaseErr = makeSupabaseForValidations({ audError: { message: "aud" }, audiences: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: supabaseErr });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabaseErr });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -306,9 +329,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     expect(r1.status).toBe(500);
 
     const supabaseBad = makeSupabaseForValidations({ audiences: [2] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: supabaseBad });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabaseBad });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -321,9 +344,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("validates script_id belongs to workspace", async () => {
     const supabase = makeSupabaseForValidations({ scripts: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -340,9 +363,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("returns 500 when script_id lookup errors", async () => {
     const supabase = makeSupabaseForValidations({ scriptError: { message: "script lookup failed" } });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -371,9 +394,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         throw new Error(`Unexpected table: ${table}`);
       }),
     };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id,
@@ -401,9 +424,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
       }),
     };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -429,9 +452,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
       }),
     };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: supabase2 });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabase2 });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -461,9 +484,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
       }),
     };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id,
@@ -488,9 +511,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
 
   test("createCampaign errors are returned as 400 (Error and non-Error)", async () => {
     const supabase = makeSupabaseForValidations({ callerNumbers: ["+1555"] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -501,9 +524,9 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r1.status).toBe(400);
 
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
       caller_id: "+1555",
@@ -515,7 +538,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("full success (session auth) links audiences and enqueues new contacts", async () => {
-    const workspaceId = "w1";
+    const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
     const audience_ids = [1, 2, 3, 4, 5, 6];
     const campaignId = 777;
@@ -622,7 +645,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("existing script_id path works and skips audience loop when audience_ids empty", async () => {
-    const workspaceId = "w1";
+    const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
     const supabase = makeSupabaseForValidations({ callerNumbers: [caller_id] });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId, supabase });
@@ -650,7 +673,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("covers queuedRows ?? [] when campaign_queue returns null data", async () => {
-    const workspaceId = "w1";
+    const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
     const supabaseClient = {
       from: vi.fn((table: string) => {
@@ -715,7 +738,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("covers enqueue_audience_contacts false branch inside audience loop", async () => {
-    const workspaceId = "w1";
+    const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
     const supabaseClient = {
       from: vi.fn((table: string) => {
@@ -775,7 +798,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("covers audienceContacts ?? [] when contact_audience returns null data", async () => {
-    const workspaceId = "w1";
+    const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
     const supabaseClient = {
       from: vi.fn((table: string) => {

@@ -11,10 +11,10 @@ This directory contains project documentation and archived implementation notes.
 - `error-handling.md`
 - `stripe-webhook.md`
 - `number-rental-billing.md`
-- `api-create-campaign-with-script.md`
-- `api-overview.md`
-- `api-send-sms.md`
-- `public-api-test-drift.md`
+- `api-overview.md` — Public integrator API boundary, quickstart, auth, errors, SDK
+- `api-create-campaign-with-script.md` — `POST /api/campaigns/create-with-script` one-shot campaign setup
+- `api-send-sms.md` — `POST /api/chat_sms` and `POST /api/sms` messaging endpoints
+- `public-api-test-drift.md` — Public API test/coverage drift tracker
 - `script-structure.md`
 - `script-json-format.md`
 - `csv-export-contract.md`

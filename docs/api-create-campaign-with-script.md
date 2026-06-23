@@ -8,6 +8,12 @@ This endpoint creates a call campaign in a single request: it can create a scrip
 
 **Authentication:** Session (cookie) or workspace API key.
 
+- **Interactive docs:** [`/docs`](/docs) (Scalar)
+- **OpenAPI spec:** [`/api/docs/openapi`](/api/docs/openapi)
+- **Overview:** [API overview](./api-overview.md)
+
+Provide **exactly one** of `script` or `script_id` in the request body, not both. This XOR rule is enforced in Zod validation (OpenAPI cannot express mutual exclusion in `required`).
+
 ---
 
 ## Authentication
