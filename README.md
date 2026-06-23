@@ -12,5 +12,6 @@ Version 1
 - **[API overview](docs/api-overview.md)** – Public integrator API boundary, auth, and endpoint list.
 - **[Create campaign with script (one-shot API)](docs/api-create-campaign-with-script.md)** – `POST /api/campaigns/create-with-script`: create a campaign with script, caller ID, and audiences in a single request (session or API key).
 - **[Send SMS](docs/api-send-sms.md)** – `POST /api/chat_sms` and `POST /api/sms` public messaging endpoints.
+- **[Public API test drift](docs/public-api-test-drift.md)** – Tracked gaps and verification commands for the integrator API surface.
 - **Interactive API docs** – OpenAPI 3.0 spec and Scalar UI at **[`/docs`](/docs)**. Raw spec: `/api/docs/openapi`.
 - **[Stripe webhook](docs/stripe-webhook.md)** – Configure Stripe to send `checkout.session.completed` to `/api/stripe-webhook`; requires `STRIPE_WEBHOOK_SECRET`.
