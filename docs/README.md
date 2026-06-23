@@ -14,6 +14,7 @@ This directory contains project documentation and archived implementation notes.
 - `api-create-campaign-with-script.md`
 - `api-overview.md`
 - `api-send-sms.md`
+- `public-api-test-drift.md`
 - `script-structure.md`
 - `script-json-format.md`
 - `csv-export-contract.md`
