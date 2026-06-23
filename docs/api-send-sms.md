@@ -2,7 +2,8 @@
 
 CallCaster exposes two SMS endpoints for integrators. Both support **session cookie** or **workspace API key** authentication.
 
-- **Interactive docs:** [`/docs`](/docs)
+- **Interactive docs:** [`/docs`](/docs) (Scalar)
+- **OpenAPI spec:** [`/api/docs/openapi`](/api/docs/openapi)
 - **Overview:** [API overview](./api-overview.md)
 
 ---

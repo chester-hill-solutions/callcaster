@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import {
+  TEST_WORKSPACE_ID,
+  TEST_WORKSPACE_ID_ALT,
+} from "./helpers/public-api-fixtures";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -481,10 +485,10 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   });
 
   test("action api_key rejects workspace mismatch", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: {} });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: {} });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "15551234567",
-      workspace_id: "w2",
+      workspace_id: TEST_WORKSPACE_ID_ALT,
       contact_id: "",
       caller_id: "+1555",
       body: "hi",
@@ -497,10 +501,10 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action api_key success path uses authResult.supabase and user null; covers '+' not at start normalization", async () => {
     const supabase = makeSupabaseStub({ webhookRows: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "1+5551234567",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "",
       caller_id: "+15551234567",
       body: "",
@@ -519,7 +523,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "123",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "",
       caller_id: "+1555",
       body: "hi",
@@ -542,7 +546,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "1",
       caller_id: "+15551234567",
       body: "Hello {{firstname}}",
@@ -568,7 +572,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "1",
       caller_id: "+15551234567",
       body: "Hello {{firstname}}",
@@ -615,7 +619,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "1",
       caller_id: "+15551234567",
       body: "Hello",
@@ -659,7 +663,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
-      workspace_id: "w1",
+      workspace_id: TEST_WORKSPACE_ID,
       contact_id: "",
       caller_id: "+15551234567",
       body: "",

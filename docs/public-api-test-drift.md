@@ -10,14 +10,18 @@ Coordination notes for the public API surface. Update when adding endpoints or c
 | `PUBLIC_API_PATHS` / OpenAPI / Zod parity | `test/openapi.test.ts` + `app/lib/public-api.ts` |
 | `parseJsonBodyOrResponse` | Covered in `test/api-parse.server.test.ts` |
 | Public route schema validation | `create-with-script`, `chat_sms`, `sms` route tests |
+| XOR `script` / `script_id` refine | Zod + OpenAPI description + tests |
+| UUID test fixtures | `test/helpers/public-api-fixtures.ts` |
+| Integrator docs (quickstart, errors, SDK) | `docs/api-overview.md` |
+| OpenAPI response examples + caveats | `app/lib/openapi.ts` |
+| Hey API codegen | `openapi-ts.config.ts`, `tools:api:codegen`, CI drift gate |
 
 ## Remaining gaps
 
 | Area | Issue | Target fix |
 |------|--------|------------|
-| `test/sms.route.test.ts`, `test/chat-sms.route.test.ts` | Some happy-path fixtures still use short workspace IDs (`w1`) via mocks | Optional cleanup; real validation tests use UUIDs |
-| Stripe webhook, agent-status, inbound IVR | No dedicated route tests | Add after handler contracts stabilize |
-| Hey API codegen | Not wired | `openapi-ts.config.ts` + `tools:api:codegen` when public set is stable |
+| Next public endpoints | Audiences, scripts CRUD, campaign status | Product decision + doc-first promotion |
+| Outreach `$id` auth (E53) | Before public promotion | Session scoping on `PATCH /api/outreach_attempts/:id` |
 
 ## Verification
 
@@ -25,4 +29,6 @@ Coordination notes for the public API surface. Update when adding endpoints or c
 npm run typecheck
 npm run test:node -- openapi docs api-parse campaigns-create-with-script chat-sms sms.route
 npm run tools:routes:verify
+npm run tools:api:codegen
+git diff --exit-code
 ```

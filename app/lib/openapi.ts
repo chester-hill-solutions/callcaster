@@ -44,10 +44,12 @@ const schemas = {
     type: "string" as const,
     format: "uuid" as const,
     description:
-      "Required when using session auth. Optional with API key; must match key workspace if provided.",
+      "Required in the request body when using session auth. Optional with API key; must match the key workspace if provided.",
   },
   CreateCampaignWithScriptRequest: {
     type: "object" as const,
+    description:
+      "Provide exactly one of `script` or `script_id` (XOR). Enforced in Zod validation, not in OpenAPI required fields.",
     required: ["title", "type", "caller_id"] as const,
     properties: {
       workspace_id: { $ref: "#/components/schemas/WorkspaceId" },
@@ -145,6 +147,7 @@ const schemas = {
   },
   ChatSmsRequest: {
     type: "object" as const,
+    description: "Session auth requires workspace_id in the body.",
     required: ["workspace_id", "to_number", "caller_id", "body"] as const,
     properties: {
       workspace_id: { $ref: "#/components/schemas/WorkspaceId" },
@@ -184,6 +187,8 @@ const schemas = {
   },
   CampaignSmsDispatchRequest: {
     type: "object" as const,
+    description:
+      "Session auth requires workspace_id. API key auth requires user_id for outreach attribution.",
     required: ["workspace_id", "campaign_id"] as const,
     properties: {
       workspace_id: { $ref: "#/components/schemas/WorkspaceId" },
@@ -229,7 +234,7 @@ export const openApiSpec = {
   info: {
     title: "CallCaster API",
     description:
-      "Public integrator API for CallCaster: campaign creation, direct SMS, and campaign SMS dispatch. Session cookie or workspace API key authentication.",
+      "Public integrator API for CallCaster. Documented endpoints: POST /api/campaigns/create-with-script (one-shot campaign setup), POST /api/chat_sms (single SMS), POST /api/sms (batch SMS to queued campaign contacts). Session cookie or workspace API key authentication.",
     version: "1.0.0",
   },
   servers: [{ url: "/", description: "Current origin" }],
@@ -247,7 +252,7 @@ export const openApiSpec = {
         operationId: "createCampaignWithScript",
         summary: "Create campaign with script and phone number (one-shot)",
         description:
-          "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue).",
+          "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.",
         tags: [PUBLIC_API_TAG, "Campaigns"],
         security: [...publicSecurity],
         requestBody: {
@@ -298,6 +303,13 @@ export const openApiSpec = {
                 schema: {
                   $ref: "#/components/schemas/CreateCampaignWithScriptResponse",
                 },
+                example: {
+                  campaign: { id: 42, title: "Q1 outbound", type: "live_call", status: "draft" },
+                  campaignDetails: { campaign_id: 42, script_id: 7 },
+                  script: { id: 7, name: "Main script", type: "script", steps: {} },
+                  audiences_linked: 2,
+                  contacts_enqueued: 150,
+                },
               },
             },
           },
@@ -314,7 +326,7 @@ export const openApiSpec = {
         operationId: "sendChatSms",
         summary: "Send a single SMS",
         description:
-          "Sends one outbound SMS to a phone number. Supports template tag substitution when contact_id is provided.",
+          "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.",
         tags: [PUBLIC_API_TAG, "Messaging"],
         security: [...publicSecurity],
         requestBody: {
@@ -342,6 +354,10 @@ export const openApiSpec = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ChatSmsResponse" },
+                example: {
+                  data: { id: 1 },
+                  message: { sid: "SM123", status: "queued" },
+                },
               },
             },
           },
@@ -358,7 +374,7 @@ export const openApiSpec = {
         operationId: "dispatchCampaignSms",
         summary: "Dispatch SMS to queued campaign contacts",
         description:
-          "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Requires API key auth to include user_id for outreach attribution.",
+          "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. Does not use the primary queue-next dispatcher. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.",
         tags: [PUBLIC_API_TAG, "Messaging"],
         security: [...publicSecurity],
         requestBody: {
@@ -389,6 +405,12 @@ export const openApiSpec = {
               "application/json": {
                 schema: {
                   $ref: "#/components/schemas/CampaignSmsDispatchResponse",
+                },
+                example: {
+                  responses: [
+                    { "101": { success: true, skipped: false } },
+                    { "102": { success: true, skipped: true, reason: "Duplicate SMS prevented" } },
+                  ],
                 },
               },
             },

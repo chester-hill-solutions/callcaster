@@ -252,6 +252,7 @@ export function listSourceFiles() {
     if (rel.endsWith("database.types.ts")) return true;
     if (rel.endsWith("supabase.types.ts")) return true;
     if (rel.endsWith("twilio.types.ts")) return true;
+    if (rel.startsWith(path.join("app", "lib", "api-generated"))) return true;
     if (rel.startsWith(path.join("archive", "deprecated", "twilio-serverless")))
       return true;
     if (rel.startsWith(path.join("app", "routes"))) return true;
