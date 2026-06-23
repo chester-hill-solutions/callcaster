@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceTwilioPortalConfig: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
-    safeParseJson: vi.fn(),
+    parseJsonBodyOrResponse: vi.fn(),
     processTemplateTags: vi.fn((body: string) => body),
     env: { SUPABASE_URL: vi.fn(() => "http://supabase") },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
@@ -18,12 +18,20 @@ const mocks = vi.hoisted(() => {
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
-vi.mock("../app/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  getWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.getWorkspaceTwilioPortalConfig(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+vi.mock("@/lib/api-parse.server", () => ({
+  parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
+vi.mock("../app/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    createWorkspaceTwilioInstance: (...args: any[]) =>
+      mocks.createWorkspaceTwilioInstance(...args),
+    getWorkspaceTwilioPortalConfig: (...args: any[]) =>
+      mocks.getWorkspaceTwilioPortalConfig(...args),
+    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  };
+});
 vi.mock("@/lib/utils", () => ({
   processTemplateTags: (...args: any[]) => mocks.processTemplateTags(...args),
   normalizePhoneNumber: (value: string) => {
@@ -110,7 +118,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.getWorkspaceTwilioPortalConfig.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
-    mocks.safeParseJson.mockReset();
+    mocks.parseJsonBodyOrResponse.mockReset();
     mocks.processTemplateTags.mockClear();
     mocks.env.SUPABASE_URL.mockClear();
     mocks.logger.error.mockReset();
@@ -474,7 +482,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
 
   test("action api_key rejects workspace mismatch", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase: {} });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "15551234567",
       workspace_id: "w2",
       contact_id: "",
@@ -490,7 +498,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("action api_key success path uses authResult.supabase and user null; covers '+' not at start normalization", async () => {
     const supabase = makeSupabaseStub({ webhookRows: [] });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: "w1", supabase });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "1+5551234567",
       workspace_id: "w1",
       contact_id: "",
@@ -509,7 +517,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("action session requires workspace access and returns 404 on invalid phone number", async () => {
     const supabaseClient = makeSupabaseStub({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "123",
       workspace_id: "w1",
       contact_id: "",
@@ -532,7 +540,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       webhookRows: [],
     });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: "w1",
       contact_id: "1",
@@ -558,7 +566,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       webhookRows: [],
     });
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+1 (555) 123-4567",
       workspace_id: "w1",
       contact_id: "1",
@@ -605,7 +613,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       subresourceUris: {},
     }));
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: "w1",
       contact_id: "1",
@@ -649,7 +657,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
   test("action returns 500 when createWorkspaceTwilioInstance throws", async () => {
     const supabaseClient = makeSupabaseStub({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "session", supabaseClient, user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       to_number: "+15551234567",
       workspace_id: "w1",
       contact_id: "",
@@ -664,6 +672,34 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith("Error in chat_sms action:", expect.anything());
+  });
+
+  test("returns 400 when request body fails schema validation", async () => {
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: "550e8400-e29b-41d4-a716-446655440000",
+      supabase: {},
+    });
+    mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
+      const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
+        "@/lib/api-parse.server",
+      );
+      return actual.parseJsonBodyOrResponse(request, schema);
+    });
+    const mod = await import("../app/routes/api+/chat_sms");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_id: "not-a-uuid", to_number: "" }),
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringMatching(/workspace_id|to_number|caller_id|body/),
+    });
   });
 });
 

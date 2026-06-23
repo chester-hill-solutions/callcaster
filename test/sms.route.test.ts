@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(() => currentSupabase),
     verifyApiKeyOrSession: vi.fn(),
-    safeParseJson: vi.fn(),
+    parseJsonBodyOrResponse: vi.fn(),
     getCampaignQueueById: vi.fn(),
     getWorkspaceTwilioPortalConfig: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
@@ -49,13 +49,22 @@ vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => mocks.verifyApiKeyOrSession(...args),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
-  getCampaignQueueById: (...args: any[]) => mocks.getCampaignQueueById(...args),
-  getWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.getWorkspaceTwilioPortalConfig(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+vi.mock("@/lib/api-parse.server", () => ({
+  parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
+
+vi.mock("../app/lib/database.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+  return {
+    ...actual,
+    getCampaignQueueById: (...args: any[]) => mocks.getCampaignQueueById(...args),
+    getWorkspaceTwilioPortalConfig: (...args: any[]) =>
+      mocks.getWorkspaceTwilioPortalConfig(...args),
+    createWorkspaceTwilioInstance: (...args: any[]) =>
+      mocks.createWorkspaceTwilioInstance(...args),
+    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  };
+});
 
 vi.mock("@/lib/utils", () => ({
   processTemplateTags: (...args: any[]) => mocks.processTemplateTags(...args),
@@ -164,7 +173,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
-    mocks.safeParseJson.mockReset();
+    mocks.parseJsonBodyOrResponse.mockReset();
     mocks.getCampaignQueueById.mockReset();
     mocks.getWorkspaceTwilioPortalConfig.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -193,7 +202,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
 
   test("rejects api_key workspace mismatch", async () => {
     currentSupabase = makeSupabase({});
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
       workspace_id: "w2",
       caller_id: "+15551234567",
@@ -215,7 +224,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       signedUrls: ["http://signed-1"],
     });
 
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -276,7 +285,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
         campaign: { end_time: new Date().toISOString() },
       },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c2",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -299,7 +308,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c3",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -327,7 +336,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
       messageCount: 1,
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c-dup",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -356,7 +365,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
       messageCount: 0,
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c-no-dup",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -379,7 +388,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       rpcResult: { data: null, error: { message: "rpc-bad" } },
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c4",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -405,7 +414,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       outreachUpdate: { data: null, error: { message: "update-bad" } },
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c5",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -430,7 +439,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Go https://example.com", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c6",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -465,7 +474,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       sendMode: "messaging_service",
       messagingServiceSid: "MG123",
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c6b",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -494,7 +503,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c7",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -541,7 +550,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Priority update", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c10",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -607,7 +616,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
         },
       },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c11",
       workspace_id: "w1",
       caller_id: "",
@@ -661,7 +670,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
         },
       },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c12",
       workspace_id: "w1",
       caller_id: "",
@@ -681,7 +690,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaignError: { message: "nope" },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c8",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -700,7 +709,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c9",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -722,7 +731,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     currentSupabase = makeSupabase({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
-    mocks.safeParseJson.mockResolvedValueOnce({
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c9b",
       workspace_id: "w1",
       caller_id: "+15551234567",
@@ -740,9 +749,59 @@ describe("app/routes/api+/sms/route.tsx", () => {
     expect(res.status).toBe(500);
   });
 
-  test("safeParseJson throws returns 500 with Unknown error handling", async () => {
+  test("api_key requires user_id", async () => {
     currentSupabase = makeSupabase({});
-    mocks.safeParseJson.mockRejectedValueOnce("nope");
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: "550e8400-e29b-41d4-a716-446655440000",
+      supabase: {},
+    });
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "c1",
+      workspace_id: "550e8400-e29b-41d4-a716-446655440000",
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(
+      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: "user_id is required when using API key auth",
+    });
+  });
+
+  test("returns 400 when request body fails schema validation", async () => {
+    currentSupabase = makeSupabase({});
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: "550e8400-e29b-41d4-a716-446655440000",
+      supabase: {},
+    });
+    mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
+      const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
+        "@/lib/api-parse.server",
+      );
+      return actual.parseJsonBodyOrResponse(request, schema);
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(
+      await mod.action({
+        request: new Request("http://x", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace_id: "not-a-uuid" }),
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringMatching(/workspace_id|campaign_id/),
+    });
+  });
+
+  test("parseJsonBodyOrResponse throws returns 500 with Unknown error handling", async () => {
+    currentSupabase = makeSupabase({});
+    mocks.parseJsonBodyOrResponse.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);

@@ -9,6 +9,8 @@ Version 1
 - **[Local development](docs/local-development.md)** - Run the app locally, including Supabase, Localtunnel, and Twilio calling setup.
 - **[Script structure](docs/script-structure.md)** – How campaign scripts are stored (`steps`), pages vs blocks, and IVR navigation.
 - **[Script JSON format](docs/script-json-format.md)** – Script structure for campaigns (pages, blocks); field reference and examples.
+- **[API overview](docs/api-overview.md)** – Public integrator API boundary, auth, and endpoint list.
 - **[Create campaign with script (one-shot API)](docs/api-create-campaign-with-script.md)** – `POST /api/campaigns/create-with-script`: create a campaign with script, caller ID, and audiences in a single request (session or API key).
-- **Interactive API docs** – OpenAPI 3.0 spec and Scalar UI at **[`/docs`](/docs)**. Spec URL: `/api/docs/openapi`.
+- **[Send SMS](docs/api-send-sms.md)** – `POST /api/chat_sms` and `POST /api/sms` public messaging endpoints.
+- **Interactive API docs** – OpenAPI 3.0 spec and Scalar UI at **[`/docs`](/docs)**. Raw spec: `/api/docs/openapi`.
 - **[Stripe webhook](docs/stripe-webhook.md)** – Configure Stripe to send `checkout.session.completed` to `/api/stripe-webhook`; requires `STRIPE_WEBHOOK_SECRET`.

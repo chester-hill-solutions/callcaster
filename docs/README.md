@@ -12,6 +12,8 @@ This directory contains project documentation and archived implementation notes.
 - `stripe-webhook.md`
 - `number-rental-billing.md`
 - `api-create-campaign-with-script.md`
+- `api-overview.md`
+- `api-send-sms.md`
 - `script-structure.md`
 - `script-json-format.md`
 - `csv-export-contract.md`

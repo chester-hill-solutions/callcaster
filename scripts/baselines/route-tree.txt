@@ -1,5 +1,6 @@
 :audience_id
 :blockId
+:blockId
 :campaignId/:pageId
 :campaign_id/audiences/new
 :campaign_id/call
@@ -92,6 +93,7 @@ contacts
 create-with-script
 dashboard/:id
 dialer
+docs
 edit
 end
 export
@@ -113,6 +115,7 @@ queues
 remember
 reset
 reset-password
+response
 response
 responses
 script/edit

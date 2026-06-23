@@ -1,14 +1,18 @@
 import { env } from "@/lib/env.server";
-import { getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import {
+  getWorkspaceTwilioPortalConfig,
+  requireWorkspaceAccess,
+} from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { sendMessage } from "@/lib/chat-sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { chatSmsBodySchema } from "@/lib/schemas/api/chat-sms";
 import type { TwilioMessageIntent } from "@/lib/types";
 
 export const action = async ({ request }: { request: Request }) => {
-
   const authResult = await verifyApiKeyOrSession(request);
 
   if ("error" in authResult) {
@@ -16,6 +20,11 @@ export const action = async ({ request }: { request: Request }) => {
       headers: { "Content-Type": "application/json" },
       status: authResult.status,
     });
+  }
+
+  const parsed = await parseJsonBodyOrResponse(request, chatSmsBodySchema);
+  if (parsed instanceof Response) {
+    return parsed;
   }
 
   const {
@@ -27,16 +36,7 @@ export const action = async ({ request }: { request: Request }) => {
     media,
     message_intent,
     messaging_service_sid,
-  } = await safeParseJson<{
-    to_number: string;
-    workspace_id: string;
-    contact_id: string;
-    caller_id: string;
-    body: string;
-    media: string;
-    message_intent?: string;
-    messaging_service_sid?: string;
-  }>(request);
+  } = parsed;
 
   if (authResult.authType === "api_key") {
     if (workspace_id !== authResult.workspaceId) {
@@ -100,12 +100,12 @@ export const action = async ({ request }: { request: Request }) => {
 
     const { message, data } = await sendMessage({
       body: processedBody,
-      media,
+      media: media ?? "",
       to,
       from: caller_id,
       supabase,
       workspace: workspace_id,
-      contact_id,
+      contact_id: contact_id ?? "",
       user,
       portalConfig,
       messageIntent,
@@ -121,7 +121,8 @@ export const action = async ({ request }: { request: Request }) => {
     logger.error("Error in chat_sms action:", error);
     return new Response(
       JSON.stringify({
-        error: error instanceof Error ? error.message : "Failed to send message",
+        error:
+          error instanceof Error ? error.message : "Failed to send message",
       }),
       {
         headers: {
@@ -131,4 +132,4 @@ export const action = async ({ request }: { request: Request }) => {
       },
     );
   }
-}
+};

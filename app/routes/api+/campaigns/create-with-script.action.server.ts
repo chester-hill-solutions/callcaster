@@ -1,7 +1,12 @@
-import { createCampaign, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { createCampaign, requireWorkspaceAccess } from "@/lib/database.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { logger } from "@/lib/logger.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import {
+  createWithScriptBodySchema,
+  type CreateWithScriptBody,
+} from "@/lib/schemas/api/create-with-script";
 import type { ActionFunctionArgs } from "react-router";
 import type { CampaignData, CampaignType } from "@/lib/database/campaign.server";
 import type { Json } from "@/lib/database.types";
@@ -14,37 +19,7 @@ const SCRIPT_TYPES_FOR_CAMPAIGN: Record<CampaignType, string> = {
   complex_ivr: "ivr",
 };
 
-const SCRIPT_CAMPAIGN_TYPES: CampaignType[] = [
-  "live_call",
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-];
-
-interface CreateWithScriptBody {
-  workspace_id?: string;
-  title: string;
-  type: CampaignType;
-  caller_id: string;
-  script?: {
-    name: string;
-    type?: string;
-    steps: Record<string, unknown>;
-  };
-  script_id?: number;
-  audience_ids?: number[];
-  status?: string;
-  enqueue_audience_contacts?: boolean;
-  is_active?: boolean;
-  start_date?: string | null;
-  end_date?: string | null;
-  schedule?: unknown;
-}
-
-function jsonResponse(
-  data: unknown,
-  status: number
-) {
+function jsonResponse(data: unknown, status: number) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -54,7 +29,6 @@ function jsonResponse(
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
@@ -64,12 +38,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return jsonResponse({ error: authResult.error }, authResult.status);
   }
 
-  let body: CreateWithScriptBody;
-  try {
-    body = await safeParseJson<CreateWithScriptBody>(request);
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  const parsed = await parseJsonBodyOrResponse(
+    request,
+    createWithScriptBodySchema,
+  );
+  if (parsed instanceof Response) {
+    return parsed;
   }
+  const body: CreateWithScriptBody = parsed;
 
   const {
     workspace_id: bodyWorkspaceId,
@@ -98,14 +74,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (bodyWorkspaceId && bodyWorkspaceId !== workspaceId) {
       return jsonResponse(
         { error: "workspace_id does not match API key" },
-        403
+        403,
       );
     }
   } else {
     if (!bodyWorkspaceId) {
       return jsonResponse(
         { error: "workspace_id is required when using session auth" },
-        400
+        400,
       );
     }
     await requireWorkspaceAccess({
@@ -116,29 +92,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     workspaceId = bodyWorkspaceId;
   }
 
-  if (!title || typeof title !== "string") {
-    return jsonResponse({ error: "title is required" }, 400);
-  }
-  if (!type || !SCRIPT_CAMPAIGN_TYPES.includes(type)) {
-    return jsonResponse(
-      {
-        error: `type must be one of: ${SCRIPT_CAMPAIGN_TYPES.join(", ")}`,
-      },
-      400
-    );
-  }
-  if (!caller_id || typeof caller_id !== "string") {
-    return jsonResponse({ error: "caller_id is required" }, 400);
-  }
-
-  if (!scriptPayload && existingScriptId == null) {
-    return jsonResponse(
-      { error: "Either script or script_id is required" },
-      400
-    );
-  }
-
-  // Validate caller_id belongs to workspace
   const { data: workspaceNumbers, error: numbersError } = await supabase
     .from("workspace_number")
     .select("phone_number")
@@ -146,10 +99,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (numbersError) {
     logger.error("Error fetching workspace numbers", numbersError);
-    return jsonResponse(
-      { error: "Failed to validate caller_id" },
-      500
-    );
+    return jsonResponse({ error: "Failed to validate caller_id" }, 500);
   }
 
   const validNumbers = (workspaceNumbers ?? []).map((n) => n.phone_number);
@@ -159,11 +109,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         error:
           "caller_id must be a phone number that belongs to this workspace",
       },
-      400
+      400,
     );
   }
 
-  // Validate audience_ids belong to workspace
   if (audience_ids.length > 0) {
     const { data: workspaceAudiences, error: audError } = await supabase
       .from("audience")
@@ -172,14 +121,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (audError) {
       logger.error("Error fetching workspace audiences", audError);
-      return jsonResponse(
-        { error: "Failed to validate audience_ids" },
-        500
-      );
+      return jsonResponse({ error: "Failed to validate audience_ids" }, 500);
     }
 
     const validAudienceIds = new Set(
-      (workspaceAudiences ?? []).map((a) => a.id)
+      (workspaceAudiences ?? []).map((a) => a.id),
     );
     const invalid = audience_ids.filter((id) => !validAudienceIds.has(id));
     if (invalid.length > 0) {
@@ -187,7 +133,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         {
           error: `audience_ids must belong to this workspace; invalid: ${invalid.join(", ")}`,
         },
-        400
+        400,
       );
     }
   }
@@ -202,23 +148,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (scriptLookupError) {
       logger.error("Error validating script_id", scriptLookupError);
-      return jsonResponse(
-        { error: "Failed to validate script_id" },
-        500
-      );
+      return jsonResponse({ error: "Failed to validate script_id" }, 500);
     }
 
     if (!existingScript) {
       return jsonResponse(
         { error: "script_id must belong to this workspace" },
-        400
+        400,
       );
     }
   }
 
   let scriptId: number;
-  let createdScript: { id: number; name: string; type: string | null; steps: unknown } | null =
-    null;
+  let createdScript: {
+    id: number;
+    name: string;
+    type: string | null;
+    steps: unknown;
+  } | null = null;
 
   if (scriptPayload) {
     const scriptType =
@@ -243,7 +190,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       logger.error("Error creating script", scriptError);
       return jsonResponse(
         { error: `Failed to create script: ${scriptError.message}` },
-        500
+        500,
       );
     }
 
@@ -291,17 +238,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     logger.error("Error creating campaign", err);
-    return jsonResponse(
-      { error: `Failed to create campaign: ${message}` },
-      400
-    );
+    return jsonResponse({ error: `Failed to create campaign: ${message}` }, 400);
   }
 
   const campaignId = campaign.id;
   let audiencesLinked = 0;
   let contactsEnqueued = 0;
 
-  // Track queued contact_ids across audiences (fetch once, then update as we enqueue)
   let queuedContactIds = new Set<number>();
   if (enqueue_audience_contacts && audience_ids.length > 0) {
     const { data: queuedRows } = await supabase
@@ -346,15 +289,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         continue;
       }
 
-      const audienceContactIds = (audienceContacts ?? []).map((c) => c.contact_id);
+      const audienceContactIds = (audienceContacts ?? []).map(
+        (c) => c.contact_id,
+      );
       const contactIdsToEnqueue = audienceContactIds.filter(
-        (id) => !queuedContactIds.has(id)
+        (id) => !queuedContactIds.has(id),
       );
 
       if (contactIdsToEnqueue.length > 0) {
-        await enqueueContactsForCampaign(supabase, campaignId, contactIdsToEnqueue, {
-          requeue: false,
-        });
+        await enqueueContactsForCampaign(
+          supabase,
+          campaignId,
+          contactIdsToEnqueue,
+          { requeue: false },
+        );
         contactsEnqueued += contactIdsToEnqueue.length;
         contactIdsToEnqueue.forEach((id) => queuedContactIds.add(id));
       }
@@ -369,6 +317,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       audiences_linked: audiencesLinked,
       contacts_enqueued: contactsEnqueued,
     },
-    201
+    201,
   );
-}
+};

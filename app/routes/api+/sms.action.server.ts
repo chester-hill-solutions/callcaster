@@ -5,12 +5,14 @@ import {
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance, getCampaignQueueById, getWorkspaceTwilioPortalConfig, requireWorkspaceAccess } from "@/lib/database.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { bodyHasUrls } from "@/lib/sms.server";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
+import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
+import { campaignSmsDispatchBodySchema } from "@/lib/schemas/api/sms";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
@@ -255,6 +257,14 @@ export const action = async ({ request }: { request: Request }) => {
   );
 
   try {
+    const parsed = await parseJsonBodyOrResponse(
+      request,
+      campaignSmsDispatchBodySchema,
+    );
+    if (parsed instanceof Response) {
+      return parsed;
+    }
+
     const {
       campaign_id,
       workspace_id,
@@ -262,20 +272,20 @@ export const action = async ({ request }: { request: Request }) => {
       message_intent,
       messaging_service_sid,
       user_id,
-    } = await safeParseJson<Record<string, unknown>>(request);
-    if (
-      typeof campaign_id !== "string" ||
-      typeof workspace_id !== "string" ||
-      (authResult.authType === "api_key" && typeof user_id !== "string")
-    ) {
-      return new Response(JSON.stringify({ error: "Invalid SMS payload" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    } = parsed;
+
+    if (authResult.authType === "api_key" && !user_id) {
+      return new Response(
+        JSON.stringify({ error: "user_id is required when using API key auth" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
     }
 
     const effectiveUserId =
-      authResult.authType === "api_key" ? user_id : authResult.user.id;
+      authResult.authType === "api_key" ? user_id! : authResult.user.id;
 
     const messageIntent =
       typeof message_intent === "string" && message_intent.trim()

@@ -19,6 +19,41 @@ export function validationErrorResponse(
   return routeData({ error: formatZodError(error) }, { status });
 }
 
+function jsonErrorResponse(
+  body: unknown,
+  status: number,
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function thrownToJsonResponse(thrown: unknown): Response {
+  if (thrown instanceof Response) {
+    return thrown;
+  }
+
+  if (
+    thrown &&
+    typeof thrown === "object" &&
+    "data" in thrown &&
+    ("init" in thrown || "type" in thrown)
+  ) {
+    const wrapped = thrown as {
+      data: unknown;
+      init?: number | { status?: number } | null;
+    };
+    const status =
+      typeof wrapped.init === "number"
+        ? wrapped.init
+        : wrapped.init?.status ?? 400;
+    return jsonErrorResponse(wrapped.data, status);
+  }
+
+  return jsonErrorResponse({ error: "Invalid JSON body" }, 400);
+}
+
 /**
  * Parse JSON request body with a Zod schema.
  * Malformed JSON still throws via safeParseJson (400 Invalid JSON).
@@ -33,6 +68,21 @@ export async function parseJsonBody<T>(
     throw validationErrorResponse(result.error);
   }
   return result.data;
+}
+
+/**
+ * Like parseJsonBody but returns a JSON Response on validation/parse failure
+ * instead of throwing route data objects.
+ */
+export async function parseJsonBodyOrResponse<T>(
+  request: Request,
+  schema: ZodType<T>,
+): Promise<T | Response> {
+  try {
+    return await parseJsonBody(request, schema);
+  } catch (thrown) {
+    return thrownToJsonResponse(thrown);
+  }
 }
 
 /**

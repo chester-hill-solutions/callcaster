@@ -167,6 +167,7 @@ Error responses are JSON with an `error` string, e.g.:
 
 ## Related docs
 
+- [API overview](./api-overview.md) – public API boundary and authentication.
 - [Script JSON format](./script-json-format.md) – structure of `script.steps` (pages, blocks).
 - **Interactive API docs** – OpenAPI 3.0 spec and try-it-out UI at `/docs` (Scalar). Raw spec: `/api/docs/openapi`.
 - Workspace API keys: create and manage keys in the workspace settings; use the key as `X-API-Key` or `Authorization: Bearer <key>` for this endpoint.

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   formatZodError,
   parseJsonBody,
+  parseJsonBodyOrResponse,
   parseSearchParams,
   validationErrorResponse,
 } from "../app/lib/api-parse.server";
@@ -55,6 +56,34 @@ describe("api-parse.server", () => {
         return true;
       },
     );
+  });
+
+  test("parseJsonBodyOrResponse returns parsed data", async () => {
+    const schema = z.object({ count: z.number() });
+    const request = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: 3 }),
+    });
+    await expect(parseJsonBodyOrResponse(request, schema)).resolves.toEqual({
+      count: 3,
+    });
+  });
+
+  test("parseJsonBodyOrResponse returns 400 response on schema failure", async () => {
+    const schema = z.object({ count: z.number() });
+    const request = new Request("http://localhost/api/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ count: "bad" }),
+    });
+    const result = await parseJsonBodyOrResponse(request, schema);
+    expect(result).toBeInstanceOf(Response);
+    const res = await asRouteResponse(result);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining("count:"),
+    });
   });
 
   test("parseSearchParams returns ok data or error", () => {
