@@ -4,7 +4,8 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "build": "react-router build",
+    "build": "npm run build:buffer-polyfill && react-router build",
+    "build:buffer-polyfill": "esbuild app/buffer-polyfill.client.ts --bundle --format=esm --outfile=public/buffer-polyfill.mjs --platform=browser",
     "dev": "node ./scripts/local/dev-stable.mjs",
     "dev:calling:sync": "node ./scripts/local/sync-calling-dev.mjs",
     "tools:sync-inbound-sms": "node ./scripts/one-off/sync-inbound-sms-from-twilio.mjs",

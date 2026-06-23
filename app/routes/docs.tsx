@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LinksFunction, MetaFunction } from "react-router";
 import type { AnyApiReferenceConfiguration } from "@scalar/types/api-reference";
 import scalarStyles from "@scalar/api-reference-react/style.css?url";
@@ -15,60 +15,73 @@ export const meta: MetaFunction = () => [
   },
 ];
 
-export async function loader() {
-  return {};
-}
-
-const scalarConfiguration: AnyApiReferenceConfiguration = {
+const scalarConfiguration: Pick<
+  AnyApiReferenceConfiguration,
+  "theme" | "layout" | "url"
+> = {
   url: "/api/docs/openapi",
   theme: "default",
   layout: "modern",
 };
 
-export default function DocsPage() {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading API docs…
-      </div>
-    );
-  }
-
-  return <ScalarDocs configuration={scalarConfiguration} />;
+function DocsLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+      Loading API docs…
+    </div>
+  );
 }
 
-function ScalarDocs({
-  configuration,
-}: {
-  configuration: AnyApiReferenceConfiguration;
-}) {
-  const [ApiReference, setApiReference] = useState<
-    typeof import("@scalar/api-reference-react").ApiReferenceReact | null
-  >(null);
+export default function DocsPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void import("@scalar/api-reference-react").then(({ ApiReferenceReact }) => {
-      setApiReference(() => ApiReferenceReact);
-    });
+    const container = containerRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    let destroy: (() => void) | undefined;
+
+    void (async () => {
+      try {
+        const { createApiReference } = await import("@scalar/api-reference");
+        if (cancelled) return;
+
+        const instance = createApiReference(container, scalarConfiguration);
+        destroy = () => instance.destroy();
+        setStatus("ready");
+      } catch (error: unknown) {
+        if (cancelled) return;
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load API docs",
+        );
+        setStatus("error");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      destroy?.();
+    };
   }, []);
 
-  if (!ApiReference) {
+  if (status === "error") {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
-        Loading API docs…
+      <div className="flex min-h-screen items-center justify-center px-4 text-center text-muted-foreground">
+        <div>
+          <p className="font-medium text-foreground">Could not load API docs</p>
+          <p className="mt-2 text-sm">{errorMessage}</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <ApiReference configuration={configuration} />
+      {status === "loading" ? <DocsLoading /> : null}
+      <div ref={containerRef} className="min-h-screen" />
     </div>
   );
 }
