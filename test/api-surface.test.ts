@@ -112,12 +112,10 @@ describe("api surface inventory enums", () => {
     }
   });
 
-  test("duplicate outreach routes share duplicateGroup", () => {
-    const dupes = API_SURFACE.filter((e) => e.path === "/api/outreach_attempts/:id");
-    expect(dupes).toHaveLength(2);
-    expect(new Set(dupes.map((d) => d.duplicateGroup))).toEqual(
-      new Set(["outreach_attempts-id"]),
-    );
+  test("outreach attempt id route is singular in inventory", () => {
+    const entries = API_SURFACE.filter((e) => e.path === "/api/outreach_attempts/:id");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.routeModule).toBe("app/routes/api+/outreach_attempts/$id.route.tsx");
   });
 
   test("surface keys are unique except explicit duplicate modules", () => {
